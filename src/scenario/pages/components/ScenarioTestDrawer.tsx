@@ -23,11 +23,7 @@
 import { Button } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
 import { useState } from "react";
-import {
-  primeScan,
-  useUnitsyncHeightmap,
-  useUnitsyncScan,
-} from "@/content/config";
+import { primeScan, useUnitsyncScan } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
 import {
   gameOptionSchema,
@@ -48,6 +44,7 @@ import { ensureBundledScenarioMedia, type GameOrigin } from "../../storage";
 import { describeIssue, type MissionIssue } from "../../validate";
 import { missionWarnings, type ScenarioReader } from "../../wording";
 import { useScenarioGate } from "./useScenarioGate";
+import { useScenarioMapExtent } from "./useScenarioMapExtent";
 
 type Launched = Extract<ScenarioLaunchResult, { ok: true }>;
 
@@ -90,23 +87,11 @@ export function ScenarioTestDrawer({
   const testing = mode === "test";
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  // How big the map is, so the validator can say a position is past its far
-  // edge as well as before its near one. The same unitsync read the editing
-  // surface already makes, and cached with it, so this costs nothing extra. A
-  // map that has not answered yet leaves the extent out rather than blocking
-  // the launch, which drops the far-edge half of the check for that run.
-  const heightmap = useUnitsyncHeightmap(
-    target?.enginePath,
-    target?.dataDir,
-    scenario.setup.mapName,
-  );
-  const samplesX = heightmap.data?.width;
-  const samplesZ = heightmap.data?.height;
-  const mapExtent =
-    samplesX && samplesZ
-      ? // World extent = (samples - 1) x 8 elmos, as `useMissionMapAssets` reports it.
-        { width: (samplesX - 1) * 8, height: (samplesZ - 1) * 8 }
-      : undefined;
+  // How big the map is, so the validator can say a position is past its far edge
+  // as well as before its near one. A map that has not answered yet leaves the
+  // extent out rather than blocking the launch, which drops the far-edge half of
+  // the check for that run.
+  const mapExtent = useScenarioMapExtent(scenario.setup.mapName);
   // The game's own units, so a unit def it does not have is refused rather than
   // spawning nothing in silence. The same cached read the editor's pickers make.
   // A read that has not answered leaves the list empty, which the validator says

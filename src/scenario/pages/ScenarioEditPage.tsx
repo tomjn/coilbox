@@ -1,5 +1,5 @@
-import { Button, Input, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, Rocket } from "lucide-react";
+import { Button, Drawer, Input, useDrawer } from "@picoframe/frame";
+import { ArrowLeft, Rocket, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,7 @@ import type { Scenario } from "../model";
 import { saveEditedScenario } from "../saveIntoGame";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { isEditable, type LoadedScenario } from "../storage";
+import { missionProblemCount } from "../wording";
 import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { applyEdit, type ScenarioEdit } from "./components/edits";
@@ -26,6 +27,7 @@ import {
   redoEdit,
   undoEdit,
 } from "./components/history";
+import { MissionProblemsList } from "./components/MissionProblemsList";
 import { ObjectivePanel } from "./components/ObjectivePanel";
 import { orderPathId } from "./components/orderPaths";
 import { RestrictionPanel } from "./components/RestrictionPanel";
@@ -41,7 +43,9 @@ import {
   stepAt,
   stepLabel,
 } from "./components/triggers";
+import { useMissionProblems } from "./components/useMissionProblems";
 import { useScenarioGate } from "./components/useScenarioGate";
+import { useScenarioMapExtent } from "./components/useScenarioMapExtent";
 import { VarPanel } from "./components/VarPanel";
 
 const BACK = "/scenario-builder";
@@ -82,6 +86,25 @@ export default function ScenarioEditPage() {
     "author",
     loaded?.origin,
   );
+  // What is wrong with the mission as it stands, on the validator the launch
+  // refuses on. Held here rather than in the panel each problem belongs to,
+  // because a reference is only broken relative to the whole document: the zone
+  // panel cannot know that a trigger elsewhere was pointing at what it deleted.
+  //
+  // The units are handed over only once that read has settled. An empty list is
+  // an answer to the validator ("coilbox could not read this game's units"), and
+  // a read still in flight is not that answer.
+  const mapExtent = useScenarioMapExtent(scenario?.setup.mapName ?? "");
+  const problems = useMissionProblems(
+    scenario,
+    mapExtent,
+    gameUnits.loading ? undefined : gameUnits.units,
+  );
+  const problemCount = missionProblemCount(
+    problems.blocking.length,
+    problems.warnings.length,
+  );
+  const [showProblems, setShowProblems] = useState(false);
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
   // Both are also held in refs, because an edit and a step through the history
   // read them at the moment they happen rather than at the last render: two
@@ -238,13 +261,45 @@ export default function ScenarioEditPage() {
           >
             <ArrowLeft className="size-3.5" /> Back to scenarios
           </Link>
-          {/* Testing belongs with the setup, because the setup is all a launch
-            consumes: the game named there decides whether the scenario is
-            played as itself or through the test mutator. */}
-          <Button size="sm" className="ml-auto shrink-0" onClick={openTest}>
-            <Rocket className="size-4" /> Test in game
-          </Button>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {/* What the validator has found, said while the mission is being
+              made rather than when it fails to start (issue #2162). Styled as
+              a problem, and destructive only when something in it actually
+              stops a launch: an unwritten objective is not an emergency. */}
+            {problemCount ? (
+              <Button
+                size="sm"
+                variant={
+                  problems.blocking.length > 0 ? "destructive" : "outline"
+                }
+                className={
+                  problems.blocking.length > 0 ? undefined : "text-amber-300"
+                }
+                onClick={() => setShowProblems(true)}
+              >
+                <TriangleAlert className="size-4" /> {problemCount}
+              </Button>
+            ) : null}
+            {/* Testing belongs with the setup, because the setup is all a launch
+              consumes: the game named there decides whether the scenario is
+              played as itself or through the test mutator. */}
+            <Button size="sm" onClick={openTest}>
+              <Rocket className="size-4" /> Test in game
+            </Button>
+          </div>
         </div>
+
+        {/* The frame's own drawer takes a snapshot of its content when it
+          opens, and this list changes as the author fixes what is in it, so
+          this one is the controlled drawer instead. */}
+        <Drawer
+          open={showProblems}
+          onOpenChange={setShowProblems}
+          title={`Problems in ${scenario.name}`}
+          width="32rem"
+        >
+          <MissionProblemsList problems={problems} />
+        </Drawer>
 
         {error && <ErrorBanner message={error} />}
 
