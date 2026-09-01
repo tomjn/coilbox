@@ -21,8 +21,8 @@ import {
 } from "../../../content/pages/components/UnitPicker";
 import { mediaKind, refIsVideo } from "../../../lib/assetUrl";
 import {
-  campaignImageDelete,
   campaignImageImport,
+  campaignMediaDelete,
   campaignMediaImport,
 } from "../../bindings";
 import type {
@@ -279,7 +279,9 @@ export function MissionEditorDrawer({
     const cur = mission.panorama;
     if (cur?.kind === "file" && sessionFiles.current.has(cur.file)) {
       sessionFiles.current.delete(cur.file);
-      void campaignImageDelete({ campaignId, file: cur.file }).catch(() => {});
+      // A video backdrop was copied verbatim into `media/`, so this has to be
+      // the delete that reaches both folders (issue #2210).
+      void campaignMediaDelete({ campaignId, file: cur.file }).catch(() => {});
     }
   };
 

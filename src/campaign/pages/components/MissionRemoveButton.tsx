@@ -7,6 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { Scenario } from "@/scenario/model";
+import { missionMedia } from "../../media";
 import { scenarioAttachment } from "../../missionScenario";
 import type { CampaignMission } from "../../model";
 
@@ -16,7 +17,7 @@ import type { CampaignMission } from "../../model";
  * Removing a mission was the one destructive action on either builder screen
  * that happened on the first click, and it is not a small one: the mission
  * carries a briefing, objectives, unit restrictions and a whole copy of a
- * scenario, and its imported panorama is deleted from disk on the way out.
+ * scenario, and everything it imported goes off disk on the way out.
  *
  * So the confirmation says what this particular mission holds rather than
  * asking "are you sure?". The attached scenario is the part worth reading
@@ -34,7 +35,7 @@ export function MissionRemoveButton({
   mission: CampaignMission;
   /** Every scenario stored here, to say whether the attached copy is the only one. */
   scenarios: Scenario[];
-  /** Drops the mission and deletes its panorama file. Reports its own failures. */
+  /** Drops the mission and deletes its imported files. Reports its own failures. */
   onRemove: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -117,6 +118,12 @@ export function MissionRemoveButton({
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
 
+/** "a", "a and b", "a, b and c". */
+const asList = (items: string[]) =>
+  items.length < 2
+    ? (items[0] ?? "")
+    : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+
 /**
  * What this mission holds that removing it destroys, as sentence fragments.
  *
@@ -143,9 +150,12 @@ export function missionLosses(
     );
   }
   // Only an imported file is deleted from disk. A bundled or inlined panorama
-  // is a reference the mission loses, and the image survives it.
-  if (mission.panorama?.kind === "file") {
-    losses.push("its panorama image, deleted from disk");
+  // is a reference the mission loses, and the image survives it. Read from the
+  // same slot list the delete works through, so the promise and the deletion
+  // cannot drift apart (issue #2210).
+  const imported = missionMedia(mission).map((m) => m.label);
+  if (imported.length > 0) {
+    losses.push(`its ${asList(imported)}, deleted from disk`);
   }
   const attached = scenarioAttachment(mission, scenarios);
   switch (attached.state) {
