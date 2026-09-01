@@ -10,16 +10,14 @@ import {
   Target,
   Trophy,
 } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import { useWriteRootPath } from "../../downloads/config";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
-import { useStillUi } from "../../general/display";
 import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
 import type { Campaign, CampaignMission } from "../model";
@@ -31,11 +29,13 @@ import {
   MissionMapSideGraphic,
 } from "./components/MissionMapPreview";
 import { MissionMediaPlayer } from "./components/MissionMediaFields";
+import { MissionUnfinishedGate } from "./components/MissionUnfinishedGate";
 import {
   MissionUnitBackground,
   MissionUnitSideGraphic,
 } from "./components/MissionUnitPreview";
 import { PanoramaScroller } from "./components/PanoramaScroller";
+import { PhaseCard } from "./components/PhaseCard";
 import { RunDifficulty } from "./components/RunDifficulty";
 import { useMissionUnit } from "./components/useMissionUnit";
 
@@ -106,11 +106,12 @@ function MissionStage({
   // (an older version of the game, a unit renamed since) gets the slot's image
   // or the gradient instead, rather than an empty backdrop.
   const unit = useMissionUnit(mission.snapshot.gameName, mission.panoramaUnit);
-  // A live 3D backdrop, of either kind. Suppressed while the game or map is
-  // missing: the gate below is showing instead, and there is nothing to read a
-  // map or a unit out of.
+  // A live 3D backdrop, of either kind. Suppressed while either gate is showing:
+  // there is nothing to read a map or a unit out of when the mission's game or
+  // map is missing, and nothing at all when it never named one.
   const live3d =
     !run.missing &&
+    !run.unfinished &&
     !!(mission.panoramaMap || (mission.panoramaUnit && !unit.unavailable));
 
   return (
@@ -177,9 +178,16 @@ function MissionStage({
         <BackLink campaignId={campaign.id} />
 
         <div className="flex min-h-0 flex-1 items-end">
-          {/* A missing game/map hard-blocks the mission: the briefing and its map
-              preview are withheld until the requirement is installed. */}
-          {run.missing ? (
+          {/* Two hard blocks, and they are not the same block. A mission that
+              names no game or map was never finished, so it says so and offers
+              nothing to install. A mission naming content this machine does not
+              have withholds the briefing until the requirement is installed. */}
+          {run.unfinished ? (
+            <MissionUnfinishedGate
+              campaignId={campaign.id}
+              reason={run.unfinished}
+            />
+          ) : run.missing ? (
             <MissionRequiredGate
               mission={mission}
               missing={run.missing}
@@ -595,29 +603,6 @@ function AutoDetectedNote() {
     <p className="text-xs text-muted-foreground">
       Result detected from the replay.
     </p>
-  );
-}
-
-function PhaseCard({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  // Cross-fade between phases (and the Victory/Defeat stamp passed in via
-  // className); dropped entirely when the user prefers a still UI.
-  const still = useStillUi();
-  return (
-    <Card
-      className={cn(
-        "w-full max-w-md gap-4 border-border/50 bg-card/85 p-5 shadow-none backdrop-blur-sm",
-        !still && "phase-fade",
-        !still && className,
-      )}
-    >
-      {children}
-    </Card>
   );
 }
 

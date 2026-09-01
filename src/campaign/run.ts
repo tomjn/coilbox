@@ -116,6 +116,34 @@ export interface MissionRequirement {
 }
 
 /**
+ * Why a mission cannot be played whatever is installed, or null when its
+ * snapshot names both a game and a map (issue #2245).
+ *
+ * The preset picker offers a preset reading "No game · No map" as readily as a
+ * complete one, so an author can leave a mission short of either. That is not a
+ * missing install and no download fixes it, which is the distinction the install
+ * check below cannot make on its own: nothing is installed under the empty name,
+ * so an exact-name match reads an unnamed map as one the machine does not have.
+ *
+ * The sentence is the campaign list's, from `campaignUnplayableReason` in
+ * `listing.ts`, including numbering the mission from one. The list already says
+ * "Mission 3 has no map" about this mission and the two must not contradict each
+ * other, so `missionGate.test.tsx` pins them together.
+ */
+export function missionUnfinishedReason(
+  campaign: Campaign,
+  mission: CampaignMission,
+): string | null {
+  const short = [
+    !mission.snapshot?.gameName && "game",
+    !mission.snapshot?.mapName && "map",
+  ].filter(Boolean);
+  if (short.length === 0) return null;
+  const at = campaign.missions.findIndex((m) => m.id === mission.id);
+  return `Mission ${at + 1} has no ${short.join(" or ")}`;
+}
+
+/**
  * Drive one mission's play flow: resolve the launch target, check the mission's
  * game+map are installed, launch through {@link usePlay}, then determine the
  * outcome and persist progress. After a non-cancelled exit the new replay is
@@ -147,15 +175,20 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const maps = scan.data?.maps ?? [];
   const scanReady = !!scan.data;
 
+  // A mission short of a name is answered before anything is looked for, so the
+  // install check below only ever runs on a name worth looking for.
+  const unfinished = missionUnfinishedReason(campaign, mission);
+
   // Exact-name install check (no version substitution): the mission plays the
   // game+map it was authored against, or not at all.
-  const missing: MissionRequirement | null = !scanReady
-    ? null
-    : !games.some((g) => g.name === snapshot.gameName)
-      ? { kind: "game", name: snapshot.gameName }
-      : !maps.some((m) => m.name === snapshot.mapName)
-        ? { kind: "map", name: snapshot.mapName }
-        : null;
+  const missing: MissionRequirement | null =
+    unfinished || !scanReady
+      ? null
+      : !games.some((g) => g.name === snapshot.gameName)
+        ? { kind: "game", name: snapshot.gameName }
+        : !maps.some((m) => m.name === snapshot.mapName)
+          ? { kind: "map", name: snapshot.mapName }
+          : null;
 
   // How hard to play it (issue #2220). The level is the run's, held in progress
   // so it carries from one mission to the next, and offered only on a mission
@@ -168,7 +201,12 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const noEngine = !targetLoading && !target;
   const scanLoading = !!target && !scanReady && scan.loading;
   const canStart =
-    !!target && scanReady && !missing && !running && !scan.loading;
+    !!target &&
+    scanReady &&
+    !unfinished &&
+    !missing &&
+    !running &&
+    !scan.loading;
 
   /** Apply a Victory/Defeat progress transition and land on that phase — shared by
    * the manual buttons and automatic detection (`auto` just toggles the note). */
@@ -412,6 +450,8 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     error,
     canStart,
     missing,
+    /** Why the mission cannot be played at all, whatever is installed. */
+    unfinished,
     noEngine,
     scanLoading,
     running,
