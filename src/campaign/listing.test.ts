@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   campaignFallbackMap,
   campaignGameLabel,
+  campaignIsPlayable,
   campaignSummary,
 } from "./listing";
 import type { Campaign, CampaignMission } from "./model";
@@ -79,6 +80,42 @@ describe("campaignSummary", () => {
     expect(campaignSummary(campaign([mission("BAR")], ""), now)).toBe(
       "BAR · 1 mission",
     );
+  });
+});
+
+describe("campaignIsPlayable", () => {
+  it("plays a campaign whose every mission names a game and a map", () => {
+    expect(campaignIsPlayable(campaign([mission("BAR"), mission("BAR")]))).toBe(
+      true,
+    );
+  });
+
+  it("cannot play a campaign with no missions", () => {
+    expect(campaignIsPlayable(campaign([]))).toBe(false);
+  });
+
+  it("cannot play a campaign whose mission names no game", () => {
+    expect(campaignIsPlayable(campaign([mission("")]))).toBe(false);
+  });
+
+  it("cannot play a campaign whose mission names no map", () => {
+    expect(campaignIsPlayable(campaign([mission("BAR", "")]))).toBe(false);
+  });
+
+  // Play order is the array order, so a mission nobody can launch stops the
+  // campaign there however many good ones came first.
+  it("cannot play a campaign whose last mission is incomplete", () => {
+    expect(campaignIsPlayable(campaign([mission("BAR"), mission("")]))).toBe(
+      false,
+    );
+  });
+
+  // A preset-only mission is a supported campaign mission that plays as an
+  // ordinary skirmish, so a campaign of them is finished, not a draft.
+  it("plays a campaign whose missions carry no scenario", () => {
+    const c = campaign([mission("BAR")]);
+    expect(c.missions[0].scenario).toBeUndefined();
+    expect(campaignIsPlayable(c)).toBe(true);
   });
 });
 
