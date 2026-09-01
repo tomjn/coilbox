@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router";
 import { CONTINUE_BADGE_CLASS } from "@/components/ContinueBadge";
+import { Badge } from "@/components/ui/badge";
 import { mostRecentOpen } from "@/lib/recency";
 import { cn } from "@/lib/utils";
 import {
@@ -10,6 +11,7 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { useCampaignProgress, useCampaigns } from "../campaigns";
+import { campaignUnplayableReason } from "../listing";
 import type { Campaign } from "../model";
 import { resumeMissionId } from "../progress";
 import { CampaignIconBox } from "./components/CampaignImage";
@@ -40,6 +42,14 @@ function findResumeTarget(
  * each card linking to its detail page and showing how many missions are
  * complete. Progress comes from {@link useCampaignProgress}, which reloads on
  * mount so returning here after a mission reflects the new count.
+ *
+ * A campaign nobody can play end to end is listed too, badged Draft and told
+ * why (issue #2219). Hiding it was the alternative, and it is the wrong one
+ * here: `useHasCampaigns` puts the Campaigns nav item there as soon as any
+ * campaign is stored, so a reader whose only campaign was unfinished would
+ * follow a nav item onto a page reading "No campaigns yet". In an app where the
+ * author and the player are usually the same person, that is indistinguishable
+ * from having lost the campaign.
  */
 export default function CampaignsPage() {
   const { campaigns, loading, error } = useCampaigns();
@@ -116,36 +126,76 @@ function CampaignCard({
   continueMissionId?: string;
 }) {
   const total = campaign.missions.length;
-  return (
-    <div className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50">
-      <Link
-        to={`/campaign/${encodeURIComponent(campaign.id)}`}
-        className="flex min-w-0 flex-1 items-center gap-3"
+  const reason = campaignUnplayableReason(campaign);
+  // The two ways a campaign is unplayable want different rows. A campaign short
+  // a game or a map still has missions to read and earlier ones to play, so its
+  // row keeps its link and the reason tells the reader where it stops. A
+  // campaign with no missions has a detail page holding a title, a 0% bar and an
+  // empty list, so the row says so here and does not offer the click.
+  const empty = total === 0;
+
+  const body = (
+    <>
+      <div
+        className={cn(
+          "transition-transform duration-300 motion-reduce:transform-none",
+          !empty && "group-hover:scale-105",
+        )}
       >
-        <div className="transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none">
-          <CampaignIconBox campaignId={campaign.id} icon={campaign.icon} />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">
-              {campaign.title}
-            </span>
-            {bundled && (
-              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                Bundled
-              </span>
-            )}
-          </div>
-          {campaign.description && (
-            <p className="line-clamp-2 text-xs text-muted-foreground">
-              {campaign.description}
-            </p>
+        <CampaignIconBox campaignId={campaign.id} icon={campaign.icon} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{campaign.title}</span>
+          {/* The word the builder list already uses for this campaign, so an
+              author who saw it there recognises it here. */}
+          {reason && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              Draft
+            </Badge>
           )}
+          {bundled && (
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+              Bundled
+            </span>
+          )}
+        </div>
+        {campaign.description && (
+          <p className="line-clamp-2 text-xs text-muted-foreground">
+            {campaign.description}
+          </p>
+        )}
+        {/* "0/0 missions" is a score for a game nobody is playing. The reason
+            below says the same thing and says what to do about it. */}
+        {!empty && (
           <span className="text-xs text-muted-foreground">
             {completed}/{total} mission{total === 1 ? "" : "s"}
           </span>
-        </div>
-      </Link>
+        )}
+        {reason && (
+          <span className="text-xs text-muted-foreground">{reason}</span>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors",
+        !empty && "hover:border-primary/40 hover:bg-accent/50",
+      )}
+    >
+      {empty ? (
+        <div className="flex min-w-0 flex-1 items-center gap-3">{body}</div>
+      ) : (
+        <Link
+          to={`/campaign/${encodeURIComponent(campaign.id)}`}
+          className="flex min-w-0 flex-1 items-center gap-3"
+        >
+          {body}
+        </Link>
+      )}
       {continueMissionId ? (
         <Link
           to={`/campaign/${encodeURIComponent(campaign.id)}/${encodeURIComponent(continueMissionId)}`}
@@ -154,10 +204,12 @@ function CampaignCard({
           Continue
         </Link>
       ) : (
-        <ChevronRight
-          className="size-4 shrink-0 text-muted-foreground"
-          aria-hidden
-        />
+        !empty && (
+          <ChevronRight
+            className="size-4 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+        )
       )}
     </div>
   );
