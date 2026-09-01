@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { type SaveState, SaveStatus } from "@/components/SaveStatus";
 import {
   Collapsible,
   CollapsibleContent,
@@ -50,7 +51,6 @@ import {
   presentationSummary,
   useStoredPresentationOpen,
 } from "./components/presentationOpen";
-import { type SaveState, SaveStatus } from "./components/SaveStatus";
 import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
 
 const BACK = "/campaign-builder";

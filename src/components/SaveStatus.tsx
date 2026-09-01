@@ -2,18 +2,23 @@ import { Button } from "@picoframe/frame";
 import { Check, Loader2, TriangleAlert } from "lucide-react";
 
 /**
- * Where the campaign editor's last write got to (issue #2198).
+ * Where an editor's last write got to. Shared by the campaign editor (issue
+ * #2198) and the scenario editor (issue #2270).
  *
- * The editor has no save button. Typing in the title or description writes on
- * blur, and every other change writes as it is made, so an author had nothing
- * to look at and no way to tell a write that landed from one that never
- * happened.
+ * Neither editor has a save button. Typing in a title or description writes
+ * on blur, and every other change writes as it is made, so an author had
+ * nothing to look at and no way to tell a write that landed from one that
+ * never happened.
  *
  * Which is why this reports the failure as loudly as the success. A tick that
  * can only ever say "Saved" teaches the author to trust it, and then says the
  * same thing on the day the disk is full. The failed state names what is at
  * risk, because the edit is still on screen and only the copy on disk is
  * behind, and offers the one action that can fix it.
+ *
+ * The `role="status"` on each returned element is also the app's only
+ * `aria-live` region under the scenario and campaign editors: a screen reader
+ * hears a write land or fail without the page needing one of its own.
  */
 export type SaveState =
   /** Nothing written yet this session, so there is nothing to report. */

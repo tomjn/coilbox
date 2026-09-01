@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { type SaveState, SaveStatus } from "@/components/SaveStatus";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,6 +109,10 @@ export default function ScenarioEditPage() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  // Where the saver's last write got to (issue #2270). The editor has no save
+  // button, so this is the only way an author can tell a write that landed
+  // from one that never happened.
+  const [save, setSave] = useState<SaveState>({ kind: "idle" });
   // A trigger parameter waiting for a point on the map. Held here rather than in
   // the panel that asked, because the map that answers it is a sibling.
   const [pick, setPick] = useState<PointTarget | null>(null);
@@ -172,12 +177,18 @@ export default function ScenarioEditPage() {
   if (!saver.current) {
     saver.current = createScenarioSaver({
       write: (document) => saveEditedScenario(loadedRef.current, document),
+      onQueued: () => setSave({ kind: "saving" }),
       onWritten: async (written) => {
         scenarioRef.current = written;
         setScenario(written);
+        setError(null);
+        setSave({ kind: "saved", at: new Date() });
         await refreshScenarios();
       },
-      onError: (e) => setError(e instanceof Error ? e.message : String(e)),
+      onError: (e) => {
+        setError(e instanceof Error ? e.message : String(e));
+        setSave({ kind: "failed" });
+      },
     });
   }
 
@@ -381,6 +392,10 @@ export default function ScenarioEditPage() {
           >
             <ArrowLeft className="size-3.5" /> Back to scenarios
           </Link>
+          {/* Every edit here writes to disk as it is made, with no save
+            button, so this is the only sign an author gets that a write
+            landed, is still going, or was refused (issue #2270). */}
+          <SaveStatus state={save} onRetry={() => persist(scenario)} />
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {/* What the validator has found, said while the mission is being
               made rather than when it fails to start (issue #2162). Styled as
@@ -489,9 +504,10 @@ export default function ScenarioEditPage() {
           <Input
             aria-label="Scenario name"
             value={scenario.name}
-            onChange={(e) =>
-              setScenario((s) => (s ? { ...s, name: e.target.value } : s))
-            }
+            onChange={(e) => {
+              setScenario((s) => (s ? { ...s, name: e.target.value } : s));
+              setSave({ kind: "unsaved" });
+            }}
             onBlur={() => apply(scenario)}
             className="text-base font-semibold"
           />
@@ -500,11 +516,12 @@ export default function ScenarioEditPage() {
             value={scenario.description}
             placeholder="Description"
             className="min-h-16"
-            onChange={(e) =>
+            onChange={(e) => {
               setScenario((s) =>
                 s ? { ...s, description: e.target.value } : s,
-              )
-            }
+              );
+              setSave({ kind: "unsaved" });
+            }}
             onBlur={() => apply(scenario)}
           />
         </header>

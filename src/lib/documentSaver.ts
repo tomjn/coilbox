@@ -30,6 +30,12 @@ export function createDocumentSaver<T>(opts: {
   /** The newest document, as it was stored. Not called for a superseded write. */
   onWritten: (document: T) => void | Promise<void>;
   onError: (error: unknown) => void;
+  /** A write has just been asked for, ahead of or behind whatever the queue
+   *  already holds. Fires synchronously from `save()`, so a caller building a
+   *  Saving/Saved indicator has somewhere to flip to "saving" without doing it
+   *  by hand next to every call to `save()`. Landing is `onWritten` and
+   *  `onError`, which already carry that state. */
+  onQueued?: () => void;
 }): DocumentSaver<T> {
   let queue: Promise<void> = Promise.resolve();
   let latest = 0;
@@ -37,6 +43,7 @@ export function createDocumentSaver<T>(opts: {
   return {
     save(document) {
       const seq = ++latest;
+      opts.onQueued?.();
       queue = queue.then(async () => {
         try {
           const written = await opts.write(document);
