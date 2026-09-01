@@ -306,6 +306,23 @@ describe("registryOptions", () => {
     ]);
   });
 
+  /** Issue #2205. A trigger is offered by the name its author gave it and
+   *  stored by the id that never moves, which is what a zone has always done.
+   *  Two triggers may share a name, so the same numbering applies. */
+  it("offers triggers by name and stores them by id", () => {
+    const scenario = {
+      ...document(),
+      triggers: [
+        trigger("open", { name: "The gates" }),
+        trigger("close", { name: "The gates" }),
+      ],
+    };
+    expect(registryOptions(scenario, "triggerId")).toMatchObject([
+      { value: "open", label: "The gates 1" },
+      { value: "close", label: "The gates 2" },
+    ]);
+  });
+
   it("names groups by their place and vars by their key", () => {
     expect(registryOptions(document(), "groupId")?.[0]).toMatchObject({
       value: "g1",
