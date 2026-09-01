@@ -5,6 +5,7 @@ import { Link, useLocation, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncThumbnails } from "@/content/config";
 import { refIsVideo } from "@/lib/assetUrl";
+import { createDocumentSaver, type DocumentSaver } from "@/lib/documentSaver";
 import { usePreferredTarget } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
@@ -77,10 +78,6 @@ export default function CampaignEditPage() {
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
-  // Which write the indicator is speaking for. Writes are not queued, so two
-  // can be in flight at once, and only the newest one describes where the
-  // document has got to.
-  const writes = useRef(0);
 
   // Seed the editable copy once the (local) campaign for this id is available,
   // and re-seed if the route id changes under the same component instance.
@@ -91,38 +88,52 @@ export default function CampaignEditPage() {
     }
   }, [loaded, loadedId]);
 
-  /** Show a document and write it to disk. Every edit on this page comes
-   *  through here, because there is no save button to defer one to. */
+  // One queue for the whole editing session, so writes land in the order they
+  // were asked for and only the newest one reports (issue #2221). Every write
+  // carries the whole document, so two of them in flight at once left whichever
+  // the plugin happened to finish last in the file. See `documentSaver.ts`.
+  const saver = useRef<DocumentSaver<Campaign>>(undefined);
+  if (!saver.current) {
+    saver.current = createDocumentSaver<Campaign>({
+      write: async (document) => {
+        await campaignSave({ id: document.id, json: JSON.stringify(document) });
+        // The plugin stores what it is handed, so the document written is the
+        // document now on disk.
+        return document;
+      },
+      // Only reached for the newest write, so nothing here can claim a
+      // superseded document saved.
+      onWritten: async () => {
+        setError(null);
+        setSave({ kind: "saved", at: new Date() });
+        // Re-reading the campaign list is what keeps the sidebar and the
+        // campaigns page in step, and it is a separate read. One that fails
+        // leaves those stale but says nothing about whether the edit reached
+        // disk, so counting it as a failed save would send the author to retry
+        // a write that worked.
+        try {
+          await refreshCampaigns();
+        } catch (e) {
+          console.error("campaign list refresh failed", e);
+        }
+      },
+      onError: (e) => {
+        setError(e instanceof Error ? e.message : String(e));
+        setSave({ kind: "failed" });
+      },
+    });
+  }
+
+  /** Show a document and queue it for disk. Every edit on this page comes
+   *  through here, because there is no save button to defer one to. Resolves
+   *  once the queue has drained, which is what the mission drawer waits on
+   *  before it closes. */
   const persist = useCallback(async (next: Campaign) => {
     const stamped: Campaign = { ...next, updatedAt: new Date().toISOString() };
     setCampaign(stamped);
-    const seq = ++writes.current;
     setSave({ kind: "saving" });
-    let failure: string | null = null;
-    try {
-      await campaignSave({ id: stamped.id, json: JSON.stringify(stamped) });
-    } catch (e) {
-      failure = e instanceof Error ? e.message : String(e);
-    }
-    // A newer write is already under way with a document that contains this
-    // one's edit, so it owns what the indicator says either way.
-    if (seq !== writes.current) return;
-    if (failure !== null) {
-      setError(failure);
-      setSave({ kind: "failed" });
-      return;
-    }
-    setError(null);
-    setSave({ kind: "saved", at: new Date() });
-    // Re-reading the campaign list is what keeps the sidebar and the campaigns
-    // page in step, and it is a separate read. One that fails leaves those
-    // stale but says nothing about whether the edit reached disk, so counting
-    // it as a failed save would send the author to retry a write that worked.
-    try {
-      await refreshCampaigns();
-    } catch (e) {
-      console.error("campaign list refresh failed", e);
-    }
+    saver.current?.save(stamped);
+    await saver.current?.settled();
   }, []);
 
   if (loading && !campaign) return <DetailLoading backTo={BACK} />;

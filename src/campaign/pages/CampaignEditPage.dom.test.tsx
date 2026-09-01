@@ -18,9 +18,20 @@
  * #2198). It saves as you go and never asks, so the case that has to hold is
  * the refused write: an indicator that can only ever say "Saved" is worse than
  * no indicator, because it is believed.
+ *
+ * And because it saves as you go, two writes can be asked for close enough
+ * together to be in flight at once (issue #2221). Every one of them writes the
+ * whole document, so the order they land in decides what the file is left
+ * holding, and the last one asked for has to be the last one written.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -450,6 +461,100 @@ describe("saying whether an edit reached disk", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText(SAVED)).toBeTruthy();
+  });
+});
+
+/**
+ * Record the documents in the order they land, which is the order that decides
+ * what the file keeps, and hold one of the two writes open until `release`.
+ * Holding the first is what a page without a queue trips over: it starts the
+ * second write anyway, and the two land the wrong way round.
+ */
+function twoWrites(hold: 1 | 2): { onDisk: Campaign[]; release: () => void } {
+  const onDisk: Campaign[] = [];
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const record = async ({ json }: { json: string }) => {
+    onDisk.push(JSON.parse(json));
+    return {};
+  };
+  const wait = async (args: { json: string }) => {
+    await held;
+    return record(args);
+  };
+  campaignSave.mockImplementationOnce(hold === 1 ? wait : record);
+  campaignSave.mockImplementationOnce(hold === 2 ? wait : record);
+  return { onDisk, release: () => release() };
+}
+
+/**
+ * Rename the campaign and then remove its only mission, without waiting in
+ * between. This is the click the issue describes: leaving a text box writes,
+ * and the button that took the focus writes again on top of it.
+ */
+async function renameThenRemove() {
+  fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+  fireEvent.blur(titleBox());
+  fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  // The removal deletes the mission's panorama before it writes.
+  await waitFor(() => expect(campaignImageDelete).toHaveBeenCalled());
+}
+
+describe("two edits made close together", () => {
+  it("leaves the document the author asked for last on disk", async () => {
+    const { onDisk, release } = twoWrites(1);
+    show([mission()]);
+
+    await renameThenRemove();
+    release();
+    await waitFor(() => expect(onDisk).toHaveLength(2));
+
+    // The removal was asked for second, so it is written second and is what
+    // the file is left holding. The other way round and the mission is back on
+    // disk while the author is looking at a page without it.
+    expect(onDisk.map((c) => c.missions.length)).toEqual([1, 0]);
+    expect(onDisk.at(-1)?.title).toBe("Landfall II");
+  });
+
+  it("does not call the campaign saved while an older write is still to land", async () => {
+    const { onDisk, release } = twoWrites(1);
+    show([mission()]);
+
+    await renameThenRemove();
+    // Long enough for anything already finished to have said so. The first
+    // write is still open, so nothing has reached disk yet and the removal is
+    // not on it, which makes "Saved" a lie the author would act on.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText(SAVED)).toBeNull();
+    expect(screen.getByText("Saving…")).toBeTruthy();
+
+    release();
+    await waitFor(() => expect(onDisk).toHaveLength(2));
+
+    expect(await screen.findByText(SAVED)).toBeTruthy();
+  });
+
+  it("does not call the campaign saved on a write another has superseded", async () => {
+    const { onDisk, release } = twoWrites(2);
+    show([mission()]);
+
+    await renameThenRemove();
+    // The rename is on disk and the removal is not. The rename is the older of
+    // the two documents, so its landing says nothing about where the campaign
+    // has got to, and reporting it would leave a tick over a page whose last
+    // edit is still unwritten.
+    await waitFor(() => expect(onDisk).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText(SAVED)).toBeNull();
+    expect(screen.getByText("Saving…")).toBeTruthy();
+
+    release();
+    await waitFor(() => expect(onDisk).toHaveLength(2));
 
     expect(await screen.findByText(SAVED)).toBeTruthy();
   });
