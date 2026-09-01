@@ -149,7 +149,7 @@ describe("greetingCopy", () => {
       hasResume: false,
       zones: EVERY_ZONE,
     });
-    expect(heading).toBe("Welcome back, Zephyr");
+    expect(heading).toBe("Welcome back Zephyr");
   });
 
   it("falls back to the app title when nobody is logged in", () => {
@@ -297,7 +297,7 @@ describe("greetingCopy with a distribution's own wording", () => {
 
   it("overrides each line independently", () => {
     const copy = greetingCopy(state, { tagline: "Fight on." });
-    expect(copy.heading).toBe("Welcome back, Zephyr");
+    expect(copy.heading).toBe("Welcome back Zephyr");
   });
 
   it("keeps Coilbox's wording when the distribution supplies none", () => {
@@ -319,7 +319,7 @@ describe("Greeting zone", () => {
 
   it("greets the lobby name once the login is accepted", () => {
     lobby.mockReturnValue(online("Zephyr"));
-    expect(render().heading).toBe("Welcome back, Zephyr");
+    expect(render().heading).toBe("Welcome back Zephyr");
   });
 
   it("keeps the title while a connection is still in progress", () => {

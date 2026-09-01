@@ -30,6 +30,7 @@ import type { ResumeCandidate } from "./continue";
 vi.mock("@picoframe/frame", () => ({
   Slot: () => null,
   useSetting: () => [{}, () => {}],
+  useTheme: () => ({ resolved: "dark" }),
   buttonVariants: () => "button",
   // The real `cn`, because one of the claims below is about which of two
   // competing border utilities survives the merge.

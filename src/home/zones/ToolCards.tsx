@@ -15,6 +15,7 @@ import {
 import { forgetContentArt } from "../contentArt";
 import { homeToolGroups, splitGroupItems } from "../nav";
 import { openExternal, useResolvedNavItem } from "../navItem";
+import { accentHueRotate, useThemeColor } from "../useThemeColor";
 import LinkCard from "./LinkCard";
 
 /**
@@ -228,11 +229,22 @@ export function ToolCard({
   // The art Coilbox draws is drawn for the scheme the card is in, and the theme
   // is the only thing here that re-renders when that flips. Reading the scheme
   // inside `resolveCardArt` instead would leave a card painting the old ramp
-  // until something else made it render.
-  const { resolved } = useTheme();
+  // until something else made it render. The colour comes through
+  // `useThemeColor` for the same reason: an accent change lands its CSS after
+  // the render it caused, so a card has to be told to look again.
+  const { resolved, accent } = useTheme();
+  const themeColor = useThemeColor();
   if (!visible) return null;
 
-  const art = cardArtUrl(resolveCardArt(item.id, undefined, resolved), broken);
+  const resolvedArt = resolveCardArt(item.id, themeColor, resolved);
+  const art = cardArtUrl(resolvedArt, broken);
+  // A cycling accent (rainbow, opal) animates `--primary` with no render, so
+  // drawn art is counter-rotated by the compositor to keep up. Never a photo:
+  // those are not theme-tinted, so there is nothing for them to keep up with.
+  const drawn =
+    resolvedArt.kind === "art" &&
+    (resolvedArt.source === "bundled" || resolvedArt.source === "procedural");
+  const hueFilter = drawn ? accentHueRotate(accent, themeColor) : undefined;
   // The band across the foot, and the only thing in either full-size card that
   // carries text. One copy, so a pictureless card in a row of pictures reads at
   // the same height and in the same colours as the cards either side of it
@@ -265,6 +277,7 @@ export function ToolCard({
         <img
           src={art}
           alt=""
+          style={hueFilter ? { filter: hueFilter } : undefined}
           className="absolute inset-0 size-full object-cover transition-transform duration-300 motion-safe:group-hover:scale-105"
           onError={() => {
             // Told to the content step as well as remembered here. That URL may

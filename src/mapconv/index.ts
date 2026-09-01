@@ -1,7 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   BookOpen,
-  Code2,
   Hammer,
   LayoutGrid,
   Map as MapIcon,
@@ -64,15 +63,6 @@ const mapconvPlugin: FramePlugin = {
           icon: BookOpen,
           sidebar: false,
           order: 3,
-          useVisible: useAdvancedMode,
-        },
-        {
-          id: "mapconv.s3o-blender-tools",
-          label: "S3O Blender Tools",
-          href: "https://github.com/ChrisFloofyKitsune/s3o-blender-tools/",
-          icon: Code2,
-          sidebar: false,
-          order: 4,
           useVisible: useAdvancedMode,
         },
       ],

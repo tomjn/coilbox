@@ -1,14 +1,16 @@
 import type { CSSProperties } from "react";
 import { assetUrl } from "../lib/assetUrl";
 import { parseRef } from "../profile/refs";
+import { type CardScheme, readColorScheme, readThemeColor } from "./art";
+import { homeBackdropSvg } from "./bundledArt";
 import { noteHomeIssue, showHomeValue } from "./config";
 
 /**
  * The home page's backdrop: a layer painted behind every zone.
  *
  * Mostly a hook for distributions. A distribution supplies one image and gets a
- * page that looks like theirs. Everyone else gets a default wash built from the
- * theme's own colours.
+ * page that looks like theirs. Everyone else gets a default drawing tinted
+ * from the theme's own colours.
  *
  * The hard constraint is legibility. A distribution can supply a bright, busy
  * photograph, and the greeting, the tool cards and the onboarding cards all have
@@ -20,7 +22,7 @@ import { noteHomeIssue, showHomeValue } from "./config";
 
 /** What to paint behind the home page. */
 export type HomeBackdrop =
-  /** The Coilbox wash, built from theme tokens. What an unconfigured install gets. */
+  /** The Coilbox drawing, tinted from theme tokens. What an unconfigured install gets. */
   | { kind: "default" }
   /** Nothing at all: the flat theme background. Only a distribution asks for this. */
   | { kind: "none" }
@@ -58,30 +60,55 @@ export type HomeBackdrop =
 export const BACKDROP_MAX_ALPHA = 0.05;
 
 /**
- * The default wash: a soft glow behind the greeting and a fainter lift at the
- * foot of the page.
+ * The default backdrop: the coil mark over a starfield, drawn in code and
+ * tinted from the theme (see {@link homeBackdropSvg}).
  *
- * Built from `--primary` and `--foreground` rather than from fixed colours, so a
- * distribution that only sets `theme` gets a backdrop in its own palette, and so
- * the wash inverts sensibly between the light and dark ramps. No bundled image,
- * which keeps this working offline, at any window size, and on a fresh install
- * with nothing downloaded.
+ * It replaced a pair of CSS radial gradients that were both too quiet to name
+ * and banded visibly, since a page-wide gradient at 3% alpha crosses its whole
+ * range in a handful of 8-bit steps. Line art has no slow ramps, so it cannot
+ * band, and it is built from `--primary` the same way the wash was, so a
+ * distribution that only sets `theme` still gets a backdrop in its own
+ * palette. Drawn in code, it keeps working offline and at any window size.
  *
- * Every stop carries an explicit alpha, the transparent ends included:
- * `hsl(var(--primary) / 0)` rather than `transparent`, which interpolates
- * through transparent black and greys the gradient out. The two gradients
- * overlap, so it is their alphas summed, not each on its own, that has to stay
- * within {@link BACKDROP_MAX_ALPHA}.
- *
- * The glow is 3% rather than the 4% it shipped at, because the bound moved to 5%
- * and the pair has to fit under it. The wash was never the failing case: rendered,
- * it leaves the quietest ink at 4.86:1 either way. One rule for every layer is
- * worth more than a percentage point of a glow nobody can name the strength of.
+ * Dimmed to {@link BACKDROP_MAX_ALPHA} exactly like a supplied image, so the
+ * legibility bound holds by the same one rule for every layer.
  */
-export const DEFAULT_BACKDROP_GRADIENT = [
-  "radial-gradient(120% 70% at 50% 0%, hsl(var(--primary) / 0.03), hsl(var(--primary) / 0) 70%)",
-  "radial-gradient(90% 60% at 100% 100%, hsl(var(--foreground) / 0.02), hsl(var(--foreground) / 0) 60%)",
-].join(", ");
+export function defaultBackdropUrl(
+  themeColor: string,
+  scheme: CardScheme,
+): string {
+  return `data:image/svg+xml,${encodeURIComponent(homeBackdropSvg(themeColor, scheme))}`;
+}
+
+/**
+ * How strongly the default drawing composites, and why it is allowed past
+ * {@link BACKDROP_MAX_ALPHA}.
+ *
+ * The 5% bound exists for images Coilbox has never seen: a distribution can
+ * supply a flat white photograph, and a flat layer changes the background
+ * under every word on the page, so the bound has to survive that worst case.
+ * The default drawing is Coilbox's own and is nothing like that case. It
+ * paints hairline strokes, dots under 3px and a handful of small diamonds
+ * over a transparent field, the same no-flat-areas contract the card
+ * drawings hold so text bands can sit on them. So the worst it can do under
+ * a word is run a thin line through a glyph, not change the surface the text
+ * is read against. At the flat-image bound the drawing was invisible on an
+ * ordinary monitor, which made the layer pointless.
+ *
+ * 15% is a taste call inside that argument, not a measured ceiling: high
+ * enough that the composition reads as art, low enough that it stays behind
+ * the page. Anyone raising it further should look at a light-ramp screenshot
+ * first, since shade-on-pale is the direction with less room.
+ */
+export const DEFAULT_BACKDROP_ALPHA = 0.15;
+
+/**
+ * The fade that keeps the top of the page clean, matching the treatment the
+ * docs site gives the same art: full strength at the foot, nothing at all
+ * behind the greeting. A mask only ever lowers alpha, so it cannot push a
+ * layer past the bound.
+ */
+export const BACKDROP_MASK = "linear-gradient(to top, black 60%, transparent)";
 
 /**
  * A configured background read as a file reference, or null when it is not one.
@@ -186,7 +213,7 @@ export function resolveHomeBackground(
       return { kind: "image", url: assetUrl(ref.path) };
     noteHomeIssue(
       issues,
-      `home: could not read background ${ref.token}, painting the default wash`,
+      `home: could not read background ${ref.token}, painting the default backdrop`,
     );
     return { kind: "default" };
   }
@@ -200,16 +227,30 @@ export function resolveHomeBackground(
 /**
  * The inline style for the backdrop layer, or `null` when there is nothing to
  * paint. The layer is composited over the theme background by its caller, which
- * is what {@link BACKDROP_MAX_ALPHA} is measured against.
+ * is what {@link BACKDROP_MAX_ALPHA} is measured against: both kinds are an
+ * image dimmed by the layer's `opacity`.
  *
- * A supplied image is dimmed by the layer's `opacity`. The default gradient
- * carries its alphas per colour stop instead, because it fades out and a flat
- * opacity cannot express that.
+ * The default takes the scheme as an argument, read from the document when the
+ * caller has nothing better, because the caller that matters (the layout) has
+ * a reactive scheme from `useTheme` and the drawing has to repaint when the
+ * ramp flips. The theme colour is read from the document each call, which is
+ * how the card art chain reads it too.
  */
-export function backdropStyle(backdrop: HomeBackdrop): CSSProperties | null {
+export function backdropStyle(
+  backdrop: HomeBackdrop,
+  scheme: CardScheme = readColorScheme(),
+  themeColor: string = readThemeColor(),
+): CSSProperties | null {
   if (backdrop.kind === "none") return null;
   if (backdrop.kind === "default")
-    return { backgroundImage: DEFAULT_BACKDROP_GRADIENT };
+    return {
+      backgroundImage: `url("${defaultBackdropUrl(themeColor, scheme)}")`,
+      backgroundSize: "cover",
+      backgroundPosition: "center bottom",
+      opacity: DEFAULT_BACKDROP_ALPHA,
+      maskImage: BACKDROP_MASK,
+      WebkitMaskImage: BACKDROP_MASK,
+    };
   return {
     backgroundImage: `url("${backdrop.url}")`,
     backgroundSize: "cover",

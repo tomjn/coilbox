@@ -159,12 +159,13 @@ export const RAIL_DIM_CLASS = "text-muted-foreground";
  * rail is the quiet half of the hero above it and a tint would compete with the
  * hero's own accent border for the same "look here" job.
  *
- * Width matches the tool cards below, so the page has one card width rather than
- * two, and the rail wraps and shrinks to whatever exists instead of stretching
- * cards to fill a grid.
+ * Width adjusts from `sm`: a 10rem base so three cards fit beside the hero on
+ * lines a fixed 16rem card pushed onto a second row, growing back to the tool
+ * cards' 16rem cap whenever the line has the room, so a wide page looks as it
+ * did before.
  */
 export const RAIL_CARD_CLASS =
-  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-3 text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:w-64 " +
+  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-3 text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:max-w-64 sm:grow sm:basis-40 " +
   CARD_FOCUS_CLASS;
 
 /**
@@ -174,11 +175,12 @@ export const RAIL_CARD_CLASS =
  * there is nothing. It waits on the same `loading` flag the hero waits on, so the
  * two arrive together rather than the rail filling in under a settled hero.
  *
- * Layout-agnostic: no page-level spacing or width of its own, because the
- * `stacked` layout is a compatibility contract and a later layout has to be able
- * to put the rail somewhere else. Beside the hero (#1041) it needs no width
- * class at all: a flex item sizes to its content and does not grow by default,
- * which is already what the rail wants.
+ * Layout-agnostic: no page-level spacing of its own, because the `stacked`
+ * layout is a compatibility contract and a later layout has to be able to put
+ * the rail somewhere else. Beside the hero (#1041) it is `flex-1 min-w-0`, so
+ * it takes the rest of the hero's line and wraps its own cards inside that
+ * space, rather than sizing to three full cards and dropping whole onto a
+ * second row whenever they did not fit.
  *
  * ## The log-in card
  *
@@ -215,7 +217,10 @@ export default function ResumeRail() {
     // shares a row with, and a heading between the two would split one block in
     // half. The label gives assistive tech the grouping a sighted reader gets
     // from the layout.
-    <section aria-label="More to pick up" className="flex flex-wrap gap-3">
+    <section
+      aria-label="More to pick up"
+      className="flex min-w-0 flex-1 flex-wrap gap-3"
+    >
       {cards.map(({ key, icon: Icon, label, title, detail, action, to }) => (
         <Link key={key} to={to} className={RAIL_CARD_CLASS}>
           <span

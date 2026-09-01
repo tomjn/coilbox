@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Hammer, Milestone } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import CoilMark from "../general/CoilMark";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedCampaign, useHasCampaigns } from "./campaigns";
 
@@ -13,9 +14,9 @@ import { getCachedCampaign, useHasCampaigns } from "./campaigns";
  *
  * The player-facing Campaigns item joins the existing **Play** group (nav groups
  * merge by id) and is shown only once a campaign exists ({@link useHasCampaigns}).
- * The builder gets its own group like the other advanced tools (uberstress,
- * mapconv, animation), visible only in advanced mode — its routes are
- * additionally `gateAdvanced`-wrapped so a deep link isn't reachable while hidden.
+ * The builder joins the shared **Campaign Builder** group beside Scenarios,
+ * visible only in advanced mode. Its routes are additionally
+ * `gateAdvanced`-wrapped so a deep link isn't reachable while hidden.
  */
 const campaignPlugin: FramePlugin = {
   id: "campaign",
@@ -37,17 +38,29 @@ const campaignPlugin: FramePlugin = {
       ],
     },
     {
-      id: "campaign-builder",
+      id: "builder",
       label: "Campaign Builder",
       order: 35,
       items: [
         {
           id: "campaign.builder",
-          label: "Builder",
+          label: "Campaigns",
           to: "/campaign-builder",
           order: 1,
           icon: Hammer,
           // A distribution can also hide Campaign Builder outright (issue #372).
+          useVisible: () =>
+            useAdvancedMode() && !isProfileHidden("campaign.builder"),
+        },
+        // External reference, home launcher only (sidebar: false), opened in
+        // the system browser via the Tauri opener.
+        {
+          id: "campaign.guide",
+          label: "Campaigns guide",
+          href: "https://tomjn.github.io/coilbox/campaigns",
+          icon: CoilMark,
+          sidebar: false,
+          order: 3,
           useVisible: () =>
             useAdvancedMode() && !isProfileHidden("campaign.builder"),
         },

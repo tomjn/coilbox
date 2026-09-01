@@ -1,5 +1,12 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Download, Gamepad2, Map as MapIcon, Package } from "lucide-react";
+import {
+  Download,
+  Gamepad2,
+  Globe,
+  Map as MapIcon,
+  Package,
+} from "lucide-react";
+import CoilMark from "../general/CoilMark";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import DownloadQueueBadge from "./DownloadQueueBadge";
 import { DownloadsProvider } from "./DownloadsProvider";
@@ -54,6 +61,24 @@ const downloadsPlugin: FramePlugin = {
           icon: Gamepad2,
           // A distribution bundled with a single game can hide game downloads.
           useVisible: () => !isProfileHidden("downloads.games"),
+        },
+        // External references, home launcher only (sidebar: false), opened in
+        // the system browser via the Tauri opener.
+        {
+          id: "downloads.hub",
+          label: "Coilbox Hub",
+          href: "https://coilbox-hub.vercel.app",
+          icon: CoilMark,
+          sidebar: false,
+          order: 3,
+        },
+        {
+          id: "downloads.springfiles",
+          label: "Springfiles",
+          href: "https://springfiles.springrts.com/",
+          icon: Globe,
+          sidebar: false,
+          order: 4,
         },
       ],
     },

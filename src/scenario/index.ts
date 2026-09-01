@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Flag, Target } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import CoilMark from "../general/CoilMark";
 import { getCachedScenario, useHasScenarios } from "./scenarios";
 
 /**
@@ -10,9 +11,9 @@ import { getCachedScenario, useHasScenarios } from "./scenarios";
  * `tauri-plugin-coilbox-scenario` crate (ACL id `coilbox-scenario`). The schema
  * lives in `model.ts`.
  *
- * The builder gets its own nav group beside Campaign Builder, like the other
- * advanced tools, and its routes are `gateAdvanced`-wrapped so a deep link is
- * not reachable while advanced mode is off.
+ * The builder joins the shared **Campaign Builder** group beside Campaigns (nav
+ * groups merge by id), and its routes are `gateAdvanced`-wrapped so a deep
+ * link is not reachable while advanced mode is off.
  *
  * The player-facing half is a Scenarios list that plays a scenario bare. It
  * joins the existing **Play** group (nav groups merge by id) beside Campaigns,
@@ -43,16 +44,27 @@ const scenarioPlugin: FramePlugin = {
       ],
     },
     {
-      id: "scenario-builder",
-      label: "Scenario Builder",
-      order: 36,
+      id: "builder",
+      label: "Campaign Builder",
+      order: 35,
       items: [
         {
           id: "scenario.builder",
-          label: "Builder",
+          label: "Scenarios",
           to: "/scenario-builder",
-          order: 1,
+          order: 2,
           icon: Flag,
+          useVisible: useAdvancedMode,
+        },
+        // External reference, home launcher only (sidebar: false), opened in
+        // the system browser via the Tauri opener.
+        {
+          id: "scenario.guide",
+          label: "Scenarios guide",
+          href: "https://tomjn.github.io/coilbox/scenarios",
+          icon: CoilMark,
+          sidebar: false,
+          order: 4,
           useVisible: useAdvancedMode,
         },
       ],

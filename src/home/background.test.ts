@@ -11,9 +11,11 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 }));
 
 import {
+  BACKDROP_MASK,
   BACKDROP_MAX_ALPHA,
   backdropStyle,
-  DEFAULT_BACKDROP_GRADIENT,
+  DEFAULT_BACKDROP_ALPHA,
+  defaultBackdropUrl,
   type HomeBackdrop,
   loadHomeBackground,
   resolveHomeBackground,
@@ -176,10 +178,25 @@ describe("backdropStyle", () => {
     expect(backdropStyle({ kind: "none" })).toBeNull();
   });
 
-  it("paints the default gradient", () => {
-    expect(backdropStyle({ kind: "default" })).toEqual({
-      backgroundImage: DEFAULT_BACKDROP_GRADIENT,
+  it("paints the default drawing, dimmed and faded at the top", () => {
+    // The scheme is passed because node has no document to read it from.
+    const style = backdropStyle({ kind: "default" }, "dark");
+    expect(style).toMatchObject({
+      backgroundSize: "cover",
+      backgroundPosition: "center bottom",
+      opacity: DEFAULT_BACKDROP_ALPHA,
+      maskImage: BACKDROP_MASK,
+      WebkitMaskImage: BACKDROP_MASK,
     });
+    // The drawing itself, as a data URI, so it needs no file and no network.
+    expect(style?.backgroundImage).toContain("data:image/svg+xml");
+  });
+
+  it("repaints the default drawing per scheme", () => {
+    const theme = "hsl(221.2 83.2% 53.3%)";
+    expect(defaultBackdropUrl(theme, "dark")).not.toBe(
+      defaultBackdropUrl(theme, "light"),
+    );
   });
 
   it("covers the page with a supplied image, dimmed to the bound", () => {
@@ -199,11 +216,13 @@ describe("backdropStyle", () => {
 /**
  * The legibility guarantee, measured rather than asserted.
  *
- * What these tests prove: every backdrop layer composites over the theme
+ * What these tests prove: every supplied image composites over the theme
  * background at no more than {@link BACKDROP_MAX_ALPHA}, and at that bound the
  * worst image a distribution can supply (a flat white one, or a flat black one)
  * leaves every text colour on the page at or above WCAG AA, in both picoframe
- * ramps and every base preset it ships. Body text keeps AAA outright.
+ * ramps and every base preset it ships. Body text keeps AAA outright. The
+ * default drawing is the one exception, argued at `DEFAULT_BACKDROP_ALPHA`:
+ * strokes and dots with no flat area, so the flat extremes do not model it.
  *
  * A flat white and a flat black image are the extremes worth checking because
  * relative luminance rises with every channel, so no other image can push the
@@ -359,28 +378,17 @@ const AA_SMALL = 4.5;
 /** The bar body text keeps even at the bound. */
 const AAA = 7;
 
-/** The alphas in a CSS string, summed. Overlapping layers add up. */
-function totalAlpha(css: string): number {
-  return [...css.matchAll(/\/\s*([0-9.]+)\s*\)/g)].reduce(
-    (sum, m) => sum + Number(m[1]),
-    0,
-  );
-}
-
 describe("backdrop dimming", () => {
-  it("keeps every layer of the default gradient within the bound", () => {
-    // Summed, not per stop: the two gradients overlap on the page.
-    expect(totalAlpha(DEFAULT_BACKDROP_GRADIENT)).toBeLessThanOrEqual(
-      BACKDROP_MAX_ALPHA,
+  it("dims the default drawing", () => {
+    // The default drawing sits above the flat-image bound on purpose: it is
+    // strokes and dots with no flat area to change the surface under a word,
+    // so the extremes arithmetic below does not model it. The constant's own
+    // doc carries the argument, and this pins the shipped value so a change
+    // to it has to come through here.
+    expect(backdropStyle({ kind: "default" }, "dark")?.opacity).toBe(
+      DEFAULT_BACKDROP_ALPHA,
     );
-  });
-
-  it("gives every colour in the default gradient an explicit alpha", () => {
-    // A stop written without one composites at full strength, which no amount
-    // of arithmetic below would catch.
-    const colours = DEFAULT_BACKDROP_GRADIENT.match(/hsl\(/g) ?? [];
-    const alphas = DEFAULT_BACKDROP_GRADIENT.match(/\/\s*[0-9.]+\s*\)/g) ?? [];
-    expect(alphas).toHaveLength(colours.length);
+    expect(DEFAULT_BACKDROP_ALPHA).toBe(0.15);
   });
 
   it("dims a supplied image to the bound", () => {

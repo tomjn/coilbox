@@ -1,0 +1,27 @@
+import type { IconComponent } from "@picoframe/plugin-sdk";
+
+/**
+ * The coilbox mark as a nav icon, so links into coilbox's own guides carry the
+ * brand rather than a generic book icon. The path is the hexagonal coil from
+ * `src-tauri/icons/source-hexagonal-coil.svg`, drawn lucide-style (24px grid,
+ * currentColor stroke) so it sits beside lucide icons without adjustment.
+ */
+const CoilMark: IconComponent = ({ size = 24, className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M12 3 18.62 7.39A1.3 1.3 0 0 1 19.2 8.56L18.76 15.13A1.3 1.3 0 0 1 18.03 16.21L12.68 18.79A1.3 1.3 0 0 1 11.38 18.69L6.99 15.68A1.3 1.3 0 0 1 6.44 14.5L6.84 9.82A1.3 1.3 0 0 1 7.6 8.75L11.31 7.06A1.3 1.3 0 0 1 12.61 7.2L15.39 9.24A1.3 1.3 0 0 1 15.91 10.45L15.56 13.24A1.3 1.3 0 0 1 14.75 14.28L12.72 15.09A1.3 1.3 0 0 1 11.4 14.88L10.22 13.89A1.3 1.3 0 0 1 9.79 12.61L10.04 11.47A1.09 1.09 0 0 1 10.66 10.71L11.34 10.4" />
+  </svg>
+);
+
+export default CoilMark;

@@ -522,30 +522,84 @@ const savegames: Drawing = {
 };
 
 /**
- * A lit gateway with an arrow going through it.
+ * A lit gateway at the end of a walkway, with a trail of arrivals going in.
  *
  * Logging in is the one thing this card does, and a threshold says it without
- * drawing a form. Deliberately not a picture of who is online: a fixed drawing
- * cannot report live state, so it does not try to.
+ * drawing a form. Three nested arches give the door depth, the perspective
+ * ties under it give the page a floor to stand the door on, and the dots
+ * shrinking toward the doorway are the queue you are joining. Deliberately not
+ * a picture of who is online: a fixed drawing cannot report live state, so it
+ * does not try to.
  */
 const lobbyLogin: Drawing = {
   pools: [
-    [172, 80, 106, 0.24],
-    [172, 80, 200, 0.08],
+    [172, 74, 110, 0.26],
+    [172, 90, 210, 0.08],
   ],
-  paint: (p) =>
-    `<g fill="none" stroke="${p.faint}" stroke-width="2" stroke-opacity="0.3">` +
-    '<path d="M124 138 L124 78 Q124 40 172 40 Q220 40 220 78 L220 138"/>' +
-    "</g>" +
-    `<g fill="none" stroke="${p.line}" stroke-width="1.5" stroke-opacity="0.42">` +
-    '<path d="M142 138 L142 82 Q142 58 172 58 Q202 58 202 82 L202 138"/>' +
-    "</g>" +
-    `<rect x="108" y="138" width="128" height="4" rx="2" fill="${p.faint}" fill-opacity="0.3"/>` +
-    `<g fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round">` +
-    '<path d="M44 100 L112 100"/>' +
-    '<path d="M96 86 L112 100 L96 114"/>' +
-    "</g>" +
-    `<circle cx="172" cy="90" r="5" fill="${p.spark}" fill-opacity="0.85"/>`,
+  paint: (p) => {
+    // The walkway: rails converging on the gate's feet, cross ties tightening
+    // as they recede, each fainter than the one in front of it.
+    const ties = (
+      [
+        [40, 300, 172, 0.2],
+        [76, 268, 160, 0.16],
+        [104, 240, 150, 0.12],
+        [124, 218, 143, 0.09],
+      ] as const
+    )
+      .map(
+        ([x1, x2, y, o]) =>
+          `<path d="M${x1} ${y} L${x2} ${y}" stroke-opacity="${o}"/>`,
+      )
+      .join("");
+    // Arrivals: a trail of dots curving in from the left, shrinking with
+    // distance, the last one already inside and lit.
+    const trail = (
+      [
+        [48, 160, 3.2, 0.4],
+        [84, 150, 2.8, 0.45],
+        [118, 138, 2.5, 0.5],
+        [146, 124, 2.2, 0.55],
+        [163, 110, 2, 0.6],
+      ] as const
+    )
+      .map(
+        ([x, y, r, o]) =>
+          `<circle cx="${x}" cy="${y}" r="${r}" fill="${p.line}" fill-opacity="${o}"/>`,
+      )
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-linecap="round">` +
+      '<path d="M20 176 L144 140" stroke-opacity="0.22"/>' +
+      '<path d="M324 176 L200 140" stroke-opacity="0.22"/>' +
+      ties +
+      "</g>" +
+      // The door, three arches deep: faint at the rim, the subject's own line
+      // at the innermost, so the gate darkens into the page and lightens
+      // toward whatever is on the other side.
+      `<g fill="none" stroke="${p.faint}" stroke-width="2" stroke-opacity="0.28">` +
+      '<path d="M116 138 L116 80 Q116 34 172 34 Q228 34 228 80 L228 138"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.8" stroke-opacity="0.38">` +
+      '<path d="M130 138 L130 82 Q130 46 172 46 Q214 46 214 82 L214 138"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.line}" stroke-width="1.5" stroke-opacity="0.52">` +
+      '<path d="M144 138 L144 84 Q144 58 172 58 Q200 58 200 84 L200 138"/>' +
+      "</g>" +
+      // A shimmer inside the doorway: three vertical hairlines, the middle one
+      // brightest, standing in for light from beyond the threshold.
+      `<g fill="none" stroke="${p.line}" stroke-linecap="round">` +
+      '<path d="M160 78 L160 130" stroke-width="1" stroke-opacity="0.14"/>' +
+      '<path d="M172 70 L172 132" stroke-width="1.2" stroke-opacity="0.22"/>' +
+      '<path d="M184 78 L184 130" stroke-width="1" stroke-opacity="0.14"/>' +
+      "</g>" +
+      `<rect x="108" y="138" width="128" height="3" rx="1.5" fill="${p.faint}" fill-opacity="0.32"/>` +
+      // The keystone and the one who just stepped through.
+      `<g fill="${p.spark}">${diamond(172, 34, 4)}</g>` +
+      `<circle cx="172" cy="96" r="4.5" fill="${p.spark}" fill-opacity="0.85"/>` +
+      trail
+    );
+  },
 };
 
 /** Three speech bubbles, the newest lit. A conversation, not a window. */
@@ -582,38 +636,63 @@ const chat: Drawing = {
   },
 };
 
-/** Several rooms at once, one of them lit. The battle list, not a battle. */
+/**
+ * A radar sweep over the battle list: blips at range, one of them lit.
+ *
+ * The list is a live view of rooms you could be in, and a scope says
+ * "contacts out there right now" better than a row of circles did. Each blip
+ * is a diamond with its crew as two dots under it, the lit one gets the
+ * double ring, and the sweep arm gives the picture a direction to read in.
+ */
 const battles: Drawing = {
   pools: [
-    [160, 80, 148, 0.16],
-    [58, 40, 92, 0.1],
+    [132, 84, 120, 0.2],
+    [226, 66, 96, 0.1],
   ],
   paint: (p) => {
-    const rooms: readonly (readonly [number, number, number])[] = [
-      [62, 52, 27],
-      [140, 34, 19],
-      [214, 72, 33],
-      [96, 116, 22],
-      [180, 128, 16],
-      [286, 26, 14],
+    // Contacts: position, size, ink strength. The fourth is outside the
+    // outermost ring, because a list always has more below the fold.
+    const blips: readonly (readonly [number, number, number, number])[] = [
+      [174, 60, 5, 0.6],
+      [96, 118, 4.5, 0.5],
+      [76, 52, 4, 0.45],
+      [244, 128, 4.5, 0.5],
+      [282, 44, 3.5, 0.4],
     ];
-    const rings = rooms
+    const contacts = blips
       .map(
-        ([x, y, r]) =>
-          `<circle cx="${x}" cy="${y}" r="${r}" stroke-opacity="0.34"/>`,
+        ([x, y, r, o]) =>
+          `<g fill="${p.line}" fill-opacity="${o}">${diamond(x, y, r)}</g>` +
+          `<circle cx="${x - 5}" cy="${y + 10}" r="2" fill="${p.line}" fill-opacity="${round(o * 0.7)}"/>` +
+          `<circle cx="${x + 5}" cy="${y + 10}" r="2" fill="${p.line}" fill-opacity="${round(o * 0.7)}"/>`,
       )
       .join("");
-    const crews = rooms
-      .flatMap(([x, y, r]) => [
-        `<circle cx="${round(x - r * 0.44)}" cy="${y}" r="3"/>`,
-        `<circle cx="${round(x + r * 0.44)}" cy="${y}" r="3"/>`,
-      ])
-      .join("");
     return (
-      `<g fill="none" stroke="${p.faint}" stroke-width="1.8">${rings}</g>` +
-      `<g fill="${p.line}" fill-opacity="0.45">${crews}</g>` +
-      `<circle cx="214" cy="72" r="33" fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.6"/>` +
-      `<circle cx="214" cy="72" r="43" fill="none" stroke="${p.spark}" stroke-width="1" stroke-opacity="0.22"/>`
+      // The scope: three rings and a dashed fourth, a hairline cross through
+      // the middle, everything fainter with range.
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5">` +
+      '<circle cx="132" cy="84" r="28" stroke-opacity="0.3"/>' +
+      '<circle cx="132" cy="84" r="56" stroke-opacity="0.24"/>' +
+      '<circle cx="132" cy="84" r="84" stroke-opacity="0.18"/>' +
+      '<circle cx="132" cy="84" r="70" stroke-opacity="0.14" stroke-dasharray="3 8"/>' +
+      "</g>" +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.12">` +
+      '<path d="M132 4 L132 164"/>' +
+      '<path d="M52 84 L212 84"/>' +
+      "</g>" +
+      // The sweep arm: a bright leading edge and a fainter one trailing it.
+      `<g fill="none" stroke="${p.line}" stroke-linecap="round">` +
+      '<path d="M132 84 L174 11" stroke-width="1.5" stroke-opacity="0.4"/>' +
+      '<path d="M132 84 L208 48" stroke-width="1.2" stroke-opacity="0.18"/>' +
+      "</g>" +
+      contacts +
+      // The lit battle: a spark blip with the double ring the old drawing
+      // gave its chosen room.
+      `<g fill="${p.spark}" fill-opacity="0.9">${diamond(212, 88, 6)}</g>` +
+      `<circle cx="212" cy="88" r="12" fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.55"/>` +
+      `<circle cx="212" cy="88" r="19" fill="none" stroke="${p.spark}" stroke-width="1" stroke-opacity="0.25"/>` +
+      `<circle cx="205" cy="100" r="2.2" fill="${p.spark}" fill-opacity="0.6"/>` +
+      `<circle cx="219" cy="100" r="2.2" fill="${p.spark}" fill-opacity="0.6"/>`
     );
   },
 };
@@ -1450,6 +1529,141 @@ export function bundledBackdropSvg(
     `<defs>${pools.defs}</defs>` +
     pools.rects +
     `<g opacity="${round(clamp(strength, 0, 1))}">${drawing.paint(p)}</g>` +
+    "</svg>"
+  );
+}
+
+/**
+ * The hexagonal coil brand mark as path data, on its authored 24x24 grid.
+ * Transcribed from `src-tauri/icons/source-hexagonal-coil.svg` (the same path
+ * `src/general/CoilMark.tsx` draws), rather than imported from there, because
+ * the docs site loads this module and a `.tsx` import would drag React into
+ * its build.
+ */
+const COIL_PATH =
+  "M12 3 18.62 7.39A1.3 1.3 0 0 1 19.2 8.56L18.76 15.13A1.3 1.3 0 0 1 18.03 16.21L12.68 18.79A1.3 1.3 0 0 1 11.38 18.69L6.99 15.68A1.3 1.3 0 0 1 6.44 14.5L6.84 9.82A1.3 1.3 0 0 1 7.6 8.75L11.31 7.06A1.3 1.3 0 0 1 12.61 7.2L15.39 9.24A1.3 1.3 0 0 1 15.91 10.45L15.56 13.24A1.3 1.3 0 0 1 14.75 14.28L12.72 15.09A1.3 1.3 0 0 1 11.4 14.88L10.22 13.89A1.3 1.3 0 0 1 9.79 12.61L10.04 11.47A1.09 1.09 0 0 1 10.66 10.71L11.34 10.4";
+
+/** Canvas the home backdrop is authored against: a page-ish aspect. */
+const BACKDROP_WIDTH = 640;
+const BACKDROP_HEIGHT = 400;
+
+/**
+ * The home page's own backdrop: the coil mark over a starfield, in the same
+ * tinted line-art style as the tool drawings.
+ *
+ * Deliberately not in {@link DRAWINGS}. Every drawing there is a tool card the
+ * grid can put on the same page, and a backdrop repeating a card drawn inches
+ * above it reads as a mistake (the conquest galaxy was the first candidate and
+ * fails exactly that way). A composition of its own also gets to be about the
+ * app rather than about one tool, which is what a page-wide layer should say.
+ *
+ * Like {@link bundledBackdropSvg} it paints no field wash, since the page has
+ * its own background, and no pools either: a page-wide radial gradient at
+ * backdrop strength is where the old CSS wash's banding came from, so the
+ * layer is strokes and dots only. How faint it is on the page is the caller's
+ * business ({@link ../home/background} dims it to `BACKDROP_MAX_ALPHA`), so
+ * the inks here carry card-strength opacities.
+ *
+ * The mark sits low right, where the page is emptiest, and bleeds off both
+ * edges so it reads as texture rather than as a logo stamped on the page. Star
+ * positions come from a fixed seed, so the picture is the same on every
+ * launch.
+ */
+export function homeBackdropSvg(
+  themeColor: string,
+  scheme: CardScheme,
+): string {
+  const p = paletteFor(themeColor, scheme);
+  const rand = mulberry32(0xc0115eed);
+  // Small and sharp-edged on purpose: an isolated soft dot at backdrop
+  // strength reads as a mark on the monitor rather than as a star, so the
+  // field stays under 1.4px and the brighter accents are four-point sparkles
+  // below, which nothing smudged ever looks like.
+  // Weighted to the right half, because on a wide window the tool grid covers
+  // the left of the page and the right is where the layer is actually seen.
+  const star = () => {
+    const wide = rand() < 0.4;
+    const x = round(wide ? rand() * BACKDROP_WIDTH : 300 + rand() * 340);
+    const y = round(rand() * BACKDROP_HEIGHT);
+    const r = round(0.5 + rand() * 0.9);
+    const o = round(0.18 + rand() * 0.38);
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill-opacity="${o}"/>`;
+  };
+  const stars = Array.from({ length: 150 }, star).join("");
+  const sparkles = Array.from({ length: 12 }, () => {
+    const x = round(rand() * BACKDROP_WIDTH);
+    const y = round(rand() * BACKDROP_HEIGHT);
+    const a = round(2 + rand() * 2);
+    const o = round(0.3 + rand() * 0.3);
+    return `<path d="M${x - a} ${y} H${x + a} M${x} ${y - a} V${y + a}" stroke-opacity="${o}"/>`;
+  }).join("");
+  // Thin orbits around the mark's centre (the 24-grid centre lands at 520,240
+  // under the transform below), one of them dashed, for the depth the tool
+  // drawings get from their pools without any soft gradient to band.
+  const orbits =
+    [150, 205]
+      .map(
+        (r, i) =>
+          `<circle cx="520" cy="240" r="${r}" stroke-opacity="${round(0.2 - i * 0.06)}"/>`,
+      )
+      .join("") +
+    `<circle cx="520" cy="240" r="176" stroke-opacity="0.15" stroke-dasharray="2 7"/>` +
+    // Two wide outer rings, mostly off-canvas, so the system feels bigger than
+    // the frame rather than a diagram floated on it.
+    `<circle cx="520" cy="240" r="270" stroke-opacity="0.11"/>` +
+    `<circle cx="520" cy="240" r="340" stroke-opacity="0.07"/>`;
+  // Satellites riding the rings: the diamonds the warpath and conquest
+  // drawings use for bodies, each sitting on one of the orbits above.
+  const satellites =
+    `<g fill="${p.line}" fill-opacity="0.55">${diamond(405, 336, 4)}${diamond(551, 67, 3.4)}</g>` +
+    `<g fill="${p.spark}" fill-opacity="0.6">${diamond(334, 327, 4.5)}</g>`;
+  // A little constellation on the otherwise empty left half: linked nodes in
+  // the style of the warpath drawing, so both sides of a wide window carry
+  // something.
+  const nodes: readonly [number, number][] = [
+    [96, 232],
+    [156, 196],
+    [222, 224],
+    [274, 182],
+    [238, 282],
+    [154, 288],
+  ];
+  const constellation =
+    `<path d="M${nodes.map(([x, y]) => `${x} ${y}`).join(" L")} Z" stroke-opacity="0.2"/>` +
+    `<path d="M156 196 L154 288" stroke-opacity="0.14"/>` +
+    nodes
+      .map(
+        ([x, y]) =>
+          `<circle cx="${x}" cy="${y}" r="2" fill="${p.line}" fill-opacity="0.7"/>`,
+      )
+      .join("");
+  // Terrain contours along the foot, the singleplayer drawing's own device, so
+  // the scene has a ground plane rather than floating.
+  const contours = [352, 368, 386]
+    .map(
+      (y, i) =>
+        `<path d="M-10 ${y} Q 90 ${y - 16} 200 ${y - 4} T 420 ${y - 8} T 660 ${y - 2}" stroke-opacity="${round(0.24 - i * 0.06)}"/>`,
+    )
+    .join("");
+  // One comet streaking toward the mark, as the composition's single mover.
+  const comet =
+    `<path d="M94 96 L166 76" stroke-opacity="0.4"/>` +
+    `<circle cx="166" cy="76" r="2.2" fill="${p.spark}" fill-opacity="0.65"/>`;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BACKDROP_WIDTH} ${BACKDROP_HEIGHT}" preserveAspectRatio="xMidYMax slice">` +
+    `<g fill="${p.line}">${stars}</g>` +
+    `<g fill="none" stroke="${p.line}" stroke-width="1">${sparkles}</g>` +
+    `<g fill="none" stroke="${p.faint}" stroke-width="1">${orbits}</g>` +
+    satellites +
+    `<g fill="none" stroke="${p.faint}" stroke-width="1.2">${constellation}</g>` +
+    `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-linecap="round">${contours}</g>` +
+    `<g fill="none" stroke="${p.spark}" stroke-width="1.2" stroke-linecap="round">${comet}</g>` +
+    // stroke-width 2 is not a choice made here: it is the weight the mark is
+    // authored at in `source-hexagonal-coil.svg`, so scaled up it is the
+    // actual logo rather than a thinner tracing of it.
+    `<g transform="translate(340 60) scale(15)" fill="none" stroke="${p.line}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.3">` +
+    `<path d="${COIL_PATH}"/>` +
+    "</g>" +
     "</svg>"
   );
 }
