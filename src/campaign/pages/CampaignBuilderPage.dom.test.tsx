@@ -334,6 +334,63 @@ describe("what a campaign row says", () => {
     expect(screen.getByTestId("icon")).toBeTruthy();
   });
 
+  // Issue #2190: a campaign nobody can play looked exactly like a finished one,
+  // and the only clue was reading "0 missions" and knowing what that implies.
+  describe("the Draft badge", () => {
+    it("marks a campaign with no missions", () => {
+      show([local]);
+
+      expect(screen.getByText("Draft")).toBeTruthy();
+    });
+
+    it("stays off a campaign whose missions all name a game and a map", () => {
+      show([beachhead]);
+
+      expect(screen.queryByText("Draft")).toBeNull();
+    });
+
+    // The preset picker offers a preset reading "No game · No map" as readily
+    // as a complete one, so a campaign can hold missions and still launch none
+    // of them. Play order is the array order, so the last one counts too.
+    it("marks a campaign whose last mission names no map", () => {
+      show([
+        {
+          campaign: campaignNamed("beachhead", "Beachhead", {
+            missions: [mission("BAR", "Comet Catcher"), mission("BAR", "")],
+          }),
+          source: "local",
+        },
+      ]);
+
+      expect(screen.getByText("Draft")).toBeTruthy();
+    });
+
+    // A mission with no attached scenario plays as an ordinary skirmish, which
+    // is a supported campaign rather than an unfinished one.
+    it("stays off a campaign of preset-only missions", () => {
+      expect(beachhead.campaign.missions.map((m) => m.scenario)).toEqual([
+        undefined,
+        undefined,
+      ]);
+      show([beachhead]);
+
+      expect(screen.queryByText("Draft")).toBeNull();
+    });
+
+    // The row is already a link into the editor, which is where the campaign
+    // gets finished. A second link inside it is a click target nothing agrees
+    // on, and a second tab stop on every unfinished row.
+    it("is not a link, and adds no tab stop inside the row's link", () => {
+      show([local]);
+
+      const badge = screen.getByText("Draft");
+      expect(badge.tagName).toBe("SPAN");
+      expect(badge.closest("a")?.getAttribute("href")).toBe(
+        "/campaign-builder/beachhead",
+      );
+    });
+  });
+
   // Everything added here is text and a picture inside the row's own link. A
   // second tab stop in a row is a list a keyboard has to walk twice.
   it("adds nothing inside the row link that takes focus", () => {

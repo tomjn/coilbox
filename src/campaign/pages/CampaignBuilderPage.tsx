@@ -4,6 +4,7 @@ import { Download, Loader2, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "../../content/config";
 import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
@@ -26,7 +27,7 @@ import {
 } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { inlineCampaignImages, materializeCampaignImages } from "../images";
-import { campaignSummary } from "../listing";
+import { campaignIsPlayable, campaignSummary } from "../listing";
 import type { Campaign } from "../model";
 import {
   collectCampaignScenarioMedia,
@@ -255,6 +256,12 @@ export default function CampaignBuilderPage() {
         <ul className="flex flex-col gap-2">
           {campaigns.map(({ campaign, source }) => {
             const bundled = source === "bundled";
+            // Nobody can play this one end to end: it has no missions, or one
+            // of its missions names no game or no map (issue #2190). The row's
+            // second line counts the missions and the editor's own mission list
+            // says which one is short, so the badge carries the consequence
+            // rather than repeating either.
+            const draft = !campaignIsPlayable(campaign);
             return (
               <li
                 key={campaign.id}
@@ -278,6 +285,17 @@ export default function CampaignBuilderPage() {
                       <span className="truncate text-sm font-medium">
                         {campaign.title}
                       </span>
+                      {/* Not a link, and nothing to tab to. The whole row is
+                          already a link into the editor, which is where an
+                          author fixes this. */}
+                      {draft && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 text-[10px]"
+                        >
+                          Draft
+                        </Badge>
+                      )}
                       {bundled && (
                         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                           Bundled
