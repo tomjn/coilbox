@@ -1171,3 +1171,85 @@ describe("previewing a campaign as a player", () => {
     expect(screen.queryByText("the campaign as a player sees it")).toBeNull();
   });
 });
+
+/**
+ * How the top of the page reads (issue #2193).
+ *
+ * It opened on two bare bordered boxes with no labels on them, and a lone
+ * bordered box across the top of a page is the shape of a search field, so the
+ * campaign's own name read as something to type a query into.
+ *
+ * The title is the page's heading now and is edited where it sits, so what has
+ * to hold is that it is still only a text box underneath: reachable and
+ * writable without a mouse, and writing through the same queued save as
+ * everything else on the page. An editable heading that needs a click to enter
+ * an edit mode would have taken renaming away from the keyboard entirely.
+ */
+describe("the top of the campaign editor", () => {
+  it("draws the campaign's title as the page's heading", () => {
+    show([]);
+
+    // The heading is the box, not a copy of the title printed beside one.
+    const heading = titleBox().closest("h1");
+    expect(heading).not.toBeNull();
+    expect(within(heading as HTMLElement).getByRole("textbox")).toBe(
+      titleBox(),
+    );
+    expect((titleBox() as HTMLInputElement).value).toBe("Landfall");
+  });
+
+  it("says on the page what the description box is for", () => {
+    show([]);
+
+    // A visible label, rather than an aria-label only a screen reader reaches.
+    expect(screen.getByText("Description").tagName).toBe("LABEL");
+    expect(screen.getByLabelText("Description").tagName).toBe("TEXTAREA");
+  });
+
+  it("renames the campaign from the keyboard alone", async () => {
+    show([]);
+
+    // No click anywhere. The box takes focus by itself, which is what being an
+    // input rather than a click-to-edit heading buys, and Enter leaves it.
+    titleBox().focus();
+    expect(document.activeElement).toBe(titleBox());
+    fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+    fireEvent.keyDown(titleBox(), { key: "Enter" });
+
+    expect(await screen.findByText(SAVED)).toBeTruthy();
+    expect(
+      JSON.parse(campaignSave.mock.calls.at(-1)?.[0].json ?? "{}").title,
+    ).toBe("Landfall II");
+  });
+
+  it("keeps a rename committed with Enter when the author leaves at once", async () => {
+    // The same race the Preview button already waits out for a click-away
+    // blur (issue #2197). Enter is a second way to reach it, and an author who
+    // presses Enter and then goes straight to Preview must not be shown a page
+    // built from the name they just replaced.
+    let finish: (() => void) | undefined;
+    campaignSave.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({});
+        }),
+    );
+    showWithPlayerPages([mission()]);
+
+    titleBox().focus();
+    fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+    fireEvent.keyDown(titleBox(), { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText("the campaign as a player sees it")).toBeNull();
+
+    finish?.();
+    expect(
+      await screen.findByText("the campaign as a player sees it"),
+    ).toBeTruthy();
+    expect(
+      JSON.parse(campaignSave.mock.calls.at(-1)?.[0].json ?? "{}").title,
+    ).toBe("Landfall II");
+  });
+});
