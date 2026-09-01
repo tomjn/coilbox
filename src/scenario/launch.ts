@@ -39,7 +39,7 @@ import {
 } from "./bindings";
 import { compileScenario, missionPath } from "./compile";
 import { missionDrifted } from "./drift";
-import type { Scenario } from "./model";
+import type { Difficulty, Scenario } from "./model";
 import { writeTestMutator } from "./mutator";
 import type { GameOrigin } from "./storage";
 import { scenarioMediaFiles } from "./transfer";
@@ -71,6 +71,20 @@ import {
  * coilbox wrote, and the game's own folder name for one the game ships.
  */
 export const MISSION_MODOPTION = "coilbox_mission";
+
+/**
+ * The modoption that says how hard to play it (issue #2164).
+ *
+ * A modoption rather than something in the compiled mission, for the reason the
+ * mission id is one: it is a property of this launch, not of the document. One
+ * scenario is meant to be played at every difficulty, and a mission a game ships
+ * in a packaged `.sd7`/`.sdz` cannot be written into at all, so a level compiled
+ * in would be a level that mission could never change.
+ *
+ * Written only when the caller picked one, so a scenario that gates nothing
+ * produces exactly the start script it always did.
+ */
+export const DIFFICULTY_MODOPTION = "coilbox_difficulty";
 
 /** How a scenario reaches the engine. */
 export type ScenarioRoute = "adopted" | "mutator";
@@ -267,6 +281,15 @@ export interface ScenarioLaunchInput {
    * game's own folder name. Absent for a scenario coilbox stored.
    */
   origin?: GameOrigin;
+  /**
+   * How hard to play it, when the player was offered the choice (issue #2164).
+   *
+   * Absent leaves the modoption out and the runtime plays at its own default,
+   * which is what every launch of a scenario that gates nothing does. The offer
+   * is `usesDifficulty`'s question, asked by the caller: a picker that changes
+   * nothing about the mission is a picker worth leaving out.
+   */
+  difficulty?: Difficulty;
 }
 
 export type ScenarioLaunchResult =
@@ -508,6 +531,7 @@ export async function launchScenario(
     map,
     units,
     origin,
+    difficulty,
   } = input;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
@@ -632,6 +656,7 @@ export async function launchScenario(
       modOptions: {
         ...scenario.setup.modOptionValues,
         [MISSION_MODOPTION]: folder,
+        ...(difficulty ? { [DIFFICULTY_MODOPTION]: difficulty } : {}),
       },
       optionSchema,
       mapOptionSchema,

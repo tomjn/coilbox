@@ -1,6 +1,6 @@
 import { scenarioEvalMission, scenarioReadMission } from "./bindings";
 import { missionPath } from "./compile";
-import { amountVar } from "./model";
+import { amountVar, DIFFICULTIES, type Difficulty } from "./model";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -621,6 +621,41 @@ function checkText(
  * `units` is the game's own unit list, when the caller has read one. Without it
  * no unit def is checked, and every other check still runs.
  */
+/**
+ * A difficulty range nothing can satisfy (issue #2164).
+ *
+ * `atLeast: "hard"` with `atMost: "easy"` compiles, validates against every
+ * other check and then quietly never happens, at any setting. That is the same
+ * failure a refused spawn is, so it is said out loud. A warning rather than an
+ * error, because the mission plays: what the author lost is one squad, and
+ * refusing the launch over it would be the editor deciding they made a mistake.
+ */
+function checkDifficulty(
+  mission: Record<string, unknown>,
+  issues: MissionIssue[],
+): void {
+  const rank = (value: unknown): number | null => {
+    const at = DIFFICULTIES.indexOf(value as Difficulty);
+    return at === -1 ? null : at;
+  };
+
+  for (const list of ["actors", "groups", "prefabs", "triggers"] as const) {
+    asArray(mission[list]).forEach((raw, index) => {
+      const entry = asRecord(raw);
+      const range = entry.difficulty;
+      if (!isRecord(range)) return;
+      const least = rank(range.atLeast);
+      const most = rank(range.atMost);
+      if (least === null || most === null || least <= most) return;
+      issues.push({
+        path: `${at(list, entry, index)}.difficulty`,
+        message: `it is only there from ${range.atLeast} up and only up to ${range.atMost}, which is no difficulty at all, so it never appears`,
+        severity: "warning",
+      });
+    });
+  }
+}
+
 export function validateMission(
   mission: unknown,
   map?: MapExtent,
@@ -674,6 +709,7 @@ export function validateMission(
     });
   });
 
+  checkDifficulty(mission, issues);
   checkUnitNames(mission, issues);
   checkPositions(mission, map, issues);
   checkUnitDefs(mission, units, issues);

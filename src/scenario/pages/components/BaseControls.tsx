@@ -82,6 +82,7 @@ import {
   strayDefs,
   withoutQueued,
 } from "./bases";
+import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { SubstituteBaseForm } from "./SubstituteBaseForm";
 import { TeamSelect } from "./TeamSelect";
 
@@ -177,7 +178,7 @@ export function BaseControls({
   /** Whether the map is waiting for a click to move the base. */
   moving: boolean;
   /** Change the base's own fields, as {@link editBase} takes them. */
-  onEdit: (patch: Partial<Pick<ScenarioBase, "team">>) => void;
+  onEdit: (patch: Partial<Pick<ScenarioBase, "team" | "difficulty">>) => void;
   /** Rename the layout, which names a copy when it is shared and `sharedEdit`
    *  is off. */
   onRename: (name: string) => void;
@@ -446,6 +447,16 @@ export function BaseControls({
               <Repeat className="size-3.5" /> Say it in another side's buildings
             </Button>
           )}
+
+          {/* This placement's, not the layout's (issue #2164). A layout two
+              bases share says what the buildings are; which difficulties each
+              of those bases stands at is each one's own business. */}
+          <div className="border-t border-border/60 pt-3">
+            <DifficultyRangeFields
+              value={base.difficulty}
+              onChange={(difficulty) => onEdit({ difficulty })}
+            />
+          </div>
 
           <Button
             size="sm"

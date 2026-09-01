@@ -1,0 +1,313 @@
+{
+  "id": "outbreak",
+  "name": "Outbreak",
+  "description": "A raid the player holds off, with more of it the harder they asked for.",
+  "runtimeVersion": 6,
+  "setup": {
+    "gameName": "Test Game",
+    "mapName": "Comet Catcher Redux",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Commander",
+        "side": "arm",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "raiders",
+        "kind": "ai",
+        "name": "Raiders",
+        "side": "core",
+        "color": [1, 0, 0],
+        "allyTeam": 1,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {},
+  "zones": [
+    {
+      "id": "landing",
+      "name": "Landing",
+      "shape": "circle",
+      "center": {
+        "x": 1200,
+        "z": 1200
+      },
+      "radius": 400
+    }
+  ],
+  "actors": [
+    {
+      "id": "beacon",
+      "unitDef": "armsolar",
+      "team": "player",
+      "pos": {
+        "x": 1200,
+        "z": 1200
+      },
+      "facing": 0
+    },
+    {
+      "id": "warlord",
+      "unitDef": "corcom",
+      "team": "raiders",
+      "pos": {
+        "x": 2400,
+        "z": 2400
+      },
+      "facing": 2,
+      "difficulty": {
+        "atLeast": "hard"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "id": "escort",
+      "team": "player",
+      "units": [
+        {
+          "def": "armpw",
+          "count": 2
+        }
+      ],
+      "pos": {
+        "x": 1200,
+        "z": 1400
+      },
+      "orders": [
+        {
+          "kind": "guard",
+          "target": "beacon"
+        }
+      ],
+      "dormant": false
+    },
+    {
+      "id": "second-wave",
+      "team": "raiders",
+      "units": [
+        {
+          "def": "corak",
+          "count": 4
+        }
+      ],
+      "pos": {
+        "x": 2600,
+        "z": 2600
+      },
+      "orders": [
+        {
+          "kind": "fight",
+          "waypoints": [
+            {
+              "x": 1200,
+              "z": 1200
+            }
+          ]
+        }
+      ],
+      "dormant": true,
+      "difficulty": {
+        "atLeast": "hard"
+      }
+    }
+  ],
+  "blueprints": [
+    {
+      "id": "turret-layout",
+      "name": "A turret",
+      "buildings": [
+        {
+          "def": "armllt",
+          "offset": {
+            "x": 0,
+            "z": 0
+          },
+          "facing": 0
+        }
+      ]
+    }
+  ],
+  "bases": [
+    {
+      "id": "spare-turret",
+      "blueprint": "turret-layout",
+      "team": "player",
+      "origin": {
+        "x": 1100,
+        "z": 1100
+      },
+      "buildings": [
+        {
+          "id": "spare-gun"
+        }
+      ],
+      "difficulty": {
+        "atMost": "normal"
+      }
+    },
+    {
+      "id": "raider-turret",
+      "blueprint": "turret-layout",
+      "team": "raiders",
+      "origin": {
+        "x": 2500,
+        "z": 2500
+      },
+      "buildings": [
+        {
+          "id": "raider-gun"
+        }
+      ],
+      "difficulty": {
+        "atLeast": "normal",
+        "atMost": "hard"
+      }
+    }
+  ],
+  "restrictions": {},
+  "vars": {
+    "waves": 0
+  },
+  "triggers": [
+    {
+      "id": "first-wave",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 60
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "add_var",
+          "params": {
+            "name": "waves",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "second-wave-arrives",
+      "enabled": true,
+      "repeat": false,
+      "difficulty": {
+        "atLeast": "hard"
+      },
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 120
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "wake_group",
+          "params": {
+            "group": "second-wave"
+          }
+        },
+        {
+          "type": "add_var",
+          "params": {
+            "name": "waves",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "mercy",
+      "enabled": true,
+      "repeat": false,
+      "difficulty": {
+        "atMost": "easy"
+      },
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_health_below",
+            "params": {
+              "actor": "beacon",
+              "fraction": 0.5
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "map_marker",
+          "params": {
+            "pos": {
+              "x": 1200,
+              "z": 1200
+            },
+            "text": "The beacon is failing"
+          }
+        }
+      ]
+    },
+    {
+      "id": "held",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 300
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "hold-out"
+          }
+        },
+        {
+          "type": "victory",
+          "params": {
+            "team": "player"
+          }
+        }
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "hold-out",
+      "kind": "primary",
+      "text": "Keep the beacon standing for five minutes.",
+      "hidden": false
+    }
+  ],
+  "dialogue": [],
+  "createdAt": "2026-09-01T00:00:00.000Z",
+  "updatedAt": "2026-09-01T00:00:00.000Z"
+}

@@ -14,6 +14,13 @@ local DEFAULT_FACING = 0
 -- placed this far apart do not spawn inside each other.
 local START_UNIT_SPACING = 64
 
+--- The gate a caller that says nothing about difficulty gets: everything the
+-- scenario placed is placed (issue #2164). What every mission written before
+-- difficulty existed asks for, and what the two functions below fall back to.
+local function always()
+	return true
+end
+
 local function sortedKeys(map)
 	local keys = {}
 	for key in pairs(map) do
@@ -92,11 +99,21 @@ end
 -- start units and no start position keeps them unplaced: a mission missing a
 -- squad is easier to diagnose than one whose squad turned up in a map corner.
 --
+-- An actor outside the difficulty being played is left out, and that is not a
+-- problem: it is the author saying the boss is only on hard. So it is dropped
+-- silently, where a team that cannot be resolved is reported. The two look the
+-- same on the map and are opposite things, and a mission that logged a line per
+-- skipped actor would read as broken at every setting but the hardest.
+--
 -- @param mission the compiled mission table
 -- @param plan the result of teamPlan
 -- @param startPositions map of engine team number to `{ x = , z = }`
+-- @param gate `gate(range)` says whether a difficulty range applies to the
+--   mission being played. Absent places everything (issue #2164).
 -- @return array of placements, array of problems to log
-function M.placements(mission, plan, startPositions)
+function M.placements(mission, plan, startPositions, gate)
+	gate = gate or always
+
 	local teamById = {}
 	for _, team in ipairs(plan) do
 		teamById[team.id] = team
@@ -105,21 +122,23 @@ function M.placements(mission, plan, startPositions)
 	local placements, problems = {}, {}
 
 	for _, actor in ipairs(mission.actors or {}) do
-		local team = teamById[actor.team]
-		if not team then
-			problems[#problems + 1] = string.format(
-				"actor %s belongs to team %s, which the mission has no engine team for",
-				tostring(actor.id), tostring(actor.team))
-		else
-			placements[#placements + 1] = {
-				actor = actor.id,
-				unitDef = actor.unitDef,
-				team = team.team,
-				x = actor.pos.x,
-				z = actor.pos.z,
-				facing = actor.facing or DEFAULT_FACING,
-				state = actor.state,
-			}
+		if gate(actor.difficulty) then
+			local team = teamById[actor.team]
+			if not team then
+				problems[#problems + 1] = string.format(
+					"actor %s belongs to team %s, which the mission has no engine team for",
+					tostring(actor.id), tostring(actor.team))
+			else
+				placements[#placements + 1] = {
+					actor = actor.id,
+					unitDef = actor.unitDef,
+					team = team.team,
+					x = actor.pos.x,
+					z = actor.pos.z,
+					facing = actor.facing or DEFAULT_FACING,
+					state = actor.state,
+				}
+			end
 		end
 	end
 
@@ -191,10 +210,18 @@ end
 -- the same `units` table and every condition and order target that reads an
 -- actor reads it without knowing the difference (issue #878).
 --
+-- A base outside the difficulty being played is left out whole, the way the
+-- scenario placed it. An author who wants the extra turret and not the rest of
+-- the base puts the turret down as a base of its own (issue #2164).
+--
 -- @param mission the compiled mission table
 -- @param plan the result of teamPlan
+-- @param gate `gate(range)` says whether a difficulty range applies to the
+--   mission being played. Absent places every base.
 -- @return array of placements, array of problems to log
-function M.prefabPlacements(mission, plan)
+function M.prefabPlacements(mission, plan, gate)
+	gate = gate or always
+
 	local teamById = {}
 	for _, team in ipairs(plan) do
 		teamById[team.id] = team
@@ -203,25 +230,27 @@ function M.prefabPlacements(mission, plan)
 	local placements, problems = {}, {}
 
 	for _, prefab in ipairs((mission or {}).prefabs or {}) do
-		local team = teamById[prefab.team]
-		if not team then
-			problems[#problems + 1] = string.format(
-				"prefab %s belongs to team %s, which the mission has no engine team for",
-				tostring(prefab.id), tostring(prefab.team))
-		else
-			for _, building in ipairs(prefab.buildings or {}) do
-				placements[#placements + 1] = {
-					prefab = prefab.id,
-					actor = building.id,
-					unitDef = building.def,
-					team = team.team,
-					x = prefab.origin.x + building.offset.x,
-					z = prefab.origin.z + building.offset.z,
-					facing = building.facing or DEFAULT_FACING,
-					queue = building.queue,
-					-- `repeat` is a Lua keyword, so the compiled mission quotes it.
-					repeatQueue = building["repeat"] == true,
-				}
+		if gate(prefab.difficulty) then
+			local team = teamById[prefab.team]
+			if not team then
+				problems[#problems + 1] = string.format(
+					"prefab %s belongs to team %s, which the mission has no engine team for",
+					tostring(prefab.id), tostring(prefab.team))
+			else
+				for _, building in ipairs(prefab.buildings or {}) do
+					placements[#placements + 1] = {
+						prefab = prefab.id,
+						actor = building.id,
+						unitDef = building.def,
+						team = team.team,
+						x = prefab.origin.x + building.offset.x,
+						z = prefab.origin.z + building.offset.z,
+						facing = building.facing or DEFAULT_FACING,
+						queue = building.queue,
+						-- `repeat` is a Lua keyword, so the compiled mission quotes it.
+						repeatQueue = building["repeat"] == true,
+					}
+				end
 			end
 		end
 	end

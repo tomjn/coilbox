@@ -13,7 +13,7 @@
  * player, and that a quiet run is told apart from a log that could not be read.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { launchScenario, playInfolog } = vi.hoisted(() => ({
@@ -64,6 +64,7 @@ vi.mock("../../storage", () => ({
 }));
 
 import { newScenario } from "../../create";
+import type { Scenario } from "../../model";
 import { ScenarioTestDrawer } from "./ScenarioTestDrawer";
 
 /** A refusal the runtime logs, in the shape Spring's formatter writes it. */
@@ -193,5 +194,68 @@ describe("the engine log after a scenario test run", () => {
     ).toBeTruthy();
     expect(playInfolog).not.toHaveBeenCalled();
     expect(screen.queryByText(REFUSED)).toBeNull();
+  });
+});
+
+/**
+ * Issue #2164. The choice is offered by the same drawer the Scenarios page
+ * opens, so a player pressing Play and an author testing a change pick their
+ * difficulty in one place.
+ */
+describe("choosing a difficulty before the launch", () => {
+  /** A scenario with one thing in it that only exists on hard. */
+  function varying(): Scenario {
+    const scenario = newScenario("Demo");
+    return {
+      ...scenario,
+      actors: [
+        {
+          id: "boss",
+          unitDef: "corcom",
+          team: "enemy",
+          pos: { x: 500, z: 500 },
+          facing: 0,
+          difficulty: { atLeast: "hard" },
+        },
+      ],
+    };
+  }
+
+  it("offers nothing for a scenario that plays the same either way", () => {
+    render(<ScenarioTestDrawer scenario={newScenario("Demo")} mode="play" />);
+
+    expect(screen.queryByText("How hard should it be?")).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Hard" })).toBeNull();
+  });
+
+  it("launches at the middle of the ladder without being touched", async () => {
+    render(<ScenarioTestDrawer scenario={varying()} mode="play" />);
+    screen.getByText("How hard should it be?");
+    screen.getByRole("button", { name: "Play" }).click();
+
+    await vi.waitFor(() =>
+      expect(launchScenario.mock.calls[0][0].difficulty).toBe("normal"),
+    );
+  });
+
+  it("launches at the one that was picked", async () => {
+    render(<ScenarioTestDrawer scenario={varying()} mode="play" />);
+    fireEvent.click(screen.getByRole("radio", { name: "Hard" }));
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+    await vi.waitFor(() =>
+      expect(launchScenario.mock.calls[0][0].difficulty).toBe("hard"),
+    );
+  });
+
+  // The launch has to be told nothing rather than told the default, or a
+  // scenario that gates nothing gets a modoption it never had.
+  it("says nothing about difficulty for a scenario that does not vary", async () => {
+    render(<ScenarioTestDrawer scenario={newScenario("Demo")} mode="play" />);
+    screen.getByRole("button", { name: "Play" }).click();
+
+    await vi.waitFor(() =>
+      expect(launchScenario.mock.calls[0][0].difficulty).toBeUndefined(),
+    );
   });
 });

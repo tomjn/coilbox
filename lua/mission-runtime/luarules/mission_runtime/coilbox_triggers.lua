@@ -99,11 +99,29 @@ end
 
 --- Arm or disarm a trigger by id, which is what enable_trigger and
 -- disable_trigger do and what a fire-once trigger does to itself.
+--
+-- A trigger the difficulty leaves out cannot be armed at all (issue #2164). The
+-- author said it is not part of the mission at this setting, so a mission that
+-- enables its own triggers must not be able to switch it back on by accident,
+-- and "on hard the reinforcements arrive twice" stays a second trigger rather
+-- than a difficulty test written into every one that touches it.
+--
+-- Said at notice level, not error. The trigger not running is what was asked
+-- for, unlike a trigger that does not exist, and a mission that logged an error
+-- for it would look broken at every setting the author gated something out of.
 function Engine:setEnabled(id, enabled)
 	local record = self.byId[id]
 	if not record then
 		self:report("trigger:" .. tostring(id), "warning",
 			"no trigger named " .. tostring(id) .. ", ignoring it")
+		return
+	end
+	if record.excluded then
+		if enabled then
+			self:report("trigger-difficulty:" .. tostring(id), "notice", string.format(
+				"trigger %s is not part of this mission at difficulty %s, leaving it off",
+				tostring(id), tostring(self.ctx.difficulty)))
+		end
 		return
 	end
 	record.enabled = enabled
@@ -143,6 +161,11 @@ end
 -- `gameSpeed` and, during a pass, `frame` and `event` on it; the host puts
 -- whatever its own conditions need there, such as the published mission state.
 -- `ctx.log(level, message)` is used for anything the engine has to report.
+--
+-- `ctx.difficultyGate(range)` says whether a difficulty range applies to the
+-- mission being played, and `ctx.difficulty` is the level it is being played
+-- at, for anything that has to name it. A host that hands neither gets every
+-- trigger, which is what a mission written before difficulty existed wants.
 function M.new(mission, ctx)
 	local self = setmetatable({
 		ctx = ctx or {},
@@ -162,13 +185,20 @@ function M.new(mission, ctx)
 	self.ctx.engine = self
 	self.ctx.gameSpeed = tonumber(self.ctx.gameSpeed) or DEFAULT_GAME_SPEED
 
+	local gate = self.ctx.difficultyGate
+
 	for _, trigger in ipairs((mission or {}).triggers or {}) do
+		-- The difficulty is settled once, here, because it cannot change while a
+		-- mission is running: an excluded trigger is off for the whole game and
+		-- setEnabled will not take it back.
+		local excluded = gate ~= nil and not gate(trigger.difficulty)
 		local record = {
 			id = trigger.id,
 			def = trigger,
+			excluded = excluded,
 			-- A trigger nobody thought about is armed. Only an explicit false
 			-- makes one wait for enable_trigger.
-			enabled = trigger.enabled ~= false,
+			enabled = not excluded and trigger.enabled ~= false,
 			repeats = trigger["repeat"] == true,
 			cooldown = math.floor((tonumber(trigger.cooldown) or 0) * self.ctx.gameSpeed),
 			readyFrame = 0,

@@ -256,6 +256,92 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #2164. Runtime 5 reads past every difficulty range, so it places the
+   * hard-only turrets whatever the player picked and arms the hard-only
+   * triggers with them. A scenario that gates anything has to be refused by a
+   * game behind 6 rather than played at the wrong difficulty.
+   */
+  describe("a scenario that varies by difficulty", () => {
+    const base = withTrigger([], []);
+    const ranged = { difficulty: { atLeast: "hard" } } as const;
+
+    it("is left where it was when nothing names a difficulty", () => {
+      expect(requiredRuntimeVersion(base)).toBe(1);
+    });
+
+    it("needs the runtime that reads a range on a trigger", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...base,
+          triggers: [{ ...base.triggers[0], ...ranged }],
+        }),
+      ).toBe(6);
+    });
+
+    it("needs it for a range on an actor", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...base,
+          actors: [
+            {
+              id: "turret",
+              unitDef: "corllt",
+              team: "player",
+              pos: { x: 100, z: 100 },
+              facing: 0,
+              ...ranged,
+            },
+          ],
+        }),
+      ).toBe(6);
+    });
+
+    it("needs it for a range on a group", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...base,
+          groups: [
+            {
+              id: "second-wave",
+              team: "enemy",
+              units: [{ def: "armpw", count: 4 }],
+              pos: { x: 600, z: 600 },
+              orders: [],
+              dormant: true,
+              ...ranged,
+            },
+          ],
+        }),
+      ).toBe(6);
+    });
+
+    it("needs it for a range on a base", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...base,
+          blueprints: [
+            {
+              id: "outpost",
+              name: "Outpost",
+              buildings: [{ def: "corllt", offset: { x: 0, z: 0 }, facing: 0 }],
+            },
+          ],
+          bases: [
+            {
+              id: "north-outpost",
+              blueprint: "outpost",
+              team: "enemy",
+              origin: { x: 500, z: 500 },
+              buildings: [],
+              ...ranged,
+            },
+          ],
+        }),
+      ).toBe(6);
+    });
+  });
+
+  /**
    * Issue #808. Runtime 2 reads `{ var = "quota" }` as no number at all and
    * compares against zero, so "kills reached the quota" holds from the first
    * frame and "add the bonus" adds nothing.

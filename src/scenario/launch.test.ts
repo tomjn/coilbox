@@ -31,6 +31,7 @@ import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { Participant } from "../play/participants";
 import { compileScenario } from "./compile";
 import {
+  DIFFICULTY_MODOPTION,
   launchScenario,
   MISSION_MODOPTION,
   missionIssueMessage,
@@ -243,7 +244,11 @@ describe("launchScenario", () => {
   const launch = vi.fn();
   const rescan = vi.fn();
 
-  function run(scenario: Scenario, games: GameItem[]) {
+  function run(
+    scenario: Scenario,
+    games: GameItem[],
+    extra: Partial<Parameters<typeof launchScenario>[0]> = {},
+  ) {
     return launchScenario({
       scenario,
       reader: "author",
@@ -253,6 +258,7 @@ describe("launchScenario", () => {
       mapOptionSchema: [],
       rescan,
       launch,
+      ...extra,
     });
   }
 
@@ -319,6 +325,40 @@ describe("launchScenario", () => {
       deathmode: "com",
       [MISSION_MODOPTION]: "s1",
     });
+  });
+
+  /**
+   * Issue #2164. The difficulty is a property of this launch rather than of the
+   * document, so it rides in a modoption. Left out entirely when nobody chose,
+   * which is what keeps the start script of a scenario that gates nothing the
+   * one it always was.
+   */
+  it("tells the runtime which difficulty to play, when one was chosen", async () => {
+    const result = await run(build(), [LOOSE], { difficulty: "hard" });
+
+    expect(result.ok && result.config.modOptions).toEqual({
+      deathmode: "com",
+      [MISSION_MODOPTION]: "s1",
+      [DIFFICULTY_MODOPTION]: "hard",
+    });
+  });
+
+  it("says nothing about difficulty when none was chosen", async () => {
+    const result = await run(build(), [LOOSE]);
+
+    expect(
+      result.ok && DIFFICULTY_MODOPTION in (result.config.modOptions ?? {}),
+    ).toBe(false);
+  });
+
+  // The compiled mission does not carry it, which is what lets one already
+  // written into a game be played at every level.
+  it("does not put the difficulty in the compiled mission", async () => {
+    await run(build(), [LOOSE], { difficulty: "hard" });
+
+    expect(writeMissionMock.mock.calls[0][0].mission).not.toContain(
+      "difficulty",
+    );
   });
 
   it("plays the fight the captured preset described: restrict list, advantage and income", async () => {

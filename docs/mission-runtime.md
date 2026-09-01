@@ -288,6 +288,16 @@ coilbox_mission = <scenario id>
 
 The gadget reads `Spring.GetModOptions().coilbox_mission`, trims it, and refuses anything that is not a plain name, because the id becomes part of a VFS path. With a valid id it includes `missions/runtime.lua` and `missions/<id>/mission.lua`, refuses a mission needing a newer runtime than it is, and publishes both on `GG.CoilboxMission` for the rest of the runtime and for your own Lua.
 
+A second modoption says how hard to play it:
+
+```
+coilbox_difficulty = easy | normal | hard
+```
+
+Coilbox writes it only for a scenario that varies by difficulty. Absent, or a word this runtime cannot rank, means `normal`. It is not in the compiled mission, because one scenario is meant to be played at every difficulty and a mission your game ships in a packaged archive cannot be rewritten per launch.
+
+`GG.CoilboxMission.difficulty` is the level, and `GG.CoilboxMission.difficultyGate(range)` answers whether a `{ atLeast, atMost }` range applies to this run. Use the gate rather than reading the modoption yourself, so your own Lua and the runtime agree about what "hard and up" means.
+
 `mission` on that table is the compiled scenario exactly as coilbox emitted it, so a misbehaving mission can be diagnosed by reading `missions/<id>/mission.lua` beside the scenario in coilbox.
 
 The gadget sits at `layer = 1000`, behind your own gadgets, because it is overriding the game rather than pre-empting it. It wants the last word on starting resources.
@@ -346,7 +356,7 @@ return {
 
 Coilbox reads two of these: the one in the game (`installed`) and the one this build ships (`available`). Every type is then in one of three states. `supported` means the installed runtime declares it. `added` means coilbox's does and the installed one does not, so installing or updating brings it. `extra` means the installed runtime declares it and coilbox does not, so the game is ahead of this build.
 
-A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses and from the format features it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1. Naming a base building needs 2. Version 3 is four format changes released together: a var read where a number goes, a team on `camera_pan` and `map_marker`, an uncontested `zone_held_for`, and the `release_group` action.
+A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses and from the format features it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1. Naming a base building needs 2. Version 3 is four format changes released together: a var read where a number goes, a team on `camera_pan` and `map_marker`, an uncontested `zone_held_for`, and the `release_group` action. Version 6 is the difficulty ranges, asked for only by a scenario that carries one.
 
 Three rules keep this honest, and all three matter to anyone adding a type:
 

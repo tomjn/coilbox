@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, `coilbox_gameover.lua` how it ends, and `coilbox_extensions.lua` the condition and action types a game declares for itself. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_difficulty.lua` is the difficulty ladder and the one comparison every other module gates on. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, `coilbox_gameover.lua` how it ends, and `coilbox_extensions.lua` the condition and action types a game declares for itself. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
 - `luaui/widgets/coilbox_mission_ui.lua`, the widget: the objectives panel, the dialogue panel, the debrief and the name over a named actor. `luaui/mission_ui/coilbox_panel_model.lua` is everything it decides before it draws, pure and tested outside the engine.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `missions/extensions.lua` is *not* here, and never installed. It is the game's own file, declaring the game's own trigger types, and both the runtime and the editor read it out of whatever game has one. See [Game extensions](#game-extensions).
@@ -24,6 +24,8 @@ GG.CoilboxMission = {
   id      = <scenario id>,
   mission = <compiled scenario>,
   runtime = <runtime.lua>,
+  difficulty = <"easy", "normal" or "hard">,
+  difficultyGate = <function(range): does a { atLeast, atMost } range apply?>,
   teams   = <per-participant setup, with the engine team number resolved>,
   suppressesStart = <function(teamID): does the mission place this team's start?>,
   suppressesEveryStart = <function(): does it place every team's?>,
@@ -44,6 +46,22 @@ GG.CoilboxMission = {
 ```
 
 `mission` is the compiled scenario exactly as coilbox emitted it, so a misbehaving mission can be diagnosed by reading `missions/<id>/mission.lua` beside the scenario JSON.
+
+## Difficulty
+
+A second modoption, `coilbox_difficulty`, says how hard to play it. Absent, or a word this runtime cannot rank, means `normal`, and an unrankable one is logged as a warning rather than guessed at: reading an unknown word as the nearest end of the ladder is how somebody who asked for easy gets hard.
+
+It is not in the compiled mission on purpose. One scenario is meant to be played at every difficulty, and a mission a game ships in a packaged archive cannot be rewritten per launch, so a level compiled in would be a level that mission could never change.
+
+An actor, a group, a prefab base and a trigger may each carry `difficulty = { atLeast = , atMost = }`. Both bounds are optional and inclusive, and a table with neither is the same as no table, which is what every mission written before this says. `coilbox_difficulty.lua` owns the ladder and the comparison. Everything else takes the closure `M.gate(level)` returns and asks it.
+
+Where each range is read:
+
+- An actor's and a base's in `coilbox_start.lua`, which leaves the placement out of the list it hands back.
+- A group's in `coilbox_groups.lua`, settled once at registration. An excluded group is not placed at the start and is not placed by `spawn_group` or `wake_group` either.
+- A trigger's in `coilbox_triggers.lua`, also settled once. An excluded trigger is not armed and `setEnabled` will not arm it, so a mission that switches its own triggers about cannot turn the hard-only wave back on at easy.
+
+A skip is not a refusal, and the log levels say so. A spawn the engine would not make is an Error, because a mission that placed nothing and a mission whose units did not arrive look identical from outside ([issue #2165](https://github.com/tomjn/coilbox/issues/2165)). A placement the author gated out is neither, so it is dropped without a word. An action aimed at a group this difficulty leaves out gets one Notice, which explains a wave that never came without putting every difficulty-aware mission in the test drawer's problem list.
 
 ## The start
 

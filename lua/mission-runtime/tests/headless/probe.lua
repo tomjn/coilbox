@@ -408,6 +408,10 @@ end
 local function startPlacements()
 	local mission = state().mission
 	local wanted = {}
+	-- What this run's difficulty leaves in. A mission that gates nothing has
+	-- every range nil and the gate says yes to all of them, so this reads the
+	-- same for every fixture written before difficulty existed (issue #2164).
+	local applies = state().difficultyGate
 
 	local function want(label, unitID, defName, x, z, facing)
 		local wx, wz = wantedPos(defName, x, z, facing)
@@ -415,12 +419,14 @@ local function startPlacements()
 	end
 
 	for _, actor in ipairs(mission.actors or {}) do
-		want("actor " .. actor.id, state().units[actor.id], actor.unitDef,
-			actor.pos.x, actor.pos.z, actor.facing)
+		if applies(actor.difficulty) then
+			want("actor " .. actor.id, state().units[actor.id], actor.unitDef,
+				actor.pos.x, actor.pos.z, actor.facing)
+		end
 	end
 
 	for _, group in ipairs(mission.groups or {}) do
-		if group.dormant ~= true then
+		if group.dormant ~= true and applies(group.difficulty) then
 			local units = state().groups.units(group.id)
 			local defs = {}
 			for _, entry in ipairs(group.units or {}) do
@@ -438,16 +444,18 @@ local function startPlacements()
 	end
 
 	for _, prefab in ipairs(mission.prefabs or {}) do
-		for index, building in ipairs(prefab.buildings or {}) do
-			-- A building the fixture forgot to name would drop out of every check
-			-- below with nothing said, so it is a failure in its own right.
-			check(string.format("prefab %s's building %d is named", prefab.id, index),
-				building.id ~= nil, building.def)
-			want(string.format("prefab %s's %s", prefab.id, building.def),
-				state().units[building.id], building.def,
-				prefab.origin.x + building.offset.x,
-				prefab.origin.z + building.offset.z,
-				building.facing)
+		if applies(prefab.difficulty) then
+			for index, building in ipairs(prefab.buildings or {}) do
+				-- A building the fixture forgot to name would drop out of every check
+				-- below with nothing said, so it is a failure in its own right.
+				check(string.format("prefab %s's building %d is named", prefab.id, index),
+					building.id ~= nil, building.def)
+				want(string.format("prefab %s's %s", prefab.id, building.def),
+					state().units[building.id], building.def,
+					prefab.origin.x + building.offset.x,
+					prefab.origin.z + building.offset.z,
+					building.facing)
+			end
 		end
 	end
 
@@ -1097,6 +1105,54 @@ plans.siege = {
 				rules("coilbox_mission_winners") == 1 and rules("coilbox_mission_winner_0") == 1,
 				tostring(rules("coilbox_mission_winners")) .. "/"
 					.. tostring(rules("coilbox_mission_winner_0")))
+		end },
+	},
+}
+
+-- Outbreak: the same scenario played at one difficulty or another (issue #2164).
+--
+-- Everything asserted here is asserted against the level this run was given
+-- rather than against a fixed answer, so one plan covers all three and the
+-- harness proves each of them by being run again with a different modoption.
+--
+-- The claim only a real engine can settle is that the level survives the trip:
+-- coilbox writes a word into a start script, the engine parses that script, and
+-- `Spring.GetModOptions()` hands the runtime whatever it made of it. Everything
+-- after that is arithmetic the luajit suite already proves.
+plans.outbreak = {
+	deadline = 60,
+	steps = {
+		{ frame = 1, run = checkPlacement },
+		{ frame = 5, run = function()
+			local level = state().difficulty
+			local asked = Spring.GetModOptions().coilbox_difficulty or "normal"
+			check("the runtime plays at the difficulty the start script asked for",
+				level == asked, tostring(level) .. " for " .. tostring(asked))
+
+			local hard = level == "hard"
+			check("a hard-only actor is on the map only on hard",
+				(state().units.warlord ~= nil) == hard, tostring(defOf(state().units.warlord)))
+			check("an up-to-normal base is there at every level below hard",
+				(state().units["spare-gun"] ~= nil) == not hard)
+			check("a base bounded at both ends is absent only outside them",
+				(state().units["raider-gun"] ~= nil) == (level ~= "easy"))
+			check("a hard-only trigger is armed only on hard",
+				armed("second-wave-arrives") == hard)
+			check("an easy-only trigger only on easy", armed("mercy") == (level == "easy"))
+			check("a trigger with no range is armed either way", armed("first-wave") == true)
+		end },
+		-- Standing in for the trigger that would send the wave, because that one
+		-- waits two minutes and this run is over in two seconds. A group the
+		-- difficulty leaves out has to answer this with nothing on the map and
+		-- without the runtime calling it an error, which is what the harness's own
+		-- error count is checking at the same time.
+		{ frame = 10, run = function()
+			state().groups.spawn("second-wave")
+		end },
+		{ frame = 20, run = function()
+			local wave = state().groups.units("second-wave")
+			check("spawn_group puts a hard-only group on the map only on hard",
+				#wave == (state().difficulty == "hard" and 4 or 0), #wave)
 		end },
 	},
 }

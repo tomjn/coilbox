@@ -315,6 +315,63 @@ describe("validateMission", () => {
    * rather than a warning. The game's unit list is a unitsync read, so it is
    * passed in, and a caller with no engine to ask still gets every other check.
    */
+  /** Issue #2164. */
+  describe("a difficulty range", () => {
+    const ranged = (difficulty: unknown) =>
+      validateMission(
+        mission({
+          actors: [
+            { id: "boss", unitDef: "armcom", team: "Enemy-1", difficulty },
+          ],
+        }),
+      );
+
+    it("passes when it can be satisfied, at either end or both", () => {
+      for (const range of [
+        { atLeast: "hard" },
+        { atMost: "easy" },
+        { atLeast: "easy", atMost: "hard" },
+        { atLeast: "normal", atMost: "normal" },
+        undefined,
+      ]) {
+        expect(ranged(range), JSON.stringify(range)).toEqual([]);
+      }
+    });
+
+    it("warns about one that crosses itself and can never apply", () => {
+      const issues = ranged({ atLeast: "hard", atMost: "easy" });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].severity).toBe("warning");
+      expect(issues[0].path).toBe('actors["boss"].difficulty');
+      expect(issues[0].message).toContain("never appears");
+    });
+
+    it("says the same about a group, a base and a trigger", () => {
+      const crossed = { atLeast: "hard", atMost: "easy" };
+      const issues = validateMission(
+        mission({
+          groups: [{ id: "wave1", team: "Enemy-1", difficulty: crossed }],
+          prefabs: [{ id: "base", team: "player", difficulty: crossed }],
+          triggers: [
+            {
+              id: "open",
+              conditions: { op: "all", conditions: [] },
+              actions: [],
+              difficulty: crossed,
+            },
+          ],
+        }),
+      );
+
+      expect(issues.map((i) => i.path)).toEqual([
+        'groups["wave1"].difficulty',
+        'prefabs["base"].difficulty',
+        'triggers["open"].difficulty',
+      ]);
+    });
+  });
+
   describe("a unit type the game does not have", () => {
     const units = [{ name: "armcom" }, { name: "armpw" }, { name: "ARMSOLAR" }];
 

@@ -78,9 +78,20 @@ function M.register(engine, state, hooks)
 		engineTeam[team.id] = team.team
 	end
 
+	-- Group id -> true when the difficulty being played leaves it out
+	-- (issue #2164). Settled once: an excluded group is not placed at the start
+	-- and is not placed by spawn_group or wake_group either, so "the second wave
+	-- only comes on hard" is one range on the group rather than a difficulty test
+	-- on every trigger that sends it.
+	local excluded = {}
+	local gate = state.difficultyGate
+
 	for _, group in ipairs((state.mission or {}).groups or {}) do
 		groups[group.id] = group
 		members[group.id] = {}
+		if gate and not gate(group.difficulty) then
+			excluded[group.id] = true
+		end
 	end
 
 	--- The group a params table names, or nil once it has said so.
@@ -95,6 +106,23 @@ function M.register(engine, state, hooks)
 				"no group named " .. tostring(name) .. ", ignoring it")
 		end
 		return group
+	end
+
+	--- Whether a group is part of the mission at the difficulty being played.
+	--
+	-- Notice rather than error, which is the difference between this and every
+	-- other reason an action does nothing. A group the author gated out is meant
+	-- to be missing: saying so at error level would put a line in the test
+	-- drawer's problem list for every difficulty-aware mission, which is exactly
+	-- what #2165 added that list to stop happening.
+	local function playing(group)
+		if not excluded[group.id] then
+			return true
+		end
+		engine:report("group-difficulty:" .. tostring(group.id), "notice", string.format(
+			"group %s is not part of this mission at difficulty %s, so nothing was placed",
+			tostring(group.id), tostring(state.difficulty)))
+		return false
 	end
 
 	--- The units an order's target names: an actor's unit, a named prefab
@@ -268,7 +296,7 @@ function M.register(engine, state, hooks)
 	-- how a mission puts a garrison somewhere without setting it off.
 	function handle.spawn(id)
 		local group = groupOfName(id)
-		if group then
+		if group and playing(group) then
 			place(group)
 			settle(group, group.orders)
 		end
@@ -281,7 +309,7 @@ function M.register(engine, state, hooks)
 	-- one action for a wave is what a mission author reaches for.
 	function handle.wake(id)
 		local group = groupOfName(id)
-		if group then
+		if group and playing(group) then
 			awake[group.id] = true
 			place(group)
 			settle(group, group.orders)
@@ -296,7 +324,7 @@ function M.register(engine, state, hooks)
 	-- author wrote.
 	function handle.orders(id, orders)
 		local group = groupOfName(id)
-		if group and requireUnits(group, "order") then
+		if group and playing(group) and requireUnits(group, "order") then
 			awake[group.id] = true
 			settle(group, orders)
 		end
@@ -317,7 +345,7 @@ function M.register(engine, state, hooks)
 	-- see.
 	function handle.gift(id, team)
 		local group = groupOfName(id)
-		if not group then
+		if not group or not playing(group) then
 			return
 		end
 
@@ -363,7 +391,7 @@ function M.register(engine, state, hooks)
 	-- otherwise.
 	function handle.release(id)
 		local group = groupOfName(id)
-		if not group or not requireUnits(group, "release") then
+		if not group or not playing(group) or not requireUnits(group, "release") then
 			return
 		end
 		rouse(group.id)
@@ -400,7 +428,10 @@ function M.register(engine, state, hooks)
 	function handle.start()
 		local spawned = 0
 		for _, group in ipairs((state.mission or {}).groups or {}) do
-			if group.dormant ~= true then
+			-- Silently at the start, where the actions above say a word: a group
+			-- the difficulty leaves out is one the mission never asked for here,
+			-- and one line per gated group on every load says nothing useful.
+			if group.dormant ~= true and not excluded[group.id] then
 				awake[group.id] = true
 				place(group)
 				settle(group, group.orders)

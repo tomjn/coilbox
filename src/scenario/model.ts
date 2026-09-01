@@ -65,6 +65,56 @@ export type Point = { x: number; z: number };
  */
 export type Facing = 0 | 1 | 2 | 3;
 
+/**
+ * How hard the mission is being played.
+ *
+ * Chosen at launch and not stored in the document, the way the engine team
+ * numbers are not: one scenario is played at every level, which is the whole
+ * point of having them. `launch.ts` carries the choice to the runtime in the
+ * `coilbox_difficulty` modoption.
+ *
+ * Three levels because that is what a player expects to be offered, and ordered
+ * because the ranges below are "this and up" and "this and down" rather than a
+ * set of levels to tick. Never reorder or remove one: a document names a level
+ * by its own name, so the order here is the meaning of every range already
+ * authored.
+ */
+export const DIFFICULTIES = ["easy", "normal", "hard"] as const;
+
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
+/** What a mission plays at when nobody chose, which is the middle one. */
+export const DEFAULT_DIFFICULTY: Difficulty = "normal";
+
+/** Where one level sits on the ladder, counting from the easiest. */
+export function difficultyRank(level: Difficulty): number {
+  return DIFFICULTIES.indexOf(level) + 1;
+}
+
+/**
+ * The difficulties one thing exists at (issue #2164). Both ends are optional
+ * and inclusive, so `{ atLeast: "hard" }` is "only on hard", `{ atMost:
+ * "normal" }` is "up to normal", and saying neither is what everything already
+ * authored says: it is always there.
+ *
+ * Two bounds rather than a list of levels because that is the shape Splaunch
+ * gives a Zero-K scenario's units, and because it stays right when a level is
+ * added between two that exist.
+ */
+export type DifficultyRange = { atLeast?: Difficulty; atMost?: Difficulty };
+
+/** Whether something with this range is part of a mission played at `level`. */
+export function difficultyApplies(
+  range: DifficultyRange | undefined,
+  level: Difficulty,
+): boolean {
+  if (!range) return true;
+  const at = difficultyRank(level);
+  if (range.atLeast && at < difficultyRank(range.atLeast)) return false;
+  if (range.atMost && at > difficultyRank(range.atMost)) return false;
+  return true;
+}
+
 /** A named area of the map, referenced by triggers. */
 export type ScenarioZone = { id: string; name: string } & (
   | { shape: "box"; min: Point; max: Point }
@@ -90,6 +140,8 @@ export type ScenarioActor = {
   pos: Point;
   facing: Facing;
   state?: ActorState;
+  /** The difficulties this actor is placed at. Absent is every one. */
+  difficulty?: DifficultyRange;
 };
 
 /**
@@ -119,6 +171,13 @@ export type ScenarioGroup = {
    * away.
    */
   dormant: boolean;
+  /**
+   * The difficulties this group exists at. Absent is every one. A group left
+   * out is not placed at the start and is not placed by `spawn_group` or
+   * `wake_group` either, so "the second wave only comes on hard" is one range
+   * rather than a difficulty test on every trigger that sends it.
+   */
+  difficulty?: DifficultyRange;
 };
 
 /**
@@ -167,6 +226,13 @@ export type ScenarioBase = {
    * blueprint dropped in from outside looks like before anything is added to it.
    */
   buildings: BaseBuildingRole[];
+  /**
+   * The difficulties this base is placed at. Absent is every one. The whole
+   * placement, not one building of it: an author who wants the extra turret and
+   * not the rest of the base places the turret as its own base, which is what
+   * Splaunch's own example does.
+   */
+  difficulty?: DifficultyRange;
 };
 
 /**
@@ -278,6 +344,16 @@ export type ScenarioTrigger = {
    * how a mission slows a repeating trigger down without counting in a var.
    */
   cooldown?: number;
+  /**
+   * The difficulties this trigger runs at. Absent is every one.
+   *
+   * A trigger outside its range is not armed and cannot be armed:
+   * `enable_trigger` on it does nothing. So "on hard the reinforcements arrive
+   * twice" is a second trigger with `atLeast: "hard"`, and a mission that turns
+   * its own triggers on and off cannot switch a hard-only one back on by
+   * accident.
+   */
+  difficulty?: DifficultyRange;
   conditions: { op: "all" | "any"; conditions: ScenarioCondition[] };
   actions: ScenarioAction[];
 };
@@ -353,6 +429,36 @@ const id = (v: unknown): string | undefined =>
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === "string");
+}
+
+const difficulty = (v: unknown): Difficulty | undefined =>
+  DIFFICULTIES.find((level) => level === v);
+
+/**
+ * A difficulty range, or undefined when it says nothing.
+ *
+ * An end that is not a level this build knows is dropped rather than rejecting
+ * the document, so a document written against a later ladder loses the bound it
+ * cannot read and keeps the one it can. An empty range is undefined, because
+ * "no bounds either way" is what saying nothing already means, and leaving an
+ * empty table in would change the compiled bytes of a document that asks for
+ * nothing.
+ */
+function parseDifficultyRange(value: unknown): DifficultyRange | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: DifficultyRange = {};
+  const atLeast = difficulty(value.atLeast);
+  if (atLeast !== undefined) out.atLeast = atLeast;
+  const atMost = difficulty(value.atMost);
+  if (atMost !== undefined) out.atMost = atMost;
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** `{ difficulty }` when there is a range, and nothing at all when there is
+ *  not, so the key stays absent rather than present and undefined. */
+function difficultyOf(value: unknown): { difficulty?: DifficultyRange } {
+  const range = parseDifficultyRange(value);
+  return range ? { difficulty: range } : {};
 }
 
 function parsePoint(value: unknown): Point | undefined {
@@ -473,6 +579,7 @@ function parseActor(a: Record<string, unknown>): ScenarioActor | null {
     pos,
     facing: parseFacing(a.facing),
     state: parseActorState(a.state),
+    ...difficultyOf(a.difficulty),
   };
 }
 
@@ -498,7 +605,15 @@ function parseGroup(g: Record<string, unknown>): ScenarioGroup | null {
   if (gid === undefined || team === undefined || !pos || !units || !orders) {
     return null;
   }
-  return { id: gid, team, units, pos, orders, dormant: g.dormant === true };
+  return {
+    id: gid,
+    team,
+    units,
+    pos,
+    orders,
+    dormant: g.dormant === true,
+    ...difficultyOf(g.difficulty),
+  };
 }
 
 function parseLayout(value: unknown): BlueprintBuilding[] | null {
@@ -610,6 +725,7 @@ function parseBase(p: Record<string, unknown>): ScenarioBase | null {
     team,
     origin,
     buildings: parseRoles(p.buildings),
+    ...difficultyOf(p.difficulty),
   };
 }
 
@@ -857,6 +973,7 @@ function parseTrigger(t: Record<string, unknown>): ScenarioTrigger | null {
     // Absent means armed: a trigger nobody thought about should fire.
     enabled: t.enabled !== false,
     repeat: t.repeat === true,
+    ...difficultyOf(t.difficulty),
     conditions: { op: group.op === "any" ? "any" : "all", conditions },
     actions,
   };
@@ -978,6 +1095,26 @@ export function parseScenario(value: unknown): Scenario | null {
     createdAt: str(value.createdAt) ?? "",
     updatedAt: str(value.updatedAt) ?? "",
   };
+}
+
+/**
+ * Whether anything in the document depends on the difficulty it is played at.
+ *
+ * The one question two things ask. `requiredRuntimeVersion` raises the runtime a
+ * scenario needs only for a document this is true of, so nothing already
+ * authored asks for a runtime it does not need. And the launch offers a
+ * difficulty only for one, because a picker that changes nothing is a picker
+ * worth leaving out.
+ */
+export function usesDifficulty(scenario: Scenario): boolean {
+  const ranged = (item: { difficulty?: DifficultyRange }) =>
+    item.difficulty !== undefined;
+  return (
+    scenario.actors.some(ranged) ||
+    scenario.groups.some(ranged) ||
+    scenario.bases.some(ranged) ||
+    scenario.triggers.some(ranged)
+  );
 }
 
 /**

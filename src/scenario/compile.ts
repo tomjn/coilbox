@@ -1,5 +1,6 @@
 import { effectiveTeams, type Participant } from "../play/participants";
 import type {
+  DifficultyRange,
   Scenario,
   ScenarioDialogue,
   ScenarioGroup,
@@ -206,6 +207,24 @@ const point = (p: { x: number; z: number }): LuaTable =>
     ["z", p.z],
   ]);
 
+/**
+ * The difficulties one placement or trigger applies at, or nothing at all.
+ *
+ * Nothing at all is what everything already authored emits, which is what keeps
+ * this additive: a document that names no range compiles to the bytes it always
+ * did, and a runtime that has never heard of difficulty reads a table with no
+ * new key in it (issue #2164).
+ */
+const difficulty = (
+  range: DifficultyRange | undefined,
+): LuaTable | undefined =>
+  range === undefined
+    ? undefined
+    : tbl([
+        ["atLeast", range.atLeast],
+        ["atMost", range.atMost],
+      ]);
+
 const zone = (z: ScenarioZone): LuaTable =>
   tbl([
     ["id", z.id],
@@ -243,6 +262,7 @@ const group = (g: ScenarioGroup): LuaTable =>
     ["pos", point(g.pos)],
     ["orders", g.orders.map(order)],
     ["dormant", g.dormant],
+    ["difficulty", difficulty(g.difficulty)],
   ]);
 
 const objective = (o: ScenarioObjective): LuaTable =>
@@ -285,6 +305,7 @@ const trigger = (t: ScenarioTrigger): LuaTable =>
     ["enabled", t.enabled],
     ["repeat", t.repeat],
     ["cooldown", t.cooldown],
+    ["difficulty", difficulty(t.difficulty)],
     [
       "conditions",
       tbl([
@@ -400,6 +421,7 @@ function mission(scenario: Scenario): LuaTable {
                 ])
               : undefined,
           ],
+          ["difficulty", difficulty(a.difficulty)],
         ]),
       ),
     ],
@@ -411,6 +433,7 @@ function mission(scenario: Scenario): LuaTable {
           ["id", p.id],
           ["team", p.team],
           ["origin", point(p.origin)],
+          ["difficulty", difficulty(p.difficulty)],
           [
             "buildings",
             baseBuildings(scenario.blueprints, p).map((b) =>

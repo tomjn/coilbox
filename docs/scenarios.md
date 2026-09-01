@@ -131,6 +131,20 @@ The **name** is what triggers refer to, so it is the only thing worth editing af
 
 Each participant can be given a starting bank, free income per second, a list of units to spawn on its start position, and **no commander**. Resources are set for every team the scenario declares, so a team you say nothing about starts with nothing rather than with the game's usual opening bank. The commander is only suppressed for a team you actually mark **no commander**, because the format has a flag per team and a flat rule would make it meaningless.
 
+## Difficulty
+
+One scenario can be three. An actor, a group, a base and a trigger each carry an optional **Only from** and **Only up to**, over easy, normal and hard. Leave both on **Any difficulty** and the thing is always there, which is what everything you have already written says.
+
+So the extra turret is a base marked "Only from hard". The mercy waypoint marker is a trigger marked "Only up to easy". The second wave is a group marked "Only from hard", set once on the group rather than on every trigger that sends it: a group outside its range is not placed at the start and is not placed by `spawn_group` or `wake_group` either.
+
+A trigger outside its range is not armed and cannot be armed. `enable_trigger` on it does nothing, so "on hard the reinforcements arrive twice" is a second trigger set to hard rather than a difficulty test written into the trigger you already have.
+
+The player picks the difficulty in the same drawer they press **Play** in, and you pick it in **Test in game**. The picker only appears for a scenario that actually varies by it.
+
+A range that crosses itself, "only from hard" and "only up to easy" together, is a warning on the launch rather than a refusal. Nothing in the mission can satisfy it, so the thing never appears at any setting.
+
+A scenario that sets any range needs mission runtime 6. One that sets none asks for whatever it asked for before, plays identically at every setting, and compiles to the same file it always did.
+
 ## Triggers
 
 A trigger is "when these conditions hold, run these actions". The list is flat, and triggers that enable and disable other triggers are what turn a flat list into a state machine.
@@ -142,6 +156,7 @@ Each trigger has:
 - **Waits N seconds between firings**, for a repeating trigger. With no wait, a repeating trigger fires on every pass its conditions hold, which on the polled tick is about twice a second.
 - **Fires when**, a list of conditions with **all of these hold** or **any of these hold** over it. There is no nesting. An empty list holds under `all` and never holds under `any`.
 - **Then**, the actions, run in the order you list them.
+- **Only from** and **Only up to**, the difficulties it runs at. See [Difficulty](#difficulty).
 
 A trigger's name is its id. Renaming one rewrites the actions that referred to it.
 
@@ -258,6 +273,8 @@ The drawer also says which route the launch is taking and why, before you press 
 
 The button is disabled with a reason for the things you have to fix elsewhere: no engine installed, no game and map set, the game not installed, or a game already running.
 
+Both the editor's drawer and the player's offer a difficulty, for a scenario that varies by one. See [Difficulty](#difficulty).
+
 **Play > Scenarios** is the player-facing half. It lists every scenario that names a game and a map, with its contents, and gives each one a **Play** button that runs the same pipeline. It also has its own **Import**, so a scenario someone sent you can be brought in and played without Advanced mode or the editor. The sidebar item is hidden until at least one scenario is ready to play.
 
 A player is told the same facts as an author in different words. "Install it from Content" is something anyone can do, so it is said either way, while "set the scenario up on a game you have", the test mutator and mission runtime versions are the author's and are not shown on the Scenarios page at all. A player is told that coilbox sets up what the game needs and leaves their copy of it alone.
@@ -366,6 +383,7 @@ Honest limits, all of them things you can hit while authoring:
 - **A restricted unit's build icon is greyed out, and a game may un-grey it.** The runtime greys the icons your restrictions forbid, on every builder, and ungreys one an `unlock_unit` frees. A game that paints its own build icons, for a tech tree or a supply limit, can repaint over that, and then a forbidden unit looks available. The build is still refused either way.
 - **A mission coilbox wrote into a game stays there.** There is no in-app way to remove one: [issue #814](https://github.com/tomjn/coilbox/issues/814).
 - **A scenario cannot be set up without a preset:** [issue #821](https://github.com/tomjn/coilbox/issues/821).
+- **A campaign mission is not offered a difficulty yet.** The ranges work wherever the scenario is played, but the campaign's own launch has no picker, so a mission run from a campaign plays at normal: [issue #2220](https://github.com/tomjn/coilbox/issues/2220).
 
 One thing nobody has watched happen, so treat it as unproven rather than working:
 

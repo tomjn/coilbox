@@ -29,6 +29,7 @@ import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { GroupUnit, ScenarioGroup, ScenarioOrder } from "../../model";
+import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import {
   clampCount,
   groupSize,
@@ -130,6 +131,17 @@ export function GroupControls({
               id="group-dormant"
               checked={group.dormant}
               onCheckedChange={(dormant) => onEdit({ dormant })}
+            />
+          </div>
+
+          {/* Which difficulties this group exists at (issue #2164). A group the
+              range leaves out is not placed at the start and is not placed by
+              spawn_group or wake_group either, so "the second wave only comes
+              on hard" is set here rather than on every trigger that sends it. */}
+          <div className="border-t border-border/60 pt-3">
+            <DifficultyRangeFields
+              value={group.difficulty}
+              onChange={(difficulty) => onEdit({ difficulty })}
             />
           </div>
 
