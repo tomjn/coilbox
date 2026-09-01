@@ -13,6 +13,11 @@
  * plays its own copy, and once the builder's document has moved on the copy is
  * the only one of itself, so the case worth pinning is which document ends up
  * saved and when the action is offered at all.
+ *
+ * The third thing here is what the page says about its own writes (issue
+ * #2198). It saves as you go and never asks, so the case that has to hold is
+ * the refused write: an indicator that can only ever say "Saved" is worse than
+ * no indicator, because it is believed.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -27,24 +32,27 @@ vi.mock("@picoframe/frame", async () => ({
 
 // The campaign comes off disk through the plugin, and the writes go back the
 // same way. Both stand in, so what is asserted is what the page asked for.
-const { campaignSave, campaignImageDelete, useCampaigns, useScenarios } =
-  vi.hoisted(() => ({
-    campaignSave: vi.fn(async (_args: { id: string; json: string }) => ({})),
-    campaignImageDelete: vi.fn(
-      async (_args: { campaignId: string; file: string }) => ({}),
-    ),
-    useCampaigns: vi.fn(),
-    useScenarios: vi.fn(),
-  }));
+const {
+  campaignSave,
+  campaignImageDelete,
+  useCampaigns,
+  useScenarios,
+  refreshCampaigns,
+} = vi.hoisted(() => ({
+  campaignSave: vi.fn(async (_args: { id: string; json: string }) => ({})),
+  campaignImageDelete: vi.fn(
+    async (_args: { campaignId: string; file: string }) => ({}),
+  ),
+  useCampaigns: vi.fn(),
+  useScenarios: vi.fn(),
+  refreshCampaigns: vi.fn(async () => []),
+}));
 vi.mock("../bindings", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../bindings")),
   campaignSave,
   campaignImageDelete,
 }));
-vi.mock("../campaigns", () => ({
-  useCampaigns,
-  refreshCampaigns: async () => [],
-}));
+vi.mock("../campaigns", () => ({ useCampaigns, refreshCampaigns }));
 // What the scenario builder holds, which is the other half of every staleness
 // question this page asks.
 vi.mock("@/scenario/scenarios", () => ({ useScenarios }));
@@ -132,6 +140,7 @@ function savedMissions(): CampaignMission[] {
 beforeEach(() => {
   campaignSave.mockClear();
   campaignImageDelete.mockClear();
+  refreshCampaigns.mockClear();
 });
 
 afterEach(() => {
@@ -331,5 +340,104 @@ describe("re-copying a mission's scenario", () => {
         /The mission's map changes from Comet Catcher to Red Comet\./,
       ),
     ).toBeTruthy();
+  });
+});
+
+const SAVED = /^Saved \d{1,2}:\d{2}/;
+const NOT_SAVED = "Not saved. Leaving this page loses the change.";
+const REFUSED = "the campaign folder is read-only";
+
+/** The title box, which edits as it is typed in and writes on blur. */
+function titleBox(): HTMLElement {
+  return screen.getByLabelText("Campaign title");
+}
+
+describe("saying whether an edit reached disk", () => {
+  it("says nothing until something has been written", () => {
+    show([]);
+
+    expect(screen.queryByText(SAVED)).toBeNull();
+    expect(screen.queryByText("Saving…")).toBeNull();
+    expect(screen.queryByText("Unsaved changes")).toBeNull();
+  });
+
+  it("calls a typed-in title unsaved until the box is left", () => {
+    show([]);
+
+    fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+
+    expect(screen.getByText("Unsaved changes")).toBeTruthy();
+    expect(campaignSave).not.toHaveBeenCalled();
+  });
+
+  it("says it is saving while the write is in flight, then names the time", async () => {
+    let finish: (() => void) | undefined;
+    campaignSave.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({});
+        }),
+    );
+    show([]);
+
+    fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+    fireEvent.blur(titleBox());
+
+    expect(await screen.findByText("Saving…")).toBeTruthy();
+    expect(screen.queryByText(SAVED)).toBeNull();
+
+    finish?.();
+    expect(await screen.findByText(SAVED)).toBeTruthy();
+    expect(screen.queryByText("Saving…")).toBeNull();
+  });
+
+  it("does not claim a refused write saved, and says what it costs", async () => {
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    show([]);
+
+    fireEvent.blur(titleBox());
+
+    expect(await screen.findByText(NOT_SAVED)).toBeTruthy();
+    expect(screen.queryByText(SAVED)).toBeNull();
+    // The reason the plugin gave, which the indicator has no room for.
+    expect(screen.getByText(REFUSED)).toBeTruthy();
+  });
+
+  it("writes the document again on retry, and says so once it lands", async () => {
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    show([]);
+
+    fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+    fireEvent.blur(titleBox());
+    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText(SAVED)).toBeTruthy();
+    expect(screen.queryByText(NOT_SAVED)).toBeNull();
+    // The retry carries the edit that failed, not the document as stored.
+    const written = campaignSave.mock.calls.at(-1)?.[0];
+    expect(JSON.parse(written?.json ?? "{}").title).toBe("Landfall II");
+    // And the reason for the failed write is gone with it.
+    expect(screen.queryByText(REFUSED)).toBeNull();
+  });
+
+  it("keeps the failure up while the write that failed is the last one", async () => {
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    show([]);
+
+    fireEvent.blur(titleBox());
+    await screen.findByText(NOT_SAVED);
+
+    // Nothing else has been asked for, so nothing may quietly clear this.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByText(NOT_SAVED)).toBeTruthy();
+  });
+
+  it("reports a mission change too, not only the text boxes", async () => {
+    show([mission()]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText(SAVED)).toBeTruthy();
   });
 });

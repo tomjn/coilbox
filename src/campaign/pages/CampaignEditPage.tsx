@@ -1,6 +1,6 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncThumbnails } from "@/content/config";
@@ -25,6 +25,7 @@ import { MissionRemoveButton } from "./components/MissionRemoveButton";
 import { MissionScenarioUpdateButton } from "./components/MissionScenarioUpdateButton";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
+import { type SaveState, SaveStatus } from "./components/SaveStatus";
 import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
 
 const BACK = "/campaign-builder";
@@ -75,6 +76,11 @@ export default function CampaignEditPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [save, setSave] = useState<SaveState>({ kind: "idle" });
+  // Which write the indicator is speaking for. Writes are not queued, so two
+  // can be in flight at once, and only the newest one describes where the
+  // document has got to.
+  const writes = useRef(0);
 
   // Seed the editable copy once the (local) campaign for this id is available,
   // and re-seed if the route id changes under the same component instance.
@@ -85,15 +91,30 @@ export default function CampaignEditPage() {
     }
   }, [loaded, loadedId]);
 
+  /** Show a document and write it to disk. Every edit on this page comes
+   *  through here, because there is no save button to defer one to. */
   const persist = useCallback(async (next: Campaign) => {
     const stamped: Campaign = { ...next, updatedAt: new Date().toISOString() };
     setCampaign(stamped);
+    const seq = ++writes.current;
+    setSave({ kind: "saving" });
+    let failure: string | null = null;
     try {
       await campaignSave({ id: stamped.id, json: JSON.stringify(stamped) });
       await refreshCampaigns();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      failure = e instanceof Error ? e.message : String(e);
     }
+    // A newer write is already under way with a document that contains this
+    // one's edit, so it owns what the indicator says either way.
+    if (seq !== writes.current) return;
+    if (failure !== null) {
+      setError(failure);
+      setSave({ kind: "failed" });
+      return;
+    }
+    setError(null);
+    setSave({ kind: "saved", at: new Date() });
   }, []);
 
   if (loading && !campaign) return <DetailLoading backTo={BACK} />;
@@ -114,6 +135,14 @@ export default function CampaignEditPage() {
     );
   }
   if (!campaign) return <NotFound backTo={BACK} label="campaign" />;
+
+  /** Change the document without writing it. The text boxes edit as they are
+   *  typed in and only persist on blur, so until then what is on screen is
+   *  ahead of what is on disk and the indicator has to say so. */
+  const edit = (change: (c: Campaign) => Campaign) => {
+    setCampaign((c) => (c ? change(c) : c));
+    setSave({ kind: "unsaved" });
+  };
 
   const move = (index: number, dir: -1 | 1) => {
     const j = index + dir;
@@ -212,12 +241,15 @@ export default function CampaignEditPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <Link
-        to={BACK}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-      >
-        <ArrowLeft className="size-3.5" /> Back to campaigns
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          to={BACK}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+        >
+          <ArrowLeft className="size-3.5" /> Back to campaigns
+        </Link>
+        <SaveStatus state={save} onRetry={() => void persist(campaign)} />
+      </div>
 
       {error && <ErrorBanner message={error} />}
 
@@ -225,9 +257,7 @@ export default function CampaignEditPage() {
         <Input
           aria-label="Campaign title"
           value={campaign.title}
-          onChange={(e) =>
-            setCampaign((c) => (c ? { ...c, title: e.target.value } : c))
-          }
+          onChange={(e) => edit((c) => ({ ...c, title: e.target.value }))}
           onBlur={() => void persist(campaign)}
           className="text-base font-semibold"
         />
@@ -236,9 +266,7 @@ export default function CampaignEditPage() {
           value={campaign.description}
           placeholder="Description"
           className="min-h-16"
-          onChange={(e) =>
-            setCampaign((c) => (c ? { ...c, description: e.target.value } : c))
-          }
+          onChange={(e) => edit((c) => ({ ...c, description: e.target.value }))}
           onBlur={() => void persist(campaign)}
         />
       </header>
