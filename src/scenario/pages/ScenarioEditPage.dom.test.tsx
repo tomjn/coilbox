@@ -149,8 +149,12 @@ function openMenuByKeyboard(name: string) {
 // The same cost the scenario list's share test pays, for the same reason. The
 // header's Share loads its form with a dynamic import, and in a test that is
 // Vite transforming the form's whole module graph on demand rather than fetching
-// a built chunk. Left inside the 1000ms `vi.waitFor` below it went over the
-// budget under the full suite and failed at random (issue #2215).
+// a built chunk, inside the 1000ms `vi.waitFor` below.
+//
+// This one is a precaution rather than a repair. Only the list's share test was
+// ever seen to fail (issue #2215), but this is the same wait around the same
+// import of the same form, so it is one machine being slightly slower away from
+// being the one that fails next.
 beforeAll(async () => {
   await import("./components/ShareScenarioForm");
 });

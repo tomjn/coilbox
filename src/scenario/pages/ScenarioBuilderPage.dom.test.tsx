@@ -229,11 +229,13 @@ function openMenuByKeyboard(name: string) {
 
 // The Share menu item loads its form with a dynamic import. In the shipped app
 // that fetches a built chunk. In a test it is Vite transforming the form's whole
-// module graph on demand, which measured 722ms on this machine against the
-// 1000ms budget `vi.waitFor` gives the share test below. Under the full suite
-// running in parallel it went over that budget and the test failed at random
-// (issue #2215). Paying it here leaves the wait covering the drawer opening and
-// nothing else.
+// module graph on demand, inside the 1000ms budget `vi.waitFor` gives the share
+// test below. On an idle machine that is tens of milliseconds and nothing is at
+// risk: the share test measured 123ms with this line taken out and 88ms with it
+// in. Under the whole suite running in parallel it went over the budget instead,
+// and 5 of 10 whole-suite runs failed on it before this line against 0 of 20
+// after (issue #2215). Paying the transform here leaves the wait covering the
+// drawer opening and nothing else.
 beforeAll(async () => {
   await import("./components/ShareScenarioForm");
 });
