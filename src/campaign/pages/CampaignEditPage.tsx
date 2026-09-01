@@ -1,5 +1,12 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Copy,
+  Pencil,
+  Plus,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +24,7 @@ import {
 } from "../../content/pages/components/states";
 import { campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
+import { copyTitle } from "../duplicate";
 import { deleteDroppedMedia } from "../media";
 import { missionFromScenario, scenarioAttachment } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
@@ -51,6 +59,34 @@ function missionFromPreset(preset: SkirmishPreset): CampaignMission {
     snapshot,
     disabledUnits: [],
     skippable: false,
+  };
+}
+
+/**
+ * A copy of one mission, for the row's Duplicate action (issue #2196).
+ *
+ * The whole mission is deep-copied, so the copy's scenario, its launch snapshot
+ * and its objectives are its own. Two missions sharing one scenario object would
+ * hold until something edited it in place, and then the edit would land on both.
+ *
+ * What it does *not* copy is the media. A ref names a bare file in the
+ * campaign's own `images/<id>/` or `media/<id>/` folder, and the copy is in that
+ * same campaign, so both missions read the same file and the copy shows the
+ * original's panorama straight away. Writing a second set of bytes would double
+ * the disk for a variant whose art is almost always the same art, and it would
+ * mean a round trip through the `coilbox://` protocol that can fail, on an
+ * action that otherwise cannot. Deleting either mission afterwards is safe:
+ * `droppedMediaFiles` asks what the whole document still names, so a file the
+ * other mission plays is kept.
+ */
+export function duplicateMission(
+  mission: CampaignMission,
+  taken: Iterable<string>,
+): CampaignMission {
+  return {
+    ...structuredClone(mission),
+    id: crypto.randomUUID(),
+    title: copyTitle(mission.title, taken),
   };
 }
 
@@ -179,6 +215,25 @@ export default function CampaignEditPage() {
   const persistMedia = async (next: Campaign) => {
     await deleteDroppedMedia(campaign.id, campaign, next);
     await persist(next);
+  };
+
+  /** Copy the mission at `index` in directly after it.
+   *
+   *  After the original rather than at the end, because array order is play
+   *  order: a variant of mission 3 appended to a ten-mission campaign is a
+   *  mission the author now has to walk back up the list, and it reads as
+   *  mission 11 until they do. Nothing is deleted or replaced, so this goes
+   *  through `persist` rather than `persistMedia`. */
+  const duplicateMissionAt = (index: number) => {
+    const missions = campaign.missions.slice();
+    const source = missions[index];
+    if (!source) return;
+    const copy = duplicateMission(
+      source,
+      missions.map((x) => x.title),
+    );
+    missions.splice(index + 1, 0, copy);
+    void persist({ ...campaign, missions });
   };
 
   const removeMission = (m: CampaignMission) =>
@@ -455,8 +510,20 @@ export default function CampaignEditPage() {
                       >
                         <Pencil className="size-4" /> Edit
                       </Button>
+                      {/* No confirmation, the way campaign duplication has
+                          none: a copy takes nothing away, and removing it is
+                          one click on the row it just made. */}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Duplicate ${m.title}`}
+                        onClick={() => duplicateMissionAt(i)}
+                      >
+                        <Copy className="size-4" />
+                      </Button>
                       <MissionRemoveButton
                         mission={m}
+                        others={campaign.missions.filter((x) => x.id !== m.id)}
                         scenarios={scenarios}
                         onRemove={() => removeMission(m)}
                       />
