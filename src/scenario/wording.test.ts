@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adoptedGameRoute,
   coilboxTooOld,
+  engineRunProblems,
   gameNotInstalled,
   gameOwnMissionRoute,
   missionDriftedFromDocument,
@@ -9,6 +10,9 @@ import {
   missionProblems,
   missionProblemsLookWrong,
   missionProblemsStopPlay,
+  missionRunLogMissing,
+  missionRuntimeProblems,
+  missionRuntimeSaidNothing,
   missionWarnings,
   olderRuntimeRoute,
   packagedGameRoute,
@@ -155,6 +159,29 @@ describe("the editor header's count", () => {
       "One thing plays, and reads to a player as a bug:",
     );
     expect(missionProblemsLookWrong(3)).toContain("3 things play");
+  });
+});
+
+describe("what the engine's log said about a test run", () => {
+  it("counts the runtime's own problems apart from the engine's", () => {
+    expect(missionRuntimeProblems(1)).toBe(
+      "The mission runtime reported 1 problem while it played:",
+    );
+    expect(missionRuntimeProblems(4)).toContain("4 problems");
+    expect(engineRunProblems(1)).toContain("one error or warning of its own");
+    expect(engineRunProblems(3)).toContain("3 errors and warnings of its own");
+  });
+
+  it("reads silence from the runtime as an answer, not as nothing", () => {
+    const said = missionRuntimeSaidNothing();
+
+    expect(said).toContain("reported nothing");
+    expect(said).toContain("reached the map");
+  });
+
+  it("says when there was no log to read rather than implying a clean run", () => {
+    expect(missionRunLogMissing()).toContain("could not be read");
+    expect(missionRunLogMissing()).not.toBe(missionRuntimeSaidNothing());
   });
 });
 
