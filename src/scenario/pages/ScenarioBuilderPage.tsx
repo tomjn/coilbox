@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
@@ -17,11 +18,23 @@ import { newScenario } from "../create";
 import { campaignsUsingScenario, isSetUp, scenarioSummary } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import { deleteScenario, isEditable, saveScenario } from "../storage";
+import {
+  deleteScenario,
+  isEditable,
+  type LoadedScenario,
+  saveScenario,
+} from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 import { ScenarioMapThumb } from "./components/ScenarioMapThumb";
 import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
+import {
+  filterScenarios,
+  groupScenariosByGame,
+  offeredSources,
+  SOURCE_LABELS,
+  type SourceFilter,
+} from "./components/scenarioList";
 
 /**
  * Scenario Builder landing: create a scenario, import a shared one, and list
@@ -33,10 +46,16 @@ import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
  * only later attached to a campaign mission.
  *
  * A row says what an author needs to tell two scenarios apart while scanning the
- * list (issue #2179): the map, the name, the game and map it is set on, what it
- * holds, when it was last written, and the description. Ten smoke tests all
- * called "test" are separated by the edit time, which is also the only thing on
- * screen that explains why the list is in the order it is.
+ * list (issue #2179): the map, the name, the map it is set on, what it holds,
+ * when it was last written, and the description. Ten smoke tests all called
+ * "test" are separated by the edit time, which is also the only thing on screen
+ * that explains why the list is in the order it is.
+ *
+ * Past a screenful, scanning stops working, so the list is also searchable by
+ * name, narrowable to one source, and gathered under the game each scenario is
+ * set on (issue #2181). Grouping is what pays for the row: the game was the most
+ * repeated text on the screen and it is now written once per group, which is
+ * also the row's longest and least predictable line gone.
  */
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
@@ -62,6 +81,25 @@ export default function ScenarioBuilderPage() {
   const navigate = useNavigate();
   const drawer = useDrawer();
   const [rescanning, setRescanning] = useState(false);
+
+  // Search and filter are this mount's state, so opening a scenario and coming
+  // back shows the whole list again. Searching is how an author reaches one
+  // scenario, and once they are in it the search has done its job. A list still
+  // narrowed on the way back, with no address bar in a desktop app to say why,
+  // is a list that looks like it has lost documents.
+  const [query, setQuery] = useState("");
+  const [source, setSource] = useState<SourceFilter>("all");
+  // Computed from the whole list rather than the filtered one, so the chips
+  // stay put while the search box is typed into.
+  const sources = useMemo(() => offeredSources(scenarios), [scenarios]);
+  const groups = useMemo(
+    () => groupScenariosByGame(filterScenarios(scenarios, query, source)),
+    [scenarios, query, source],
+  );
+  const showAll = () => {
+    setQuery("");
+    setSource("all");
+  };
 
   const openNew = () =>
     drawer.open({
@@ -125,6 +163,112 @@ export default function ScenarioBuilderPage() {
     await refreshScenarios();
   };
 
+  // A closure rather than a component, because a row needs the thumbnails, the
+  // installed maps, the campaigns and all three menu actions, and passing six
+  // props down one level to say the same thing is a worse row.
+  const row = (loaded: LoadedScenario) => {
+    const { scenario, source: from, origin } = loaded;
+    // A bundled scenario is a distribution's own file, so it is listed and
+    // exportable but not editable or deletable. Same treatment as a bundled
+    // campaign.
+    //
+    // A game's own mission is listed with them and shares the read-only half,
+    // but never offers Delete even when it is editable: taking a mission out of
+    // a game puts the document back in coilbox's store, which is its own action
+    // rather than a delete (issue #2160).
+    const bundled = from === "bundled";
+    const fromGame = from === "game";
+    // A scenario with no game or no map cannot be launched, by anything. The
+    // group heading and the second line already say which of the two is
+    // missing, so the badge carries the consequence rather than repeating the
+    // gap.
+    const draft = !isSetUp(scenario);
+    const inCampaigns = usedBy(scenario.id);
+    return (
+      <li
+        key={scenario.id}
+        className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50"
+      >
+        {/* The whole row opens the scenario, which is what nearly every click on
+            one wants. A read-only scenario goes to the same route and lands on
+            the read-only view there, which says why it cannot be edited, so no
+            row is a dead click. */}
+        <Link
+          to={`/scenario-builder/${scenario.id}`}
+          className="flex min-w-0 flex-1 items-center gap-3"
+        >
+          <ScenarioMapThumb
+            mapName={scenario.setup.mapName}
+            thumbs={thumbs}
+            installedMaps={installedMaps}
+            loading={thumbsLoading}
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-medium">
+                {scenario.name}
+              </span>
+              {draft && (
+                <Badge variant="outline" className="shrink-0 text-[10px]">
+                  Draft
+                </Badge>
+              )}
+              {bundled && (
+                <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                  Bundled
+                </span>
+              )}
+              {fromGame && origin && (
+                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                  From {origin.gameName}
+                </Badge>
+              )}
+              {/* Not a link. The whole row is already one, and an anchor inside
+                  an anchor is a click target neither browsers nor screen readers
+                  agree on. Naming the campaigns on hover costs no tab stop and
+                  no nesting. */}
+              {inCampaigns.length > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 text-[10px]"
+                  title={`Used by ${inCampaigns.join(", ")}`}
+                >
+                  {inCampaigns.length === 1
+                    ? "In campaign"
+                    : `In ${inCampaigns.length} campaigns`}
+                </Badge>
+              )}
+            </div>
+            {/* The map alone. The heading above the group names the game, so
+                repeating it here would be the one piece of text the grouping
+                was meant to stop repeating (issue #2181). */}
+            <span className="truncate text-xs text-muted-foreground">
+              {scenario.setup.mapName || "No map"}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+              {scenarioSummary(scenario)}
+            </span>
+            {/* Only when the author wrote one. An empty line here would be a row
+                that is taller for having said nothing. */}
+            {scenario.description && (
+              <span className="truncate text-xs text-muted-foreground">
+                {scenario.description}
+              </span>
+            )}
+          </div>
+        </Link>
+        <ScenarioRowMenu
+          scenario={scenario}
+          editable={isEditable(loaded)}
+          deletable={!bundled && !fromGame}
+          attached={inCampaigns.length > 0}
+          onShare={() => void openShare(scenario)}
+          onDelete={() => remove(scenario.id)}
+        />
+      </li>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <PageHeader
@@ -156,7 +300,48 @@ export default function ScenarioBuilderPage() {
             </Button>
           </>
         }
-      />
+      >
+        {/* The filter row belongs to the header rather than the list, because it
+            acts on the whole page and has to stay put when the list under it
+            empties out. Hidden only when there is nothing at all to filter. */}
+        {scenarios.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search scenarios…"
+              aria-label="Search scenarios by name"
+              className="h-8 w-56"
+            />
+            {/* Only when this machine has more than one kind. Most authors have
+                only their own scenarios, and a chip that can match nothing is a
+                control that has to be tried before it can be dismissed. */}
+            {sources.length > 0 && (
+              <ButtonGroup>
+                <Button
+                  size="sm"
+                  variant={source === "all" ? "default" : "outline"}
+                  aria-pressed={source === "all"}
+                  onClick={() => setSource("all")}
+                >
+                  All
+                </Button>
+                {sources.map((s) => (
+                  <Button
+                    key={s}
+                    size="sm"
+                    variant={source === s ? "default" : "outline"}
+                    aria-pressed={source === s}
+                    onClick={() => setSource(s)}
+                  >
+                    {SOURCE_LABELS[s]}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            )}
+          </div>
+        )}
+      </PageHeader>
 
       {error && <ErrorBanner message={error} />}
 
@@ -164,114 +349,38 @@ export default function ScenarioBuilderPage() {
         <SkeletonList />
       ) : scenarios.length === 0 ? (
         <EmptyState label="No scenarios yet. Start one with New scenario, or import a shared one." />
+      ) : groups.length === 0 ? (
+        // A list that just goes blank reads as documents having been lost, so
+        // this counts what is still there and offers the way back in one click
+        // rather than leaving somebody to work out which control hid them.
+        <EmptyState
+          label={
+            <span className="flex flex-col items-center gap-2">
+              <span>
+                No scenarios match. All {scenarios.length} are still here.
+              </span>
+              <Button variant="outline" size="sm" onClick={showAll}>
+                Show all scenarios
+              </Button>
+            </span>
+          }
+        />
       ) : (
-        <ul className="flex flex-col gap-2">
-          {scenarios.map((loaded) => {
-            const { scenario, source, origin } = loaded;
-            // A bundled scenario is a distribution's own file, so it is listed
-            // and exportable but not editable or deletable. Same treatment as a
-            // bundled campaign.
-            //
-            // A game's own mission is listed with them and shares the read-only
-            // half, but never offers Delete even when it is editable: taking a
-            // mission out of a game puts the document back in coilbox's store,
-            // which is its own action rather than a delete (issue #2160).
-            const bundled = source === "bundled";
-            const fromGame = source === "game";
-            // A scenario with no game or no map cannot be launched, by anything.
-            // The second line already says which of the two is missing, so the
-            // badge carries the consequence rather than repeating the gap.
-            const draft = !isSetUp(scenario);
-            const inCampaigns = usedBy(scenario.id);
-            return (
-              <li
-                key={scenario.id}
-                className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50"
-              >
-                {/* The whole row opens the scenario, which is what nearly every
-                    click on one wants. A read-only scenario goes to the same
-                    route and lands on the read-only view there, which says why
-                    it cannot be edited, so no row is a dead click. */}
-                <Link
-                  to={`/scenario-builder/${scenario.id}`}
-                  className="flex min-w-0 flex-1 items-center gap-3"
-                >
-                  <ScenarioMapThumb
-                    mapName={scenario.setup.mapName}
-                    thumbs={thumbs}
-                    installedMaps={installedMaps}
-                    loading={thumbsLoading}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">
-                        {scenario.name}
-                      </span>
-                      {draft && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 text-[10px]"
-                        >
-                          Draft
-                        </Badge>
-                      )}
-                      {bundled && (
-                        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                          Bundled
-                        </span>
-                      )}
-                      {fromGame && origin && (
-                        <Badge
-                          variant="secondary"
-                          className="shrink-0 text-[10px]"
-                        >
-                          From {origin.gameName}
-                        </Badge>
-                      )}
-                      {/* Not a link. The whole row is already one, and an anchor
-                          inside an anchor is a click target neither browsers nor
-                          screen readers agree on. Naming the campaigns on hover
-                          costs no tab stop and no nesting. */}
-                      {inCampaigns.length > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="shrink-0 text-[10px]"
-                          title={`Used by ${inCampaigns.join(", ")}`}
-                        >
-                          {inCampaigns.length === 1
-                            ? "In campaign"
-                            : `In ${inCampaigns.length} campaigns`}
-                        </Badge>
-                      )}
-                    </div>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {scenario.setup.gameName || "No game"} ·{" "}
-                      {scenario.setup.mapName || "No map"}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {scenarioSummary(scenario)}
-                    </span>
-                    {/* Only when the author wrote one. An empty line here would
-                        be a row that is taller for having said nothing. */}
-                    {scenario.description && (
-                      <span className="truncate text-xs text-muted-foreground">
-                        {scenario.description}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-                <ScenarioRowMenu
-                  scenario={scenario}
-                  editable={isEditable(loaded)}
-                  deletable={!bundled && !fromGame}
-                  attached={inCampaigns.length > 0}
-                  onShare={() => void openShare(scenario)}
-                  onDelete={() => remove(scenario.id)}
-                />
-              </li>
-            );
-          })}
-        </ul>
+        <div className="flex flex-col gap-5">
+          {groups.map((group) => (
+            <section key={group.gameName} className="flex flex-col gap-2">
+              {/* The game, written once. Not uppercased: these are archive
+                  names, often with a version in them, and they should read the
+                  way they are written everywhere else in the app. */}
+              <h2 className="px-1 text-xs font-semibold text-muted-foreground">
+                {group.gameName || "No game yet"}
+              </h2>
+              <ul className="flex flex-col gap-2">
+                {group.scenarios.map(row)}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </div>
   );

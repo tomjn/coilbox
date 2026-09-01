@@ -162,6 +162,16 @@ function show(scenarios: LoadedScenario[]) {
   );
 }
 
+/** The names of the rows on screen, in the order they are drawn. */
+const rowNames = () =>
+  screen
+    .getAllByRole("link")
+    .map((link) => link.querySelector("span.font-medium")?.textContent);
+
+/** The group headings on screen, in the order they are drawn. */
+const headings = () =>
+  screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+
 /** Open a row's menu the way a keyboard does, and hand back its items. */
 function openMenuByKeyboard(name: string) {
   const trigger = screen.getByRole("button", { name: `Actions for ${name}` });
@@ -441,11 +451,14 @@ describe("what a scenario row says", () => {
     expect(screen.getByText(/· edited 2h ago$/)).toBeTruthy();
   });
 
+  // The game used to sit on this line too. It is the group heading now
+  // (issue #2181), so the row is left with the half of the pair the heading
+  // does not cover.
   it("gives a scenario with no description no line to hold it", () => {
     show([local]);
 
     expect(linesUnder("Beachhead")).toEqual([
-      "No game · No map",
+      "No map",
       "0 unit placements · 0 zones · 0 triggers · 0 objectives",
     ]);
   });
@@ -454,7 +467,7 @@ describe("what a scenario row says", () => {
     show([described("Hold the landing zone.")]);
 
     expect(linesUnder("Beachhead")).toEqual([
-      "No game · No map",
+      "No map",
       "0 unit placements · 0 zones · 0 triggers · 0 objectives · edited 2h ago",
       "Hold the landing zone.",
     ]);
@@ -470,6 +483,221 @@ describe("what a scenario row says", () => {
         .getByRole("link", { name: /Beachhead/ })
         .querySelectorAll("a, button, input, select, textarea, [tabindex]"),
     ).toHaveLength(0);
+  });
+});
+
+/**
+ * Narrowing the list and gathering it under the game (issue #2181).
+ *
+ * Past a screenful the list could only be scrolled, and the game repeated on
+ * every row. What is pinned here is that the search and the chips actually
+ * narrow it, that a search matching nothing says the scenarios are still there
+ * rather than going blank, that the controls can be reached without a mouse, and
+ * that the groups come out newest edit first the way the flat list did.
+ */
+describe("finding a scenario in the list", () => {
+  /** A scenario as the list holds one: named, on a game, from a source. */
+  function made(
+    name: string,
+    {
+      game = "",
+      map = "Comet Catcher",
+      source = "local",
+      edited = "2026-01-01T00:00:00.000Z",
+    }: {
+      game?: string;
+      map?: string;
+      source?: LoadedScenario["source"];
+      edited?: string;
+    } = {},
+  ): LoadedScenario {
+    const scenario = {
+      ...newScenario(name),
+      id: name.toLowerCase().replace(/\W+/g, "-"),
+      updatedAt: edited,
+    };
+    return {
+      scenario: {
+        ...scenario,
+        setup: { ...scenario.setup, gameName: game, mapName: map },
+      },
+      source,
+      ...(source === "game"
+        ? {
+            origin: {
+              gameName: game,
+              archivePath: `/games/${game}.sdd`,
+              folder: "missions",
+              loose: true,
+            },
+          }
+        : {}),
+    };
+  }
+
+  const searchBox = () =>
+    screen.getByRole("textbox", { name: "Search scenarios by name" });
+
+  it("narrows the list to the names matching what is typed", () => {
+    show([made("Beachhead"), made("Bridgehead"), made("Last Stand")]);
+
+    fireEvent.change(searchBox(), { target: { value: "head" } });
+
+    expect(rowNames()).toEqual(["Beachhead", "Bridgehead"]);
+  });
+
+  it("ignores case and surrounding space in the search", () => {
+    show([made("Beachhead"), made("Last Stand")]);
+
+    fireEvent.change(searchBox(), { target: { value: "  BEACH " } });
+
+    expect(rowNames()).toEqual(["Beachhead"]);
+  });
+
+  // A blank list is indistinguishable from a list that has lost its documents,
+  // so the empty state counts what is being hidden and offers the way back.
+  it("says the scenarios are still there when nothing matches", () => {
+    show([made("Beachhead"), made("Last Stand")]);
+
+    fireEvent.change(searchBox(), { target: { value: "zzz" } });
+
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    expect(
+      screen.getByText("No scenarios match. All 2 are still here."),
+    ).toBeTruthy();
+  });
+
+  it("brings the whole list back from the empty state, without a mouse", () => {
+    show([made("Beachhead"), made("Last Stand")]);
+    fireEvent.change(searchBox(), { target: { value: "zzz" } });
+
+    const button = screen.getByRole("button", { name: "Show all scenarios" });
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    fireEvent.click(button);
+
+    expect(rowNames()).toEqual(["Beachhead", "Last Stand"]);
+    expect((searchBox() as HTMLInputElement).value).toBe("");
+  });
+
+  it("offers no source chips when every scenario came from the same place", () => {
+    show([made("Beachhead"), made("Last Stand")]);
+
+    expect(screen.queryByRole("button", { name: "Mine" })).toBeNull();
+    expect(screen.queryByRole("group")).toBeNull();
+  });
+
+  it("offers a chip per source once the list holds more than one", () => {
+    show([
+      made("Beachhead"),
+      made("Tutorial", { source: "bundled" }),
+      made("Skirmish", { game: "BA", source: "game" }),
+    ]);
+
+    expect(
+      screen
+        .getAllByRole("button", { pressed: false })
+        .map((b) => b.textContent),
+    ).toEqual(["Mine", "Bundled", "From games"]);
+    expect(
+      screen.getByRole("button", { name: "All", pressed: true }),
+    ).toBeTruthy();
+  });
+
+  it("narrows to one source when its chip is pressed", () => {
+    show([
+      made("Beachhead"),
+      made("Tutorial", { source: "bundled" }),
+      made("Skirmish", { game: "BA", source: "game" }),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Bundled" }));
+
+    expect(rowNames()).toEqual(["Tutorial"]);
+    expect(
+      screen.getByRole("button", { name: "Bundled", pressed: true }),
+    ).toBeTruthy();
+  });
+
+  it("applies the search and the chip together", () => {
+    show([
+      made("Beachhead"),
+      made("Beach Landing", { source: "bundled" }),
+      made("Tutorial", { source: "bundled" }),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Bundled" }));
+    fireEvent.change(searchBox(), { target: { value: "beach" } });
+
+    expect(rowNames()).toEqual(["Beach Landing"]);
+  });
+
+  // Every control added here is a plain button or a text box, so it is in the
+  // tab order and works on Enter without any handler of its own. What would
+  // break that is a tabindex taking one back out, so that is what is checked.
+  it("puts the search box and every chip in the tab order", () => {
+    show([made("Beachhead"), made("Tutorial", { source: "bundled" })]);
+
+    const controls = [
+      searchBox(),
+      ...screen
+        .getAllByRole("button")
+        .filter((b) =>
+          ["All", "Mine", "Bundled"].includes(b.textContent ?? ""),
+        ),
+    ];
+    expect(controls).toHaveLength(4);
+    for (const control of controls) {
+      expect(control.getAttribute("tabindex")).toBeNull();
+      control.focus();
+      expect(document.activeElement).toBe(control);
+    }
+  });
+});
+
+describe("the list gathered under each game", () => {
+  function onGame(name: string, game: string, edited: string): LoadedScenario {
+    const scenario = { ...newScenario(name), id: name, updatedAt: edited };
+    return {
+      scenario: {
+        ...scenario,
+        setup: { ...scenario.setup, gameName: game, mapName: "Comet Catcher" },
+      },
+      source: "local",
+    };
+  }
+
+  it("names the game once above its scenarios instead of on every row", () => {
+    show([
+      onGame("One", "Balanced Annihilation", "2026-01-03T00:00:00.000Z"),
+      onGame("Two", "Balanced Annihilation", "2026-01-02T00:00:00.000Z"),
+    ]);
+
+    expect(headings()).toEqual(["Balanced Annihilation"]);
+    expect(screen.queryAllByText("Balanced Annihilation")).toHaveLength(1);
+  });
+
+  // The list arrives newest edit first and nothing here reorders it, so the
+  // group holding the newest scenario leads and each group is internally newest
+  // first. That keeps the one thing the ordering was for: the scenario just
+  // edited is the first on the screen.
+  it("leads with the group holding the newest edit", () => {
+    show([
+      onGame("Newest", "Zero-K", "2026-03-01T00:00:00.000Z"),
+      onGame("Older", "Balanced Annihilation", "2026-02-01T00:00:00.000Z"),
+      onGame("Oldest", "Zero-K", "2026-01-01T00:00:00.000Z"),
+    ]);
+
+    expect(headings()).toEqual(["Zero-K", "Balanced Annihilation"]);
+    expect(rowNames()).toEqual(["Newest", "Oldest", "Older"]);
+  });
+
+  // A draft names no game and cannot be filed under one, so it gets a heading
+  // that says as much rather than an empty one or a silent first section.
+  it("gathers the scenarios with no game under a heading of their own", () => {
+    show([local, onGame("Two", "Zero-K", "2020-01-01T00:00:00.000Z")]);
+
+    expect(headings()).toEqual(["No game yet", "Zero-K"]);
   });
 });
 
