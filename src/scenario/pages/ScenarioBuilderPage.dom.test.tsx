@@ -12,7 +12,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Campaign } from "../../campaign/model";
 
@@ -41,6 +41,30 @@ vi.mock("../scenarios", () => ({
 vi.mock("../storage", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../storage")),
   deleteScenario,
+}));
+// Duplicating runs the real storage module, because copying the dialogue clips
+// is the whole of what it does (issue #2183) and a stand-in for it would prove
+// nothing. Only the plugin underneath is stubbed, so what the copy asks the
+// disk for is what these tests read.
+const plugin = vi.hoisted(() => ({
+  save: vi.fn(async () => ({})),
+  mediaRead: vi.fn(async () => ({ dataUrl: "data:image/png;base64,AA==" })),
+  mediaWrite: vi.fn(async () => ({})),
+}));
+vi.mock("../bindings", () => ({
+  scenarioList: vi.fn(async () => ({ items: [] })),
+  scenarioSave: (...args: unknown[]) => plugin.save(...args),
+  scenarioDelete: vi.fn(async () => ({})),
+  scenarioMediaImport: vi.fn(async () => ({ file: "" })),
+  scenarioMediaDelete: vi.fn(async () => ({})),
+  scenarioMediaRead: (...args: unknown[]) => plugin.mediaRead(...args),
+  scenarioMediaSweep: vi.fn(async () => ({ summary: {} })),
+  scenarioMediaWrite: (...args: unknown[]) => plugin.mediaWrite(...args),
+}));
+// Duplicate reports a failure through a toast, which has no shell here.
+const toasted = vi.hoisted(() => ({ errors: [] as string[] }));
+vi.mock("sonner", () => ({
+  toast: { error: (message: string) => toasted.errors.push(message) },
 }));
 // Which campaigns exist decides which rows are attached to one, so the list is
 // set per test.
@@ -142,6 +166,20 @@ function campaignUsing(title: string, scenarioId: string) {
   return { campaign, source: "local" as const };
 }
 
+/** The editor's route, saying which scenario it was opened on. */
+function Editing() {
+  const { id } = useParams();
+  return (
+    <>
+      <p>Editing this scenario</p>
+      <p data-testid="editing">{id}</p>
+    </>
+  );
+}
+
+/** Which scenario the editor route is showing, or null when it is not. */
+const editingId = () => screen.queryByTestId("editing")?.textContent ?? null;
+
 function show(scenarios: LoadedScenario[]) {
   useScenarios.mockReturnValue({
     scenarios,
@@ -153,10 +191,7 @@ function show(scenarios: LoadedScenario[]) {
     <MemoryRouter initialEntries={["/scenario-builder"]}>
       <Routes>
         <Route path="/scenario-builder" element={<ScenarioBuilderPage />} />
-        <Route
-          path="/scenario-builder/:id"
-          element={<p>Editing this scenario</p>}
-        />
+        <Route path="/scenario-builder/:id" element={<Editing />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -184,6 +219,7 @@ function openMenuByKeyboard(name: string) {
 afterEach(() => {
   cleanup();
   opened.length = 0;
+  toasted.errors.length = 0;
   stored.campaigns = [];
   content.scanned = false;
   content.maps = [];
@@ -201,11 +237,12 @@ describe("a scenario row", () => {
     expect(screen.getByText("Editing this scenario")).toBeTruthy();
   });
 
-  it("reaches Edit, Share and Delete from the keyboard alone", () => {
+  it("reaches Edit, Duplicate, Share and Delete from the keyboard alone", () => {
     show([local]);
 
     expect(openMenuByKeyboard("Beachhead")).toEqual([
       expect.stringContaining("Edit"),
+      expect.stringContaining("Duplicate"),
       expect.stringContaining("Share"),
       expect.stringContaining("Delete"),
     ]);
@@ -806,8 +843,144 @@ describe("the list gathered under each game", () => {
   });
 });
 
+/**
+ * Duplicate (issue #2183). The issue expected a copy to share the original's
+ * dialogue clips the way an attached campaign mission does, but a mission shares
+ * them by keeping the source scenario's id and a copy has an id of its own, so
+ * the clips are copied instead. What is pinned here is the whole chain from the
+ * menu item to what lands on disk, because a copy that quietly loses its clips
+ * looks exactly like one that worked.
+ */
+describe("duplicating a scenario", () => {
+  /** The local scenario with a dialogue line carrying both kinds of clip. */
+  const withClips = (): LoadedScenario => ({
+    scenario: {
+      ...local.scenario,
+      dialogue: [
+        {
+          id: "open",
+          speaker: "Command",
+          text: "Go.",
+          portrait: "a.png",
+          audio: "b.ogg",
+        },
+      ],
+    },
+    source: "local",
+  });
+
+  /** Pick Duplicate out of a row's menu, the way a keyboard does. */
+  function duplicateByKeyboard(name: string) {
+    openMenuByKeyboard(name);
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Duplicate/ }), {
+      key: "Enter",
+    });
+  }
+
+  /** The document the copy wrote, once it has been written. */
+  async function written() {
+    await vi.waitFor(() => expect(plugin.save).toHaveBeenCalledTimes(1));
+    const { id, json } = plugin.save.mock.calls[0][0] as {
+      id: string;
+      json: string;
+    };
+    return { id, document: JSON.parse(json) };
+  }
+
+  it("writes a second scenario rather than touching the one it came from", async () => {
+    show([local]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { id, document } = await written();
+    expect(id).not.toBe("beachhead");
+    expect(document.id).toBe(id);
+    expect(document.name).toBe("Copy of Beachhead");
+    // The original is still exactly what it was: one write, and not to it.
+    expect(plugin.save).toHaveBeenCalledTimes(1);
+    expect(local.scenario.name).toBe("Beachhead");
+  });
+
+  it("opens the editor on the copy, not on the original", async () => {
+    show([local]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { id } = await written();
+    await vi.waitFor(() => expect(editingId()).toBe(id));
+    expect(id).not.toBe("beachhead");
+  });
+
+  // The load-bearing half. A clip lives at `media/<scenarioId>/<file>`, so a
+  // copy under a new id that took only the document would name two files that
+  // are not under it, and play silent.
+  it("copies the dialogue clips into the copy's own media folder", async () => {
+    show([withClips()]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { id } = await written();
+    expect(plugin.mediaRead.mock.calls.map((c) => c[0])).toEqual(
+      expect.arrayContaining([
+        { scenarioId: "beachhead", file: "a.png" },
+        { scenarioId: "beachhead", file: "b.ogg" },
+      ]),
+    );
+    expect(
+      plugin.mediaWrite.mock.calls.map((c) => ({
+        scenarioId: (c[0] as { scenarioId: string }).scenarioId,
+        file: (c[0] as { file: string }).file,
+      })),
+    ).toEqual(
+      expect.arrayContaining([
+        { scenarioId: id, file: "a.png" },
+        { scenarioId: id, file: "b.ogg" },
+      ]),
+    );
+  });
+
+  // Duplicating twice is the fastest way to two rows nothing on screen can tell
+  // apart, which is what the row was rebuilt to avoid (issue #2179).
+  it("counts up when the obvious copy name is already in the list", async () => {
+    show([
+      local,
+      {
+        scenario: {
+          ...local.scenario,
+          id: "copy-1",
+          name: "Copy of Beachhead",
+        },
+        source: "local",
+      },
+    ]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { document } = await written();
+    expect(document.name).toBe("Copy of Beachhead (2)");
+  });
+
+  it("says so when the copy could not be written, and stays on the list", async () => {
+    plugin.save.mockRejectedValueOnce(new Error("disk full"));
+    show([local]);
+
+    duplicateByKeyboard("Beachhead");
+
+    await vi.waitFor(() =>
+      expect(toasted.errors).toEqual([
+        "Could not duplicate Beachhead: disk full",
+      ]),
+    );
+    expect(editingId()).toBeNull();
+  });
+});
+
 describe("a read-only scenario's row", () => {
-  it("offers neither Edit nor Delete, but still shares", () => {
+  // A bundled scenario's clips are not in the media store until it is launched,
+  // and a game's own mission keeps them inside the game archive, so neither has
+  // anything a copy could take with it. Offering Duplicate would make a copy
+  // whose dialogue has quietly lost its portraits.
+  it("offers neither Edit, Duplicate nor Delete, but still shares", () => {
     show([bundled]);
 
     expect(openMenuByKeyboard("Tutorial")).toEqual([
