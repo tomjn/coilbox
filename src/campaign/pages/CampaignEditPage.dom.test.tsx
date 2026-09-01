@@ -432,6 +432,19 @@ describe("saying whether an edit reached disk", () => {
     expect(screen.getByText(NOT_SAVED)).toBeTruthy();
   });
 
+  it("reports the save, not the list refresh that failed after it", async () => {
+    // The campaign list is a separate read. Failing it leaves other views
+    // stale, and telling the author their edit did not save would be a lie
+    // that sends them to retry a write that worked.
+    refreshCampaigns.mockRejectedValueOnce(new Error("list read failed"));
+    show([]);
+
+    fireEvent.blur(titleBox());
+
+    expect(await screen.findByText(SAVED)).toBeTruthy();
+    expect(screen.queryByText(NOT_SAVED)).toBeNull();
+  });
+
   it("reports a mission change too, not only the text boxes", async () => {
     show([mission()]);
 

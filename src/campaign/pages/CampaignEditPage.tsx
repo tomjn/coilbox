@@ -101,7 +101,6 @@ export default function CampaignEditPage() {
     let failure: string | null = null;
     try {
       await campaignSave({ id: stamped.id, json: JSON.stringify(stamped) });
-      await refreshCampaigns();
     } catch (e) {
       failure = e instanceof Error ? e.message : String(e);
     }
@@ -115,6 +114,15 @@ export default function CampaignEditPage() {
     }
     setError(null);
     setSave({ kind: "saved", at: new Date() });
+    // Re-reading the campaign list is what keeps the sidebar and the campaigns
+    // page in step, and it is a separate read. One that fails leaves those
+    // stale but says nothing about whether the edit reached disk, so counting
+    // it as a failed save would send the author to retry a write that worked.
+    try {
+      await refreshCampaigns();
+    } catch (e) {
+      console.error("campaign list refresh failed", e);
+    }
   }, []);
 
   if (loading && !campaign) return <DetailLoading backTo={BACK} />;
