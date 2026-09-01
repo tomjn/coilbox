@@ -29,6 +29,7 @@ import {
   MissionMapSideGraphic,
 } from "./components/MissionMapPreview";
 import { MissionMediaPlayer } from "./components/MissionMediaFields";
+import { MissionUnfinishedGate } from "./components/MissionUnfinishedGate";
 import {
   MissionUnitBackground,
   MissionUnitSideGraphic,
@@ -105,11 +106,12 @@ function MissionStage({
   // (an older version of the game, a unit renamed since) gets the slot's image
   // or the gradient instead, rather than an empty backdrop.
   const unit = useMissionUnit(mission.snapshot.gameName, mission.panoramaUnit);
-  // A live 3D backdrop, of either kind. Suppressed while the game or map is
-  // missing: the gate below is showing instead, and there is nothing to read a
-  // map or a unit out of.
+  // A live 3D backdrop, of either kind. Suppressed while either gate is showing:
+  // there is nothing to read a map or a unit out of when the mission's game or
+  // map is missing, and nothing at all when it never named one.
   const live3d =
     !run.missing &&
+    !run.unfinished &&
     !!(mission.panoramaMap || (mission.panoramaUnit && !unit.unavailable));
 
   return (
@@ -176,9 +178,16 @@ function MissionStage({
         <BackLink campaignId={campaign.id} />
 
         <div className="flex min-h-0 flex-1 items-end">
-          {/* A missing game/map hard-blocks the mission: the briefing and its map
-              preview are withheld until the requirement is installed. */}
-          {run.missing ? (
+          {/* Two hard blocks, and they are not the same block. A mission that
+              names no game or map was never finished, so it says so and offers
+              nothing to install. A mission naming content this machine does not
+              have withholds the briefing until the requirement is installed. */}
+          {run.unfinished ? (
+            <MissionUnfinishedGate
+              campaignId={campaign.id}
+              reason={run.unfinished}
+            />
+          ) : run.missing ? (
             <MissionRequiredGate
               mission={mission}
               missing={run.missing}
