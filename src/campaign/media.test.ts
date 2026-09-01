@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { campaignMediaDelete } = vi.hoisted(() => ({
   campaignMediaDelete: vi.fn(
-    async (_args: { campaignId: string; file: string }) => ({
+    async (_args: {
+      campaignId: string;
+      file: string;
+    }): Promise<{ deleted: boolean; from: "images" | "media" | null }> => ({
       deleted: true,
-      from: "media" as const,
+      from: "media",
     }),
   ),
 }));
@@ -162,6 +165,24 @@ describe("deleting what an edit left behind", () => {
       { campaignId: "c1", file: "brief.ogg" },
       { campaignId: "c1", file: "intro.mp4" },
     ]);
+  });
+
+  it("says so when the file was not there to delete", async () => {
+    // The whole of issue #2210 was a delete that removed nothing and reported
+    // success, so the one case that must not pass in silence is this one.
+    campaignMediaDelete.mockResolvedValueOnce({ deleted: false, from: null });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await deleteDroppedMedia(
+      "c1",
+      campaign([mission({ cutscene: { kind: "file", file: "intro.mp4" } })]),
+      campaign([]),
+    );
+
+    expect(warn).toHaveBeenCalledWith(
+      "campaign media was already gone",
+      "intro.mp4",
+    );
   });
 
   it("goes on after one refuses", async () => {

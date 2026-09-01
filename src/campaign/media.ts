@@ -88,7 +88,13 @@ export async function deleteDroppedMedia(
 ): Promise<void> {
   for (const file of droppedMediaFiles(prev, next)) {
     try {
-      await campaignMediaDelete({ campaignId, file });
+      const { deleted } = await campaignMediaDelete({ campaignId, file });
+      // The document named a file neither folder held. Nothing to do about it
+      // here, but a delete that quietly removes nothing is what issue #2210
+      // was, so it is said out loud rather than read as a removal.
+      if (!deleted) {
+        console.warn("campaign media was already gone", file);
+      }
     } catch (e) {
       console.error("could not delete campaign media", file, e);
     }
