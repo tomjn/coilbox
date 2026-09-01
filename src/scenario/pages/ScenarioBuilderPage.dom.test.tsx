@@ -168,6 +168,10 @@ const rowNames = () =>
     .getAllByRole("link")
     .map((link) => link.querySelector("span.font-medium")?.textContent);
 
+/** The group headings on screen, in the order they are drawn. */
+const headings = () =>
+  screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+
 /** Open a row's menu the way a keyboard does, and hand back its items. */
 function openMenuByKeyboard(name: string) {
   const trigger = screen.getByRole("button", { name: `Actions for ${name}` });
@@ -447,11 +451,14 @@ describe("what a scenario row says", () => {
     expect(screen.getByText(/· edited 2h ago$/)).toBeTruthy();
   });
 
+  // The game used to sit on this line too. It is the group heading now
+  // (issue #2181), so the row is left with the half of the pair the heading
+  // does not cover.
   it("gives a scenario with no description no line to hold it", () => {
     show([local]);
 
     expect(linesUnder("Beachhead")).toEqual([
-      "No game · No map",
+      "No map",
       "0 unit placements · 0 zones · 0 triggers · 0 objectives",
     ]);
   });
@@ -460,7 +467,7 @@ describe("what a scenario row says", () => {
     show([described("Hold the landing zone.")]);
 
     expect(linesUnder("Beachhead")).toEqual([
-      "No game · No map",
+      "No map",
       "0 unit placements · 0 zones · 0 triggers · 0 objectives · edited 2h ago",
       "Hold the landing zone.",
     ]);
@@ -645,6 +652,52 @@ describe("finding a scenario in the list", () => {
       control.focus();
       expect(document.activeElement).toBe(control);
     }
+  });
+});
+
+describe("the list gathered under each game", () => {
+  function onGame(name: string, game: string, edited: string): LoadedScenario {
+    const scenario = { ...newScenario(name), id: name, updatedAt: edited };
+    return {
+      scenario: {
+        ...scenario,
+        setup: { ...scenario.setup, gameName: game, mapName: "Comet Catcher" },
+      },
+      source: "local",
+    };
+  }
+
+  it("names the game once above its scenarios instead of on every row", () => {
+    show([
+      onGame("One", "Balanced Annihilation", "2026-01-03T00:00:00.000Z"),
+      onGame("Two", "Balanced Annihilation", "2026-01-02T00:00:00.000Z"),
+    ]);
+
+    expect(headings()).toEqual(["Balanced Annihilation"]);
+    expect(screen.queryAllByText("Balanced Annihilation")).toHaveLength(1);
+  });
+
+  // The list arrives newest edit first and nothing here reorders it, so the
+  // group holding the newest scenario leads and each group is internally newest
+  // first. That keeps the one thing the ordering was for: the scenario just
+  // edited is the first on the screen.
+  it("leads with the group holding the newest edit", () => {
+    show([
+      onGame("Newest", "Zero-K", "2026-03-01T00:00:00.000Z"),
+      onGame("Older", "Balanced Annihilation", "2026-02-01T00:00:00.000Z"),
+      onGame("Oldest", "Zero-K", "2026-01-01T00:00:00.000Z"),
+    ]);
+
+    expect(headings()).toEqual(["Zero-K", "Balanced Annihilation"]);
+    expect(rowNames()).toEqual(["Newest", "Oldest", "Older"]);
+  });
+
+  // A draft names no game and cannot be filed under one, so it gets a heading
+  // that says as much rather than an empty one or a silent first section.
+  it("gathers the scenarios with no game under a heading of their own", () => {
+    show([local, onGame("Two", "Zero-K", "2020-01-01T00:00:00.000Z")]);
+
+    expect(headings()).toEqual(["No game yet", "Zero-K"]);
   });
 });
 

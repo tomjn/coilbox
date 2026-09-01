@@ -30,6 +30,7 @@ import { ScenarioMapThumb } from "./components/ScenarioMapThumb";
 import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
 import {
   filterScenarios,
+  groupScenariosByGame,
   offeredSources,
   SOURCE_LABELS,
   type SourceFilter,
@@ -45,13 +46,16 @@ import {
  * only later attached to a campaign mission.
  *
  * A row says what an author needs to tell two scenarios apart while scanning the
- * list (issue #2179): the map, the name, the game and map it is set on, what it
- * holds, when it was last written, and the description. Ten smoke tests all
- * called "test" are separated by the edit time, which is also the only thing on
- * screen that explains why the list is in the order it is.
+ * list (issue #2179): the map, the name, the map it is set on, what it holds,
+ * when it was last written, and the description. Ten smoke tests all called
+ * "test" are separated by the edit time, which is also the only thing on screen
+ * that explains why the list is in the order it is.
  *
  * Past a screenful, scanning stops working, so the list is also searchable by
- * name and narrowable to one source (issue #2181).
+ * name, narrowable to one source, and gathered under the game each scenario is
+ * set on (issue #2181). Grouping is what pays for the row: the game was the most
+ * repeated text on the screen and it is now written once per group, which is
+ * also the row's longest and least predictable line gone.
  */
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
@@ -88,8 +92,8 @@ export default function ScenarioBuilderPage() {
   // Computed from the whole list rather than the filtered one, so the chips
   // stay put while the search box is typed into.
   const sources = useMemo(() => offeredSources(scenarios), [scenarios]);
-  const filtered = useMemo(
-    () => filterScenarios(scenarios, query, source),
+  const groups = useMemo(
+    () => groupScenariosByGame(filterScenarios(scenarios, query, source)),
     [scenarios, query, source],
   );
   const showAll = () => {
@@ -175,8 +179,9 @@ export default function ScenarioBuilderPage() {
     const bundled = from === "bundled";
     const fromGame = from === "game";
     // A scenario with no game or no map cannot be launched, by anything. The
-    // second line already says which of the two is missing, so the badge
-    // carries the consequence rather than repeating the gap.
+    // group heading and the second line already say which of the two is
+    // missing, so the badge carries the consequence rather than repeating the
+    // gap.
     const draft = !isSetUp(scenario);
     const inCampaigns = usedBy(scenario.id);
     return (
@@ -234,8 +239,10 @@ export default function ScenarioBuilderPage() {
                 </Badge>
               )}
             </div>
+            {/* The map alone. The heading above the group names the game, so
+                repeating it here would be the one piece of text the grouping
+                was meant to stop repeating (issue #2181). */}
             <span className="truncate text-xs text-muted-foreground">
-              {scenario.setup.gameName || "No game"} ·{" "}
               {scenario.setup.mapName || "No map"}
             </span>
             <span className="truncate text-xs text-muted-foreground">
@@ -342,7 +349,7 @@ export default function ScenarioBuilderPage() {
         <SkeletonList />
       ) : scenarios.length === 0 ? (
         <EmptyState label="No scenarios yet. Start one with New scenario, or import a shared one." />
-      ) : filtered.length === 0 ? (
+      ) : groups.length === 0 ? (
         // A list that just goes blank reads as documents having been lost, so
         // this counts what is still there and offers the way back in one click
         // rather than leaving somebody to work out which control hid them.
@@ -359,7 +366,21 @@ export default function ScenarioBuilderPage() {
           }
         />
       ) : (
-        <ul className="flex flex-col gap-2">{filtered.map(row)}</ul>
+        <div className="flex flex-col gap-5">
+          {groups.map((group) => (
+            <section key={group.gameName} className="flex flex-col gap-2">
+              {/* The game, written once. Not uppercased: these are archive
+                  names, often with a version in them, and they should read the
+                  way they are written everywhere else in the app. */}
+              <h2 className="px-1 text-xs font-semibold text-muted-foreground">
+                {group.gameName || "No game yet"}
+              </h2>
+              <ul className="flex flex-col gap-2">
+                {group.scenarios.map(row)}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </div>
   );
