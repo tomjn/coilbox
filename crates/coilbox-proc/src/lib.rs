@@ -111,7 +111,8 @@ pub fn is_running(pid: u32) -> bool {
     {
         use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
         use windows::Win32::System::Threading::{
-            OpenProcess, WaitForSingleObject, PROCESS_QUERY_LIMITED_INFORMATION, SYNCHRONIZE,
+            OpenProcess, WaitForSingleObject, PROCESS_QUERY_LIMITED_INFORMATION,
+            PROCESS_SYNCHRONIZE,
         };
 
         // A process that has exited but still has a handle open somewhere can
@@ -121,9 +122,11 @@ pub fn is_running(pid: u32) -> bool {
         // route, and it is worse, because a process that genuinely exited with
         // 259 is indistinguishable from `STILL_ACTIVE`.
         unsafe {
-            let Ok(handle) =
-                OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, false, pid)
-            else {
+            let Ok(handle) = OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                false,
+                pid,
+            ) else {
                 // No such process, or one we are not allowed to look at. The
                 // second is not a case coilbox reaches: both processes it asks
                 // about are its own children.
