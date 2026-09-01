@@ -22,14 +22,21 @@
 
 import { Button } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { primeScan, useUnitsyncScan } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
+import { playInfolog } from "@/play/bindings";
 import {
   gameOptionSchema,
   mapOptionSchema,
   usePreferredTarget,
 } from "@/play/config";
+import { classifyLine } from "@/play/crash";
 import { usePlay } from "@/play/PlayProvider";
 import { MUTATOR_FOLDER } from "../../../lib/generatedGames";
 import {
@@ -40,9 +47,17 @@ import {
 } from "../../launch";
 import type { Scenario } from "../../model";
 import { mutatorOffer } from "../../offer";
+import { type RunLog, readRunLog } from "../../runLog";
 import { ensureBundledScenarioMedia, type GameOrigin } from "../../storage";
 import { describeIssue, type MissionIssue } from "../../validate";
-import { missionWarnings, type ScenarioReader } from "../../wording";
+import {
+  engineRunProblems,
+  missionRunLogMissing,
+  missionRuntimeProblems,
+  missionRuntimeSaidNothing,
+  missionWarnings,
+  type ScenarioReader,
+} from "../../wording";
 import { useScenarioGate } from "./useScenarioGate";
 import { useScenarioMapExtent } from "./useScenarioMapExtent";
 
@@ -61,6 +76,54 @@ const BUSY_LABEL: Record<string, string> = {
   scanning: "Letting the engine find it",
   playing: "Game running",
 };
+
+/**
+ * How much of the engine's log to read back after a run.
+ *
+ * 500 rather than the crash drawer's 200. A crash puts what killed it at the
+ * very end of the file, so a short tail finds it. A refused spawn happens as the
+ * mission starts and then the whole game is logged on top of it, so the line
+ * being looked for is the oldest one that matters rather than the newest. The
+ * tail is filtered down to error and warning lines before anything is shown, so
+ * reading more of it costs nothing on screen.
+ */
+const TAIL_LINES = 500;
+
+/**
+ * The log's error and warning lines, each in the colour of its own level.
+ *
+ * The same two tones `InfologView` uses, and not that component, because what is
+ * shown here is a filtered list of lines rather than the tail of a file, so
+ * there is no truncation to report and no normal lines to grey out.
+ */
+function LogLines({ lines }: { lines: string[] }) {
+  // Classified once per list rather than once per render, and carrying its own
+  // key: a log repeats lines verbatim, so position has to be part of the key.
+  const rows = useMemo(
+    () =>
+      lines.map((text, i) => ({
+        key: `${i}-${text}`,
+        text,
+        error: classifyLine(text) === "error",
+      })),
+    [lines],
+  );
+
+  return (
+    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded border border-border/60 bg-muted/30 p-2 font-mono text-[11px] leading-relaxed">
+      {rows.map((row) => (
+        <span
+          key={row.key}
+          className={
+            row.error ? "block text-destructive" : "block text-amber-500"
+          }
+        >
+          {row.text}
+        </span>
+      ))}
+    </pre>
+  );
+}
 
 export function ScenarioTestDrawer({
   scenario,
@@ -105,6 +168,12 @@ export function ScenarioTestDrawer({
     origin,
   );
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
+  // What the engine's log said about the run that just finished (issue #2165).
+  // Its own state rather than part of the `done` phase, because the read happens
+  // after the phase is set: the author is told the game closed at once, and this
+  // fills in behind it. Null until the read answers, and `{ log: null }` once it
+  // has answered with nothing this run can use.
+  const [runLog, setRunLog] = useState<{ log: RunLog | null } | null>(null);
 
   const busy =
     phase.state === "writing" ||
@@ -138,6 +207,12 @@ export function ScenarioTestDrawer({
   async function run() {
     if (!target) return;
     setPhase({ state: "writing" });
+    setRunLog(null);
+    // When the engine actually started, which is the only thing that tells this
+    // run's log from the one before it. Set again inside `launch` because
+    // compiling the mission and rescanning both happen before the engine does,
+    // and a log written in between is not this run's.
+    let startedAtMs = Date.now();
     try {
       // A bundled scenario's dialogue clips have never been written into the
       // media store, and that store is where the compile step copies them from,
@@ -165,6 +240,7 @@ export function ScenarioTestDrawer({
         },
         launch: (config) => {
           setPhase({ state: "playing" });
+          startedAtMs = Date.now();
           return play.launch("skirmish", {
             config,
             executable: target.executable,
@@ -181,6 +257,25 @@ export function ScenarioTestDrawer({
         return;
       }
       setPhase({ state: "done", result });
+
+      // What the engine wrote while it played. Author only: a player who has
+      // just finished a mission has no use for a log, and reading one for them
+      // would be work done for a panel that is never rendered.
+      //
+      // Not gated on the exit code, unlike the crash drawer. A mission that
+      // spawned nothing exits with code 0, and that is the run this is for.
+      // A read that fails is not reported as its own error: the run is the news
+      // and it has already been shown.
+      if (!testing) return;
+      try {
+        const { log } = await playInfolog({
+          dataDir: target.dataDir,
+          maxLines: TAIL_LINES,
+        });
+        setRunLog({ log: readRunLog(log, startedAtMs) });
+      } catch {
+        setRunLog({ log: null });
+      }
     } catch (error) {
       setPhase({
         state: "failed",
@@ -296,6 +391,52 @@ export function ScenarioTestDrawer({
               ) : null}
             </>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* What the runtime said while it played (issue #2165). The one thing
+          that tells a mission which placed nothing from a mission whose units
+          did not arrive, because both exit cleanly and look the same from here.
+          Absent until the read answers, rather than flashing an empty panel. */}
+      {testing && phase.state === "done" && runLog ? (
+        <div className="flex flex-col gap-2 border-t border-border/60 pt-4 text-xs">
+          {runLog.log === null ? (
+            <p className="text-muted-foreground">{missionRunLogMissing()}</p>
+          ) : (
+            <>
+              {runLog.log.mission.length > 0 ? (
+                <>
+                  <p className="text-destructive">
+                    {missionRuntimeProblems(runLog.log.mission.length)}
+                  </p>
+                  <LogLines lines={runLog.log.mission} />
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  {missionRuntimeSaidNothing()}
+                </p>
+              )}
+
+              {/* Folded away. The engine logs its own deprecated config keys and
+                  missing textures at these levels on every run, and a list of
+                  them above the runtime's own would bury the thing being looked
+                  for. */}
+              {runLog.log.engine.length > 0 ? (
+                <Collapsible>
+                  <CollapsibleTrigger className="text-left text-muted-foreground underline-offset-4 hover:underline">
+                    {engineRunProblems(runLog.log.engine.length)}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <LogLines lines={runLog.log.engine} />
+                  </CollapsibleContent>
+                </Collapsible>
+              ) : null}
+
+              <p className="break-all text-muted-foreground">
+                <code>{runLog.log.path}</code>
+              </p>
+            </>
+          )}
         </div>
       ) : null}
     </div>
