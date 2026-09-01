@@ -1,6 +1,11 @@
 import { scenarioEvalMission, scenarioReadMission } from "./bindings";
 import { missionPath } from "./compile";
-import { amountVar, DIFFICULTIES, type Difficulty } from "./model";
+import {
+  amountVar,
+  DIFFICULTIES,
+  type Difficulty,
+  type Scenario,
+} from "./model";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -726,6 +731,12 @@ export function validateMission(
  * wrote the scenario. `triggers["open"].actions[0].params.group` is the same
  * fact as `Trigger "open", action 1, group`, and only the second one tells them
  * where to click.
+ *
+ * An id is still not what the author calls a thing, which is the rest of the
+ * job (issue #2249). Only the document knows that, and a trigger's name is not
+ * even in the compiled file, so a caller that has the document hands
+ * {@link missionIssueLabels} in and the sentence carries both. Everything above
+ * this line reads the compiled mission and nothing else.
  * -------------------------------------------------------------------------- */
 
 /** What each part of a compiled path is called in the editor. */
@@ -787,14 +798,97 @@ function pathParts(path: string): PathPart[] | null {
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /**
+ * What the author calls each id, keyed by the compiled list that holds it.
+ *
+ * A plain record rather than the document itself, so this half of the module
+ * stays free of the editor and a caller with no document still gets a sentence.
+ * An id with no entry has no label, which is the ordinary state of an actor, a
+ * group, and anything the author has not got round to naming.
+ */
+export type IssueLabels = Record<string, Record<string, string>>;
+
+/** A `list -> id -> label` map, dropping every label that is blank. */
+function labelsFor<T>(
+  entries: readonly T[],
+  id: (entry: T) => string,
+  label: (entry: T) => string | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of entries) {
+    const said = label(entry)?.trim();
+    if (said) out[id(entry)] = said;
+  }
+  return out;
+}
+
+/**
+ * The author's own words for everything in a document a problem can name.
+ *
+ * One table rather than a rule per kind, because the split between the id in
+ * the file and the words beside it is every registry's, not the trigger's. What
+ * counts as the label is whatever the editor's own list puts in the row: a
+ * zone's and a trigger's name, an objective's text, a dialogue line's speaker,
+ * an actor's display name, and for a base the layout it places, since a base id
+ * is a minted UUID and the contents list reads one the same way.
+ *
+ * A team is keyed by participant id, so its label is that participant's name.
+ * Groups are missing on purpose: nothing in the document names one.
+ */
+export function missionIssueLabels(scenario: Scenario): IssueLabels {
+  const layouts = new Map(scenario.blueprints.map((b) => [b.id, b.name]));
+  return {
+    zones: labelsFor(
+      scenario.zones,
+      (z) => z.id,
+      (z) => z.name,
+    ),
+    actors: labelsFor(
+      scenario.actors,
+      (a) => a.id,
+      (a) => a.state?.name,
+    ),
+    // The compiled mission spells a base "prefabs", which is the key a path
+    // arrives under. See PART above.
+    prefabs: labelsFor(
+      scenario.bases,
+      (b) => b.id,
+      (b) => layouts.get(b.blueprint),
+    ),
+    triggers: labelsFor(
+      scenario.triggers,
+      (t) => t.id,
+      (t) => t.name,
+    ),
+    objectives: labelsFor(
+      scenario.objectives,
+      (o) => o.id,
+      (o) => o.text,
+    ),
+    dialogue: labelsFor(
+      scenario.dialogue,
+      (d) => d.id,
+      (d) => d.speaker,
+    ),
+    teams: labelsFor(
+      scenario.setup.participants ?? [],
+      (p) => p.id,
+      (p) => p.name,
+    ),
+  };
+}
+
+/**
  * Where an issue is, in the terms the editor uses. Null when the path does not
  * point into the mission table.
  *
  * A list position is counted from one, because that is how the panel that holds
- * it is read. An entry that has an id is named by it, because that is what the
- * author typed.
+ * it is read. An entry that has an id is named by whatever `labels` calls it,
+ * and by the id as well.
  */
-export function issueLocation(path: string): string | null {
+export function issueLocation(
+  path: string,
+  labels: IssueLabels = {},
+): string | null {
   const parts = pathParts(path);
   if (!parts) return null;
   const said: string[] = [];
@@ -806,7 +900,8 @@ export function issueLocation(path: string): string | null {
     // what the form calls it.
     const label = PART[name] ?? name;
     if (ref === null) said.push(label);
-    else if (ref.startsWith('"')) said.push(`${label} ${quoted(ref)}`);
+    else if (ref.startsWith('"'))
+      said.push(`${label} ${named(ref, labels[name])}`);
     else said.push(`${label} ${Number(ref) + 1}`);
   }
   const [first, ...rest] = said;
@@ -814,18 +909,41 @@ export function issueLocation(path: string): string | null {
   return [first, ...rest.map(lowerFirst)].join(", ");
 }
 
-/** An id out of a compiled path, in plain quotes rather than Lua escapes. */
-function quoted(ref: string): string {
+/**
+ * One entry of a registry, as the author reads it: their own name for it, then
+ * the id in brackets.
+ *
+ * Both, rather than one or the other. The label is the row they are looking at,
+ * and the id is what `mission.lua` carries and what the objective and dialogue
+ * panels keep beside the row for exactly this (issue #2248). It is also what
+ * tells two zones called "north" apart, because a label is not unique and is
+ * not meant to be.
+ *
+ * The id alone when there is no label, when the label is the id, or when the
+ * path is quoted in a way that will not parse. That covers a kind with no name
+ * of its own and a thing the author has not named yet, which is where an
+ * objective with no text starts and where the warning about it fires.
+ */
+function named(
+  ref: string,
+  labels: Record<string, string> | undefined,
+): string {
+  let id: string;
   try {
-    return `"${JSON.parse(ref)}"`;
+    id = String(JSON.parse(ref));
   } catch {
     return ref;
   }
+  const label = labels?.[id];
+  return label === undefined || label === id ? `"${id}"` : `"${label}" (${id})`;
 }
 
 /** One issue as the author is told it: where it is, then what is wrong. */
-export function describeIssue(issue: MissionIssue): string {
-  return `${issueLocation(issue.path) ?? issue.path}: ${issue.message}`;
+export function describeIssue(
+  issue: MissionIssue,
+  labels: IssueLabels = {},
+): string {
+  return `${issueLocation(issue.path, labels) ?? issue.path}: ${issue.message}`;
 }
 
 /**

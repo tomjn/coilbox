@@ -11,13 +11,14 @@ vi.mock("./bindings", () => ({
   scenarioEvalMission: (...args: unknown[]) => evalMissionMock(...args),
 }));
 
-import { newScenario } from "./create";
+import { newScenario, starterScenario } from "./create";
 import type { Scenario } from "./model";
 import {
   defsMissingFrom,
   describeIssue,
   isBlocking,
   issueLocation,
+  missionIssueLabels,
   unitDefsIn,
   validateCompiledMission,
   validateCompiledMissionText,
@@ -884,5 +885,194 @@ describe("describeIssue", () => {
         message: "unexpected symbol near '}'",
       }),
     ).toBe("missions/demo/mission.lua: unexpected symbol near '}'");
+  });
+
+  it("puts the author's own name in front of the id (issue #2249)", () => {
+    expect(
+      describeIssue(
+        {
+          path: 'triggers["trigger-3"].actions[0].params.zone',
+          message: 'no zone called "zone-a"',
+        },
+        { triggers: { "trigger-3": "The gates open" } },
+      ),
+    ).toBe(
+      'Trigger "The gates open" (trigger-3), action 1, zone: no zone called "zone-a"',
+    );
+  });
+});
+
+/**
+ * Issue #2249. A problem is located by the path out of the compiled mission, so
+ * it names a zone or a trigger by the id in the file. Since #2205 minted a
+ * trigger an id of its own, that id can be a string the author has never seen:
+ * a trigger they called "The gates open" was reported as `Trigger "trigger-3"`.
+ * A zone was always worse, because a zone id is a UUID.
+ *
+ * So a message names both. The label is what the author reads in the panel, and
+ * the id is what `mission.lua` carries and what the panel keeps beside the row
+ * (issue #2248), so the sentence can be matched to either. It is also the only
+ * thing that tells two zones called "north" apart, because a label is not
+ * unique and is not meant to be.
+ */
+describe("naming what an author called a thing", () => {
+  const labels = {
+    zones: { "3f2a8c1e": "The pass" },
+    triggers: { "trigger-3": "The gates open" },
+    groups: {},
+  };
+
+  it("leads with the label and keeps the id in brackets", () => {
+    expect(issueLocation('zones["3f2a8c1e"].name', labels)).toBe(
+      'Zone "The pass" (3f2a8c1e), name',
+    );
+  });
+
+  it("names a renamed trigger the way its row in the list does", () => {
+    expect(
+      issueLocation('triggers["trigger-3"].conditions[1].params.zone', labels),
+    ).toBe('Trigger "The gates open" (trigger-3), condition 2, zone');
+  });
+
+  it("tells two things called the same thing apart by their ids", () => {
+    const two = { zones: { "zone-a": "north", "zone-b": "north" } };
+    expect(issueLocation('zones["zone-a"]', two)).toBe('Zone "north" (zone-a)');
+    expect(issueLocation('zones["zone-b"]', two)).toBe('Zone "north" (zone-b)');
+  });
+
+  it("says the id alone for a kind that has no label of its own", () => {
+    expect(issueLocation('groups["wave"].orders[0].target', labels)).toBe(
+      'Group "wave", order 1, target',
+    );
+  });
+
+  it("says the id alone when the author has not named it yet", () => {
+    expect(
+      issueLocation('objectives["objective-2"].text', { objectives: {} }),
+    ).toBe('Objective "objective-2", text');
+  });
+
+  it("does not say the id twice when the name is the id", () => {
+    expect(
+      issueLocation('triggers["open"]', { triggers: { open: "open" } }),
+    ).toBe('Trigger "open"');
+  });
+
+  it("says exactly what it always said when nothing was looked up", () => {
+    expect(issueLocation('zones["3f2a8c1e"].name')).toBe(
+      'Zone "3f2a8c1e", name',
+    );
+  });
+});
+
+describe("missionIssueLabels", () => {
+  /** A document with one of everything an id can be labelled from. */
+  function labelled(): Scenario {
+    const scenario = newScenario("Demo");
+    return {
+      ...scenario,
+      zones: [
+        {
+          id: "3f2a8c1e",
+          name: "  The pass  ",
+          shape: "circle",
+          center: { x: 0, z: 0 },
+          radius: 100,
+        },
+      ],
+      actors: [
+        {
+          id: "a1",
+          unitDef: "armcom",
+          team: "p0",
+          pos: { x: 0, z: 0 },
+          facing: 0,
+          state: { name: "Kane" },
+        },
+        {
+          id: "a2",
+          unitDef: "armcom",
+          team: "p0",
+          pos: { x: 0, z: 0 },
+          facing: 0,
+        },
+      ],
+      blueprints: [
+        {
+          id: "bp1",
+          name: "The keep",
+          buildings: [],
+        },
+      ],
+      bases: [
+        {
+          id: "base-uuid",
+          blueprint: "bp1",
+          team: "p0",
+          origin: { x: 0, z: 0 },
+          buildings: [],
+        },
+      ],
+      triggers: [
+        {
+          id: "trigger-3",
+          name: "The gates open",
+          enabled: true,
+          repeat: false,
+          conditions: { op: "all", conditions: [] },
+          actions: [],
+        },
+      ],
+      objectives: [
+        {
+          id: "objective-1",
+          kind: "primary",
+          text: "Hold out.",
+          hidden: false,
+        },
+        { id: "objective-2", kind: "primary", text: "   ", hidden: false },
+      ],
+      dialogue: [{ id: "line-1", speaker: "Control", text: "Contact." }],
+    };
+  }
+
+  it("reads a label out of every registry that carries one", () => {
+    const labels = missionIssueLabels(labelled());
+
+    expect(labels.zones["3f2a8c1e"]).toBe("The pass");
+    expect(labels.triggers["trigger-3"]).toBe("The gates open");
+    expect(labels.objectives["objective-1"]).toBe("Hold out.");
+    expect(labels.dialogue["line-1"]).toBe("Control");
+    expect(labels.actors.a1).toBe("Kane");
+    // A base is labelled by the layout it places, the way the contents list
+    // reads one, because its own id is a minted UUID.
+    expect(labels.prefabs["base-uuid"]).toBe("The keep");
+  });
+
+  it("names a team by the participant's name rather than the slot id", () => {
+    const scenario = newScenario("Demo");
+    const [you] = scenario.setup.participants;
+
+    expect(missionIssueLabels(scenario).teams[you.id]).toBe(you.name);
+    expect(you.name).not.toBe(you.id);
+  });
+
+  it("leaves out a label that is blank, so the id answers instead", () => {
+    const labels = missionIssueLabels(labelled());
+
+    expect("objective-2" in labels.objectives).toBe(false);
+    expect("a2" in labels.actors).toBe(false);
+  });
+
+  it("puts a real document's names in front of a real problem", () => {
+    const scenario = starterScenario("Demo");
+    const issue = {
+      path: 'triggers["briefing"].actions[0].params.line',
+      message: 'no dialogue line called "gone"',
+    };
+
+    expect(describeIssue(issue, missionIssueLabels(scenario))).toBe(
+      'Trigger "Command calls in" (briefing), action 1, line: no dialogue line called "gone"',
+    );
   });
 });
