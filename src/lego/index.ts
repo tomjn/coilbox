@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Blocks, BookOpen, Boxes } from "lucide-react";
+import { Blocks, Boxes, Code2 } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import CoilMark from "../general/CoilMark";
 
 /**
  * The unit builder: assemble Spring/Recoil units from a library of pre-textured
@@ -35,13 +36,42 @@ const legoPlugin: FramePlugin = {
           icon: Blocks,
           useVisible: useAdvancedMode,
         },
+        // External references, home launcher only (sidebar: false), opened in
+        // the system browser via the Tauri opener.
+        {
+          id: "lego.builder-guide",
+          label: "Unit builder guide",
+          href: "https://tomjn.github.io/coilbox/lego-builder",
+          icon: CoilMark,
+          sidebar: false,
+          order: 2,
+          useVisible: useAdvancedMode,
+        },
         {
           id: "lego.parts-pack-guide",
           label: "Parts pack format",
           href: "https://tomjn.github.io/coilbox/lego-parts-pack",
-          icon: BookOpen,
+          icon: CoilMark,
           sidebar: false,
-          order: 2,
+          order: 3,
+          useVisible: useAdvancedMode,
+        },
+        {
+          id: "lego.s3o-format",
+          label: "s3o format",
+          href: "https://tomjn.github.io/coilbox/s3o-format",
+          icon: CoilMark,
+          sidebar: false,
+          order: 4,
+          useVisible: useAdvancedMode,
+        },
+        {
+          id: "lego.s3o-blender-tools",
+          label: "S3O Blender Tools",
+          href: "https://github.com/ChrisFloofyKitsune/s3o-blender-tools/",
+          icon: Code2,
+          sidebar: false,
+          order: 5,
           useVisible: useAdvancedMode,
         },
       ],
