@@ -45,14 +45,17 @@ vi.mock("@picoframe/frame", async () => ({
 // same way. Both stand in, so what is asserted is what the page asked for.
 const {
   campaignSave,
-  campaignImageDelete,
+  campaignMediaDelete,
   useCampaigns,
   useScenarios,
   refreshCampaigns,
 } = vi.hoisted(() => ({
   campaignSave: vi.fn(async (_args: { id: string; json: string }) => ({})),
-  campaignImageDelete: vi.fn(
-    async (_args: { campaignId: string; file: string }) => ({}),
+  campaignMediaDelete: vi.fn(
+    async (_args: { campaignId: string; file: string }) => ({
+      deleted: true,
+      from: "media" as const,
+    }),
   ),
   useCampaigns: vi.fn(),
   useScenarios: vi.fn(),
@@ -61,7 +64,7 @@ const {
 vi.mock("../bindings", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../bindings")),
   campaignSave,
-  campaignImageDelete,
+  campaignMediaDelete,
 }));
 vi.mock("../campaigns", () => ({ useCampaigns, refreshCampaigns }));
 // What the scenario builder holds, which is the other half of every staleness
@@ -150,7 +153,7 @@ function savedMissions(): CampaignMission[] {
 
 beforeEach(() => {
   campaignSave.mockClear();
-  campaignImageDelete.mockClear();
+  campaignMediaDelete.mockClear();
   refreshCampaigns.mockClear();
 });
 
@@ -168,15 +171,13 @@ describe("removing a campaign mission", () => {
     expect(screen.getByText("its briefing")).toBeTruthy();
     expect(screen.getByText("1 objective")).toBeTruthy();
     expect(screen.getByText("1 unit restriction")).toBeTruthy();
-    expect(
-      screen.getByText("its panorama image, deleted from disk"),
-    ).toBeTruthy();
+    expect(screen.getByText("its panorama, deleted from disk")).toBeTruthy();
     expect(screen.getByText(/copy of the scenario "Beachhead"/)).toBeTruthy();
     // Nothing has happened yet: the mission is still in the list, and the
     // panorama is still on disk.
     expect(screen.getByText("1. Beachhead")).toBeTruthy();
     expect(campaignSave).not.toHaveBeenCalled();
-    expect(campaignImageDelete).not.toHaveBeenCalled();
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
   });
 
   it("leaves the mission and its panorama alone when the answer is no", () => {
@@ -187,7 +188,7 @@ describe("removing a campaign mission", () => {
 
     expect(screen.queryByText("Remove Beachhead?")).toBeNull();
     expect(screen.getByText("1. Beachhead")).toBeTruthy();
-    expect(campaignImageDelete).not.toHaveBeenCalled();
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
     expect(campaignSave).not.toHaveBeenCalled();
   });
 
@@ -198,12 +199,47 @@ describe("removing a campaign mission", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
 
-    expect(campaignImageDelete).toHaveBeenCalledWith({
+    expect(campaignMediaDelete).toHaveBeenCalledWith({
       campaignId: "c1",
       file: "shore.jpg",
     });
     expect(savedMissions()).toEqual([]);
     expect(screen.queryByText("1. Beachhead")).toBeNull();
+  });
+
+  /**
+   * The panorama was the only slot the removal ever cleaned up, and the command
+   * it used could not reach the folder audio and video go into, so a voiceover
+   * or a cutscene stayed on disk with nothing left naming it (issue #2210).
+   */
+  it("takes the side graphic, voiceover and cutscene with it", async () => {
+    show([
+      {
+        ...mission(),
+        sideGraphic: { kind: "file", file: "emblem.png" },
+        voiceover: { kind: "file", file: "brief.ogg" },
+        cutscene: { kind: "file", file: "intro.mp4" },
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+    // The confirmation has to name them, or it is quietly deleting more than
+    // it said it would.
+    expect(
+      screen.getByText(
+        "its panorama, side graphic, briefing voiceover and intro cutscene, deleted from disk",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+
+    expect(campaignMediaDelete.mock.calls.map(([a]) => a.file)).toEqual([
+      "shore.jpg",
+      "emblem.png",
+      "brief.ogg",
+      "intro.mp4",
+    ]);
   });
 
   it("does not claim a mission holds what it does not", () => {
@@ -502,7 +538,7 @@ async function renameThenRemove() {
   fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
   // The removal deletes the mission's panorama before it writes.
-  await waitFor(() => expect(campaignImageDelete).toHaveBeenCalled());
+  await waitFor(() => expect(campaignMediaDelete).toHaveBeenCalled());
 }
 
 describe("two edits made close together", () => {

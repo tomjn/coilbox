@@ -61,8 +61,9 @@ export function MissionMediaPlayer({
 /**
  * A "choose / replace / remove" control for one mission audio or video slot. Picks a
  * file, imports it verbatim via {@link campaignMediaImport}, and reports the stored
- * `{ kind: "file" }` ref. Like the image fields, it never deletes a superseded file
- * (reclaimed wholesale when the campaign is deleted).
+ * `{ kind: "file" }` ref. Like the image fields, it deletes nothing itself: the
+ * file it replaced goes when whoever owns the document can see that nothing else
+ * names it (issue #2210).
  */
 export function MissionAvField({
   campaignId,
