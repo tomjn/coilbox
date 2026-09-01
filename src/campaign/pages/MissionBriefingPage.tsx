@@ -10,16 +10,14 @@ import {
   Target,
   Trophy,
 } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import { useWriteRootPath } from "../../downloads/config";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
-import { useStillUi } from "../../general/display";
 import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
 import type { Campaign, CampaignMission } from "../model";
@@ -36,6 +34,7 @@ import {
   MissionUnitSideGraphic,
 } from "./components/MissionUnitPreview";
 import { PanoramaScroller } from "./components/PanoramaScroller";
+import { PhaseCard } from "./components/PhaseCard";
 import { RunDifficulty } from "./components/RunDifficulty";
 import { useMissionUnit } from "./components/useMissionUnit";
 
@@ -595,29 +594,6 @@ function AutoDetectedNote() {
     <p className="text-xs text-muted-foreground">
       Result detected from the replay.
     </p>
-  );
-}
-
-function PhaseCard({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  // Cross-fade between phases (and the Victory/Defeat stamp passed in via
-  // className); dropped entirely when the user prefers a still UI.
-  const still = useStillUi();
-  return (
-    <Card
-      className={cn(
-        "w-full max-w-md gap-4 border-border/50 bg-card/85 p-5 shadow-none backdrop-blur-sm",
-        !still && "phase-fade",
-        !still && className,
-      )}
-    >
-      {children}
-    </Card>
   );
 }
 
