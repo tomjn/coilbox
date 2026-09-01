@@ -30,6 +30,7 @@ import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
+import { useFieldText } from "@/lib/useFieldText";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import {
@@ -508,17 +509,18 @@ function NumberField({
   optional: boolean;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
-  const [text, setText] = useState(value === undefined ? "" : String(value));
+  const stored = value === undefined ? "" : String(value);
+  const [text, setText] = useFieldText(stored);
 
   const commit = () => {
     const trimmed = text.trim();
     if (trimmed === "") {
       if (optional) return onChange(undefined);
-      return setText(value === undefined ? "" : String(value));
+      return setText(stored);
     }
     const next = Number(trimmed);
     if (!Number.isFinite(next)) {
-      return setText(value === undefined ? "" : String(value));
+      return setText(stored);
     }
     setText(String(next));
     if (next !== value) onChange(next);
@@ -628,7 +630,7 @@ function TextField({
   optional: boolean;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
-  const [text, setText] = useState(value);
+  const [text, setText] = useFieldText(value);
 
   const commit = () => {
     const trimmed = text.trim();
