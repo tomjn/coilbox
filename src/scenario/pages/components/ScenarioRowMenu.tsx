@@ -18,7 +18,7 @@
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
-import { MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
+import { Copy, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -35,6 +35,7 @@ export function ScenarioRowMenu({
   editable,
   deletable,
   attached,
+  onDuplicate,
   onShare,
   onDelete,
 }: {
@@ -46,6 +47,9 @@ export function ScenarioRowMenu({
   /** A campaign mission carries a copy of this scenario, which changes what
    *  deleting it leaves behind, so the confirmation says so. */
   attached: boolean;
+  /** Absent for a scenario coilbox does not store, whose dialogue clips are not
+   *  in the media store for a copy to take with it. */
+  onDuplicate?: () => void;
   onShare: () => void;
   onDelete: () => Promise<void>;
 }) {
@@ -87,6 +91,13 @@ export function ScenarioRowMenu({
             onSelect={() => navigate(`/scenario-builder/${scenario.id}`)}
           >
             <Pencil className="size-4" aria-hidden="true" /> Edit
+          </DropdownMenuItem>
+        )}
+        {/* Above Share, because duplicating is part of writing a scenario and
+            sharing is what happens once it is written (issue #2183). */}
+        {onDuplicate && (
+          <DropdownMenuItem onSelect={onDuplicate}>
+            <Copy className="size-4" aria-hidden="true" /> Duplicate
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={onShare}>
