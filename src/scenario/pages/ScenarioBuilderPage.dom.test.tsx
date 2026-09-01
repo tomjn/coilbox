@@ -12,6 +12,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Campaign } from "../../campaign/model";
 
 // The drawer is the app shell's, so it is stubbed down to what opened in it.
 // Share and the delete confirmation both land here.
@@ -39,8 +40,13 @@ vi.mock("../storage", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../storage")),
   deleteScenario,
 }));
+// Which campaigns exist decides which rows are attached to one, so the list is
+// set per test.
+const stored = vi.hoisted(() => ({
+  campaigns: [] as { campaign: Campaign; source: "local" }[],
+}));
 vi.mock("../../campaign/campaigns", () => ({
-  useCampaigns: () => ({ campaigns: [] }),
+  useCampaigns: () => ({ campaigns: stored.campaigns }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
 // The map pictures and the list of maps this machine has both come off the
@@ -92,6 +98,48 @@ function onMap(mapName: string): LoadedScenario {
   };
 }
 
+/** The same local scenario, finished: it names a game and a map. */
+function setUp(): LoadedScenario {
+  const scenario = local.scenario;
+  return {
+    scenario: {
+      ...scenario,
+      setup: {
+        ...scenario.setup,
+        gameName: "Balanced Annihilation",
+        mapName: "Comet Catcher",
+      },
+    },
+    source: "local",
+  };
+}
+
+/** A campaign whose only mission carries a copy of the scenario named. */
+function campaignUsing(title: string, scenarioId: string) {
+  const campaign = {
+    schemaVersion: 1,
+    id: `campaign-${title}`,
+    type: "ta",
+    title,
+    description: "",
+    missions: [
+      {
+        id: `mission-${title}`,
+        title: "One",
+        briefing: "",
+        objectives: [],
+        snapshot: local.scenario.setup,
+        scenario: { ...local.scenario, id: scenarioId },
+        disabledUnits: [],
+        skippable: false,
+      },
+    ],
+    createdAt: "",
+    updatedAt: "",
+  } as Campaign;
+  return { campaign, source: "local" as const };
+}
+
 function show(scenarios: LoadedScenario[]) {
   useScenarios.mockReturnValue({
     scenarios,
@@ -124,6 +172,7 @@ function openMenuByKeyboard(name: string) {
 afterEach(() => {
   cleanup();
   opened.length = 0;
+  stored.campaigns = [];
   content.scanned = false;
   content.maps = [];
   content.thumbs = new Map();
@@ -256,6 +305,92 @@ describe("the map at the start of a scenario row", () => {
       link.querySelectorAll(
         "a, button, input, select, textarea, [tabindex], [contenteditable]",
       ),
+    ).toHaveLength(0);
+  });
+});
+
+// Issue #2178: a scenario missing a game or a map cannot be launched, and used
+// to look exactly like one that can.
+describe("the Draft badge", () => {
+  it("marks a scenario that names neither a game nor a map", () => {
+    show([local]);
+
+    expect(screen.getByText("Draft")).toBeTruthy();
+  });
+
+  it("stays off a scenario that names both", () => {
+    show([setUp()]);
+
+    expect(screen.queryByText("Draft")).toBeNull();
+  });
+
+  // The thumbnail can only speak about the map. A scenario set on a map it has
+  // and no game draws a perfectly good minimap and still cannot be launched,
+  // which is the row the badge exists for.
+  it("marks a scenario that has a map but no game", () => {
+    content.scanned = true;
+    content.maps = [{ name: "Comet Catcher" }];
+    content.thumbs = new Map([["Comet Catcher", { url: "asset://comet.png" }]]);
+
+    show([onMap("Comet Catcher")]);
+
+    expect(
+      screen.getByRole("img", { name: "Minimap of Comet Catcher" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Draft")).toBeTruthy();
+  });
+});
+
+describe("the In campaign badge", () => {
+  it("stays off a scenario no campaign has attached", () => {
+    show([setUp()]);
+
+    expect(screen.queryByText(/In campaign|In \d+ campaigns/)).toBeNull();
+  });
+
+  it("marks a scenario a campaign mission carries, and names it on hover", () => {
+    stored.campaigns = [campaignUsing("Core Contingency", "beachhead")];
+
+    show([setUp()]);
+
+    expect(screen.getByText("In campaign").getAttribute("title")).toBe(
+      "Used by Core Contingency",
+    );
+  });
+
+  // Nothing stops two missions attaching the same scenario, so the badge counts
+  // rather than claiming there is one campaign to go to.
+  it("counts the campaigns when more than one carries it", () => {
+    stored.campaigns = [
+      campaignUsing("Core Contingency", "beachhead"),
+      campaignUsing("Battle Tactics", "beachhead"),
+    ];
+
+    show([setUp()]);
+
+    expect(screen.getByText("In 2 campaigns").getAttribute("title")).toBe(
+      "Used by Core Contingency, Battle Tactics",
+    );
+  });
+
+  // The row is itself a link into the editor. Linking the badge to the campaign
+  // would nest one anchor in another, so it is text, and the row keeps its one
+  // tab stop.
+  it("is not a link, and adds no tab stop inside the row's link", () => {
+    stored.campaigns = [campaignUsing("Core Contingency", "beachhead")];
+
+    show([setUp()]);
+
+    const badge = screen.getByText("In campaign");
+    expect(badge.tagName).toBe("SPAN");
+    // The only link around it is the row's own, into the editor.
+    expect(badge.closest("a")?.getAttribute("href")).toBe(
+      "/scenario-builder/beachhead",
+    );
+    expect(
+      screen
+        .getByRole("link", { name: /Beachhead/ })
+        .querySelectorAll("a, button, [tabindex]"),
     ).toHaveLength(0);
   });
 });
