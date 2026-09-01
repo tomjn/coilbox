@@ -37,6 +37,7 @@ import type { Campaign, CampaignMission } from "../model";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
 import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
+import { MissionFacts, MissionSetup } from "./components/MissionFacts";
 import { MissionRemoveButton } from "./components/MissionRemoveButton";
 import { MissionScenarioUpdateButton } from "./components/MissionScenarioUpdateButton";
 import { PanoramaScroller } from "./components/PanoramaScroller";
@@ -514,13 +515,15 @@ export default function CampaignEditPage() {
                       <span className="truncate text-sm font-medium">
                         {i + 1}. {m.title}
                       </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {m.subtitle ? `${m.subtitle} · ` : ""}
-                        {m.snapshot.gameName || "No game"} ·{" "}
-                        {m.snapshot.mapName || "No map"}
-                        {m.scenario ? ` · scenario: ${m.scenario.name}` : ""}
-                        {m.skippable ? " · skippable" : ""}
-                      </span>
+                      {/* Against the title, because that is where the briefing
+                          screen puts it: a location line under the name. */}
+                      {m.subtitle && (
+                        <span className="truncate text-xs text-muted-foreground">
+                          {m.subtitle}
+                        </span>
+                      )}
+                      <MissionSetup snapshot={m.snapshot} />
+                      <MissionFacts mission={m} />
                       {attachment.state === "stale" && (
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs text-amber-600 dark:text-amber-500">

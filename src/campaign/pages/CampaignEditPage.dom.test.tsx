@@ -35,6 +35,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -195,6 +196,18 @@ afterEach(() => {
   cleanup();
 });
 
+/**
+ * The open confirmation popover. The row behind it now says what the mission
+ * holds too (issue #2195), in the same words, so a count asked for here has to
+ * be asked for inside the popover or it matches twice.
+ */
+function confirmation(): HTMLElement {
+  const heading = screen.getByText(/^Remove .+\?$/);
+  const content = heading.closest("[data-slot='popover-content']");
+  if (!content) throw new Error("the confirmation is not open");
+  return content as HTMLElement;
+}
+
 describe("removing a campaign mission", () => {
   it("asks first, and says what the mission holds", () => {
     show([mission()]);
@@ -203,8 +216,8 @@ describe("removing a campaign mission", () => {
 
     expect(screen.getByText("Remove Beachhead?")).toBeTruthy();
     expect(screen.getByText("its briefing")).toBeTruthy();
-    expect(screen.getByText("1 objective")).toBeTruthy();
-    expect(screen.getByText("1 unit restriction")).toBeTruthy();
+    expect(within(confirmation()).getByText("1 objective")).toBeTruthy();
+    expect(within(confirmation()).getByText("1 unit restriction")).toBeTruthy();
     expect(screen.getByText("its panorama, deleted from disk")).toBeTruthy();
     expect(screen.getByText(/copy of the scenario "Beachhead"/)).toBeTruthy();
     // Nothing has happened yet: the mission is still in the list, and the
@@ -769,6 +782,177 @@ describe("two edits made close together", () => {
     await waitFor(() => expect(onDisk).toHaveLength(2));
 
     expect(await screen.findByText(SAVED)).toBeTruthy();
+  });
+});
+
+/**
+ * What a mission row says about the mission (issue #2195).
+ *
+ * It used to say all of it in one string joined by dots, subtitle first and
+ * skippable last, on a line that truncates. So on a narrow window the row lost
+ * the end of itself, and what it lost was the part nothing else on the page
+ * says: whether a scenario is attached and whether the mission can be skipped.
+ *
+ * What is pinned here is the split. Each fact has a line and a kind of its own,
+ * the counts hold their place whether or not there is anything to count, and
+ * none of it is a sentence any more.
+ */
+describe("what a mission row says", () => {
+  /** The column of lines beside a row's move buttons. */
+  const columnOf = (title: string) =>
+    screen.getByText(title).parentElement as HTMLElement;
+
+  /**
+   * The lines under a row's title, in the order they are drawn. The last of
+   * them is icons and digits, so it is named rather than read out.
+   */
+  const linesUnder = (title: string) =>
+    [...columnOf(title).children]
+      .slice(1)
+      .map((el) =>
+        el.querySelector("svg") ? "the mission facts" : el.textContent,
+      );
+
+  /** Every chip in a row, by the phrase it carries. */
+  const chipsOf = (title: string) =>
+    [...columnOf(title).querySelectorAll("span[title]")].map((el) =>
+      el.getAttribute("title"),
+    );
+
+  it("gives the subtitle, the setup and the facts a line each", () => {
+    show([{ ...plain("m1", "Ridge"), subtitle: "Northern Isles" }]);
+
+    expect(linesUnder("1. Ridge")).toEqual([
+      "Northern Isles",
+      "No game · No map",
+      "the mission facts",
+    ]);
+  });
+
+  it("gives a mission with no subtitle no line to hold it", () => {
+    show([plain("m1", "Ridge")]);
+
+    expect(linesUnder("1. Ridge")).toEqual([
+      "No game · No map",
+      "the mission facts",
+    ]);
+  });
+
+  it("stops packing the facts into one line joined by dots", () => {
+    show([{ ...mission(), subtitle: "Northern Isles", skippable: true }]);
+
+    expect(screen.queryByText(/Northern Isles ·/)).toBeNull();
+    expect(screen.queryByText(/· scenario:/)).toBeNull();
+    expect(screen.queryByText(/· skippable/)).toBeNull();
+  });
+
+  it("draws what the author wrote into the mission as chips", () => {
+    show([mission()]);
+
+    expect(chipsOf("1. Beachhead")).toEqual([
+      "Briefing written",
+      "1 objective",
+      "1 unit restriction",
+    ]);
+  });
+
+  /**
+   * A count of nothing is dimmed, not dropped. Dropping one slides the rest
+   * along, so no kind sits in the same place twice down the list, and a gap
+   * makes no claim where "0 objectives" does.
+   */
+  it("keeps a chip for what the mission has none of, dimmed", () => {
+    show([plain("m1", "Ridge")]);
+
+    expect(chipsOf("1. Ridge")).toEqual([
+      "No briefing",
+      "0 objectives",
+      "0 unit restrictions",
+    ]);
+    expect(screen.getByTitle("0 objectives").className).toMatch(/opacity-40/);
+    expect(screen.getByTitle("No briefing").className).toMatch(/opacity-40/);
+  });
+
+  it("leaves a chip that has something to say undimmed", () => {
+    show([mission()]);
+
+    expect(screen.getByTitle("1 objective").className).not.toMatch(
+      /opacity-40/,
+    );
+    expect(screen.getByTitle("Briefing written").className).not.toMatch(
+      /opacity-40/,
+    );
+  });
+
+  // An icon beside a digit says nothing to a screen reader, so the phrase is
+  // the only text the chip is given and the drawing is hidden from it.
+  it("gives every chip its phrase in text, and hides the drawing", () => {
+    show([mission()]);
+
+    const objectives = screen.getByTitle("1 objective");
+    expect(objectives.querySelector("span.sr-only")?.textContent).toBe(
+      "1 objective",
+    );
+    expect(
+      objectives.querySelector("span[aria-hidden='true']")?.textContent,
+    ).toBe("1");
+    expect(objectives.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+  });
+
+  // A briefing is written or it is not, so its chip is the icon alone. "1
+  // briefing" would be a count of something nobody counts.
+  it("gives the briefing chip no digit to read", () => {
+    show([mission()]);
+
+    const briefing = screen.getByTitle("Briefing written");
+    expect(briefing.querySelector("span[aria-hidden='true']")).toBeNull();
+    expect(briefing.querySelector("span.sr-only")?.textContent).toBe(
+      "Briefing written",
+    );
+  });
+
+  // The mission is titled after the scenario when it is built from one, but it
+  // can be renamed afterwards, and then this badge is the only thing naming the
+  // document the mission actually plays.
+  it("names the attached scenario in a badge", () => {
+    show([{ ...mission(), title: "Landing" }]);
+
+    expect(screen.getByText("Scenario: Beachhead")).toBeTruthy();
+  });
+
+  it("gives a preset-only mission no scenario badge", () => {
+    show([plain("m1", "Ridge")]);
+
+    expect(screen.queryByText(/^Scenario:/)).toBeNull();
+  });
+
+  it("badges only the mission that can be skipped", () => {
+    show([{ ...plain("m1", "Ridge"), skippable: true }, plain("m2", "Dam")]);
+
+    expect(columnOf("1. Ridge").textContent).toContain("Skippable");
+    expect(columnOf("2. Dam").textContent).not.toContain("Skippable");
+  });
+
+  /**
+   * A mission naming no game or no map cannot launch, and play order is array
+   * order, so it blocks every mission after it (`campaignUnplayableReason`). It
+   * used to read exactly like a game name, at the end of the line that
+   * truncates.
+   */
+  it("marks a missing game or map rather than printing it like a name", () => {
+    show([plain("m1", "Ridge")]);
+
+    expect(screen.getByText("No game").className).toMatch(/amber/);
+    expect(screen.getByText("No map").className).toMatch(/amber/);
+  });
+
+  it("leaves a game and a map the mission has as plain text", () => {
+    show([scenarioMission(asAttached)], [asAttached]);
+
+    expect(screen.getByText("BAR 1.0").className).not.toMatch(/amber/);
+    expect(screen.getByText("Comet Catcher").className).not.toMatch(/amber/);
   });
 });
 
