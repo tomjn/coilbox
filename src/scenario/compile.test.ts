@@ -478,6 +478,54 @@ describe("a trigger's name", () => {
   });
 });
 
+/**
+ * Issue #2248. An objective and a dialogue line are addressed by id in the
+ * compiled mission, and `complete_objective` and `dialogue` carry that same id.
+ * The words beside each one are the label: the player reads an objective's
+ * `text`, the editor lists a line by its `speaker`, and neither is what anything
+ * points at.
+ *
+ * So the id is minted once and nothing renames it, which is what makes this
+ * change free at the far end. The compiled file did not move, no runtime has to
+ * learn anything, and every mission written before now names the ids it always
+ * named.
+ */
+describe("an objective's and a dialogue line's id", () => {
+  const doc = (text: string, speaker: string) =>
+    build({
+      objectives: [{ id: "hold", kind: "primary", text, hidden: false }],
+      dialogue: [{ id: "warn", speaker, text: "Contact." }],
+      triggers: [
+        {
+          id: "t1",
+          conditions: { op: "all", conditions: [] },
+          actions: [
+            { type: "complete_objective", params: { objective: "hold" } },
+            { type: "dialogue", params: { line: "warn" } },
+          ],
+        },
+      ],
+    });
+
+  it("is what the file carries and what the actions point at", () => {
+    const emitted = compileScenario(doc("Hold the pad.", "HQ"));
+
+    expect(emitted).toContain('id = "hold"');
+    expect(emitted).toContain('objective = "hold"');
+    expect(emitted).toContain('id = "warn"');
+    expect(emitted).toContain('line = "warn"');
+  });
+
+  it("does not move when the words beside it are rewritten", () => {
+    const emitted = compileScenario(doc("Hold the landing pad.", "Control"));
+
+    expect(emitted).toContain('id = "hold"');
+    expect(emitted).toContain('objective = "hold"');
+    expect(emitted).toContain('id = "warn"');
+    expect(emitted).toContain('line = "warn"');
+  });
+});
+
 describe("missionPath", () => {
   it("puts a mission in its own folder under missions/", () => {
     expect(missionPath("abc-123")).toBe("missions/abc-123/mission.lua");

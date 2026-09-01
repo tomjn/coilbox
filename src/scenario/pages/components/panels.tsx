@@ -56,8 +56,10 @@ export function EditorPanel({
 }
 
 /**
- * The name of a thing whose name is its id: an objective, a dialogue line, a
- * variable.
+ * The name of a thing whose name is its id. A variable is the only one left:
+ * its name is the key in `vars`, so there is no id beside it to point at. An
+ * objective and a dialogue line each have one, and it is not editable (issue
+ * #2248).
  *
  * Committed when the box is left rather than as it is typed, because every edit
  * a panel makes is written to disk. Put back when the name is refused, which is

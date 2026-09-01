@@ -23,8 +23,6 @@ import {
   removeDialogue,
   removeObjective,
   removeVar,
-  renameDialogue,
-  renameObjective,
   renameVar,
   setBuildableMode,
   setVar,
@@ -114,18 +112,15 @@ describe("objectives", () => {
     expect(loads(next)).toBe(true);
   });
 
-  it("carries the actions that named it over on a rename", () => {
-    const next = renameObjective(document(), "hold", "hold-the-pad");
-    expect(next.objectives[0].id).toBe("hold-the-pad");
-    expect(next.triggers[0].actions[0].params.objective).toBe("hold-the-pad");
+  /** Issue #2248. The id is what `complete_objective` points at, and editing
+   *  the words the author reads is not allowed to move it. */
+  it("keeps its id when its words are rewritten", () => {
+    const next = editObjective(document(), "hold", {
+      text: "Hold the landing pad.",
+    });
+    expect(next.objectives[0].id).toBe("hold");
+    expect(next.triggers[0].actions[0].params.objective).toBe("hold");
     expect(loads(next)).toBe(true);
-  });
-
-  it("refuses a rename that would make the document unreadable", () => {
-    const scenario = addObjective(document(), "second");
-    expect(renameObjective(scenario, "hold", "")).toBe(scenario);
-    expect(renameObjective(scenario, "hold", "   ")).toBe(scenario);
-    expect(renameObjective(scenario, "hold", "second")).toBe(scenario);
   });
 
   it("deletes one without rewriting the trigger that named it", () => {
@@ -178,17 +173,16 @@ describe("dialogue", () => {
     expect(portraitDrawable("dds.png")).toBe(true);
   });
 
-  it("carries the actions that played it over on a rename", () => {
-    const next = renameDialogue(document(), "warn", "hq-warning");
-    expect(next.dialogue[0].id).toBe("hq-warning");
-    expect(next.triggers[0].actions[1].params.line).toBe("hq-warning");
+  /** Issue #2248. The id is what a `dialogue` action plays, and editing the
+   *  speaker and the words is not allowed to move it. */
+  it("keeps its id when its speaker and words are rewritten", () => {
+    const next = editDialogue(document(), "warn", {
+      speaker: "Control",
+      text: "Contact, north pass.",
+    });
+    expect(next.dialogue[0].id).toBe("warn");
+    expect(next.triggers[0].actions[1].params.line).toBe("warn");
     expect(loads(next)).toBe(true);
-  });
-
-  it("refuses a rename onto a line that already exists", () => {
-    const scenario = addDialogue(document(), "second");
-    expect(renameDialogue(scenario, "warn", "second")).toBe(scenario);
-    expect(renameDialogue(scenario, "warn", "")).toBe(scenario);
   });
 
   it("deletes a line", () => {
@@ -275,6 +269,11 @@ describe("vars", () => {
  * declares leaves them pointing at a name nothing answers to. The `amount`
  * parameter is the same question one level in: the var it reads sits inside the
  * value rather than being it (#952).
+ *
+ * A variable is the last one this can happen to. An objective and a dialogue
+ * line are pointed at by an id nothing renames (issue #2248), so a game's own
+ * reference to one survives without anybody having to know it is there, and
+ * without the extension table having to be loaded for it to survive.
  */
 describe("a reference a game's own type holds", () => {
   const declared = parseExtensions({
@@ -320,18 +319,6 @@ describe("a reference a game's own type holds", () => {
 
   const reported = (scenario: Scenario) => scenario.triggers[0].actions[3];
 
-  it("carries it over when an objective is renamed", () => {
-    const next = renameObjective(withDeclared(), "hold", "held", declared);
-    expect(reported(next).params.about).toBe("held");
-    expect(loads(next)).toBe(true);
-  });
-
-  it("carries it over when a dialogue line is renamed", () => {
-    const next = renameDialogue(withDeclared(), "warn", "warned", declared);
-    expect(reported(next).params.say).toBe("warned");
-    expect(loads(next)).toBe(true);
-  });
-
   it("carries it over when a variable is renamed, inside an amount too", () => {
     const next = renameVar(withDeclared(), "alertLevel", "alarm", declared);
     expect(reported(next).params.counter).toBe("alarm");
@@ -340,8 +327,21 @@ describe("a reference a game's own type holds", () => {
   });
 
   it("leaves it behind when the caller does not know what the game declares", () => {
-    const next = renameObjective(withDeclared(), "hold", "held");
-    expect(reported(next).params.about).toBe("hold");
+    const next = renameVar(withDeclared(), "alertLevel", "alarm");
+    expect(reported(next).params.counter).toBe("alertLevel");
+  });
+
+  /** Nothing renames an objective or a dialogue line, so a game's own reference
+   *  to one is never touched, whatever else is edited around it. */
+  it("is left alone when an objective or a line is edited", () => {
+    const edited = editDialogue(
+      editObjective(withDeclared(), "hold", { text: "Hold the landing pad." }),
+      "warn",
+      { speaker: "Control" },
+    );
+    expect(reported(edited).params.about).toBe("hold");
+    expect(reported(edited).params.say).toBe("warn");
+    expect(loads(edited)).toBe(true);
   });
 });
 

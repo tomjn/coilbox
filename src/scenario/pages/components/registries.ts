@@ -6,18 +6,19 @@
  * that show it are `ObjectivePanel.tsx`, `DialoguePanel.tsx`,
  * `RestrictionPanel.tsx` and `VarPanel.tsx`.
  *
- * One rule runs through all of it, and it comes from the parser. An objective or
- * a dialogue line with an empty id, or two of either sharing one, makes
- * `parseScenario` refuse the whole document, which would lose the author's
- * scenario off the list on the next load. So every name here is minted unique
- * and every rename hands the document straight back rather than writing a name
- * that cannot be loaded.
+ * An objective and a dialogue line each have an id that is minted once here and
+ * then only read. It is what `complete_objective`, `fail_objective` and
+ * `dialogue` point at, what the compiled mission is addressed by, and what a
+ * mission problem names one by, so nothing in this file changes it (issue
+ * #2248). What the author edits is the objective's text and the line's speaker
+ * and words, which is what the lists and the trigger picker show anyway. Two
+ * ids are never the same, because `parseScenario` refuses a document where they
+ * are and the author would find their scenario gone off the list.
  *
- * Renaming any of the four rewrites the triggers that named it, through
- * {@link rewriteRefs} and the reference kind, so an author can call an objective
- * what they mean without silently unhooking the trigger that completes it.
- *
- * Each rename takes what the scenario's game declares in its
+ * A variable is the exception, and it is not one of these. A variable has no id
+ * beside its name: the name is the key in `vars`, so renaming one has to rewrite
+ * the triggers that read it, through {@link rewriteRefs} and the reference kind.
+ * That rename takes what the scenario's game declares in its
  * `missions/extensions.lua`, so a reference held by a parameter of the game's
  * own is carried over with coilbox's (issue #913). Left out, only coilbox's own
  * parameters are rewritten, which is what a caller with no game to read has.
@@ -121,34 +122,6 @@ export function removeObjective(scenario: Scenario, id: string): Scenario {
     : { ...scenario, objectives };
 }
 
-/** An objective under a different id, with every `complete_objective` and
- *  `fail_objective` that named it carried over. Unchanged when the new id is
- *  empty or already taken, because both are documents that will not load. */
-export function renameObjective(
-  scenario: Scenario,
-  from: string,
-  to: string,
-  extensions: ExtensionTypes = NO_EXTENSIONS,
-): Scenario {
-  const wanted = to.trim();
-  if (!wanted || wanted === from) return scenario;
-  if (!scenario.objectives.some((o) => o.id === from)) return scenario;
-  if (scenario.objectives.some((o) => o.id === wanted)) return scenario;
-  const rewritten = rewriteRefs(
-    scenario,
-    "objectiveId",
-    from,
-    wanted,
-    extensions,
-  );
-  return {
-    ...rewritten,
-    objectives: rewritten.objectives.map((o) =>
-      o.id === from ? { ...o, id: wanted } : o,
-    ),
-  };
-}
-
 /* -------------------------------------------------------------------------- *
  * Dialogue.
  *
@@ -193,33 +166,6 @@ export function removeDialogue(scenario: Scenario, id: string): Scenario {
   return dialogue.length === scenario.dialogue.length
     ? scenario
     : { ...scenario, dialogue };
-}
-
-/** A dialogue line under a different id, with every `dialogue` action that
- *  played it carried over. */
-export function renameDialogue(
-  scenario: Scenario,
-  from: string,
-  to: string,
-  extensions: ExtensionTypes = NO_EXTENSIONS,
-): Scenario {
-  const wanted = to.trim();
-  if (!wanted || wanted === from) return scenario;
-  if (!scenario.dialogue.some((d) => d.id === from)) return scenario;
-  if (scenario.dialogue.some((d) => d.id === wanted)) return scenario;
-  const rewritten = rewriteRefs(
-    scenario,
-    "dialogueId",
-    from,
-    wanted,
-    extensions,
-  );
-  return {
-    ...rewritten,
-    dialogue: rewritten.dialogue.map((d) =>
-      d.id === from ? { ...d, id: wanted } : d,
-    ),
-  };
 }
 
 /** The clips one line holds, for deleting them off disk when the line goes. */

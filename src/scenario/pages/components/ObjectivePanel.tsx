@@ -9,6 +9,12 @@
  * the words, whether it is a primary or a side job, and whether it is on the
  * panel from the start.
  *
+ * The id is not one of them. It is what those two actions point at, what the
+ * compiled mission is addressed by, and what a mission problem names an
+ * objective by, so it is minted once and shown here rather than edited (issue
+ * #2248). It used to be the name box, and typing in it rewrote every trigger
+ * that pointed at the objective.
+ *
  * The document is never held here. Every edit goes out through `onChange` and
  * comes back as a new `scenario`, the way the trigger panel works.
  */
@@ -19,27 +25,21 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
-import type { ExtensionTypes } from "../../extensions";
 import type { Scenario, ScenarioObjective } from "../../model";
-import { EditorPanel, NameField, TextField } from "./panels";
+import { EditorPanel, TextField } from "./panels";
 import {
   addObjective,
   editObjective,
   nextObjectiveId,
   removeObjective,
-  renameObjective,
 } from "./registries";
 
 export function ObjectivePanel({
   scenario,
   onChange,
-  extensions,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
-  /** The types the scenario's game declares, so a rename carries over a
-   *  reference one of its own parameters holds (issue #913). */
-  extensions: ExtensionTypes;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -103,7 +103,6 @@ export function ObjectivePanel({
               key={selected.id}
               objective={selected}
               scenario={scenario}
-              extensions={extensions}
               onChange={onChange}
               onSelect={setSelectedId}
             />
@@ -151,17 +150,15 @@ function ObjectiveRow({
   );
 }
 
-/** The selected objective: its name, its words, and how it is shown. */
+/** The selected objective: its id, its words, and how it is shown. */
 function ObjectiveForm({
   objective,
   scenario,
-  extensions,
   onChange,
   onSelect,
 }: {
   objective: ScenarioObjective;
   scenario: Scenario;
-  extensions: ExtensionTypes;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
 }) {
@@ -171,22 +168,11 @@ function ObjectiveForm({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <NameField
-          name={objective.id}
-          label="Objective name"
-          onRename={(wanted) => {
-            const next = renameObjective(
-              scenario,
-              objective.id,
-              wanted,
-              extensions,
-            );
-            if (next === scenario) return false;
-            onChange(next);
-            onSelect(wanted.trim());
-            return true;
-          }}
-        />
+        {/* Read only. The mission problems list names an objective by this, so
+            it is worth being able to read, and nothing moves it (issue #2248). */}
+        <span className="font-mono text-xs text-muted-foreground">
+          {objective.id}
+        </span>
         <OptionSelect
           size="sm"
           className="w-36"

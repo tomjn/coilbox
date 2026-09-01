@@ -241,9 +241,13 @@ Settling an objective does not end the mission. Three objectives and one ending 
 
 The player sees them in a panel in game: primaries first, then secondaries, in the order you listed them, with a hidden one left out until it settles.
 
+Rewrite the text whenever. `complete_objective` and `fail_objective` point at an id the editor mints once and never changes, so a better wording moves nothing. The id is shown beside the objective because that is what a mission problem calls it, and you cannot edit it.
+
 ## Dialogue and sound
 
 A dialogue line is a radio message: a speaker, a line of text, and optionally a portrait image and a voice clip. Triggers fire them with the `dialogue` action.
+
+Change the speaker and the words whenever. The `dialogue` action points at an id the editor mints once and never changes, so rewriting a line does not unhook the trigger that plays it. The id is shown beside the line and you cannot edit it, the same as an objective.
 
 **Import an image** and **Import a clip** copy the file into the scenario's own store, verbatim, with no re-encoding. Portraits take `png`, `jpg`, `jpeg`, `dds` and `bmp`, and clips take `ogg`, `wav` and `mp3`. The files travel with an export, and they are copied into the game beside the compiled mission at launch, which is how the engine can load them.
 
