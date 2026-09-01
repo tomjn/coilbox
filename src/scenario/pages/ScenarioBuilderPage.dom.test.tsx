@@ -977,6 +977,67 @@ describe("duplicating a scenario", () => {
   });
 });
 
+/**
+ * The starter, offered where somebody has nothing to copy (issue #2183). What
+ * it holds is pinned in `create.test.ts`, against the validator. What is pinned
+ * here is that the empty state can actually reach it, and that picking it saves
+ * the mission rather than the blank document the other button saves.
+ */
+describe("the empty state's starter", () => {
+  /** Fill in the form the drawer opened and create the scenario. */
+  function createNamed(name: string) {
+    render(opened[0].content);
+    fireEvent.change(screen.getByPlaceholderText("Name"), {
+      target: { value: name },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create/ }));
+  }
+
+  it("offers the starter only while there are no scenarios", () => {
+    show([]);
+    expect(
+      screen.getByRole("button", { name: /Start from the starter/ }),
+    ).toBeTruthy();
+
+    cleanup();
+    show([local]);
+    expect(
+      screen.queryByRole("button", { name: /Start from the starter/ }),
+    ).toBeNull();
+  });
+
+  it("saves a scenario with a mission in it, not an empty one", async () => {
+    show([]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Start from the starter/ }),
+    );
+    expect(opened.map((o) => o.title)).toEqual([
+      "New scenario from the starter",
+    ]);
+    createNamed("First mission");
+
+    await vi.waitFor(() => expect(plugin.save).toHaveBeenCalledTimes(1));
+    const document = JSON.parse(plugin.save.mock.calls[0][0].json) as Scenario;
+    expect(document.name).toBe("First mission");
+    expect(document.triggers.length).toBeGreaterThan(0);
+    expect(document.objectives.length).toBeGreaterThan(0);
+  });
+
+  it("still saves an empty document from New scenario", async () => {
+    show([]);
+
+    fireEvent.click(screen.getByRole("button", { name: /New scenario/ }));
+    expect(opened.map((o) => o.title)).toEqual(["New scenario"]);
+    createNamed("From scratch");
+
+    await vi.waitFor(() => expect(plugin.save).toHaveBeenCalledTimes(1));
+    const document = JSON.parse(plugin.save.mock.calls[0][0].json) as Scenario;
+    expect(document.triggers).toEqual([]);
+    expect(document.objectives).toEqual([]);
+  });
+});
+
 describe("a read-only scenario's row", () => {
   // A bundled scenario's clips are not in the media store until it is launched,
   // and a game's own mission keeps them inside the game archive, so neither has
