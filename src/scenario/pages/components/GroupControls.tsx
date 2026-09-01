@@ -25,6 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
+import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { GroupUnit, ScenarioGroup, ScenarioOrder } from "../../model";
@@ -195,8 +196,16 @@ export function GroupControls({
   );
 }
 
-/** One unit type in the group: what it is, and how many of it. */
-function UnitRow({
+/**
+ * One unit type in the group: what it is, and how many of it.
+ *
+ * The box follows the count when the count changes on its own, which is what an
+ * undo does (issue #2185). The row is keyed by the unit type rather than by the
+ * count, so nothing remounts it when the count moves: the box carried on showing
+ * the count from before the step back, and the next keystroke wrote it over the
+ * restored one.
+ */
+export function UnitRow({
   entry,
   onCount,
   onRemove,
@@ -205,7 +214,7 @@ function UnitRow({
   onCount: (count: number) => void;
   onRemove: () => void;
 }) {
-  const [count, setCount] = useState(String(entry.count));
+  const [count, setCount] = useFieldText(String(entry.count));
 
   const commit = () => {
     const next = clampCount(Number(count));
