@@ -214,6 +214,34 @@ function UnitSlotEditor({
   );
 }
 
+/**
+ * Take this session's imports off disk, except the ones `keep` names, and forget
+ * them either way.
+ *
+ * Best-effort. A file that will not go is wasted disk space, and by the time the
+ * drawer is closing there is nobody left to tell, so a refusal goes to the
+ * console rather than the screen. `deleted: false` is said out loud too: it
+ * means neither folder held the file, and a delete that quietly removes nothing
+ * was the whole of issue #2210.
+ */
+function deleteSessionFiles(
+  campaignId: string,
+  files: Set<string>,
+  keep: Set<string>,
+) {
+  for (const file of files) {
+    if (keep.has(file)) continue;
+    files.delete(file);
+    campaignMediaDelete({ campaignId, file })
+      .then(({ deleted }) => {
+        if (!deleted) console.warn("campaign media was already gone", file);
+      })
+      .catch((e) => {
+        console.error("could not delete campaign media", file, e);
+      });
+  }
+}
+
 /** A framed, fixed-height box for an in-editor live 3D preview. */
 function PreviewBox({ children }: { children: ReactNode }) {
   return (
@@ -235,6 +263,10 @@ function PreviewBox({ children }: { children: ReactNode }) {
  * clean it up: its diff works from the stored document, which never named it). The
  * mission's *already-saved* files are left for the parent to delete on Apply, so
  * cancelling never dangles a saved reference.
+ *
+ * Closing takes the rest. Whatever the drawer still holds and never saved goes
+ * when it unmounts, which is where Cancel, Escape and a click on the backdrop all
+ * end up. Apply is spared: the mission it persisted keeps its files.
  */
 export function MissionEditorDrawer({
   campaignId,
@@ -251,6 +283,11 @@ export function MissionEditorDrawer({
   const [error, setError] = useState<string | null>(null);
   // Files imported during this drawer session (safe to delete on replace).
   const sessionFiles = useRef<Set<string>>(new Set());
+  // The mission Apply committed, or null while nothing has been. Read only by
+  // the closing cleanup below, which is why it is a ref: as state it would be a
+  // dependency, and a cleanup that re-runs on a dependency change would delete
+  // files the drawer is still using.
+  const applied = useRef<CampaignMission | null>(null);
 
   const patch = (p: Partial<CampaignMission>) =>
     setMission((m) => ({ ...m, ...p }));
@@ -291,14 +328,37 @@ export function MissionEditorDrawer({
   // folders.
   useEffect(() => {
     const named = new Set(missionMedia(mission).map((m) => m.file));
-    for (const file of sessionFiles.current) {
-      if (named.has(file)) continue;
-      sessionFiles.current.delete(file);
-      campaignMediaDelete({ campaignId, file }).catch((e) => {
-        console.error("could not delete campaign media", file, e);
-      });
-    }
+    deleteSessionFiles(campaignId, sessionFiles.current, named);
   }, [mission, campaignId]);
+
+  // Closing without applying leaves every remaining session import an orphan:
+  // no slot names it, the stored campaign never heard of it, and the page behind
+  // diffs against that stored campaign so it cannot find it either. A 200 MB
+  // cutscene the author decided against stayed until the whole campaign was
+  // deleted (issue #2231).
+  //
+  // Cancel, Escape and a click on the backdrop are three different routes to the
+  // same place: the drawer's content unmounts. So the cleanup goes here rather
+  // than on the Cancel button, which is the only one of the three that button
+  // could ever cover.
+  //
+  // Apply is what this has to spare, and `applied` is what tells them apart.
+  // Once a mission has been persisted the files it names belong to the saved
+  // campaign, and deleting them would leave it naming files that are not there.
+  //
+  // Empty deps, and read through refs, because React runs a cleanup on every
+  // dependency change and once more on mount under StrictMode. A cleanup that
+  // could re-run mid-edit would delete a file the drawer is still using.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: must run on unmount alone, because a re-run would delete a file the open drawer still names
+  useEffect(
+    () => () => {
+      const keep = applied.current
+        ? new Set(missionMedia(applied.current).map((m) => m.file))
+        : new Set<string>();
+      deleteSessionFiles(campaignId, sessionFiles.current, keep);
+    },
+    [],
+  );
 
   const pickImage = async () => {
     setError(null);
@@ -364,6 +424,11 @@ export function MissionEditorDrawer({
         objectives: mission.objectives.map((o) => o.trim()).filter(Boolean),
       };
       await onApply(cleaned);
+      // Saved, so the files this mission names are the campaign's now and the
+      // closing cleanup must leave them alone. Set only on success: a refused
+      // save leaves the drawer open with its error, and cancelling from there
+      // is still a cancel.
+      applied.current = cleaned;
       drawer.close();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
