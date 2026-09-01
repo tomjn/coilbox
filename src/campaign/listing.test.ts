@@ -4,6 +4,7 @@ import {
   campaignGameLabel,
   campaignIsPlayable,
   campaignSummary,
+  campaignUnplayableReason,
   sortCampaigns,
 } from "./listing";
 import type { Campaign, CampaignMission } from "./model";
@@ -117,6 +118,50 @@ describe("campaignIsPlayable", () => {
     const c = campaign([mission("BAR")]);
     expect(c.missions[0].scenario).toBeUndefined();
     expect(campaignIsPlayable(c)).toBe(true);
+  });
+});
+
+describe("campaignUnplayableReason", () => {
+  it("has nothing to say about a campaign that plays", () => {
+    expect(
+      campaignUnplayableReason(campaign([mission("BAR"), mission("BAR")])),
+    ).toBeNull();
+  });
+
+  it("says a campaign has no missions yet", () => {
+    expect(campaignUnplayableReason(campaign([]))).toBe("No missions yet");
+  });
+
+  // Naming the mission is the whole point: the play list is reachable without
+  // the builder, so "unfinished" on its own would be a problem the reader
+  // cannot go and look at.
+  it("numbers the mission that has no map, counting from one", () => {
+    expect(
+      campaignUnplayableReason(
+        campaign([mission("BAR"), mission("BAR"), mission("BAR", "")]),
+      ),
+    ).toBe("Mission 3 has no map");
+  });
+
+  it("numbers the mission that has no game", () => {
+    expect(campaignUnplayableReason(campaign([mission("")]))).toBe(
+      "Mission 1 has no game",
+    );
+  });
+
+  it("names both when a mission has neither", () => {
+    expect(campaignUnplayableReason(campaign([mission("", "")]))).toBe(
+      "Mission 1 has no game or map",
+    );
+  });
+
+  // Play order is the array order, so the first one to stop is the one to fix.
+  it("reports the first short mission, not the last", () => {
+    expect(
+      campaignUnplayableReason(
+        campaign([mission("BAR"), mission("BAR", ""), mission("")]),
+      ),
+    ).toBe("Mission 2 has no map");
   });
 });
 

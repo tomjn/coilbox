@@ -12,7 +12,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 // The drawer is the app shell's, so it is stubbed down to what opened in it.
 // Share and the delete confirmation both land here.
@@ -145,6 +145,19 @@ function openMenuByKeyboard(name: string) {
   fireEvent.keyDown(trigger, { key: "Enter" });
   return screen.getAllByRole("menuitem").map((item) => item.textContent);
 }
+
+// The same cost the scenario list's share test pays, for the same reason. The
+// header's Share loads its form with a dynamic import, and in a test that is
+// Vite transforming the form's whole module graph on demand rather than fetching
+// a built chunk, inside the 1000ms `vi.waitFor` below.
+//
+// This one is a precaution rather than a repair. Only the list's share test was
+// ever seen to fail (issue #2215), but this is the same wait around the same
+// import of the same form, so it is one machine being slightly slower away from
+// being the one that fails next.
+beforeAll(async () => {
+  await import("./components/ShareScenarioForm");
+});
 
 afterEach(() => {
   cleanup();

@@ -3,12 +3,18 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  ChevronRight,
   Copy,
   Pencil,
   Plus,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncThumbnails } from "@/content/config";
 import { refIsVideo } from "@/lib/assetUrl";
@@ -36,6 +42,11 @@ import { MissionRemoveButton } from "./components/MissionRemoveButton";
 import { MissionScenarioUpdateButton } from "./components/MissionScenarioUpdateButton";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
+import {
+  presentationOpen,
+  presentationSummary,
+  useStoredPresentationOpen,
+} from "./components/presentationOpen";
 import { type SaveState, SaveStatus } from "./components/SaveStatus";
 import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
 
@@ -116,6 +127,9 @@ export default function CampaignEditPage() {
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
+  // A view preference, not part of the document, so it never goes through
+  // `persist` (issue #2194). See `presentationOpen.ts`.
+  const [storedArtOpen, setStoredArtOpen] = useStoredPresentationOpen();
 
   // Seed the editable copy once the (local) campaign for this id is available,
   // and re-seed if the route id changes under the same component instance.
@@ -336,62 +350,82 @@ export default function CampaignEditPage() {
         />
       </header>
 
-      <section className="grid gap-4 rounded-lg border border-border/50 bg-card p-4 sm:grid-cols-2">
-        <CampaignImageField
-          campaignId={campaign.id}
-          kind="icon"
-          value={campaign.icon}
-          onChange={(icon) => void persistMedia({ ...campaign, icon })}
-          label="Icon"
-          help="Small emblem shown on this campaign in lists. Transparency is kept."
-          gameName={campaign.missions[0]?.snapshot.gameName}
-          preview={
-            <div className="flex size-20 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-muted">
-              <CampaignImage
-                campaignId={campaign.id}
-                image={campaign.icon}
-                alt=""
-                className="size-full object-contain p-1.5"
-              />
-            </div>
-          }
-        />
-        <CampaignImageField
-          campaignId={campaign.id}
-          kind="background"
-          value={campaign.background}
-          onChange={(background) =>
-            void persistMedia({ ...campaign, background })
-          }
-          label="Background"
-          help="Backdrop behind the campaign's mission list — an image or a looping video. A video imported here only plays back on this machine (it isn't bundled into a single-file export)."
-          gameName={campaign.missions[0]?.snapshot.gameName}
-          allowVideo
-          preview={
-            <div className="overflow-hidden rounded-md border border-border/50 bg-muted">
-              <CampaignImage
-                campaignId={campaign.id}
-                image={campaign.background}
-                alt=""
-                className="h-24 w-full object-cover"
-              />
-            </div>
-          }
-        />
-        {refIsVideo(campaign.background) && (
-          <PlaybackTuning
-            playback={campaign.backgroundPlayback}
-            defaults={DECORATIVE_DEFAULTS}
-            decorative
-            showAutoplay
-            showLoop
-            showMuted
-            onChange={(backgroundPlayback) =>
-              void persist({ ...campaign, backgroundPlayback })
+      {/* The art is set once and the missions are edited constantly, so the
+          pickers start out of the way and say what they are hiding (issue
+          #2194). An empty campaign opens them, because there is nothing below
+          them to be in the way of. */}
+      <Collapsible
+        open={presentationOpen(storedArtOpen, campaign.missions.length)}
+        onOpenChange={setStoredArtOpen}
+        className="flex flex-col gap-2"
+      >
+        <h2 className="text-sm font-medium">
+          <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md py-1 text-left hover:text-foreground/80">
+            <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+            Presentation
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {presentationSummary(!!campaign.icon, !!campaign.background)}
+            </span>
+          </CollapsibleTrigger>
+        </h2>
+
+        <CollapsibleContent className="grid gap-4 rounded-lg border border-border/50 bg-card p-4 sm:grid-cols-2">
+          <CampaignImageField
+            campaignId={campaign.id}
+            kind="icon"
+            value={campaign.icon}
+            onChange={(icon) => void persistMedia({ ...campaign, icon })}
+            label="Icon"
+            help="Small emblem shown on this campaign in lists. Transparency is kept."
+            gameName={campaign.missions[0]?.snapshot.gameName}
+            preview={
+              <div className="flex size-20 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-muted">
+                <CampaignImage
+                  campaignId={campaign.id}
+                  image={campaign.icon}
+                  alt=""
+                  className="size-full object-contain p-1.5"
+                />
+              </div>
             }
           />
-        )}
-      </section>
+          <CampaignImageField
+            campaignId={campaign.id}
+            kind="background"
+            value={campaign.background}
+            onChange={(background) =>
+              void persistMedia({ ...campaign, background })
+            }
+            label="Background"
+            help="Backdrop behind the campaign's mission list — an image or a looping video. A video imported here only plays back on this machine (it isn't bundled into a single-file export)."
+            gameName={campaign.missions[0]?.snapshot.gameName}
+            allowVideo
+            preview={
+              <div className="overflow-hidden rounded-md border border-border/50 bg-muted">
+                <CampaignImage
+                  campaignId={campaign.id}
+                  image={campaign.background}
+                  alt=""
+                  className="h-24 w-full object-cover"
+                />
+              </div>
+            }
+          />
+          {refIsVideo(campaign.background) && (
+            <PlaybackTuning
+              playback={campaign.backgroundPlayback}
+              defaults={DECORATIVE_DEFAULTS}
+              decorative
+              showAutoplay
+              showLoop
+              showMuted
+              onChange={(backgroundPlayback) =>
+                void persist({ ...campaign, backgroundPlayback })
+              }
+            />
+          )}
+        </CollapsibleContent>
+      </Collapsible>
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">

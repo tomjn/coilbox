@@ -39,10 +39,16 @@ import type { CampaignMission } from "../../model";
  * into chips. A game and a map are names, and no icon stands in for a name.
  *
  * A missing half is tinted, in the same amber the stale-scenario warning below
- * it uses, because it is not an empty field. `campaignIsPlayable` refuses a
- * campaign holding a mission with no game or no map, and play order is array
+ * it uses, because it is not an empty field. `campaignUnplayableReason` refuses
+ * a campaign holding a mission with no game or no map, and play order is array
  * order, so one such mission blocks every mission after it. That was previously
  * the "No map" at the truncating end of a line of dots.
+ *
+ * The same condition, said in the place that can act on it. The play list reads
+ * `campaignUnplayableReason` and says "Mission 2 has no map", because a player
+ * there has no way to go and look (issue #2219). The editor is where the fixing
+ * happens, so it marks the field on the row itself and leaves the sentence to
+ * the list.
  */
 export function MissionSetup({ snapshot }: { snapshot: SkirmishDraft }) {
   const part = (value: string | undefined, missing: string) =>
