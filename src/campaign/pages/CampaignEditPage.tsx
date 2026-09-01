@@ -5,11 +5,12 @@ import {
   ArrowUp,
   ChevronRight,
   Copy,
+  Eye,
   Pencil,
   Plus,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import {
   Collapsible,
   CollapsibleContent,
@@ -31,6 +32,7 @@ import {
 import { campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { copyTitle } from "../duplicate";
+import { campaignUnplayableReason } from "../listing";
 import { deleteDroppedMedia } from "../media";
 import { missionFromScenario, scenarioAttachment } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
@@ -121,6 +123,7 @@ export default function CampaignEditPage() {
   const location = useLocation();
   const presetGame = (location.state as { presetGame?: string } | null)
     ?.presetGame;
+  const navigate = useNavigate();
 
   const loaded = campaigns.find((c) => c.campaign.id === id);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -145,6 +148,10 @@ export default function CampaignEditPage() {
   // carries the whole document, so two of them in flight at once left whichever
   // the plugin happened to finish last in the file. See `documentSaver.ts`.
   const saver = useRef<DocumentSaver<Campaign>>(undefined);
+  // Whether the last write the saver reported on was refused. `save` is state,
+  // so a handler that waits for a write reads it as it was before that write
+  // and never after it. Preview is the one thing here that has to know.
+  const writeFailed = useRef(false);
   if (!saver.current) {
     saver.current = createDocumentSaver<Campaign>({
       write: async (document) => {
@@ -156,6 +163,7 @@ export default function CampaignEditPage() {
       // Only reached for the newest write, so nothing here can claim a
       // superseded document saved.
       onWritten: async () => {
+        writeFailed.current = false;
         setError(null);
         setSave({ kind: "saved", at: new Date() });
         // Re-reading the campaign list is what keeps the sidebar and the
@@ -170,6 +178,7 @@ export default function CampaignEditPage() {
         }
       },
       onError: (e) => {
+        writeFailed.current = true;
         setError(e instanceof Error ? e.message : String(e));
         setSave({ kind: "failed" });
       },
@@ -251,6 +260,39 @@ export default function CampaignEditPage() {
     void persist({ ...campaign, missions });
   };
 
+  /**
+   * Open the page a player opens: the campaign's detail page, or one mission's
+   * briefing (issue #2197).
+   *
+   * These are the player's own pages, reached by their own routes. Drawing a
+   * copy of them in the editor was the alternative and it is the worse one:
+   * the copy would drift from the real page the first time either changed, and
+   * a preview that differs from the page it claims to show teaches the author
+   * something false. Nothing needs building for that, because neither route is
+   * gated. `/campaign/:id` renders any stored campaign, finished or not, and a
+   * briefing is reachable by id whether or not the player's own progress has
+   * unlocked it. That is the whole point of the per-mission link. The detail
+   * page locks everything past the first mission, so without it an author has
+   * no way to look at mission five's art at all.
+   *
+   * Getting back is the top bar's Back button, so the editor is one click away
+   * and there is no return trip to build either.
+   *
+   * The wait is the part that matters. The title and description boxes only
+   * write on blur, so the click that opens the preview is racing the write
+   * that the same click's blur just asked for. Draining the queue first is
+   * what stops the preview showing the document as it was a keystroke ago.
+   * A refused write stays put: the header is showing "Not saved" with the
+   * retry beside it, and leaving would take that retry away and show a page
+   * built from the older document on disk.
+   */
+  const openPreview = async (missionId?: string) => {
+    await saver.current?.settled();
+    if (writeFailed.current) return;
+    const to = `/campaign/${encodeURIComponent(campaign.id)}`;
+    navigate(missionId ? `${to}/${encodeURIComponent(missionId)}` : to);
+  };
+
   const removeMission = (m: CampaignMission) =>
     persistMedia({
       ...campaign,
@@ -327,7 +369,28 @@ export default function CampaignEditPage() {
         >
           <ArrowLeft className="size-3.5" /> Back to campaigns
         </Link>
-        <SaveStatus state={save} onRetry={() => void persist(campaign)} />
+        <div className="flex flex-wrap items-center gap-3">
+          <SaveStatus state={save} onRetry={() => void persist(campaign)} />
+          {/* A campaign with no missions has no row to click in the play list
+              either (issue #2219), so there is no page for a player to open
+              and nothing here to show them. The other way a campaign is
+              unfinished, a mission short a game or a map, keeps its link
+              there, so it keeps this one. */}
+          {campaign.missions.length === 0 && (
+            <span className="text-xs text-muted-foreground">
+              {campaignUnplayableReason(campaign)}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={campaign.missions.length === 0}
+            onClick={() => void openPreview()}
+          >
+            <Eye className="size-4" /> Preview
+          </Button>
+        </div>
       </div>
 
       {error && <ErrorBanner message={error} />}
@@ -546,6 +609,17 @@ export default function CampaignEditPage() {
                         onClick={() => openMission(m)}
                       >
                         <Pencil className="size-4" /> Edit
+                      </Button>
+                      {/* Straight to this mission's briefing, because the
+                          detail page will not take the author there: it locks
+                          every mission the player has not reached. */}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Preview ${m.title}`}
+                        onClick={() => void openPreview(m.id)}
+                      >
+                        <Eye className="size-4" />
                       </Button>
                       {/* No confirmation, the way campaign duplication has
                           none: a copy takes nothing away, and removing it is
