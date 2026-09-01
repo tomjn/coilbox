@@ -4,6 +4,7 @@ import {
   campaignProgressLoad,
   campaignProgressSave,
 } from "./bindings";
+import { sortCampaigns } from "./listing";
 import { type Campaign, type ProgressFile, parseCampaignJson } from "./model";
 import { sweepOrphanedScenarioMedia } from "./scenarioMedia";
 
@@ -27,7 +28,14 @@ export interface LoadedCampaign {
 let cache: LoadedCampaign[] | null = null;
 const listeners = new Set<(loaded: LoadedCampaign[]) => void>();
 
-/** Read + parse every stored campaign document, skipping invalid ones. */
+/**
+ * Read + parse every stored campaign document, skipping invalid ones, and hand
+ * the list back in reading order (see {@link sortCampaigns}). The order is
+ * settled here rather than in the builder page because every consumer of this
+ * hook renders the list as it arrives, so ordering once is the only way the
+ * builder and the player-facing Campaigns page agree. It is also where
+ * `listScenarios` settles the scenario order.
+ */
 async function fetchCampaigns(): Promise<LoadedCampaign[]> {
   const { items } = await campaignList({});
   const loaded: LoadedCampaign[] = [];
@@ -43,7 +51,7 @@ async function fetchCampaigns(): Promise<LoadedCampaign[]> {
   // still named needs. Not awaited: the list must not wait on a disk sweep, and
   // the sweep only ever removes folders this list does not name.
   void sweepOrphanedScenarioMedia(loaded.map((l) => l.campaign));
-  return loaded;
+  return sortCampaigns(loaded);
 }
 
 /**

@@ -419,10 +419,12 @@ describe("the In campaign badge", () => {
 });
 
 /**
- * What a row says about the scenario (issue #2179). The sentence itself is a
- * plain unit test in `listing.test.ts`. What is pinned here is that the row
- * shows it, that the description only takes a line when there is one, and that
- * none of it added a second thing to tab to.
+ * What a row says about the scenario (issue #2179), and how it says what the
+ * scenario holds (issue #2180). The counts themselves are a plain unit test in
+ * `listing.test.ts`. What is pinned here is that the row draws them as chips
+ * rather than a sentence, that a count of nothing is still drawn, that the
+ * description only takes a line when there is one, and that none of it added a
+ * second thing to tab to.
  */
 describe("what a scenario row says", () => {
   /** The same local scenario, described and last written two hours ago. */
@@ -437,13 +439,71 @@ describe("what a scenario row says", () => {
     };
   }
 
-  /** The lines of text under a row's name, in the order they are drawn. */
+  /** A scenario holding one of each kind of content, and no objectives. */
+  function holding(): LoadedScenario {
+    return {
+      scenario: {
+        ...local.scenario,
+        actors: [
+          {
+            id: "a1",
+            unitDef: "armcom",
+            team: "you",
+            pos: { x: 0, z: 0 },
+            facing: 0,
+          },
+        ],
+        zones: [
+          {
+            id: "z1",
+            name: "Base",
+            shape: "box",
+            min: { x: 0, z: 0 },
+            max: { x: 100, z: 100 },
+          },
+        ],
+        triggers: [
+          {
+            id: "t1",
+            enabled: true,
+            repeat: false,
+            conditions: { op: "all", conditions: [] },
+            actions: [],
+          },
+        ],
+      },
+      source: "local",
+    };
+  }
+
+  /** The column of lines beside a row's map picture. */
+  const columnOf = (name: string) =>
+    screen
+      .getByRole("link", { name: new RegExp(name) })
+      .querySelector("div.flex-col") as HTMLElement;
+
+  /**
+   * The lines under a row's name, in the order they are drawn. The line saying
+   * what the scenario holds is icons and numbers, so it is named rather than
+   * read out.
+   */
   const linesUnder = (name: string) =>
+    [...columnOf(name).children]
+      .slice(1)
+      .map((el) =>
+        el.querySelector("svg") ? "the content chips" : el.textContent,
+      );
+
+  /**
+   * Every content chip in a row, by the phrase it carries. These fixtures are in
+   * no campaign, so the chips are the only titled things inside the link.
+   */
+  const chipsOf = (name: string) =>
     [
       ...screen
         .getByRole("link", { name: new RegExp(name) })
-        .querySelectorAll("span.truncate.text-xs"),
-    ].map((span) => span.textContent);
+        .querySelectorAll("span[title]"),
+    ].map((el) => el.getAttribute("title"));
 
   it("shows the description, on one truncated line", () => {
     show([described("Hold the landing zone until the second wave lands.")]);
@@ -459,7 +519,13 @@ describe("what a scenario row says", () => {
   it("says when the scenario was last edited", () => {
     show([described("Anything")]);
 
-    expect(screen.getByText(/· edited 2h ago$/)).toBeTruthy();
+    expect(screen.getByText("edited 2h ago")).toBeTruthy();
+  });
+
+  it("leaves the edit time off a document carrying no stamp", () => {
+    show([local]);
+
+    expect(screen.queryByText(/^edited\b/)).toBeNull();
   });
 
   // The game used to sit on this line too. It is the group heading now
@@ -468,10 +534,7 @@ describe("what a scenario row says", () => {
   it("gives a scenario with no description no line to hold it", () => {
     show([local]);
 
-    expect(linesUnder("Beachhead")).toEqual([
-      "No map",
-      "0 unit placements · 0 zones · 0 triggers · 0 objectives",
-    ]);
+    expect(linesUnder("Beachhead")).toEqual(["No map", "the content chips"]);
   });
 
   it("puts the description under what the scenario holds", () => {
@@ -479,9 +542,51 @@ describe("what a scenario row says", () => {
 
     expect(linesUnder("Beachhead")).toEqual([
       "No map",
-      "0 unit placements · 0 zones · 0 triggers · 0 objectives · edited 2h ago",
+      "the content chips",
       "Hold the landing zone.",
     ]);
+  });
+
+  // Issue #2180: the counts used to be a sentence, and a screenful of rows all
+  // reading the same shape of sentence hid the row that was different.
+  it("draws what the scenario holds as chips, not as a sentence", () => {
+    show([holding()]);
+
+    expect(chipsOf("Beachhead")).toEqual([
+      "1 unit placement",
+      "1 zone",
+      "1 trigger",
+      "0 objectives",
+    ]);
+    expect(screen.queryByText(/unit placements? · \d+ zones?/)).toBeNull();
+  });
+
+  // A chip is an icon beside a digit, which says nothing to a screen reader, so
+  // the phrase is the only text either the chip or the row's own name is given.
+  it("gives every chip its phrase in text, and hides the digit from it", () => {
+    show([holding()]);
+
+    const zones = screen.getByTitle("1 zone");
+    expect(zones.querySelector("span.sr-only")?.textContent).toBe("1 zone");
+    expect(zones.querySelector("span[aria-hidden='true']")?.textContent).toBe(
+      "1",
+    );
+    expect(zones.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+  });
+
+  /**
+   * A count of nothing is dimmed, not dropped. A dropped chip slides the rest
+   * along, so no kind sits in the same place twice down the list, and a gap
+   * makes no claim at all where "0 triggers" does.
+   */
+  it("keeps a chip for a kind the scenario has none of, dimmed", () => {
+    show([holding()]);
+
+    expect(chipsOf("Beachhead")).toContain("0 objectives");
+    expect(screen.getByTitle("0 objectives").className).toMatch(/opacity-40/);
+    expect(screen.getByTitle("1 zone").className).not.toMatch(/opacity-40/);
   });
 
   // Everything added here is text inside the row's own link. A second tab stop

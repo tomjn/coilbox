@@ -1,6 +1,10 @@
 import { asContainer } from "../container/container";
 import type { SkirmishDraft } from "../play/drafts";
-import { parseScenario, type Scenario } from "../scenario/model";
+import {
+  type Difficulty,
+  parseScenario,
+  type Scenario,
+} from "../scenario/model";
 
 /**
  * Campaign schema — the single source of truth for the shape of a campaign
@@ -193,6 +197,21 @@ export interface Campaign {
 export interface CampaignProgress {
   completedMissionIds: string[];
   lastPlayedMissionId?: string;
+  /**
+   * How hard this run of the campaign is being played (issue #2220).
+   *
+   * On the run rather than on the mission because a campaign is one playthrough:
+   * the player picks a difficulty once and every mission after it is played at
+   * that level, which is what a campaign author means by "hard" and what a
+   * player means when they say a campaign was too hard. It sits in progress
+   * rather than in the campaign document so a bundled, read-only campaign can
+   * still be played at a level of the player's choosing.
+   *
+   * Absent means nobody chose, which is every run recorded before this existed.
+   * The launch then says nothing about difficulty and the runtime plays at its
+   * own default, exactly as those runs already did.
+   */
+  difficulty?: Difficulty;
   updatedAt: string;
 }
 

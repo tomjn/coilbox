@@ -4,6 +4,7 @@ import {
   campaignGameLabel,
   campaignIsPlayable,
   campaignSummary,
+  sortCampaigns,
 } from "./listing";
 import type { Campaign, CampaignMission } from "./model";
 
@@ -134,5 +135,69 @@ describe("campaignFallbackMap", () => {
 
   it("has no map when the first mission names none", () => {
     expect(campaignFallbackMap(campaign([mission("BAR", "")]))).toBeNull();
+  });
+});
+
+describe("sortCampaigns", () => {
+  /** A list entry as `useCampaigns` holds one, named so the order is readable. */
+  function row(id: string, updatedAt: string, source: "local" | "bundled") {
+    return { campaign: { ...campaign([]), id, updatedAt }, source };
+  }
+
+  const ids = (list: { campaign: Campaign }[]) =>
+    list.map((l) => l.campaign.id);
+
+  it("puts the newest edit first", () => {
+    const sorted = sortCampaigns([
+      row("older", "2026-08-01T00:00:00.000Z", "local"),
+      row("newest", "2026-09-01T00:00:00.000Z", "local"),
+      row("middle", "2026-08-20T00:00:00.000Z", "local"),
+    ]);
+    expect(ids(sorted)).toEqual(["newest", "middle", "older"]);
+  });
+
+  it("keeps bundled campaigns below the author's own, however new they are", () => {
+    const sorted = sortCampaigns([
+      row("bundled-today", "2026-09-01T00:00:00.000Z", "bundled"),
+      row("mine-last-month", "2026-08-01T00:00:00.000Z", "local"),
+    ]);
+    expect(ids(sorted)).toEqual(["mine-last-month", "bundled-today"]);
+  });
+
+  it("orders bundled campaigns among themselves by edit too", () => {
+    const sorted = sortCampaigns([
+      row("bundled-old", "2026-01-01T00:00:00.000Z", "bundled"),
+      row("bundled-new", "2026-08-01T00:00:00.000Z", "bundled"),
+    ]);
+    expect(ids(sorted)).toEqual(["bundled-new", "bundled-old"]);
+  });
+
+  // A hand-authored or bundled document can omit `updatedAt`, which
+  // `parseCampaignJson` reads as "". Sorting it to the top would be a worse
+  // arbitrary order than the read order it replaced.
+  it("sinks a campaign with no timestamp below the dated ones", () => {
+    const sorted = sortCampaigns([
+      row("undated", "", "local"),
+      row("dated", "2026-01-01T00:00:00.000Z", "local"),
+    ]);
+    expect(ids(sorted)).toEqual(["dated", "undated"]);
+  });
+
+  it("leaves campaigns that cannot be told apart in the order they were read", () => {
+    const sorted = sortCampaigns([
+      row("first", "", "local"),
+      row("second", "", "local"),
+      row("third", "", "local"),
+    ]);
+    expect(ids(sorted)).toEqual(["first", "second", "third"]);
+  });
+
+  it("does not reorder the caller's array", () => {
+    const list = [
+      row("old", "2026-01-01T00:00:00.000Z", "local"),
+      row("new", "2026-09-01T00:00:00.000Z", "local"),
+    ];
+    sortCampaigns(list);
+    expect(ids(list)).toEqual(["old", "new"]);
   });
 });

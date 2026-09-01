@@ -9,6 +9,10 @@
  * A campaign is a sequence of them, so the row answers the version of that
  * question a campaign can answer: which game its missions are on, and how many
  * games that is when they are not all on one.
+ *
+ * It also answers what order the rows come in (issue #2213), which is a question
+ * about the list rather than about any one campaign, but is read off the same
+ * fields and is worth the same plain unit test.
  */
 
 import { relativeTime } from "../lib/relativeTime";
@@ -72,6 +76,42 @@ export function campaignIsPlayable(campaign: Campaign): boolean {
   if (campaign.missions.length === 0) return false;
   return campaign.missions.every(
     (m) => !!m.snapshot?.gameName && !!m.snapshot?.mapName,
+  );
+}
+
+/** Local campaigns before bundled ones, as the plugin already reads them. */
+const sourceRank = { local: 0, bundled: 1 } as const;
+
+/**
+ * The campaign list in the order an author wants to read it: their own
+ * campaigns first, newest edit at the top of each group.
+ *
+ * The timestamp rule is `listScenarios`'s, so the two builders agree about what
+ * "first" means and the campaign just saved is where the scenario just saved
+ * would be. What differs is the grouping. `listScenarios` sorts local and
+ * bundled together, which is fine there because the scenario list is grouped by
+ * game and can be filtered by source. The campaign list is one flat list, so a
+ * distribution bundling ten campaigns packaged this morning would push an
+ * author's own work off the bottom of the screen. A bundled campaign's
+ * `updatedAt` is whoever packaged the distribution last saving it, which is not
+ * a date the reader did anything on, so it does not get to outrank one they did.
+ *
+ * A campaign with no `updatedAt` sorts last within its group, which is where a
+ * campaign nobody can date belongs. Nothing coilbox writes is in that state:
+ * every save stamps the field. A hand-authored document, or one bundled by a
+ * distribution that wrote the JSON itself, can leave it out, and
+ * `parseCampaignJson` reads that as the empty string rather than refusing the
+ * document. The empty string sorts below every real timestamp for free, and the
+ * sort is stable, so those campaigns hold the order they were read in rather
+ * than shuffling between sessions.
+ */
+export function sortCampaigns<
+  T extends { campaign: Campaign; source: "local" | "bundled" },
+>(loaded: readonly T[]): T[] {
+  return [...loaded].sort(
+    (a, b) =>
+      sourceRank[a.source] - sourceRank[b.source] ||
+      b.campaign.updatedAt.localeCompare(a.campaign.updatedAt),
   );
 }
 

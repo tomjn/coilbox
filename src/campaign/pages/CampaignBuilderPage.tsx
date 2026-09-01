@@ -62,6 +62,10 @@ function requirementsForCampaign(campaign: Campaign) {
  * list (issue #2187): the emblem or the first mission's map, the title, the game
  * the missions are on, how many there are, when it was last written, and the
  * description. `listing.ts` works out the sentence, so the row only lays it out.
+ *
+ * The order is the loader's (issue #2213): the author's own campaigns first,
+ * newest edit at the top of each group. The page draws the list as it arrives so
+ * the Campaigns page and this one cannot disagree about it.
  */
 export default function CampaignBuilderPage() {
   const { campaigns, loading, error, refresh } = useCampaigns();
