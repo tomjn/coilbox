@@ -37,7 +37,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The drawer is the app shell's, and nothing opened in it bears on removal.
@@ -1046,5 +1046,128 @@ describe("the campaign editor's presentation section", () => {
     fireEvent.click(trigger());
 
     expect(campaignSave).not.toHaveBeenCalled();
+  });
+});
+
+/** Stands in for the mission briefing, naming the mission it was asked for. */
+function PlayerBriefing() {
+  const { missionId } = useParams();
+  return <div>{`the briefing for ${missionId}`}</div>;
+}
+
+/**
+ * The editor with the two player-facing routes mounted alongside it, so a
+ * Preview click can be read as the navigation it is. The real pages are not
+ * rendered: what is being asserted is which page the author is sent to, and
+ * both of those pages have their own tests.
+ */
+function showWithPlayerPages(missions: CampaignMission[]) {
+  useCampaigns.mockReturnValue({
+    campaigns: [{ campaign: campaign(missions), source: "local" }],
+    loading: false,
+    error: null,
+  });
+  useScenarios.mockReturnValue({ scenarios: [], loading: false });
+  render(
+    <MemoryRouter initialEntries={["/campaign-builder/c1"]}>
+      <Routes>
+        <Route path="/campaign-builder/:id" element={<CampaignEditPage />} />
+        <Route
+          path="/campaign/:id"
+          element={<div>the campaign as a player sees it</div>}
+        />
+        <Route path="/campaign/:id/:missionId" element={<PlayerBriefing />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+/**
+ * Looking at what the player will see (issue #2197).
+ *
+ * The editor sends the author to the player's own pages rather than drawing a
+ * copy of them, so most of what could go wrong is not reachable from here. Two
+ * things are, and both would show the author something untrue.
+ *
+ * The first is timing. The title and description write on blur, so the click
+ * that opens the preview is racing the write its own blur asked for, and
+ * arriving a keystroke early shows a page built from the previous document.
+ *
+ * The second is a campaign with no missions. The play list drops that
+ * campaign's link outright (issue #2219), so offering the author a page no
+ * player can open would be the preview lying about the one thing it is for.
+ */
+describe("previewing a campaign as a player", () => {
+  const previewButton = () => screen.getByRole("button", { name: "Preview" });
+
+  it("opens the campaign's own player-facing page", async () => {
+    showWithPlayerPages([mission()]);
+
+    fireEvent.click(previewButton());
+
+    expect(
+      await screen.findByText("the campaign as a player sees it"),
+    ).toBeTruthy();
+  });
+
+  it("opens a mission's briefing straight from its row", async () => {
+    // The detail page locks every mission the player has not reached, so
+    // going through it would not get the author to a later briefing at all.
+    showWithPlayerPages([plain("m1", "First"), plain("m2", "Second")]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview Second" }));
+
+    expect(await screen.findByText("the briefing for m2")).toBeTruthy();
+  });
+
+  it("offers nothing to preview on a campaign with no missions, and says why", () => {
+    showWithPlayerPages([]);
+
+    expect(previewButton().hasAttribute("disabled")).toBe(true);
+    // The play list's own words for this campaign, so an author who read them
+    // there reads the same ones here.
+    expect(screen.getByText("No missions yet")).toBeTruthy();
+  });
+
+  it("waits for a pending write, so the page opened is not a keystroke behind", async () => {
+    let finish: (() => void) | undefined;
+    campaignSave.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({});
+        }),
+    );
+    showWithPlayerPages([mission()]);
+
+    fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+    fireEvent.blur(titleBox());
+    fireEvent.click(previewButton());
+
+    // The write is still in flight, so the author is still in the editor.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText("the campaign as a player sees it")).toBeNull();
+
+    finish?.();
+    expect(
+      await screen.findByText("the campaign as a player sees it"),
+    ).toBeTruthy();
+    expect(
+      JSON.parse(campaignSave.mock.calls.at(-1)?.[0].json ?? "{}").title,
+    ).toBe("Landfall II");
+  });
+
+  it("stays put when the write was refused, keeping the retry on screen", async () => {
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    showWithPlayerPages([mission()]);
+
+    fireEvent.change(titleBox(), { target: { value: "Landfall II" } });
+    fireEvent.blur(titleBox());
+    fireEvent.click(previewButton());
+
+    expect(await screen.findByText(NOT_SAVED)).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy(),
+    );
+    expect(screen.queryByText("the campaign as a player sees it")).toBeNull();
   });
 });
