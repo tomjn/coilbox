@@ -4,7 +4,6 @@ import {
   scenarioList,
   scenarioMediaDelete,
   scenarioMediaImport,
-  scenarioMediaRead,
   scenarioMediaSweep,
   scenarioMediaWrite,
   scenarioSave,
@@ -15,7 +14,6 @@ import {
   dropMissingDialogueMedia,
   readScenarioExport,
   type ScenarioExport,
-  scenarioMediaFiles,
 } from "./transfer";
 
 /**
@@ -230,38 +228,6 @@ export async function sweepScenarioMedia(
     apply,
   });
   return summary;
-}
-
-/**
- * Gather everything one self-contained export holds: the document plus every
- * dialogue clip it references, read back off disk and inlined. A clip that
- * cannot be read is left out rather than sinking the export, the way a campaign
- * export drops a broken image.
- *
- * This gathers rather than serializing, because the same value feeds both share
- * routes, a file and a code (issue #1336), and reading the clips is the
- * expensive part. A share drawer that offered both would otherwise read them
- * twice. Naming the game (issue #1335) happens at the serialize step, so both
- * routes get it from the one place.
- */
-export async function gatherScenarioExport(
-  scenario: Scenario,
-): Promise<ScenarioExport> {
-  const media: Record<string, string> = {};
-  await Promise.all(
-    scenarioMediaFiles(scenario).map(async (file) => {
-      try {
-        const { dataUrl } = await scenarioMediaRead({
-          scenarioId: scenario.id,
-          file,
-        });
-        media[file] = dataUrl;
-      } catch {
-        console.warn("skipping unreadable dialogue clip", file);
-      }
-    }),
-  );
-  return { scenario, media };
 }
 
 /**

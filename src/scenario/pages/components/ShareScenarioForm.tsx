@@ -22,12 +22,11 @@ import type { InstalledGameInfo } from "@/container/gameIdentity";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { scenarioExport } from "../../bindings";
 import type { Scenario } from "../../model";
-import { gatherScenarioExport } from "../../storage";
 import {
-  encodeScenarioCode,
-  encodeScenarioExport,
-  type ScenarioExport,
-} from "../../transfer";
+  type GatheredScenario,
+  gatherScenarioExport,
+} from "../../scenarioMedia";
+import { encodeScenarioCode, encodeScenarioExport } from "../../transfer";
 
 export function ShareScenarioForm({
   scenario,
@@ -39,7 +38,7 @@ export function ShareScenarioForm({
    * built from the same payload, so both carry it or neither does. */
   installed: readonly InstalledGameInfo[];
 }) {
-  const [gathered, setGathered] = useState<ScenarioExport | null>(null);
+  const [gathered, setGathered] = useState<GatheredScenario | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Reading the clips off disk is the slow part, so it happens once when the
@@ -65,7 +64,7 @@ export function ShareScenarioForm({
     });
     if (!dest) return;
     await scenarioExport({
-      text: encodeScenarioExport(gathered, installed),
+      text: encodeScenarioExport(gathered.exported, installed),
       dest,
     });
   };
@@ -87,18 +86,51 @@ export function ShareScenarioForm({
     );
   }
 
-  const result = encodeScenarioCode(gathered, installed);
-  if (result.ok) {
-    return (
-      <ChallengeCodeView
-        code={result.code}
-        helpText="Anyone who pastes this into Scenarios → Import gets this mission, its dialogue clips and an offer to download the game and map it is played on."
-        onExportFile={saveFile}
-      />
-    );
-  }
+  const result = encodeScenarioCode(gathered.exported, installed);
+  return (
+    <>
+      <MissingClips files={gathered.missing} />
+      {result.ok ? (
+        <ChallengeCodeView
+          code={result.code}
+          helpText="Anyone who pastes this into Scenarios → Import gets this mission, its dialogue clips and an offer to download the game and map it is played on."
+          onExportFile={saveFile}
+        />
+      ) : (
+        <TooLargeToShare message={result.message} onExportFile={saveFile} />
+      )}
+    </>
+  );
+}
 
-  return <TooLargeToShare message={result.message} onExportFile={saveFile} />;
+/**
+ * What the export is short of, said before either route is offered.
+ *
+ * A share that quietly drops a clip hands somebody a mission whose radio
+ * messages have lost their picture and their voice, and nothing on their end
+ * can tell that from a mission that never had any (issue #2235). It warns
+ * rather than refuses: one unreadable portrait is not a reason to withhold the
+ * other ninety per cent of somebody's mission, as long as they know.
+ */
+function MissingClips({ files }: { files: readonly string[] }) {
+  if (files.length === 0) return null;
+  return (
+    <div className="border-amber-500/40 border-b bg-amber-500/10 p-4 text-amber-200 text-sm">
+      <p>
+        {files.length === 1
+          ? "One dialogue clip could not be read, so it is not in this share:"
+          : `${files.length} dialogue clips could not be read, so they are not in this share:`}
+      </p>
+      <ul className="mt-1 font-mono text-[11px]">
+        {files.map((file) => (
+          <li key={file}>{file}</li>
+        ))}
+      </ul>
+      <p className="mt-2">
+        Whoever imports it gets those lines with no portrait and no voice.
+      </p>
+    </div>
+  );
 }
 
 /**
