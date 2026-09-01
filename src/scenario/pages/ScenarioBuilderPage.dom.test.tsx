@@ -43,7 +43,24 @@ vi.mock("../../campaign/campaigns", () => ({
   useCampaigns: () => ({ campaigns: [] }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
-vi.mock("@/content/config", () => ({ useUnitsyncScan: () => ({}) }));
+// The map pictures and the list of maps this machine has both come off the
+// scan target, so they are stood in for and set per test. `scanned` is the
+// difference between a scan that found no maps and one that has not run.
+const content = vi.hoisted(() => ({
+  scanned: false,
+  maps: [] as { name: string }[],
+  thumbs: new Map<string, { url: string; width?: number; height?: number }>(),
+  thumbsLoading: false,
+}));
+vi.mock("@/content/config", () => ({
+  useUnitsyncScan: () => ({
+    data: content.scanned ? { maps: content.maps, games: [] } : null,
+  }),
+  useUnitsyncThumbnails: () => ({
+    thumbs: content.thumbs,
+    loading: content.thumbsLoading,
+  }),
+}));
 // Neither bears on the row, and both reach for a real Tauri context.
 vi.mock("./components/ReclaimClipsButton", () => ({
   ReclaimClipsButton: () => null,
@@ -65,6 +82,15 @@ const bundled: LoadedScenario = {
   scenario: { ...newScenario("Tutorial"), id: "tutorial" },
   source: "bundled",
 };
+
+/** The same local scenario, set on a map. */
+function onMap(mapName: string): LoadedScenario {
+  const scenario = local.scenario;
+  return {
+    scenario: { ...scenario, setup: { ...scenario.setup, mapName } },
+    source: "local",
+  };
+}
 
 function show(scenarios: LoadedScenario[]) {
   useScenarios.mockReturnValue({
@@ -98,6 +124,10 @@ function openMenuByKeyboard(name: string) {
 afterEach(() => {
   cleanup();
   opened.length = 0;
+  content.scanned = false;
+  content.maps = [];
+  content.thumbs = new Map();
+  content.thumbsLoading = false;
   vi.clearAllMocks();
 });
 
@@ -153,6 +183,65 @@ describe("a scenario row", () => {
         keepMedia: false,
       }),
     );
+  });
+});
+
+describe("the map at the start of a scenario row", () => {
+  /** A target with Comet Catcher installed and its minimap already rendered. */
+  function haveCometCatcher() {
+    content.scanned = true;
+    content.maps = [{ name: "Comet Catcher" }];
+    content.thumbs = new Map([
+      ["Comet Catcher", { url: "asset://comet.png", width: 512, height: 256 }],
+    ]);
+  }
+
+  it("draws the minimap of an installed map", () => {
+    haveCometCatcher();
+
+    show([onMap("Comet Catcher")]);
+
+    const img = screen.getByRole("img", { name: "Minimap of Comet Catcher" });
+    expect(img.getAttribute("src")).toBe("asset://comet.png");
+  });
+
+  it("draws no picture for a draft that has not picked a map", () => {
+    content.scanned = true;
+
+    show([local]);
+
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getByText("No map yet")).toBeTruthy();
+  });
+
+  // A missing map is not the same fact as no map, and it is the one that will
+  // stop the scenario playing, so the slot says which.
+  it("says so when the map the scenario names is not installed", () => {
+    haveCometCatcher();
+
+    show([onMap("Red Comet")]);
+
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getByText("Red Comet is not installed")).toBeTruthy();
+  });
+
+  it("keeps quiet about a missing map until the scan has said", () => {
+    show([onMap("Red Comet")]);
+
+    expect(screen.queryByText("Red Comet is not installed")).toBeNull();
+  });
+
+  it("adds no tab stop inside the row's link", () => {
+    haveCometCatcher();
+
+    show([onMap("Comet Catcher")]);
+
+    const link = screen.getByRole("link", { name: /Beachhead/ });
+    expect(
+      link.querySelectorAll(
+        "a, button, input, select, textarea, [tabindex], [contenteditable]",
+      ),
+    ).toHaveLength(0);
   });
 });
 

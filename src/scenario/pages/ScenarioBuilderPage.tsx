@@ -1,11 +1,11 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { Loader2, Plus, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { useUnitsyncScan } from "@/content/config";
+import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
 import { scenarioIsAttached } from "../../campaign/missionScenario";
@@ -21,6 +21,7 @@ import { refreshScenarios, useScenarios } from "../scenarios";
 import { deleteScenario, isEditable, saveScenario } from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
+import { ScenarioMapThumb } from "./components/ScenarioMapThumb";
 import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
 
 /**
@@ -35,10 +36,24 @@ import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
   const { campaigns } = useCampaigns();
-  // Read only for the modinfo shortname an export records beside the game's
+  // The engine and content root every row's map is looked up against, and that
+  // an export reads the modinfo shortname from to record beside the game's
   // archive name (issue #1335).
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  // One batch of rendered minimaps for the whole list, session cached and
+  // already primed at startup, rather than a render per row (issue #2177).
+  const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
+    target?.enginePath,
+    target?.dataDir,
+  );
+  // What the rows need to tell a map they cannot draw from a map this machine
+  // does not have. Null while the scan is still running, so no row accuses a
+  // map of being missing on the strength of a list that is not finished.
+  const installedMaps = useMemo(
+    () => (scan.data ? new Set(scan.data.maps.map((m) => m.name)) : null),
+    [scan.data],
+  );
   const navigate = useNavigate();
   const drawer = useDrawer();
   const [rescanning, setRescanning] = useState(false);
@@ -168,33 +183,41 @@ export default function ScenarioBuilderPage() {
                     it cannot be edited, so no row is a dead click. */}
                 <Link
                   to={`/scenario-builder/${scenario.id}`}
-                  className="flex min-w-0 flex-1 flex-col gap-0.5"
+                  className="flex min-w-0 flex-1 items-center gap-3"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {scenario.name}
-                    </span>
-                    {bundled && (
-                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                        Bundled
+                  <ScenarioMapThumb
+                    mapName={scenario.setup.mapName}
+                    thumbs={thumbs}
+                    installedMaps={installedMaps}
+                    loading={thumbsLoading}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">
+                        {scenario.name}
                       </span>
-                    )}
-                    {fromGame && origin && (
-                      <Badge
-                        variant="secondary"
-                        className="shrink-0 text-[10px]"
-                      >
-                        From {origin.gameName}
-                      </Badge>
-                    )}
+                      {bundled && (
+                        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                          Bundled
+                        </span>
+                      )}
+                      {fromGame && origin && (
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0 text-[10px]"
+                        >
+                          From {origin.gameName}
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {scenario.setup.gameName || "No game"} ·{" "}
+                      {scenario.setup.mapName || "No map"}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {scenarioContents(scenario)}
+                    </span>
                   </div>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {scenario.setup.gameName || "No game"} ·{" "}
-                    {scenario.setup.mapName || "No map"}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {scenarioContents(scenario)}
-                  </span>
                 </Link>
                 <ScenarioRowMenu
                   scenario={scenario}
