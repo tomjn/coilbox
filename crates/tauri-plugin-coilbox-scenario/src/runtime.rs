@@ -390,16 +390,22 @@ fn tidy_lua_error(raw: &str, chunk: &str) -> String {
 /// `VFS.Include`. Both files are data with no globals and no engine calls, so
 /// what comes back here is what the engine will read.
 fn read_data(root: &Path, rel: &str) -> Result<serde_json::Value, String> {
+    // Both files are optional, and both callers treat a missing one as an
+    // ordinary answer: nearly every game declares no types of its own, and a
+    // game that never adopted the runtime has no marker. Asking the sandbox for
+    // a file that is not there turns that ordinary answer into a Lua error and
+    // a line on stderr, which buries the games that do have something wrong.
+    // The path resolves against the casing on disk, as the engine does (issue
+    // #951) and as `marker_present` does, so a game's own `Missions/` answers a
+    // read of `missions/`.
+    let path = resolve_case(root, Path::new(rel));
+    if !path.is_file() {
+        return Err(format!("{rel} is not there"));
+    }
     let lua = SpringLua::new(root).map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
-    // The path is handed over as the runtime writes it. The sandbox resolves it
-    // against the casing on disk, as the engine does (issue #951), so a game's
-    // own `Missions/` answers a read of `missions/`.
     lua.include_value(rel).map_err(|e| {
         let raw = e.to_string();
-        eprintln!(
-            "coilbox-scenario: {} would not load: {raw}",
-            resolve_case(root, Path::new(rel)).display()
-        );
+        eprintln!("coilbox-scenario: {} would not load: {raw}", path.display());
         format!("could not read {rel}: {}", tidy_lua_error(&raw, rel))
     })
 }
@@ -548,6 +554,24 @@ mod tests {
         let game = tempfile::tempdir().expect("tempdir");
         install(src.path(), game.path()).expect("install");
         assert!(read_extensions(game.path()).is_err());
+    }
+
+    /// A file that was never there is absent, not broken. Nearly every game
+    /// declares no types of its own, and an unadopted game has no marker, so
+    /// both must read as "not there" rather than as a sandbox failure. The
+    /// stderr line the sandbox failure earns sits behind the same check.
+    #[test]
+    fn a_file_that_is_not_there_reads_as_absent_rather_than_broken() {
+        let game = tempfile::tempdir().expect("tempdir");
+
+        assert_eq!(
+            read_extensions(game.path()).expect_err("no declaration"),
+            "missions/extensions.lua is not there"
+        );
+        assert_eq!(
+            read_marker(game.path()).expect_err("no marker"),
+            "missions/runtime.lua is not there"
+        );
     }
 
     #[test]
