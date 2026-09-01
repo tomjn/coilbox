@@ -153,6 +153,14 @@ export default function CampaignEditPage() {
   // so a handler that waits for a write reads it as it was before that write
   // and never after it. Preview is the one thing here that has to know.
   const writeFailed = useRef(false);
+  // The document as it stood before the first media drop this session that is
+  // still on disk, or null when nothing is owed (issue #2232). A document
+  // rather than a list of filenames, because what goes is worked out by
+  // comparing this against the document that lands: the queue drops a
+  // superseded write's result, so the only document there is to compare
+  // against is the newest one, and a file some later edit names again is then
+  // kept rather than deleted out from under it.
+  const undeleted = useRef<Campaign | null>(null);
   if (!saver.current) {
     saver.current = createDocumentSaver<Campaign>({
       write: async (document) => {
@@ -163,10 +171,22 @@ export default function CampaignEditPage() {
       },
       // Only reached for the newest write, so nothing here can claim a
       // superseded document saved.
-      onWritten: async () => {
+      onWritten: async (written) => {
         writeFailed.current = false;
         setError(null);
         setSave({ kind: "saved", at: new Date() });
+        // The document on disk is now this one, so whatever it stopped naming
+        // can go. Deleting before the write was the loss in issue #2232: a
+        // refused write left the stored campaign pointing at a file that had
+        // already gone. `written.id` rather than the campaign in scope, because
+        // the saver is built on the first render and that render has no
+        // campaign yet, and because a delete owed by one campaign must not
+        // reach into another's folder.
+        const dropped = undeleted.current;
+        undeleted.current = null;
+        if (dropped?.id === written.id) {
+          await deleteDroppedMedia(written.id, dropped, written);
+        }
         // Re-reading the campaign list is what keeps the sidebar and the
         // campaigns page in step, and it is a separate read. One that fails
         // leaves those stale but says nothing about whether the edit reached
@@ -233,12 +253,21 @@ export default function CampaignEditPage() {
     void persist({ ...campaign, missions });
   };
 
-  /** Persist, having taken off disk whatever the new document stops naming.
-   *  Every edit that can drop or replace an imported file comes through here,
-   *  because a slot the delete forgets leaks a file nothing on this page can
-   *  see again (issue #2210). `media.ts` owns which slots those are. */
+  /** Persist, and take off disk whatever the new document stops naming once
+   *  that document is the one on disk. Every edit that can drop or replace an
+   *  imported file comes through here, because a slot the delete forgets leaks
+   *  a file nothing on this page can see again (issue #2210). `media.ts` owns
+   *  which slots those are.
+   *
+   *  The document to compare against is remembered rather than the files, and
+   *  it is the oldest one still owed a delete: a second drop made while the
+   *  first is unwritten is owed too, and the older document names both. The
+   *  delete itself is `onWritten`'s, because that is the one place that knows a
+   *  write landed and which document landed. An author who gives up on a
+   *  refused write leaves the files on disk, which is the failure worth
+   *  having. */
   const persistMedia = async (next: Campaign) => {
-    await deleteDroppedMedia(campaign.id, campaign, next);
+    undeleted.current ??= campaign;
     await persist(next);
   };
 

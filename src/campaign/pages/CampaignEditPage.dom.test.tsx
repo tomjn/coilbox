@@ -244,12 +244,15 @@ describe("removing a campaign mission", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    // The panorama goes once the document that stops naming it is on disk, so
+    // the delete is what there is to wait for (issue #2232).
+    await vi.waitFor(() =>
+      expect(campaignMediaDelete).toHaveBeenCalledWith({
+        campaignId: "c1",
+        file: "shore.jpg",
+      }),
+    );
 
-    expect(campaignMediaDelete).toHaveBeenCalledWith({
-      campaignId: "c1",
-      file: "shore.jpg",
-    });
     expect(savedMissions()).toEqual([]);
     expect(screen.queryByText("1. Beachhead")).toBeNull();
   });
@@ -279,7 +282,9 @@ describe("removing a campaign mission", () => {
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(campaignMediaDelete).toHaveBeenCalledTimes(4),
+    );
 
     expect(campaignMediaDelete.mock.calls.map(([a]) => a.file)).toEqual([
       "shore.jpg",
@@ -692,6 +697,84 @@ describe("saying whether an edit reached disk", () => {
 });
 
 /**
+ * Which comes first, the delete or the write (issue #2232).
+ *
+ * The page used to take the file off disk and then write the document that
+ * stops naming it. A refused write left the campaign on disk still pointing at
+ * a panorama, voiceover or cutscene that was already gone, and reopening it
+ * showed a mission that had lost its media with nothing to say why. Writing
+ * first leaves the opposite failure: a file nothing names, which costs disk
+ * space and no authoring.
+ */
+describe("dropping media an edit stops naming", () => {
+  /** Confirm the removal of the only mission, which drops its panorama. */
+  function removeTheMission() {
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  }
+
+  it("keeps the file while the write is still in flight", async () => {
+    let finish: (() => void) | undefined;
+    campaignSave.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({});
+        }),
+    );
+    show([mission()]);
+
+    removeTheMission();
+
+    // The document that stops naming the panorama has not landed, so the
+    // panorama is the only copy of itself and stays where it is.
+    expect(await screen.findByText("Saving…")).toBeTruthy();
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+
+    finish?.();
+    await screen.findByText(SAVED);
+    await waitFor(() =>
+      expect(campaignMediaDelete).toHaveBeenCalledWith({
+        campaignId: "c1",
+        file: "shore.jpg",
+      }),
+    );
+  });
+
+  it("keeps the file when the write is refused", async () => {
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    show([mission()]);
+
+    removeTheMission();
+    await screen.findByText(NOT_SAVED);
+
+    // The campaign on disk is the one that still has the mission in it, and
+    // that mission's panorama has to still be there to be shown.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+  });
+
+  it("takes the file once a retry lands", async () => {
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    show([mission()]);
+
+    removeTheMission();
+    const retry = await screen.findByRole("button", { name: "Retry" });
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+
+    fireEvent.click(retry);
+    await screen.findByText(SAVED);
+
+    // The delete the failed write held back is owed by whichever write lands,
+    // or the file is left behind for good.
+    await waitFor(() =>
+      expect(campaignMediaDelete.mock.calls.map(([a]) => a.file)).toEqual([
+        "shore.jpg",
+      ]),
+    );
+  });
+});
+
+/**
  * Record the documents in the order they land, which is the order that decides
  * what the file keeps, and hold one of the two writes open until `release`.
  * Holding the first is what a page without a queue trips over: it starts the
@@ -726,8 +809,9 @@ async function renameThenRemove() {
   fireEvent.blur(titleBox());
   fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-  // The removal deletes the mission's panorama before it writes.
-  await waitFor(() => expect(campaignMediaDelete).toHaveBeenCalled());
+  // Both writes have been asked for once the row is off the page. The panorama
+  // is still on disk: it goes when the write that stops naming it lands.
+  await waitFor(() => expect(screen.queryByText("1. Beachhead")).toBeNull());
 }
 
 describe("two edits made close together", () => {
