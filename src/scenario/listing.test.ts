@@ -5,7 +5,7 @@ import {
   isSetUp,
   playableScenarios,
   scenarioContents,
-  scenarioSummary,
+  scenarioCounts,
 } from "./listing";
 import { parseScenario, type Scenario } from "./model";
 
@@ -81,23 +81,40 @@ describe("scenarioContents", () => {
   });
 });
 
-describe("scenarioSummary", () => {
-  const now = Date.parse("2026-09-01T12:00:00.000Z");
-
-  it("ends the contents line with the last edit", () => {
-    const scenario = build({ updatedAt: "2026-09-01T10:00:00.000Z" });
-
-    expect(scenarioSummary(scenario, now)).toBe(
-      "0 unit placements · 0 zones · 0 triggers · 0 objectives · edited 2h ago",
-    );
+// The Scenario Builder draws the same counts as chips (issue #2180), so it
+// reads them as data. What it needs from here is that every kind is present
+// whatever the count, and that the order matches the sentence the other screens
+// print.
+describe("scenarioCounts", () => {
+  it("gives a count for every kind, in the order the sentence reads them", () => {
+    expect(scenarioCounts(build())).toEqual([
+      { key: "placements", count: 0, noun: "unit placement" },
+      { key: "zones", count: 0, noun: "zone" },
+      { key: "triggers", count: 0, noun: "trigger" },
+      { key: "objectives", count: 0, noun: "objective" },
+    ]);
   });
 
-  // A scenario written by an older build, or hand-edited, can carry no stamp at
-  // all. Dropping the segment beats printing "edited Invalid Date".
-  it("says only what it holds when the document carries no stamp", () => {
-    expect(scenarioSummary(build(), now)).toBe(
-      "0 unit placements · 0 zones · 0 triggers · 0 objectives",
-    );
+  it("counts actors and groups into the one placements number", () => {
+    const scenario = build({
+      actors: [actor("a1"), actor("a2")],
+      groups: [
+        {
+          id: "g1",
+          team: "you",
+          units: [{ def: "armpw", count: 4 }],
+          pos: { x: 0, z: 0 },
+          orders: [],
+          dormant: false,
+        },
+      ],
+    });
+
+    expect(scenarioCounts(scenario)[0]).toEqual({
+      key: "placements",
+      count: 3,
+      noun: "unit placement",
+    });
   });
 });
 

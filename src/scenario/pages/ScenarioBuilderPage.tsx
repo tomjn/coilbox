@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
+import { relativeTime } from "@/lib/relativeTime";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
 import {
@@ -15,7 +16,7 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { newScenario } from "../create";
-import { campaignsUsingScenario, isSetUp, scenarioSummary } from "../listing";
+import { campaignsUsingScenario, isSetUp } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import {
@@ -25,6 +26,7 @@ import {
   saveScenario,
 } from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
+import { ScenarioContentChips } from "./components/ScenarioContentChips";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 import { ScenarioMapThumb } from "./components/ScenarioMapThumb";
 import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
@@ -49,7 +51,9 @@ import {
  * list (issue #2179): the map, the name, the map it is set on, what it holds,
  * when it was last written, and the description. Ten smoke tests all called
  * "test" are separated by the edit time, which is also the only thing on screen
- * that explains why the list is in the order it is.
+ * that explains why the list is in the order it is. What it holds is drawn as
+ * icons and numbers rather than written out, so the counts line up down the
+ * list instead of reading the same on every row (issue #2180).
  *
  * Past a screenful, scanning stops working, so the list is also searchable by
  * name, narrowable to one source, and gathered under the game each scenario is
@@ -184,6 +188,9 @@ export default function ScenarioBuilderPage() {
     // gap.
     const draft = !isSetUp(scenario);
     const inCampaigns = usedBy(scenario.id);
+    // Null for a document written by an older build, or hand-edited, which can
+    // carry no stamp at all. Dropping the segment beats "edited Invalid Date".
+    const edited = relativeTime(scenario.updatedAt);
     return (
       <li
         key={scenario.id}
@@ -245,8 +252,13 @@ export default function ScenarioBuilderPage() {
             <span className="truncate text-xs text-muted-foreground">
               {scenario.setup.mapName || "No map"}
             </span>
-            <span className="truncate text-xs text-muted-foreground">
-              {scenarioSummary(scenario)}
+            {/* The chips and the edit time share one line, and the chips are
+                what makes room for it. The edit time is a fact about the
+                document, as the counts are, where the line above is about the
+                engine setup. */}
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ScenarioContentChips scenario={scenario} />
+              {edited && <span className="truncate">edited {edited}</span>}
             </span>
             {/* Only when the author wrote one. An empty line here would be a row
                 that is taller for having said nothing. */}
