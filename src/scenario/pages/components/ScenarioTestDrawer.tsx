@@ -28,6 +28,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { primeScan, useUnitsyncScan } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
 import { playInfolog } from "@/play/bindings";
@@ -45,7 +46,13 @@ import {
   type ScenarioLaunchResult,
   scenarioLaunchBlocker,
 } from "../../launch";
-import type { Scenario } from "../../model";
+import {
+  DEFAULT_DIFFICULTY,
+  DIFFICULTIES,
+  type Difficulty,
+  type Scenario,
+  usesDifficulty,
+} from "../../model";
 import { mutatorOffer } from "../../offer";
 import { type RunLog, readRunLog } from "../../runLog";
 import { ensureBundledScenarioMedia, type GameOrigin } from "../../storage";
@@ -125,6 +132,13 @@ function LogLines({ lines }: { lines: string[] }) {
   );
 }
 
+/** How each difficulty is written on its button. */
+const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  easy: "Easy",
+  normal: "Normal",
+  hard: "Hard",
+};
+
 export function ScenarioTestDrawer({
   scenario,
   /**
@@ -167,6 +181,12 @@ export function ScenarioTestDrawer({
     reader,
     origin,
   );
+  // How hard to play it (issue #2164). Offered only for a scenario that
+  // actually varies by it: three buttons that change nothing about the mission
+  // are three buttons worth leaving out, and every scenario written before
+  // difficulty existed is one of those.
+  const varies = useMemo(() => usesDifficulty(scenario), [scenario]);
+  const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
   // What the engine's log said about the run that just finished (issue #2165).
   // Its own state rather than part of the `done` phase, because the read happens
@@ -229,6 +249,9 @@ export function ScenarioTestDrawer({
         mapOptionSchema: await mapOptionSchema(target, scenario.setup.mapName),
         map: mapExtent,
         units: gameUnits.units,
+        // Left out for a scenario that does not vary by it, so its start script
+        // is the one it has always been.
+        difficulty: varies ? difficulty : undefined,
         rescan: async () => {
           setPhase({ state: "scanning" });
           const rescanned = await primeScan(
@@ -304,6 +327,35 @@ export function ScenarioTestDrawer({
         <div className="flex flex-col gap-2 rounded border border-border/60 px-3 py-2 text-xs text-muted-foreground">
           <p>{offer.offer}</p>
           {offer.limit ? <p>{offer.limit}</p> : null}
+        </div>
+      ) : null}
+
+      {/* Only for a scenario that varies by it. The wording is the same for
+          both readers: an author testing the hard version and a player picking
+          it want the identical choice. */}
+      {varies ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm" id="scenario-difficulty-label">
+            How hard should it be?
+          </p>
+          <ToggleGroup
+            type="single"
+            value={difficulty}
+            onValueChange={(v) => v && setDifficulty(v as Difficulty)}
+            aria-labelledby="scenario-difficulty-label"
+            className="justify-start gap-2"
+            disabled={busy}
+          >
+            {DIFFICULTIES.map((level) => (
+              <ToggleGroupItem
+                key={level}
+                value={level}
+                className="rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+              >
+                {DIFFICULTY_LABEL[level]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
       ) : null}
 
