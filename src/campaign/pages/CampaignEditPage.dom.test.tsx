@@ -14,8 +14,9 @@
  * the only one of itself, so the case worth pinning is which document ends up
  * saved and when the action is offered at all.
  *
- * Copying a mission is the reverse of both (issue #2196). Where the copy lands
- * is the whole of what it is worth, because array order is play order.
+ * Copying a mission is the reverse of both (issue #2196), and it changes what
+ * removal can promise: two missions in one campaign read one media folder, so
+ * the copy plays the original's files and neither one's removal takes them.
  *
  * The next thing here is what the page says about its own writes (issue
  * #2198). It saves as you go and never asks, so the case that has to hold is
@@ -488,6 +489,48 @@ describe("duplicating a campaign mission", () => {
       { kind: "file", file: "shore.jpg" },
     ]);
     expect(campaignMediaDelete).not.toHaveBeenCalled();
+  });
+
+  it("says a shared file stays when one of the two is removed", async () => {
+    show([mission()]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Duplicate Beachhead" }),
+    );
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+
+    // The old wording promised the panorama went off disk, which the copy makes
+    // untrue: it still plays the same file.
+    expect(
+      screen.getByText(
+        "its panorama, kept on disk because another mission uses the same file",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("its panorama, deleted from disk")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await vi.waitFor(() => expect(savedMissions()).toHaveLength(1));
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+  });
+
+  it("stops calling an orphaned scenario the only copy once it is not", async () => {
+    // Nothing in the scenario builder, so the mission's own copy is the last
+    // one there is, until a second mission carries it too.
+    show([scenarioMission(asAttached)], []);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+    expect(screen.getByText(/the only copy of the scenario/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Duplicate Beachhead" }),
+    );
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+
+    expect(screen.queryByText(/the only copy of the scenario/)).toBeNull();
+    expect(screen.getByText(/which another mission also carries/)).toBeTruthy();
   });
 
   /**

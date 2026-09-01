@@ -523,6 +523,7 @@ export default function CampaignEditPage() {
                       </Button>
                       <MissionRemoveButton
                         mission={m}
+                        others={campaign.missions.filter((x) => x.id !== m.id)}
                         scenarios={scenarios}
                         onRemove={() => removeMission(m)}
                       />

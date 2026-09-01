@@ -29,10 +29,14 @@ import type { CampaignMission } from "../../model";
  */
 export function MissionRemoveButton({
   mission,
+  others,
   scenarios,
   onRemove,
 }: {
   mission: CampaignMission;
+  /** The campaign's other missions, to say which of this one's files another
+   *  mission also plays and so which of them actually go off disk. */
+  others: CampaignMission[];
   /** Every scenario stored here, to say whether the attached copy is the only one. */
   scenarios: Scenario[];
   /** Drops the mission and deletes its imported files. Reports its own failures. */
@@ -40,7 +44,7 @@ export function MissionRemoveButton({
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const losses = missionLosses(mission, scenarios);
+  const losses = missionLosses(mission, scenarios, others);
 
   // The page owns the error banner for a failed save, so there is nothing to
   // report in here: by the time this resolves the popover has no reason to stay.
@@ -134,6 +138,7 @@ const asList = (items: string[]) =>
 export function missionLosses(
   mission: CampaignMission,
   scenarios: Scenario[],
+  others: CampaignMission[] = [],
 ): string[] {
   const losses: string[] = [];
   if (mission.briefing.trim() !== "") losses.push("its briefing");
@@ -153,9 +158,27 @@ export function missionLosses(
   // is a reference the mission loses, and the image survives it. Read from the
   // same slot list the delete works through, so the promise and the deletion
   // cannot drift apart (issue #2210).
-  const imported = missionMedia(mission).map((m) => m.label);
-  if (imported.length > 0) {
-    losses.push(`its ${asList(imported)}, deleted from disk`);
+  //
+  // And only a file nothing else names. The delete has always kept a file
+  // another mission still plays, but the wording said it went, which duplicating
+  // a mission makes the common case rather than the odd one: the copy shares the
+  // original's art (issue #2196). So the two are said apart.
+  const shared = new Set(
+    others.flatMap((m) => missionMedia(m).map((x) => x.file)),
+  );
+  const imported = missionMedia(mission);
+  const deleted = imported
+    .filter((m) => !shared.has(m.file))
+    .map((m) => m.label);
+  const kept = imported.filter((m) => shared.has(m.file)).map((m) => m.label);
+  if (deleted.length > 0) {
+    losses.push(`its ${asList(deleted)}, deleted from disk`);
+  }
+  if (kept.length > 0) {
+    const file = kept.length === 1 ? "file" : "files";
+    losses.push(
+      `its ${asList(kept)}, kept on disk because another mission uses the same ${file}`,
+    );
   }
   const attached = scenarioAttachment(mission, scenarios);
   switch (attached.state) {
@@ -169,11 +192,20 @@ export function missionLosses(
         `its copy of the scenario "${attached.snapshot.name}", which is not the one the scenario builder now holds`,
       );
       break;
-    case "orphaned":
+    case "orphaned": {
+      // "The only copy" stops being true the moment a mission carrying it is
+      // duplicated, and the copy is a whole second scenario document rather
+      // than a shared file, so this one is checked the same way the media is.
+      const elsewhere = others.some(
+        (m) => m.scenario?.id === attached.snapshot.id,
+      );
       losses.push(
-        `the only copy of the scenario "${attached.snapshot.name}", which is no longer in the scenario builder`,
+        elsewhere
+          ? `its copy of the scenario "${attached.snapshot.name}", which is no longer in the scenario builder but which another mission also carries`
+          : `the only copy of the scenario "${attached.snapshot.name}", which is no longer in the scenario builder`,
       );
       break;
+    }
   }
   return losses;
 }
