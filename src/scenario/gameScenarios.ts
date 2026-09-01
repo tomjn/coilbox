@@ -58,6 +58,34 @@ const packagedStamps = new Map<string, string | null>();
 /** Files already pulled out of a packaged archive this session, keyed archive + path. */
 const files = new Map<string, string>();
 
+/**
+ * Where each game mission listed this session came from, by scenario id.
+ *
+ * A game's own mission keeps its dialogue clips inside the game archive rather
+ * than in the media store every other scenario's clips live in, so anything
+ * reading a clip has to know which of the two to reach for (issue #2235). That
+ * is what {@link GameOrigin} answers, and this is how a caller holding nothing
+ * but a document gets one.
+ *
+ * A lookup rather than a prop because the document is what travels: the share
+ * drawer, the copy and the editor's portrait preview each receive a
+ * {@link Scenario} and no more, and threading the origin through all three
+ * would put the same question in three places. {@link gameScenarios} is the
+ * only writer, and it is what put the mission in the list somebody can reach
+ * those three from in the first place.
+ */
+const origins = new Map<string, GameOrigin>();
+
+/**
+ * Where a mission came from, or `undefined` for an ordinary stored scenario.
+ * Populated by {@link gameScenarios}, so a game whose missions have never been
+ * listed this session answers `undefined` and the caller reads the media store,
+ * which is the same answer it gave before this existed.
+ */
+export function gameMissionOrigin(scenarioId: string): GameOrigin | undefined {
+  return origins.get(scenarioId);
+}
+
 /** Drop every cached file under a root, because the archive there has changed. */
 function forgetFiles(root: string): void {
   const prefix = `${root} `;
@@ -150,16 +178,14 @@ export async function gameScenarios(
           );
           continue;
         }
-        found.push({
-          scenario,
-          source: "game",
-          origin: {
-            gameName: game.name,
-            archivePath,
-            folder: mission.folder,
-            loose,
-          },
-        });
+        const origin: GameOrigin = {
+          gameName: game.name,
+          archivePath,
+          folder: mission.folder,
+          loose,
+        };
+        origins.set(scenario.id, origin);
+        found.push({ scenario, source: "game", origin });
       }
     } catch (e) {
       console.warn("could not read missions from", game.name, e);
@@ -169,19 +195,18 @@ export async function gameScenarios(
 }
 
 /**
- * One of a mission's dialogue files as a `data:` URI, for coilbox's own panels.
- * The engine reads the archive itself, so this exists only so the app can draw a
- * portrait. Nothing is written to disk.
+ * One of a mission's own files, base64 encoded, for coilbox's own panels and
+ * its export. The engine reads the archive itself, so this exists only so the
+ * app can draw a portrait, play a clip and inline one in a share. Nothing is
+ * written to disk, which is what keeps a game's media in its game.
+ *
+ * Base64 rather than a `data:` URI because the content type depends on what the
+ * caller is doing with the bytes, and that is `scenarioMedia.ts`'s question,
+ * not this module's.
  */
-export async function missionFileUrl(
+export async function missionFileBase64(
   origin: GameOrigin,
   file: string,
 ): Promise<string> {
-  const base64 = await fileBase64(
-    origin.archivePath,
-    origin.folder,
-    file,
-    origin.loose,
-  );
-  return `data:application/octet-stream;base64,${base64}`;
+  return fileBase64(origin.archivePath, origin.folder, file, origin.loose);
 }

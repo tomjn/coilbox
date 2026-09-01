@@ -22,10 +22,16 @@
  * it, so this is the export path with no file in the middle. It also means the
  * two documents own their clips separately: deleting either one takes only its
  * own folder, which is what makes a copy safe to delete.
+ *
+ * A mission a game ships keeps its clips inside the game archive rather than in
+ * that store, and `gatherScenarioExport` reads those too since issue #2235, so
+ * a copy of one lands with its portraits and voices in its own folder like any
+ * other.
  */
 
 import type { Scenario } from "../../model";
-import { gatherScenarioExport, storeScenario } from "../../storage";
+import { gatherScenarioExport } from "../../scenarioMedia";
+import { storeScenario } from "../../storage";
 
 /**
  * What to call a copy of `name`, avoiding the names already in use.
@@ -57,7 +63,7 @@ export async function duplicateScenario(
   scenario: Scenario,
   taken: Iterable<string>,
 ): Promise<Scenario> {
-  const exported = await gatherScenarioExport(scenario);
+  const { exported } = await gatherScenarioExport(scenario);
   return storeScenario({
     ...exported,
     scenario: {
