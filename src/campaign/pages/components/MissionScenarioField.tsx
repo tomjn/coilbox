@@ -1,5 +1,5 @@
 import { Button, Drawer } from "@picoframe/frame";
-import { FileCode2, Flag, Link2Off, RefreshCw } from "lucide-react";
+import { FileCode2, Flag, Link2Off } from "lucide-react";
 import { useState } from "react";
 import {
   Popover,
@@ -16,18 +16,11 @@ import {
   scenarioAttachment,
 } from "../../missionScenario";
 import type { CampaignMission } from "../../model";
+import {
+  editedAt,
+  MissionScenarioUpdateButton,
+} from "./MissionScenarioUpdateButton";
 import { ScenarioPickerList } from "./ScenarioPicker";
-
-/** An edit timestamp in the reader's own locale, or nothing when unstamped. */
-function editedAt(iso: string): string {
-  if (!iso) return "";
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return "";
-  return at.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 
 /**
  * The mission's scenario: what is attached, whether the copy has fallen behind
@@ -128,14 +121,11 @@ export function MissionScenarioField({
         </Popover>
 
         {attachment.state === "stale" && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            onClick={() => onChange(attachScenario(mission, attachment.live))}
-          >
-            <RefreshCw className="size-4" /> Update to latest
-          </Button>
+          <MissionScenarioUpdateButton
+            mission={mission}
+            attachment={attachment}
+            onUpdate={onChange}
+          />
         )}
 
         {snapshot && (
