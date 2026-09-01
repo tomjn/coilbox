@@ -14,7 +14,7 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { newScenario } from "../create";
-import { campaignsUsingScenario, isSetUp, scenarioContents } from "../listing";
+import { campaignsUsingScenario, isSetUp, scenarioSummary } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { deleteScenario, isEditable, saveScenario } from "../storage";
@@ -31,6 +31,12 @@ import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
  * A scenario is the in-engine half of a mission (spawns, zones, triggers,
  * objectives, dialogue) and a standalone document, so it is created here and
  * only later attached to a campaign mission.
+ *
+ * A row says what an author needs to tell two scenarios apart while scanning the
+ * list (issue #2179): the map, the name, the game and map it is set on, what it
+ * holds, when it was last written, and the description. Ten smoke tests all
+ * called "test" are separated by the edit time, which is also the only thing on
+ * screen that explains why the list is in the order it is.
  */
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
@@ -243,8 +249,15 @@ export default function ScenarioBuilderPage() {
                       {scenario.setup.mapName || "No map"}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {scenarioContents(scenario)}
+                      {scenarioSummary(scenario)}
                     </span>
+                    {/* Only when the author wrote one. An empty line here would
+                        be a row that is taller for having said nothing. */}
+                    {scenario.description && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {scenario.description}
+                      </span>
+                    )}
                   </div>
                 </Link>
                 <ScenarioRowMenu
