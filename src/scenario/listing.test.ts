@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isSetUp, playableScenarios, scenarioContents } from "./listing";
+import type { Campaign, CampaignMission } from "../campaign/model";
+import {
+  campaignsUsingScenario,
+  isSetUp,
+  playableScenarios,
+  scenarioContents,
+} from "./listing";
 import { parseScenario, type Scenario } from "./model";
 
 function build(overrides: Record<string, unknown> = {}): Scenario {
@@ -71,6 +77,62 @@ describe("scenarioContents", () => {
     expect(scenarioContents(scenario)).toBe(
       "1 unit placement · 1 zone · 0 triggers · 0 objectives",
     );
+  });
+});
+
+describe("campaignsUsingScenario", () => {
+  const mission = (scenarioId?: string) =>
+    ({
+      id: `m-${scenarioId ?? "none"}`,
+      title: "Mission",
+      briefing: "",
+      objectives: [],
+      snapshot: build().setup,
+      scenario: scenarioId ? build({ id: scenarioId }) : undefined,
+      disabledUnits: [],
+      skippable: false,
+    }) as CampaignMission;
+
+  const campaign = (title: string, missions: CampaignMission[]) =>
+    ({ title, missions }) as Campaign;
+
+  it("names the campaign whose mission carries the scenario", () => {
+    expect(
+      campaignsUsingScenario(
+        [campaign("Core Contingency", [mission(), mission("s1")])],
+        "s1",
+      ),
+    ).toEqual(["Core Contingency"]);
+  });
+
+  it("names every campaign that carries it", () => {
+    expect(
+      campaignsUsingScenario(
+        [
+          campaign("Core Contingency", [mission("s1")]),
+          campaign("Battle Tactics", [mission("s2")]),
+          campaign("The Cold Place", [mission("s1")]),
+        ],
+        "s1",
+      ),
+    ).toEqual(["Core Contingency", "The Cold Place"]);
+  });
+
+  // A row counts campaigns, not attachments, so a campaign using the same
+  // scenario twice is still one campaign to lose it from.
+  it("counts a campaign once however many of its missions carry it", () => {
+    expect(
+      campaignsUsingScenario(
+        [campaign("Core Contingency", [mission("s1"), mission("s1")])],
+        "s1",
+      ),
+    ).toEqual(["Core Contingency"]);
+  });
+
+  it("finds nothing when no mission carries it", () => {
+    expect(
+      campaignsUsingScenario([campaign("Core Contingency", [mission()])], "s1"),
+    ).toEqual([]);
   });
 });
 

@@ -8,14 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
-import { scenarioIsAttached } from "../../campaign/missionScenario";
 import {
   EmptyState,
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
 import { newScenario } from "../create";
-import { scenarioContents } from "../listing";
+import { campaignsUsingScenario, isSetUp, scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { deleteScenario, isEditable, saveScenario } from "../storage";
@@ -104,9 +103,10 @@ export default function ScenarioBuilderPage() {
   // A campaign mission that attached this scenario carries the document but
   // still loads its dialogue clips out of the scenario media store by name, so
   // deleting the scenario keeps the clips when a campaign is still playing them
-  // (issue #866).
-  const attached = (id: string) =>
-    scenarioIsAttached(
+  // (issue #866). The row says so too, because that is a reason to think twice
+  // about a scenario before reaching for its menu at all (issue #2178).
+  const usedBy = (id: string) =>
+    campaignsUsingScenario(
       campaigns.map((c) => c.campaign),
       id,
     );
@@ -115,7 +115,7 @@ export default function ScenarioBuilderPage() {
   // which is what somebody is looking at when it fails, so nothing is caught
   // here.
   const remove = async (id: string) => {
-    await deleteScenario(id, { keepMedia: attached(id) });
+    await deleteScenario(id, { keepMedia: usedBy(id).length > 0 });
     await refreshScenarios();
   };
 
@@ -172,6 +172,11 @@ export default function ScenarioBuilderPage() {
             // which is its own action rather than a delete (issue #2160).
             const bundled = source === "bundled";
             const fromGame = source === "game";
+            // A scenario with no game or no map cannot be launched, by anything.
+            // The second line already says which of the two is missing, so the
+            // badge carries the consequence rather than repeating the gap.
+            const draft = !isSetUp(scenario);
+            const inCampaigns = usedBy(scenario.id);
             return (
               <li
                 key={scenario.id}
@@ -196,6 +201,14 @@ export default function ScenarioBuilderPage() {
                       <span className="truncate text-sm font-medium">
                         {scenario.name}
                       </span>
+                      {draft && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 text-[10px]"
+                        >
+                          Draft
+                        </Badge>
+                      )}
                       {bundled && (
                         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                           Bundled
@@ -207,6 +220,21 @@ export default function ScenarioBuilderPage() {
                           className="shrink-0 text-[10px]"
                         >
                           From {origin.gameName}
+                        </Badge>
+                      )}
+                      {/* Not a link. The whole row is already one, and an anchor
+                          inside an anchor is a click target neither browsers nor
+                          screen readers agree on. Naming the campaigns on hover
+                          costs no tab stop and no nesting. */}
+                      {inCampaigns.length > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0 text-[10px]"
+                          title={`Used by ${inCampaigns.join(", ")}`}
+                        >
+                          {inCampaigns.length === 1
+                            ? "In campaign"
+                            : `In ${inCampaigns.length} campaigns`}
                         </Badge>
                       )}
                     </div>
@@ -223,7 +251,7 @@ export default function ScenarioBuilderPage() {
                   scenario={scenario}
                   editable={isEditable(loaded)}
                   deletable={!bundled && !fromGame}
-                  attached={attached(scenario.id)}
+                  attached={inCampaigns.length > 0}
                   onShare={() => void openShare(scenario)}
                   onDelete={() => remove(scenario.id)}
                 />
