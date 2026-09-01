@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { useFieldText } from "@/lib/useFieldText";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import { clipIsAttached } from "../../../campaign/scenarioMedia";
 import { scenarioMediaUrl } from "../../../lib/assetUrl";
@@ -210,7 +211,12 @@ function DialogueForm({
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
 }) {
-  const [text, setText] = useState(line.text);
+  // The words are held here while they are typed and written when the box is
+  // left, because every change is saved. That copy follows the line when the
+  // line changes on its own, which is what an undo does (issue #2185): the form
+  // is keyed by the line's id and the words are not the id, so nothing remounts
+  // it and the box carried on showing the words from before the step back.
+  const [text, setText] = useFieldText(line.text);
   const [error, setError] = useState<string | null>(null);
 
   const edit = (patch: Partial<Omit<ScenarioDialogue, "id">>) =>

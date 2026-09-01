@@ -13,7 +13,7 @@
 
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, Variable } from "lucide-react";
-import { useState } from "react";
+import { useFieldText } from "@/lib/useFieldText";
 import type { ExtensionTypes } from "../../extensions";
 import type { Scenario } from "../../model";
 import { EditorPanel, NameField } from "./panels";
@@ -111,9 +111,17 @@ export function VarPanel({
   );
 }
 
-/** What a variable starts at. Committed when the box is left, and put back when
- *  what was typed is not a number: `parseVars` drops a value that is not one,
- *  which would take the declaration with it. */
+/**
+ * What a variable starts at. Committed when the box is left, and put back when
+ * what was typed is not a number: `parseVars` drops a value that is not one,
+ * which would take the declaration with it.
+ *
+ * The box follows the value when the value changes on its own, which is what an
+ * undo does (issue #2185). It is mounted keyed by the variable's name, so a
+ * rename reseeds it and a change of value does not: the box carried on showing
+ * the value from before the step back, and the next keystroke wrote it over the
+ * restored one.
+ */
 function ValueField({
   value,
   label,
@@ -123,7 +131,7 @@ function ValueField({
   label: string;
   onCommit: (value: number) => void;
 }) {
-  const [text, setText] = useState(String(value));
+  const [text, setText] = useFieldText(String(value));
 
   return (
     <Input

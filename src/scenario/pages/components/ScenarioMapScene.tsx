@@ -33,6 +33,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
+import { useFieldText } from "@/lib/useFieldText";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
@@ -1224,9 +1225,13 @@ function ScenarioSelectionBar({
  * the box is left rather than on every keystroke, because every change to the
  * document is written to disk.
  *
- * Mounted per zone by its id, so moving the selection reseeds the box.
+ * Mounted per zone by its id, so moving the selection reseeds the box. A zone's
+ * id is not its name, so renaming one does not reseed it, and the box has to
+ * follow the name when the name changes on its own. That is what an undo does
+ * (issue #2185): before this, the box carried on showing the name from before
+ * the step back, and the next keystroke wrote it over the restored one.
  */
-function ZoneBar({
+export function ZoneBar({
   zone,
   onRename,
   onDelete,
@@ -1235,7 +1240,7 @@ function ZoneBar({
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
-  const [name, setName] = useState(zone.name);
+  const [name, setName] = useFieldText(zone.name);
   const { halfX, halfZ } = zoneExtent(zone);
   const size =
     zone.shape === "circle"
