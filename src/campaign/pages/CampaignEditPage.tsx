@@ -1,12 +1,5 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowUp,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +21,7 @@ import type { Campaign, CampaignMission } from "../model";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
 import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
+import { MissionRemoveButton } from "./components/MissionRemoveButton";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
 import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
@@ -413,14 +407,11 @@ export default function CampaignEditPage() {
                       >
                         <Pencil className="size-4" /> Edit
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={`Remove ${m.title}`}
-                        onClick={() => void removeMission(m)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
+                      <MissionRemoveButton
+                        mission={m}
+                        scenarios={scenarios}
+                        onRemove={() => removeMission(m)}
+                      />
                     </div>
                   </div>
                 </li>
