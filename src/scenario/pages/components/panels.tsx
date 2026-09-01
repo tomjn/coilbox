@@ -55,6 +55,32 @@ export function EditorPanel({
 }
 
 /**
+ * A field's own copy of a value the document also holds.
+ *
+ * Every field in these panels keeps one, so that typing is not a disk write per
+ * keystroke: it is what the box shows, and it is written back when the box is
+ * left. The copy has to follow the document when the document changes on its
+ * own, which is what undo and redo do (issue #2173). Left to drift, the box
+ * shows the old text after a step back, and the next keystroke commits that old
+ * text over the top and takes the undo with it.
+ *
+ * The value seen last is remembered rather than compared against the copy,
+ * because those two differ for the ordinary reason as well: somebody is part way
+ * through typing. Only a value that has moved on its own resets the box.
+ */
+function useFieldText(value: string): [string, (text: string) => void] {
+  const [text, setText] = useState(value);
+  const [seen, setSeen] = useState(value);
+
+  if (seen !== value) {
+    setSeen(value);
+    setText(value);
+  }
+
+  return [text, setText];
+}
+
+/**
  * The name of a thing whose name is its id: an objective, a dialogue line, a
  * variable.
  *
@@ -75,7 +101,7 @@ export function NameField({
   onRename: (wanted: string) => boolean;
   className?: string;
 }) {
-  const [text, setText] = useState(name);
+  const [text, setText] = useFieldText(name);
 
   return (
     <Input
@@ -112,7 +138,7 @@ export function TextField({
   onCommit: (value: string) => void;
   className?: string;
 }) {
-  const [text, setText] = useState(value);
+  const [text, setText] = useFieldText(value);
 
   return (
     <Input
