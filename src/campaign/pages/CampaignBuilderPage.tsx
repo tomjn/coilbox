@@ -26,6 +26,7 @@ import {
   campaignSave,
 } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
+import { copyTitle, duplicateCampaign } from "../duplicate";
 import { inlineCampaignImages, materializeCampaignImages } from "../images";
 import { campaignIsPlayable, campaignSummary } from "../listing";
 import type { Campaign } from "../model";
@@ -55,8 +56,9 @@ function requirementsForCampaign(campaign: Campaign) {
 /**
  * Campaign builder landing: create a new campaign, import a shared one, and list
  * every stored campaign. Every row opens the campaign and carries a menu. A local
- * one offers Edit, Export and Delete. A bundled one carries a badge, lands on the
- * editor's read-only view, and offers Export alone. Advanced-gated by its route.
+ * one offers Edit, Duplicate, Export and Delete. A bundled one carries a badge,
+ * lands on the editor's read-only view, and offers Duplicate and Export.
+ * Advanced-gated by its route.
  *
  * A row says what an author needs to tell two campaigns apart while scanning the
  * list (issue #2187): the emblem or the first mission's map, the title, the game
@@ -179,6 +181,50 @@ export default function CampaignBuilderPage() {
   const remove = async (id: string) => {
     await campaignDelete({ id });
     await refreshCampaigns();
+  };
+
+  /**
+   * Copy a campaign and open the copy (issue #2189).
+   *
+   * The starter a new campaign has no other way to get. Every field that decides
+   * whether a campaign is playable comes from a preset on this machine, so a
+   * template coilbox could ship would be a Draft on arrival, and the only
+   * campaign already past that is one this install already has.
+   *
+   * A copy that lost a picture or a clip stays on the list rather than opening,
+   * because the banner saying what went is here. Dropping straight into the
+   * editor would put it behind the page nobody is looking at any more, and the
+   * first an author would know of it is a briefing with a gap in it.
+   */
+  const duplicate = async (campaign: Campaign) => {
+    setActionError(null);
+    setBusy(true);
+    try {
+      const title = copyTitle(
+        campaign.title,
+        campaigns.map((c) => c.campaign.title),
+      );
+      const { campaign: copy, droppedMedia } = await duplicateCampaign(
+        campaign,
+        title,
+      );
+      await campaignSave({ id: copy.id, json: JSON.stringify(copy) });
+      await refreshCampaigns();
+      if (droppedMedia > 0) {
+        setActionError(
+          `Copied ${campaign.title} as ${title}, but ${droppedMedia} media ` +
+            `file${droppedMedia === 1 ? "" : "s"} could not be read and ${
+              droppedMedia === 1 ? "was" : "were"
+            } left out. The copy is in the list below.`,
+        );
+        return;
+      }
+      navigate(`/campaign-builder/${copy.id}`);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   // Export a local campaign to a single-file .json (issue #499: moved here from
@@ -319,15 +365,17 @@ export default function CampaignBuilderPage() {
                   </div>
                 </Link>
                 {/* A bundled campaign is the distribution's own file, which
-                    coilbox never writes back and never removes, so it keeps
-                    Export alone (issue #2191). Export only reads the campaign
-                    and writes a file the author picked, and exporting a bundled
-                    one then importing it back is how an author gets a copy they
-                    may edit. */}
+                    coilbox never writes back and never removes, so it keeps the
+                    two actions that only read it (issues #2191 and #2189):
+                    Export, which writes a file the author picked, and
+                    Duplicate, which writes a new local campaign. Duplicating a
+                    bundled one is the one step that used to be an export
+                    followed by an import. */}
                 <CampaignRowMenu
                   campaign={campaign}
                   editable={!bundled}
                   deletable={!bundled}
+                  onDuplicate={() => void duplicate(campaign)}
                   onExport={() => void exportCampaign(campaign)}
                   onDelete={() => remove(campaign.id)}
                 />
