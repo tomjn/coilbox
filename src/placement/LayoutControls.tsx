@@ -32,14 +32,20 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { useFieldText } from "@/lib/useFieldText";
 import type { SceneUnchecked } from "./placements";
 
 /**
  * What the layout is called, which is what a picker will list it by.
  *
  * Local while it is typed and committed when the box is left, because every edit
- * either editor makes is written to disk. Seeded on mount, so mounting it inside
- * a popover shows the current name each time the popover is opened.
+ * either editor makes is written to disk.
+ *
+ * That copy follows the name when the name changes on its own, which is what an
+ * undo does and both editors have one (issue #2175). Re-opening the popover this
+ * sits in seeds a fresh copy and hid the problem, but an undo taken while the
+ * popover is open did not: the box carried on showing the name from before the
+ * step back, and the next keystroke wrote it over the restored one.
  */
 export function LayoutNameField({
   id,
@@ -51,7 +57,7 @@ export function LayoutNameField({
   name: string;
   onRename: (name: string) => void;
 }) {
-  const [text, setText] = useState(name);
+  const [text, setText] = useFieldText(name);
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs font-medium">
