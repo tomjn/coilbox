@@ -311,4 +311,37 @@ check("a difficulty this runtime has never heard of falls back to the default",
 check("and says which word it could not read",
 	said(badEngine, "warning", "this runtime has no difficulty called nightmare"))
 
+--------------------------------------------------------------------------------
+-- The same claims against a real compiled fixture rather than a table written
+-- here. `src/scenario/fixtures/missions/outbreak/mission.lua` is coilbox's own
+-- emitter output, kept byte-identical by corpus.test.ts, so this is where the
+-- compiler and the runtime are proved to agree on what a range looks like.
+--------------------------------------------------------------------------------
+
+local function playFixture(difficulty)
+	local engine = load({ coilbox_mission = "demo", coilbox_difficulty = difficulty },
+		missionFiles(support.fixture("outbreak")), {
+			buildings = { armllt = true, armsolar = true },
+			defs = { armsolar = true, corcom = true, armpw = true, corak = true, armllt = true },
+			startPositions = { [0] = { x = 1200, z = 1200 }, [1] = { x = 2400, z = 2400 } },
+		})
+	engine.env:Initialize()
+	engine.env:GameStart()
+	return engine, engine.GG.CoilboxMission
+end
+
+local _, easyRun = playFixture("easy")
+local _, hardRun = playFixture("hard")
+
+check("the fixture's hard-only warlord is absent on easy and there on hard",
+	easyRun.units.warlord == nil and hardRun.units.warlord ~= nil)
+check("its up-to-normal spare turret is the other way round",
+	easyRun.units["spare-gun"] ~= nil and hardRun.units["spare-gun"] == nil)
+check("its hard-only trigger is armed only on hard",
+	easyRun.triggers:isEnabled("second-wave-arrives") == false
+	and hardRun.triggers:isEnabled("second-wave-arrives") == true)
+check("and its easy-only trigger only on easy",
+	easyRun.triggers:isEnabled("mercy") == true
+	and hardRun.triggers:isEnabled("mercy") == false)
+
 support.report()

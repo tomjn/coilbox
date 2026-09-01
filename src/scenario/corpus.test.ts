@@ -6,6 +6,7 @@ import { requiredRuntimeVersion } from "./gating";
 import {
   amountVar,
   baseBuildings,
+  type DifficultyRange,
   parseScenario,
   type Scenario,
 } from "./model";
@@ -129,6 +130,16 @@ describe("scenario fixture corpus", () => {
     );
     const allGroups = fixtures.flatMap(({ scenario }) => scenario.groups);
     const allTriggers = fixtures.flatMap(({ scenario }) => scenario.triggers);
+    const rangedEnds = fixtures.flatMap(({ scenario }) =>
+      [
+        ...scenario.actors,
+        ...scenario.groups,
+        ...scenario.bases,
+        ...scenario.triggers,
+      ]
+        .map((item) => item.difficulty)
+        .filter((range): range is DifficultyRange => range !== undefined),
+    );
 
     const shapes: Record<string, boolean> = {
       "a repeating trigger": allTriggers.some((t) => t.repeat),
@@ -198,6 +209,31 @@ describe("scenario fixture corpus", () => {
       ),
       "a group that starts on the map (not dormant)": allGroups.some(
         (g) => g.dormant === false,
+      ),
+      // Issue #2164. Each registry a range can sit on, because a range is read
+      // in a different place for each: actors and bases in the start module,
+      // groups in the group module, triggers in the trigger engine. A corpus
+      // covering only one of them would leave three of those unexercised.
+      "an actor that only exists at some difficulties": fixtures.some((f) =>
+        f.scenario.actors.some((a) => a.difficulty !== undefined),
+      ),
+      "a group that only exists at some difficulties": allGroups.some(
+        (g) => g.difficulty !== undefined,
+      ),
+      "a base that only exists at some difficulties": allBases.some(
+        (b) => b.difficulty !== undefined,
+      ),
+      "a trigger that only runs at some difficulties": allTriggers.some(
+        (t) => t.difficulty !== undefined,
+      ),
+      // Both ends, and both together. `atMost` is the easier version of a
+      // mission rather than the harder one, which is the half an author
+      // writing "make it fair on easy" reaches for and the half a corpus that
+      // only ever gated things upward would never emit.
+      "a range bounded at the bottom": rangedEnds.some((r) => r.atLeast),
+      "a range bounded at the top": rangedEnds.some((r) => r.atMost),
+      "a range bounded at both ends": rangedEnds.some(
+        (r) => r.atLeast && r.atMost,
       ),
     };
 
