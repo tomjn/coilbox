@@ -5,7 +5,10 @@ import {
   gameNotInstalled,
   gameOwnMissionRoute,
   missionDriftedFromDocument,
+  missionProblemCount,
   missionProblems,
+  missionProblemsLookWrong,
+  missionProblemsStopPlay,
   missionWarnings,
   olderRuntimeRoute,
   packagedGameRoute,
@@ -129,6 +132,29 @@ describe("author wording", () => {
     expect(said).toContain("version 9");
     expect(said).toContain("ships version 3");
     expect(coilboxTooOld("player", 9, 3)).toContain("Update coilbox");
+  });
+});
+
+describe("the editor header's count", () => {
+  it("counts what stops a launch apart from what only looks wrong", () => {
+    expect(missionProblemCount(2, 1)).toBe("2 problems, 1 warning");
+    expect(missionProblemCount(1, 0)).toBe("1 problem");
+    expect(missionProblemCount(0, 3)).toBe("3 warnings");
+  });
+
+  it("says nothing about a mission with nothing wrong in it", () => {
+    expect(missionProblemCount(0, 0)).toBe("");
+  });
+
+  it("says which of the two lists stops the mission playing", () => {
+    expect(missionProblemsStopPlay(1)).toBe(
+      "1 problem stops this mission from playing:",
+    );
+    expect(missionProblemsStopPlay(2)).toContain("2 problems stop");
+    expect(missionProblemsLookWrong(1)).toBe(
+      "One thing plays, and reads to a player as a bug:",
+    );
+    expect(missionProblemsLookWrong(3)).toContain("3 things play");
   });
 });
 

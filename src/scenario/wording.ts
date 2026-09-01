@@ -173,3 +173,44 @@ export function missionWarnings(reader: ScenarioReader, count: number): string {
     ? `It played, but ${things} in it looked wrong. Worth telling whoever shared it:`
     : `The mission played, but ${things} in it ${count === 1 ? "reads" : "read"} to a player as a bug:`;
 }
+
+/* -------------------------------------------------------------------------- *
+ * What the editor says about the mission being written, before anyone has
+ * pressed Test (issue #2162).
+ *
+ * No reader parameter, because there is one: the editor is the author's screen
+ * and a player never opens it. The sentences above are all about a launch that
+ * has happened or been refused, and none of them is true of a document sitting
+ * mid-edit, so these are their own.
+ * -------------------------------------------------------------------------- */
+
+const plural = (count: number, noun: string) =>
+  `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+/**
+ * The count in the editor header. Blocking issues and warnings are counted
+ * apart, because the author's next question about a number on screen is whether
+ * it stops them playing the mission.
+ *
+ * Empty when there is nothing wrong, so the header has nothing to show.
+ */
+export function missionProblemCount(
+  blocking: number,
+  warnings: number,
+): string {
+  const said: string[] = [];
+  if (blocking > 0) said.push(plural(blocking, "problem"));
+  if (warnings > 0) said.push(plural(warnings, "warning"));
+  return said.join(", ");
+}
+
+/** The lead-in to the issues that stop the mission being played at all. */
+export function missionProblemsStopPlay(count: number): string {
+  return `${plural(count, "problem")} ${count === 1 ? "stops" : "stop"} this mission from playing:`;
+}
+
+/** The lead-in to the issues the mission plays with, and a player reads as a bug. */
+export function missionProblemsLookWrong(count: number): string {
+  const things = count === 1 ? "One thing" : `${count} things`;
+  return `${things} ${count === 1 ? "plays" : "play"}, and ${count === 1 ? "reads" : "read"} to a player as a bug:`;
+}
