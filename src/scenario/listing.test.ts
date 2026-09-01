@@ -5,6 +5,7 @@ import {
   isSetUp,
   playableScenarios,
   scenarioContents,
+  scenarioSummary,
 } from "./listing";
 import { parseScenario, type Scenario } from "./model";
 
@@ -76,6 +77,26 @@ describe("scenarioContents", () => {
 
     expect(scenarioContents(scenario)).toBe(
       "1 unit placement · 1 zone · 0 triggers · 0 objectives",
+    );
+  });
+});
+
+describe("scenarioSummary", () => {
+  const now = Date.parse("2026-09-01T12:00:00.000Z");
+
+  it("ends the contents line with the last edit", () => {
+    const scenario = build({ updatedAt: "2026-09-01T10:00:00.000Z" });
+
+    expect(scenarioSummary(scenario, now)).toBe(
+      "0 unit placements · 0 zones · 0 triggers · 0 objectives · edited 2h ago",
+    );
+  });
+
+  // A scenario written by an older build, or hand-edited, can carry no stamp at
+  // all. Dropping the segment beats printing "edited Invalid Date".
+  it("says only what it holds when the document carries no stamp", () => {
+    expect(scenarioSummary(build(), now)).toBe(
+      "0 unit placements · 0 zones · 0 triggers · 0 objectives",
     );
   });
 });

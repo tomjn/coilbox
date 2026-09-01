@@ -8,6 +8,7 @@
  */
 
 import type { Campaign } from "../campaign/model";
+import { relativeTime } from "../lib/relativeTime";
 import type { Scenario } from "./model";
 
 /** What a scenario holds, for a list row's second line. */
@@ -21,6 +22,29 @@ export function scenarioContents(scenario: Scenario): string {
   return counts
     .map(([n, noun]) => `${n} ${noun}${n === 1 ? "" : "s"}`)
     .join(" · ");
+}
+
+/**
+ * What a scenario holds and when it was last written, for the Scenario Builder
+ * row (issue #2179).
+ *
+ * The edit time rides on the contents line rather than on the line naming the
+ * game and the map, for two reasons. It is a fact about the document, as the
+ * counts are, while the other line is about the engine setup. And the counts are
+ * small integers, so this line has a length the row can predict, where a game's
+ * archive name has none and would push the time off the end of a narrow window.
+ *
+ * `campaignSummary` puts the same segment in the same place, last, so a campaign
+ * row and a scenario row read as one product.
+ */
+export function scenarioSummary(
+  scenario: Scenario,
+  now: number = Date.now(),
+): string {
+  const edited = relativeTime(scenario.updatedAt, now);
+  return edited
+    ? `${scenarioContents(scenario)} · edited ${edited}`
+    : scenarioContents(scenario);
 }
 
 /**

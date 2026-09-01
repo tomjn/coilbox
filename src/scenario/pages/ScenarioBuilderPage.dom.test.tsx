@@ -7,6 +7,8 @@
  * lose an action: a menu a keyboard cannot open, and a read-only scenario that
  * is offered a Delete it must never have. Both are pinned here, against the
  * real menu rather than a stand-in for it.
+ *
+ * What the row says about the scenario is at the foot of the file (issue #2179).
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -391,6 +393,82 @@ describe("the In campaign badge", () => {
       screen
         .getByRole("link", { name: /Beachhead/ })
         .querySelectorAll("a, button, [tabindex]"),
+    ).toHaveLength(0);
+  });
+});
+
+/**
+ * What a row says about the scenario (issue #2179). The sentence itself is a
+ * plain unit test in `listing.test.ts`. What is pinned here is that the row
+ * shows it, that the description only takes a line when there is one, and that
+ * none of it added a second thing to tab to.
+ */
+describe("what a scenario row says", () => {
+  /** The same local scenario, described and last written two hours ago. */
+  function described(description: string): LoadedScenario {
+    return {
+      scenario: {
+        ...local.scenario,
+        description,
+        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      },
+      source: "local",
+    };
+  }
+
+  /** The lines of text under a row's name, in the order they are drawn. */
+  const linesUnder = (name: string) =>
+    [
+      ...screen
+        .getByRole("link", { name: new RegExp(name) })
+        .querySelectorAll("span.truncate.text-xs"),
+    ].map((span) => span.textContent);
+
+  it("shows the description, on one truncated line", () => {
+    show([described("Hold the landing zone until the second wave lands.")]);
+
+    const line = screen.getByText(
+      "Hold the landing zone until the second wave lands.",
+    );
+    expect(line.className).toMatch(/truncate/);
+  });
+
+  // The list is ordered newest edit first, and until now nothing on screen said
+  // so or separated two scenarios of the same name.
+  it("says when the scenario was last edited", () => {
+    show([described("Anything")]);
+
+    expect(screen.getByText(/· edited 2h ago$/)).toBeTruthy();
+  });
+
+  it("gives a scenario with no description no line to hold it", () => {
+    show([local]);
+
+    expect(linesUnder("Beachhead")).toEqual([
+      "No game · No map",
+      "0 unit placements · 0 zones · 0 triggers · 0 objectives",
+    ]);
+  });
+
+  it("puts the description under what the scenario holds", () => {
+    show([described("Hold the landing zone.")]);
+
+    expect(linesUnder("Beachhead")).toEqual([
+      "No game · No map",
+      "0 unit placements · 0 zones · 0 triggers · 0 objectives · edited 2h ago",
+      "Hold the landing zone.",
+    ]);
+  });
+
+  // Everything added here is text inside the row's own link. A second tab stop
+  // in a row is a list a keyboard has to walk twice.
+  it("adds nothing inside the row link that takes focus", () => {
+    show([described("Hold the landing zone.")]);
+
+    expect(
+      screen
+        .getByRole("link", { name: /Beachhead/ })
+        .querySelectorAll("a, button, input, select, textarea, [tabindex]"),
     ).toHaveLength(0);
   });
 });
