@@ -14,7 +14,9 @@
  *
  * The preview reads that stored file back over the `coilbox://` protocol's
  * `scenario` root, so a voice clip streams and seeks like any other audio
- * source instead of arriving as one base64 string.
+ * source instead of arriving as one base64 string. A mission a game ships has
+ * no file in that store, so its clips come out of the game archive instead:
+ * see {@link useClipSrc}.
  */
 
 import { Button } from "@picoframe/frame";
@@ -27,14 +29,14 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { useFieldText } from "@/lib/useFieldText";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import { clipIsAttached } from "../../../campaign/scenarioMedia";
-import { scenarioMediaUrl } from "../../../lib/assetUrl";
 import type { ExtensionTypes } from "../../extensions";
 import type { Scenario, ScenarioDialogue } from "../../model";
+import { dialogueClipUrl, readDialogueClip } from "../../scenarioMedia";
 import { deleteScenarioMedia, importScenarioMedia } from "../../storage";
 import { EditorPanel, NameField, TextField } from "./panels";
 import {
@@ -338,6 +340,42 @@ function DialogueForm({
   );
 }
 
+/**
+ * Where the preview draws this clip from, and whether reading it failed.
+ *
+ * A stored scenario answers straight away with a `scenario://` URL, so the
+ * common case never blanks the preview for a frame. A mission a game ships has
+ * nothing in that store: its clips are inside the game archive, so they are
+ * pulled out and held as a `data:` URI for as long as the panel is open (issue
+ * #2235). Before that read existed the editor drew no portrait for one of those
+ * missions at all, and said nothing about why.
+ */
+function useClipSrc(scenarioId: string, file: string | undefined) {
+  const direct = file ? dialogueClipUrl(scenarioId, file) : null;
+  const [read, setRead] = useState<string | null>(null);
+  const [unreadable, setUnreadable] = useState(false);
+
+  useEffect(() => {
+    setRead(null);
+    setUnreadable(false);
+    if (!file || direct) return;
+    let live = true;
+    readDialogueClip(scenarioId, file).then(
+      (url) => live && setRead(url),
+      (e) => {
+        if (!live) return;
+        console.warn("could not read the dialogue clip", file, e);
+        setUnreadable(true);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [scenarioId, file, direct]);
+
+  return { src: direct ?? read, unreadable };
+}
+
 /** One of a line's two clips: what it holds, what it looks or sounds like, and
  *  the buttons that change it. */
 function MediaField({
@@ -353,7 +391,9 @@ function MediaField({
   onImport: () => void;
   onDrop: () => void;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [undrawable, setUndrawable] = useState(false);
+  const { src, unreadable } = useClipSrc(scenarioId, file);
+  const failed = undrawable || unreadable;
   const Icon = field === "portrait" ? ImageIcon : Volume2;
 
   return (
@@ -388,20 +428,24 @@ function MediaField({
               DDS is a format the engine reads and no browser engine does, so
               coilbox cannot show it here. The mission still gets it.
             </p>
+          ) : !src ? (
+            <p className="text-[11px] text-muted-foreground">
+              Reading the file…
+            </p>
           ) : field === "portrait" ? (
             <img
-              src={scenarioMediaUrl(scenarioId, file)}
+              src={src}
               alt="The portrait this line shows"
               className="size-24 rounded border border-border/50 object-cover"
-              onError={() => setFailed(true)}
+              onError={() => setUndrawable(true)}
             />
           ) : (
             // biome-ignore lint/a11y/useMediaCaption: the caption of a voice clip is the line's own text, which is in the box above it
             <audio
-              src={scenarioMediaUrl(scenarioId, file)}
+              src={src}
               controls
               className="w-full"
-              onError={() => setFailed(true)}
+              onError={() => setUndrawable(true)}
             />
           )}
           <p className="truncate font-mono text-[10px] text-muted-foreground">
