@@ -36,6 +36,7 @@ import {
   MissionUnitSideGraphic,
 } from "./components/MissionUnitPreview";
 import { PanoramaScroller } from "./components/PanoramaScroller";
+import { RunDifficulty } from "./components/RunDifficulty";
 import { useMissionUnit } from "./components/useMissionUnit";
 
 /**
@@ -346,15 +347,27 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <Button onClick={run.start} disabled={!run.canStart}>
-        <Play className="size-4 fill-current" />{" "}
-        {run.running
-          ? "Game running…"
-          : run.scanLoading
-            ? "Loading content…"
-            : "Start Mission"}
-      </Button>
+    <div className="flex flex-col gap-3">
+      {/* Only for a mission that actually plays differently at each level
+          (issue #2220). The choice is the run's, and it reaches the engine
+          through the same `launchScenario` call the mission launches by. */}
+      {run.variesByDifficulty && (
+        <RunDifficulty
+          value={run.difficulty}
+          onChange={run.setDifficulty}
+          disabled={run.running}
+        />
+      )}
+      <div className="flex items-center gap-3">
+        <Button onClick={run.start} disabled={!run.canStart}>
+          <Play className="size-4 fill-current" />{" "}
+          {run.running
+            ? "Game running…"
+            : run.scanLoading
+              ? "Loading content…"
+              : "Start Mission"}
+        </Button>
+      </div>
     </div>
   );
 }
