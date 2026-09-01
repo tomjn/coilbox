@@ -73,10 +73,35 @@ export function campaignSummary(
  * `CampaignMission.scenario`), so a campaign made entirely of them is finished.
  */
 export function campaignIsPlayable(campaign: Campaign): boolean {
-  if (campaign.missions.length === 0) return false;
-  return campaign.missions.every(
-    (m) => !!m.snapshot?.gameName && !!m.snapshot?.mapName,
+  return campaignUnplayableReason(campaign) === null;
+}
+
+/**
+ * The same answer as {@link campaignIsPlayable}, in words a player can act on,
+ * or null when the campaign plays (issue #2219).
+ *
+ * The builder's Draft badge only has to say "this one is not finished", because
+ * the author is one click from the editor that shows which mission is short.
+ * The play list has no such click: the Campaign Builder is advanced-mode only
+ * and a distribution can hide it outright, so a badge on its own would name a
+ * problem the reader cannot even go and look at. Naming the mission is the
+ * difference between a dead end and a to-do.
+ *
+ * The position is the mission's place in the sequence, counting from one,
+ * because that is how the detail page numbers them.
+ */
+export function campaignUnplayableReason(campaign: Campaign): string | null {
+  if (campaign.missions.length === 0) return "No missions yet";
+  const at = campaign.missions.findIndex(
+    (m) => !m.snapshot?.gameName || !m.snapshot?.mapName,
   );
+  if (at === -1) return null;
+  const snapshot = campaign.missions[at].snapshot;
+  const missing = [
+    !snapshot?.gameName && "game",
+    !snapshot?.mapName && "map",
+  ].filter(Boolean);
+  return `Mission ${at + 1} has no ${missing.join(" or ")}`;
 }
 
 /** Local campaigns before bundled ones, as the plugin already reads them. */
