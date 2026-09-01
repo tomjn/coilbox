@@ -161,7 +161,11 @@
         "x": 2500,
         "z": 2500
       },
-      "buildings": [],
+      "buildings": [
+        {
+          "id": "raider-gun"
+        }
+      ],
       "difficulty": {
         "atLeast": "normal",
         "atMost": "hard"

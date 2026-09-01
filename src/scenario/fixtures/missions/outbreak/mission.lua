@@ -92,6 +92,7 @@ return {
       difficulty = { atLeast = "normal", atMost = "hard" },
       buildings = {
         {
+          id = "raider-gun",
           def = "armllt",
           offset = { x = 0, z = 0 },
           facing = 0,

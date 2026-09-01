@@ -20,7 +20,12 @@
 # that the whole thing loads at all.
 #
 # Usage: scripts/mission-headless.sh [mission ...]
-# Default: gate, ambush, garrison, siege.
+# Default: gate, ambush, garrison, siege, outbreak.
+#
+# outbreak is the difficulty fixture. It is run at whatever
+# COILBOX_HARNESS_DIFFICULTY says, which is nothing by default, so the default
+# run proves what the runtime does when no launcher chose. Run the script again
+# with that variable set to easy, normal and hard to cover the rest.
 #
 # Needs a headless engine, a game carrying the fixtures' unit defs (Balanced
 # Annihilation by default) and any map.
@@ -41,6 +46,9 @@
 #                            Default the first balanced_annihilation-* there.
 #   COILBOX_HARNESS_MAP      the map archive's filename under maps/. Default the
 #                            first one there.
+#   COILBOX_HARNESS_DIFFICULTY  the coilbox_difficulty modoption to launch with.
+#                            Default none, which is what a launcher that has
+#                            never heard of difficulty writes.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -70,7 +78,9 @@ MAP_ARCHIVE="${COILBOX_HARNESS_MAP:-}"
 [ -n "$MAP_ARCHIVE" ] || MAP_ARCHIVE="$(pick "$DATA_DIR/maps" '\.sd[7z]$' 'map')"
 
 MISSIONS=("$@")
-[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege)
+[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege outbreak)
+
+DIFFICULTY="${COILBOX_HARNESS_DIFFICULTY:-}"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/coilbox-mission-headless.XXXXXX")"
 GAME="$WORK/data/games/coilbox-mission-harness.sdd"
@@ -169,6 +179,11 @@ echo "engine:  $ENGINE"
 echo "game:    $BASE_NAME"
 echo "map:     $MAP_NAME"
 echo "runtime: version $RUNTIME_VERSION, $RUNTIME_FILES files from lua/mission-runtime"
+if [ -n "$DIFFICULTY" ]; then
+  echo "difficulty: $DIFFICULTY"
+else
+  echo "difficulty: none chosen, so the runtime picks its own default"
+fi
 if [ -n "$LUAUI" ]; then
   echo "luaui:   $LUAUI"
 else
@@ -183,7 +198,14 @@ run_mission() { # a fixture mission id, or "gate" for a game with no mission
   local log="$WORK/$id.log"
   local script="$WORK/$id.script.txt"
   local modoption=""
-  [ "$id" = gate ] || modoption="$(printf '\t\tcoilbox_mission=%s\x3b' "$id")"
+  if [ "$id" != gate ]; then
+    modoption="$(printf '\t\tcoilbox_mission=%s\x3b' "$id")"
+    # A launcher that never chose writes nothing, and that is the default here
+    # too: the runtime's own fallback is part of what this proves.
+    if [ -n "$DIFFICULTY" ]; then
+      modoption="$modoption$(printf '\n\t\tcoilbox_difficulty=%s\x3b' "$DIFFICULTY")"
+    fi
+  fi
 
   MODOPTIONS="$modoption" GAME_NAME="$GAME_NAME" MAP_NAME="$MAP_NAME" \
     TEMPLATE="$HEADLESS/start-script.tdf" SCRIPT="$script" \
