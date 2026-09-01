@@ -241,7 +241,7 @@ Settling an objective does not end the mission. Three objectives and one ending 
 
 The player sees them in a panel in game: primaries first, then secondaries, in the order you listed them, with a hidden one left out until it settles.
 
-Rewrite the text whenever. `complete_objective` and `fail_objective` point at an id the editor mints once and never changes, so a better wording moves nothing. The id is shown beside the objective because that is what a mission problem calls it, and you cannot edit it.
+Rewrite the text whenever. `complete_objective` and `fail_objective` point at an id the editor mints once and never changes, so a better wording moves nothing. The id is shown beside the objective, and you cannot edit it: it is what `mission.lua` carries, and a mission problem quotes it after the text so either one finds the row.
 
 ## Dialogue and sound
 
@@ -277,7 +277,9 @@ Anywhere a `var` condition, `set_var` or `add_var` asks for a number you can nam
 
 **Test in game** is in the Setup card at the top of the editor. It compiles the scenario, writes it where the game will look for it, **reads it back out and checks every reference resolves**, and only then starts the engine. A zone name a trigger points at that no longer exists stops there rather than playing as a trigger that never fires.
 
-If anything fails to resolve, nothing launches and every problem is listed at once, each located in editor terms, for example `Trigger "open", action 1, group`.
+If anything fails to resolve, nothing launches and every problem is listed at once, each located in editor terms, for example `Trigger "The gates open" (trigger-3), action 1, group`.
+
+A problem names what you called the thing, then the id in brackets. The name is the row to go and click. The id is what `mission.lua` carries, and it is the part that tells two zones called "north" apart, because a name is yours to reuse. Something you have not named yet, and anything with no name of its own, is named by its id alone.
 
 The drawer also says which route the launch is taking and why, before you press anything. On the mutator route it says what it is about to write and that deleting that one folder undoes it.
 

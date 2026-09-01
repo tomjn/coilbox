@@ -460,7 +460,7 @@ export default function ScenarioEditPage() {
           title={`Problems in ${scenario.name}`}
           width="32rem"
         >
-          <MissionProblemsList problems={problems} />
+          <MissionProblemsList problems={problems} scenario={scenario} />
         </Drawer>
 
         {/* Controlled for the same reason: the compiled mission is recompiled
