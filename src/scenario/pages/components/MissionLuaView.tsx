@@ -57,7 +57,10 @@ export function MissionLuaView({ scenario }: { scenario: Scenario }) {
   };
 
   return (
-    <div className="flex min-h-0 flex-col gap-3">
+    // Fills the drawer's body so the file itself is what scrolls. Left to grow,
+    // the drawer scrolls instead and the copy button leaves with it: a mission
+    // is thousands of lines and the button would be at the top of all of them.
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           What the mission runtime reads, compiled from this document. It is
