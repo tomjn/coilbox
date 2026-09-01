@@ -31,6 +31,7 @@ import {
   type EditHistory,
   emptyHistory,
   recordEdit,
+  redoEdit,
   undoEdit,
 } from "./history";
 import { TriggerPanel } from "./TriggerPanel";
@@ -111,6 +112,17 @@ function PanelHarness({ triggers }: { triggers: ScenarioTrigger[] }) {
       >
         Undo
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          const step = redoEdit(history, document);
+          if (!step) return;
+          setHistory(step.history);
+          setDocument(step.document);
+        }}
+      >
+        Redo
+      </button>
       <output>{JSON.stringify(document.triggers)}</output>
     </>
   );
@@ -144,6 +156,13 @@ function typeOneMore(field: HTMLElement) {
 
 const undo = () =>
   fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+const redo = () =>
+  fireEvent.click(screen.getByRole("button", { name: "Redo" }));
+
+/** Click a trigger in the list, the way an author picks the one to work on. */
+const select = (id: string) =>
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(id) }));
 
 const nameBox = () => screen.getByLabelText("Trigger name");
 const cooldownBox = () => screen.getByLabelText("Waits");
@@ -200,6 +219,73 @@ describe("a trigger's name commit rules", () => {
 
     expect(asInput(nameBox()).value).toBe("wave-one");
     expect(stored().map((t) => t.id)).toEqual(["wave-one", "wave-two"]);
+  });
+});
+
+/**
+ * Which trigger the panel is on after a rename is stepped over (issue #2202).
+ *
+ * The selection is held by name, and a rename changes the name, so an undo
+ * leaves the panel holding a name the document no longer has. It used to show
+ * the first trigger in the list instead, and the author carried on typing into
+ * a trigger they had not picked.
+ */
+describe("which trigger the panel is on when a rename is stepped over", () => {
+  it("goes back to the trigger that was renamed", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    commit(nameBox(), "second-wave");
+    undo();
+
+    expect(asInput(nameBox()).value).toBe("wave-two");
+  });
+
+  it("edits the trigger that was renamed, not the first one", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    commit(nameBox(), "second-wave");
+    undo();
+    typeOneMore(nameBox());
+
+    expect(stored().map((t) => t.id)).toEqual(["wave-one", "wave-two!"]);
+  });
+
+  // First in the list is the answer the old fallback gave for every trigger, so
+  // this case came out right for the wrong reason. Pinned so a change to how
+  // the selection is resolved cannot break it quietly.
+  it("stays on the renamed trigger when it is first in the list", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+
+    commit(nameBox(), "first-wave");
+    undo();
+    typeOneMore(nameBox());
+
+    expect(stored().map((t) => t.id)).toEqual(["wave-one!", "wave-two"]);
+  });
+
+  it("follows the rename forward again when it is redone", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    commit(nameBox(), "second-wave");
+    undo();
+    // The author clicks the row the undo put back before stepping forward.
+    select("wave-two");
+    redo();
+
+    expect(asInput(nameBox()).value).toBe("second-wave");
+  });
+
+  it("shows no form when an undo takes the selected trigger away", () => {
+    openPanel([trigger({ id: "wave-one" })]);
+
+    fireEvent.click(screen.getByRole("button", { name: /New trigger/ }));
+    undo();
+
+    expect(screen.queryByLabelText("Trigger name")).toBeNull();
+    expect(stored().map((t) => t.id)).toEqual(["wave-one"]);
   });
 });
 
