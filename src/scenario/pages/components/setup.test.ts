@@ -88,6 +88,7 @@ function populated(): Scenario {
     triggers: [
       {
         id: "trigger-1",
+        name: "trigger-1",
         enabled: true,
         repeat: false,
         conditions: {

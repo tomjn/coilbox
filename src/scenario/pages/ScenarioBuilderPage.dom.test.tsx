@@ -503,6 +503,7 @@ describe("what a scenario row says", () => {
         triggers: [
           {
             id: "t1",
+            name: "t1",
             enabled: true,
             repeat: false,
             conditions: { op: "all", conditions: [] },

@@ -42,6 +42,7 @@ function document(): Scenario {
     triggers: [
       {
         id: "t1",
+        name: "t1",
         enabled: true,
         repeat: false,
         conditions: {

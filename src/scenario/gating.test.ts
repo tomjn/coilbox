@@ -33,6 +33,7 @@ function withTrigger(conditions: string[], actions: string[]): Scenario {
     triggers: [
       {
         id: "trigger-1",
+        name: "trigger-1",
         enabled: true,
         repeat: false,
         conditions: { op: "all", conditions: conditions.map(step) },
@@ -45,6 +46,24 @@ function withTrigger(conditions: string[], actions: string[]): Scenario {
 describe("requiredRuntimeVersion", () => {
   it("is the first runtime for a scenario with no triggers", () => {
     expect(requiredRuntimeVersion(newScenario("empty"))).toBe(1);
+  });
+
+  /**
+   * Issue #2205. A version is raised for a feature an older runtime would ignore
+   * and play wrong. A trigger's name is not one: it never reaches the compiled
+   * mission, so there is nothing there for a runtime to ignore, and a game that
+   * vendored runtime 1 plays a renamed mission exactly as it played it before.
+   */
+  it("is not raised by a trigger having a name of its own", () => {
+    const scenario = withTrigger(["time_elapsed"], ["victory"]);
+    const renamed = {
+      ...scenario,
+      triggers: [{ ...scenario.triggers[0], name: "The gates open" }],
+    };
+    expect(requiredRuntimeVersion(renamed)).toBe(
+      requiredRuntimeVersion(scenario),
+    );
+    expect(requiredRuntimeVersion(renamed)).toBe(1);
   });
 
   it("is the first runtime for every type the launch set shipped", () => {

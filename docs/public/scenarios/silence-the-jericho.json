@@ -307,6 +307,7 @@
       "triggers": [
         {
           "id": "deploy",
+          "name": "deploy",
           "enabled": true,
           "repeat": false,
           "conditions": {
@@ -352,6 +353,7 @@
         },
         {
           "id": "ridge-contact",
+          "name": "ridge-contact",
           "enabled": true,
           "repeat": false,
           "conditions": {
@@ -396,6 +398,7 @@
         },
         {
           "id": "alarm",
+          "name": "alarm",
           "enabled": false,
           "repeat": false,
           "conditions": {
@@ -443,6 +446,7 @@
         },
         {
           "id": "scramble-reserve",
+          "name": "scramble-reserve",
           "enabled": true,
           "repeat": false,
           "conditions": {
@@ -483,6 +487,7 @@
         },
         {
           "id": "extractor-down",
+          "name": "extractor-down",
           "enabled": true,
           "repeat": false,
           "conditions": {
@@ -513,6 +518,7 @@
         },
         {
           "id": "battery-down",
+          "name": "battery-down",
           "enabled": true,
           "repeat": false,
           "conditions": {
@@ -549,6 +555,7 @@
         },
         {
           "id": "strike-team-lost",
+          "name": "strike-team-lost",
           "enabled": true,
           "repeat": false,
           "conditions": {

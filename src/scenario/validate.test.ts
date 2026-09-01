@@ -567,6 +567,7 @@ describe("validateMission", () => {
         triggers: [
           {
             id: "open",
+            name: "open",
             enabled: true,
             repeat: false,
             conditions: { op: "all", conditions: [] },
