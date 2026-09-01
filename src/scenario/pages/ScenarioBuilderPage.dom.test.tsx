@@ -184,6 +184,21 @@ describe("a scenario row", () => {
       }),
     );
   });
+
+  // Issue #2203: the trigger used to fade in from `opacity-0`, which leaves
+  // nothing to notice at rest and nothing to aim at on a touch screen.
+  // Emphasis may change on hover. Existence may not, so the class that took it
+  // away is pinned out here rather than left to be tidied back in.
+  it("shows its menu trigger before anything is hovered", () => {
+    show([local]);
+
+    const trigger = screen.getByRole("button", {
+      name: "Actions for Beachhead",
+    });
+
+    expect(trigger.className).not.toMatch(/(^|\s|:)opacity-0(\s|$)/);
+    expect(trigger.className).toMatch(/group-hover:opacity-100/);
+  });
 });
 
 describe("the map at the start of a scenario row", () => {
