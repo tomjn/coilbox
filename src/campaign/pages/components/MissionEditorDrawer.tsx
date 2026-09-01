@@ -1,7 +1,7 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, Plus, Trash2, X } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,8 +25,10 @@ import {
   campaignMediaDelete,
   campaignMediaImport,
 } from "../../bindings";
+import { missionMedia } from "../../media";
 import type {
   CampaignMission,
+  ImageRef,
   MapPreviewConfig,
   UnitPreviewConfig,
 } from "../../model";
@@ -226,11 +228,13 @@ function PreviewBox({ children }: { children: ReactNode }) {
  * commits it via `onApply` (which persists the whole campaign) — so a cancelled
  * drawer leaves the stored campaign untouched.
  *
- * Panorama handling is the one exception that touches disk before Apply: picking an
- * image imports it immediately (the plugin needs a real file). To avoid orphaning
- * files, an image imported *this session* that is then replaced/removed is deleted
- * at once (it was never saved); the mission's *original* panorama file is left for
- * the parent to delete on Apply, so cancelling never dangles a saved reference.
+ * Media is the exception that touches disk before Apply: picking a file imports it
+ * immediately, because the plugin needs a real file before anything can play it. So
+ * a file imported *this session* and then replaced or emptied out is deleted at
+ * once, in any of the four slots (it was never saved, and the page behind cannot
+ * clean it up: its diff works from the stored document, which never named it). The
+ * mission's *already-saved* files are left for the parent to delete on Apply, so
+ * cancelling never dangles a saved reference.
  */
 export function MissionEditorDrawer({
   campaignId,
@@ -245,7 +249,7 @@ export function MissionEditorDrawer({
   const [mission, setMission] = useState<CampaignMission>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Panorama files imported during this drawer session (safe to delete on replace).
+  // Files imported during this drawer session (safe to delete on replace).
   const sessionFiles = useRef<Set<string>>(new Set());
 
   const patch = (p: Partial<CampaignMission>) =>
@@ -274,16 +278,27 @@ export function MissionEditorDrawer({
     );
   };
 
-  // Drop an unsaved session import if the panorama currently points at one.
-  const discardSessionPanorama = () => {
-    const cur = mission.panorama;
-    if (cur?.kind === "file" && sessionFiles.current.has(cur.file)) {
-      sessionFiles.current.delete(cur.file);
-      // A video backdrop was copied verbatim into `media/`, so this has to be
-      // the delete that reaches both folders (issue #2210).
-      void campaignMediaDelete({ campaignId, file: cur.file }).catch(() => {});
-    }
+  /** Remember an import this session made, so replacing it can take it off disk. */
+  const trackImport = (ref?: ImageRef) => {
+    if (ref?.kind === "file") sessionFiles.current.add(ref.file);
   };
+
+  // An import this session made and then replaced or emptied out was never
+  // saved, so nothing will ever name it again and it goes now. Reads the same
+  // slot list `media.ts` deletes through, because the slot this forgot is what
+  // left every voiceover and cutscene on disk (issue #2210). A video was copied
+  // verbatim into `media/`, so this has to be the delete that reaches both
+  // folders.
+  useEffect(() => {
+    const named = new Set(missionMedia(mission).map((m) => m.file));
+    for (const file of sessionFiles.current) {
+      if (named.has(file)) continue;
+      sessionFiles.current.delete(file);
+      campaignMediaDelete({ campaignId, file }).catch((e) => {
+        console.error("could not delete campaign media", file, e);
+      });
+    }
+  }, [mission, campaignId]);
 
   const pickImage = async () => {
     setError(null);
@@ -314,7 +329,6 @@ export function MissionEditorDrawer({
         mediaKind(src) === "video"
           ? await campaignMediaImport({ campaignId, srcPath: src })
           : await campaignImageImport({ campaignId, srcPath: src });
-      discardSessionPanorama();
       sessionFiles.current.add(file);
       patch({ panorama: { kind: "file", file } });
     } catch (e) {
@@ -322,15 +336,11 @@ export function MissionEditorDrawer({
     }
   };
 
-  const removeImage = () => {
-    discardSessionPanorama();
-    patch({ panorama: undefined });
-  };
+  const removeImage = () => patch({ panorama: undefined });
 
   // Same session-import bookkeeping as `pickImage`'s success path, just sourced
   // from the archive picker instead of the OS file dialog.
   const importPanoramaFromArchive = (file: string) => {
-    discardSessionPanorama();
     sessionFiles.current.add(file);
     patch({ panorama: { kind: "file", file } });
   };
@@ -587,7 +597,10 @@ export function MissionEditorDrawer({
               campaignId={campaignId}
               kind="sideGraphic"
               value={mission.sideGraphic}
-              onChange={(sideGraphic) => patch({ sideGraphic })}
+              onChange={(sideGraphic) => {
+                trackImport(sideGraphic);
+                patch({ sideGraphic });
+              }}
               label="Image or video"
               help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
               gameName={mission.snapshot.gameName}
@@ -625,7 +638,10 @@ export function MissionEditorDrawer({
           campaignId={campaignId}
           kind="audio"
           value={mission.voiceover}
-          onChange={(voiceover) => patch({ voiceover })}
+          onChange={(voiceover) => {
+            trackImport(voiceover);
+            patch({ voiceover });
+          }}
           label="Briefing voiceover"
           help="Optional audio played on the briefing screen."
           gameName={mission.snapshot.gameName}
@@ -646,7 +662,10 @@ export function MissionEditorDrawer({
           campaignId={campaignId}
           kind="video"
           value={mission.cutscene}
-          onChange={(cutscene) => patch({ cutscene })}
+          onChange={(cutscene) => {
+            trackImport(cutscene);
+            patch({ cutscene });
+          }}
           label="Intro cutscene"
           help="Optional video offered on the briefing screen."
           gameName={mission.snapshot.gameName}
