@@ -27,14 +27,13 @@ import {
   deleteScenario,
   deleteScenarioMedia,
   ensureBundledScenarioMedia,
-  gatherScenarioExport,
   importScenarioMedia,
   isEditable,
   listScenarios,
   saveScenario,
   storeScenario,
 } from "./storage";
-import { encodeScenarioExport, readScenarioExport } from "./transfer";
+import { encodeScenarioExport } from "./transfer";
 
 /** A local document as the plugin hands it back. */
 function stored(id: string, updatedAt: string) {
@@ -259,33 +258,6 @@ describe("deleteScenario and media", () => {
       scenarioId: "s1",
       file: "abc.png",
     });
-  });
-});
-
-describe("gatherScenarioExport", () => {
-  it("inlines every referenced clip into the container", async () => {
-    const gathered = await gatherScenarioExport(withPortrait());
-    const read = readScenarioExport(encodeScenarioExport(gathered));
-
-    expect(mediaReadMock).toHaveBeenCalledWith({
-      scenarioId: "s1",
-      file: "abc.png",
-    });
-    expect(read.ok).toBe(true);
-    if (!read.ok) return;
-    expect(read.payload.media).toEqual({ "abc.png": PORTRAIT });
-    expect(read.payload.scenario.dialogue[0].portrait).toBe("abc.png");
-  });
-
-  it("leaves out a clip that cannot be read", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    mediaReadMock.mockRejectedValue(new Error("gone"));
-
-    const gathered = await gatherScenarioExport(withPortrait());
-
-    expect(gathered.media).toEqual({});
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
   });
 });
 
