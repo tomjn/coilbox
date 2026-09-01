@@ -123,10 +123,11 @@ export function CampaignIconBox({
  * (so the plugin encodes it correctly — alpha PNG for icons/side graphics), and
  * reports the new {@link ImageRef} via `onChange`.
  *
- * It never deletes the previously-stored file: like the mission panorama's
- * cancel case, superseded files are left as orphans and reclaimed wholesale when
- * the campaign is deleted (the image folder is removed then). This keeps the
- * control simple and can never delete a file that's still referenced.
+ * It deletes nothing itself. Whoever owns the document decides that, because
+ * only they can see whether another slot still names the file this one replaced:
+ * `CampaignEditPage` diffs the whole campaign on save, and the mission drawer
+ * clears its own unsaved imports (issue #2210). This control can never delete a
+ * file that is still referenced, because it never deletes one.
  */
 export function CampaignImageField({
   campaignId,

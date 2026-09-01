@@ -14,7 +14,11 @@
  * the only one of itself, so the case worth pinning is which document ends up
  * saved and when the action is offered at all.
  *
- * The third thing here is what the page says about its own writes (issue
+ * Copying a mission is the reverse of both (issue #2196), and it changes what
+ * removal can promise: two missions in one campaign read one media folder, so
+ * the copy plays the original's files and neither one's removal takes them.
+ *
+ * The next thing here is what the page says about its own writes (issue
  * #2198). It saves as you go and never asks, so the case that has to hold is
  * the refused write: an indicator that can only ever say "Saved" is worse than
  * no indicator, because it is believed.
@@ -45,14 +49,17 @@ vi.mock("@picoframe/frame", async () => ({
 // same way. Both stand in, so what is asserted is what the page asked for.
 const {
   campaignSave,
-  campaignImageDelete,
+  campaignMediaDelete,
   useCampaigns,
   useScenarios,
   refreshCampaigns,
 } = vi.hoisted(() => ({
   campaignSave: vi.fn(async (_args: { id: string; json: string }) => ({})),
-  campaignImageDelete: vi.fn(
-    async (_args: { campaignId: string; file: string }) => ({}),
+  campaignMediaDelete: vi.fn(
+    async (_args: { campaignId: string; file: string }) => ({
+      deleted: true,
+      from: "media" as const,
+    }),
   ),
   useCampaigns: vi.fn(),
   useScenarios: vi.fn(),
@@ -61,7 +68,7 @@ const {
 vi.mock("../bindings", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../bindings")),
   campaignSave,
-  campaignImageDelete,
+  campaignMediaDelete,
 }));
 vi.mock("../campaigns", () => ({ useCampaigns, refreshCampaigns }));
 // What the scenario builder holds, which is the other half of every staleness
@@ -88,7 +95,7 @@ import { newScenario } from "@/scenario/create";
 import type { Scenario } from "@/scenario/model";
 import { attachScenario } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
-import CampaignEditPage from "./CampaignEditPage";
+import CampaignEditPage, { duplicateMission } from "./CampaignEditPage";
 
 const source = { ...newScenario("Beachhead"), id: "beachhead" };
 
@@ -107,6 +114,19 @@ function mission(): CampaignMission {
     },
     source,
   );
+}
+
+/** A mission with nothing on it but an id and a title, for order questions. */
+function plain(id: string, title: string): CampaignMission {
+  return {
+    id,
+    title,
+    briefing: "",
+    objectives: [],
+    snapshot: source.setup,
+    disabledUnits: [],
+    skippable: false,
+  };
 }
 
 function campaign(missions: CampaignMission[]): Campaign {
@@ -150,7 +170,7 @@ function savedMissions(): CampaignMission[] {
 
 beforeEach(() => {
   campaignSave.mockClear();
-  campaignImageDelete.mockClear();
+  campaignMediaDelete.mockClear();
   refreshCampaigns.mockClear();
 });
 
@@ -168,15 +188,13 @@ describe("removing a campaign mission", () => {
     expect(screen.getByText("its briefing")).toBeTruthy();
     expect(screen.getByText("1 objective")).toBeTruthy();
     expect(screen.getByText("1 unit restriction")).toBeTruthy();
-    expect(
-      screen.getByText("its panorama image, deleted from disk"),
-    ).toBeTruthy();
+    expect(screen.getByText("its panorama, deleted from disk")).toBeTruthy();
     expect(screen.getByText(/copy of the scenario "Beachhead"/)).toBeTruthy();
     // Nothing has happened yet: the mission is still in the list, and the
     // panorama is still on disk.
     expect(screen.getByText("1. Beachhead")).toBeTruthy();
     expect(campaignSave).not.toHaveBeenCalled();
-    expect(campaignImageDelete).not.toHaveBeenCalled();
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
   });
 
   it("leaves the mission and its panorama alone when the answer is no", () => {
@@ -187,7 +205,7 @@ describe("removing a campaign mission", () => {
 
     expect(screen.queryByText("Remove Beachhead?")).toBeNull();
     expect(screen.getByText("1. Beachhead")).toBeTruthy();
-    expect(campaignImageDelete).not.toHaveBeenCalled();
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
     expect(campaignSave).not.toHaveBeenCalled();
   });
 
@@ -198,12 +216,47 @@ describe("removing a campaign mission", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
 
-    expect(campaignImageDelete).toHaveBeenCalledWith({
+    expect(campaignMediaDelete).toHaveBeenCalledWith({
       campaignId: "c1",
       file: "shore.jpg",
     });
     expect(savedMissions()).toEqual([]);
     expect(screen.queryByText("1. Beachhead")).toBeNull();
+  });
+
+  /**
+   * The panorama was the only slot the removal ever cleaned up, and the command
+   * it used could not reach the folder audio and video go into, so a voiceover
+   * or a cutscene stayed on disk with nothing left naming it (issue #2210).
+   */
+  it("takes the side graphic, voiceover and cutscene with it", async () => {
+    show([
+      {
+        ...mission(),
+        sideGraphic: { kind: "file", file: "emblem.png" },
+        voiceover: { kind: "file", file: "brief.ogg" },
+        cutscene: { kind: "file", file: "intro.mp4" },
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+    // The confirmation has to name them, or it is quietly deleting more than
+    // it said it would.
+    expect(
+      screen.getByText(
+        "its panorama, side graphic, briefing voiceover and intro cutscene, deleted from disk",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+
+    expect(campaignMediaDelete.mock.calls.map(([a]) => a.file)).toEqual([
+      "shore.jpg",
+      "emblem.png",
+      "brief.ogg",
+      "intro.mp4",
+    ]);
   });
 
   it("does not claim a mission holds what it does not", () => {
@@ -351,6 +404,148 @@ describe("re-copying a mission's scenario", () => {
         /The mission's map changes from Comet Catcher to Red Comet\./,
       ),
     ).toBeTruthy();
+  });
+});
+
+/**
+ * Copying a mission (issue #2196). A variant of a mission, an easier one or one
+ * on another map, used to mean going back to the picker and re-typing the
+ * briefing, the objectives and the restrictions.
+ *
+ * Three things decide whether the copy is any use. Where it lands, because
+ * array order is play order. What it shares with the original, because the two
+ * sit in one campaign and so in one media folder. And what it does not share,
+ * because a scenario document held by two missions at once is one in-place edit
+ * away from changing a mission nobody was editing.
+ */
+describe("duplicating a campaign mission", () => {
+  it("puts the copy directly after the original, not at the end", async () => {
+    show([plain("m1", "Beachhead"), plain("m2", "Ridge"), plain("m3", "Dam")]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate Ridge" }));
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+
+    expect(savedMissions().map((m) => m.title)).toEqual([
+      "Beachhead",
+      "Ridge",
+      "Copy of Ridge",
+      "Dam",
+    ]);
+    // And the list on screen agrees about the numbering, which is what an
+    // author reads the play order off.
+    expect(screen.getByText("3. Copy of Ridge")).toBeTruthy();
+    expect(screen.getByText("4. Dam")).toBeTruthy();
+  });
+
+  it("counts up rather than making two rows read the same", async () => {
+    show([plain("m1", "Ridge")]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate Ridge" }));
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate Ridge" }));
+    await vi.waitFor(() => expect(savedMissions()).toHaveLength(3));
+
+    expect(savedMissions().map((m) => m.title)).toEqual([
+      "Ridge",
+      "Copy of Ridge (2)",
+      "Copy of Ridge",
+    ]);
+  });
+
+  it("carries the authoring over and leaves the original alone", async () => {
+    show([mission()]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Duplicate Beachhead" }),
+    );
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+
+    const [original, copy] = savedMissions();
+    expect(original).toEqual(mission());
+    expect(copy.briefing).toBe("Take the shore before dawn.");
+    expect(copy.objectives).toEqual(["Hold the beach"]);
+    expect(copy.disabledUnits).toEqual(["armbrtha"]);
+    expect(copy.scenario?.id).toBe("beachhead");
+    // A fresh id, or the document will not parse back off disk at all.
+    expect(copy.id).not.toBe(original.id);
+  });
+
+  /**
+   * Both missions live in one campaign, so both read one `images/<id>/` folder.
+   * Sharing the file is what makes the copy show the original's panorama
+   * without a second set of bytes, and removing either mission afterwards is
+   * safe because the delete asks what the whole document still names.
+   */
+  it("shares the original's stored files rather than writing them again", async () => {
+    show([mission()]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Duplicate Beachhead" }),
+    );
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+
+    expect(savedMissions().map((m) => m.panorama)).toEqual([
+      { kind: "file", file: "shore.jpg" },
+      { kind: "file", file: "shore.jpg" },
+    ]);
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+  });
+
+  it("says a shared file stays when one of the two is removed", async () => {
+    show([mission()]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Duplicate Beachhead" }),
+    );
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+
+    // The old wording promised the panorama went off disk, which the copy makes
+    // untrue: it still plays the same file.
+    expect(
+      screen.getByText(
+        "its panorama, kept on disk because another mission uses the same file",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("its panorama, deleted from disk")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await vi.waitFor(() => expect(savedMissions()).toHaveLength(1));
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+  });
+
+  it("stops calling an orphaned scenario the only copy once it is not", async () => {
+    // Nothing in the scenario builder, so the mission's own copy is the last
+    // one there is, until a second mission carries it too.
+    show([scenarioMission(asAttached)], []);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+    expect(screen.getByText(/the only copy of the scenario/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Duplicate Beachhead" }),
+    );
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
+
+    expect(screen.queryByText(/the only copy of the scenario/)).toBeNull();
+    expect(screen.getByText(/which another mission also carries/)).toBeTruthy();
+  });
+
+  /**
+   * The scenario is the one thing that must not be shared. It is a whole
+   * document, and two missions holding the same object means an edit made in
+   * place on one lands on both.
+   */
+  it("gives the copy a scenario of its own", () => {
+    const original = mission();
+    const copy = duplicateMission(original, [original.title]);
+
+    expect(copy.scenario).toEqual(original.scenario);
+    expect(copy.scenario).not.toBe(original.scenario);
+    expect(copy.snapshot).not.toBe(original.snapshot);
+    expect(copy.objectives).not.toBe(original.objectives);
   });
 });
 
@@ -502,7 +697,7 @@ async function renameThenRemove() {
   fireEvent.click(screen.getByRole("button", { name: "Remove Beachhead" }));
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
   // The removal deletes the mission's panorama before it writes.
-  await waitFor(() => expect(campaignImageDelete).toHaveBeenCalled());
+  await waitFor(() => expect(campaignMediaDelete).toHaveBeenCalled());
 }
 
 describe("two edits made close together", () => {

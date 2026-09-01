@@ -1,12 +1,27 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { Loader2, Plus, RefreshCw } from "lucide-react";
+import {
+  ChevronDown,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Wand2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
+import { nextDrawerKey } from "@/general/drawerKey";
 import { relativeTime } from "@/lib/relativeTime";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
@@ -15,7 +30,7 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { newScenario } from "../create";
+import { newScenario, starterScenario } from "../create";
 import { campaignsUsingScenario, isSetUp } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
@@ -25,7 +40,8 @@ import {
   type LoadedScenario,
   saveScenario,
 } from "../storage";
-import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
+import { duplicateScenario } from "./components/duplicate";
+import { ReclaimClipsForm } from "./components/ReclaimClipsForm";
 import { ScenarioContentChips } from "./components/ScenarioContentChips";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 import { ScenarioMapThumb } from "./components/ScenarioMapThumb";
@@ -105,12 +121,16 @@ export default function ScenarioBuilderPage() {
     setSource("all");
   };
 
-  const openNew = () =>
+  // Both ways in open the same form. The only difference is which document it
+  // saves, so an author who picks the starter still names and describes their
+  // scenario before it exists.
+  const openNew = (starter = false) =>
     drawer.open({
-      title: "New scenario",
+      title: starter ? "New scenario from the starter" : "New scenario",
       width: "28rem",
       content: (
         <NewScenarioForm
+          starter={starter}
           onCreated={(id) => {
             drawer.close();
             navigate(`/scenario-builder/${id}`);
@@ -119,14 +139,34 @@ export default function ScenarioBuilderPage() {
       ),
     });
 
+  // The list is re-read in place, so a rescan that changes nothing looks exactly
+  // like a click that did nothing. The spinning button used to say it was
+  // running. From inside a menu that closes on select there is nothing left to
+  // spin, so the toast carries it instead. A rescan that fails sets the page's
+  // error and the banner above the list says so.
   const rescan = async () => {
+    if (rescanning) return;
     setRescanning(true);
     try {
       await refresh();
+      toast.success("Rescanned. The scenario list is up to date.");
     } finally {
       setRescanning(false);
     }
   };
+
+  // Reclaiming is a preview first and a delete only on confirm, so what the menu
+  // item opens is the preview. A fresh form every time, because the drawer keeps
+  // the last one mounted and it would still be showing the count it found the
+  // time before (issue #1395).
+  const openReclaim = () =>
+    drawer.open({
+      title: "Reclaim dialogue clips",
+      width: "24rem",
+      content: (
+        <ReclaimClipsForm key={nextDrawerKey()} onDone={() => drawer.close()} />
+      ),
+    });
 
   // Share: a code, a link or a file (issue #1336). The drawer owns all three,
   // and says so when the scenario's dialogue clips make it too big for a code.
@@ -158,6 +198,30 @@ export default function ScenarioBuilderPage() {
       campaigns.map((c) => c.campaign),
       id,
     );
+
+  // Duplicate: a copy of the document under a new id, its dialogue clips copied
+  // into that id's own media folder, opened for editing (issue #2183). Only for
+  // a scenario coilbox stores, because a bundled one's clips and a game
+  // mission's are not in that store to be copied from.
+  //
+  // Nothing asks first. A copy is one row that can be deleted, and the author
+  // lands in the editor on it, which is the undo. Failure has no drawer of its
+  // own to report itself in, so it is toasted: the list is unchanged behind it
+  // and the author is still looking at the row they asked about.
+  const duplicate = async (scenario: Scenario) => {
+    try {
+      const copy = await duplicateScenario(
+        scenario,
+        scenarios.map((l) => l.scenario.name),
+      );
+      await refreshScenarios();
+      navigate(`/scenario-builder/${copy.id}`);
+    } catch (e) {
+      toast.error(
+        `Could not duplicate ${scenario.name}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
 
   // Failure is reported by the confirmation drawer that asked for the delete,
   // which is what somebody is looking at when it fails, so nothing is caught
@@ -274,6 +338,9 @@ export default function ScenarioBuilderPage() {
           editable={isEditable(loaded)}
           deletable={!bundled && !fromGame}
           attached={inCampaigns.length > 0}
+          onDuplicate={
+            bundled || fromGame ? undefined : () => void duplicate(scenario)
+          }
           onShare={() => void openShare(scenario)}
           onDelete={() => remove(scenario.id)}
         />
@@ -288,28 +355,64 @@ export default function ScenarioBuilderPage() {
         description="Author a mission's in-engine content: what spawns, what the triggers watch for, and what wins it. A scenario stands alone, so you can play one on its own or attach it to a campaign mission later."
         actions={
           <>
-            <Button
-              variant="outline"
-              className="gap-1.5"
-              onClick={rescan}
-              disabled={rescanning}
-            >
-              {rescanning ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-              Rescan
-            </Button>
-            <ReclaimClipsButton />
+            {/* The two the page exists for. Getting hold of a scenario and
+                starting one are what an author came here to do, so they are the
+                only two the header spends a button on (issue #2184). */}
             <ScenarioImportButton
               onImported={(scenario) =>
                 navigate(`/scenario-builder/${scenario.id}`)
               }
             />
-            <Button className="gap-1.5" onClick={openNew}>
+            <Button className="gap-1.5" onClick={() => openNew()}>
               <Plus className="size-4" /> New scenario
             </Button>
+            {/* Rescan and Reclaim clips are housekeeping on the store behind the
+                list rather than authoring, and they were sitting at the same
+                weight as the two above. Three weights now: filled for New
+                scenario, outlined for Import, and this one ghosted.
+
+                Labelled "More" rather than drawn as three dots alone. A row's
+                menu is explained by the row it sits on. A header menu has no
+                such neighbour, so an unlabelled trigger here would be a control
+                nobody can name without opening it.
+
+                Ghost, not hidden. It is muted at rest and takes its background
+                on hover or when open, which changes emphasis without ever
+                changing whether it is there (issue #2203). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="gap-1.5 text-muted-foreground data-[state=open]:text-foreground"
+                  aria-label="More scenario actions"
+                >
+                  More <ChevronDown className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  disabled={rescanning}
+                  onSelect={() => void rescan()}
+                >
+                  {rescanning ? (
+                    <Loader2
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <RefreshCw className="size-4" aria-hidden="true" />
+                  )}
+                  Rescan
+                </DropdownMenuItem>
+                {/* Not marked destructive, because this item deletes nothing.
+                    It opens a dry run that names the count and the size, and
+                    the confirm inside it is the destructive control. */}
+                <DropdownMenuItem onSelect={openReclaim}>
+                  <Trash2 className="size-4" aria-hidden="true" /> Reclaim clips
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       >
@@ -360,7 +463,29 @@ export default function ScenarioBuilderPage() {
       {loading ? (
         <SkeletonList />
       ) : scenarios.length === 0 ? (
-        <EmptyState label="No scenarios yet. Start one with New scenario, or import a shared one." />
+        // The starter is offered here and nowhere else. Somebody with no
+        // scenarios has nothing to copy and nothing to read, and a blank
+        // document tells them nothing about what a scenario is for. Once there
+        // is a list, Duplicate is the better answer: their own mission beats a
+        // generic one (issue #2183).
+        <EmptyState
+          label={
+            <span className="flex flex-col items-center gap-3">
+              <span>
+                No scenarios yet. Start from the starter to get a mission that
+                already plays, start an empty one, or import a shared one.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => openNew(true)}
+              >
+                <Wand2 className="size-4" /> Start from the starter
+              </Button>
+            </span>
+          }
+        />
       ) : groups.length === 0 ? (
         // A list that just goes blank reads as documents having been lost, so
         // this counts what is still there and offers the way back in one click
@@ -400,10 +525,20 @@ export default function ScenarioBuilderPage() {
 
 /**
  * The new-scenario form, shown in the drawer behind the New scenario button.
- * It saves the empty scenario itself, so the page only has to open the editor
- * on the id it hands back. Mirrors the campaign builder's own form.
+ * It saves the scenario itself, so the page only has to open the editor on the
+ * id it hands back. Mirrors the campaign builder's own form.
+ *
+ * `starter` swaps the empty document for the starter one (issue #2183). One
+ * form for both, because naming and describing a scenario is the same job
+ * either way and the difference is a single call.
  */
-function NewScenarioForm({ onCreated }: { onCreated: (id: string) => void }) {
+function NewScenarioForm({
+  starter = false,
+  onCreated,
+}: {
+  starter?: boolean;
+  onCreated: (id: string) => void;
+}) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -415,9 +550,8 @@ function NewScenarioForm({ onCreated }: { onCreated: (id: string) => void }) {
     setBusy(true);
     setError(null);
     try {
-      const saved = await saveScenario(
-        newScenario(trimmed, description.trim()),
-      );
+      const make = starter ? starterScenario : newScenario;
+      const saved = await saveScenario(make(trimmed, description.trim()));
       await refreshScenarios();
       onCreated(saved.id);
     } catch (e) {
@@ -428,6 +562,17 @@ function NewScenarioForm({ onCreated }: { onCreated: (id: string) => void }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* What the starter actually contains, said before it is made rather
+          than left to be discovered in the editor. It names no game, no map
+          and no unit, because those are the author's to pick and a template
+          cannot know them. */}
+      {starter && (
+        <p className="text-xs text-muted-foreground">
+          The starter comes with a mission in it: an opening radio message, an
+          objective, and the triggers that play the one and complete the other
+          five minutes in. Pick a game and a map in the editor and it plays.
+        </p>
+      )}
       <Input
         value={name}
         placeholder="Name"

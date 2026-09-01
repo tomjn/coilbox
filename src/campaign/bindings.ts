@@ -92,11 +92,19 @@ export const campaignImageRead = defineCommand<
   { dataUrl: string }
 >("coilbox-campaign", "campaign_image_read");
 
-/** Best-effort removal of a stored panorama. */
-export const campaignImageDelete = defineCommand<
+/**
+ * Delete one file a mission imported, whichever folder it went into: a
+ * re-encoded image under `images/<id>/` or a verbatim clip under `media/<id>/`.
+ * The stored ref carries only the filename, so the plugin looks in both.
+ *
+ * `deleted` is false when neither folder held it, which is not an error (the
+ * mission is dropping a reference either way) but is not a removal either. A
+ * campaign id or file name that could reach outside those folders is rejected.
+ */
+export const campaignMediaDelete = defineCommand<
   { campaignId: string; file: string },
-  Record<string, never>
->("coilbox-campaign", "campaign_image_delete");
+  { deleted: boolean; from: "images" | "media" | null }
+>("coilbox-campaign", "campaign_media_delete");
 
 /** Write a caller-serialized campaign export document to a chosen path. */
 export const campaignExport = defineCommand<

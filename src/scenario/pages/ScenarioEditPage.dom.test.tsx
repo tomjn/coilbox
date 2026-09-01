@@ -41,6 +41,14 @@ vi.mock("../storage", async () => ({
 vi.mock("../saveIntoGame", () => ({
   saveEditedScenario: async (_loaded: unknown, document: unknown) => document,
 }));
+// What a copy does with the dialogue clips is pinned where it happens, in
+// `components/duplicate.test.ts` and against the list page. Here it is stood in
+// for, so what is under test is the header: which document it copies, and where
+// the author lands afterwards.
+const { duplicateScenario } = vi.hoisted(() => ({
+  duplicateScenario: vi.fn(),
+}));
+vi.mock("./components/duplicate", () => ({ duplicateScenario }));
 
 // Everything the editor reads off this machine's content. None of it bears on
 // the header, and all of it reaches for a real Tauri context.
@@ -112,9 +120,9 @@ const bundled: LoadedScenario = {
   source: "bundled",
 };
 
-function edit(loaded: LoadedScenario) {
+function edit(loaded: LoadedScenario, ...also: LoadedScenario[]) {
   useScenarios.mockReturnValue({
-    scenarios: [loaded],
+    scenarios: [loaded, ...also],
     loading: false,
     error: null,
     refresh: async () => {},
@@ -154,10 +162,11 @@ afterEach(() => {
 });
 
 describe("the scenario editor's header", () => {
-  it("reaches Share and Delete from the keyboard alone", () => {
+  it("reaches Duplicate, Share and Delete from the keyboard alone", () => {
     edit(local);
 
     expect(openMenuByKeyboard("Beachhead")).toEqual([
+      expect.stringContaining("Duplicate"),
       expect.stringContaining("Share"),
       expect.stringContaining("Delete"),
     ]);
@@ -218,10 +227,64 @@ describe("the scenario editor's header", () => {
     ).toBe("Beachhead");
   });
 
+  // Issue #2183. The moment an author wants a variant is usually with the
+  // mission open, so the copy is made from the document on screen and the
+  // editor moves onto it. There is no confirmation: the copy is one more
+  // scenario, and being taken to it is what says it happened.
+  it("duplicates the scenario it has open and edits the copy", async () => {
+    const copy: LoadedScenario = {
+      scenario: {
+        ...local.scenario,
+        id: "beachhead-copy",
+        name: "Copy of Beachhead",
+      },
+      source: "local",
+    };
+    duplicateScenario.mockResolvedValue(copy.scenario);
+    edit(local, copy);
+    openMenuByKeyboard("Beachhead");
+
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Duplicate/ }), {
+      key: "Enter",
+    });
+
+    await vi.waitFor(() =>
+      expect(
+        screen
+          .getByRole("textbox", { name: "Scenario name" })
+          .getAttribute("value"),
+      ).toBe("Copy of Beachhead"),
+    );
+    // The document on screen, and the names the copy has to avoid.
+    expect(duplicateScenario).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "beachhead", name: "Beachhead" }),
+      ["Beachhead", "Copy of Beachhead"],
+    );
+  });
+
+  it("says so when the copy could not be written, and stays where it is", async () => {
+    duplicateScenario.mockRejectedValue(new Error("disk full"));
+    edit(local);
+    openMenuByKeyboard("Beachhead");
+
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Duplicate/ }), {
+      key: "Enter",
+    });
+
+    await vi.waitFor(() => expect(screen.getByText("disk full")).toBeTruthy());
+    expect(
+      screen
+        .getByRole("textbox", { name: "Scenario name" })
+        .getAttribute("value"),
+    ).toBe("Beachhead");
+  });
+
   // Editable and deletable are not the same question. A mission inside a loose
   // game folder is written back into that folder, and leaving the game is a
-  // move rather than a delete (issue #2160).
-  it("offers no Delete for a mission that lives inside a game", () => {
+  // move rather than a delete (issue #2160). Its dialogue clips live in the
+  // game archive rather than in the media store, so a copy has nothing to take
+  // them from either.
+  it("offers neither Duplicate nor Delete for a mission that lives inside a game", () => {
     edit(inGame);
 
     expect(openMenuByKeyboard("Landing")).toEqual([

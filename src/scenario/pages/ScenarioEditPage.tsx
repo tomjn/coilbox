@@ -1,6 +1,7 @@
 import { Button, Drawer, Input, useDrawer } from "@picoframe/frame";
 import {
   ArrowLeft,
+  Copy,
   FileCode2,
   MoreVertical,
   Rocket,
@@ -35,6 +36,7 @@ import { deleteScenario, isEditable, type LoadedScenario } from "../storage";
 import { missionProblemCount } from "../wording";
 import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
+import { duplicateScenario } from "./components/duplicate";
 import { applyEdit, type ScenarioEdit } from "./components/edits";
 import {
   type EditHistory,
@@ -269,6 +271,33 @@ export default function ScenarioEditPage() {
     });
   };
 
+  // Duplicate: a copy of the document as it stands, its dialogue clips copied
+  // into the copy's own media folder, opened in place of this one (issue
+  // #2183). The most common moment to want a variant is mid-edit, with the
+  // mission on screen, so the list's row menu is a shortcut rather than the
+  // only way in.
+  //
+  // The copy is made from the working document, not from what the list is
+  // holding, so an edit made a keystroke ago is in it. The saver writes on
+  // every change, so the two are the same thing but for the write in flight.
+  //
+  // Only for a scenario coilbox stores, for the same reason the list has it:
+  // a game's own mission keeps its clips inside the game archive, where there
+  // is nothing for a copy to read them out of.
+  const duplicable = loaded?.source === "local";
+  const duplicate = async () => {
+    try {
+      const copy = await duplicateScenario(
+        scenario,
+        scenarios.map((l) => l.scenario.name),
+      );
+      await refreshScenarios();
+      navigate(`/scenario-builder/${copy.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   // Only a scenario in coilbox's own store is deleted. A game's own mission is
   // editable here when the game is a loose `.sdd`, but taking it out of the
   // game is a move rather than a delete, and that is what the setup panel's
@@ -387,8 +416,7 @@ export default function ScenarioEditPage() {
               A menu rather than two more buttons. The header already carries
               the problem count, Mission Lua and Test in game, all of which act
               on the mission being made. These act on the file it is kept in,
-              and Delete has no business sitting one click away from Test.
-              Duplicate joins them here when #2183 lands. */}
+              and Delete has no business sitting one click away from Test. */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -402,6 +430,11 @@ export default function ScenarioEditPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                {duplicable && (
+                  <DropdownMenuItem onSelect={() => void duplicate()}>
+                    <Copy className="size-4" aria-hidden="true" /> Duplicate
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onSelect={() => void openShare()}>
                   <Share2 className="size-4" aria-hidden="true" /> Share
                 </DropdownMenuItem>
