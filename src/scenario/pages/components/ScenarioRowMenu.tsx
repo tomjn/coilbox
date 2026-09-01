@@ -5,8 +5,13 @@
  * click on a scenario wants. A button inside a link is a link nobody can trust,
  * so the rest of the actions sit here, beside the link and above it, in one
  * menu. The menu is a button like any other: it takes focus, opens on Enter or
- * Space, and walks with the arrow keys, so nothing here is mouse-only even
- * though the trigger fades in on hover.
+ * Space, and walks with the arrow keys, so nothing here is mouse-only.
+ *
+ * The trigger is on every row, all the time. It is muted at rest and full
+ * strength once the row is hovered or holds focus, which is a change of
+ * emphasis rather than of existence. Fading it in from nothing left no
+ * affordance at rest and nothing to aim at on a touch screen, which is the
+ * regression issue #2203 records. Same class list as `CampaignRowMenu`.
  *
  * Which items appear is the caller's call, since the page already works out
  * what a bundled scenario and a game's own mission may do.
@@ -70,7 +75,7 @@ export function ScenarioRowMenu({
           type="button"
           size="icon"
           variant="ghost"
-          className="size-8 text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100 [@media(pointer:coarse)]:opacity-100"
+          className="size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100"
           aria-label={`Actions for ${scenario.name}`}
         >
           <MoreVertical className="size-4" aria-hidden="true" />
@@ -98,8 +103,12 @@ export function ScenarioRowMenu({
 }
 
 /** The confirmation behind Delete. It reports its own failure, because the page
- *  behind the drawer is not what somebody is looking at when it fails. */
-function DeleteScenarioForm({
+ *  behind the drawer is not what somebody is looking at when it fails.
+ *
+ *  Exported because the editor deletes the scenario it has open through the
+ *  same drawer (issue #2203), and one wording of "this can't be undone" is
+ *  worth more than a second copy of it. */
+export function DeleteScenarioForm({
   scenario,
   attached,
   onDelete,
