@@ -54,9 +54,9 @@ function requirementsForCampaign(campaign: Campaign) {
 
 /**
  * Campaign builder landing: create a new campaign, import a shared one, and list
- * every stored campaign. Every row opens the campaign. A local one also carries a
- * menu of Edit, Export and Delete, and a bundled one carries a badge and lands on
- * the editor's read-only view. Advanced-gated by its route.
+ * every stored campaign. Every row opens the campaign and carries a menu. A local
+ * one offers Edit, Export and Delete. A bundled one carries a badge, lands on the
+ * editor's read-only view, and offers Export alone. Advanced-gated by its route.
  *
  * A row says what an author needs to tell two campaigns apart while scanning the
  * list (issue #2187): the emblem or the first mission's map, the title, the game
@@ -314,17 +314,19 @@ export default function CampaignBuilderPage() {
                     )}
                   </div>
                 </Link>
-                {/* A bundled campaign gets no menu because it may do none of
-                    these three. Issue #2191 wants Export offered on one, which
-                    is a decision about bundled content rather than about the
-                    menu. */}
-                {!bundled && (
-                  <CampaignRowMenu
-                    campaign={campaign}
-                    onExport={() => void exportCampaign(campaign)}
-                    onDelete={() => remove(campaign.id)}
-                  />
-                )}
+                {/* A bundled campaign is the distribution's own file, which
+                    coilbox never writes back and never removes, so it keeps
+                    Export alone (issue #2191). Export only reads the campaign
+                    and writes a file the author picked, and exporting a bundled
+                    one then importing it back is how an author gets a copy they
+                    may edit. */}
+                <CampaignRowMenu
+                  campaign={campaign}
+                  editable={!bundled}
+                  deletable={!bundled}
+                  onExport={() => void exportCampaign(campaign)}
+                  onDelete={() => remove(campaign.id)}
+                />
               </li>
             );
           })}

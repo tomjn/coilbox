@@ -13,10 +13,12 @@
  * has no affordance at rest, cannot be found on a touch screen, and is the
  * regression issue #2203 records against the scenario list's version of this.
  *
- * Only local campaigns get a menu, because a bundled one has nothing here it is
- * allowed to do. That is the page's call, not this component's. Issue #2191
- * wants Export offered on bundled rows too, which is where the split between
- * "may be edited" and "may be exported" will first be worth having.
+ * Every campaign gets a menu, because every campaign can be exported (issue
+ * #2191). Export only reads the campaign and writes a file the author picked, so
+ * a bundled campaign is as exportable as a local one, and exporting one then
+ * importing it back is how an author gets a copy they may edit. Which of Edit
+ * and Delete appear is the caller's call, since the page is what knows where a
+ * campaign came from. Same shape as `ScenarioRowMenu`.
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
@@ -34,10 +36,19 @@ import type { Campaign } from "../../model";
 
 export function CampaignRowMenu({
   campaign,
+  editable,
+  deletable,
   onExport,
   onDelete,
 }: {
   campaign: Campaign;
+  /** Whether the editor may write this one back where it came from. */
+  editable: boolean;
+  /** A bundled campaign is the distribution's file, so coilbox never removes
+   *  it. Named apart from `editable` because they are different questions, the
+   *  way they are on the scenario side, even though a campaign is only ever
+   *  local or bundled and so answers both the same way today. */
+  deletable: boolean;
   onExport: () => void;
   onDelete: () => Promise<void>;
 }) {
@@ -73,17 +84,21 @@ export function CampaignRowMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem
-          onSelect={() => navigate(`/campaign-builder/${campaign.id}`)}
-        >
-          <Pencil className="size-4" aria-hidden="true" /> Edit
-        </DropdownMenuItem>
+        {editable && (
+          <DropdownMenuItem
+            onSelect={() => navigate(`/campaign-builder/${campaign.id}`)}
+          >
+            <Pencil className="size-4" aria-hidden="true" /> Edit
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={onExport}>
           <Upload className="size-4" aria-hidden="true" /> Export
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onSelect={confirmDelete}>
-          <Trash2 className="size-4" aria-hidden="true" /> Delete
-        </DropdownMenuItem>
+        {deletable && (
+          <DropdownMenuItem variant="destructive" onSelect={confirmDelete}>
+            <Trash2 className="size-4" aria-hidden="true" /> Delete
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -231,11 +231,42 @@ describe("a campaign row", () => {
   });
 });
 
+// Issue #2191: the whole menu hung off `!bundled`, so a bundled campaign had no
+// way out of the app at all while a bundled scenario kept its Share.
 describe("a bundled campaign's row", () => {
-  it("offers no menu, because there is nothing it may do", () => {
+  it("offers Export, and nothing it cannot do", () => {
     show([bundled]);
 
-    expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
+    expect(openMenuByKeyboard("Tutorial")).toEqual([
+      expect.stringContaining("Export"),
+    ]);
+  });
+
+  it("exports from the menu without a mouse", async () => {
+    show([bundled]);
+    openMenuByKeyboard("Tutorial");
+
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Export/ }), {
+      key: "Enter",
+    });
+
+    await vi.waitFor(() =>
+      expect(campaignExport).toHaveBeenCalledWith(
+        expect.objectContaining({ dest: "/tmp/Beachhead.json" }),
+      ),
+    );
+  });
+
+  // `campaign_delete` only ever removes a document from the app's own campaign
+  // folder, and treats a missing file as a success. Offering Delete here would
+  // report that a bundled campaign had gone and leave it in the list.
+  it("cannot reach a delete from its menu", () => {
+    show([bundled]);
+    openMenuByKeyboard("Tutorial");
+
+    expect(screen.queryByRole("menuitem", { name: /Delete/ })).toBeNull();
+    expect(opened).toEqual([]);
+    expect(campaignDelete).not.toHaveBeenCalled();
   });
 
   it("still opens on a row click, which explains itself", () => {
