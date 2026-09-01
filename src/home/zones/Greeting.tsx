@@ -90,7 +90,7 @@ export function greetingCopy(
   overrides: GreetingOverrides = {},
 ): GreetingCopy {
   const heading =
-    overrides.title ?? (username ? `Welcome back, ${username}` : title);
+    overrides.title ?? (username ? `Welcome back ${username}` : title);
   const settled = (tagline: string | null): GreetingCopy => ({
     heading,
     tagline,
