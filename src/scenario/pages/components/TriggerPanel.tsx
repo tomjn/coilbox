@@ -179,14 +179,13 @@ export function TriggerPanel({
               picking={picking}
               onPick={onPick}
               onChange={onChange}
-              onSelect={setSelectedId}
             />
           </div>
         )}
         {!selected && count > 0 && (
           <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-            The trigger you were on is not in the list any more. Pick one to
-            carry on.
+            The trigger you were on has gone. Pick one from the list, or step
+            back to bring it back.
           </p>
         )}
       </div>
@@ -247,7 +246,6 @@ function TriggerForm({
   picking,
   onPick,
   onChange,
-  onSelect,
 }: {
   trigger: ScenarioTrigger;
   scenario: Scenario;
@@ -262,7 +260,6 @@ function TriggerForm({
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
-  onSelect: (id: string | null) => void;
 }) {
   const at = scenario.triggers.indexOf(trigger);
   const edit = (patch: Partial<Omit<ScenarioTrigger, "id">>) =>
@@ -304,10 +301,13 @@ function TriggerForm({
           size="sm"
           variant="ghost"
           className="ml-auto h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          // The selection is left on the deleted trigger's id rather than
+          // cleared. Nothing else answers to that id, so the panel shows no form
+          // until a step back puts the trigger itself back, and then the author
+          // is on the trigger they were on (issue #2205).
           onClick={() => {
             onChange(removeTrigger(scenario, trigger.id));
             onPick(null);
-            onSelect(null);
           }}
         >
           <Trash2 className="size-3.5" /> Delete

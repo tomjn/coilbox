@@ -10,15 +10,14 @@
  * copy and takes the undo with it.
  *
  * Driven through the whole panel rather than through the two fields on their
- * own, because the form is mounted keyed by the trigger's id. That key is the
- * name box's value, so a rename remounts the form and reseeds the name box
- * while leaving every other box in it alone. A test that mounted the name field
- * by itself would be testing an arrangement the editor never puts it in.
+ * own, because both the drift and which trigger is under the cursor are
+ * properties of the panel around them. A test that mounted the name field by
+ * itself would be testing an arrangement the editor never puts it in.
  *
  * Their commit rules are pinned alongside, because the resync must not quietly
- * change them: a name that is empty or already taken is refused and the old one
- * put back, and a cooldown that is empty or not a positive number clears the
- * wait rather than storing a nonsense one.
+ * change them: an empty name is refused and the old one put back, and a cooldown
+ * that is empty or not a positive number clears the wait rather than storing a
+ * nonsense one.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -294,6 +293,38 @@ describe("which trigger the panel is on when a rename is stepped over", () => {
 
     expect(screen.queryByLabelText("Trigger name")).toBeNull();
     expect(stored().map((t) => t.name)).toEqual(["wave-one"]);
+  });
+});
+
+/**
+ * What the stable id closes on its own (issue #2205). Deleting a trigger used to
+ * clear the selection outright, so undoing the delete put the trigger back and
+ * left the author on whichever one happened to be first. The id outlives the
+ * delete, so the selection can stay on it and the undo lands where the author
+ * was.
+ */
+describe("which trigger the panel is on when one is deleted", () => {
+  const del = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Delete/ }));
+
+  it("shows no form once the trigger it was on has gone", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    del();
+
+    expect(screen.queryByLabelText("Trigger name")).toBeNull();
+    expect(stored().map((t) => t.id)).toEqual(["wave-one"]);
+  });
+
+  it("goes back to the deleted trigger when the delete is undone", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    del();
+    undo();
+
+    expect(asInput(nameBox()).value).toBe("wave-two");
   });
 });
 
