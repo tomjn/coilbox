@@ -6,6 +6,11 @@
  * runtime plays it, so this panel is the words and the media, and the trigger
  * panel is when.
  *
+ * It names one by id, which is also what the compiled mission is addressed by
+ * and what a mission problem calls a line. So the id is minted once and shown
+ * here rather than edited (issue #2248). It used to be the name box, and typing
+ * in it rewrote every trigger that played the line.
+ *
  * `portrait` and `audio` are bare file names, not paths and not data URIs,
  * because LuaUI loads them out of the game's VFS beside the compiled mission.
  * Importing one copies the author's file into the scenario's own media folder
@@ -34,11 +39,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useFieldText } from "@/lib/useFieldText";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import { clipIsAttached } from "../../../campaign/scenarioMedia";
-import type { ExtensionTypes } from "../../extensions";
 import type { Scenario, ScenarioDialogue } from "../../model";
 import { dialogueClipUrl, readDialogueClip } from "../../scenarioMedia";
 import { deleteScenarioMedia, importScenarioMedia } from "../../storage";
-import { EditorPanel, NameField, TextField } from "./panels";
+import { EditorPanel, TextField } from "./panels";
 import {
   addDialogue,
   dialogueMedia,
@@ -46,7 +50,6 @@ import {
   nextDialogueId,
   portraitDrawable,
   removeDialogue,
-  renameDialogue,
 } from "./registries";
 
 /** What the file dialog offers for each of the two clips. The engine reads more
@@ -82,13 +85,9 @@ async function dropClip(scenarioId: string, file: string): Promise<void> {
 export function DialoguePanel({
   scenario,
   onChange,
-  extensions,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
-  /** The types the scenario's game declares, so a rename carries over a
-   *  reference one of its own parameters holds (issue #913). */
-  extensions: ExtensionTypes;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -150,7 +149,6 @@ export function DialoguePanel({
               key={selected.id}
               line={selected}
               scenario={scenario}
-              extensions={extensions}
               onChange={onChange}
               onSelect={setSelectedId}
             />
@@ -199,17 +197,15 @@ function DialogueRow({
   );
 }
 
-/** The selected line: its name, who says it, what they say, and its clips. */
+/** The selected line: its id, who says it, what they say, and its clips. */
 function DialogueForm({
   line,
   scenario,
-  extensions,
   onChange,
   onSelect,
 }: {
   line: ScenarioDialogue;
   scenario: Scenario;
-  extensions: ExtensionTypes;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
 }) {
@@ -258,17 +254,11 @@ function DialogueForm({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <NameField
-          name={line.id}
-          label="Dialogue line name"
-          onRename={(wanted) => {
-            const next = renameDialogue(scenario, line.id, wanted, extensions);
-            if (next === scenario) return false;
-            onChange(next);
-            onSelect(wanted.trim());
-            return true;
-          }}
-        />
+        {/* Read only. The mission problems list names a line by this, so it is
+            worth being able to read, and nothing moves it (issue #2248). */}
+        <span className="font-mono text-xs text-muted-foreground">
+          {line.id}
+        </span>
         <TextField
           value={line.speaker}
           label="Speaker"

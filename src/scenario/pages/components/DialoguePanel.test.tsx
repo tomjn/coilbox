@@ -22,7 +22,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { NO_EXTENSIONS } from "../../extensions";
 import type { Scenario, ScenarioDialogue, ScenarioTrigger } from "../../model";
 import { DialoguePanel } from "./DialoguePanel";
 import {
@@ -104,7 +103,6 @@ function PanelHarness({
           setHistory(recordEdit(history, document, next));
           setDocument(next);
         }}
-        extensions={NO_EXTENSIONS}
       />
       <button
         type="button"

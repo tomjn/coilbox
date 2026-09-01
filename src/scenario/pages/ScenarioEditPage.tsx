@@ -542,16 +542,8 @@ export default function ScenarioEditPage() {
           picking={pick}
           onPick={setPick}
         />
-        <ObjectivePanel
-          scenario={scenario}
-          onChange={(next) => apply(next)}
-          extensions={extensions}
-        />
-        <DialoguePanel
-          scenario={scenario}
-          onChange={(next) => apply(next)}
-          extensions={extensions}
-        />
+        <ObjectivePanel scenario={scenario} onChange={(next) => apply(next)} />
+        <DialoguePanel scenario={scenario} onChange={(next) => apply(next)} />
         <RestrictionPanel
           scenario={scenario}
           onChange={(next) => apply(next)}
