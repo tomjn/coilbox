@@ -1,5 +1,5 @@
 import { Button, Drawer, Input, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, Rocket, TriangleAlert } from "lucide-react";
+import { ArrowLeft, FileCode2, Rocket, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +27,7 @@ import {
   redoEdit,
   undoEdit,
 } from "./components/history";
+import { MissionLuaView } from "./components/MissionLuaView";
 import { MissionProblemsList } from "./components/MissionProblemsList";
 import { ObjectivePanel } from "./components/ObjectivePanel";
 import { orderPathId } from "./components/orderPaths";
@@ -105,6 +106,7 @@ export default function ScenarioEditPage() {
     problems.warnings.length,
   );
   const [showProblems, setShowProblems] = useState(false);
+  const [showLua, setShowLua] = useState(false);
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
   // Both are also held in refs, because an edit and a step through the history
   // read them at the moment they happen rather than at the last render: two
@@ -280,6 +282,16 @@ export default function ScenarioEditPage() {
                 <TriangleAlert className="size-4" /> {problemCount}
               </Button>
             ) : null}
+            {/* The file the engine is handed, beside the problems found in it:
+              an author who has read a problem and does not believe it reads the
+              mission next (issue #2163). */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowLua(true)}
+            >
+              <FileCode2 className="size-4" /> Mission Lua
+            </Button>
             {/* Testing belongs with the setup, because the setup is all a launch
               consumes: the game named there decides whether the scenario is
               played as itself or through the test mutator. */}
@@ -299,6 +311,18 @@ export default function ScenarioEditPage() {
           width="32rem"
         >
           <MissionProblemsList problems={problems} />
+        </Drawer>
+
+        {/* Controlled for the same reason: the compiled mission is recompiled
+          from the document on every edit, so an author can leave this open and
+          watch a change land in the file. */}
+        <Drawer
+          open={showLua}
+          onOpenChange={setShowLua}
+          title={`${scenario.name} as mission.lua`}
+          width="44rem"
+        >
+          <MissionLuaView scenario={scenario} />
         </Drawer>
 
         {error && <ErrorBanner message={error} />}
