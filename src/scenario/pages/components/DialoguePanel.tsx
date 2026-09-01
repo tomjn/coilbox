@@ -97,7 +97,7 @@ export function DialoguePanel({
 
   const count = scenario.dialogue.length;
   const create = () => {
-    const id = nextDialogueId(scenario.dialogue);
+    const id = nextDialogueId(scenario);
     onChange(addDialogue(scenario, id));
     setSelectedId(id);
   };

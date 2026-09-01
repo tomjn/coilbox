@@ -83,6 +83,31 @@ describe("scenario fixture corpus", () => {
       );
       expect(emitted).toBe(golden);
     });
+
+    /**
+     * Issue #2250 changed how a new id is minted. Every scenario already
+     * written keeps the ids it has: a trigger, an objective and a dialogue line
+     * are all addressed by id in the compiled mission and pointed at by id from
+     * another trigger, so moving one would break a document that plays today.
+     *
+     * The checked-in Lua above is the same guarantee in bytes. This says it in
+     * the terms the bug is about, so a change that reads a document differently
+     * fails here by name rather than as a diff in a 400-line file.
+     */
+    it(`${file} keeps every id the document was written with`, () => {
+      const raw = JSON.parse(readFileSync(join(FIXTURES_DIR, file), "utf8"));
+      const ids = (list: unknown) =>
+        (list as { id: string }[]).map((entry) => entry.id);
+
+      expect(ids(scenario.triggers)).toEqual(ids(raw.triggers));
+      expect(ids(scenario.objectives)).toEqual(ids(raw.objectives ?? []));
+      expect(ids(scenario.dialogue)).toEqual(ids(raw.dialogue ?? []));
+
+      // The high water mark #2250 added is written when something is deleted,
+      // so a document nothing has been removed from gains no key by being
+      // read and saved.
+      expect("idCounters" in JSON.parse(JSON.stringify(scenario))).toBe(false);
+    });
   }
 
   /**

@@ -105,7 +105,7 @@ export function TriggerPanel({
 
   const count = scenario.triggers.length;
   const create = () => {
-    const id = nextTriggerId(scenario.triggers);
+    const id = nextTriggerId(scenario);
     onChange(addTrigger(scenario, id));
     setSelectedId(id);
   };
