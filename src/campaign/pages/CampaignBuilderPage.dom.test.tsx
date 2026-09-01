@@ -8,6 +8,8 @@
  * until they hover it (issue #2203), and a bundled campaign offered an Edit it
  * must never have. All three are pinned here, against the real menu rather than
  * a stand-in for it.
+ *
+ * What the row says about the campaign is at the foot of the file (issue #2187).
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -50,17 +52,30 @@ const { save } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save, open: vi.fn() }));
 
 vi.mock("../../play/config", () => ({ usePreferredTarget: () => ({}) }));
-vi.mock("../../content/config", () => ({ useUnitsyncScan: () => ({}) }));
+// The rendered minimaps a row falls back to when a campaign has no emblem. The
+// real batch comes off the unitsync worker, so the tests put maps in here
+// directly and every row reads the same map the app would have handed it.
+const { thumbs } = vi.hoisted(() => ({
+  thumbs: new Map<string, { url: string; width: number; height: number }>(),
+}));
+vi.mock("../../content/config", () => ({
+  useUnitsyncScan: () => ({}),
+  useUnitsyncThumbnails: () => ({ thumbs, loading: false }),
+}));
 // The emblem resolves its image through the plugin, and bears on nothing here.
 vi.mock("./components/CampaignImage", () => ({
   CampaignIconBox: () => <div data-testid="icon" />,
 }));
 
 import type { LoadedCampaign } from "../campaigns";
-import type { Campaign } from "../model";
+import type { Campaign, CampaignMission } from "../model";
 import CampaignBuilderPage from "./CampaignBuilderPage";
 
-function campaignNamed(id: string, title: string): Campaign {
+function campaignNamed(
+  id: string,
+  title: string,
+  extra: Partial<Campaign> = {},
+): Campaign {
   return {
     schemaVersion: 1,
     id,
@@ -70,8 +85,26 @@ function campaignNamed(id: string, title: string): Campaign {
     missions: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    ...extra,
   };
 }
+
+/** A mission carrying only the snapshot fields a row reads. */
+function mission(gameName: string, mapName: string): CampaignMission {
+  return {
+    id: `${gameName}-${mapName}`,
+    title: "M",
+    briefing: "",
+    objectives: [],
+    snapshot: { gameName, mapName } as CampaignMission["snapshot"],
+    disabledUnits: [],
+    skippable: false,
+  };
+}
+
+/** An ISO stamp the row will read back as a relative time. */
+const hoursAgo = (h: number) =>
+  new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
 
 const local: LoadedCampaign = {
   campaign: campaignNamed("beachhead", "Beachhead"),
@@ -90,7 +123,7 @@ function show(campaigns: LoadedCampaign[]) {
     error: null,
     refresh: async () => {},
   });
-  render(
+  return render(
     <MemoryRouter initialEntries={["/campaign-builder"]}>
       <Routes>
         <Route path="/campaign-builder" element={<CampaignBuilderPage />} />
@@ -115,6 +148,7 @@ function openMenuByKeyboard(name: string) {
 afterEach(() => {
   cleanup();
   opened.length = 0;
+  thumbs.clear();
   vi.clearAllMocks();
 });
 
@@ -210,5 +244,109 @@ describe("a bundled campaign's row", () => {
     expect(
       screen.getByRole("link", { name: /Tutorial/ }).getAttribute("href"),
     ).toBe("/campaign-builder/tutorial");
+  });
+});
+
+/**
+ * What a row says about the campaign (issue #2187). The sentence itself is a
+ * plain unit test in `listing.test.ts`. What is pinned here is that the row
+ * shows it, that the description only takes a line when there is one, and that
+ * none of it added a second thing to tab to.
+ */
+describe("what a campaign row says", () => {
+  const beachhead: LoadedCampaign = {
+    campaign: campaignNamed("beachhead", "Beachhead", {
+      missions: [mission("BAR", "Comet Catcher"), mission("BAR", "Isis")],
+      updatedAt: hoursAgo(2),
+    }),
+    source: "local",
+  };
+
+  it("names the game, the size and the last edit", () => {
+    show([beachhead]);
+
+    expect(screen.getByText("BAR · 2 missions · edited 2h ago")).toBeTruthy();
+  });
+
+  it("shows the description, on one truncated line", () => {
+    show([
+      {
+        campaign: campaignNamed("beachhead", "Beachhead", {
+          description: "Hold the landing zone until the second wave lands.",
+        }),
+        source: "local",
+      },
+    ]);
+
+    const line = screen.getByText(
+      "Hold the landing zone until the second wave lands.",
+    );
+    expect(line.className).toMatch(/truncate/);
+  });
+
+  it("gives a campaign with no description no line to hold it", () => {
+    show([beachhead]);
+
+    expect(screen.getByRole("link", { name: /Beachhead/ }).textContent).toBe(
+      "BeachheadBAR · 2 missions · edited 2h ago",
+    );
+  });
+
+  it("draws the first mission's map when there is no emblem", () => {
+    thumbs.set("Comet Catcher", {
+      url: "data:image/png;base64,comet",
+      width: 8,
+      height: 8,
+    });
+    const { container } = show([beachhead]);
+
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "data:image/png;base64,comet",
+    );
+    expect(screen.queryByTestId("icon")).toBeNull();
+  });
+
+  it("keeps the emblem when the campaign has one, map or no map", () => {
+    thumbs.set("Comet Catcher", {
+      url: "data:image/png;base64,comet",
+      width: 8,
+      height: 8,
+    });
+    show([
+      {
+        campaign: {
+          ...beachhead.campaign,
+          icon: { kind: "file", file: "icon.png" },
+        },
+        source: "local",
+      },
+    ]);
+
+    expect(screen.getByTestId("icon")).toBeTruthy();
+  });
+
+  // A map this machine does not have renders nothing, so the row falls back to
+  // the campaign glyph rather than showing an empty box where a picture was.
+  it("falls back to the emblem box when the map cannot be drawn", () => {
+    const { container } = show([beachhead]);
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByTestId("icon")).toBeTruthy();
+  });
+
+  // Everything added here is text and a picture inside the row's own link. A
+  // second tab stop in a row is a list a keyboard has to walk twice.
+  it("adds nothing inside the row link that takes focus", () => {
+    thumbs.set("Comet Catcher", {
+      url: "data:image/png;base64,comet",
+      width: 8,
+      height: 8,
+    });
+    show([beachhead]);
+
+    const link = screen.getByRole("link", { name: /Beachhead/ });
+    expect(
+      link.querySelectorAll("a, button, input, select, textarea, [tabindex]"),
+    ).toHaveLength(0);
   });
 });

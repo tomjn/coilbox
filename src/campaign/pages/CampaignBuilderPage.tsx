@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
-import { useUnitsyncScan } from "../../content/config";
+import { useUnitsyncScan, useUnitsyncThumbnails } from "../../content/config";
 import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
   EmptyState,
@@ -26,6 +26,7 @@ import {
 } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { inlineCampaignImages, materializeCampaignImages } from "../images";
+import { campaignSummary } from "../listing";
 import type { Campaign } from "../model";
 import {
   collectCampaignScenarioMedia,
@@ -37,8 +38,8 @@ import {
   parseCampaignExport,
   wrapCampaignForExport,
 } from "../transfer";
-import { CampaignIconBox } from "./components/CampaignImage";
 import { CampaignRowMenu } from "./components/CampaignRowMenu";
+import { CampaignRowThumb } from "./components/CampaignRowThumb";
 
 /** Every game+map a campaign's missions need installed, deduped by the shared
  * gate itself (#387) — a campaign with several missions on one game only
@@ -55,6 +56,11 @@ function requirementsForCampaign(campaign: Campaign) {
  * every stored campaign. Every row opens the campaign. A local one also carries a
  * menu of Edit, Export and Delete, and a bundled one carries a badge and lands on
  * the editor's read-only view. Advanced-gated by its route.
+ *
+ * A row says what an author needs to tell two campaigns apart while scanning the
+ * list (issue #2187): the emblem or the first mission's map, the title, the game
+ * the missions are on, how many there are, when it was last written, and the
+ * description. `listing.ts` works out the sentence, so the row only lays it out.
  */
 export default function CampaignBuilderPage() {
   const { campaigns, loading, error, refresh } = useCampaigns();
@@ -104,6 +110,12 @@ export default function CampaignBuilderPage() {
   // Read only for the modinfo shortname an export records beside the game's
   // archive name (issue #1335).
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  // One batch of rendered minimaps for the whole list, session cached and
+  // already primed at startup, rather than a render per row (issue #2177).
+  const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
+    target?.enginePath,
+    target?.dataDir,
+  );
 
   // Mint a fresh id so importing never collides with an existing campaign,
   // materialize every inlined (data-URI) image (icon, background and each
@@ -256,11 +268,12 @@ export default function CampaignBuilderPage() {
                   to={`/campaign-builder/${campaign.id}`}
                   className="flex min-w-0 flex-1 items-center gap-3"
                 >
-                  <CampaignIconBox
-                    campaignId={campaign.id}
-                    icon={campaign.icon}
+                  <CampaignRowThumb
+                    campaign={campaign}
+                    thumbs={thumbs}
+                    loading={thumbsLoading}
                   />
-                  <div className="flex min-w-0 flex-col gap-0.5">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium">
                         {campaign.title}
@@ -271,10 +284,16 @@ export default function CampaignBuilderPage() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {campaign.missions.length} mission
-                      {campaign.missions.length === 1 ? "" : "s"}
+                    <span className="truncate text-xs text-muted-foreground">
+                      {campaignSummary(campaign)}
                     </span>
+                    {/* Only when the author wrote one. An empty line here would
+                        be a row that is taller for having said nothing. */}
+                    {campaign.description && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {campaign.description}
+                      </span>
+                    )}
                   </div>
                 </Link>
                 {/* A bundled campaign gets no menu because it may do none of
