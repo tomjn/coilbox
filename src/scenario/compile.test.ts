@@ -346,6 +346,106 @@ describe("compileScenario", () => {
   });
 });
 
+/**
+ * Issue #2164. The whole feature is additive or it is a migration, and the
+ * checked-in `fixtures/missions/*.lua` in `corpus.test.ts` is the other half of
+ * this proof: five documents that name no difficulty still compile to the exact
+ * bytes they did before difficulty existed.
+ */
+describe("difficulty", () => {
+  /** Every registry a range can sit on, with nothing said about difficulty. */
+  const populated = {
+    actors: [
+      { id: "a1", unitDef: "armcom", team: "p0", pos: { x: 100, z: 100 } },
+    ],
+    groups: [
+      {
+        id: "g1",
+        team: "p0",
+        units: [{ def: "armpw", count: 2 }],
+        pos: { x: 200, z: 200 },
+        orders: [],
+      },
+    ],
+    blueprints: [
+      {
+        id: "bp1",
+        name: "Keep",
+        buildings: [{ def: "armlab", offset: { x: 0, z: 0 } }],
+      },
+    ],
+    bases: [
+      { id: "b1", blueprint: "bp1", team: "p0", origin: { x: 300, z: 300 } },
+    ],
+    triggers: [{ id: "t1", actions: [] }],
+  };
+
+  it("says nothing about a document that names no difficulty", () => {
+    expect(compileScenario(build(populated))).not.toContain("difficulty");
+  });
+
+  it("emits the range on an actor, a group, a base and a trigger", () => {
+    const range = { difficulty: { atLeast: "hard" } };
+    const emitted = compileScenario(
+      build({
+        actors: [{ ...populated.actors[0], ...range }],
+        groups: [{ ...populated.groups[0], ...range }],
+        blueprints: populated.blueprints,
+        bases: [{ ...populated.bases[0], ...range }],
+        triggers: [{ ...populated.triggers[0], ...range }],
+      }),
+    );
+
+    expect(emitted.match(/difficulty = \{ atLeast = "hard" \}/g)).toHaveLength(
+      4,
+    );
+  });
+
+  it("emits both ends of a range that has both", () => {
+    const emitted = compileScenario(
+      build({
+        actors: [
+          {
+            ...populated.actors[0],
+            difficulty: { atMost: "normal", atLeast: "easy" },
+          },
+        ],
+      }),
+    );
+
+    expect(emitted).toContain(
+      'difficulty = { atLeast = "easy", atMost = "normal" }',
+    );
+  });
+
+  // A level this build has never heard of is dropped rather than written out,
+  // so the runtime never reads a bound it cannot rank.
+  it("drops a bound that is not a difficulty", () => {
+    const emitted = compileScenario(
+      build({
+        actors: [
+          {
+            ...populated.actors[0],
+            difficulty: { atLeast: "nightmare", atMost: "hard" },
+          },
+        ],
+      }),
+    );
+
+    expect(emitted).toContain('difficulty = { atMost = "hard" }');
+  });
+
+  // An empty range and no range are the same thing, and they have to compile
+  // the same way or a document that says nothing stops being byte-identical.
+  it("treats a range with no bounds as no range", () => {
+    expect(
+      compileScenario(
+        build({ actors: [{ ...populated.actors[0], difficulty: {} }] }),
+      ),
+    ).toBe(compileScenario(build({ actors: populated.actors })));
+  });
+});
+
 describe("missionPath", () => {
   it("puts a mission in its own folder under missions/", () => {
     expect(missionPath("abc-123")).toBe("missions/abc-123/mission.lua");

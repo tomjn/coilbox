@@ -25,7 +25,12 @@ import {
   runtimeCapabilities,
 } from "./capabilities";
 import type { ScenarioRoute } from "./launch";
-import { amountVar, SCENARIO_RUNTIME_VERSION, type Scenario } from "./model";
+import {
+  amountVar,
+  SCENARIO_RUNTIME_VERSION,
+  type Scenario,
+  usesDifficulty,
+} from "./model";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -112,6 +117,14 @@ function asksForAnUncontestedHold(scenario: Scenario): boolean {
   );
 }
 
+/**
+ * The runtime that first read a difficulty range (issue #2164). A runtime behind
+ * this ignores every range and plays the hard version of the mission at every
+ * setting, which is worse than refusing: the player asked for easy and got the
+ * extra turrets anyway.
+ */
+const DIFFICULTY_VERSION = 6;
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -182,6 +195,9 @@ export function requiredRuntimeVersion(
   }
   if (asksForAnUncontestedHold(scenario)) {
     version = Math.max(version, UNCONTESTED_HOLD_VERSION);
+  }
+  if (usesDifficulty(scenario)) {
+    version = Math.max(version, DIFFICULTY_VERSION);
   }
   return version;
 }

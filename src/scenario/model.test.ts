@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { baseBuildings, parseScenario, parseScenarioJson } from "./model";
+import {
+  baseBuildings,
+  DIFFICULTIES,
+  type DifficultyRange,
+  difficultyApplies,
+  parseScenario,
+  parseScenarioJson,
+  usesDifficulty,
+} from "./model";
 
 /** A minimal valid scenario document, with extra top-level fields spread in. */
 function doc(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -979,5 +987,150 @@ describe("parseScenario — round trip", () => {
     );
     expect(first).not.toBeNull();
     expect(parseScenarioJson(JSON.stringify(first))).toEqual(first);
+  });
+});
+
+/** Issue #2164. */
+describe("parseScenario — difficulty ranges", () => {
+  const actor = {
+    id: "a1",
+    unitDef: "corllt",
+    team: "p0",
+    pos: { x: 10, z: 20 },
+  };
+
+  const rangeOf = (difficulty: unknown) =>
+    parseScenario(doc({ actors: [{ ...actor, difficulty }] }))?.actors[0]
+      .difficulty;
+
+  it("keeps either bound, or both", () => {
+    expect(rangeOf({ atLeast: "hard" })).toEqual({ atLeast: "hard" });
+    expect(rangeOf({ atMost: "normal" })).toEqual({ atMost: "normal" });
+    expect(rangeOf({ atLeast: "easy", atMost: "normal" })).toEqual({
+      atLeast: "easy",
+      atMost: "normal",
+    });
+  });
+
+  // A bound this build cannot rank would otherwise reach the runtime, which
+  // cannot rank it either and would read the thing as always present.
+  it("drops a bound that is not one of the difficulties", () => {
+    expect(rangeOf({ atLeast: "nightmare", atMost: "hard" })).toEqual({
+      atMost: "hard",
+    });
+  });
+
+  // The field has to stay absent rather than present and empty: an empty table
+  // in the document is an empty table in the compiled mission, and a document
+  // that asks for nothing has to compile to the bytes it always did.
+  it("leaves the field off when the range says nothing", () => {
+    for (const said of [{}, { atLeast: "nightmare" }, "hard", 3, null]) {
+      expect(rangeOf(said)).toBeUndefined();
+    }
+    expect(parseScenario(doc({ actors: [actor] }))?.actors[0].difficulty).toBe(
+      undefined,
+    );
+  });
+
+  it("reads one on a group, a base and a trigger too", () => {
+    const s = parseScenario(
+      doc({
+        groups: [
+          {
+            id: "g1",
+            team: "p0",
+            units: [{ def: "armpw", count: 1 }],
+            pos: { x: 1, z: 1 },
+            difficulty: { atLeast: "hard" },
+          },
+        ],
+        blueprints: [
+          {
+            id: "bp1",
+            name: "Outpost",
+            buildings: [{ def: "corllt", offset: { x: 0, z: 0 } }],
+          },
+        ],
+        bases: [
+          {
+            id: "b1",
+            blueprint: "bp1",
+            team: "p0",
+            origin: { x: 5, z: 5 },
+            difficulty: { atMost: "easy" },
+          },
+        ],
+        triggers: [
+          {
+            id: "t1",
+            conditions: { op: "all", conditions: [] },
+            actions: [],
+            difficulty: { atLeast: "normal" },
+          },
+        ],
+      }),
+    );
+
+    expect(s?.groups[0].difficulty).toEqual({ atLeast: "hard" });
+    expect(s?.bases[0].difficulty).toEqual({ atMost: "easy" });
+    expect(s?.triggers[0].difficulty).toEqual({ atLeast: "normal" });
+  });
+});
+
+describe("difficultyApplies", () => {
+  it("says yes to everything with no range", () => {
+    for (const level of DIFFICULTIES) {
+      expect(difficultyApplies(undefined, level)).toBe(true);
+      expect(difficultyApplies({}, level)).toBe(true);
+    }
+  });
+
+  it("reads both bounds inclusively", () => {
+    const at = (range: DifficultyRange) =>
+      DIFFICULTIES.filter((level) => difficultyApplies(range, level));
+
+    expect(at({ atLeast: "normal" })).toEqual(["normal", "hard"]);
+    expect(at({ atMost: "normal" })).toEqual(["easy", "normal"]);
+    expect(at({ atLeast: "normal", atMost: "normal" })).toEqual(["normal"]);
+  });
+
+  // An author can write a range that excludes every level. It is theirs to fix,
+  // and the mission validator says so, but it must not read as "always".
+  it("says no everywhere for a range that crosses itself", () => {
+    expect(
+      DIFFICULTIES.filter((level) =>
+        difficultyApplies({ atLeast: "hard", atMost: "easy" }, level),
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("usesDifficulty", () => {
+  const parsed = (extra: Record<string, unknown>) => {
+    const scenario = parseScenario(doc(extra));
+    if (!scenario) throw new Error("fixture does not parse");
+    return scenario;
+  };
+
+  it("is false for a document that never mentions it", () => {
+    expect(usesDifficulty(parsed({ actors: [] }))).toBe(false);
+  });
+
+  it("is true as soon as one thing has a range", () => {
+    expect(
+      usesDifficulty(
+        parsed({
+          actors: [
+            {
+              id: "a1",
+              unitDef: "corllt",
+              team: "p0",
+              pos: { x: 1, z: 1 },
+              difficulty: { atLeast: "hard" },
+            },
+          ],
+        }),
+      ),
+    ).toBe(true);
   });
 });
