@@ -22,6 +22,7 @@ import { parseColor } from "./proceduralArt";
 export function useThemeColor(): string {
   const { accent, base, resolved } = useTheme();
   const [color, setColor] = useState(readThemeColor);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the theme axes are the trigger, not inputs. The effect reads the document, and these are the three things whose change makes that read come out different.
   useEffect(() => {
     // No frame callback outside a browser (tests): read in the effect itself.
     if (typeof requestAnimationFrame !== "function") {
