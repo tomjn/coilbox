@@ -63,6 +63,8 @@ A scenario's dialogue clips stay in coilbox's own store rather than inside the m
 
 An export carries every attached scenario and its dialogue clips, and import writes the clips back. See [Export / import](#export--import). **Bundling is the gap**: a bundled campaign carries its scenarios but not their portraits and voice clips, so its radio messages play silent ([issue #877](https://github.com/tomjn/coilbox/issues/877)).
 
+A scenario can vary by difficulty, and then the player picks a level on the mission's briefing. The choice is the campaign run's, not the mission's: it holds for every mission after it until the player changes it, and it is saved with their progress, so a bundled campaign nobody can edit is still playable at every level. See [Difficulty](scenarios.md#difficulty).
+
 Which game can play a scenario mission, and what a game has to do to play one itself, is [the mission runtime's](mission-runtime.md) business rather than the campaign's.
 
 ## Export / import

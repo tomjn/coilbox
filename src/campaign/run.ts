@@ -23,9 +23,16 @@ import {
 } from "../play/detect";
 import { usePlay } from "../play/PlayProvider";
 import { launchScenario } from "../scenario/launch";
+import { type Difficulty, usesDifficulty } from "../scenario/model";
 import { useCampaignProgress } from "./campaigns";
 import type { Campaign, CampaignMission } from "./model";
-import { applyDefeat, applyVictory, nextAvailableMission } from "./results";
+import {
+  applyDefeat,
+  applyVictory,
+  chooseDifficulty,
+  nextAvailableMission,
+  runDifficulty,
+} from "./results";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
 
 /* -------------------------------------------------------------------------- *
@@ -150,6 +157,14 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         ? { kind: "map", name: snapshot.mapName }
         : null;
 
+  // How hard to play it (issue #2220). The level is the run's, held in progress
+  // so it carries from one mission to the next, and offered only on a mission
+  // whose scenario actually varies by it: a picker that changes nothing about
+  // the mission in front of the player is a picker worth leaving out.
+  const variesByDifficulty =
+    !!mission.scenario && usesDifficulty(mission.scenario);
+  const difficulty = runDifficulty(progress, campaign.id);
+
   const noEngine = !targetLoading && !target;
   const scanLoading = !!target && !scanReady && scan.loading;
   const canStart =
@@ -244,6 +259,12 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
             mission.scenario.setup.mapName,
           ),
           disabledUnits: mission.disabledUnits,
+          // The run's level, by the one route a scenario's difficulty ever
+          // reaches the engine: `launchScenario` writes the `coilbox_difficulty`
+          // modoption. Left out for a mission that does not vary by it, and for
+          // a run nobody has chosen a level for, so both produce the start
+          // script they always did.
+          difficulty: variesByDifficulty ? difficulty : undefined,
           rescan: async () =>
             (await primeScan(target.enginePath, target.dataDir, true)).games,
           launch: startEngine,
@@ -338,7 +359,27 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     campaign.id,
     mission.id,
     setProvenance,
+    variesByDifficulty,
+    difficulty,
   ]);
+
+  /**
+   * Set the difficulty for this campaign run. It is the run's rather than this
+   * mission's, so it holds for every mission after this one until it is changed
+   * again, which is what lets a player stuck on mission 4 drop the level and
+   * carry on.
+   */
+  const setDifficulty = useCallback(
+    async (level: Difficulty) => {
+      setError(null);
+      try {
+        await save(chooseDifficulty(progress, campaign.id, level));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [save, progress, campaign.id],
+  );
 
   const recordVictory = useCallback(
     () => applyResult("victory", false),
@@ -377,6 +418,11 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     saving,
     autoDetected,
     nextMission,
+    /** Whether this mission plays differently at different difficulties. */
+    variesByDifficulty,
+    /** The run's chosen level, or undefined when nobody has chosen one. */
+    difficulty,
+    setDifficulty,
     start,
     recordVictory,
     recordDefeat,
