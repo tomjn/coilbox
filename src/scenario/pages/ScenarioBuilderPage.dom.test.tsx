@@ -13,7 +13,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Campaign } from "../../campaign/model";
 
 // The drawer is the app shell's, so it is stubbed down to what opened in it.
@@ -180,6 +180,17 @@ function openMenuByKeyboard(name: string) {
   fireEvent.keyDown(trigger, { key: "Enter" });
   return screen.getAllByRole("menuitem").map((item) => item.textContent);
 }
+
+// The Share menu item loads its form with a dynamic import. In the shipped app
+// that fetches a built chunk. In a test it is Vite transforming the form's whole
+// module graph on demand, which measured 722ms on this machine against the
+// 1000ms budget `vi.waitFor` gives the share test below. Under the full suite
+// running in parallel it went over that budget and the test failed at random
+// (issue #2215). Paying it here leaves the wait covering the drawer opening and
+// nothing else.
+beforeAll(async () => {
+  await import("./components/ShareScenarioForm");
+});
 
 afterEach(() => {
   cleanup();
