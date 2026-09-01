@@ -234,7 +234,7 @@ check("and running its orders", state.groups.isAwake("standing") == true)
 
 check("a dormant group is not on the map at the start", #state.groups.units("wave") == 0)
 check("a group whose team the mission has no engine team for is reported",
-	logged(engine, "group lost belongs to team nobody"))
+	logged(engine, "error: group lost belongs to team nobody"))
 
 --------------------------------------------------------------------------------
 -- Orders. A move is one command per waypoint, a patrol is one per waypoint too,
@@ -331,6 +331,10 @@ check("an attack on a group is one command per unit in it",
 playTo(195)
 check("an action naming a group the mission does not have is reported",
 	logged(engine, "no group named phantom"))
+-- Issue #2165: the action did nothing, so Error is what says so. A warning sits
+-- among the engine's own routine ones and reads as noise.
+check("at Error, because the action did nothing at all",
+	logged(engine, "error: no group named phantom"))
 check("an order kind this runtime has no meaning for is reported",
 	logged(engine, "no implementation for order dance"))
 
@@ -455,7 +459,7 @@ check("while the units themselves are untouched, on the map and on their team",
 
 state.groups.orders("reserve", { { kind = "move", waypoints = { { x = 5, z = 5 } } } })
 check("so an order aimed at it afterwards reaches nothing, and says so",
-	logged(engine, "group reserve has no units on the map to order"))
+	logged(engine, "error: group reserve has no units on the map to order"))
 
 state.groups.spawn("reserve")
 local respawned = state.groups.units("reserve")
@@ -478,7 +482,7 @@ check("and the mission is holding none of it either", #state.groups.units("loane
 
 state.groups.release("loaned")
 check("releasing a group the mission is already holding none of says so",
-	logged(engine, "group loaned has no units on the map to release"))
+	logged(engine, "error: group loaned has no units on the map to release"))
 
 --------------------------------------------------------------------------------
 -- Groups are synced only.

@@ -382,6 +382,12 @@ if gadgetHandler:IsSyncedCode() then
 	-- Spring.CreateUnit raises on a unit def the game does not have. A scenario
 	-- built against a different version of the game is the likely cause, and one
 	-- missing unit should not take the whole mission down with it.
+	--
+	-- It also answers nil without raising, for a team that is already at its unit
+	-- limit and for a position the loader would not put a unit on. That is the
+	-- refusal worth saying most: the mission plays, the engine exits cleanly, and
+	-- the only difference between it and a mission whose author placed nothing
+	-- there is this line (issue #2165).
 	local function create(placement)
 		local x, y, z = groundAt(placement)
 		spawning = true
@@ -392,6 +398,12 @@ if gadgetHandler:IsSyncedCode() then
 		if not ok then
 			log("error", string.format(
 				"could not spawn %s: %s", tostring(placement.unitDef), tostring(unitID)))
+			return nil
+		end
+		if not unitID then
+			log("error", string.format(
+				"the engine refused to spawn %s for team %s at %g,%g, so it is not on the map",
+				tostring(placement.unitDef), tostring(placement.team), x, z))
 			return nil
 		end
 		return unitID

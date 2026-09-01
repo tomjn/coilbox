@@ -84,10 +84,14 @@ function M.register(engine, state, hooks)
 	end
 
 	--- The group a params table names, or nil once it has said so.
+	--
+	-- Error rather than warning: the action did nothing at all, and a mission
+	-- whose squad never arrives looks the same from outside as one that never had
+	-- a squad. The level is what a reader can filter the log on (issue #2165).
 	local function groupOfName(name)
 		local group = groups[name]
 		if not group then
-			engine:report("group:" .. tostring(name), "warning",
+			engine:report("group:" .. tostring(name), "error",
 				"no group named " .. tostring(name) .. ", ignoring it")
 		end
 		return group
@@ -209,7 +213,9 @@ function M.register(engine, state, hooks)
 
 		local team = engineTeam[group.team]
 		if not team then
-			engine:report("group-team:" .. tostring(group.id), "warning", string.format(
+			-- Nothing at all is placed for this group, so it is an error rather
+			-- than a warning: the map is short a squad and the run ends cleanly.
+			engine:report("group-team:" .. tostring(group.id), "error", string.format(
 				"group %s belongs to team %s, which the mission has no engine team for",
 				tostring(group.id), tostring(group.team)))
 			return
@@ -233,12 +239,14 @@ function M.register(engine, state, hooks)
 	end
 
 	--- Say once that an action was aimed at a group with nothing on the map. Not
-	-- fatal, but it is what a mission that forgot its spawn_group looks like.
+	-- fatal, but it is what a mission that forgot its spawn_group looks like, and
+	-- that mission exits with code 0 having done nothing anybody can see. Error,
+	-- so the level carries it (issue #2165).
 	local function requireUnits(group, what)
 		if #members[group.id] > 0 then
 			return true
 		end
-		engine:report("group-empty:" .. tostring(group.id) .. ":" .. what, "warning",
+		engine:report("group-empty:" .. tostring(group.id) .. ":" .. what, "error",
 			"group " .. tostring(group.id) .. " has no units on the map to " .. what)
 		return false
 	end

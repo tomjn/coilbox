@@ -196,7 +196,25 @@ check("a team with no stated income gets none", engine.income[1] == nil)
 local missing = { startPositions = OPTIONS.startPositions, ground = OPTIONS.ground, defs = { armcom = true } }
 engine = started(missing)
 check("a unit def the game does not have is reported", logged(engine, "could not spawn corkrog"))
+check("and at Error, which is the level a reader filters the log on",
+	logged(engine, "error: could not spawn corkrog"))
 check("the rest of the mission still spawns", engine.GG.CoilboxMission.units.hero ~= nil)
+
+-- Issue #2165. The engine also answers nil without raising, for a team at its
+-- unit limit or a position it will not place on. That used to be the one refusal
+-- the runtime made in silence, and it is the one that reads as "the author
+-- placed nothing here": the mission plays and the engine exits with code 0.
+local refused = {
+	startPositions = OPTIONS.startPositions,
+	ground = OPTIONS.ground,
+	refuses = { corkrog = true },
+}
+engine = started(refused)
+check("a spawn the engine refuses without raising is reported",
+	logged(engine, "error: the engine refused to spawn corkrog"))
+check("and says where it would have gone", logged(engine, "at 900,800"))
+check("the actor is not on the map", engine.GG.CoilboxMission.units.boss == nil)
+check("and the rest of the mission still spawns", engine.GG.CoilboxMission.units.hero ~= nil)
 
 --------------------------------------------------------------------------------
 -- The unsynced half.

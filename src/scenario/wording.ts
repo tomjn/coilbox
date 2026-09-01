@@ -214,3 +214,39 @@ export function missionProblemsLookWrong(count: number): string {
   const things = count === 1 ? "One thing" : `${count} things`;
   return `${things} ${count === 1 ? "plays" : "play"}, and ${count === 1 ? "reads" : "read"} to a player as a bug:`;
 }
+
+/* -------------------------------------------------------------------------- *
+ * What the engine's log said about a test run (issue #2165).
+ *
+ * No reader parameter, for the same reason as the block above: a player who has
+ * just finished a mission does not want a log. These sentences are about a run
+ * that has already happened, and a run that ended cleanly is exactly when they
+ * are worth reading, because a mission that spawned nothing exits with code 0.
+ * -------------------------------------------------------------------------- */
+
+/** The lead-in to what the mission runtime itself reported while it played. */
+export function missionRuntimeProblems(count: number): string {
+  return `The mission runtime reported ${plural(count, "problem")} while it played:`;
+}
+
+/** The lead-in to the engine's own errors and warnings from the same run. */
+export function engineRunProblems(count: number): string {
+  return count === 1
+    ? "The engine logged one error or warning of its own during the run:"
+    : `The engine logged ${count} errors and warnings of its own during the run:`;
+}
+
+/**
+ * What a run with nothing from the runtime in it means, which is the whole
+ * point of reading the log. Silence from the runtime is an answer: it placed
+ * everything it was asked to, so anything missing from the map was never in the
+ * document.
+ */
+export function missionRuntimeSaidNothing(): string {
+  return "The mission runtime reported nothing, so everything the scenario asked for reached the map.";
+}
+
+/** No log to read: none was found, or the newest one predates this run. */
+export function missionRunLogMissing(): string {
+  return "The engine's log could not be read for this run, so there is nothing here about what it did.";
+}
