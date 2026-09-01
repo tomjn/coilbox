@@ -71,6 +71,12 @@ if not MISSION then
 	return false
 end
 
+local DIFFICULTY, difficultyError = includeTable("luarules/mission_runtime/coilbox_difficulty.lua")
+if not DIFFICULTY then
+	log("error", difficultyError)
+	return false
+end
+
 local START, startError = includeTable("luarules/mission_runtime/coilbox_start.lua")
 if not START then
 	log("error", startError)
@@ -170,6 +176,22 @@ if needsNewerRuntime("runtimeVersion", RUNTIME.version)
 	return false
 end
 
+-- How hard this mission is being played (issue #2164).
+--
+-- A modoption rather than something in the compiled mission, because one
+-- scenario is played at every difficulty. It also has to reach a mission the
+-- game ships in a packaged archive, which coilbox cannot write into, so a
+-- setting compiled in would be a setting that mission could never change.
+--
+-- Read here, once, so both halves of the gadget answer the same. A launcher
+-- that says nothing leaves it at the default, and a mission that gates nothing
+-- plays the same whatever it says.
+local DIFFICULTY_LEVEL, difficultyProblem = DIFFICULTY.parse(Spring.GetModOptions().coilbox_difficulty)
+if difficultyProblem then
+	log("warning", difficultyProblem)
+end
+local DIFFICULTY_GATE = DIFFICULTY.gate(DIFFICULTY_LEVEL)
+
 -- Not fatal. The mission will spawn its units at coordinates that mean nothing
 -- on this map, but saying so beats a silent sea of drowned commanders.
 if MISSION.map and MISSION.map ~= Game.mapName then
@@ -256,6 +278,12 @@ local function publish()
 		id = MISSION_ID,
 		mission = MISSION,
 		runtime = RUNTIME,
+		-- What the mission is being played at, and the question everything the
+		-- scenario gated asks of it. Published so a game's own Lua can ask the
+		-- same question the runtime does rather than reading the modoption and
+		-- inventing its own ladder (issue #2164).
+		difficulty = DIFFICULTY_LEVEL,
+		difficultyGate = DIFFICULTY_GATE,
 		-- Per-participant setup with the engine team number resolved.
 		teams = teams,
 		--- Whether the mission places this engine team's opening units itself, and
@@ -462,8 +490,8 @@ if gadgetHandler:IsSyncedCode() then
 			end
 		end
 
-		local placements, problems = START.placements(MISSION, teams, startPositions)
-		local prefabs, prefabProblems = START.prefabPlacements(MISSION, teams)
+		local placements, problems = START.placements(MISSION, teams, startPositions, DIFFICULTY_GATE)
+		local prefabs, prefabProblems = START.prefabPlacements(MISSION, teams, DIFFICULTY_GATE)
 		for _, placement in ipairs(prefabs) do
 			placements[#placements + 1] = placement
 		end
@@ -507,8 +535,8 @@ if gadgetHandler:IsSyncedCode() then
 		local anchored = gameOver.place()
 
 		log("notice", string.format(
-			"mission %s spawned %d of %d units, %d in groups and %d anchors",
-			MISSION_ID, spawned, #placements, grouped, anchored))
+			"mission %s spawned %d of %d units, %d in groups and %d anchors, at difficulty %s",
+			MISSION_ID, spawned, #placements, grouped, anchored, DIFFICULTY_LEVEL))
 	end
 
 	--- Set every mission team's bank to what the scenario asked for. Teams the
@@ -554,6 +582,11 @@ if gadgetHandler:IsSyncedCode() then
 		triggers = TRIGGERS.new(MISSION, {
 			state = published,
 			gameSpeed = Game.gameSpeed,
+			-- A trigger the difficulty leaves out is never armed and cannot be
+			-- armed, which is decided here, before the first frame, because the
+			-- level cannot change while the mission runs.
+			difficulty = DIFFICULTY_LEVEL,
+			difficultyGate = DIFFICULTY_GATE,
 			log = log,
 		})
 		unitHooks = UNIT_CONDITIONS.register(triggers, published)
@@ -692,7 +725,8 @@ if gadgetHandler:IsSyncedCode() then
 		end
 
 		log("notice", string.format(
-			"mission %s loaded, runtime version %s", MISSION_ID, tostring(RUNTIME.version)))
+			"mission %s loaded at difficulty %s, runtime version %s",
+			MISSION_ID, DIFFICULTY_LEVEL, tostring(RUNTIME.version)))
 	end
 
 	function gadget:GameStart()

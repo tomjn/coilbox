@@ -80,6 +80,8 @@ end
 function M.missionFiles(mission)
 	return {
 		["missions/runtime.lua"] = module("missions/runtime.lua"),
+		["luarules/mission_runtime/coilbox_difficulty.lua"] = module(
+			"luarules/mission_runtime/coilbox_difficulty.lua"),
 		["luarules/mission_runtime/coilbox_start.lua"] = module("luarules/mission_runtime/coilbox_start.lua"),
 		["luarules/mission_runtime/coilbox_triggers.lua"] = module("luarules/mission_runtime/coilbox_triggers.lua"),
 		["luarules/mission_runtime/coilbox_unit_conditions.lua"] = module(

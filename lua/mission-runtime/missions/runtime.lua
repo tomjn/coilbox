@@ -44,8 +44,15 @@
 -- same way, and is offered this so its authors can tell a mission that placed
 -- nothing from one whose units did not arrive.
 
+-- 6 adds no types either, and it is a format feature: an actor, a group, a base
+-- and a trigger may each carry a difficulty range, and the level comes in on the
+-- coilbox_difficulty modoption (issue #2164). A game that vendored 5 reads past
+-- every range and plays the hard version of the mission whatever the player
+-- picked, so a scenario that gates anything asks for 6 and one that gates
+-- nothing still asks for whatever it asked for before.
+
 return {
-	version = 5,
+	version = 6,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
