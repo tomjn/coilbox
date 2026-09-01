@@ -7,6 +7,7 @@
  * all.
  */
 
+import type { Campaign } from "../campaign/model";
 import type { Scenario } from "./model";
 
 /** What a scenario holds, for a list row's second line. */
@@ -28,6 +29,27 @@ export function scenarioContents(scenario: Scenario): string {
  */
 export function isSetUp(scenario: Scenario): boolean {
   return !!scenario.setup.gameName && !!scenario.setup.mapName;
+}
+
+/**
+ * The campaigns with a mission carrying a copy of this scenario, by title.
+ *
+ * More than one is possible. Two missions can attach the same scenario, in one
+ * campaign or in two, and the attach picker does not hide a scenario that is
+ * already in use. A campaign is counted once however many of its missions carry
+ * it, because the question a row is answering is which campaigns depend on this
+ * scenario, not how many times it appears in them.
+ *
+ * `scenarioIsAttached` answers the same question as a yes or no, for the delete
+ * confirmation. This one keeps the titles, so a row can say how many.
+ */
+export function campaignsUsingScenario(
+  campaigns: Campaign[],
+  scenarioId: string,
+): string[] {
+  return campaigns
+    .filter((c) => c.missions.some((m) => m.scenario?.id === scenarioId))
+    .map((c) => c.title);
 }
 
 /**
