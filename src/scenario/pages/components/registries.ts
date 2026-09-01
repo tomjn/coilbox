@@ -31,6 +31,7 @@ import type {
   ScenarioDialogue,
   ScenarioObjective,
 } from "../../model";
+import { markIdsUsed, nextMintedId } from "./ids";
 import { rewriteRefs } from "./triggers";
 
 /** Replace one entry of a registry by id. The list's own identity back when the
@@ -45,15 +46,6 @@ function edit<T extends { id: string }>(
   const out = list.slice();
   out[at] = update(list[at]);
   return out;
-}
-
-/** The first `<prefix>-<n>` no entry has taken. */
-function nextId(taken: Iterable<string>, prefix: string): string {
-  const used = new Set(taken);
-  for (let n = 1; ; n++) {
-    const id = `${prefix}-${n}`;
-    if (!used.has(id)) return id;
-  }
 }
 
 /**
@@ -82,11 +74,11 @@ export function nameIssue(
  * says it instead.
  * -------------------------------------------------------------------------- */
 
-export function nextObjectiveId(objectives: ScenarioObjective[]): string {
-  return nextId(
-    objectives.map((o) => o.id),
-    "objective",
-  );
+/** One past the highest number the document has used, deleted objectives
+ *  included, so a `complete_objective` left naming a deleted one never settles
+ *  a different objective instead (issue #2250). */
+export function nextObjectiveId(scenario: Scenario): string {
+  return nextMintedId(scenario, "objective");
 }
 
 /** The document with one more objective on the end: primary, shown, and waiting
@@ -114,12 +106,14 @@ export function editObjective(
 
 /** The document without an objective. Triggers naming it are left alone, the
  *  way deleting a zone leaves them alone: the validator says so rather than the
- *  editor rewriting triggers nobody asked it to touch. */
+ *  editor rewriting triggers nobody asked it to touch. The id goes with it and
+ *  is not handed out again (issue #2250). */
 export function removeObjective(scenario: Scenario, id: string): Scenario {
-  const objectives = scenario.objectives.filter((o) => o.id !== id);
-  return objectives.length === scenario.objectives.length
+  const marked = markIdsUsed(scenario, "objective");
+  const objectives = marked.objectives.filter((o) => o.id !== id);
+  return objectives.length === marked.objectives.length
     ? scenario
-    : { ...scenario, objectives };
+    : { ...marked, objectives };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -130,11 +124,10 @@ export function removeObjective(scenario: Scenario, id: string): Scenario {
  * back and clears what was dropped.
  * -------------------------------------------------------------------------- */
 
-export function nextDialogueId(dialogue: ScenarioDialogue[]): string {
-  return nextId(
-    dialogue.map((d) => d.id),
-    "line",
-  );
+/** As {@link nextObjectiveId}, for the same reason: a `dialogue` action left
+ *  naming a deleted line must not find a different line under that id. */
+export function nextDialogueId(scenario: Scenario): string {
+  return nextMintedId(scenario, "line");
 }
 
 export function addDialogue(scenario: Scenario, id: string): Scenario {
@@ -161,11 +154,14 @@ export function editDialogue(
   return dialogue === scenario.dialogue ? scenario : { ...scenario, dialogue };
 }
 
+/** The document without a line, its id kept out of reach the way
+ *  {@link removeObjective} keeps an objective's. */
 export function removeDialogue(scenario: Scenario, id: string): Scenario {
-  const dialogue = scenario.dialogue.filter((d) => d.id !== id);
-  return dialogue.length === scenario.dialogue.length
+  const marked = markIdsUsed(scenario, "line");
+  const dialogue = marked.dialogue.filter((d) => d.id !== id);
+  return dialogue.length === marked.dialogue.length
     ? scenario
-    : { ...scenario, dialogue };
+    : { ...marked, dialogue };
 }
 
 /** The clips one line holds, for deleting them off disk when the line goes. */

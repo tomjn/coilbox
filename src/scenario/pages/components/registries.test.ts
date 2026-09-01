@@ -86,11 +86,29 @@ describe("nameIssue", () => {
 describe("objectives", () => {
   it("mints an id nothing has taken", () => {
     const scenario = addObjective(newScenario("t"), "objective-1");
-    expect(nextObjectiveId(scenario.objectives)).toBe("objective-2");
+    expect(nextObjectiveId(scenario)).toBe("objective-2");
+  });
+
+  /** Issue #2250, the same reuse a trigger had. `complete_objective` is left
+   *  pointing at a deleted objective on purpose, so the id has to stay gone or
+   *  the action settles an objective it was never written for. */
+  it("never hands a deleted objective's id to a new one", () => {
+    const two = addObjective(
+      addObjective(newScenario("t"), "objective-1"),
+      "objective-2",
+    );
+    const after = removeObjective(two, "objective-2");
+    expect(nextObjectiveId(after)).toBe("objective-3");
+
+    const saved = parseScenario(JSON.parse(JSON.stringify(after)));
+    expect(nextObjectiveId(saved as Scenario)).toBe("objective-3");
   });
 
   it("adds one the parser accepts, with no empty required field", () => {
-    const scenario = addObjective(newScenario("t"), nextObjectiveId([]));
+    const scenario = addObjective(
+      newScenario("t"),
+      nextObjectiveId(newScenario("t")),
+    );
     expect(scenario.objectives).toEqual([
       { id: "objective-1", kind: "primary", text: "", hidden: false },
     ]);
@@ -134,7 +152,18 @@ describe("objectives", () => {
 describe("dialogue", () => {
   it("mints an id nothing has taken", () => {
     const scenario = addDialogue(newScenario("t"), "line-1");
-    expect(nextDialogueId(scenario.dialogue)).toBe("line-2");
+    expect(nextDialogueId(scenario)).toBe("line-2");
+  });
+
+  /** Issue #2250. A `dialogue` action left pointing at a deleted line must not
+   *  find a different line under that id. */
+  it("never hands a deleted line's id to a new one", () => {
+    const two = addDialogue(addDialogue(newScenario("t"), "line-1"), "line-2");
+    const after = removeDialogue(two, "line-2");
+    expect(nextDialogueId(after)).toBe("line-3");
+
+    const saved = parseScenario(JSON.parse(JSON.stringify(after)));
+    expect(nextDialogueId(saved as Scenario)).toBe("line-3");
   });
 
   it("adds one the parser accepts", () => {

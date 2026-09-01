@@ -84,23 +84,76 @@ function document(): Scenario {
   };
 }
 
+/** A document holding exactly these triggers and nothing else. */
+const withTriggers = (...triggers: ScenarioTrigger[]): Scenario => ({
+  ...newScenario("t"),
+  triggers,
+});
+
 describe("nextTriggerId", () => {
   it("numbers past what the list already holds", () => {
-    expect(nextTriggerId([])).toBe("trigger-1");
-    expect(nextTriggerId([trigger("open")])).toBe("trigger-2");
+    expect(nextTriggerId(withTriggers())).toBe("trigger-1");
+    expect(nextTriggerId(withTriggers(trigger("trigger-1")))).toBe("trigger-2");
   });
 
   it("steps over a number an author has already used", () => {
-    expect(nextTriggerId([trigger("trigger-2"), trigger("open")])).toBe(
-      "trigger-3",
-    );
     expect(
-      nextTriggerId([
-        trigger("trigger-3"),
-        trigger("trigger-4"),
-        trigger("open"),
-      ]),
+      nextTriggerId(withTriggers(trigger("trigger-2"), trigger("open"))),
+    ).toBe("trigger-3");
+    expect(
+      nextTriggerId(
+        withTriggers(
+          trigger("trigger-3"),
+          trigger("trigger-4"),
+          trigger("open"),
+        ),
+      ),
     ).toBe("trigger-5");
+  });
+
+  /**
+   * Issue #2250. Deleting a trigger leaves the actions pointing at it alone on
+   * purpose, so the validator can report the dangling reference. That only
+   * works while the id stays gone: hand it to a new trigger and the stale
+   * `enable_trigger` resolves, quietly, to a trigger it was never written for.
+   */
+  it("never hands a deleted trigger's id to a new trigger", () => {
+    const armer = trigger("trigger-1", {
+      actions: [{ type: "enable_trigger", params: { trigger: "trigger-2" } }],
+    });
+    const armed = trigger("trigger-2");
+
+    const after = removeTrigger(withTriggers(armer, armed), "trigger-2");
+    const minted = nextTriggerId(after);
+
+    expect(minted).not.toBe("trigger-2");
+
+    const rebuilt = addTrigger(after, minted);
+    const pointed = rebuilt.triggers[0].actions[0].params.trigger;
+    expect(rebuilt.triggers.some((t) => t.id === pointed)).toBe(false);
+  });
+
+  /** The mark survives being written to disk and read back, which is where a
+   *  counter held only in memory would lose it. */
+  it("keeps a deleted id out of reach across a save", () => {
+    const before = withTriggers(trigger("trigger-1"), trigger("trigger-2"));
+    const saved = JSON.stringify(removeTrigger(before, "trigger-2"));
+    const reloaded = parseScenario(JSON.parse(saved));
+
+    expect(reloaded).not.toBeNull();
+    expect(nextTriggerId(reloaded as Scenario)).not.toBe("trigger-2");
+  });
+
+  /** Deleting the last one frees nothing either. This is the case the old
+   *  minting got wrong most easily, because it started counting at the length
+   *  of the list. */
+  it("never reuses the id of the trigger most recently deleted", () => {
+    const three = withTriggers(
+      trigger("trigger-1"),
+      trigger("trigger-2"),
+      trigger("trigger-3"),
+    );
+    expect(nextTriggerId(removeTrigger(three, "trigger-3"))).toBe("trigger-4");
   });
 });
 

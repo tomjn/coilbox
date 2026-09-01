@@ -400,6 +400,19 @@ export interface Scenario {
   objectives: ScenarioObjective[];
   dialogue: ScenarioDialogue[];
   /**
+   * The highest number this document has used for each kind of minted id, keyed
+   * by the id's prefix: `trigger`, `objective` and `line`.
+   *
+   * Deleting one of those frees its id, and the steps pointing at it are left
+   * alone on purpose, so without this the next one added takes the freed id and
+   * a stale `enable_trigger` quietly arms the wrong trigger (issue #2250).
+   * Deleting writes the mark, so a number is never handed out twice.
+   *
+   * Absent until something is deleted, so a document nothing has been removed
+   * from is written exactly as it was. See `pages/components/ids.ts`.
+   */
+  idCounters?: Record<string, number>;
+  /**
    * A hand-written `script.lua` sits beside the compiled mission. The editor
    * shows that it exists but never edits it. Every use of it is a bug report
    * against this format.
@@ -1055,6 +1068,27 @@ function parseVars(value: unknown): Record<string, number> {
 }
 
 /**
+ * The high water marks a document carries, or undefined when it carries none.
+ *
+ * A mark is a whole count, so anything else is dropped rather than refused: a
+ * lost mark costs one reused id, which is what the document had before the mark
+ * existed, and refusing the document over it would lose the mission instead.
+ * Keys are not narrowed to the prefixes known here, so a mark written by a later
+ * coilbox survives a round trip through this one.
+ */
+function parseIdCounters(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [prefix, raw] of Object.entries(value)) {
+    const n = num(raw);
+    if (prefix !== "" && n !== undefined && n >= 0 && Number.isInteger(n)) {
+      out[prefix] = n;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
  * Narrow an already-parsed value to a validated {@link Scenario}, or `null` when
  * the shape does not match. Takes an unknown rather than text so the container
  * reader can hand it a payload directly.
@@ -1107,6 +1141,7 @@ export function parseScenario(value: unknown): Scenario | null {
     triggers,
     objectives,
     dialogue,
+    idCounters: parseIdCounters(value.idCounters),
     script: value.script === true ? true : undefined,
     createdAt: str(value.createdAt) ?? "",
     updatedAt: str(value.updatedAt) ?? "",

@@ -47,6 +47,7 @@ import {
   type TargetOption,
   uniqueLabels,
 } from "./groups";
+import { markIdsUsed, nextMintedId } from "./ids";
 
 /** Which of a trigger's two step lists a step sits in. */
 export type StepList = "conditions" | "actions";
@@ -107,13 +108,13 @@ function round(pos: Point): Point {
  * compiled mission and in the paths the validator reports problems at, and
  * `trigger-3` is a far better thing to find in `mission.lua` than a hex blob.
  * The author's own name for it is a separate field.
+ *
+ * One past the highest number the document has used, deleted triggers included,
+ * so a stale `enable_trigger` never finds a different trigger under the id it
+ * names. See `ids.ts` for why the document has to remember that.
  */
-export function nextTriggerId(triggers: ScenarioTrigger[]): string {
-  const taken = new Set(triggers.map((t) => t.id));
-  for (let n = triggers.length + 1; ; n++) {
-    const id = `trigger-${n}`;
-    if (!taken.has(id)) return id;
-  }
+export function nextTriggerId(scenario: Scenario): string {
+  return nextMintedId(scenario, "trigger");
 }
 
 /** The document with one more trigger on the end: armed, firing once, named
@@ -133,12 +134,15 @@ export function addTrigger(scenario: Scenario, id: string): Scenario {
 
 /** The document without a trigger. Actions naming it are left alone, exactly as
  *  deleting a zone leaves the conditions naming it alone: the validator says so
- *  rather than the editor rewriting triggers nobody asked it to touch. */
+ *  rather than the editor rewriting triggers nobody asked it to touch. The id
+ *  goes with it and is not handed out again, so an action left naming it stays
+ *  a dangling reference the validator can report (issue #2250). */
 export function removeTrigger(scenario: Scenario, id: string): Scenario {
-  const triggers = scenario.triggers.filter((t) => t.id !== id);
-  return triggers.length === scenario.triggers.length
+  const marked = markIdsUsed(scenario, "trigger");
+  const triggers = marked.triggers.filter((t) => t.id !== id);
+  return triggers.length === marked.triggers.length
     ? scenario
-    : { ...scenario, triggers };
+    : { ...marked, triggers };
 }
 
 /** One trigger's fields changed. A cooldown that is not a wait is dropped, so

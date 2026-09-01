@@ -970,6 +970,39 @@ describe("parseScenario — teams, vars and restrictions", () => {
   });
 });
 
+/**
+ * Issue #2250. The mark says which numbered ids the document has already handed
+ * out, so a deleted trigger's id is never given to a new one.
+ */
+describe("parseScenario — id counters", () => {
+  it("reads the marks a document carries", () => {
+    const s = parseScenario(doc({ idCounters: { trigger: 4, line: 2 } }));
+    expect(s?.idCounters).toEqual({ trigger: 4, line: 2 });
+  });
+
+  it("carries a prefix it does not know, so a later coilbox keeps its mark", () => {
+    const s = parseScenario(doc({ idCounters: { waypoint: 3 } }));
+    expect(s?.idCounters).toEqual({ waypoint: 3 });
+  });
+
+  it("drops a mark that is not a whole count rather than refusing the mission", () => {
+    const s = parseScenario(
+      doc({ idCounters: { trigger: 2, a: -1, b: 1.5, c: "9", d: null } }),
+    );
+    expect(s?.idCounters).toEqual({ trigger: 2 });
+  });
+
+  /** Absent rather than empty, so a document that has never had anything
+   *  deleted from it is written back with no new key. */
+  it("leaves the field off a document that carries no mark", () => {
+    expect(parseScenario(doc({}))?.idCounters).toBeUndefined();
+    expect(parseScenario(doc({ idCounters: {} }))?.idCounters).toBeUndefined();
+    expect(
+      parseScenario(doc({ idCounters: "none" }))?.idCounters,
+    ).toBeUndefined();
+  });
+});
+
 describe("parseScenario — round trip", () => {
   it("re-parses its own output unchanged", () => {
     const first = parseScenario(

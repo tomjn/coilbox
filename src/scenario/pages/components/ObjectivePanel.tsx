@@ -52,7 +52,7 @@ export function ObjectivePanel({
     (o) => o.kind === "primary",
   ).length;
   const create = () => {
-    const id = nextObjectiveId(scenario.objectives);
+    const id = nextObjectiveId(scenario);
     onChange(addObjective(scenario, id));
     setSelectedId(id);
   };
