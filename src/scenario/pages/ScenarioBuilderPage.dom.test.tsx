@@ -12,7 +12,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Campaign } from "../../campaign/model";
 
@@ -41,6 +41,41 @@ vi.mock("../scenarios", () => ({
 vi.mock("../storage", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../storage")),
   deleteScenario,
+}));
+// Duplicating runs the real storage module, because copying the dialogue clips
+// is the whole of what it does (issue #2183) and a stand-in for it would prove
+// nothing. Only the plugin underneath is stubbed, so what the copy asks the
+// disk for is what these tests read.
+const plugin = vi.hoisted(() => ({
+  save: vi.fn(async (_a: { id: string; json: string }) => ({})),
+  mediaRead: vi.fn(async (_a: { scenarioId: string; file: string }) => ({
+    dataUrl: "data:image/png;base64,AA==",
+  })),
+  mediaWrite: vi.fn(
+    async (_a: { scenarioId: string; file: string; dataUri: string }) => ({}),
+  ),
+}));
+vi.mock("../bindings", () => ({
+  scenarioList: vi.fn(async () => ({ items: [] })),
+  scenarioSave: plugin.save,
+  scenarioDelete: vi.fn(async () => ({})),
+  scenarioMediaImport: vi.fn(async () => ({ file: "" })),
+  scenarioMediaDelete: vi.fn(async () => ({})),
+  scenarioMediaRead: plugin.mediaRead,
+  scenarioMediaSweep: vi.fn(async () => ({ summary: {} })),
+  scenarioMediaWrite: plugin.mediaWrite,
+}));
+// Duplicate reports a failure through a toast, which has no shell here, and a
+// rescan says it ran through the same channel (issue #2184).
+const toasted = vi.hoisted(() => ({
+  errors: [] as string[],
+  successes: [] as string[],
+}));
+vi.mock("sonner", () => ({
+  toast: {
+    error: (message: string) => toasted.errors.push(message),
+    success: (message: string) => toasted.successes.push(message),
+  },
 }));
 // Which campaigns exist decides which rows are attached to one, so the list is
 // set per test.
@@ -75,11 +110,9 @@ vi.mock("@/content/config", () => ({
 vi.mock("./components/ReclaimClipsForm", () => ({
   ReclaimClipsForm: () => null,
 }));
-// A rescan says it ran through a toast, so the toast is what the test reads.
-const { toasted } = vi.hoisted(() => ({ toasted: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { success: toasted, error: vi.fn() } }));
 
 import { newScenario } from "../create";
+import type { Scenario } from "../model";
 import type { LoadedScenario } from "../storage";
 import ScenarioBuilderPage from "./ScenarioBuilderPage";
 
@@ -144,6 +177,20 @@ function campaignUsing(title: string, scenarioId: string) {
   return { campaign, source: "local" as const };
 }
 
+/** The editor's route, saying which scenario it was opened on. */
+function Editing() {
+  const { id } = useParams();
+  return (
+    <>
+      <p>Editing this scenario</p>
+      <p data-testid="editing">{id}</p>
+    </>
+  );
+}
+
+/** Which scenario the editor route is showing, or null when it is not. */
+const editingId = () => screen.queryByTestId("editing")?.textContent ?? null;
+
 function show(scenarios: LoadedScenario[], refresh = async () => {}) {
   useScenarios.mockReturnValue({
     scenarios,
@@ -155,10 +202,7 @@ function show(scenarios: LoadedScenario[], refresh = async () => {}) {
     <MemoryRouter initialEntries={["/scenario-builder"]}>
       <Routes>
         <Route path="/scenario-builder" element={<ScenarioBuilderPage />} />
-        <Route
-          path="/scenario-builder/:id"
-          element={<p>Editing this scenario</p>}
-        />
+        <Route path="/scenario-builder/:id" element={<Editing />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -186,6 +230,8 @@ function openMenuByKeyboard(name: string) {
 afterEach(() => {
   cleanup();
   opened.length = 0;
+  toasted.errors.length = 0;
+  toasted.successes.length = 0;
   stored.campaigns = [];
   content.scanned = false;
   content.maps = [];
@@ -203,11 +249,12 @@ describe("a scenario row", () => {
     expect(screen.getByText("Editing this scenario")).toBeTruthy();
   });
 
-  it("reaches Edit, Share and Delete from the keyboard alone", () => {
+  it("reaches Edit, Duplicate, Share and Delete from the keyboard alone", () => {
     show([local]);
 
     expect(openMenuByKeyboard("Beachhead")).toEqual([
       expect.stringContaining("Edit"),
+      expect.stringContaining("Duplicate"),
       expect.stringContaining("Share"),
       expect.stringContaining("Delete"),
     ]);
@@ -808,8 +855,202 @@ describe("the list gathered under each game", () => {
   });
 });
 
+/**
+ * Duplicate (issue #2183). The issue expected a copy to share the original's
+ * dialogue clips the way an attached campaign mission does, but a mission shares
+ * them by keeping the source scenario's id and a copy has an id of its own, so
+ * the clips are copied instead. What is pinned here is the whole chain from the
+ * menu item to what lands on disk, because a copy that quietly loses its clips
+ * looks exactly like one that worked.
+ */
+describe("duplicating a scenario", () => {
+  /** The local scenario with a dialogue line carrying both kinds of clip. */
+  const withClips = (): LoadedScenario => ({
+    scenario: {
+      ...local.scenario,
+      dialogue: [
+        {
+          id: "open",
+          speaker: "Command",
+          text: "Go.",
+          portrait: "a.png",
+          audio: "b.ogg",
+        },
+      ],
+    },
+    source: "local",
+  });
+
+  /** Pick Duplicate out of a row's menu, the way a keyboard does. */
+  function duplicateByKeyboard(name: string) {
+    openMenuByKeyboard(name);
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Duplicate/ }), {
+      key: "Enter",
+    });
+  }
+
+  /** The document the copy wrote, once it has been written. */
+  async function written() {
+    await vi.waitFor(() => expect(plugin.save).toHaveBeenCalledTimes(1));
+    const { id, json } = plugin.save.mock.calls[0][0];
+    return { id, document: JSON.parse(json) as Scenario };
+  }
+
+  it("writes a second scenario rather than touching the one it came from", async () => {
+    show([local]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { id, document } = await written();
+    expect(id).not.toBe("beachhead");
+    expect(document.id).toBe(id);
+    expect(document.name).toBe("Copy of Beachhead");
+    // The original is still exactly what it was: one write, and not to it.
+    expect(plugin.save).toHaveBeenCalledTimes(1);
+    expect(local.scenario.name).toBe("Beachhead");
+  });
+
+  it("opens the editor on the copy, not on the original", async () => {
+    show([local]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { id } = await written();
+    await vi.waitFor(() => expect(editingId()).toBe(id));
+    expect(id).not.toBe("beachhead");
+  });
+
+  // The load-bearing half. A clip lives at `media/<scenarioId>/<file>`, so a
+  // copy under a new id that took only the document would name two files that
+  // are not under it, and play silent.
+  it("copies the dialogue clips into the copy's own media folder", async () => {
+    show([withClips()]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { id } = await written();
+    expect(plugin.mediaRead.mock.calls.map((c) => c[0])).toEqual(
+      expect.arrayContaining([
+        { scenarioId: "beachhead", file: "a.png" },
+        { scenarioId: "beachhead", file: "b.ogg" },
+      ]),
+    );
+    expect(
+      plugin.mediaWrite.mock.calls.map(([{ scenarioId, file }]) => ({
+        scenarioId,
+        file,
+      })),
+    ).toEqual(
+      expect.arrayContaining([
+        { scenarioId: id, file: "a.png" },
+        { scenarioId: id, file: "b.ogg" },
+      ]),
+    );
+  });
+
+  // Duplicating twice is the fastest way to two rows nothing on screen can tell
+  // apart, which is what the row was rebuilt to avoid (issue #2179).
+  it("counts up when the obvious copy name is already in the list", async () => {
+    show([
+      local,
+      {
+        scenario: {
+          ...local.scenario,
+          id: "copy-1",
+          name: "Copy of Beachhead",
+        },
+        source: "local",
+      },
+    ]);
+
+    duplicateByKeyboard("Beachhead");
+
+    const { document } = await written();
+    expect(document.name).toBe("Copy of Beachhead (2)");
+  });
+
+  it("says so when the copy could not be written, and stays on the list", async () => {
+    plugin.save.mockRejectedValueOnce(new Error("disk full"));
+    show([local]);
+
+    duplicateByKeyboard("Beachhead");
+
+    await vi.waitFor(() =>
+      expect(toasted.errors).toEqual([
+        "Could not duplicate Beachhead: disk full",
+      ]),
+    );
+    expect(editingId()).toBeNull();
+  });
+});
+
+/**
+ * The starter, offered where somebody has nothing to copy (issue #2183). What
+ * it holds is pinned in `create.test.ts`, against the validator. What is pinned
+ * here is that the empty state can actually reach it, and that picking it saves
+ * the mission rather than the blank document the other button saves.
+ */
+describe("the empty state's starter", () => {
+  /** Fill in the form the drawer opened and create the scenario. */
+  function createNamed(name: string) {
+    render(opened[0].content);
+    fireEvent.change(screen.getByPlaceholderText("Name"), {
+      target: { value: name },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create/ }));
+  }
+
+  it("offers the starter only while there are no scenarios", () => {
+    show([]);
+    expect(
+      screen.getByRole("button", { name: /Start from the starter/ }),
+    ).toBeTruthy();
+
+    cleanup();
+    show([local]);
+    expect(
+      screen.queryByRole("button", { name: /Start from the starter/ }),
+    ).toBeNull();
+  });
+
+  it("saves a scenario with a mission in it, not an empty one", async () => {
+    show([]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Start from the starter/ }),
+    );
+    expect(opened.map((o) => o.title)).toEqual([
+      "New scenario from the starter",
+    ]);
+    createNamed("First mission");
+
+    await vi.waitFor(() => expect(plugin.save).toHaveBeenCalledTimes(1));
+    const document = JSON.parse(plugin.save.mock.calls[0][0].json) as Scenario;
+    expect(document.name).toBe("First mission");
+    expect(document.triggers.length).toBeGreaterThan(0);
+    expect(document.objectives.length).toBeGreaterThan(0);
+  });
+
+  it("still saves an empty document from New scenario", async () => {
+    show([]);
+
+    fireEvent.click(screen.getByRole("button", { name: /New scenario/ }));
+    expect(opened.map((o) => o.title)).toEqual(["New scenario"]);
+    createNamed("From scratch");
+
+    await vi.waitFor(() => expect(plugin.save).toHaveBeenCalledTimes(1));
+    const document = JSON.parse(plugin.save.mock.calls[0][0].json) as Scenario;
+    expect(document.triggers).toEqual([]);
+    expect(document.objectives).toEqual([]);
+  });
+});
+
 describe("a read-only scenario's row", () => {
-  it("offers neither Edit nor Delete, but still shares", () => {
+  // A bundled scenario's clips are not in the media store until it is launched,
+  // and a game's own mission keeps them inside the game archive, so neither has
+  // anything a copy could take with it. Offering Duplicate would make a copy
+  // whose dialogue has quietly lost its portraits.
+  it("offers neither Edit, Duplicate nor Delete, but still shares", () => {
     show([bundled]);
 
     expect(openMenuByKeyboard("Tutorial")).toEqual([
@@ -881,8 +1122,10 @@ describe("the Scenario Builder header", () => {
     });
 
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
-    expect(toasted).toHaveBeenCalledWith(
-      "Rescanned. The scenario list is up to date.",
+    await vi.waitFor(() =>
+      expect(toasted.successes).toEqual([
+        "Rescanned. The scenario list is up to date.",
+      ]),
     );
   });
 
