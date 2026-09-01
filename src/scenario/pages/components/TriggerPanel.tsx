@@ -27,6 +27,7 @@ import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import type { PaletteGate } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";
+import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { EditorPanel } from "./panels";
 import { AddStep, StepRow } from "./TriggerSteps";
 import {
@@ -386,6 +387,17 @@ function TriggerForm({
             onChange={(cooldown) => edit({ cooldown })}
           />
         )}
+      </div>
+
+      {/* Which difficulties this trigger runs at (issue #2164). A trigger
+          outside its range is not armed and cannot be armed, so "on hard the
+          reinforcements arrive twice" is a second trigger set to hard rather
+          than a difficulty test written into the one that already exists. */}
+      <div className="max-w-sm">
+        <DifficultyRangeFields
+          value={trigger.difficulty}
+          onChange={(difficulty) => edit({ difficulty })}
+        />
       </div>
 
       <StepSection

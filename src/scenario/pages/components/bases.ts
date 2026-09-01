@@ -474,7 +474,9 @@ export function addBuilding(
 export function editBase(
   scenario: Scenario,
   id: string,
-  patch: Partial<Pick<ScenarioBase, "team" | "origin" | "buildings">>,
+  patch: Partial<
+    Pick<ScenarioBase, "team" | "origin" | "buildings" | "difficulty">
+  >,
 ): Scenario {
   const bases = edit<ScenarioBase>(scenario.bases, id, (base) => ({
     ...base,

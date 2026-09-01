@@ -40,6 +40,7 @@ import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ActorState, Facing, ScenarioActor } from "../../model";
+import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { MIN_ACTOR_HP } from "./editing";
 import { TeamSelect } from "./TeamSelect";
 
@@ -139,6 +140,16 @@ export function ActorControls({
               className="h-8 text-xs"
             />
           </Field>
+
+          {/* Which difficulties this actor is placed at (issue #2164). Below
+              the overrides, because it is a question about the mission rather
+              than about the unit, and most actors never leave it alone. */}
+          <div className="border-t border-border/60 pt-3">
+            <DifficultyRangeFields
+              value={actor.difficulty}
+              onChange={(difficulty) => onEdit({ difficulty })}
+            />
+          </div>
         </PopoverContent>
       </Popover>
     </>
