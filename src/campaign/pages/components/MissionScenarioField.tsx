@@ -1,5 +1,5 @@
-import { Button } from "@picoframe/frame";
-import { Flag, Link2Off, RefreshCw } from "lucide-react";
+import { Button, Drawer } from "@picoframe/frame";
+import { FileCode2, Flag, Link2Off, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import {
   Popover,
@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/popover";
 import { scenarioContents } from "@/scenario/listing";
 import type { Scenario } from "@/scenario/model";
+import { MissionLuaView } from "@/scenario/pages/components/MissionLuaView";
 import { useScenarios } from "@/scenario/scenarios";
 import {
   attachScenario,
@@ -51,7 +52,14 @@ export function MissionScenarioField({
   const { scenarios: loaded, loading } = useScenarios();
   const scenarios = loaded.map((l) => l.scenario);
   const [open, setOpen] = useState(false);
+  const [showLua, setShowLua] = useState(false);
   const attachment = scenarioAttachment(mission, scenarios);
+  // The attached copy, never the stored scenario it came from. A stale
+  // attachment is the case somebody opens this in: the mission plays the
+  // snapshot, and showing them the document in the builder instead would answer
+  // a question they did not ask (issue #2163).
+  const snapshot =
+    attachment.state === "none" ? undefined : attachment.snapshot;
 
   const pick = (scenario: Scenario) => {
     setOpen(false);
@@ -130,6 +138,17 @@ export function MissionScenarioField({
           </Button>
         )}
 
+        {snapshot && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => setShowLua(true)}
+          >
+            <FileCode2 className="size-4" /> Mission Lua
+          </Button>
+        )}
+
         {attachment.state !== "none" && (
           <Button
             size="sm"
@@ -141,6 +160,19 @@ export function MissionScenarioField({
           </Button>
         )}
       </div>
+
+      {/* Its own controlled drawer rather than the frame's shared one, which
+        the mission editor around this is already using. */}
+      {snapshot && (
+        <Drawer
+          open={showLua}
+          onOpenChange={setShowLua}
+          title={`${snapshot.name} as mission.lua`}
+          width="44rem"
+        >
+          <MissionLuaView scenario={snapshot} />
+        </Drawer>
+      )}
     </div>
   );
 }
