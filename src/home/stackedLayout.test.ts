@@ -8,7 +8,10 @@ import { DEFAULT_ZONES, type HomeEntry, resolveHome } from "./config";
 const { zone } = vi.hoisted(() => ({
   zone: (name: string) => Object.assign(() => null, { zoneName: name }),
 }));
-vi.mock("@picoframe/frame", () => ({ Slot: zone("slot") }));
+vi.mock("@picoframe/frame", () => ({
+  Slot: zone("slot"),
+  useTheme: () => ({ resolved: "dark" }),
+}));
 vi.mock("./zones/Onboarding", () => ({ default: zone("onboarding") }));
 vi.mock("./zones/Greeting", () => ({ default: zone("greeting") }));
 vi.mock("./zones/Continue", () => ({ default: zone("continue") }));

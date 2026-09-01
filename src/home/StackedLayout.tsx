@@ -1,4 +1,4 @@
-import { Slot } from "@picoframe/frame";
+import { Slot, useTheme } from "@picoframe/frame";
 import { Fragment, type ReactNode } from "react";
 import { backdropStyle, resolveHomeBackground } from "./background";
 import { type HomeEntry, type ZoneId, zonesOnPage } from "./config";
@@ -35,7 +35,10 @@ export default function StackedLayout({
   background,
   suggested = "cards",
 }: HomeLayoutProps) {
-  const backdrop = backdropStyle(resolveHomeBackground(background));
+  // The resolved scheme, so the default backdrop's drawing repaints when the
+  // ramp flips, the same way the tool cards re-ask the chain.
+  const { resolved } = useTheme();
+  const backdrop = backdropStyle(resolveHomeBackground(background), resolved);
   return (
     <div className="relative min-h-full">
       {backdrop && (
@@ -48,7 +51,13 @@ export default function StackedLayout({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-background"
         >
-          <div className="absolute inset-0" style={backdrop} />
+          {/* Sticky and one viewport tall, not the page's own height. The page
+              scrolls, and `cover` against a page-height box scales the drawing
+              to that height, which showed as giant cropped arcs on a tall
+              page. Pinned to the scrollport the art keeps its aspect and stays
+              put while the content scrolls over it, which is the docs site's
+              fixed backdrop by other means, scoped to the content area. */}
+          <div className="sticky top-0 h-screen" style={backdrop} />
         </div>
       )}
       {/* Positioned, so the zones paint over the backdrop without a z-index. */}
