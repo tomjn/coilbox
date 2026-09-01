@@ -141,6 +141,10 @@ A trigger outside its range is not armed and cannot be armed. `enable_trigger` o
 
 The player picks the difficulty in the same drawer they press **Play** in, and you pick it in **Test in game**. The picker only appears for a scenario that actually varies by it.
 
+In a campaign the level belongs to the whole run rather than to one mission. The picker sits on the briefing of a mission that varies by difficulty, right above **Start Mission**, and what the player picks there holds for every mission after it until they change it again. So a player who finds mission 4 too hard drops the level on mission 4's briefing and plays on. Missions they already beat stay beaten.
+
+A campaign run nobody has picked a level for plays at normal, which is what every campaign did before this existed.
+
 A range that crosses itself, "only from hard" and "only up to easy" together, is a warning on the launch rather than a refusal. Nothing in the mission can satisfy it, so the thing never appears at any setting.
 
 A scenario that sets any range needs mission runtime 6. One that sets none asks for whatever it asked for before, plays identically at every setting, and compiles to the same file it always did.
@@ -383,7 +387,6 @@ Honest limits, all of them things you can hit while authoring:
 - **A restricted unit's build icon is greyed out, and a game may un-grey it.** The runtime greys the icons your restrictions forbid, on every builder, and ungreys one an `unlock_unit` frees. A game that paints its own build icons, for a tech tree or a supply limit, can repaint over that, and then a forbidden unit looks available. The build is still refused either way.
 - **A mission coilbox wrote into a game stays there.** There is no in-app way to remove one: [issue #814](https://github.com/tomjn/coilbox/issues/814).
 - **A scenario cannot be set up without a preset:** [issue #821](https://github.com/tomjn/coilbox/issues/821).
-- **A campaign mission is not offered a difficulty yet.** The ranges work wherever the scenario is played, but the campaign's own launch has no picker, so a mission run from a campaign plays at normal: [issue #2220](https://github.com/tomjn/coilbox/issues/2220).
 
 One thing nobody has watched happen, so treat it as unproven rather than working:
 

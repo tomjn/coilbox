@@ -279,6 +279,31 @@ describe("a bundled campaign's row", () => {
 });
 
 /**
+ * The order the rows are drawn in (issue #2213). The rule lives in
+ * `listing.ts` and is loaded once in `campaigns.ts`, which is where its own
+ * tests are. What this pins is the half that makes that order the one an author
+ * sees: the page draws the list it was handed and does not re-sort it.
+ */
+describe("the order of the list", () => {
+  it("draws the campaigns in the order the list gave them", () => {
+    show([
+      { campaign: campaignNamed("c", "Cold Start"), source: "local" },
+      { campaign: campaignNamed("a", "Ashes"), source: "local" },
+      { campaign: campaignNamed("b", "Beachhead"), source: "local" },
+    ]);
+
+    const titles = screen
+      .getAllByRole("link")
+      .map((link) => link.textContent?.split(" · ")[0]);
+    expect(titles).toEqual([
+      expect.stringContaining("Cold Start"),
+      expect.stringContaining("Ashes"),
+      expect.stringContaining("Beachhead"),
+    ]);
+  });
+});
+
+/**
  * What a row says about the campaign (issue #2187). The sentence itself is a
  * plain unit test in `listing.test.ts`. What is pinned here is that the row
  * shows it, that the description only takes a line when there is one, and that

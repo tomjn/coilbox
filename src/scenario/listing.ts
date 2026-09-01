@@ -8,43 +8,54 @@
  */
 
 import type { Campaign } from "../campaign/model";
-import { relativeTime } from "../lib/relativeTime";
 import type { Scenario } from "./model";
 
-/** What a scenario holds, for a list row's second line. */
-export function scenarioContents(scenario: Scenario): string {
-  const counts = [
-    [scenario.actors.length + scenario.groups.length, "unit placement"],
-    [scenario.zones.length, "zone"],
-    [scenario.triggers.length, "trigger"],
-    [scenario.objectives.length, "objective"],
-  ] as const;
-  return counts
-    .map(([n, noun]) => `${n} ${noun}${n === 1 ? "" : "s"}`)
-    .join(" · ");
-}
+/** The kinds of content a scenario is counted by, in the order they are read. */
+export type ScenarioCountKey =
+  | "placements"
+  | "zones"
+  | "triggers"
+  | "objectives";
+
+/** How many of one kind a scenario holds, and what that kind is called. */
+export type ScenarioCount = {
+  key: ScenarioCountKey;
+  count: number;
+  /** Singular, so a caller can phrase it either way. */
+  noun: string;
+};
 
 /**
- * What a scenario holds and when it was last written, for the Scenario Builder
- * row (issue #2179).
+ * What a scenario holds, counted.
  *
- * The edit time rides on the contents line rather than on the line naming the
- * game and the map, for two reasons. It is a fact about the document, as the
- * counts are, while the other line is about the engine setup. And the counts are
- * small integers, so this line has a length the row can predict, where a game's
- * archive name has none and would push the time off the end of a narrow window.
- *
- * `campaignSummary` puts the same segment in the same place, last, so a campaign
- * row and a scenario row read as one product.
+ * The counts are given as data rather than as a finished string because the two
+ * screens listing scenarios want different pictures of them. The Scenarios page
+ * and the campaign pickers read them as a sentence, in the middle of a
+ * paragraph. The Scenario Builder draws them as chips (issue #2180), where a
+ * wall of near identical sentences was the problem. Both start here, so neither
+ * can drift from the other about what a placement is.
  */
-export function scenarioSummary(
-  scenario: Scenario,
-  now: number = Date.now(),
-): string {
-  const edited = relativeTime(scenario.updatedAt, now);
-  return edited
-    ? `${scenarioContents(scenario)} · edited ${edited}`
-    : scenarioContents(scenario);
+export function scenarioCounts(scenario: Scenario): ScenarioCount[] {
+  return [
+    {
+      key: "placements",
+      count: scenario.actors.length + scenario.groups.length,
+      noun: "unit placement",
+    },
+    { key: "zones", count: scenario.zones.length, noun: "zone" },
+    { key: "triggers", count: scenario.triggers.length, noun: "trigger" },
+    { key: "objectives", count: scenario.objectives.length, noun: "objective" },
+  ];
+}
+
+/** One count named, pluralised against itself: "1 zone", "0 zones". */
+export function countPhrase({ count, noun }: ScenarioCount): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** What a scenario holds, as a sentence, for a list row's second line. */
+export function scenarioContents(scenario: Scenario): string {
+  return scenarioCounts(scenario).map(countPhrase).join(" · ");
 }
 
 /**

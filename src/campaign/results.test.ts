@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Campaign, CampaignMission, ProgressFile } from "./model";
-import { applyDefeat, applyVictory, nextAvailableMission } from "./results";
+import {
+  applyDefeat,
+  applyVictory,
+  chooseDifficulty,
+  nextAvailableMission,
+  runDifficulty,
+} from "./results";
 
 function mission(id: string, skippable = false): CampaignMission {
   return {
@@ -90,6 +96,74 @@ describe("applyDefeat", () => {
       lastPlayedMissionId: "a",
       updatedAt: NOW,
     });
+  });
+});
+
+/** Issue #2220. The difficulty belongs to the run, so progress is where it lives. */
+describe("the run's difficulty", () => {
+  const easyRun: ProgressFile = {
+    schemaVersion: 1,
+    campaigns: {
+      c: { completedMissionIds: ["a"], difficulty: "easy", updatedAt: "" },
+    },
+  };
+
+  it("is nothing for a run nobody has set one on", () => {
+    expect(runDifficulty(empty, "c")).toBeUndefined();
+    expect(
+      runDifficulty(applyVictory(empty, "c", "a", NOW), "c"),
+    ).toBeUndefined();
+  });
+
+  it("is the level the run recorded", () => {
+    expect(runDifficulty(easyRun, "c")).toBe("easy");
+  });
+
+  // Progress is opaque JSON read back without validation, so a level this build
+  // cannot rank has to read as no choice rather than reach the engine.
+  it("is nothing for a level this build cannot rank", () => {
+    const file = {
+      schemaVersion: 1,
+      campaigns: {
+        c: { completedMissionIds: [], difficulty: "nightmare", updatedAt: "" },
+      },
+    } as unknown as ProgressFile;
+
+    expect(runDifficulty(file, "c")).toBeUndefined();
+  });
+
+  it("records a choice on a campaign that has never been played", () => {
+    const next = chooseDifficulty(empty, "c", "hard", NOW);
+
+    expect(next.campaigns.c).toEqual({
+      completedMissionIds: [],
+      difficulty: "hard",
+      updatedAt: NOW,
+    });
+  });
+
+  // A player who finds mission 4 too hard drops the level mid-run. What they
+  // already beat, they beat.
+  it("changes the level without disturbing what was already won", () => {
+    const next = chooseDifficulty(easyRun, "c", "hard", NOW);
+
+    expect(next.campaigns.c.difficulty).toBe("hard");
+    expect(next.campaigns.c.completedMissionIds).toEqual(["a"]);
+  });
+
+  it("survives a win and a loss", () => {
+    expect(applyVictory(easyRun, "c", "b", NOW).campaigns.c.difficulty).toBe(
+      "easy",
+    );
+    expect(applyDefeat(easyRun, "c", "b", NOW).campaigns.c.difficulty).toBe(
+      "easy",
+    );
+  });
+
+  it("does not mutate the input document", () => {
+    chooseDifficulty(easyRun, "c", "hard", NOW);
+
+    expect(easyRun.campaigns.c.difficulty).toBe("easy");
   });
 });
 
