@@ -83,9 +83,15 @@ vi.mock("@/content/config", () => ({
 }));
 // Both reach for stored media through the coilbox:// protocol, which a test has
 // no business standing up, and neither is part of removing a mission.
+// The field itself reaches for stored media through the coilbox:// protocol,
+// which a test has no business standing up. It still renders its label, because
+// whether the icon and background pickers are on the page at all is the whole
+// of issue #2194.
 vi.mock("./components/CampaignImage", () => ({
   CampaignImage: () => null,
-  CampaignImageField: () => null,
+  CampaignImageField: ({ label }: { label: string }) => (
+    <div>{label} picker</div>
+  ),
 }));
 vi.mock("./components/PanoramaScroller", () => ({
   PanoramaScroller: () => null,
@@ -129,7 +135,10 @@ function plain(id: string, title: string): CampaignMission {
   };
 }
 
-function campaign(missions: CampaignMission[]): Campaign {
+function campaign(
+  missions: CampaignMission[],
+  art: Partial<Campaign> = {},
+): Campaign {
   return {
     schemaVersion: 1,
     id: "c1",
@@ -139,12 +148,17 @@ function campaign(missions: CampaignMission[]): Campaign {
     missions,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    ...art,
   };
 }
 
-function show(missions: CampaignMission[], stored: Scenario[] = []) {
+function show(
+  missions: CampaignMission[],
+  stored: Scenario[] = [],
+  art: Partial<Campaign> = {},
+) {
   useCampaigns.mockReturnValue({
-    campaigns: [{ campaign: campaign(missions), source: "local" }],
+    campaigns: [{ campaign: campaign(missions, art), source: "local" }],
     loading: false,
     error: null,
   });
@@ -172,6 +186,9 @@ beforeEach(() => {
   campaignSave.mockClear();
   campaignMediaDelete.mockClear();
   refreshCampaigns.mockClear();
+  // The Presentation disclosure remembers itself in localStorage, which
+  // outlives a render, so each test starts from "never chosen".
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -752,5 +769,98 @@ describe("two edits made close together", () => {
     await waitFor(() => expect(onDisk).toHaveLength(2));
 
     expect(await screen.findByText(SAVED)).toBeTruthy();
+  });
+});
+
+/**
+ * Where the icon and background pickers sit (issue #2194).
+ *
+ * They were the first thing under the title, so opening a campaign with three
+ * missions put one and a bit of them on screen at the default window size and
+ * the rest below the fold. The art is set once and the missions are edited
+ * constantly, so the section is now a disclosure that starts shut.
+ *
+ * The thing a disclosure can get wrong is discovery: a shut section that shows
+ * nothing leaves a new author never learning there is an icon to set. So the
+ * cases worth pinning are what the shut row says, and that a campaign with
+ * nothing in it yet gets the section open without asking.
+ */
+describe("the campaign editor's presentation section", () => {
+  const trigger = () => screen.getByRole("button", { name: /Presentation/ });
+
+  it("starts shut on a campaign that has missions", () => {
+    show([mission()]);
+
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Icon picker")).toBeNull();
+    expect(screen.queryByText("Background picker")).toBeNull();
+  });
+
+  it("starts open on a campaign with no missions", () => {
+    // Nothing below it to be in the way of, and a campaign with no missions is
+    // still being set up (issue #2190 calls it a Draft).
+    show([]);
+
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Icon picker")).toBeTruthy();
+    expect(screen.getByText("Background picker")).toBeTruthy();
+  });
+
+  it("says nothing is set yet, so a shut section is still an invitation", () => {
+    show([mission()]);
+
+    expect(screen.getByText("No icon or background yet")).toBeTruthy();
+  });
+
+  it("says which of the two is set", () => {
+    show([mission()], [], { icon: { kind: "file", file: "emblem.png" } });
+
+    expect(screen.getByText("Icon set, no background")).toBeTruthy();
+  });
+
+  it("opens on click, putting the pickers back", () => {
+    show([mission()]);
+
+    fireEvent.click(trigger());
+
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Icon picker")).toBeTruthy();
+  });
+
+  it("remembers being opened, so the next campaign opened is open too", () => {
+    show([mission()]);
+    fireEvent.click(trigger());
+    cleanup();
+
+    // A different campaign, with missions, so nothing but the remembered
+    // choice can be holding it open.
+    show([plain("m9", "Second")]);
+
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("remembers being shut, even where it would have opened itself", () => {
+    show([]);
+    fireEvent.click(trigger());
+    cleanup();
+
+    show([]);
+
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  /**
+   * Opening a disclosure is a view preference, not an edit. Storing it on the
+   * campaign would queue a write and stamp `updatedAt`, so a click that changed
+   * nothing would move the campaign to the top of a list sorted by when it was
+   * last touched.
+   */
+  it("never writes the campaign document", () => {
+    show([mission()]);
+
+    fireEvent.click(trigger());
+    fireEvent.click(trigger());
+
+    expect(campaignSave).not.toHaveBeenCalled();
   });
 });
