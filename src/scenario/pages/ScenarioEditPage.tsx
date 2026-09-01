@@ -366,7 +366,15 @@ export default function ScenarioEditPage() {
     // panel being handed the game name.
     <UnitGameProvider gameName={scenario.setup.gameName}>
       <div className="flex flex-col gap-5 p-4">
-        <div className="flex items-center gap-3">
+        {/* Test in game, Mission Lua and the problems count are the actions an
+          author reaches for on every test run, so the row stays on screen
+          rather than scrolling off above the map (issue #2276). Sticky
+          within the editor's own scroll container (picoframe's `<main>`),
+          thin (no padding beyond the border) so it costs the map as little
+          height as possible, and left plain so the save indicator, an
+          always-present problems button and undo/redo (later issues in this
+          milestone) have a row to land in without another restructure. */}
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/50 bg-background py-2">
           <Link
             to={BACK}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
