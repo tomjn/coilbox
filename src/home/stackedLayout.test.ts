@@ -12,6 +12,10 @@ vi.mock("@picoframe/frame", () => ({
   Slot: zone("slot"),
   useTheme: () => ({ resolved: "dark" }),
 }));
+vi.mock("./useThemeColor", () => ({
+  useThemeColor: () => "hsl(221.2 83.2% 53.3%)",
+  accentHueRotate: () => undefined,
+}));
 vi.mock("./zones/Onboarding", () => ({ default: zone("onboarding") }));
 vi.mock("./zones/Greeting", () => ({ default: zone("greeting") }));
 vi.mock("./zones/Continue", () => ({ default: zone("continue") }));

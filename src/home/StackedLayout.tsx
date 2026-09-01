@@ -5,6 +5,7 @@ import { type HomeEntry, type ZoneId, zonesOnPage } from "./config";
 import HomeMarkup from "./HomeMarkup";
 import type { HomeLayoutProps } from "./layout";
 import type { SuggestedPlacement } from "./suggestedMap";
+import { accentHueRotate, useThemeColor } from "./useThemeColor";
 import Continue from "./zones/Continue";
 import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
@@ -35,10 +36,20 @@ export default function StackedLayout({
   background,
   suggested = "cards",
 }: HomeLayoutProps) {
-  // The resolved scheme, so the default backdrop's drawing repaints when the
-  // ramp flips, the same way the tool cards re-ask the chain.
-  const { resolved } = useTheme();
-  const backdrop = backdropStyle(resolveHomeBackground(background), resolved);
+  // The resolved scheme and the reactive colour, so the default backdrop's
+  // drawing repaints when the ramp flips or the accent changes, the same way
+  // the tool cards re-ask the chain. A cycling accent additionally
+  // counter-rotates the drawing's hue so it turns with the page (see
+  // `accentHueRotate`), but only the default: a distribution's own image is
+  // not theme-tinted.
+  const { resolved, accent } = useTheme();
+  const themeColor = useThemeColor();
+  const resolvedBackground = resolveHomeBackground(background);
+  const backdrop = backdropStyle(resolvedBackground, resolved, themeColor);
+  if (backdrop && resolvedBackground.kind === "default") {
+    const hueFilter = accentHueRotate(accent, themeColor);
+    if (hueFilter) backdrop.filter = hueFilter;
+  }
   return (
     <div className="relative min-h-full">
       {backdrop && (

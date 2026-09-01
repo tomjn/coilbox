@@ -239,11 +239,12 @@ export function resolveHomeBackground(
 export function backdropStyle(
   backdrop: HomeBackdrop,
   scheme: CardScheme = readColorScheme(),
+  themeColor: string = readThemeColor(),
 ): CSSProperties | null {
   if (backdrop.kind === "none") return null;
   if (backdrop.kind === "default")
     return {
-      backgroundImage: `url("${defaultBackdropUrl(readThemeColor(), scheme)}")`,
+      backgroundImage: `url("${defaultBackdropUrl(themeColor, scheme)}")`,
       backgroundSize: "cover",
       backgroundPosition: "center bottom",
       opacity: DEFAULT_BACKDROP_ALPHA,
