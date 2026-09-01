@@ -36,9 +36,16 @@
 -- how the mission widget draws, and the version is also what tells coilbox an
 -- installed runtime is older than the one it ships, which is how a game that
 -- vendored 3 is offered the new widget.
+--
+-- 5 adds no types either. It is what the runtime says when it refuses to do
+-- something: a spawn the engine would not make and an order given to a group
+-- with nothing on the map are logged at Error rather than passed over or filed
+-- as a warning (issue #2165). A game that vendored 4 plays every scenario the
+-- same way, and is offered this so its authors can tell a mission that placed
+-- nothing from one whose units did not arrive.
 
 return {
-	version = 4,
+	version = 5,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

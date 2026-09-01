@@ -397,7 +397,13 @@ function M.newEngine(modOptions, files, options)
 				end
 				return pos.x, 0, pos.z, true
 			end,
+			-- `options.refuses` is the set of def names the engine answers nil for
+			-- without raising, which is what it does for a team at its unit limit
+			-- or a position the loader will not place on.
 			CreateUnit = function(def, x, y, z, facing, team)
+				if (options.refuses or {})[def] then
+					return nil
+				end
 				local unitID = engine.spawn(def, team, nil)
 				local unit = engine.units[unitID]
 				unit.x, unit.y, unit.z, unit.facing = x, y, z, facing
