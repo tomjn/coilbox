@@ -162,7 +162,9 @@ Each trigger has:
 - **Then**, the actions, run in the order you list them.
 - **Only from** and **Only up to**, the difficulties it runs at. See [Difficulty](#difficulty).
 
-A trigger's name is its id. Renaming one rewrites the actions that referred to it.
+A trigger's name is a label. Call it what you like, call two triggers the same thing if that reads better, and rename it whenever. Nothing points at the name: `enable_trigger` and the compiled mission point at an id the editor mints once and never changes. So a rename moves nothing, and the mission a game ships does not need recompiling because you thought of a better name.
+
+A trigger written before names existed shows the id it was called by, which is the name it was displayed under anyway. Nothing to do.
 
 Conditions are checked two ways, and you do not choose which. A condition about a thing that happened, a unit dying or being captured, is checked when it happens. A condition about an aggregate, a count or a zone's contents or a clock, is checked on a slow tick every 15 frames. A trigger with one aggregate condition is checked on the tick.
 

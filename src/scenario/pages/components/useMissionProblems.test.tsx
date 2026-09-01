@@ -32,6 +32,7 @@ function pointsAtAMissingZone(): Scenario {
     triggers: [
       {
         id: "open",
+        name: "open",
         enabled: true,
         repeat: false,
         conditions: {

@@ -10,15 +10,14 @@
  * copy and takes the undo with it.
  *
  * Driven through the whole panel rather than through the two fields on their
- * own, because the form is mounted keyed by the trigger's id. That key is the
- * name box's value, so a rename remounts the form and reseeds the name box
- * while leaving every other box in it alone. A test that mounted the name field
- * by itself would be testing an arrangement the editor never puts it in.
+ * own, because both the drift and which trigger is under the cursor are
+ * properties of the panel around them. A test that mounted the name field by
+ * itself would be testing an arrangement the editor never puts it in.
  *
  * Their commit rules are pinned alongside, because the resync must not quietly
- * change them: a name that is empty or already taken is refused and the old one
- * put back, and a cooldown that is empty or not a positive number clears the
- * wait rather than storing a nonsense one.
+ * change them: an empty name is refused and the old one put back, and a cooldown
+ * that is empty or not a positive number clears the wait rather than storing a
+ * nonsense one.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -62,8 +61,10 @@ vi.setConfig({ testTimeout: 30_000 });
 afterEach(cleanup);
 
 function trigger(patch: Partial<ScenarioTrigger> = {}): ScenarioTrigger {
+  const id = patch.id ?? "wave-one";
   return {
-    id: "wave-one",
+    id,
+    name: id,
     enabled: true,
     repeat: false,
     conditions: { op: "all", conditions: [] },
@@ -183,9 +184,10 @@ const undo = () =>
 const redo = () =>
   fireEvent.click(screen.getByRole("button", { name: "Redo" }));
 
-/** Click a trigger in the list, the way an author picks the one to work on. */
-const select = (id: string) =>
-  fireEvent.click(screen.getByRole("button", { name: new RegExp(id) }));
+/** Click a trigger in the list, the way an author picks the one to work on.
+ *  The rows read as the author named them, so that is what they are found by. */
+const select = (name: string) =>
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(name) }));
 
 const nameBox = () => screen.getByLabelText("Trigger name");
 const cooldownBox = () => screen.getByLabelText("Waits");
@@ -207,12 +209,14 @@ describe("a trigger's name when the document moves under it", () => {
     undo();
     typeOneMore(nameBox());
 
-    expect(stored().map((t) => t.id)).toEqual(["wave-one!", "wave-two"]);
+    expect(stored().map((t) => t.name)).toEqual(["wave-one!", "wave-two"]);
   });
 });
 
 describe("a trigger's name commit rules", () => {
-  it("carries the actions that named it over to the new name", () => {
+  /** The point of issue #2205, seen from the panel. A rename is a label change
+   *  and nothing else, so nothing else in the document moves. */
+  it("leaves the actions that point at it alone", () => {
     openPanel([
       trigger({ id: "wave-one" }),
       trigger({
@@ -223,7 +227,8 @@ describe("a trigger's name commit rules", () => {
 
     commit(nameBox(), "first-wave");
 
-    expect(stored()[1].actions[0].params).toEqual({ trigger: "first-wave" });
+    expect(stored()[0].id).toBe("wave-one");
+    expect(stored()[1].actions[0].params).toEqual({ trigger: "wave-one" });
   });
 
   it("puts the name back when the box is emptied", () => {
@@ -232,15 +237,16 @@ describe("a trigger's name commit rules", () => {
     commit(nameBox(), "   ");
 
     expect(asInput(nameBox()).value).toBe("wave-one");
-    expect(stored().map((t) => t.id)).toEqual(["wave-one"]);
+    expect(stored().map((t) => t.name)).toEqual(["wave-one"]);
   });
 
-  it("puts the name back when another trigger already has it", () => {
+  it("takes a name another trigger already has", () => {
     openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
 
     commit(nameBox(), "wave-two");
 
-    expect(asInput(nameBox()).value).toBe("wave-one");
+    expect(asInput(nameBox()).value).toBe("wave-two");
+    expect(stored().map((t) => t.name)).toEqual(["wave-two", "wave-two"]);
     expect(stored().map((t) => t.id)).toEqual(["wave-one", "wave-two"]);
   });
 });
@@ -248,10 +254,13 @@ describe("a trigger's name commit rules", () => {
 /**
  * Which trigger the panel is on after a rename is stepped over (issue #2202).
  *
- * The selection is held by name, and a rename changes the name, so an undo
- * leaves the panel holding a name the document no longer has. It used to show
- * the first trigger in the list instead, and the author carried on typing into
- * a trigger they had not picked.
+ * The selection used to be held by name, and a rename changed the name, so an
+ * undo left the panel holding a name the document no longer had. It showed the
+ * first trigger in the list instead, and the author carried on typing into a
+ * trigger they had not picked. The selection is an id now (issue #2205), and no
+ * rename moves an id, so these are the cases that bug was found through rather
+ * than a live hazard. They stay because the selection is still resolved
+ * somewhere, and this is what the answer has to be.
  */
 describe("which trigger the panel is on when a rename is stepped over", () => {
   it("goes back to the trigger that was renamed", () => {
@@ -272,7 +281,7 @@ describe("which trigger the panel is on when a rename is stepped over", () => {
     undo();
     typeOneMore(nameBox());
 
-    expect(stored().map((t) => t.id)).toEqual(["wave-one", "wave-two!"]);
+    expect(stored().map((t) => t.name)).toEqual(["wave-one", "wave-two!"]);
   });
 
   // First in the list is the answer the old fallback gave for every trigger, so
@@ -285,7 +294,7 @@ describe("which trigger the panel is on when a rename is stepped over", () => {
     undo();
     typeOneMore(nameBox());
 
-    expect(stored().map((t) => t.id)).toEqual(["wave-one!", "wave-two"]);
+    expect(stored().map((t) => t.name)).toEqual(["wave-one!", "wave-two"]);
   });
 
   it("follows the rename forward again when it is redone", () => {
@@ -294,8 +303,6 @@ describe("which trigger the panel is on when a rename is stepped over", () => {
 
     commit(nameBox(), "second-wave");
     undo();
-    // The author clicks the row the undo put back before stepping forward.
-    select("wave-two");
     redo();
 
     expect(asInput(nameBox()).value).toBe("second-wave");
@@ -308,7 +315,39 @@ describe("which trigger the panel is on when a rename is stepped over", () => {
     undo();
 
     expect(screen.queryByLabelText("Trigger name")).toBeNull();
+    expect(stored().map((t) => t.name)).toEqual(["wave-one"]);
+  });
+});
+
+/**
+ * What the stable id closes on its own (issue #2205). Deleting a trigger used to
+ * clear the selection outright, so undoing the delete put the trigger back and
+ * left the author on whichever one happened to be first. The id outlives the
+ * delete, so the selection can stay on it and the undo lands where the author
+ * was.
+ */
+describe("which trigger the panel is on when one is deleted", () => {
+  const del = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Delete/ }));
+
+  it("shows no form once the trigger it was on has gone", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    del();
+
+    expect(screen.queryByLabelText("Trigger name")).toBeNull();
     expect(stored().map((t) => t.id)).toEqual(["wave-one"]);
+  });
+
+  it("goes back to the deleted trigger when the delete is undone", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    del();
+    undo();
+
+    expect(asInput(nameBox()).value).toBe("wave-two");
   });
 });
 

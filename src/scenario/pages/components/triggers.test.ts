@@ -33,6 +33,7 @@ const trigger = (
   extra: Partial<ScenarioTrigger> = {},
 ): ScenarioTrigger => ({
   id,
+  name: id,
   enabled: true,
   repeat: false,
   conditions: { op: "all", conditions: [] },
@@ -158,29 +159,39 @@ describe("renameTrigger", () => {
     ],
   });
 
-  it("rewrites every parameter that named the trigger", () => {
-    const s = renameTrigger(withRefs(), "close", "shut");
+  it("changes the name and leaves the id where it was", () => {
+    const s = renameTrigger(withRefs(), "close", "The gates shut");
 
-    expect(s.triggers.map((t) => t.id)).toEqual(["open", "shut"]);
-    expect(s.triggers[0].actions[0].params.trigger).toBe("shut");
-    expect(s.triggers[1].actions[0].params.trigger).toBe("shut");
+    expect(s.triggers.map((t) => t.id)).toEqual(["open", "close"]);
+    expect(s.triggers.map((t) => t.name)).toEqual(["open", "The gates shut"]);
   });
 
-  it("leaves the parameters of other types alone", () => {
-    const s = renameTrigger(withRefs(), "close", "shut");
+  /** The whole point of issue #2205. Every reference is an id, and the id has
+   *  not moved, so there is nothing to carry over and nothing to get wrong. */
+  it("leaves every reference to the trigger alone", () => {
+    const s = renameTrigger(withRefs(), "close", "The gates shut");
+
+    expect(s.triggers[0].actions[0].params.trigger).toBe("close");
+    expect(s.triggers[1].actions[0].params.trigger).toBe("close");
     expect(s.triggers[0].actions[1].params).toEqual({});
   });
 
-  it("refuses a name that is empty, unchanged or already taken", () => {
+  it("refuses a name that is empty or unchanged", () => {
     const before = withRefs();
     expect(renameTrigger(before, "close", "  ")).toBe(before);
     expect(renameTrigger(before, "close", "close")).toBe(before);
-    expect(renameTrigger(before, "close", "open")).toBe(before);
     expect(renameTrigger(before, "gone", "shut")).toBe(before);
   });
 
+  /** Nothing resolves a trigger by name, so two of them may read the same. */
+  it("allows a name another trigger already has", () => {
+    const s = renameTrigger(withRefs(), "close", "open");
+    expect(s.triggers.map((t) => t.name)).toEqual(["open", "open"]);
+    expect(s.triggers.map((t) => t.id)).toEqual(["open", "close"]);
+  });
+
   it("keeps the document loadable", () => {
-    const s = renameTrigger(withRefs(), "close", "shut");
+    const s = renameTrigger(withRefs(), "close", "The gates shut");
     expect(parseScenario(JSON.parse(JSON.stringify(s)))).not.toBeNull();
   });
 });
@@ -292,6 +303,23 @@ describe("registryOptions", () => {
     expect(registryOptions(document(), "zoneId")).toEqual([
       { value: "z1", label: "Pass 1", description: "circle" },
       { value: "z2", label: "Pass 2", description: "box" },
+    ]);
+  });
+
+  /** Issue #2205. A trigger is offered by the name its author gave it and
+   *  stored by the id that never moves, which is what a zone has always done.
+   *  Two triggers may share a name, so the same numbering applies. */
+  it("offers triggers by name and stores them by id", () => {
+    const scenario = {
+      ...document(),
+      triggers: [
+        trigger("open", { name: "The gates" }),
+        trigger("close", { name: "The gates" }),
+      ],
+    };
+    expect(registryOptions(scenario, "triggerId")).toMatchObject([
+      { value: "open", label: "The gates 1" },
+      { value: "close", label: "The gates 2" },
     ]);
   });
 
@@ -479,7 +507,14 @@ describe("stepTypes with a game's own types", () => {
     expect(stepLabel("time_elapsed", extensions)).toBe("Time elapsed");
   });
 
-  it("rewrites a reference a declared type holds when a trigger is renamed", () => {
+  /**
+   * A game's own trigger reference used to need carrying over on every rename,
+   * and only the extension table said it was a reference at all, so a rename
+   * made with the table missing quietly broke it. Since issue #2205 it points at
+   * an id nothing moves, so it survives a rename without anyone having to know
+   * it is there.
+   */
+  it("leaves a reference a declared type holds alone when a trigger is renamed", () => {
     const declared = parseExtensions({
       handler: "h.lua",
       actions: [
@@ -489,17 +524,16 @@ describe("stepTypes with a game's own types", () => {
         },
       ],
     });
+    expect(declared.actions.sf_arm.spec.which.kind).toBe("triggerId");
+
     const base = addStep(document(), "open", "actions", {
       type: "sf_arm",
       params: { which: "open" },
     });
 
-    const renamed = renameTrigger(base, "open", "opened", declared);
+    const renamed = renameTrigger(base, "open", "The gates open");
 
-    expect(renamed.triggers[0].actions[0].params.which).toBe("opened");
-    expect(
-      renameTrigger(base, "open", "opened").triggers[0].actions[0].params.which,
-    ).toBe("open");
+    expect(renamed.triggers[0].actions[0].params.which).toBe("open");
   });
 });
 

@@ -112,6 +112,7 @@ export function starterScenario(name: string, description = ""): Scenario {
     triggers: [
       {
         id: "briefing",
+        name: "Command calls in",
         enabled: true,
         repeat: false,
         conditions: {
@@ -122,6 +123,7 @@ export function starterScenario(name: string, description = ""): Scenario {
       },
       {
         id: "held-out",
+        name: "The five minutes are up",
         enabled: true,
         repeat: false,
         conditions: {

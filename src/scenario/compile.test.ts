@@ -446,6 +446,38 @@ describe("difficulty", () => {
   });
 });
 
+/**
+ * Issue #2205. A trigger's name is the editor's, not the runtime's. The runtime
+ * addresses a trigger by its id and `enable_trigger` carries an id, so the name
+ * has no work to do in the compiled file and is left out of it.
+ *
+ * That is what makes the whole change free at the far end. No mission.lua on
+ * disk moves, no vendored runtime has to learn anything, and a game shipping a
+ * mission does not fall out of step with the document beside it (issue #2160)
+ * because somebody gave a trigger a better name.
+ */
+describe("a trigger's name", () => {
+  const armed = {
+    id: "t1",
+    conditions: { op: "all", conditions: [] },
+    actions: [{ type: "enable_trigger", params: { trigger: "t1" } }],
+  };
+
+  it("does not reach the compiled mission", () => {
+    const renamed = compileScenario(
+      build({ triggers: [{ ...armed, name: "The gates open" }] }),
+    );
+    expect(renamed).toBe(compileScenario(build({ triggers: [armed] })));
+    expect(renamed).not.toContain("The gates open");
+  });
+
+  it("leaves the id in the file for the runtime to address it by", () => {
+    expect(
+      compileScenario(build({ triggers: [{ ...armed, name: "Anything" }] })),
+    ).toContain('id = "t1"');
+  });
+});
+
 describe("missionPath", () => {
   it("puts a mission in its own folder under missions/", () => {
     expect(missionPath("abc-123")).toBe("missions/abc-123/mission.lua");

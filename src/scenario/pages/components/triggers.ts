@@ -11,8 +11,8 @@
  *   the whole document, so the editor must never write one. That is why a step
  *   is added with a full set of parameters, and why a type whose references
  *   cannot be filled in is offered as unavailable rather than added empty.
- * - Two triggers sharing an id is refused the same way, so renaming one checks
- *   first.
+ * - Two triggers sharing an id is refused the same way, so a new trigger's id is
+ *   minted clear of the ids already in the document.
  *
  * Which parameter is which is read from `triggerTypes.ts` throughout, never from
  * a list of type names written out again here, so a type added to that table
@@ -99,9 +99,15 @@ function round(pos: Point): Point {
  * The trigger list.
  * -------------------------------------------------------------------------- */
 
-/** A readable id for a new trigger. Readable rather than a UUID because a
- *  trigger's id is also its name: it is what the author reads in the list and
- *  what `enable_trigger` picks it out by. */
+/**
+ * A stable id for a new trigger. Nothing renames it, so it is minted once here
+ * and then only read.
+ *
+ * Readable rather than a UUID because it is the name a trigger goes under in the
+ * compiled mission and in the paths the validator reports problems at, and
+ * `trigger-3` is a far better thing to find in `mission.lua` than a hex blob.
+ * The author's own name for it is a separate field.
+ */
 export function nextTriggerId(triggers: ScenarioTrigger[]): string {
   const taken = new Set(triggers.map((t) => t.id));
   for (let n = triggers.length + 1; ; n++) {
@@ -110,11 +116,13 @@ export function nextTriggerId(triggers: ScenarioTrigger[]): string {
   }
 }
 
-/** The document with one more trigger on the end: armed, firing once, and
- *  waiting for the conditions and actions the panel adds next. */
+/** The document with one more trigger on the end: armed, firing once, named
+ *  after its id until the author says otherwise, and waiting for the conditions
+ *  and actions the panel adds next. */
 export function addTrigger(scenario: Scenario, id: string): Scenario {
   const trigger: ScenarioTrigger = {
     id,
+    name: id,
     enabled: true,
     repeat: false,
     conditions: { op: "all", conditions: [] },
@@ -245,41 +253,31 @@ export function rewriteRefs(
 }
 
 /**
- * A trigger under a different id.
+ * A trigger under a different name.
  *
- * The id is the trigger's name: it is what `enable_trigger` and
- * `disable_trigger` point at, and the only thing about a trigger an author can
- * read. So renaming one rewrites every parameter that named it, found through
- * the type table rather than through the two actions that do it today, so a
- * trigger reference a game extension declares is carried over too.
+ * A label and nothing more (issue #2205). `enable_trigger` points at the id, the
+ * compiled mission is addressed by the id, and the id does not move, so a rename
+ * rewrites nothing and leaves nothing pointing at a trigger that is gone.
  *
- * The document comes back unchanged when the new id is empty, unchanged, or
- * already taken, because two triggers sharing an id is a document the parser
- * refuses to load.
+ * Two triggers may share a name. Nothing resolves a trigger by name any more, so
+ * refusing a duplicate would be a rule with no reason behind it, and an author
+ * who wants two "reinforcements" is not making a mistake. The picker tells them
+ * apart the way it does for two zones with one name.
+ *
+ * The document comes back unchanged when the new name is empty or unchanged. An
+ * empty one is refused rather than stored, because a row with no label in it
+ * cannot be picked out of the list.
  */
 export function renameTrigger(
   scenario: Scenario,
-  from: string,
+  id: string,
   to: string,
-  extensions: ExtensionTypes = NO_EXTENSIONS,
 ): Scenario {
   const wanted = to.trim();
-  if (!wanted || wanted === from) return scenario;
-  if (!scenario.triggers.some((t) => t.id === from)) return scenario;
-  if (scenario.triggers.some((t) => t.id === wanted)) return scenario;
-  const rewritten = rewriteRefs(
-    scenario,
-    "triggerId",
-    from,
-    wanted,
-    extensions,
-  );
-  return {
-    ...rewritten,
-    triggers: rewritten.triggers.map((t) =>
-      t.id === from ? { ...t, id: wanted } : t,
-    ),
-  };
+  if (!wanted) return scenario;
+  const trigger = scenario.triggers.find((t) => t.id === id);
+  if (!trigger || trigger.name === wanted) return scenario;
+  return editTrigger(scenario, id, { name: wanted });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -493,12 +491,18 @@ export function registryOptions(
         label: `Group ${i + 1}`,
         description: `${groupSize(group)} units`,
       }));
-    case "triggerId":
-      return scenario.triggers.map((trigger) => ({
+    // By name, with the id underneath as the value, the way a zone is picked.
+    // Two triggers may share a name, so the labels are made to differ first,
+    // otherwise the list offers the same word twice and neither is the one the
+    // author means.
+    case "triggerId": {
+      const labels = uniqueLabels(scenario.triggers.map((t) => t.name));
+      return scenario.triggers.map((trigger, i) => ({
         value: trigger.id,
-        label: trigger.id,
+        label: labels[i],
         description: triggerSummary(trigger),
       }));
+    }
     case "objectiveId":
       return scenario.objectives.map((objective) => ({
         value: objective.id,

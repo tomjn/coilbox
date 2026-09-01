@@ -530,6 +530,62 @@ describe("parseScenario — reading a schema 1 document", () => {
   });
 });
 
+/**
+ * Issue #2205. A trigger used to be identified by the one string it had, so its
+ * name was also what `enable_trigger` pointed at and what the compiled mission
+ * addressed it by. Every scenario written before this build is one of those, and
+ * every one of them has to go on playing exactly as it did.
+ *
+ * The id is the thing that did not move: a document with no `name` keeps its ids
+ * and its references untouched, and gains the name it always displayed. So there
+ * is nothing to rewrite on disk and nothing to recompile. The corpus fixtures in
+ * `corpus.test.ts` are the standing proof, because none of them carries a `name`
+ * and each is checked against its committed `mission.lua` byte for byte.
+ */
+describe("parseScenario — a trigger written before names existed", () => {
+  const nameless = {
+    id: "gates-open",
+    conditions: { op: "all", conditions: [] },
+    actions: [
+      { type: "enable_trigger", params: { trigger: "gates-open" } },
+      { type: "victory", params: {} },
+    ],
+  };
+
+  it("keeps the id it was written with", () => {
+    const s = parseScenario(doc({ triggers: [nameless] }));
+    expect(s?.triggers[0].id).toBe("gates-open");
+  });
+
+  it("takes the id as the name it was displayed under", () => {
+    const s = parseScenario(doc({ triggers: [nameless] }));
+    expect(s?.triggers[0].name).toBe("gates-open");
+  });
+
+  it("leaves every reference to it pointing where it pointed", () => {
+    const s = parseScenario(doc({ triggers: [nameless] }));
+    expect(s?.triggers[0].actions[0].params.trigger).toBe("gates-open");
+  });
+
+  it("keeps a name that has been written down since", () => {
+    const s = parseScenario(
+      doc({ triggers: [{ ...nameless, name: "The gates open" }] }),
+    );
+    expect(s?.triggers[0].id).toBe("gates-open");
+    expect(s?.triggers[0].name).toBe("The gates open");
+  });
+
+  /** A name is a label, so an unreadable one falls back rather than taking the
+   *  whole document down with it. An id does not: it is what references resolve
+   *  against, and guessing one is how a mission comes apart quietly. */
+  it("falls back to the id when the name is not a string", () => {
+    for (const name of [42, null, "", {}]) {
+      const s = parseScenario(doc({ triggers: [{ ...nameless, name }] }));
+      expect(s?.triggers[0].name).toBe("gates-open");
+    }
+  });
+});
+
 describe("parseScenario — triggers", () => {
   const trigger = (extra: Record<string, unknown> = {}) => ({
     id: "t1",
@@ -545,6 +601,7 @@ describe("parseScenario — triggers", () => {
     const s = parseScenario(doc({ triggers: [trigger()] }));
     expect(s?.triggers[0]).toEqual({
       id: "t1",
+      name: "t1",
       enabled: true,
       repeat: false,
       conditions: {

@@ -85,6 +85,7 @@ describe("a range on each thing that can carry one", () => {
       triggers: [
         {
           id: "wave-one",
+          name: "wave-one",
           enabled: true,
           repeat: false,
           conditions: { op: "all", conditions: [] },

@@ -8,9 +8,10 @@
  * disable other triggers already make the flat list a state machine, and that
  * reads better than a boolean tree.
  *
- * A trigger's id is also its name. It is what the author reads in the list and
- * what `enable_trigger` picks it out by, so renaming one rewrites the actions
- * that named it rather than leaving them pointing at a trigger that is gone.
+ * A trigger has an id nothing renames and a name the author edits (issue #2205).
+ * `enable_trigger` points at the id and so does the selection here, so renaming
+ * one rewrites nothing and this panel never has to work out which trigger a name
+ * belongs to.
  *
  * The document is never held here. Every edit goes out through `onChange` and
  * comes back as a new `scenario`, the way the map scene works.
@@ -47,61 +48,29 @@ import {
   triggerSummary,
 } from "./triggers";
 
-/** A rename the panel has made: the name the trigger had, and the name it was
- *  given. Newest last. */
-interface TriggerRename {
-  from: string;
-  to: string;
-}
-
 /**
  * The trigger the panel is showing.
  *
- * A trigger's id is its name, so a rename moves the very thing the selection is
- * held by. An undo puts the old name back in the document without the panel
- * hearing about it, and the name the panel holds then matches nothing. It used
- * to show the first trigger in the list at that point, so an author who undid a
- * rename and carried on typing was editing a trigger they had not picked
- * (issue #2202).
+ * The id is held rather than the name, and nothing changes an id, so this is a
+ * lookup and not a search. It was neither before issue #2205: the id was the
+ * name, a rename moved the thing the selection was held by, and an undo left the
+ * panel holding a string the document no longer had. It showed the first trigger
+ * in the list at that point, so an author who undid a rename and carried on
+ * typing was editing a trigger they had not picked (issue #2202). PR #2204 got
+ * that right by recording every rename the panel made and walking the record.
+ * A stable id means there is nothing to record.
  *
- * Every rename in the editor goes through this panel, so the renames it has made
- * say which names belong to the same trigger. Walking them backwards finds the
- * trigger an undo has renamed back, and walking them forwards finds the one a
- * redo has renamed on. The walk is ordered rather than a set of names, because a
- * name a rename frees can be given to another trigger, and only the order says
- * which trigger a name meant at the time.
- *
- * Nothing is found when the selected trigger is not there under any of its
- * names, which is what undoing a new trigger does. The panel shows no form, so
- * it never puts a trigger nobody picked under the cursor.
+ * Nothing is found when the selected trigger has gone from the document, which
+ * is what undoing a new trigger does, and what deleting one does until it is put
+ * back. The panel shows no form then, so it never puts a trigger nobody picked
+ * under the cursor.
  */
 function selectedTrigger(
   triggers: ScenarioTrigger[],
   selectedId: string | null,
-  renames: TriggerRename[],
 ): ScenarioTrigger | null {
   if (selectedId === null) return triggers[0] ?? null;
-
-  const held = triggers.find((t) => t.id === selectedId);
-  if (held) return held;
-
-  let older = selectedId;
-  for (let i = renames.length - 1; i >= 0; i--) {
-    if (renames[i].to !== older) continue;
-    older = renames[i].from;
-    const back = triggers.find((t) => t.id === older);
-    if (back) return back;
-  }
-
-  let newer = selectedId;
-  for (const rename of renames) {
-    if (rename.from !== newer) continue;
-    newer = rename.to;
-    const forward = triggers.find((t) => t.id === newer);
-    if (forward) return forward;
-  }
-
-  return null;
+  return triggers.find((t) => t.id === selectedId) ?? null;
 }
 
 export function TriggerPanel({
@@ -131,8 +100,7 @@ export function TriggerPanel({
   onPick: (target: PointTarget | null) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [renames, setRenames] = useState<TriggerRename[]>([]);
-  const selected = selectedTrigger(scenario.triggers, selectedId, renames);
+  const selected = selectedTrigger(scenario.triggers, selectedId);
   const unitDefs = useMemo(() => units.map((u) => u.name), [units]);
 
   const count = scenario.triggers.length;
@@ -211,18 +179,13 @@ export function TriggerPanel({
               picking={picking}
               onPick={onPick}
               onChange={onChange}
-              onSelect={setSelectedId}
-              onRenamed={(from, to) => {
-                setRenames((made) => [...made, { from, to }]);
-                setSelectedId(to);
-              }}
             />
           </div>
         )}
         {!selected && count > 0 && (
           <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-            The trigger you were on is not in the list any more. Pick one to
-            carry on.
+            The trigger you were on has gone. Pick one from the list, or step
+            back to bring it back.
           </p>
         )}
       </div>
@@ -253,7 +216,7 @@ function TriggerRow({
     >
       <span className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate font-mono text-xs">
-          {trigger.id}
+          {trigger.name}
         </span>
         {!trigger.enabled && (
           <span className="shrink-0 text-[10px] text-amber-300">disarmed</span>
@@ -283,8 +246,6 @@ function TriggerForm({
   picking,
   onPick,
   onChange,
-  onSelect,
-  onRenamed,
 }: {
   trigger: ScenarioTrigger;
   scenario: Scenario;
@@ -299,10 +260,6 @@ function TriggerForm({
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
-  onSelect: (id: string | null) => void;
-  /** A rename that went through, so the panel can find this trigger again under
-   *  its old name after an undo. */
-  onRenamed: (from: string, to: string) => void;
 }) {
   const at = scenario.triggers.indexOf(trigger);
   const edit = (patch: Partial<Omit<ScenarioTrigger, "id">>) =>
@@ -312,12 +269,11 @@ function TriggerForm({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
         <TriggerName
-          id={trigger.id}
+          name={trigger.name}
           onRename={(name) => {
-            const next = renameTrigger(scenario, trigger.id, name, extensions);
+            const next = renameTrigger(scenario, trigger.id, name);
             if (next === scenario) return false;
             onChange(next);
-            onRenamed(trigger.id, name.trim());
             return true;
           }}
         />
@@ -345,10 +301,13 @@ function TriggerForm({
           size="sm"
           variant="ghost"
           className="ml-auto h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          // The selection is left on the deleted trigger's id rather than
+          // cleared. Nothing else answers to that id, so the panel shows no form
+          // until a step back puts the trigger itself back, and then the author
+          // is on the trigger they were on (issue #2205).
           onClick={() => {
             onChange(removeTrigger(scenario, trigger.id));
             onPick(null);
-            onSelect(null);
           }}
         >
           <Trash2 className="size-3.5" /> Delete
@@ -431,24 +390,24 @@ function TriggerForm({
 }
 
 /**
- * The trigger's name, which is its id. Committed when the box is left, and put
- * back when the name is empty or another trigger already has it, because both
- * make a document that will not load.
+ * The trigger's name. A label and nothing else since issue #2205: it is not what
+ * anything points at, so it may be anything but empty, and an empty box is put
+ * back rather than stored because a row with no label cannot be picked out.
  *
- * The box follows the name when the name changes on its own. The form around it
- * is mounted keyed by this same id, so a rename remounts it and a fresh copy is
- * seeded either way, which is why this field never showed the drift of issue
- * #2185 that the box below it did. The hook is what makes that true of the field
- * rather than of where it happens to be mounted.
+ * The box follows the name when the name changes on its own, which is what undo
+ * and redo do (issue #2185). That used to be free here, because the form around
+ * this field was keyed by the id, the id was the name, and a rename remounted
+ * the whole form. It is not free any more. A rename leaves the id alone, so
+ * nothing remounts, and the hook is the only thing keeping the box in step.
  */
 function TriggerName({
-  id,
+  name: stored,
   onRename,
 }: {
-  id: string;
+  name: string;
   onRename: (name: string) => boolean;
 }) {
-  const [name, setName] = useFieldText(id);
+  const [name, setName] = useFieldText(stored);
 
   return (
     <Input
@@ -456,8 +415,8 @@ function TriggerName({
       value={name}
       onChange={(e) => setName(e.target.value)}
       onBlur={() => {
-        if (name.trim() === id) return setName(id);
-        if (!onRename(name)) setName(id);
+        if (name.trim() === stored) return setName(stored);
+        if (!onRename(name)) setName(stored);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();

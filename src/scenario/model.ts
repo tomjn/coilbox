@@ -333,7 +333,20 @@ export type ScenarioAction = TriggerStep;
  * read in the editor than a boolean tree.
  */
 export type ScenarioTrigger = {
+  /**
+   * What everything else points at: `enable_trigger` and `disable_trigger`, the
+   * compiled mission, the runtime, and the editor's own selection. Minted once
+   * and never changed, so nothing holding a trigger has to guess after a rename
+   * (issue #2205).
+   */
   id: string;
+  /**
+   * What the author calls it. Editable, not unique, and never seen by the
+   * runtime: it exists only so a trigger can be read in the list and in a
+   * picker. A document written before triggers had one takes its id as its name,
+   * which is the string it was displayed under anyway.
+   */
+  name: string;
   /** Armed at mission start. A disabled trigger waits for `enable_trigger`. */
   enabled: boolean;
   /** Fire every time the conditions hold, rather than once. */
@@ -970,6 +983,9 @@ function parseTrigger(t: Record<string, unknown>): ScenarioTrigger | null {
 
   const trigger: ScenarioTrigger = {
     id: tid,
+    // The whole migration for issue #2205. A trigger written before names
+    // existed was displayed under its id, so that is the name it had.
+    name: str(t.name) || tid,
     // Absent means armed: a trigger nobody thought about should fire.
     enabled: t.enabled !== false,
     repeat: t.repeat === true,
