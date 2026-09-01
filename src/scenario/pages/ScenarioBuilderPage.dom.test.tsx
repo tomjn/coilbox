@@ -47,19 +47,23 @@ vi.mock("../storage", async () => ({
 // nothing. Only the plugin underneath is stubbed, so what the copy asks the
 // disk for is what these tests read.
 const plugin = vi.hoisted(() => ({
-  save: vi.fn(async () => ({})),
-  mediaRead: vi.fn(async () => ({ dataUrl: "data:image/png;base64,AA==" })),
-  mediaWrite: vi.fn(async () => ({})),
+  save: vi.fn(async (_a: { id: string; json: string }) => ({})),
+  mediaRead: vi.fn(async (_a: { scenarioId: string; file: string }) => ({
+    dataUrl: "data:image/png;base64,AA==",
+  })),
+  mediaWrite: vi.fn(
+    async (_a: { scenarioId: string; file: string; dataUri: string }) => ({}),
+  ),
 }));
 vi.mock("../bindings", () => ({
   scenarioList: vi.fn(async () => ({ items: [] })),
-  scenarioSave: (...args: unknown[]) => plugin.save(...args),
+  scenarioSave: plugin.save,
   scenarioDelete: vi.fn(async () => ({})),
   scenarioMediaImport: vi.fn(async () => ({ file: "" })),
   scenarioMediaDelete: vi.fn(async () => ({})),
-  scenarioMediaRead: (...args: unknown[]) => plugin.mediaRead(...args),
+  scenarioMediaRead: plugin.mediaRead,
   scenarioMediaSweep: vi.fn(async () => ({ summary: {} })),
-  scenarioMediaWrite: (...args: unknown[]) => plugin.mediaWrite(...args),
+  scenarioMediaWrite: plugin.mediaWrite,
 }));
 // Duplicate reports a failure through a toast, which has no shell here.
 const toasted = vi.hoisted(() => ({ errors: [] as string[] }));
@@ -102,6 +106,7 @@ vi.mock("./components/ScenarioImportButton", () => ({
 }));
 
 import { newScenario } from "../create";
+import type { Scenario } from "../model";
 import type { LoadedScenario } from "../storage";
 import ScenarioBuilderPage from "./ScenarioBuilderPage";
 
@@ -880,11 +885,8 @@ describe("duplicating a scenario", () => {
   /** The document the copy wrote, once it has been written. */
   async function written() {
     await vi.waitFor(() => expect(plugin.save).toHaveBeenCalledTimes(1));
-    const { id, json } = plugin.save.mock.calls[0][0] as {
-      id: string;
-      json: string;
-    };
-    return { id, document: JSON.parse(json) };
+    const { id, json } = plugin.save.mock.calls[0][0];
+    return { id, document: JSON.parse(json) as Scenario };
   }
 
   it("writes a second scenario rather than touching the one it came from", async () => {
@@ -927,9 +929,9 @@ describe("duplicating a scenario", () => {
       ]),
     );
     expect(
-      plugin.mediaWrite.mock.calls.map((c) => ({
-        scenarioId: (c[0] as { scenarioId: string }).scenarioId,
-        file: (c[0] as { file: string }).file,
+      plugin.mediaWrite.mock.calls.map(([{ scenarioId, file }]) => ({
+        scenarioId,
+        file,
       })),
     ).toEqual(
       expect.arrayContaining([

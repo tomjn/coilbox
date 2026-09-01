@@ -135,7 +135,9 @@ describe("duplicateScenario", () => {
 
     expect(copy.createdAt).not.toBe("2020-01-01T00:00:00.000Z");
     expect(copy.updatedAt).not.toBe("2020-01-02T00:00:00.000Z");
-    expect(Date.parse(copy.updatedAt)).toBeGreaterThan(Date.parse("2020-01-02"));
+    expect(Date.parse(copy.updatedAt)).toBeGreaterThan(
+      Date.parse("2020-01-02"),
+    );
   });
 
   it("carries the rest of the document over", async () => {
