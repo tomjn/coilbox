@@ -65,10 +65,17 @@ vi.mock("../bindings", () => ({
   scenarioMediaSweep: vi.fn(async () => ({ summary: {} })),
   scenarioMediaWrite: plugin.mediaWrite,
 }));
-// Duplicate reports a failure through a toast, which has no shell here.
-const toasted = vi.hoisted(() => ({ errors: [] as string[] }));
+// Duplicate reports a failure through a toast, which has no shell here, and a
+// rescan says it ran through the same channel (issue #2184).
+const toasted = vi.hoisted(() => ({
+  errors: [] as string[],
+  successes: [] as string[],
+}));
 vi.mock("sonner", () => ({
-  toast: { error: (message: string) => toasted.errors.push(message) },
+  toast: {
+    error: (message: string) => toasted.errors.push(message),
+    success: (message: string) => toasted.successes.push(message),
+  },
 }));
 // Which campaigns exist decides which rows are attached to one, so the list is
 // set per test.
@@ -97,12 +104,11 @@ vi.mock("@/content/config", () => ({
     loading: content.thumbsLoading,
   }),
 }));
-// Neither bears on the row, and both reach for a real Tauri context.
-vi.mock("./components/ReclaimClipsButton", () => ({
-  ReclaimClipsButton: () => null,
-}));
-vi.mock("./components/ScenarioImportButton", () => ({
-  ScenarioImportButton: () => null,
+// The reclaim preview reads the campaigns and sweeps real files, so what it
+// finds is not this file's business. That the menu opens it is, and the drawer
+// stub above records that without rendering the form.
+vi.mock("./components/ReclaimClipsForm", () => ({
+  ReclaimClipsForm: () => null,
 }));
 
 import { newScenario } from "../create";
@@ -185,12 +191,12 @@ function Editing() {
 /** Which scenario the editor route is showing, or null when it is not. */
 const editingId = () => screen.queryByTestId("editing")?.textContent ?? null;
 
-function show(scenarios: LoadedScenario[]) {
+function show(scenarios: LoadedScenario[], refresh = async () => {}) {
   useScenarios.mockReturnValue({
     scenarios,
     loading: false,
     error: null,
-    refresh: async () => {},
+    refresh,
   });
   render(
     <MemoryRouter initialEntries={["/scenario-builder"]}>
@@ -225,6 +231,7 @@ afterEach(() => {
   cleanup();
   opened.length = 0;
   toasted.errors.length = 0;
+  toasted.successes.length = 0;
   stored.campaigns = [];
   content.scanned = false;
   content.maps = [];
@@ -1057,5 +1064,97 @@ describe("a read-only scenario's row", () => {
     expect(
       screen.getByRole("link", { name: /Tutorial/ }).getAttribute("href"),
     ).toBe("/scenario-builder/tutorial");
+  });
+});
+
+/**
+ * The header's four buttons became two and a menu (issue #2184). Rescan and
+ * Reclaim clips are housekeeping on the store behind the list, and they were
+ * drawn at the same weight as the two actions the page is for.
+ */
+describe("the Scenario Builder header", () => {
+  /** Open the header menu the way a keyboard does, and hand back its items. */
+  function openHeaderMenu() {
+    const trigger = screen.getByRole("button", {
+      name: "More scenario actions",
+    });
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    return trigger;
+  }
+
+  it("keeps Import and New scenario as buttons of their own", () => {
+    show([local]);
+
+    expect(screen.getByRole("button", { name: /Import/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /New scenario/ })).toBeTruthy();
+  });
+
+  it("takes Rescan and Reclaim clips out of the header itself", () => {
+    show([local]);
+
+    expect(screen.queryByRole("button", { name: /Rescan/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Reclaim clips/ })).toBeNull();
+  });
+
+  it("offers both of them in the menu, reached from the keyboard alone", () => {
+    show([local]);
+
+    openHeaderMenu();
+
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      expect.stringContaining("Rescan"),
+      expect.stringContaining("Reclaim clips"),
+    ]);
+  });
+
+  // The list is re-read in place, so nothing on screen would otherwise change.
+  // The menu has also closed by then, which is why the spinner the button used
+  // to show is a toast now.
+  it("rescans from the menu and says that it did", async () => {
+    const refresh = vi.fn(async () => {});
+    show([local], refresh);
+    openHeaderMenu();
+
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Rescan/ }), {
+      key: "Enter",
+    });
+
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(toasted.successes).toEqual([
+        "Rescanned. The scenario list is up to date.",
+      ]),
+    );
+  });
+
+  // A dry run in a drawer, not a delete. The menu is gone by the time the
+  // preview is on screen, which is why it is not the popover it used to be.
+  it("opens the reclaim preview from the menu", () => {
+    show([local]);
+    openHeaderMenu();
+
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Reclaim clips/ }), {
+      key: "Enter",
+    });
+
+    expect(opened.map((o) => o.title)).toEqual(["Reclaim dialogue clips"]);
+  });
+
+  // Issue #2203, applied to a header. A row menu at least has a row to hover.
+  // This one has nothing, so it has to be there before anything is pointed at,
+  // and it has to say what it is rather than being three dots on their own.
+  it("shows a named trigger at rest rather than one that fades in", () => {
+    show([local]);
+
+    // Nothing hovered, nothing focused, nothing opened.
+    const trigger = screen.getByRole("button", {
+      name: "More scenario actions",
+    });
+
+    expect(trigger.textContent).toContain("More");
+    expect(trigger.className).not.toMatch(/(^|\s|:)opacity-0(\s|$)/);
+    expect(trigger.className).not.toMatch(/group-hover:/);
   });
 });
