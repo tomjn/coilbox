@@ -16,9 +16,11 @@ import { Check, Loader2, TriangleAlert } from "lucide-react";
  * risk, because the edit is still on screen and only the copy on disk is
  * behind, and offers the one action that can fix it.
  *
- * The `role="status"` on each returned element is also the app's only
- * `aria-live` region under the scenario and campaign editors: a screen reader
- * hears a write land or fail without the page needing one of its own.
+ * The `role="status"` container is always mounted, even when idle and empty,
+ * because a live region only reliably announces changes to text already in
+ * the DOM. It is also the app's only `aria-live` region under the scenario
+ * and campaign editors: a screen reader hears a write land or fail without
+ * the page needing one of its own.
  */
 export type SaveState =
   /** Nothing written yet this session, so there is nothing to report. */
@@ -46,8 +48,6 @@ export function SaveStatus({
   /** Ask for the failed write again, with the document as it stands. */
   onRetry: () => void;
 }) {
-  if (state.kind === "idle") return null;
-
   if (state.kind === "failed") {
     return (
       <div
