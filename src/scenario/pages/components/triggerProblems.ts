@@ -113,3 +113,27 @@ export function entryFieldProblem(
 ): string | null {
   return messagesUnder(issues, `${entryPath(list, id)}.${field}`);
 }
+
+/**
+ * What is wrong with a whole entry of a registry the validator names by id,
+ * addressed directly rather than through one of its fields: a team with no
+ * engine number, which `validateMission` reports against `teams["<id>"]`
+ * itself rather than against a field within it (issue #2343).
+ *
+ * Matched by the entry's own path exactly, unlike {@link entryFieldProblem}'s
+ * "at or under": a team whose start units also name a def the game has not
+ * got is reported under `teams["<id>"].startUnits[<n>]`, and that is a
+ * different question with a different answer, not a second sentence about
+ * the same field.
+ */
+export function entryProblem(
+  issues: MissionIssue[],
+  list: string,
+  id: string,
+): string | null {
+  const at = entryPath(list, id);
+  const found = issues.filter((issue) => issue.path === at);
+  return found.length === 0
+    ? null
+    : found.map((issue) => issue.message).join(" ");
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MissionIssue } from "../../validate";
 import {
   entryFieldProblem,
+  entryProblem,
   paramProblem,
   triggerFieldProblem,
 } from "./triggerProblems";
@@ -214,5 +215,52 @@ describe("entryFieldProblem", () => {
     ];
 
     expect(entryFieldProblem(issues, "actors", "hero", "team")).toBeNull();
+  });
+});
+
+describe("entryProblem", () => {
+  it("finds the issue at a team's own entry, which names no field", () => {
+    const issues: MissionIssue[] = [
+      {
+        path: 'teams["ghost"]',
+        message:
+          '"ghost" has no engine team, so nothing can spawn for it. It names a spectator, or a participant the setup does not have.',
+      },
+    ];
+
+    expect(entryProblem(issues, "teams", "ghost")).toBe(
+      '"ghost" has no engine team, so nothing can spawn for it. It names a spectator, or a participant the setup does not have.',
+    );
+  });
+
+  it("does not claim an issue nested under the entry", () => {
+    const issues: MissionIssue[] = [
+      { path: 'teams["ghost"].startUnits[0]', message: "elsewhere" },
+    ];
+
+    expect(entryProblem(issues, "teams", "ghost")).toBeNull();
+  });
+
+  it("does not claim another entry's issue", () => {
+    const issues: MissionIssue[] = [
+      { path: 'teams["other"]', message: "elsewhere" },
+    ];
+
+    expect(entryProblem(issues, "teams", "ghost")).toBeNull();
+  });
+
+  it("joins more than one issue on the same entry into one line", () => {
+    const issues: MissionIssue[] = [
+      { path: 'teams["ghost"]', message: "first thing" },
+      { path: 'teams["ghost"]', message: "second thing" },
+    ];
+
+    expect(entryProblem(issues, "teams", "ghost")).toBe(
+      "first thing second thing",
+    );
+  });
+
+  it("says nothing when no issue names the entry", () => {
+    expect(entryProblem([], "teams", "ghost")).toBeNull();
   });
 });

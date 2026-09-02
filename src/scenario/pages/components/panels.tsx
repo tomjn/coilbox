@@ -118,6 +118,32 @@ export function FieldProblem({
 }
 
 /**
+ * What is wrong with a whole thing rather than one of its fields: an actor, a
+ * group or a base standing off the map, a team with no engine number, or a
+ * base building whose id collides with another's (issue #2343). None of
+ * these name a control `aria-invalid` can sit on, so this is `LayoutNotes`'
+ * own shape (`src/placement/LayoutControls.tsx`, issue #1416) rather than
+ * `FieldProblem`'s: a coloured block a screen reader meets in the reading
+ * order it sits in, rather than a line tied to one field by
+ * `aria-describedby`. Red rather than `LayoutNotes`' mix of colours, because
+ * every check this covers is always an error (`isBlocking`), never a
+ * warning, so there is one thing to say rather than a severity to choose
+ * between.
+ *
+ * Rendered null with nothing to say, the same as `LayoutNotes`' own notes,
+ * so a caller can call this unconditionally rather than wrapping every use in
+ * its own `{problem && ...}`.
+ */
+export function RowProblem({ problem }: { problem: string | null }) {
+  if (!problem) return null;
+  return (
+    <p className="rounded bg-red-950/60 px-2 py-1.5 text-[11px] text-red-200">
+      {problem}
+    </p>
+  );
+}
+
+/**
  * The name of a thing whose name is its id. A variable is the only one left:
  * its name is the key in `vars`, so there is no id beside it to point at. An
  * objective and a dialogue line each have one, and it is not editable (issue
