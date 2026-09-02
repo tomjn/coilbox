@@ -26,7 +26,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
@@ -49,9 +49,12 @@ import {
   TYPE_DESCRIPTIONS,
   TYPE_GROUPS,
 } from "../../triggerTypes";
+import type { MissionIssue } from "../../validate";
 import { OrderRow } from "./GroupControls";
 import { orderOfKind, targetOptions, withOrder, withoutOrder } from "./groups";
+import { FieldProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
+import { paramProblem } from "./triggerProblems";
 import {
   ordersParam,
   type PointTarget,
@@ -137,6 +140,7 @@ export function StepRow({
   unsupported,
   units,
   unitsLoading,
+  issues,
   picking,
   onPick,
   onParam,
@@ -154,6 +158,10 @@ export function StepRow({
   unsupported: string | undefined;
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
+  /** What the validator has found wrong with the mission, so a parameter
+   *  naming a reference that does not resolve can say so next to itself
+   *  (issue #2287). */
+  issues: MissionIssue[];
   /** What the map is being asked for, or null when it is not waiting. */
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
@@ -235,6 +243,7 @@ export function StepRow({
               scenario={scenario}
               units={units}
               unitsLoading={unitsLoading}
+              issues={issues}
               picking={picking}
               onPick={onPick}
               onChange={(value) => onParam(name, value)}
@@ -352,6 +361,7 @@ function ParamField({
   scenario,
   units,
   unitsLoading,
+  issues,
   picking,
   onPick,
   onChange,
@@ -366,6 +376,10 @@ function ParamField({
   scenario: Scenario;
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
+  /** What the validator has found wrong with the mission, so a reference this
+   *  parameter names that does not resolve can say so right here rather than
+   *  leaving that to the drawer alone (issue #2287). */
+  issues: MissionIssue[];
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (value: ScenarioParam | undefined) => void;
@@ -375,38 +389,45 @@ function ParamField({
   // An optional parameter that is set can be put back to whatever the runtime
   // does by default, which is what leaving it out means.
   const clearable = spec.optional === true && value !== undefined;
+  const problem = paramProblem(issues, at, name);
+  const describedBy = useId();
 
   return (
-    <div className="flex items-start gap-2">
-      <span className="w-20 shrink-0 pt-1 text-right text-[11px] text-muted-foreground">
-        {friendly}
-      </span>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <ParamControl
-          key={fieldKey}
-          label={label}
-          name={name}
-          spec={spec}
-          value={value}
-          at={at}
-          scenario={scenario}
-          units={units}
-          unitsLoading={unitsLoading}
-          picking={picking}
-          onPick={onPick}
-          onChange={onChange}
-        />
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-start gap-2">
+        <span className="w-20 shrink-0 pt-1 text-right text-[11px] text-muted-foreground">
+          {friendly}
+        </span>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <ParamControl
+            key={fieldKey}
+            label={label}
+            name={name}
+            spec={spec}
+            value={value}
+            at={at}
+            scenario={scenario}
+            units={units}
+            unitsLoading={unitsLoading}
+            ariaInvalid={problem !== null}
+            describedBy={describedBy}
+            picking={picking}
+            onPick={onPick}
+            onChange={onChange}
+          />
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`size-7 shrink-0 p-0 ${clearable ? "" : "invisible"}`}
+          aria-label={`Clear ${label}`}
+          disabled={!clearable}
+          onClick={() => onChange(undefined)}
+        >
+          <X className="size-3.5" />
+        </Button>
       </div>
-      <Button
-        size="sm"
-        variant="ghost"
-        className={`size-7 shrink-0 p-0 ${clearable ? "" : "invisible"}`}
-        aria-label={`Clear ${label}`}
-        disabled={!clearable}
-        onClick={() => onChange(undefined)}
-      >
-        <X className="size-3.5" />
-      </Button>
+      <FieldProblem id={describedBy} problem={problem} />
     </div>
   );
 }
@@ -420,6 +441,8 @@ function ParamControl({
   scenario,
   units,
   unitsLoading,
+  ariaInvalid,
+  describedBy,
   picking,
   onPick,
   onChange,
@@ -432,6 +455,11 @@ function ParamControl({
   scenario: Scenario;
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
+  /** Whether the validator has flagged this parameter, for the registry
+   *  pickers below that can carry `aria-invalid` (issue #2287). */
+  ariaInvalid: boolean;
+  /** The id of this field's message paragraph, `FieldProblem`'s. */
+  describedBy: string;
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (value: ScenarioParam | undefined) => void;
@@ -446,6 +474,9 @@ function ParamControl({
           value={asString(value)}
           onValueChange={onChange}
           className="w-full"
+          ariaLabel={label}
+          ariaInvalid={ariaInvalid}
+          describedBy={describedBy}
         />
       );
     }
@@ -459,6 +490,9 @@ function ParamControl({
         placeholder={
           options.length === 0 ? "Nothing to pick yet" : `Pick a ${friendly}`
         }
+        ariaLabel={label}
+        ariaInvalid={ariaInvalid}
+        describedBy={describedBy}
       />
     );
   }

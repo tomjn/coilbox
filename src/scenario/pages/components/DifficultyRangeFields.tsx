@@ -16,12 +16,14 @@
  * document with no difficulty in it, compiling to the bytes it always did.
  */
 
+import { useId } from "react";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   DIFFICULTIES,
   type Difficulty,
   type DifficultyRange,
 } from "../../model";
+import { FieldProblem } from "./panels";
 
 /** The value the pickers use for "no bound this way". */
 const ANY = "any";
@@ -61,31 +63,47 @@ export function rangeWith(
 export function DifficultyRangeFields({
   value,
   onChange,
+  problem = null,
 }: {
   value: DifficultyRange | undefined;
   /** The new range, or undefined once it bounds nothing. */
   onChange: (range: DifficultyRange | undefined) => void;
+  /** Why this range never applies at any setting, in the validator's own
+   *  words (issue #2287, `checkDifficulty` in `validate.ts`). Only the
+   *  trigger panel has anything to pass here today: an actor's, a group's and
+   *  a base's own difficulty range are not read the validator's issues yet. */
+  problem?: string | null;
 }) {
   const range = value ?? {};
+  const describedBy = useId();
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <Field label="Only from">
-        <OptionSelect
-          size="sm"
-          value={range.atLeast ?? ANY}
-          onValueChange={(next) => onChange(rangeWith(value, "atLeast", next))}
-          options={options("Any difficulty")}
-        />
-      </Field>
-      <Field label="Only up to">
-        <OptionSelect
-          size="sm"
-          value={range.atMost ?? ANY}
-          onValueChange={(next) => onChange(rangeWith(value, "atMost", next))}
-          options={options("Any difficulty")}
-        />
-      </Field>
+    <div className="flex flex-col gap-0.5">
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Only from">
+          <OptionSelect
+            size="sm"
+            value={range.atLeast ?? ANY}
+            onValueChange={(next) =>
+              onChange(rangeWith(value, "atLeast", next))
+            }
+            options={options("Any difficulty")}
+            ariaInvalid={problem !== null}
+            describedBy={describedBy}
+          />
+        </Field>
+        <Field label="Only up to">
+          <OptionSelect
+            size="sm"
+            value={range.atMost ?? ANY}
+            onValueChange={(next) => onChange(rangeWith(value, "atMost", next))}
+            options={options("Any difficulty")}
+            ariaInvalid={problem !== null}
+            describedBy={describedBy}
+          />
+        </Field>
+      </div>
+      <FieldProblem id={describedBy} problem={problem} />
     </div>
   );
 }

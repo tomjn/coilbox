@@ -15,12 +15,21 @@ export function TeamSelect({
   value,
   onValueChange,
   className = "w-36",
+  ariaLabel,
+  ariaInvalid,
+  describedBy,
 }: {
   participants: Participant[];
   /** A `setup.participants` id. */
   value: string;
   onValueChange: (team: string) => void;
   className?: string;
+  ariaLabel?: string;
+  /** Marks the trigger invalid, for a field a validator has flagged (issue
+   *  #2287). */
+  ariaInvalid?: boolean;
+  /** The id of a message paragraph explaining why, `FieldProblem`'s. */
+  describedBy?: string;
 }) {
   return (
     <OptionSelect
@@ -29,6 +38,9 @@ export function TeamSelect({
       value={value}
       onValueChange={onValueChange}
       placeholder="Team"
+      ariaLabel={ariaLabel}
+      ariaInvalid={ariaInvalid}
+      describedBy={describedBy}
       options={participants.map((p) => ({
         value: p.id,
         label: p.name,

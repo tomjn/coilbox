@@ -27,11 +27,11 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_EXTENSIONS } from "../../extensions";
 import { NO_GATE } from "../../gating";
-import type { Scenario, ScenarioTrigger } from "../../model";
+import type { Scenario, ScenarioTrigger, ScenarioZone } from "../../model";
 import {
   type EditHistory,
   emptyHistory,
@@ -40,6 +40,8 @@ import {
   undoEdit,
 } from "./history";
 import { TriggerPanel } from "./TriggerPanel";
+import { setStepParam } from "./triggers";
+import { missionProblemsIn } from "./useMissionProblems";
 
 // The panel's delete notice has no shell here (issue #2280), the same gap
 // `ScenarioBuilderPage.dom.test.tsx` fills for its own toasts. Captured rather
@@ -102,7 +104,10 @@ function trigger(patch: Partial<ScenarioTrigger> = {}): ScenarioTrigger {
   };
 }
 
-function scenario(triggers: ScenarioTrigger[]): Scenario {
+function scenario(
+  triggers: ScenarioTrigger[],
+  zones: ScenarioZone[] = [],
+): Scenario {
   return {
     schemaVersion: 2,
     id: "s1",
@@ -117,7 +122,7 @@ function scenario(triggers: ScenarioTrigger[]): Scenario {
       modOptionValues: {},
     },
     teams: {},
-    zones: [],
+    zones,
     actors: [],
     groups: [],
     blueprints: [],
@@ -134,8 +139,14 @@ function scenario(triggers: ScenarioTrigger[]): Scenario {
 
 /** The editor in miniature: one scenario, the real undo stack, and an Undo
  *  button standing in for the shortcut. */
-function PanelHarness({ triggers }: { triggers: ScenarioTrigger[] }) {
-  const [document, setDocument] = useState(() => scenario(triggers));
+function PanelHarness({
+  triggers,
+  zones = [],
+}: {
+  triggers: ScenarioTrigger[];
+  zones?: ScenarioZone[];
+}) {
+  const [document, setDocument] = useState(() => scenario(triggers, zones));
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
   // Read at the moment a step is taken rather than at the last render, the
   // same reason ScenarioEditPage keeps its own copies: a delete's notice binds
@@ -146,6 +157,16 @@ function PanelHarness({ triggers }: { triggers: ScenarioTrigger[] }) {
   documentRef.current = document;
   const historyRef = useRef(history);
   historyRef.current = history;
+
+  // The real validator's own answer, not a hand-built issue, so a test that
+  // pins the panel against it is pinned against what the drawer would show
+  // too (issue #2287). No debounce: `useMissionProblems` only adds one to
+  // avoid validating every keystroke, which this harness's synchronous edits
+  // have no need of.
+  const issues = useMemo(() => {
+    const found = missionProblemsIn(document);
+    return [...found.blocking, ...found.warnings];
+  }, [document]);
 
   // Shared by the harness's own Undo button and by `onUndo`, so a test that
   // fires a toast's action is exercising the exact function Cmd+Z and the map
@@ -170,6 +191,7 @@ function PanelHarness({ triggers }: { triggers: ScenarioTrigger[] }) {
         gate={NO_GATE}
         extensions={NO_EXTENSIONS}
         note={null}
+        issues={issues}
         picking={null}
         onPick={() => {}}
         onUndo={stepBack}
@@ -194,8 +216,8 @@ function PanelHarness({ triggers }: { triggers: ScenarioTrigger[] }) {
 }
 
 /** The panel starts shut, the way it does on the edit page. */
-function openPanel(triggers: ScenarioTrigger[]) {
-  render(<PanelHarness triggers={triggers} />);
+function openPanel(triggers: ScenarioTrigger[], zones: ScenarioZone[] = []) {
+  render(<PanelHarness triggers={triggers} zones={zones} />);
   fireEvent.click(screen.getByRole("button", { name: /^Triggers/ }));
 }
 
@@ -631,5 +653,132 @@ describe("a trigger's cooldown when the value is refused", () => {
     expect(stored()[0].cooldown).toBe(60);
     expect(screen.queryByText("Cooldown is a number of seconds")).toBeNull();
     expect(cooldownBox().getAttribute("aria-invalid")).toBe("false");
+  });
+});
+
+/**
+ * A trigger's condition pointing at a zone the document no longer has (issue
+ * #2287). The validator caught this before this panel said anything about
+ * it: the zone dropdown just showed nothing picked, with no hint that this is
+ * why the mission refuses to launch. The issues here come from the real
+ * validator (`missionProblemsIn`), not a hand-built one, so this is pinned
+ * against what the drawer would say too.
+ */
+describe("a trigger's condition pointing at a zone the document no longer has", () => {
+  function zone(id: string): ScenarioZone {
+    return {
+      id,
+      name: id,
+      shape: "box",
+      min: { x: 0, z: 0 },
+      max: { x: 10, z: 10 },
+    };
+  }
+
+  const zoneField = "Units in zone zone";
+
+  /** A trigger whose only condition names a zone, and a button standing in
+   *  for the panel's own zone picker: driving a Radix `Select` open in
+   *  happy-dom is avoided project-wide (see `TriggerStepGroups.test.tsx`), so
+   *  fixing the reference is done the way `setStepParam` already is, which is
+   *  the same write the picker itself makes. */
+  function ZoneHarness({ zones }: { zones: ScenarioZone[] }) {
+    const [document, setDocument] = useState<Scenario>(() =>
+      scenario(
+        [
+          trigger({
+            id: "wave-one",
+            conditions: {
+              op: "all",
+              conditions: [
+                { type: "units_in_zone", params: { zone: "north" } },
+              ],
+            },
+          }),
+        ],
+        zones,
+      ),
+    );
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <>
+        <TriggerPanel
+          scenario={document}
+          onChange={setDocument}
+          units={[]}
+          unitsLoading={false}
+          gate={NO_GATE}
+          extensions={NO_EXTENSIONS}
+          note={null}
+          issues={issues}
+          picking={null}
+          onPick={() => {}}
+          onUndo={() => {}}
+        />
+        <button
+          type="button"
+          onClick={() =>
+            setDocument((doc) =>
+              setStepParam(
+                doc,
+                { triggerId: "wave-one", list: "conditions", index: 0 },
+                "zone",
+                "south",
+              ),
+            )
+          }
+        >
+          Point the condition at south instead
+        </button>
+        <output>{JSON.stringify(document.triggers)}</output>
+      </>
+    );
+  }
+
+  function openZonePanel(zones: ScenarioZone[]) {
+    render(<ZoneHarness zones={zones} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Triggers/ }));
+  }
+
+  it("shows the validator's reason next to the zone field once the zone is gone", () => {
+    // "north" is not among the document's zones, the state a delete leaves
+    // the trigger's own condition in.
+    openZonePanel([zone("south")]);
+
+    const field = screen.getByLabelText(zoneField);
+    const message = screen.getByText('no zone called "north"');
+
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
+  });
+
+  it("says nothing when the zone the condition names still exists", () => {
+    openZonePanel([zone("north"), zone("south")]);
+
+    expect(screen.queryByText('no zone called "north"')).toBeNull();
+    expect(screen.getByLabelText(zoneField).getAttribute("aria-invalid")).toBe(
+      "false",
+    );
+  });
+
+  it("clears the moment the condition is pointed at a zone that exists", () => {
+    openZonePanel([zone("south")]);
+    expect(screen.getByText('no zone called "north"')).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Point the condition at south instead",
+      }),
+    );
+
+    expect(screen.queryByText('no zone called "north"')).toBeNull();
+    expect(screen.getByLabelText(zoneField).getAttribute("aria-invalid")).toBe(
+      "false",
+    );
+    expect(stored()[0].conditions.conditions[0].params.zone).toBe("south");
   });
 });
