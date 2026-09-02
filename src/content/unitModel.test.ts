@@ -361,3 +361,67 @@ describe("buildModel with an atlas", () => {
     built.dispose();
   });
 });
+
+describe("buildModel materials", () => {
+  /**
+   * A `.3do` names its team-colour regions face by face, and a real one names
+   * several: Balanced Annihilation's `armpw` names five. They are all the same
+   * flat colour, so one material is enough and five was five draw calls.
+   */
+  it("paints every team-colour region from one material", () => {
+    const many = twoPieces3do({
+      root: {
+        name: "base",
+        offset: [0, 0, 0],
+        groups: [face("logo", 0), face("stripe", 2), face("badge", 4)],
+        children: [],
+      },
+      textures: [
+        { ...texture("logo"), teamColour: true },
+        { ...texture("stripe"), teamColour: true },
+        { ...texture("badge"), teamColour: true },
+      ],
+    });
+    const built = buildModel(many, undefined, { merge: true });
+    expect(meshes(built.object)).toHaveLength(1);
+    expect(triangles(built.object)).toBe(3);
+    built.dispose();
+  });
+
+  /** Two names on one file are the same material too. */
+  it("draws two names sharing a file from one material", () => {
+    const shared = twoPieces3do({
+      root: {
+        name: "base",
+        offset: [0, 0, 0],
+        groups: [face("skin.dds", 0), face("alias.dds", 2)],
+        children: [],
+      },
+      textures: [
+        texture("skin.dds", "abc_skin_dds.dds"),
+        texture("alias.dds", "abc_skin_dds.dds"),
+      ],
+    });
+    const built = buildModel(shared, undefined, { merge: true });
+    expect(meshes(built.object)).toHaveLength(1);
+    built.dispose();
+  });
+
+  /** A palette face and a team-colour one are different colours, so they stay
+   *  apart however many names each of them goes under. */
+  it("keeps a palette face off the team-colour material", () => {
+    const mixed = twoPieces3do({
+      root: {
+        name: "base",
+        offset: [0, 0, 0],
+        groups: [face("logo", 0), face("ta_color5", 2), face(undefined, 4)],
+        children: [],
+      },
+      textures: [{ ...texture("logo"), teamColour: true }],
+    });
+    const built = buildModel(mixed, undefined, { merge: true });
+    expect(meshes(built.object)).toHaveLength(2);
+    expect(triangles(built.object)).toBe(3);
+    built.dispose();
+  });
+});

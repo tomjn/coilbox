@@ -284,15 +284,31 @@ export function buildModel(
     return file ? atlas.place.get(file) : undefined;
   };
 
-  // Under a key of its own rather than a texture's, because it stands for all of
-  // them at once. It is disposed with the rest, while the sheet it draws from is
-  // shared for the session and left alone, like every other texture here.
+  /**
+   * What the material a group needs actually is, rather than what the group
+   * called it.
+   *
+   * Two names the model paints identically want one material, because one
+   * material is one draw call once the merge has run. A `.3do` names its
+   * team-colour regions face by face and a real one names several: Balanced
+   * Annihilation's `armpw` names five, all of them the flat team colour, and
+   * keying by name drew them five times over. Two names on one file are the same
+   * case. The sheet stands for every name in it at once, hence a key of its own.
+   *
+   * A leading space keeps the three fixed keys clear of any file name.
+   */
   const ATLAS_KEY = " atlas";
+  const materialKey = (name: string | undefined): string => {
+    if (placeFor(name)) return ATLAS_KEY;
+    const texture = model.textures.find((t) => t.name === name);
+    if (texture?.file) return texture.file;
+    return texture?.teamColour ? " team" : " plain";
+  };
 
   const materialFor = (
     name: string | undefined,
   ): THREE.MeshStandardMaterial => {
-    const key = placeFor(name) ? ATLAS_KEY : (name ?? "");
+    const key = materialKey(name);
     const existing = materials.get(key);
     if (existing) return existing;
     if (key === ATLAS_KEY && atlas) {
