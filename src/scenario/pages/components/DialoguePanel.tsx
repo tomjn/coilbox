@@ -27,6 +27,7 @@
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  Copy,
   ImageIcon,
   MessageSquare,
   Plus,
@@ -46,6 +47,7 @@ import { EditorPanel, TextField } from "./panels";
 import {
   addDialogue,
   dialogueMedia,
+  duplicateDialogue,
   editDialogue,
   nextDialogueId,
   portraitDrawable,
@@ -219,6 +221,11 @@ function DialogueForm({
 
   const edit = (patch: Partial<Omit<ScenarioDialogue, "id">>) =>
     onChange(editDialogue(scenario, line.id, patch));
+  const duplicate = () => {
+    const id = nextDialogueId(scenario);
+    onChange(duplicateDialogue(scenario, line.id, id));
+    onSelect(id);
+  };
 
   /** Copy a file the author picked into the scenario's media folder, and drop
    *  whatever the line held before, so a replaced clip is not left on disk. A
@@ -269,7 +276,15 @@ function DialogueForm({
         <Button
           size="sm"
           variant="ghost"
-          className="ml-auto h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          className="ml-auto h-7 gap-1.5 px-2 text-xs"
+          onClick={duplicate}
+        >
+          <Copy className="size-3.5" /> Duplicate
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
           onClick={() => {
             const clips = dialogueMedia(line);
             onChange(removeDialogue(scenario, line.id));
