@@ -18,6 +18,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { useFieldProblem } from "@/lib/useFieldProblem";
 import { useFieldText } from "@/lib/useFieldText";
 
 export function EditorPanel({
@@ -56,6 +57,45 @@ export function EditorPanel({
 }
 
 /**
+ * Why a field's box just put back what was in it, next to the field itself
+ * (issue #2275).
+ *
+ * `aria-describedby` on the field is the main route to this, read out the
+ * moment the field is focused, on the first tab in as much as on a tab back
+ * to fix it. But the revert happens on blur, when focus has already left for
+ * wherever Tab or a click sent it, so `aria-live` says it too, without
+ * waiting for the field to be found again. Not `role="status"`, which the
+ * editor already puts on the document's own save/undo output elsewhere on
+ * the page, `SaveStatus` and the plain `<output>` these panels sit beside in
+ * tests. A second one would make "the status region" ambiguous, both to a
+ * screen reader and to a test asking for it by role.
+ *
+ * Mounted whether or not there is anything to say, because a live region only
+ * reliably announces text that changes in an element already in the DOM, the
+ * same lesson `SaveStatus` documents. With nothing to report it is `sr-only`:
+ * out of the flow so it costs no room in the row the field sits in, but still
+ * there for the announcement to land in.
+ */
+export function FieldProblem({
+  id,
+  problem,
+}: {
+  id: string;
+  problem: string | null;
+}) {
+  return (
+    <p
+      id={id}
+      aria-live="polite"
+      aria-atomic="true"
+      className={problem ? "text-[11px] text-destructive" : "sr-only"}
+    >
+      {problem}
+    </p>
+  );
+}
+
+/**
  * The name of a thing whose name is its id. A variable is the only one left:
  * its name is the key in `vars`, so there is no id beside it to point at. An
  * objective and a dialogue line each have one, and it is not editable (issue
@@ -65,6 +105,8 @@ export function EditorPanel({
  * a panel makes is written to disk. Put back when the name is refused, which is
  * what an empty or already-taken name is: both make a document `parseScenario`
  * will not load, and the author would find their scenario gone from the list.
+ * `onRename` says why instead of returning a bare yes or no, and that reason is
+ * what `FieldProblem` shows (issue #2275).
  */
 export function NameField({
   name,
@@ -74,26 +116,38 @@ export function NameField({
 }: {
   name: string;
   label: string;
-  /** True when the rename was written. False puts the old name back. */
-  onRename: (wanted: string) => boolean;
+  /** Null commits the rename. A reason puts the old name back and shows why. */
+  onRename: (wanted: string) => string | null;
   className?: string;
 }) {
   const [text, setText] = useFieldText(name);
+  const { problem, refuse, clear, describedBy } = useFieldProblem();
 
   return (
-    <Input
-      aria-label={label}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => {
-        if (text.trim() === name) return setText(name);
-        if (!onRename(text)) setText(name);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      }}
-      className={className ?? "h-7 w-52 font-mono text-xs"}
-    />
+    <div className="flex flex-1 flex-col gap-0.5">
+      <Input
+        aria-label={label}
+        aria-invalid={problem !== null}
+        aria-describedby={describedBy}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          clear();
+        }}
+        onBlur={() => {
+          if (text.trim() === name) return setText(name);
+          const reason = onRename(text);
+          if (reason === null) return clear();
+          setText(name);
+          refuse(reason);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className={className ?? "h-7 w-52 font-mono text-xs"}
+      />
+      <FieldProblem id={describedBy} problem={problem} />
+    </div>
   );
 }
 

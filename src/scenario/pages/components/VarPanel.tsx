@@ -63,12 +63,17 @@ export function VarPanel({
                 <NameField
                   name={name}
                   label={`Name of ${name}`}
-                  className="h-7 flex-1 font-mono text-xs"
+                  className="h-7 w-full font-mono text-xs"
                   onRename={(wanted) => {
                     const next = renameVar(scenario, name, wanted, extensions);
-                    if (next === scenario) return false;
-                    onChange(next);
-                    return true;
+                    if (next !== scenario) {
+                      onChange(next);
+                      return null;
+                    }
+                    const trimmed = wanted.trim();
+                    return trimmed
+                      ? `A variable called ${trimmed} already exists`
+                      : "A variable needs a name";
                   }}
                 />
                 <ValueField

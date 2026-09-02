@@ -69,7 +69,14 @@ function TextHarness({ initial }: { initial: string }) {
   );
 }
 
-function NameHarness({ initial }: { initial: string }) {
+/** Names `onRename` refuses outright, the way an already-taken one is. */
+function NameHarness({
+  initial,
+  taken = [],
+}: {
+  initial: string;
+  taken?: string[];
+}) {
   const editor = useEditor(initial);
   return (
     <>
@@ -77,8 +84,13 @@ function NameHarness({ initial }: { initial: string }) {
         name={editor.document}
         label="Objective name"
         onRename={(wanted) => {
-          editor.edit(wanted);
-          return true;
+          const trimmed = wanted.trim();
+          if (!trimmed) return "An objective needs a name";
+          if (taken.includes(trimmed)) {
+            return `A name called ${trimmed} already exists`;
+          }
+          editor.edit(trimmed);
+          return null;
         }}
       />
       <UndoButton onUndo={editor.undo} />
@@ -149,5 +161,65 @@ describe("a panel's name field when the document moves under it", () => {
     typeOneMore(field);
 
     expect(documentText()).toBe("reach-ridge!");
+  });
+});
+
+/**
+ * Why a rename was refused (issue #2275). The field used to answer with
+ * silence: the box reverted and nothing on screen said which rule it broke.
+ */
+describe("a panel's name field when the rename is refused", () => {
+  it("shows the reason and puts the old name back for a name already taken", () => {
+    render(<NameHarness initial="reach-ridge" taken={["hold-ridge"]} />);
+    const field = screen.getByLabelText("Objective name");
+
+    fireEvent.change(field, { target: { value: "hold-ridge" } });
+    fireEvent.blur(field);
+
+    expect(asInput(field).value).toBe("reach-ridge");
+    const message = screen.getByText("A name called hold-ridge already exists");
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
+  });
+
+  it("shows the reason for an empty name", () => {
+    render(<NameHarness initial="reach-ridge" />);
+    const field = screen.getByLabelText("Objective name");
+
+    fireEvent.change(field, { target: { value: "   " } });
+    fireEvent.blur(field);
+
+    expect(asInput(field).value).toBe("reach-ridge");
+    expect(screen.getByText("An objective needs a name")).toBeTruthy();
+  });
+
+  it("clears the reason as soon as the field is edited again", () => {
+    render(<NameHarness initial="reach-ridge" taken={["hold-ridge"]} />);
+    const field = screen.getByLabelText("Objective name");
+
+    fireEvent.change(field, { target: { value: "hold-ridge" } });
+    fireEvent.blur(field);
+    fireEvent.change(field, { target: { value: "hold-the-line" } });
+
+    expect(
+      screen.queryByText("A name called hold-ridge already exists"),
+    ).toBeNull();
+    expect(field.getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it("clears the reason once a valid rename commits", () => {
+    render(<NameHarness initial="reach-ridge" taken={["hold-ridge"]} />);
+    const field = screen.getByLabelText("Objective name");
+
+    fireEvent.change(field, { target: { value: "hold-ridge" } });
+    fireEvent.blur(field);
+    fireEvent.change(field, { target: { value: "first-wave" } });
+    fireEvent.blur(field);
+
+    expect(documentText()).toBe("first-wave");
+    expect(
+      screen.queryByText("A name called hold-ridge already exists"),
+    ).toBeNull();
+    expect(field.getAttribute("aria-invalid")).toBe("false");
   });
 });
