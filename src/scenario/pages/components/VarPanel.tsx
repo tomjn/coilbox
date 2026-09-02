@@ -13,11 +13,14 @@
 
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, Variable } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useFieldText } from "@/lib/useFieldText";
 import type { ExtensionTypes } from "../../extensions";
 import type { Scenario } from "../../model";
 import { notifyDeleted } from "./deleteNotice";
-import { EditorPanel, NameField } from "./panels";
+import { focusListRow } from "./focusListRow";
+import { EditorPanel, type EditorPanelHandle, NameField } from "./panels";
+import type { RowFocus } from "./problemTargets";
 import {
   addVar,
   nextVarName,
@@ -31,6 +34,7 @@ export function VarPanel({
   onChange,
   extensions,
   onUndo,
+  focus,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
@@ -42,11 +46,29 @@ export function VarPanel({
    *  the shortcut does rather than a second way of getting there (issue
    *  #2280). */
   onUndo: () => void;
+  /** A variable a mission problem's row points at (issue #2271): expand the
+   *  panel and land the cursor in its name box. There is no separate form to
+   *  select into here, the row is the whole of it. */
+  focus?: RowFocus | null;
 }) {
   const names = Object.keys(scenario.vars);
+  const panelRef = useRef<EditorPanelHandle>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus.id and focus.token are the trigger, not the object identity, the same reason TriggerPanel's matching effect gives.
+  useEffect(() => {
+    if (!focus) return;
+    panelRef.current?.open();
+    const raf = requestAnimationFrame(() => {
+      const row = rowRefs.current.get(focus.id);
+      if (row) focusListRow(row);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focus?.id, focus?.token]);
 
   return (
     <EditorPanel
+      ref={panelRef}
       title="Variables"
       icon={Variable}
       summary={
@@ -66,7 +88,14 @@ export function VarPanel({
         ) : (
           <ul className="flex flex-col gap-1.5">
             {names.map((name) => (
-              <li key={name} className="flex items-center gap-2">
+              <li
+                key={name}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(name, el);
+                  else rowRefs.current.delete(name);
+                }}
+                className="flex items-center gap-2"
+              >
                 <NameField
                   name={name}
                   label={`Name of ${name}`}

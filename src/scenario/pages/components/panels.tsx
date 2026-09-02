@@ -12,7 +12,12 @@
 
 import { Input } from "@picoframe/frame";
 import { ChevronRight, type LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  forwardRef,
+  type ReactNode,
+  useImperativeHandle,
+  useState,
+} from "react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -21,24 +26,41 @@ import {
 import { useFieldProblem } from "@/lib/useFieldProblem";
 import { useFieldText } from "@/lib/useFieldText";
 
-export function EditorPanel({
-  title,
-  icon: Icon,
-  summary,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  icon: LucideIcon;
-  /** What the panel holds, in a few words, so a shut panel still says
-   *  something. */
-  summary: string;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
+/** What a caller outside the panel can ask it to do, reached through a ref the
+ *  way an imperative `inputRef.current.focus()` is. `ScenarioEditPage` uses
+ *  this to expand a panel a mission problem points into, without the panel
+ *  fighting an author who has since shut it again (issue #2271). */
+export interface EditorPanelHandle {
+  /** Expand the panel. Does nothing if it is already open. */
+  open: () => void;
+}
+
+export const EditorPanel = forwardRef<
+  EditorPanelHandle,
+  {
+    title: string;
+    icon: LucideIcon;
+    /** What the panel holds, in a few words, so a shut panel still says
+     *  something. */
+    summary: string;
+    defaultOpen?: boolean;
+    children: ReactNode;
+  }
+>(function EditorPanel(
+  { title, icon: Icon, summary, defaultOpen = false, children },
+  ref,
+) {
+  // Owned here rather than left to `Collapsible`'s own `defaultOpen`, so a
+  // ref can force it open. Passing `open` alongside `onOpenChange` this way
+  // is behaviourally the same uncontrolled toggle `defaultOpen` gave every
+  // caller before this, with a controlled escape hatch added on top.
+  const [open, setOpen] = useState(defaultOpen);
+  useImperativeHandle(ref, () => ({ open: () => setOpen(true) }), []);
+
   return (
     <Collapsible
-      defaultOpen={defaultOpen}
+      open={open}
+      onOpenChange={setOpen}
       className="rounded-lg border border-border/50 bg-card"
     >
       <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-2 p-4 text-left">
@@ -54,7 +76,7 @@ export function EditorPanel({
       </CollapsibleContent>
     </Collapsible>
   );
-}
+});
 
 /**
  * Why a field's box just put back what was in it, next to the field itself

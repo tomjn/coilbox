@@ -19,7 +19,7 @@
 
 import { Button, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2, Zap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
@@ -32,7 +32,9 @@ import type { Scenario, ScenarioTrigger } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { notifyDeleted } from "./deleteNotice";
-import { EditorPanel, FieldProblem } from "./panels";
+import { focusListRow } from "./focusListRow";
+import { EditorPanel, type EditorPanelHandle, FieldProblem } from "./panels";
+import type { RowFocus } from "./problemTargets";
 import { AddStep, StepRow } from "./TriggerSteps";
 import { triggerFieldProblem } from "./triggerProblems";
 import {
@@ -90,6 +92,7 @@ export function TriggerPanel({
   picking,
   onPick,
   onUndo,
+  focus,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
@@ -113,10 +116,30 @@ export function TriggerPanel({
    *  Handed to a delete's undo notice so that button does exactly what the
    *  shortcut does rather than a second way of getting there (issue #2280). */
   onUndo: () => void;
+  /** A trigger a mission problem's row points at (issue #2271): expand the
+   *  panel, select it and land the cursor on its row in the list. */
+  focus?: RowFocus | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedTrigger(scenario.triggers, selectedId);
   const unitDefs = useMemo(() => units.map((u) => u.name), [units]);
+  const panelRef = useRef<EditorPanelHandle>(null);
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus.id and focus.token are the trigger, not the object identity. ScenarioEditPage cannot hand this a stable `focus` reference without a ref per panel, and depending on the object would refire this, and steal focus back, on every unrelated edit that re-renders it with an equal but new one.
+  useEffect(() => {
+    if (!focus) return;
+    panelRef.current?.open();
+    setSelectedId(focus.id);
+    // The row it is selecting has to exist, and be open, before it can be
+    // scrolled to. Both land in the same commit `setSelectedId` and `open()`
+    // schedule, so a frame after this one is the row's first paint.
+    const raf = requestAnimationFrame(() => {
+      const row = rowRefs.current.get(focus.id);
+      if (row) focusListRow(row);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focus?.id, focus?.token]);
 
   const count = scenario.triggers.length;
   const create = () => {
@@ -127,6 +150,7 @@ export function TriggerPanel({
 
   return (
     <EditorPanel
+      ref={panelRef}
       title="Triggers"
       icon={Zap}
       summary={
@@ -165,6 +189,10 @@ export function TriggerPanel({
                     trigger={trigger}
                     current={trigger.id === selected?.id}
                     onSelect={() => setSelectedId(trigger.id)}
+                    rowRef={(el) => {
+                      if (el) rowRefs.current.set(trigger.id, el);
+                      else rowRefs.current.delete(trigger.id);
+                    }}
                   />
                 </li>
               ))}
@@ -217,13 +245,18 @@ function TriggerRow({
   trigger,
   current,
   onSelect,
+  rowRef,
 }: {
   trigger: ScenarioTrigger;
   current: boolean;
   onSelect: () => void;
+  /** Registers this row's button so a mission problem's row can scroll to
+   *  and focus it (issue #2271). */
+  rowRef?: (el: HTMLButtonElement | null) => void;
 }) {
   return (
     <button
+      ref={rowRef}
       type="button"
       onClick={onSelect}
       className={`flex w-full flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left ${
