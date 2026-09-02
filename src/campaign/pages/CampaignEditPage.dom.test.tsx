@@ -1135,6 +1135,85 @@ describe("switching to another campaign while a write is still in flight", () =>
 });
 
 /**
+ * The save indicator, error banner and Preview button after a campaign switch
+ * (issue #2386). None of `writeFailed`, `error` or `save` carry a campaign
+ * id, so a write refused for campaign A used to still be on screen once the
+ * route swapped to campaign B under the same component instance: B's own
+ * page opened already showing "Not saved", A's error message, and a Preview
+ * button `writeFailed.current` was still holding disabled.
+ *
+ * Nothing here is data-destructive, no file is touched and no write is lost.
+ * So the fix is a reset next to the one the seeding effect already does for
+ * `undeleted` (issue #2385), not a redesign of the save machinery. The reset
+ * has to be keyed to the campaign id changing, not to a render: a genuine
+ * failure on the campaign still being edited must stay on screen.
+ */
+describe("save status after switching to another campaign (issue #2386)", () => {
+  const ROUTES: RouteObject[] = [
+    { path: "/campaign-builder/:id", element: <CampaignEditPage /> },
+  ];
+
+  function showTwoCampaigns() {
+    useCampaigns.mockReturnValue({
+      campaigns: [
+        { campaign: campaign([plain("m1", "Alpha")]), source: "local" },
+        {
+          campaign: { ...campaign([plain("m2", "Bravo")]), id: "c2" },
+          source: "local",
+        },
+      ],
+      loading: false,
+      error: null,
+    });
+    useScenarios.mockReturnValue({ scenarios: [], loading: false });
+    const router = createMemoryRouter(ROUTES, {
+      initialEntries: ["/campaign-builder/c1"],
+    });
+    render(<RouterProvider router={router} />);
+    return router;
+  }
+
+  it("does not carry campaign A's failed save onto campaign B", async () => {
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    const router = showTwoCampaigns();
+
+    fireEvent.blur(titleBox());
+    await screen.findByText(NOT_SAVED);
+    expect(screen.getByText(REFUSED)).toBeTruthy();
+
+    await act(async () => {
+      await router.navigate("/campaign-builder/c2");
+    });
+    await screen.findByText("1. Bravo");
+
+    expect(screen.queryByText(NOT_SAVED)).toBeNull();
+    expect(screen.queryByText(REFUSED)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Preview" }).hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
+  it("keeps a genuine failure on the campaign now being edited", async () => {
+    const router = showTwoCampaigns();
+
+    await act(async () => {
+      await router.navigate("/campaign-builder/c2");
+    });
+    await screen.findByText("1. Bravo");
+
+    campaignSave.mockRejectedValueOnce(new Error(REFUSED));
+    fireEvent.blur(titleBox());
+    await screen.findByText(NOT_SAVED);
+    expect(screen.getByText(REFUSED)).toBeTruthy();
+
+    // Nothing else has been asked for, so nothing may quietly clear this.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByText(NOT_SAVED)).toBeTruthy();
+    expect(screen.getByText(REFUSED)).toBeTruthy();
+  });
+});
+
+/**
  * What a mission row says about the mission (issue #2195).
  *
  * It used to say all of it in one string joined by dots, subtitle first and
