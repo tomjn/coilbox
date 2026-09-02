@@ -82,6 +82,8 @@ vi.mock("./useMissionUnit", () => ({ useMissionUnit: () => ({}) }));
 import { DrawerHost, DrawerProvider, useDrawer } from "@picoframe/frame";
 import { StrictMode, useEffect } from "react";
 import { newScenario } from "@/scenario/create";
+import type { Scenario } from "@/scenario/model";
+import { attachScenario } from "../../missionScenario";
 import type { CampaignMission } from "../../model";
 import { MissionEditorDrawer } from "./MissionEditorDrawer";
 
@@ -753,6 +755,114 @@ describe("the four groups (issue #2261)", () => {
     expect(screen.getByText("Zero-K")).toBeTruthy();
     expect(screen.getByText("No map")).toBeTruthy();
     expect(screen.getByText("No briefing")).toBeTruthy();
+  });
+});
+
+describe("a stale scenario, with the Scenario group shut (issue #2392)", () => {
+  // The one fact a shut group used to hide. Every other summary says what is
+  // set, which is what makes shutting a group safe. This one named the attached
+  // scenario without saying the mission had stopped matching it, so an author
+  // who never opened the group never found out.
+  //
+  // The answer is handed in rather than read here. Reading every stored
+  // scenario means the content scan, 23 seconds on a cold archive cache, which
+  // is the cost the shut groups exist to avoid (issue #2265). The campaign page
+  // has already read them for its own mission rows.
+
+  /** The scenario as the builder holds it, and the same one edited since. */
+  const stored: Scenario = {
+    ...newScenario("Beachhead"),
+    id: "beachhead",
+    updatedAt: "2026-03-03T09:00:00.000Z",
+  };
+  const editedSince: Scenario = {
+    ...stored,
+    updatedAt: "2026-05-14T09:00:00.000Z",
+  };
+
+  /** A mission playing a copy of `stored`. */
+  const attached = () => attachScenario(mission(), stored);
+
+  /** The trigger for one group, whose accessible name carries its summary. */
+  const header = (group: string) =>
+    screen.getByRole("button", { name: new RegExp(`^${group}`) });
+
+  function renderPanelWith(m: CampaignMission, scenarios: Scenario[]) {
+    return render(
+      <DrawerProvider>
+        <MissionEditorDrawer
+          campaignId="c1"
+          mission={m}
+          scenarios={scenarios}
+          onSave={async () => {}}
+        />
+      </DrawerProvider>,
+    );
+  }
+
+  it("says so beside the heading, without opening the group", () => {
+    renderPanelWith(attached(), [editedSince]);
+
+    const scenario = header("Scenario");
+    expect(scenario.getAttribute("data-state")).toBe("closed");
+    expect(scenario.textContent).toContain("Out of date");
+    expect(scenario.textContent).toContain(
+      "The scenario has been edited since this copy was attached.",
+    );
+  });
+
+  it("keeps saying what is attached as well as that it has moved on", () => {
+    renderPanelWith(attached(), [editedSince]);
+
+    expect(header("Scenario").textContent).toContain("Beachhead");
+  });
+
+  it("says nothing when the copy still matches", () => {
+    renderPanelWith(attached(), [stored]);
+
+    expect(header("Scenario").textContent).not.toContain("Out of date");
+  });
+
+  it("says nothing when no stored scenario has that id any more", () => {
+    // Orphaned, not stale: there is nothing left to have fallen behind.
+    renderPanelWith(attached(), []);
+
+    expect(header("Scenario").textContent).not.toContain("Out of date");
+  });
+
+  it("says nothing when nobody handed the drawer a scenario list", () => {
+    // No list is not an answer, so the marker is absent rather than guessed at.
+    openDrawer(attached());
+
+    expect(header("Scenario").textContent).not.toContain("Out of date");
+  });
+
+  it("clears once the mission's copy is brought up to date", () => {
+    // Updating happens in the field inside the group, which hands the drawer a
+    // new mission. The marker reads the mission as it stands, so it goes.
+    const { rerender } = renderPanelWith(attached(), [editedSince]);
+    expect(header("Scenario").textContent).toContain("Out of date");
+
+    rerender(
+      <DrawerProvider>
+        <MissionEditorDrawer
+          campaignId="c1"
+          mission={attachScenario(mission(), editedSince)}
+          scenarios={[editedSince]}
+          onSave={async () => {}}
+        />
+      </DrawerProvider>,
+    );
+
+    expect(header("Scenario").textContent).not.toContain("Out of date");
+  });
+
+  it("leaves the other three headings unmarked", () => {
+    renderPanelWith(attached(), [editedSince]);
+
+    for (const group of ["Content", "Presentation", "Rules"]) {
+      expect(header(group).textContent).not.toContain("Out of date");
+    }
   });
 });
 

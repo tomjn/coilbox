@@ -416,6 +416,12 @@ export default function CampaignEditPage() {
       ),
     });
 
+  // The scenario list goes with the mission (issue #2392). The drawer's
+  // Scenario group starts shut, and its summary cannot ask whether the attached
+  // copy has fallen behind without reading every stored scenario, which is the
+  // content scan that shutting the group avoids paying for (issue #2265). This
+  // page has already read them, for the row's own "Out of date" badge, so the
+  // answer costs the drawer nothing on the way in.
   const openMission = (m: CampaignMission) =>
     drawer.open({
       title: `Edit mission: ${m.title}`,
@@ -424,6 +430,7 @@ export default function CampaignEditPage() {
         <MissionEditorDrawer
           campaignId={campaign.id}
           mission={m}
+          scenarios={scenarios}
           onSave={applyMission}
         />
       ),

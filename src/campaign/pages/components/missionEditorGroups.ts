@@ -14,7 +14,10 @@
  * scenario field and the unit picker both reach for a unitsync scan, which
  * costs 23 seconds on a cold archive cache (issue #2265), and a summary that
  * needed one would put that cost back on the drawer whether or not the group
- * it describes was ever opened.
+ * it describes was ever opened. The one fact that cannot be read off the
+ * mission alone, whether its scenario copy has fallen behind, is answered
+ * beside the heading instead, from a list the drawer is handed rather than one
+ * it reads (issue #2392).
  *
  * Which groups are open is remembered the way the campaign page remembers its
  * Presentation disclosure: in `localStorage`, under one key that covers every
@@ -130,9 +133,10 @@ export function contentSummary(mission: CampaignMission): string {
  * The attached scenario by name, with what is in it.
  *
  * Whether the copy has fallen behind the stored scenario is the other thing
- * worth knowing here, and it is not said, because answering it means reading
- * every stored scenario and that reads the content scan. The field itself
- * warns about it, in amber, the moment the group is opened.
+ * worth knowing here, and it is not said in this line, because answering it
+ * means reading every stored scenario and that reads the content scan. The
+ * drawer puts an amber badge beside the heading instead, from the list the
+ * campaign page had already read (issue #2392).
  */
 export function scenarioSummary(mission: CampaignMission): string {
   const scenario = mission.scenario;

@@ -26,12 +26,14 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGameUnits } from "@/content/useGameUnits";
+import type { Scenario } from "@/scenario/model";
 import {
   UnitGameProvider,
   UnitPickerButton,
 } from "../../../content/pages/components/UnitPicker";
 import { mediaKind, refIsVideo } from "../../../lib/assetUrl";
 import { campaignImageImport, campaignMediaImport } from "../../bindings";
+import { scenarioAttachment } from "../../missionScenario";
 import type {
   CampaignMission,
   MapPreviewConfig,
@@ -69,6 +71,7 @@ import {
   useMissionGroups,
 } from "./missionEditorGroups";
 import { PanoramaScroller } from "./PanoramaScroller";
+import { StaleScenarioBadge } from "./StaleScenarioBadge";
 import { UnitRestrictions } from "./UnitRestrictions";
 import { useMissionUnit } from "./useMissionUnit";
 
@@ -344,16 +347,24 @@ function PreviewBox({ children }: { children: ReactNode }) {
  * makes that scan cost about 23 seconds before the drawer will paint (issue
  * #2265). Three of the four groups start shut, so opening a mission to fix a
  * typo asks the engine for nothing.
+ *
+ * A summary is one line of text, which is right for "what is in here" and wrong
+ * for "something in here is not as you left it". The marker beside it is for
+ * the second kind: a badge with its own colour, which reads as a warning at a
+ * glance rather than as one more clause to parse (issue #2392).
  */
 function Group({
   title,
   summary,
+  marker,
   open,
   onOpenChange,
   children,
 }: {
   title: string;
   summary: string;
+  /** Shown after the summary, and kept from shrinking when it truncates. */
+  marker?: ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
@@ -371,6 +382,7 @@ function Group({
           <span className="truncate text-xs font-normal text-muted-foreground">
             {summary}
           </span>
+          {marker && <span className="shrink-0 font-normal">{marker}</span>}
         </CollapsibleTrigger>
       </h3>
       <CollapsibleContent className="flex flex-col gap-5 border-l border-border/50 pl-4">
@@ -411,10 +423,23 @@ function Group({
 export function MissionEditorDrawer({
   campaignId,
   mission: initial,
+  scenarios = [],
   onSave,
 }: {
   campaignId: string;
   mission: CampaignMission;
+  /**
+   * Every scenario stored here, as the page that opened this drawer already
+   * had them (issue #2392). Only the Scenario heading's "Out of date" marker
+   * reads them, and only against the mission's own attached copy.
+   *
+   * Handed in rather than read here on purpose. Reading them means the content
+   * scan, which is what the shut groups exist to avoid paying for on open
+   * (issue #2265), and the campaign page has already paid it for its own
+   * mission rows. Left out, the marker is simply absent, which is what the
+   * drawer said before there was one.
+   */
+  scenarios?: Scenario[];
   /** Store this mission, as part of the whole campaign. Called on every change. */
   onSave: (mission: CampaignMission) => Promise<void>;
 }) {
@@ -747,9 +772,17 @@ export function MissionEditorDrawer({
         </label>
       </Group>
 
+      {/* The marker reads the mission as it stands rather than as it was handed
+          in, so updating the copy in the field below clears the badge above
+          it. */}
       <Group
         title="Scenario"
         summary={scenarioSummary(mission)}
+        marker={
+          scenarioAttachment(mission, scenarios).state === "stale" ? (
+            <StaleScenarioBadge />
+          ) : undefined
+        }
         open={groups.scenario}
         onOpenChange={(o) => setGroup("scenario", o)}
       >
