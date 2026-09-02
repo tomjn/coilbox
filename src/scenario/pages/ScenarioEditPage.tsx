@@ -1,8 +1,10 @@
 import { Button, Drawer, Input, useDrawer } from "@picoframe/frame";
 import {
   ArrowLeft,
+  Check,
   Copy,
   FileCode2,
+  Loader2,
   MoreVertical,
   Rocket,
   Share2,
@@ -143,6 +145,14 @@ export default function ScenarioEditPage() {
     problems.blocking.length,
     problems.warnings.length,
   );
+  // The problems button's own state, kept apart from `problemCount` because a
+  // read still in flight and a clean read both leave that string empty, and an
+  // author cannot tell those two apart from nothing on screen (issue #2272).
+  const problemsPhase: "checking" | "clean" | "problems" = gameUnits.loading
+    ? "checking"
+    : problemCount
+      ? "problems"
+      : "clean";
   const [showProblems, setShowProblems] = useState(false);
   const [showLua, setShowLua] = useState(false);
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
@@ -398,23 +408,43 @@ export default function ScenarioEditPage() {
           <SaveStatus state={save} onRetry={() => persist(scenario)} />
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {/* What the validator has found, said while the mission is being
-              made rather than when it fails to start (issue #2162). Styled as
-              a problem, and destructive only when something in it actually
-              stops a launch: an unwritten objective is not an emergency. */}
-            {problemCount ? (
-              <Button
-                size="sm"
-                variant={
-                  problems.blocking.length > 0 ? "destructive" : "outline"
-                }
-                className={
-                  problems.blocking.length > 0 ? undefined : "text-amber-300"
-                }
-                onClick={() => setShowProblems(true)}
-              >
-                <TriangleAlert className="size-4" /> {problemCount}
-              </Button>
-            ) : null}
+              made rather than when it fails to start (issue #2162). Present
+              in all three states the validator can be in, because a button
+              that only exists when something is wrong looks the same as one
+              for a mission nobody has checked yet (issue #2272). Only the
+              problems state gets the warning colour: destructive when
+              something in it actually stops a launch, amber when it does
+              not, muted while checking or clean. */}
+            <Button
+              size="sm"
+              disabled={problemsPhase === "checking"}
+              variant={
+                problemsPhase === "problems" && problems.blocking.length > 0
+                  ? "destructive"
+                  : "outline"
+              }
+              className={
+                problemsPhase === "problems"
+                  ? problems.blocking.length > 0
+                    ? undefined
+                    : "text-amber-300"
+                  : "text-muted-foreground"
+              }
+              onClick={() => setShowProblems(true)}
+            >
+              {problemsPhase === "checking" ? (
+                <Loader2 className="size-4 motion-safe:animate-spin" />
+              ) : problemsPhase === "problems" ? (
+                <TriangleAlert className="size-4" />
+              ) : (
+                <Check className="size-4" />
+              )}
+              {problemsPhase === "checking"
+                ? "Checking…"
+                : problemsPhase === "problems"
+                  ? problemCount
+                  : "No problems"}
+            </Button>
             {/* The file the engine is handed, beside the problems found in it:
               an author who has read a problem and does not believe it reads the
               mission next (issue #2163). */}

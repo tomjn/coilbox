@@ -56,9 +56,10 @@ vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({ data: { games: [], maps: [] } }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
-vi.mock("@/content/useGameUnits", () => ({
-  useGameUnits: () => ({ units: [], loading: false }),
+const { useGameUnits } = vi.hoisted(() => ({
+  useGameUnits: vi.fn(() => ({ units: [], loading: false })),
 }));
+vi.mock("@/content/useGameUnits", () => ({ useGameUnits }));
 vi.mock("@/content/pages/components/UnitPicker", () => ({
   UnitGameProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -68,9 +69,15 @@ vi.mock("../../campaign/campaigns", () => ({
 vi.mock("./components/useScenarioMapExtent", () => ({
   useScenarioMapExtent: () => undefined,
 }));
-vi.mock("./components/useMissionProblems", () => ({
-  useMissionProblems: () => ({ blocking: [], warnings: [] }),
+const { useMissionProblems } = vi.hoisted(() => ({
+  useMissionProblems: vi.fn(
+    (): { blocking: unknown[]; warnings: unknown[] } => ({
+      blocking: [],
+      warnings: [],
+    }),
+  ),
 }));
+vi.mock("./components/useMissionProblems", () => ({ useMissionProblems }));
 vi.mock("./components/useScenarioGate", () => ({
   useScenarioGate: () => ({ gate: undefined, extensions: undefined }),
 }));
@@ -163,6 +170,11 @@ afterEach(() => {
   cleanup();
   opened.length = 0;
   vi.clearAllMocks();
+  // clearAllMocks drops call history but not a return value set with
+  // mockReturnValue, so the two tests below that override these would
+  // otherwise leak their state into whichever test runs next.
+  useGameUnits.mockReturnValue({ units: [], loading: false });
+  useMissionProblems.mockReturnValue({ blocking: [], warnings: [] });
 });
 
 describe("the scenario editor's header", () => {
@@ -294,6 +306,40 @@ describe("the scenario editor's header", () => {
     expect(openMenuByKeyboard("Landing")).toEqual([
       expect.stringContaining("Share"),
     ]);
+  });
+});
+
+// Issue #2272. A clean mission and one nobody has checked yet used to render
+// identically: nothing. The button is now present for all three states the
+// validator can be in, so an author always has something to read.
+describe("the problems button", () => {
+  it("is disabled and says Checking while the game's units are still loading", () => {
+    useGameUnits.mockReturnValue({ units: [], loading: true });
+    edit(local);
+
+    const button = screen.getByRole("button", { name: /Checking/ });
+    expect(button.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("says No problems, enabled, once the units have loaded and nothing is wrong", () => {
+    useGameUnits.mockReturnValue({ units: [], loading: false });
+    useMissionProblems.mockReturnValue({ blocking: [], warnings: [] });
+    edit(local);
+
+    const button = screen.getByRole("button", { name: /No problems/ });
+    expect(button.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("names the count once the validator has found something", () => {
+    useGameUnits.mockReturnValue({ units: [], loading: false });
+    useMissionProblems.mockReturnValue({
+      blocking: [{ path: "triggers.0", message: "Missing zone" }],
+      warnings: [],
+    });
+    edit(local);
+
+    const button = screen.getByRole("button", { name: /1 problem/ });
+    expect(button.hasAttribute("disabled")).toBe(false);
   });
 });
 
