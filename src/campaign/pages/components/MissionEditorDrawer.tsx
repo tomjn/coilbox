@@ -1,9 +1,15 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Image, Plus, Trash2, X } from "lucide-react";
+import { Image, Plus, Trash2, Undo2, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type SaveState, SaveStatus } from "@/components/SaveStatus";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -20,15 +26,9 @@ import {
   UnitPickerButton,
 } from "../../../content/pages/components/UnitPicker";
 import { mediaKind, refIsVideo } from "../../../lib/assetUrl";
-import {
-  campaignImageImport,
-  campaignMediaDelete,
-  campaignMediaImport,
-} from "../../bindings";
-import { missionMedia } from "../../media";
+import { campaignImageImport, campaignMediaImport } from "../../bindings";
 import type {
   CampaignMission,
-  ImageRef,
   MapPreviewConfig,
   UnitPreviewConfig,
 } from "../../model";
@@ -215,31 +215,92 @@ function UnitSlotEditor({
 }
 
 /**
- * Take this session's imports off disk, except the ones `keep` names, and forget
- * them either way.
+ * The mission as it is stored: a title that is never blank, and none of the
+ * objective rows the author added and never filled in.
  *
- * Best-effort. A file that will not go is wasted disk space, and by the time the
- * drawer is closing there is nobody left to tell, so a refusal goes to the
- * console rather than the screen. `deleted: false` is said out loud too: it
- * means neither folder held the file, and a delete that quietly removes nothing
- * was the whole of issue #2210.
+ * Only the stored copy is shaped this way. The drawer keeps showing what was
+ * typed, so a row waiting to be filled in stays on screen while it is empty.
  */
-function deleteSessionFiles(
-  campaignId: string,
-  files: Set<string>,
-  keep: Set<string>,
-) {
-  for (const file of files) {
-    if (keep.has(file)) continue;
-    files.delete(file);
-    campaignMediaDelete({ campaignId, file })
-      .then(({ deleted }) => {
-        if (!deleted) console.warn("campaign media was already gone", file);
-      })
-      .catch((e) => {
-        console.error("could not delete campaign media", file, e);
-      });
-  }
+function stored(mission: CampaignMission): CampaignMission {
+  return {
+    ...mission,
+    title: mission.title.trim() || "Untitled mission",
+    objectives: mission.objectives.map((o) => o.trim()).filter(Boolean),
+  };
+}
+
+/**
+ * Whether writing `a` would leave anything on disk that writing `b` did not.
+ *
+ * The stored shapes rather than the raw ones, so an objective row added and
+ * still empty is not a change waiting to be saved, and neither is a title
+ * somebody put a space on the end of.
+ */
+function changed(a: CampaignMission, b: CampaignMission): boolean {
+  return a !== b && JSON.stringify(stored(a)) !== JSON.stringify(stored(b));
+}
+
+/**
+ * Put the mission back the way it was when the drawer opened.
+ *
+ * Everything else in here saves as it is typed, so this is the one action that
+ * takes work away, and it asks first, through the same popover the mission
+ * row's own Remove uses. It says how far back it goes, because "revert" on a
+ * drawer that has been open for ten minutes could mean almost anything.
+ */
+function RevertButton({
+  disabled,
+  onRevert,
+}: {
+  disabled: boolean;
+  onRevert: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="gap-1.5"
+          disabled={disabled}
+        >
+          <Undo2 className="size-4" /> Revert
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="flex w-72 flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium">Undo every change?</h3>
+          <p className="text-xs text-muted-foreground">
+            This puts the mission back the way it was when you opened it, and
+            saves that. Anything imported since goes off disk with it.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setOpen(false)}
+          >
+            Keep editing
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              setOpen(false);
+              onRevert();
+            }}
+          >
+            Revert
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 /** A framed, fixed-height box for an in-editor live 3D preview. */
@@ -252,45 +313,146 @@ function PreviewBox({ children }: { children: ReactNode }) {
 }
 
 /**
- * Drawer body for editing one campaign mission. Holds the edit in local state and
- * commits it via `onApply` (which persists the whole campaign) — so a cancelled
- * drawer leaves the stored campaign untouched.
+ * Drawer body for editing one campaign mission. Saves as you go, the way the
+ * page it sits on does (issue #2260).
  *
- * Media is the exception that touches disk before Apply: picking a file imports it
- * immediately, because the plugin needs a real file before anything can play it. So
- * a file imported *this session* and then replaced or emptied out is deleted at
- * once, in any of the four slots (it was never saved, and the page behind cannot
- * clean it up: its diff works from the stored document, which never named it). The
- * mission's *already-saved* files are left for the parent to delete on Apply, so
- * cancelling never dangles a saved reference.
+ * It used to hold the edit in local state and commit it on Apply, which meant
+ * Cancel, Escape and a click on the backdrop each threw away everything typed
+ * without saying so. The page behind autosaves, so nothing about the drawer
+ * told an author that clicking outside it deletes a briefing they spent ten
+ * minutes on.
  *
- * Closing takes the rest. Whatever the drawer still holds and never saved goes
- * when it unmounts, which is where Cancel, Escape and a click on the backdrop all
- * end up. Apply is spared: the mission it persisted keeps its files.
+ * Now every change goes to disk through `onSave`, which persists the whole
+ * campaign. A control writes as it is changed. A text box writes on blur, the
+ * same as the campaign title and description behind it. Closing is just
+ * closing, and the one way back is Revert, which is a button that asks first
+ * rather than a click landing anywhere outside the panel.
+ *
+ * That takes the media bookkeeping with it. Picking a file imports it there and
+ * then, because the plugin needs a real file before anything can play it, and
+ * the drawer used to have to delete those itself: the page's diff works from
+ * the stored document, which had never named an import Apply had not committed
+ * yet (issues #2210 and #2231). Saving on change closes that gap. The stored
+ * document names an import the moment it is made, so replacing one, emptying
+ * the slot, or reverting the lot all go through the page's own `persistMedia`,
+ * which deletes what the document stops naming once the write has landed.
+ * Deleting only after the write is the part the drawer could never do, and it
+ * is what keeps a refused save from leaving the stored mission pointing at a
+ * file that has already gone (issue #2232).
  */
 export function MissionEditorDrawer({
   campaignId,
   mission: initial,
-  onApply,
+  onSave,
 }: {
   campaignId: string;
   mission: CampaignMission;
-  onApply: (mission: CampaignMission) => Promise<void>;
+  /** Store this mission, as part of the whole campaign. Called on every change. */
+  onSave: (mission: CampaignMission) => Promise<void>;
 }) {
   const drawer = useDrawer();
   const [mission, setMission] = useState<CampaignMission>(initial);
-  const [saving, setSaving] = useState(false);
+  const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
-  // Files imported during this drawer session (safe to delete on replace).
-  const sessionFiles = useRef<Set<string>>(new Set());
-  // The mission Apply committed, or null while nothing has been. Read only by
-  // the closing cleanup below, which is why it is a ref: as state it would be a
-  // dependency, and a cleanup that re-runs on a dependency change would delete
-  // files the drawer is still using.
-  const applied = useRef<CampaignMission | null>(null);
+  // The mission this was last seeded from, the mission as it stands, and the
+  // last one handed to `onSave`. Refs because the closing write below must run
+  // on unmount alone: as dependencies they would re-run it mid-edit.
+  const opened = useRef<CampaignMission>(initial);
+  const latest = useRef<CampaignMission>(initial);
+  const handed = useRef<CampaignMission>(initial);
+  const write = useRef(onSave);
+  write.current = onSave;
+  const panel = useRef<HTMLDivElement>(null);
 
-  const patch = (p: Partial<CampaignMission>) =>
+  // The panel outlives its own close: it goes when the slide-out animation
+  // ends, so opening a second mission before that lands hands a new mission to
+  // this same component, which is still holding the last one in state. The
+  // drawer then shows the wrong mission, and now that it saves as it goes it
+  // would write that one's fields over the one on screen. So state is seeded
+  // again whenever the mission handed in is a different object.
+  const reseeded = opened.current !== initial;
+  if (reseeded) {
+    opened.current = initial;
+    handed.current = initial;
+    setMission(initial);
+    setSave({ kind: "idle" });
+    setError(null);
+  }
+  // This render still holds the mission being replaced, and React throws it
+  // away and renders again. Nothing written on the way out may read it.
+  latest.current = reseeded ? initial : mission;
+
+  /** Write the mission, and say where that write got to. */
+  const persist = async (next: CampaignMission) => {
+    handed.current = next;
+    setSave({ kind: "saving" });
+    try {
+      await write.current(stored(next));
+      setError(null);
+      setSave({ kind: "saved", at: new Date() });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setSave({ kind: "failed" });
+    }
+  };
+
+  /** Change the mission and write it. Every control that is not a text box
+   *  comes through here: a switch, a slider or a picked file is finished the
+   *  moment it changes, so there is nothing to wait for. */
+  const patch = (p: Partial<CampaignMission>) => {
+    const next = { ...mission, ...p };
+    setMission(next);
+    void persist(next);
+  };
+
+  /** Change the mission without writing it, for a text box mid-sentence. What
+   *  is on screen is then ahead of what is on disk, and the indicator says so
+   *  until the box loses focus. */
+  const edit = (p: Partial<CampaignMission>) => {
     setMission((m) => ({ ...m, ...p }));
+    setSave({ kind: "unsaved" });
+  };
+
+  /** Write what a text box holds, unless the last write already carried it. */
+  const persistTyped = () => {
+    if (!changed(latest.current, handed.current)) return;
+    void persist(latest.current);
+  };
+  const typed = useRef(persistTyped);
+  typed.current = persistTyped;
+
+  // Escape and a press outside the panel both close the drawer over a text box
+  // that still has focus, so the blur that would have written it never comes.
+  // Both are caught before Radix acts on them: Escape on the way down through
+  // the panel, which is ahead of the document listener Radix closes from, and
+  // an outside press in the capture phase, which is ahead of everything.
+  //
+  // Waiting for the unmount instead does not work. The panel is still on
+  // screen while it slides out, and a reload or a second drawer opened in that
+  // window takes the write with it.
+  useEffect(() => {
+    const root = panel.current;
+    const outside = (e: PointerEvent) => {
+      if (e.target instanceof Node && root?.contains(e.target)) return;
+      typed.current();
+    };
+    document.addEventListener("pointerdown", outside, true);
+    return () => document.removeEventListener("pointerdown", outside, true);
+  }, []);
+
+  // The last resort, for a close that never went through either of those: the
+  // page navigated away, or the drawer was closed from code. Empty deps and
+  // read through refs, because a cleanup that re-ran on a dependency change
+  // would write on every keystroke. StrictMode runs it once on mount too,
+  // which the "already written" check makes a no-op.
+  useEffect(
+    () => () => {
+      if (!changed(latest.current, handed.current)) return;
+      handed.current = latest.current;
+      void write.current(stored(latest.current));
+    },
+    [],
+  );
 
   // Each slot's two 3D configs, as `slots.ts` reasons about them. Writing the
   // pair back together is what keeps a slot from holding two sources at once.
@@ -314,51 +476,6 @@ export function MissionEditorDrawer({
         : { sideGraphicMap: next.map, sideGraphicUnit: next.unit },
     );
   };
-
-  /** Remember an import this session made, so replacing it can take it off disk. */
-  const trackImport = (ref?: ImageRef) => {
-    if (ref?.kind === "file") sessionFiles.current.add(ref.file);
-  };
-
-  // An import this session made and then replaced or emptied out was never
-  // saved, so nothing will ever name it again and it goes now. Reads the same
-  // slot list `media.ts` deletes through, because the slot this forgot is what
-  // left every voiceover and cutscene on disk (issue #2210). A video was copied
-  // verbatim into `media/`, so this has to be the delete that reaches both
-  // folders.
-  useEffect(() => {
-    const named = new Set(missionMedia(mission).map((m) => m.file));
-    deleteSessionFiles(campaignId, sessionFiles.current, named);
-  }, [mission, campaignId]);
-
-  // Closing without applying leaves every remaining session import an orphan:
-  // no slot names it, the stored campaign never heard of it, and the page behind
-  // diffs against that stored campaign so it cannot find it either. A 200 MB
-  // cutscene the author decided against stayed until the whole campaign was
-  // deleted (issue #2231).
-  //
-  // Cancel, Escape and a click on the backdrop are three different routes to the
-  // same place: the drawer's content unmounts. So the cleanup goes here rather
-  // than on the Cancel button, which is the only one of the three that button
-  // could ever cover.
-  //
-  // Apply is what this has to spare, and `applied` is what tells them apart.
-  // Once a mission has been persisted the files it names belong to the saved
-  // campaign, and deleting them would leave it naming files that are not there.
-  //
-  // Empty deps, and read through refs, because React runs a cleanup on every
-  // dependency change and once more on mount under StrictMode. A cleanup that
-  // could re-run mid-edit would delete a file the drawer is still using.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: must run on unmount alone, because a re-run would delete a file the open drawer still names
-  useEffect(
-    () => () => {
-      const keep = applied.current
-        ? new Set(missionMedia(applied.current).map((m) => m.file))
-        : new Set<string>();
-      deleteSessionFiles(campaignId, sessionFiles.current, keep);
-    },
-    [],
-  );
 
   const pickImage = async () => {
     setError(null);
@@ -384,12 +501,12 @@ export function MissionEditorDrawer({
         ],
       });
       if (typeof src !== "string") return;
-      // A video backdrop is copied verbatim; an image is re-encoded/downscaled.
+      // A video backdrop is copied verbatim, an image is re-encoded and
+      // downscaled.
       const { file } =
         mediaKind(src) === "video"
           ? await campaignMediaImport({ campaignId, srcPath: src })
           : await campaignImageImport({ campaignId, srcPath: src });
-      sessionFiles.current.add(file);
       patch({ panorama: { kind: "file", file } });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -398,47 +515,43 @@ export function MissionEditorDrawer({
 
   const removeImage = () => patch({ panorama: undefined });
 
-  // Same session-import bookkeeping as `pickImage`'s success path, just sourced
-  // from the archive picker instead of the OS file dialog.
-  const importPanoramaFromArchive = (file: string) => {
-    sessionFiles.current.add(file);
+  const importPanoramaFromArchive = (file: string) =>
     patch({ panorama: { kind: "file", file } });
-  };
 
   const setObjective = (i: number, value: string) =>
-    patch({
+    edit({
       objectives: mission.objectives.map((o, j) => (j === i ? value : o)),
     });
   const addObjective = () => patch({ objectives: [...mission.objectives, ""] });
   const removeObjective = (i: number) =>
     patch({ objectives: mission.objectives.filter((_, j) => j !== i) });
 
-  const apply = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      // Drop blank objective lines the user added but never filled in.
-      const cleaned: CampaignMission = {
-        ...mission,
-        title: mission.title.trim() || "Untitled mission",
-        objectives: mission.objectives.map((o) => o.trim()).filter(Boolean),
-      };
-      await onApply(cleaned);
-      // Saved, so the files this mission names are the campaign's now and the
-      // closing cleanup must leave them alone. Set only on success: a refused
-      // save leaves the drawer open with its error, and cancelling from there
-      // is still a cancel.
-      applied.current = cleaned;
-      drawer.close();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
+  const revert = () => {
+    setMission(initial);
+    void persist(initial);
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div
+      ref={panel}
+      className="flex flex-col gap-5"
+      onKeyDownCapture={(e) => {
+        if (e.key === "Escape") persistTyped();
+      }}
+    >
+      {/* The contract, said once at the top, because the drawer used to have an
+          Apply button and an author who learnt that one is owed the news. The
+          indicator beside it is the page's own. */}
+      {/* Stuck a hair above the scrollport rather than at it, because that box
+          carries a padding of its own and content would otherwise show through
+          the gap above this bar. */}
+      <div className="sticky -top-1 z-10 -mx-1 -mt-1 flex flex-wrap items-center justify-between gap-2 bg-background px-1 pb-2 pt-1">
+        <p className="text-xs text-muted-foreground">
+          Changes save as you make them.
+        </p>
+        <SaveStatus state={save} onRetry={() => void persist(mission)} />
+      </div>
+
       {error && (
         <Alert variant="destructive" className="p-2">
           <AlertDescription className="text-destructive">
@@ -454,7 +567,11 @@ export function MissionEditorDrawer({
         <Input
           id="mission-title"
           value={mission.title}
-          onChange={(e) => patch({ title: e.target.value })}
+          onChange={(e) => edit({ title: e.target.value })}
+          onBlur={persistTyped}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
         />
       </div>
 
@@ -466,7 +583,11 @@ export function MissionEditorDrawer({
           id="mission-subtitle"
           value={mission.subtitle ?? ""}
           placeholder="Location line shown under the title"
-          onChange={(e) => patch({ subtitle: e.target.value || undefined })}
+          onChange={(e) => edit({ subtitle: e.target.value || undefined })}
+          onBlur={persistTyped}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
         />
       </div>
 
@@ -483,7 +604,8 @@ export function MissionEditorDrawer({
           id="mission-briefing"
           value={mission.briefing}
           className="min-h-28"
-          onChange={(e) => patch({ briefing: e.target.value })}
+          onChange={(e) => edit({ briefing: e.target.value })}
+          onBlur={persistTyped}
         />
       </div>
 
@@ -497,6 +619,10 @@ export function MissionEditorDrawer({
                 value={o}
                 placeholder={`Objective ${i + 1}`}
                 onChange={(e) => setObjective(i, e.target.value)}
+                onBlur={persistTyped}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
               />
               <Button
                 size="icon"
@@ -533,7 +659,13 @@ export function MissionEditorDrawer({
         />
       </label>
 
-      <MissionScenarioField mission={mission} onChange={setMission} />
+      <MissionScenarioField
+        mission={mission}
+        onChange={(next) => {
+          setMission(next);
+          void persist(next);
+        }}
+      />
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Panorama</span>
@@ -662,10 +794,7 @@ export function MissionEditorDrawer({
               campaignId={campaignId}
               kind="sideGraphic"
               value={mission.sideGraphic}
-              onChange={(sideGraphic) => {
-                trackImport(sideGraphic);
-                patch({ sideGraphic });
-              }}
+              onChange={(sideGraphic) => patch({ sideGraphic })}
               label="Image or video"
               help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
               gameName={mission.snapshot.gameName}
@@ -703,10 +832,7 @@ export function MissionEditorDrawer({
           campaignId={campaignId}
           kind="audio"
           value={mission.voiceover}
-          onChange={(voiceover) => {
-            trackImport(voiceover);
-            patch({ voiceover });
-          }}
+          onChange={(voiceover) => patch({ voiceover })}
           label="Briefing voiceover"
           help="Optional audio played on the briefing screen."
           gameName={mission.snapshot.gameName}
@@ -727,10 +853,7 @@ export function MissionEditorDrawer({
           campaignId={campaignId}
           kind="video"
           value={mission.cutscene}
-          onChange={(cutscene) => {
-            trackImport(cutscene);
-            patch({ cutscene });
-          }}
+          onChange={(cutscene) => patch({ cutscene })}
           label="Intro cutscene"
           help="Optional video offered on the briefing screen."
           gameName={mission.snapshot.gameName}
@@ -756,12 +879,18 @@ export function MissionEditorDrawer({
         />
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-border/50 bg-background py-3">
-        <Button variant="outline" onClick={() => drawer.close()}>
-          Cancel
-        </Button>
-        <Button onClick={apply} disabled={saving}>
-          {saving ? "Saving…" : "Apply"}
+      <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/50 bg-background py-3">
+        <RevertButton disabled={!changed(mission, initial)} onRevert={revert} />
+        {/* A real click blurs the box it came from, which writes it. This is
+            for the ones that do not: a keyboard activation, or a click a
+            handler somewhere swallowed the focus change from. */}
+        <Button
+          onClick={() => {
+            persistTyped();
+            drawer.close();
+          }}
+        >
+          Close
         </Button>
       </div>
     </div>

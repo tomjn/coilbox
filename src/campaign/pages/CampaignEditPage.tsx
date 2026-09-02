@@ -352,7 +352,7 @@ export default function CampaignEditPage() {
         <MissionEditorDrawer
           campaignId={campaign.id}
           mission={m}
-          onApply={applyMission}
+          onSave={applyMission}
         />
       ),
     });
