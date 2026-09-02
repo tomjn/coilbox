@@ -1825,6 +1825,91 @@ export const unitsyncMapCatalog = defineCommand<
   MapCatalogResult
 >("coilbox-unitsync", "unitsync_map_catalog");
 
+/** A map's minimap encoded as the asset the hub takes, written to disk. Same
+ *  shape as {@link UnitBuildpicAsset} without the archive member, since a map
+ *  layer is produced from the map file rather than read out of one. */
+export interface MapMinimapAsset {
+  /** Always `minimap`. */
+  variant: string;
+  /** Always `extracted`, against `rendered` for a picture coilbox drew. */
+  origin: string;
+  /** The name the map's archive declares for itself. */
+  sourceArchive: string;
+  /** Absolute path to the encoded file. */
+  path: string;
+  /** sha256 of the encoded bytes. */
+  hash: string;
+  /** sha256 over the texture unitsync handed over, which is what the have check
+   *  compares on and what the survey pass already knew. */
+  sourceHash: string;
+  encodeProfile: string;
+  mime: string;
+  width: number;
+  height: number;
+  bytes: number;
+}
+
+/** One map in a minimap walk: what a have check asks about, and the encoded
+ *  picture when this pass was the one that sends. */
+export interface MapMinimapRow {
+  /** unitsync's versioned name, which is the whole of a map asset's key
+   *  alongside the variant. */
+  mapName: string;
+  sourceHash: string;
+  sourceArchive: string;
+  /** The map's size in elmos, which the hub requires on a map row. */
+  mapWidth: number;
+  mapHeight: number;
+  /** Absent on a survey pass. */
+  asset?: MapMinimapAsset;
+}
+
+/** Why a map produced no row. The first seven are one picture's reasons and the
+ *  last three are about the walk. */
+export type MapMinimapSkip =
+  | "no-source"
+  | "blank"
+  | "read-failed"
+  | "no-bounds"
+  | "encode-failed"
+  | "too-large"
+  | "not-written"
+  | "no-extent"
+  | "working-folder"
+  | "duplicate-map";
+
+export interface MapMinimapsResult {
+  maps: MapMinimapRow[];
+  skipped: { mapName: string; reason: MapMinimapSkip }[];
+  errors: string[];
+}
+
+/**
+ * Name what every installed map's minimap would be called, and with `assets`
+ * encode the pictures themselves (issue #2379).
+ *
+ * Two passes, and the caller picks which, the same shape
+ * {@link unitsyncMapCatalog} takes. A minimap's identity is over the texture
+ * unitsync produces rather than over the encoded bytes, so it is knowable before
+ * anything is encoded, which is what lets the hub be asked first. `maps` then
+ * names the ones it wanted.
+ *
+ * One call is one session however many maps it covers, and what the survey read
+ * is cached on file identity, so a second sweep over an unchanged library reads
+ * no textures at all.
+ */
+export const unitsyncMapMinimaps = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    /** The maps to read. Absent walks the whole library. */
+    maps?: string[];
+    /** Encode and write each one, rather than only naming it. */
+    assets?: boolean;
+  },
+  MapMinimapsResult
+>("coilbox-unitsync", "unitsync_map_minimaps");
+
 export interface MapInfoResult {
   options: ConfigOption[];
   checksum?: string;

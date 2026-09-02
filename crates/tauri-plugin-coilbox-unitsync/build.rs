@@ -22,6 +22,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_remember_render",
     "unitsync_local_renders",
     "unitsync_map_catalog",
+    "unitsync_map_minimaps",
     "unitsync_map_info",
     "unitsync_map_skybox",
     "unitsync_skirmish_ais",
