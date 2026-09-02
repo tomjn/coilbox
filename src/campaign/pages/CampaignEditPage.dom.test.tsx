@@ -41,9 +41,12 @@ import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The drawer is the app shell's, and nothing opened in it bears on removal.
+// `open` is a spy, not a no-op, because the end-of-list add row (issue #2268)
+// has to be shown calling the very same picker as the section header.
+const { drawerOpen } = vi.hoisted(() => ({ drawerOpen: vi.fn() }));
 vi.mock("@picoframe/frame", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
-  useDrawer: () => ({ open: () => {}, close: () => {}, isOpen: false }),
+  useDrawer: () => ({ open: drawerOpen, close: () => {}, isOpen: false }),
 }));
 
 // The campaign comes off disk through the plugin, and the writes go back the
@@ -187,6 +190,7 @@ beforeEach(() => {
   campaignSave.mockClear();
   campaignMediaDelete.mockClear();
   refreshCampaigns.mockClear();
+  drawerOpen.mockClear();
   useUnitsyncThumbnails.mockReturnValue({ thumbs: new Map() });
   // The Presentation disclosure remembers itself in localStorage, which
   // outlives a render, so each test starts from "never chosen".
@@ -1081,6 +1085,64 @@ describe("a mission card's header strip with no panorama", () => {
     // overlay that band uses to show the same thumbnail alongside art.
     expect(img.className).not.toContain("size-16");
     expect(img.className).not.toContain("absolute");
+  });
+});
+
+/**
+ * Reaching the two pickers without a round trip up the page (issue #2268).
+ *
+ * The header's "From preset" and "From scenario" buttons scroll out of view
+ * on a long campaign, so adding mission 11 meant scrolling back up to the
+ * header and down again to see it land. The fix repeats both buttons in a
+ * row at the end of the list, wired to the very same handlers the header
+ * uses, so what is worth pinning is that the end row calls the same picker
+ * the header does, not a second implementation of it.
+ */
+describe("adding another mission from the end of the list", () => {
+  it("repeats both pickers after the last mission", () => {
+    show([mission()]);
+
+    expect(screen.getAllByRole("button", { name: "From preset" })).toHaveLength(
+      2,
+    );
+    expect(
+      screen.getAllByRole("button", { name: "From scenario" }),
+    ).toHaveLength(2);
+  });
+
+  it("does not repeat the pickers when there are no missions to scroll past", () => {
+    show([]);
+
+    expect(screen.getAllByRole("button", { name: "From preset" })).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getAllByRole("button", { name: "From scenario" }),
+    ).toHaveLength(1);
+  });
+
+  it("opens the same preset picker the header button opens", () => {
+    show([mission()]);
+    const buttons = screen.getAllByRole("button", { name: "From preset" });
+
+    fireEvent.click(buttons[buttons.length - 1]);
+
+    expect(drawerOpen).toHaveBeenCalledTimes(1);
+    expect(drawerOpen.mock.calls[0][0]).toMatchObject({
+      title: "Add mission from preset",
+    });
+  });
+
+  it("opens the same scenario picker the header button opens", () => {
+    show([mission()]);
+    const buttons = screen.getAllByRole("button", { name: "From scenario" });
+
+    fireEvent.click(buttons[buttons.length - 1]);
+
+    expect(drawerOpen).toHaveBeenCalledTimes(1);
+    expect(drawerOpen.mock.calls[0][0]).toMatchObject({
+      title: "Add mission from scenario",
+    });
   });
 });
 

@@ -748,6 +748,28 @@ export default function CampaignEditPage() {
                 </li>
               );
             })}
+            {/* The header's two actions, repeated where the mission they add
+                actually lands. A long campaign scrolls the header out of
+                view, so without this a tenth mission means scrolling up to
+                reach the buttons and back down to see what they made. */}
+            <li className="flex flex-wrap items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 p-3">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={openPresetPicker}
+              >
+                <Plus className="size-4" /> From preset
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={openScenarioPicker}
+              >
+                <Plus className="size-4" /> From scenario
+              </Button>
+            </li>
           </ul>
         )}
       </section>
