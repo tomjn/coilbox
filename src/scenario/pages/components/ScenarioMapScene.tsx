@@ -139,6 +139,7 @@ import {
   removePathWaypoint,
   scenarioPaths,
 } from "./orderPaths";
+import type { RowFocus } from "./problemTargets";
 import { startMarkers } from "./startPositions";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
@@ -193,6 +194,7 @@ export function ScenarioMapScene({
   extensions,
   picking,
   history,
+  focus,
 }: {
   scenario: Scenario;
   onChange: (edit: ScenarioEdit) => void;
@@ -222,6 +224,13 @@ export function ScenarioMapScene({
      *  is the path drawn with knobs while the author draws it (#847). */
     pathId?: string;
   } | null;
+  /**
+   * An entry a mission problem's row points at (issue #2271): a placement off
+   * the map, a zone with nothing in it. `id` is the same selection key
+   * `sceneContents` hands `ContentsList`, so landing on it is exactly what
+   * picking the matching row out of Contents already does.
+   */
+  focus?: RowFocus | null;
 }) {
   const mapName = scenario.setup.mapName;
   // The map's own 16 bit heights as well as the picture of them, because the
@@ -705,6 +714,21 @@ export function ScenarioMapScene({
     sceneRef.current = handle;
     setHandle(handle);
   }, []);
+
+  // Mirrored in refs so a mission problem's row can land on whatever the map
+  // currently holds without retriggering every time an unrelated edit gives
+  // `entries` a new array identity. The effect below only has to run again
+  // when the row asked for changes (issue #2271).
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+  const pickEntryRef = useRef(pickEntry);
+  pickEntryRef.current = pickEntry;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus.id and focus.token are the trigger, not the object identity. `entries` and `pickEntry` are read through the refs above on purpose, so an unrelated edit that gives them a new identity does not retrigger this and snap the camera back.
+  useEffect(() => {
+    if (!focus) return;
+    const entry = entriesRef.current.find((e) => e.key === focus.id);
+    if (entry) pickEntryRef.current(entry);
+  }, [focus?.id, focus?.token]);
 
   /** What is shown instead of the map when there is no map to show. */
   const stand =
