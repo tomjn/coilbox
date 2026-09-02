@@ -534,11 +534,13 @@ function ParamControl({
           onValueChange={onChange}
           options={(spec.values ?? []).map((v) => ({ value: v, label: v }))}
           placeholder={`Pick a ${friendly}`}
+          ariaLabel={label}
         />
       );
     case "point":
       return (
         <PointField
+          label={label}
           point={asPoint(value)}
           asking={isAsking(picking, { ref: at, param: name })}
           onAsk={(on) => onPick(on ? { ref: at, param: name } : null)}
@@ -557,6 +559,7 @@ function ParamControl({
     case "orders":
       return (
         <OrdersField
+          label={label}
           name={name}
           at={at}
           scenario={scenario}
@@ -742,7 +745,7 @@ function TextField({
     <Input
       aria-label={label}
       value={text}
-      placeholder={optional ? "default" : ""}
+      placeholder={optional ? "optional" : ""}
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -827,18 +830,30 @@ function StringsField({
 }
 
 /** A point on the map, which is clicked rather than typed. The button arms the
- *  map through the same bar a patrol path is drawn with. */
+ *  map through the same bar a patrol path is drawn with.
+ *
+ *  Not a single input, so the accessible name built for it (issue #2299) names
+ *  the pair of button and coordinates rather than either alone: a `role="group"`
+ *  wrapper, the same way `ButtonGroup` names a cluster of buttons, rather than a
+ *  `<fieldset>` since neither child is a form control that needs one. */
 function PointField({
+  label,
   point,
   asking,
   onAsk,
 }: {
+  label: string;
   point: Point | null;
   asking: boolean;
   onAsk: (on: boolean) => void;
 }) {
   return (
-    <>
+    // biome-ignore lint/a11y/useSemanticElements: a button and its readout are a role=group cluster, not a form <fieldset>
+    <div
+      role="group"
+      aria-label={label}
+      className="flex min-w-0 flex-1 items-center gap-1.5"
+    >
       <Button
         size="sm"
         variant={asking ? "default" : "outline"}
@@ -851,13 +866,18 @@ function PointField({
       <span className="font-mono text-[11px] text-muted-foreground">
         {point ? `${point.x}, ${point.z}` : "nowhere yet"}
       </span>
-    </>
+    </div>
   );
 }
 
 /** The orders a `give_orders` action hands a group, edited with the same row a
- *  group's own orders are. */
+ *  group's own orders are.
+ *
+ *  A list of rows plus an "add" button, not a single input, so the accessible
+ *  name built for it (issue #2299) names the whole list via `role="group"`
+ *  rather than any one row inside it. */
 function OrdersField({
+  label,
   name,
   at,
   scenario,
@@ -866,6 +886,7 @@ function OrdersField({
   onPick,
   onChange,
 }: {
+  label: string;
   name: string;
   at: StepRef;
   scenario: Scenario;
@@ -878,7 +899,12 @@ function OrdersField({
   const targets = targetOptions(scenario);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+    // biome-ignore lint/a11y/useSemanticElements: a list of order rows and an "add" button are a role=group cluster, not a form <fieldset>
+    <div
+      role="group"
+      aria-label={label}
+      className="flex min-w-0 flex-1 flex-col gap-1.5"
+    >
       {orders.length === 0 && (
         <p className="text-[11px] text-muted-foreground">
           With no orders the group carries on with what it was already doing.

@@ -130,4 +130,126 @@ describe("trigger parameter labels", () => {
     expect(screen.getByText("foo")).toBeTruthy();
     expect(screen.getByLabelText("Custom condition foo")).toBeTruthy();
   });
+
+  it("names the enum branch's select the same way as the other fields (issue #2299)", () => {
+    const scenario = newScenario("Test");
+    const step: TriggerStep = {
+      type: "var",
+      params: { name: "score", op: "eq", value: 0 },
+    };
+
+    render(
+      <StepRow
+        step={step}
+        at={{ triggerId: "trigger-1", list: "conditions", index: 0 }}
+        scenario={scenario}
+        extensions={NO_EXTENSIONS}
+        unsupported={undefined}
+        units={[]}
+        unitsLoading={false}
+        issues={[]}
+        picking={null}
+        onPick={noop}
+        onParam={noop}
+        onMove={null}
+        onRemove={noop}
+      />,
+    );
+
+    // "op" is relabelled to "comparison", so the key stays in the spoken name.
+    expect(screen.getByLabelText("Var comparison, op")).toBeTruthy();
+  });
+
+  it("names the point picker's group rather than either of its two parts (issue #2299)", () => {
+    const scenario = newScenario("Test");
+    const step: TriggerStep = {
+      type: "camera_pan",
+      params: { pos: { x: 0, z: 0 } },
+    };
+
+    render(
+      <StepRow
+        step={step}
+        at={{ triggerId: "trigger-1", list: "actions", index: 0 }}
+        scenario={scenario}
+        extensions={NO_EXTENSIONS}
+        unsupported={undefined}
+        units={[]}
+        unitsLoading={false}
+        issues={[]}
+        picking={null}
+        onPick={noop}
+        onParam={noop}
+        onMove={null}
+        onRemove={noop}
+      />,
+    );
+
+    // "pos" is relabelled to "position", so the key stays in the spoken name
+    // the same way #2274 already does for a text or number field.
+    expect(
+      screen.getByRole("group", { name: "Camera pan position, pos" }),
+    ).toBeTruthy();
+  });
+
+  it("names the orders list's group rather than any one row inside it (issue #2299)", () => {
+    const scenario = newScenario("Test");
+    const step: TriggerStep = {
+      type: "give_orders",
+      params: { group: "", orders: [] },
+    };
+
+    render(
+      <StepRow
+        step={step}
+        at={{ triggerId: "trigger-1", list: "actions", index: 0 }}
+        scenario={scenario}
+        extensions={NO_EXTENSIONS}
+        unsupported={undefined}
+        units={[]}
+        unitsLoading={false}
+        issues={[]}
+        picking={null}
+        onPick={noop}
+        onParam={noop}
+        onMove={null}
+        onRemove={noop}
+      />,
+    );
+
+    // "orders" has no label of its own, so the key stands in for the friendly
+    // name and is not doubled up the way #2274 already covers for "actor".
+    expect(
+      screen.getByRole("group", { name: "Give orders orders" }),
+    ).toBeTruthy();
+  });
+
+  it("says a text field is optional instead of the bare word 'default' (issue #2299)", () => {
+    const scenario = newScenario("Test");
+    const step: TriggerStep = {
+      type: "map_marker",
+      params: { pos: { x: 0, z: 0 } },
+    };
+
+    render(
+      <StepRow
+        step={step}
+        at={{ triggerId: "trigger-1", list: "actions", index: 0 }}
+        scenario={scenario}
+        extensions={NO_EXTENSIONS}
+        unsupported={undefined}
+        units={[]}
+        unitsLoading={false}
+        issues={[]}
+        picking={null}
+        onPick={noop}
+        onParam={noop}
+        onMove={null}
+        onRemove={noop}
+      />,
+    );
+
+    const text = screen.getByLabelText("Map marker text") as HTMLInputElement;
+    expect(text.placeholder).toBe("optional");
+  });
 });
