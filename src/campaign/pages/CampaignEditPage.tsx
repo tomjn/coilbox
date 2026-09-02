@@ -9,12 +9,10 @@ import {
   GripVertical,
   Pencil,
   Plus,
-  TriangleAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { type SaveState, SaveStatus } from "@/components/SaveStatus";
-import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -56,13 +54,9 @@ import {
   useStoredPresentationOpen,
 } from "./components/presentationOpen";
 import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
+import { StaleScenarioBadge } from "./components/StaleScenarioBadge";
 
 const BACK = "/campaign-builder";
-
-/** The full text behind the stale-scenario badge, said once for a screen
- * reader and again as the badge's hover title. */
-const STALE_SCENARIO_WARNING =
-  "The scenario has been edited since this copy was attached.";
 
 /** Build a fresh mission from a preset, deep-copying its setup into the snapshot. */
 function missionFromPreset(preset: SkirmishPreset): CampaignMission {
@@ -422,6 +416,12 @@ export default function CampaignEditPage() {
       ),
     });
 
+  // The scenario list goes with the mission (issue #2392). The drawer's
+  // Scenario group starts shut, and its summary cannot ask whether the attached
+  // copy has fallen behind without reading every stored scenario, which is the
+  // content scan that shutting the group avoids paying for (issue #2265). This
+  // page has already read them, for the row's own "Out of date" badge, so the
+  // answer costs the drawer nothing on the way in.
   const openMission = (m: CampaignMission) =>
     drawer.open({
       title: `Edit mission: ${m.title}`,
@@ -430,6 +430,7 @@ export default function CampaignEditPage() {
         <MissionEditorDrawer
           campaignId={campaign.id}
           mission={m}
+          scenarios={scenarios}
           onSave={applyMission}
         />
       ),
@@ -786,28 +787,12 @@ export default function CampaignEditPage() {
                         <MissionSetup snapshot={m.snapshot} />
                         <span aria-hidden="true">·</span>
                         <MissionFacts mission={m} />
-                        {/* A badge rather than a sentence, so a stale
-                            attachment is a shape to notice in one scan pass
-                            rather than a paragraph to read. The full warning
-                            stays in the DOM for a screen reader and on hover,
-                            the same split the fact chips above already use. */}
+                        {/* The same badge the mission editor's Scenario
+                            heading carries, on the same answer this row
+                            already worked out (issue #2392). */}
                         {attachment.state === "stale" && (
                           <>
-                            <Badge
-                              variant="outline"
-                              title={STALE_SCENARIO_WARNING}
-                              className="gap-1 border-amber-600/40 text-amber-600 dark:border-amber-500/40 dark:text-amber-500"
-                            >
-                              <TriangleAlert
-                                className="size-3"
-                                aria-hidden="true"
-                              />
-                              Out of date
-                              <span className="sr-only">
-                                {" "}
-                                {STALE_SCENARIO_WARNING}
-                              </span>
-                            </Badge>
+                            <StaleScenarioBadge />
                             <MissionScenarioUpdateButton
                               mission={m}
                               attachment={attachment}
