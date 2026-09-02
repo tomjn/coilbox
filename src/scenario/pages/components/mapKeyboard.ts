@@ -27,6 +27,7 @@ import {
   type Facing,
   type Point,
   type Scenario,
+  type ScenarioZone,
 } from "../../model";
 import type { LayoutEdit } from "./bases";
 import type { ContentEntry } from "./contents";
@@ -44,7 +45,7 @@ import {
   pathLabel,
   removePathWaypoint,
 } from "./orderPaths";
-import { moveZone, parseZoneKey, removeZone } from "./zones";
+import { moveZone, parseZoneKey, removeZone, resizeZone } from "./zones";
 
 /** Everything the keys need to read: the document, and the three lists the map
  *  draws it as. */
@@ -85,6 +86,20 @@ export function moveOnMap(
     snap,
     layoutEdit(parsePlacementKey(key)?.id),
   );
+}
+
+/** The document with the zone this key names grown or shrunk `step` elmos in
+ *  the direction named. The same document back when the key does not name a
+ *  zone still on it, exactly the entry point `moveOnMap` is for a move
+ *  (issue #2313). Nothing else on the map resizes, so there is no other kind
+ *  to dispatch across. */
+export function resizeOnMap(
+  scenario: Scenario,
+  key: string,
+  heading: Heading,
+  step: number,
+): Scenario {
+  return resizeZone(scenario, key, heading, step);
 }
 
 /** The document without the thing a key names. */
@@ -266,6 +281,69 @@ export function turnedWords(things: MapThings, key: string): string {
   return `Facing ${facingWords(facing)}.`;
 }
 
+/** A zone's size, in elmos: what a resize changed and the number a resize
+ *  announcement has to carry. A box says width and height because a resize
+ *  can leave the two different. A circle says its one radius. */
+function zoneSizeWords(zone: ScenarioZone): string {
+  if (zone.shape === "circle") return `radius ${Math.round(zone.radius)} elmos`;
+  const width = Math.round(zone.max.x - zone.min.x);
+  const height = Math.round(zone.max.z - zone.min.z);
+  return `${width} by ${height} elmos`;
+}
+
+/** The zone a key names, read out of the document, or null when the key does
+ *  not name a zone still on it. */
+function zoneNamed(things: MapThings, key: string): ScenarioZone | null {
+  const ref = parseZoneKey(key);
+  if (!ref) return null;
+  return things.scenario.zones.find((one) => one.id === ref.id) ?? null;
+}
+
+/** What a resize did, said after the document has taken it: the size read
+ *  back out of the document rather than reasoned out from the key press, the
+ *  same rule `movedWords` follows for a move. */
+export function resizedWords(
+  things: MapThings,
+  key: string,
+  heading: Heading,
+  step: number,
+): string {
+  const zone = zoneNamed(things, key);
+  if (!zone) return "Nothing resized.";
+  const verb = heading === "north" || heading === "east" ? "Grew" : "Shrank";
+  return `${verb} ${step}, now ${zoneSizeWords(zone)}.`;
+}
+
+/** What is said when a resize asked for no change at all: the zone is already
+ *  as small as one gets to be. Growing has no such ceiling. */
+export function resizeLimitWords(things: MapThings, key: string): string {
+  const zone = zoneNamed(things, key);
+  if (!zone) return "Nothing resized.";
+  return `Already as small as a zone gets, ${zoneSizeWords(zone)}.`;
+}
+
+/**
+ * What is said when resize mode is switched on or off for the zone that is
+ * selected (issue #2313).
+ *
+ * Arrows move a selected zone by default, the same key every other thing on
+ * the map moves by, so trading that for a resize has to say so in words. An
+ * author who cannot see the map has nothing else to tell the two apart by.
+ */
+export function resizeModeWords(
+  things: MapThings,
+  key: string,
+  on: boolean,
+): string {
+  const zone = zoneNamed(things, key);
+  if (!zone) return "Nothing selected.";
+  if (!on) return "Move mode. Arrows move it again.";
+  return (
+    `Resize mode, ${zoneSizeWords(zone)}. Arrows change its size instead of its position: ` +
+    "north and east make it bigger, south and west make it smaller. Press S again for move."
+  );
+}
+
 /** Where the view's own cursor is, for an author placing something without a
  *  pointer. The ground height comes with it because whether a spot is a hilltop
  *  or a valley floor is the thing the 3D view says and speech cannot. */
@@ -350,5 +428,7 @@ export const MAP_KEY_HELP =
   "Hold Shift for ten squares, Alt for one elmo. " +
   "With nothing selected the arrows move the view's cursor instead. " +
   "R turns, Shift R turns the other way. Delete removes. " +
+  "S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. " +
+  "North and east make it bigger, south and west make it smaller. " +
   "Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. " +
   "Escape lets go of the selection. Question mark reads this out again.";

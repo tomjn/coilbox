@@ -23,6 +23,7 @@ import { addActor } from "./editing";
 import { editedScenario } from "./edits";
 import { addGroup } from "./groups";
 import { useMapKeyboard } from "./useMapKeyboard";
+import { addZone } from "./zones";
 
 afterEach(cleanup);
 
@@ -49,6 +50,18 @@ function laidOut(): Scenario {
     buildings: [
       { id: "u1", def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
     ],
+  });
+}
+
+/** `laidOut`, plus one zone, for the tests that resize one from the keyboard
+ *  (issue #2313). */
+function withZone(): Scenario {
+  return addZone(laidOut(), {
+    id: "z1",
+    name: "Landing site",
+    shape: "circle",
+    center: { x: 2000, z: 2000 },
+    radius: 300,
   });
 }
 
@@ -147,6 +160,11 @@ function Harness({
           ? `${scenario.actors[0].pos.x},${scenario.actors[0].pos.z},${scenario.actors[0].facing}`
           : "gone"}
       </p>
+      <p data-testid="zone">
+        {scenario.zones[0] && scenario.zones[0].shape === "circle"
+          ? scenario.zones[0].radius
+          : "gone"}
+      </p>
     </>
   );
 }
@@ -155,6 +173,7 @@ const map = () => screen.getByTestId("map");
 const said = () => screen.getByTestId("said").textContent;
 const selected = () => screen.getByTestId("selected").textContent;
 const actor = () => screen.getByTestId("actor").textContent;
+const zone = () => screen.getByTestId("zone").textContent;
 
 describe("choosing what the keys act on", () => {
   it("selects the first thing on the map and says what it is", () => {
@@ -277,6 +296,79 @@ describe("Escape", () => {
     expect(outside).toHaveBeenCalledTimes(1);
 
     document.removeEventListener("keydown", outside);
+  });
+});
+
+describe("resizing a zone from the keyboard (issue #2313)", () => {
+  /** Cycles onto the zone: actors, groups and bases come first in the
+   *  contents list, so the zone `withZone` adds is the fourth thing. */
+  function withZoneSelected() {
+    render(<Harness initial={withZone()} />);
+    fireEvent.keyDown(map(), { key: "." });
+    fireEvent.keyDown(map(), { key: "." });
+    fireEvent.keyDown(map(), { key: "." });
+    fireEvent.keyDown(map(), { key: "." });
+    expect(selected()).toBe("zone:z1");
+  }
+
+  it("moves the zone on an arrow before S is pressed, the same as anything else selected", () => {
+    withZoneSelected();
+    fireEvent.keyDown(map(), { key: "ArrowRight" });
+
+    expect(zone()).toBe("300");
+    expect(said()).toContain("Moved 16 east");
+  });
+
+  it("switches what the arrows do on S, and says so with the current size", () => {
+    withZoneSelected();
+    fireEvent.keyDown(map(), { key: "s" });
+
+    expect(said()).toBe(
+      "Resize mode, radius 300 elmos. Arrows change its size instead of its position: " +
+        "north and east make it bigger, south and west make it smaller. Press S again for move.",
+    );
+  });
+
+  it("grows the zone on an arrow once resize mode is on, and leaves its position alone", () => {
+    withZoneSelected();
+    fireEvent.keyDown(map(), { key: "s" });
+    fireEvent.keyDown(map(), { key: "ArrowUp" });
+
+    expect(zone()).toBe("316");
+    expect(said()).toBe("Grew 16, now radius 316 elmos.");
+  });
+
+  it("shrinks the zone on south or west", () => {
+    withZoneSelected();
+    fireEvent.keyDown(map(), { key: "s" });
+    fireEvent.keyDown(map(), { key: "ArrowDown" });
+
+    expect(zone()).toBe("284");
+    expect(said()).toBe("Shrank 16, now radius 284 elmos.");
+  });
+
+  it("switches back to move on a second S", () => {
+    withZoneSelected();
+    fireEvent.keyDown(map(), { key: "s" });
+    fireEvent.keyDown(map(), { key: "s" });
+
+    expect(said()).toBe("Move mode. Arrows move it again.");
+
+    fireEvent.keyDown(map(), { key: "ArrowRight" });
+    expect(zone()).toBe("300");
+    expect(said()).toContain("Moved 16 east");
+  });
+
+  it("drops resize mode when the selection changes, so it never resizes something else", () => {
+    withZoneSelected();
+    fireEvent.keyDown(map(), { key: "s" });
+    fireEvent.keyDown(map(), { key: "." }); // wraps round to the actor
+    expect(selected()).toBe("actor:a1");
+
+    fireEvent.keyDown(map(), { key: "ArrowRight" });
+
+    expect(actor()).toBe("116,200,0");
+    expect(said()).toContain("Moved 16 east");
   });
 });
 

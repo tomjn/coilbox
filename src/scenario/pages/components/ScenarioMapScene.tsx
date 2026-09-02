@@ -141,7 +141,7 @@ import {
 import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
 import { moveOnMap, pointFrom } from "./mapKeyboard";
-import { EDITOR_MODES, LAYOUTS_MODE_ID } from "./modes";
+import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
 import { modeDigit } from "./shortcuts";
@@ -653,9 +653,16 @@ export const ScenarioMapScene = forwardRef<
     footprintAt,
     // A zone is a sheet lying over the ground, so it steps aside for a mode
     // that puts things on the ground: otherwise a zone covering a corner of the
-    // map would be a corner of the map nothing could be placed on. A waypoint
-    // is a knob rather than a sheet, so it covers nothing and stays pickable.
-    overlays: [onPlace ? null : zonesLayer, pathsLayer],
+    // map would be a corner of the map nothing could be placed on. Zones mode
+    // itself is the exception, because it places zones (issue #2313): its own
+    // handles have to stay pickable by pointer so a click still selects a
+    // zone or grabs its handle rather than falling through to a new one
+    // dropped on top of it. A waypoint is a knob rather than a sheet, so it
+    // covers nothing and stays pickable regardless.
+    overlays: [
+      mode.id === ZONES_MODE_ID || !onPlace ? zonesLayer : null,
+      pathsLayer,
+    ],
     onSelect: select,
     onPlace,
     onHover: preview.onHover,
