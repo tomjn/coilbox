@@ -238,7 +238,7 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   zone_held_for:
     "Holds once a team has kept a zone for the time you set, optionally only while uncontested.",
   spawn_group:
-    "Places a group's units on the map, holding position until wake_group or give_orders sets them moving.",
+    "Places a group's units on the map, holding position until wake group or give orders sets them moving.",
   wake_group:
     "Places a group on the map if it isn't there yet, and sends it off on its orders.",
   give_orders:
