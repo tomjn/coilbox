@@ -28,11 +28,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
 import { mapKeyAction } from "@/placement/mapKeys";
+import type { PlaceKind } from "@/placement/preview";
 import type { Point, Scenario } from "../../model";
+import { setOrigin } from "./bases";
 import { canTurn } from "./editing";
 import type { ScenarioEdit } from "./edits";
+import { addWaypoint } from "./groups";
 import { isTypingTarget } from "./history";
 import {
+  addedPointWords,
   cursorWords,
   type LayoutEditFor,
   MAP_KEY_HELP,
@@ -43,6 +47,7 @@ import {
   movedWords,
   moveOnMap,
   nextStep,
+  originMovedWords,
   placeInList,
   removeOnMap,
   resizedWords,
@@ -93,6 +98,12 @@ export interface MapKeyboardDeps {
    * a click there would do nothing.
    */
   onPlace: ((pos: Point) => void) | null;
+  /**
+   * What that click would do, from the same three conditions `onPlace` is
+   * built from (issue #2359), so Enter can say which of them ran rather than
+   * calling every click a placement.
+   */
+  placing: PlaceKind;
   /** Where the engine would stand a building, for a base's buildings. */
   snap: SnapBuilding | undefined;
   layoutEdit: LayoutEditFor;
@@ -182,6 +193,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
         onSelect,
         onEntry,
         onPlace,
+        placing,
         snap,
         layoutEdit,
         panBy,
@@ -405,7 +417,44 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
             return;
           }
           onPlace(at.pos);
-          say(`Placed at ${spotWords(at.pos)}.`);
+          // What ran is named from `placing` rather than assumed to be a
+          // placement (issue #2359): a path being drawn, a base's origin
+          // being moved and a trigger's question being answered are none of
+          // them "placed", and saying so to an author working by ear points
+          // them at something that is not there. The path and origin words
+          // are read out of the document the same edit produces, so they
+          // cannot disagree with what landed on it.
+          switch (placing.kind) {
+            case "path":
+              say(
+                addedPointWords(
+                  things.paths,
+                  addWaypoint(
+                    things.scenario,
+                    placing.groupId,
+                    placing.order,
+                    at.pos,
+                  ),
+                  placing.groupId,
+                  placing.order,
+                ),
+              );
+              return;
+            case "moving":
+              say(
+                originMovedWords(
+                  setOrigin(things.scenario, placing.baseId, at.pos),
+                  placing.baseId,
+                ),
+              );
+              return;
+            case "picking":
+              say(`Answered the question at ${spotWords(at.pos)}.`);
+              return;
+            case "arm":
+              say(`Placed at ${spotWords(at.pos)}.`);
+              return;
+          }
           return;
         }
 

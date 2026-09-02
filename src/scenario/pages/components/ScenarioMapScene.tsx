@@ -61,6 +61,7 @@ import {
 } from "@/placement/placements";
 import { clampToMap } from "@/placement/pointer";
 import {
+  placeKind,
   previewArmed,
   previewChecks,
   previewNote,
@@ -595,10 +596,18 @@ export const ScenarioMapScene = forwardRef<
     ? movingBase
     : null;
 
+  // What a click on the map would do, from the same three conditions
+  // `previewArmed`'s `answering` and `previewNote`'s stand down for: a path
+  // being drawn, a base's origin being moved, a point a panel asked for, or
+  // else whatever is armed. Computed once so the ghost, the sentence over the
+  // terrain and the keyboard's own announcement (issue #2359) all name the
+  // same click.
+  const placing = placeKind(drawingPath, moving, picking);
+
   // Whether the map is waiting for a point: a path being drawn, a base being
   // moved, or a point a panel asked for. While one of those is outstanding its
   // bar is the only thing the map says over the terrain (issue #2285).
-  const answering = !!(drawingPath || moving || picking);
+  const answering = placing.kind !== "arm";
 
   // Answering a question the author asked is what a click means while one is
   // outstanding, in whatever mode: a point on a path being drawn, or the place
@@ -1007,6 +1016,7 @@ export const ScenarioMapScene = forwardRef<
     onSelect: setSelected,
     onEntry: pickEntry,
     onPlace,
+    placing,
     snap,
     layoutEdit,
     cursorAt,
