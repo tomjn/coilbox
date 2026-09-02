@@ -651,6 +651,10 @@ describe("what is said", () => {
   it("names the problems key too (issue #2315)", () => {
     expect(MAP_KEY_HELP).toContain("P reads how many");
   });
+
+  it("names the key that turns the selection as one shape (issue #2353)", () => {
+    expect(MAP_KEY_HELP).toContain("T turns everything selected as one shape");
+  });
 });
 
 describe("what is wrong with the whole map, on demand (issue #2315)", () => {

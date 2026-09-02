@@ -5,7 +5,7 @@ import {
   snapToBuildGrid,
 } from "@/blueprint/footprint";
 import { newScenario } from "../../create";
-import type { Point, Scenario } from "../../model";
+import type { Point, Scenario, ScenarioOrder } from "../../model";
 import { turnedAbout } from "./editing";
 import { positionOn } from "./mapKeyboard";
 import { turnedAroundWords, turnPivot, turnSelectionAround } from "./rigidTurn";
@@ -192,6 +192,38 @@ describe("turning a selection as one shape", () => {
     expect(after.zones).toEqual(doc.zones);
     expect(after.blueprints).toEqual(doc.blueprints);
     expect(after.bases).toEqual(doc.bases);
+  });
+
+  it("comes back exactly when the middle of the selection is a half elmo", () => {
+    // The one case a pivot worked out from the bounding box cannot survive. An
+    // odd number of elmos across puts the middle on a half elmo, a turn about a
+    // half elmo puts every position on one, and rounding those away is a nudge
+    // in a fixed direction that turning back does not undo.
+    const doc = document();
+    const orders: ScenarioOrder[] = [
+      {
+        kind: "move",
+        waypoints: [
+          { x: 1600, z: 1000 },
+          { x: 1801, z: 1200 },
+        ],
+      },
+    ];
+    const odd: Scenario = {
+      ...doc,
+      groups: [{ ...doc.groups[0], orders }],
+    };
+    // The furthest east of the lot, so the selection is now an odd number of
+    // elmos wide: 1000 to 1801 across, 1000 to 1200 down.
+    expect((1000 + 1801 + 1000 + 1200) % 2).toBe(1);
+    let after = odd;
+    for (let turn = 0; turn < 4; turn++) {
+      after = turnSelectionAround(after, MIXED, 1, own);
+    }
+    expect(after.actors).toEqual(odd.actors);
+    expect(after.groups).toEqual(odd.groups);
+    expect(after.blueprints).toEqual(odd.blueprints);
+    expect(after.zones).toEqual(odd.zones);
   });
 
   it("comes back the same way round from four turns the other way", () => {

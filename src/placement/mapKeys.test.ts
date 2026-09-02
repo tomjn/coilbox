@@ -119,6 +119,18 @@ describe("acting on what is selected", () => {
     });
   });
 
+  it("turns the whole selection as one shape on T, and back on Shift T", () => {
+    expect(mapKeyAction({ key: "t" }, holding)).toEqual({
+      kind: "turnTogether",
+      steps: 1,
+    });
+    expect(mapKeyAction({ key: "T", shiftKey: true }, holding)).toEqual({
+      kind: "turnTogether",
+      steps: -1,
+    });
+    expect(mapKeyAction({ key: "t" }, empty)).toBeNull();
+  });
+
   it("deletes on either delete key", () => {
     expect(mapKeyAction({ key: "Delete" }, holding)?.kind).toBe("delete");
     expect(mapKeyAction({ key: "Backspace" }, holding)?.kind).toBe("delete");

@@ -57,8 +57,13 @@ export type MapKeyAction =
    *  answering the same toggle a Shift-click or a Contents row's Shift+Enter
    *  makes. */
   | { kind: "cycleAdd"; by: 1 | -1 }
-  /** Turn what is selected a quarter turn. */
+  /** Turn what is selected a quarter turn, each thing about its own centre. */
   | { kind: "turn"; steps: 1 | -1 }
+  /** Turn what is selected a quarter turn as one shape, so the things in it
+   *  move round each other as well as turn (issue #2353). Its own key rather
+   *  than a mood of the one above, because both are worth having: turning six
+   *  actors where they stand is not a worse version of swinging a base. */
+  | { kind: "turnTogether"; steps: 1 | -1 }
   | { kind: "delete" }
   /** Act at the cursor: answer whatever the map is waiting for, or place what
    *  the current mode places. */
@@ -164,6 +169,13 @@ export function mapKeyAction(
       return state.selected ? { kind: "turn", steps: 1 } : null;
     case "R":
       return state.selected ? { kind: "turn", steps: -1 } : null;
+    // T rather than a modifier on R: Alt sits next to Shift on this keyboard
+    // and macOS answers Alt with a different character altogether, so the key
+    // read here would not be an R at all.
+    case "t":
+      return state.selected ? { kind: "turnTogether", steps: 1 } : null;
+    case "T":
+      return state.selected ? { kind: "turnTogether", steps: -1 } : null;
     case "s":
     case "S":
       // Only while a zone is selected: nothing else on the map has a size to

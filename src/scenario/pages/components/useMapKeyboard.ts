@@ -60,6 +60,7 @@ import {
   turnedWords,
   turnOnMap,
 } from "./mapKeyboard";
+import { turnedAroundWords, turnSelectionAround } from "./rigidTurn";
 import {
   addedWords,
   deletedManyWords,
@@ -359,9 +360,9 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
           const key = selected;
           const held = selection;
           if (many) {
-            // Each about its own centre, never about the selection's: see
-            // `selection.ts` for why swinging a selection as one body is a
-            // different operation rather than this one done properly.
+            // Each about its own centre, never about the selection's. Swinging
+            // the selection as one shape is `turnTogether` below, on its own
+            // key, because both are things an author wants.
             const turns = held.filter((one) => canTurn(one)).length;
             if (turns === 0) {
               say(turnedManyWords(0, held.length, held, []));
@@ -404,6 +405,26 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
               footprintsAt(after),
             ),
           );
+          return;
+        }
+
+        case "turnTogether": {
+          if (!selected) return;
+          const held = selection;
+          const after = turnSelectionAround(
+            things.scenario,
+            held,
+            action.steps,
+            layoutEdit,
+          );
+          if (after === things.scenario) {
+            say("Nothing turned.");
+            return;
+          }
+          onChange((doc) =>
+            turnSelectionAround(doc, held, action.steps, layoutEdit),
+          );
+          say(turnedAroundWords(held, footprintsAt(after)));
           return;
         }
 

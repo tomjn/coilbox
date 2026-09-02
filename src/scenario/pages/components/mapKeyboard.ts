@@ -685,6 +685,9 @@ export const MAP_KEY_HELP =
   "Hold Shift for ten squares, Alt for one elmo. " +
   "With nothing selected the arrows move the view's cursor instead. " +
   "R turns, Shift R turns the other way. Delete removes. " +
+  "T turns everything selected as one shape instead, so a base swings round " +
+  "its own middle rather than each building spinning where it stands, and " +
+  "Shift T swings it the other way. " +
   "S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. " +
   "North and east make it bigger, south and west make it smaller. " +
   "Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. " +
