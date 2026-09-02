@@ -311,6 +311,92 @@ describe("a control that is not a text box", () => {
   });
 });
 
+describe("a blank objective (issue #2264)", () => {
+  it("is kept on save, rather than stripped as a second, unstated removal rule", async () => {
+    const saved: CampaignMission[] = [];
+    openDrawer(mission(), async (m) => {
+      saved.push(m);
+    });
+
+    screen.getByRole("button", { name: "Add objective" }).click();
+
+    await waitFor(() => expect(saved.at(-1)?.objectives).toEqual([""]));
+  });
+
+  it("stays on screen after losing focus, rather than vanishing under the author", async () => {
+    const saved: CampaignMission[] = [];
+    openDrawer(mission(), async (m) => {
+      saved.push(m);
+    });
+
+    screen.getByRole("button", { name: "Add objective" }).click();
+    await waitFor(() => expect(saved.at(-1)?.objectives).toEqual([""]));
+
+    fireEvent.blur(screen.getByPlaceholderText("Objective 1"));
+
+    await tick();
+    expect(screen.getByPlaceholderText("Objective 1")).toBeTruthy();
+    expect(saved.at(-1)?.objectives).toEqual([""]);
+  });
+
+  it("saves the text typed into it", async () => {
+    const saved: CampaignMission[] = [];
+    openDrawer(mission(), async (m) => {
+      saved.push(m);
+    });
+
+    screen.getByRole("button", { name: "Add objective" }).click();
+    await waitFor(() => expect(saved.at(-1)?.objectives).toEqual([""]));
+
+    const field = screen.getByPlaceholderText("Objective 1");
+    fireEvent.change(field, { target: { value: "Destroy the relay" } });
+    fireEvent.blur(field);
+
+    await waitFor(() =>
+      expect(saved.at(-1)?.objectives).toEqual(["Destroy the relay"]),
+    );
+  });
+
+  it("is removed only by its own Remove button, not by leaving it blank", async () => {
+    const saved: CampaignMission[] = [];
+    openDrawer(mission(), async (m) => {
+      saved.push(m);
+    });
+
+    screen.getByRole("button", { name: "Add objective" }).click();
+    await waitFor(() => expect(saved.at(-1)?.objectives).toEqual([""]));
+    fireEvent.blur(screen.getByPlaceholderText("Objective 1"));
+    await tick();
+
+    screen.getByRole("button", { name: "Remove objective 1" }).click();
+
+    await waitFor(() => expect(saved.at(-1)?.objectives).toEqual([]));
+    expect(screen.queryByPlaceholderText("Objective 1")).toBeNull();
+  });
+
+  it("survives a close and reopen with what was saved, still blank", async () => {
+    let saved = mission();
+    openDrawer(saved, async (m) => {
+      saved = m;
+    });
+
+    screen.getByRole("button", { name: "Add objective" }).click();
+    await waitFor(() => expect(saved.objectives).toEqual([""]));
+
+    await EXITS["the Close button"]();
+    await drawerClosed();
+
+    openDrawer(saved, async (m) => {
+      saved = m;
+    });
+
+    expect(screen.getByPlaceholderText("Objective 1")).toHaveProperty(
+      "value",
+      "",
+    );
+  });
+});
+
 describe("Revert", () => {
   it("is offered only once something has changed", async () => {
     openDrawer(mission());
