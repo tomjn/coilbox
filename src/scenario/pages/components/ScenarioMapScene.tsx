@@ -61,6 +61,7 @@ import {
 } from "@/placement/placements";
 import { clampToMap } from "@/placement/pointer";
 import {
+  previewArmed,
   previewChecks,
   previewNote,
   turnedMarks,
@@ -650,7 +651,12 @@ export const ScenarioMapScene = forwardRef<
     worldWidth: assets.worldWidth,
     worldHeight: assets.worldHeight,
     groundAt: units.groundAt,
-    ghost: behaviour.ghost ?? null,
+    // Nothing armed while the map is waiting for a point (issue #2349): the
+    // coming click answers that question rather than placing what is armed,
+    // so a ghost still under the pointer would be showing a placement the
+    // click will not make. `answering` is the same flag the sentence over the
+    // terrain stands down for, below.
+    ghost: previewArmed(behaviour.ghost ?? null, answering),
     checks,
     occupied: footprints,
     placements: units.placements,

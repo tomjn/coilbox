@@ -618,6 +618,27 @@ export function previewSentence(count: PreviewCount): string {
   return parts.join(" ") + unjudgedClause(count);
 }
 
+/**
+ * Whatever is armed to place, or nothing at all while the map is waiting for
+ * a point (issue #2349).
+ *
+ * A click answers that question rather than placing what is armed, so a ghost
+ * still drawn under the pointer would be showing a placement the coming click
+ * will not make. `answering` is the same flag {@link previewNote} stands its
+ * sentence down for, and this is called with it at the one call site that
+ * builds the layer's `ghost`, so the squares and the sentence are never free
+ * to disagree about whether a click is spoken for.
+ *
+ * What is armed is untouched: this only says whether to draw it. Answer the
+ * question and the same choice is drawn again.
+ */
+export function previewArmed<T>(
+  carrying: T | null,
+  answering: boolean,
+): T | null {
+  return answering ? null : carrying;
+}
+
 /** The one thing the map says over the terrain about the spot under the
  *  pointer, from {@link previewNote}. */
 export interface PreviewNote {
