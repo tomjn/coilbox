@@ -61,12 +61,12 @@ export function LayoutNameField({
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs font-medium">
-        Layout name
+        Blueprint name
       </Label>
       <Input
         id={id}
         value={text}
-        placeholder="What this layout is called"
+        placeholder="What this blueprint is called"
         onChange={(e) => setText(e.target.value)}
         onBlur={() => (text.trim() ? onRename(text) : setText(name))}
         onKeyDown={(e) => {

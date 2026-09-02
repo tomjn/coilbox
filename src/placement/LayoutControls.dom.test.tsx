@@ -82,7 +82,7 @@ const undo = () =>
 describe("a layout's name field when the document moves under it", () => {
   it("shows the name an undo put back", () => {
     render(<NameHarness initial="Opening base" />);
-    const field = screen.getByLabelText("Layout name");
+    const field = screen.getByLabelText("Blueprint name");
 
     commit(field, "Front line");
     undo();
@@ -92,7 +92,7 @@ describe("a layout's name field when the document moves under it", () => {
 
   it("does not write the undone name back on the next keystroke", () => {
     render(<NameHarness initial="Opening base" />);
-    const field = screen.getByLabelText("Layout name");
+    const field = screen.getByLabelText("Blueprint name");
 
     commit(field, "Front line");
     undo();
@@ -106,14 +106,14 @@ describe("a layout's name field commit rules", () => {
   it("hands over what was typed rather than a trimmed version of it", () => {
     render(<NameHarness initial="Opening base" />);
 
-    commit(screen.getByLabelText("Layout name"), "  Front line  ");
+    commit(screen.getByLabelText("Blueprint name"), "  Front line  ");
 
     expect(documentName()).toBe("  Front line  ");
   });
 
   it("puts the name back when the box is emptied, rather than renaming", () => {
     render(<NameHarness initial="Opening base" />);
-    const field = screen.getByLabelText("Layout name");
+    const field = screen.getByLabelText("Blueprint name");
 
     commit(field, "   ");
 

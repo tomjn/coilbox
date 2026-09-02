@@ -64,7 +64,7 @@ describe("RenameBlueprintForm", () => {
       createElement(RenameBlueprintForm, { record: RECORD, onDone: () => {} }),
     );
     expect(html).toContain('value="Opening solars"');
-    expect(html).toContain("Layout name");
+    expect(html).toContain("Blueprint name");
     expect(html).toMatch(/for="[^"]+"/);
   });
 });
