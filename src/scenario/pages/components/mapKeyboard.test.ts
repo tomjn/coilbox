@@ -14,14 +14,16 @@ import type { Scenario } from "../../model";
 import { addBase } from "./bases";
 import { sceneContents } from "./contents";
 import { addActor } from "./editing";
-import { addGroup } from "./groups";
+import { addGroup, pathKey } from "./groups";
 import {
   facingWords,
   MAP_KEY_HELP,
   type MapThings,
+  mapSteps,
   movedWords,
   moveOnMap,
   nextEntry,
+  nextStep,
   placeInList,
   pointFrom,
   positionIn,
@@ -35,6 +37,7 @@ import {
   turnedWords,
   turnOnMap,
 } from "./mapKeyboard";
+import type { PathSource } from "./orderPaths";
 import { addZone, MIN_ZONE_ELMOS } from "./zones";
 
 const own = () => "own" as const;
@@ -72,6 +75,36 @@ function laidOut(): Scenario {
     radius: 300,
   });
   return doc;
+}
+
+/** `laidOut`, with the group given a two-point move order, and the
+ *  `PathSource` that describes it, for the tests that reach a path's points
+ *  from the keyboard (issue #2314). */
+function withGroupPath(): { doc: Scenario; paths: PathSource[] } {
+  const doc = laidOut();
+  const withOrders: Scenario = {
+    ...doc,
+    groups: [
+      {
+        ...doc.groups[0],
+        orders: [
+          {
+            kind: "move",
+            waypoints: [
+              { x: 550, z: 600 },
+              { x: 700, z: 650 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  return {
+    doc: withOrders,
+    paths: [
+      { id: "g1", label: "Group 1", orders: withOrders.groups[0].orders },
+    ],
+  };
 }
 
 /** The document as the keys read it. The drawn units only ever name things
@@ -337,6 +370,73 @@ describe("stepping through the contents", () => {
   });
 });
 
+describe("weaving a path's points into the ring (issue #2314)", () => {
+  it("puts a group's points right after the group", () => {
+    const { doc, paths } = withGroupPath();
+    const entries = sceneContents(doc);
+
+    expect(mapSteps(entries, paths).map((step) => step.key)).toEqual([
+      "actor:a1",
+      "group:g1#0",
+      pathKey("g1", 0, 0),
+      pathKey("g1", 0, 1),
+      "base:b1#0",
+      "zone:z1",
+    ]);
+  });
+
+  it("carries a trigger's held orders after everything else, since they own no entry of their own", () => {
+    const doc = laidOut();
+    const entries = sceneContents(doc);
+    const held: PathSource = {
+      id: "step:0:actions:0:orders",
+      label: "A trigger",
+      orders: [{ kind: "move", waypoints: [{ x: 10, z: 10 }] }],
+    };
+
+    const steps = mapSteps(entries, [held]);
+
+    expect(steps.at(-1)?.key).toBe(pathKey(held.id, 0, 0));
+    expect(steps).toHaveLength(entries.length + 1);
+  });
+
+  it("steps from a selected group onto its first point, then its next, then off it", () => {
+    const { doc, paths } = withGroupPath();
+    const entries = sceneContents(doc);
+    const steps = mapSteps(entries, paths);
+
+    const first = nextStep(steps, entries, "group:g1#0", 1);
+    expect(first?.key).toBe(pathKey("g1", 0, 0));
+
+    const second = nextStep(steps, entries, first?.key ?? null, 1);
+    expect(second?.key).toBe(pathKey("g1", 0, 1));
+
+    const after = nextStep(steps, entries, second?.key ?? null, 1);
+    expect(after?.key).toBe("base:b1#0");
+  });
+
+  it("steps backwards from a path's first point onto the group it belongs to", () => {
+    const { doc, paths } = withGroupPath();
+    const entries = sceneContents(doc);
+    const steps = mapSteps(entries, paths);
+
+    expect(nextStep(steps, entries, pathKey("g1", 0, 0), -1)?.key).toBe(
+      "group:g1#0",
+    );
+  });
+
+  it("still finds a base's third building's neighbour once paths are woven in, the same rule nextEntry follows", () => {
+    const entries = sceneContents(laidOut());
+    const steps = mapSteps(entries, []);
+
+    expect(nextStep(steps, entries, "base:b1#1", 1)?.key).toBe("zone:z1");
+  });
+
+  it("has nothing to step to on an empty map", () => {
+    expect(nextStep([], [], null, 1)).toBeNull();
+  });
+});
+
 describe("what is said", () => {
   it("names a placement by its entry, its place inside it and its unit", () => {
     const doc = laidOut();
@@ -367,6 +467,15 @@ describe("what is said", () => {
 
     expect(thingWords(things(doc), "group:g1#0")).toBe(
       "Group 1, unit 1, armpw",
+    );
+  });
+
+  it("names a path's point by which one of how many, and where it stands (issue #2314)", () => {
+    const { doc, paths } = withGroupPath();
+    const withPath: MapThings = { ...things(doc), paths };
+
+    expect(selectionWords(withPath, pathKey("g1", 0, 1))).toBe(
+      "Group 1, point 2 of 2, at x 700, z 650.",
     );
   });
 
@@ -416,6 +525,10 @@ describe("what is said", () => {
 
   it("names the resize key too (issue #2313)", () => {
     expect(MAP_KEY_HELP).toContain("S toggles resize");
+  });
+
+  it("says a path's points are on the ring too (issue #2314)", () => {
+    expect(MAP_KEY_HELP).toContain("a path's points");
   });
 });
 
