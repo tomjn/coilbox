@@ -284,6 +284,10 @@ function GroundView({
       chrome={false}
       showSky
       showClouds={false}
+      // Every surface this component draws is one somebody is editing on, so
+      // none of them wants to spend a fifth of every frame rippling the sea
+      // (issue #2292).
+      stillWater
       heightSrc={ground.heightSrc}
       heightRange={ground.heightRange}
       heightWords={ground.heightWords}
