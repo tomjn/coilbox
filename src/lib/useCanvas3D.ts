@@ -18,6 +18,7 @@
 import { type DependencyList, type RefObject, useLayoutEffect } from "react";
 import * as THREE from "three";
 
+import { registerCanvas3D } from "./renderStats";
 import { onTextureArrived } from "./textureArrival";
 import { drawingPixelRatio } from "./uiZoom";
 
@@ -96,6 +97,10 @@ export function useCanvas3D(
       return;
     }
 
+    // Every 3D view passes through here, so this is the one place that can say
+    // what any of them cost to draw (issue #2292).
+    const unregisterStats = registerCanvas3D({ renderer, render });
+
     const observer = new ResizeObserver(resize);
     observer.observe(host);
     // A zoom change moves the pixel ratio, and only sometimes the host's size:
@@ -122,6 +127,7 @@ export function useCanvas3D(
       // disposed one draws nothing rather than re-allocating storage for a
       // texture that already has it (issue #1740).
       renderer.render = () => {};
+      unregisterStats();
       stopWatchingTextures();
       window.removeEventListener("resize", onWindowResize);
       observer.disconnect();
