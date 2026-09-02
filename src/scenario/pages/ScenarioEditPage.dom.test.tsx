@@ -10,9 +10,16 @@
  * editor afterwards, and that neither is offered where it cannot be performed.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { RowFocus } from "./components/problemTargets";
 
 // The drawer is the app shell's, so it is stubbed down to what opened in it.
 // Share and the delete confirmation both land here.
@@ -92,14 +99,37 @@ vi.mock("./components/ScenarioTestDrawer", () => ({
 }));
 vi.mock("./components/MissionLuaView", () => ({ MissionLuaView: () => null }));
 vi.mock("./components/SetupPanel", () => ({ SetupPanel: () => null }));
-vi.mock("./components/TriggerPanel", () => ({ TriggerPanel: () => null }));
-vi.mock("./components/ObjectivePanel", () => ({ ObjectivePanel: () => null }));
+// The three panels a mission problem's row can point at (issue #2271). Real
+// focusing of a row within one is TriggerPanel.test.tsx's own concern. What
+// matters here is only that ScenarioEditPage hands the right one the right
+// `focus` request, so each is stood in for by a stub that renders it back as
+// text.
+vi.mock("./components/TriggerPanel", () => ({
+  TriggerPanel: ({ focus }: { focus: RowFocus | null }) => (
+    <div data-testid="trigger-panel-focus">
+      {focus ? JSON.stringify(focus) : ""}
+    </div>
+  ),
+}));
+vi.mock("./components/ObjectivePanel", () => ({
+  ObjectivePanel: ({ focus }: { focus: RowFocus | null }) => (
+    <div data-testid="objective-panel-focus">
+      {focus ? JSON.stringify(focus) : ""}
+    </div>
+  ),
+}));
 vi.mock("./components/DialoguePanel", () => ({ DialoguePanel: () => null }));
 vi.mock("./components/RestrictionPanel", () => ({
   RestrictionPanel: () => null,
 }));
 vi.mock("./components/BlueprintPanel", () => ({ BlueprintPanel: () => null }));
-vi.mock("./components/VarPanel", () => ({ VarPanel: () => null }));
+vi.mock("./components/VarPanel", () => ({
+  VarPanel: ({ focus }: { focus: RowFocus | null }) => (
+    <div data-testid="var-panel-focus">
+      {focus ? JSON.stringify(focus) : ""}
+    </div>
+  ),
+}));
 
 import { newScenario } from "../create";
 import type { LoadedScenario } from "../storage";
@@ -340,6 +370,107 @@ describe("the problems button", () => {
 
     const button = screen.getByRole("button", { name: /1 problem/ });
     expect(button.hasAttribute("disabled")).toBe(false);
+  });
+});
+
+/**
+ * Issue #2310. Closing the problems drawer used to hand keyboard focus back
+ * to the Problems button by default, so `onActivateProblem` raced that with a
+ * 250ms timer guessed from picoframe's close animation. picoframe 0.8.0
+ * exposes the real `onCloseAutoFocus` event instead, so these drive an actual
+ * close through the real `Drawer` and picoframe's own event rather than a
+ * mock stand-in for the moment focus moves, the way the deleted timer had to
+ * guess at it.
+ */
+describe("a mission problem's row navigation", () => {
+  const wait = () =>
+    act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+
+  it("hands the trigger panel the row a trigger problem named, once the drawer's own close animation ends", async () => {
+    useGameUnits.mockReturnValue({ units: [], loading: false });
+    useMissionProblems.mockReturnValue({
+      blocking: [
+        { path: 'triggers["wave-two"]', message: 'no zone called "south"' },
+      ],
+      warnings: [],
+    });
+    edit(local);
+    const problemsButton = screen.getByRole("button", { name: /1 problem/ });
+
+    fireEvent.click(problemsButton);
+    fireEvent.click(screen.getByRole("button", { name: /no zone called/ }));
+    await wait();
+
+    expect(screen.getByTestId("trigger-panel-focus").textContent).toBe(
+      JSON.stringify({ id: "wave-two", token: 1 } satisfies RowFocus),
+    );
+    expect(document.activeElement).not.toBe(problemsButton);
+  });
+
+  it("hands the objective panel the row an objective problem named", async () => {
+    useGameUnits.mockReturnValue({ units: [], loading: false });
+    useMissionProblems.mockReturnValue({
+      blocking: [],
+      warnings: [
+        {
+          path: 'objectives["hold-ridge"].text',
+          message: "no text, so the objectives panel shows a blank line",
+        },
+      ],
+    });
+    edit(local);
+    const problemsButton = screen.getByRole("button", { name: /1 warning/ });
+
+    fireEvent.click(problemsButton);
+    fireEvent.click(screen.getByRole("button", { name: /blank line/ }));
+    await wait();
+
+    expect(screen.getByTestId("objective-panel-focus").textContent).toBe(
+      JSON.stringify({ id: "hold-ridge", token: 1 } satisfies RowFocus),
+    );
+    expect(document.activeElement).not.toBe(problemsButton);
+  });
+
+  it("hands the variable panel the row a variable problem named", async () => {
+    useGameUnits.mockReturnValue({ units: [], loading: false });
+    useMissionProblems.mockReturnValue({
+      blocking: [{ path: 'vars["waves"]', message: "never written to" }],
+      warnings: [],
+    });
+    edit(local);
+    const problemsButton = screen.getByRole("button", { name: /1 problem/ });
+
+    fireEvent.click(problemsButton);
+    fireEvent.click(screen.getByRole("button", { name: /never written to/ }));
+    await wait();
+
+    expect(screen.getByTestId("var-panel-focus").textContent).toBe(
+      JSON.stringify({ id: "waves", token: 1 } satisfies RowFocus),
+    );
+    expect(document.activeElement).not.toBe(problemsButton);
+  });
+
+  // A close with no row activated is what a keyboard Escape or an outside
+  // click does, and this is the one this whole feature must never touch: the
+  // drawer's own default of restoring focus to whatever opened it.
+  it("still restores focus to the Problems button when the drawer closes without a row being activated", async () => {
+    useGameUnits.mockReturnValue({ units: [], loading: false });
+    useMissionProblems.mockReturnValue({
+      blocking: [{ path: 'triggers["wave-two"]', message: "unused" }],
+      warnings: [],
+    });
+    edit(local);
+    const problemsButton = screen.getByRole("button", { name: /1 problem/ });
+    // A real click focuses the button it lands on. happy-dom does not, so
+    // this is done by hand, to give picoframe's own opener-restore something
+    // to restore to, the way a keyboard open already would.
+    problemsButton.focus();
+
+    fireEvent.click(problemsButton);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await wait();
+
+    expect(document.activeElement).toBe(problemsButton);
   });
 });
 
