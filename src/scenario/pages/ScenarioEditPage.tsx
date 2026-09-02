@@ -762,8 +762,13 @@ export default function ScenarioEditPage() {
           onChange={(next) => apply(next)}
           onUndo={undo}
           focus={rowFocus("objective")}
+          issues={missionIssues}
         />
-        <DialoguePanel scenario={scenario} onChange={(next) => apply(next)} />
+        <DialoguePanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          issues={missionIssues}
+        />
         <RestrictionPanel
           scenario={scenario}
           onChange={(next) => apply(next)}

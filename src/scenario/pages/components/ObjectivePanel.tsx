@@ -21,14 +21,20 @@
 
 import { Button } from "@picoframe/frame";
 import { Copy, ListChecks, Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario, ScenarioObjective } from "../../model";
+import type { MissionIssue } from "../../validate";
 import { notifyDeleted } from "./deleteNotice";
 import { focusListRow } from "./focusListRow";
-import { EditorPanel, type EditorPanelHandle, TextField } from "./panels";
+import {
+  EditorPanel,
+  type EditorPanelHandle,
+  FieldProblem,
+  TextField,
+} from "./panels";
 import type { RowFocus } from "./problemTargets";
 import {
   addObjective,
@@ -37,12 +43,14 @@ import {
   nextObjectiveId,
   removeObjective,
 } from "./registries";
+import { entryFieldProblem } from "./triggerProblems";
 
 export function ObjectivePanel({
   scenario,
   onChange,
   onUndo,
   focus,
+  issues,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
@@ -53,6 +61,11 @@ export function ObjectivePanel({
   /** An objective a mission problem's row points at (issue #2271): expand the
    *  panel, select it and land the cursor on its row in the list. */
   focus?: RowFocus | null;
+  /** What the validator has found wrong with the mission (issue #2339). An
+   *  objective with no text is the one of these an objective's own field can
+   *  show, the way a team select already does (issue #2307): the rest name a
+   *  placement or a def rather than a field on this panel. */
+  issues: MissionIssue[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -138,6 +151,7 @@ export function ObjectivePanel({
               onChange={onChange}
               onSelect={setSelectedId}
               onUndo={onUndo}
+              issues={issues}
             />
           </div>
         )}
@@ -204,12 +218,14 @@ function ObjectiveForm({
   onChange,
   onSelect,
   onUndo,
+  issues,
 }: {
   objective: ScenarioObjective;
   scenario: Scenario;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
   onUndo: () => void;
+  issues: MissionIssue[];
 }) {
   const edit = (patch: Partial<Omit<ScenarioObjective, "id">>) =>
     onChange(editObjective(scenario, objective.id, patch));
@@ -218,6 +234,18 @@ function ObjectiveForm({
     onChange(duplicateObjective(scenario, objective.id, id));
     onSelect(id);
   };
+  const textDescribedBy = useId();
+  // `checkText` in validate.ts reports this as a warning, never an error: a
+  // blank objective still plays, it just shows a blank line on the panel
+  // until somebody writes it. So this is shown next to the field the same
+  // way a difficulty range problem is, without claiming the text was
+  // refused.
+  const textProblem = entryFieldProblem(
+    issues,
+    "objectives",
+    objective.id,
+    "text",
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -264,13 +292,17 @@ function ObjectiveForm({
         </Button>
       </div>
 
-      <TextField
-        value={objective.text}
-        label="Objective text"
-        placeholder="Hold the landing pad for two minutes"
-        onCommit={(text) => edit({ text })}
-        className="h-8 text-xs"
-      />
+      <div className="flex flex-col gap-0.5">
+        <TextField
+          value={objective.text}
+          label="Objective text"
+          placeholder="Hold the landing pad for two minutes"
+          onCommit={(text) => edit({ text })}
+          className="h-8 text-xs"
+          describedBy={textDescribedBy}
+        />
+        <FieldProblem id={textDescribedBy} problem={textProblem} />
+      </div>
 
       <div className="flex items-center gap-2">
         <Switch

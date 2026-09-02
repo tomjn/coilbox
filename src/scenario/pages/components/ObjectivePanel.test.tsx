@@ -23,7 +23,7 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Scenario, ScenarioObjective, ScenarioTrigger } from "../../model";
 import {
@@ -33,6 +33,7 @@ import {
   undoEdit,
 } from "./history";
 import { ObjectivePanel } from "./ObjectivePanel";
+import { missionProblemsIn } from "./useMissionProblems";
 
 // The panel's delete notice has no shell here (issue #2280), the same gap
 // `ScenarioBuilderPage.dom.test.tsx` fills for its own toasts. Captured rather
@@ -157,6 +158,7 @@ function PanelHarness({
           setDocument(next);
         }}
         onUndo={stepBack}
+        issues={[]}
       />
       <button type="button" onClick={stepBack}>
         Undo
@@ -332,5 +334,48 @@ describe("deleting an objective", () => {
     expect(toasted.calls).toHaveLength(2);
     expect(toasted.calls[0].id).toBe(toasted.calls[1].id);
     expect(toasted.calls[0].message).not.toBe(toasted.calls[1].message);
+  });
+});
+
+/**
+ * An objective with no text, which `checkText` in validate.ts reports (issue
+ * #2339, extending #2287's pattern to a field the objectives panel already
+ * has). The issues here come from the real validator (`missionProblemsIn`),
+ * not a hand-built one, so this is pinned against what the drawer would say
+ * too.
+ */
+describe("an objective's text the validator has flagged", () => {
+  function ProblemHarness() {
+    const [document, setDocument] = useState<Scenario>(() =>
+      scenario([objective({ text: "" })]),
+    );
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <ObjectivePanel
+        scenario={document}
+        onChange={setDocument}
+        onUndo={() => {}}
+        issues={issues}
+      />
+    );
+  }
+
+  it("shows the warning next to the text field without marking it invalid", () => {
+    render(<ProblemHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /^Objectives/ }));
+
+    const field = textBox();
+    const message = screen.getByText(
+      "no text, so the objectives panel shows a blank line",
+    );
+
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
+    // checkText only ever reports a warning: the mission still plays with a
+    // blank line, so this must not claim the text was refused.
+    expect(field.getAttribute("aria-invalid")).toBeNull();
   });
 });

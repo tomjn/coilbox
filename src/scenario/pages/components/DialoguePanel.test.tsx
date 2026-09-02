@@ -20,7 +20,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Scenario, ScenarioDialogue, ScenarioTrigger } from "../../model";
 import { DialoguePanel } from "./DialoguePanel";
@@ -30,6 +30,7 @@ import {
   recordEdit,
   undoEdit,
 } from "./history";
+import { missionProblemsIn } from "./useMissionProblems";
 
 afterEach(cleanup);
 
@@ -103,6 +104,7 @@ function PanelHarness({
           setHistory(recordEdit(history, document, next));
           setDocument(next);
         }}
+        issues={[]}
       />
       <button
         type="button"
@@ -263,5 +265,47 @@ describe("duplicating a dialogue line", () => {
     undo();
 
     expect(stored().map((d) => d.id)).toEqual(["opening"]);
+  });
+});
+
+/**
+ * A dialogue line with no text, which `checkText` in validate.ts reports
+ * (issue #2339, extending #2287's pattern to a field the dialogue panel
+ * already has). The issues here come from the real validator
+ * (`missionProblemsIn`), not a hand-built one, so this is pinned against what
+ * the drawer would say too.
+ */
+describe("a dialogue line's text the validator has flagged", () => {
+  function ProblemHarness() {
+    const [document, setDocument] = useState<Scenario>(() =>
+      scenario([line({ text: "" })]),
+    );
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <DialoguePanel
+        scenario={document}
+        onChange={setDocument}
+        issues={issues}
+      />
+    );
+  }
+
+  it("shows the warning next to the text field without marking it invalid", () => {
+    render(<ProblemHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /^Dialogue/ }));
+
+    const field = textBox();
+    const message = screen.getByText(
+      "no text, so the radio panel opens on an empty message",
+    );
+
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
+    // checkText only ever reports a warning: the mission still plays with an
+    // empty line, so this must not claim the text was refused.
+    expect(field.getAttribute("aria-invalid")).toBeNull();
   });
 });
