@@ -14,6 +14,7 @@ import { Field } from "./components/Field";
 import { GameFactsControl } from "./components/GameFactsControl";
 import { GamePicturesControl } from "./components/GamePicturesControl";
 import { MapCatalogControl } from "./components/MapCatalogControl";
+import { MapPicturesControl } from "./components/MapPicturesControl";
 
 /**
  * The hub plugin's settings section (`/settings/hub`, issue #1353): lets a player
@@ -51,6 +52,14 @@ import { MapCatalogControl } from "./components/MapCatalogControl";
  * has been given. Both are buttons rather than something that happens on its
  * own, because either sweep reads every archive of its kind on the machine and
  * nothing about opening this page says that is wanted now.
+ *
+ * Four sections and not three, because a map and a game each have two halves to
+ * contribute: what it says, and what it looks like. The maps half of the
+ * pictures pair arrived last (issue #2379), and until it did the switch above
+ * promised pictures of maps that nothing in coilbox could send. Its own button
+ * rather than folded into the map catalog sweep: the measurements finish in one
+ * press and the pictures are rationed by the hour, so one button would hold the
+ * cheap half hostage to the slow one.
  */
 export default function HubSettings() {
   const [userUrl, setUserUrl] = useHubUrlSetting();
@@ -120,6 +129,7 @@ export default function HubSettings() {
       {isHubAssetUploadOffered() && (
         <>
           <MapCatalogControl hubUrl={effective} agreed={uploadsAgreed} />
+          <MapPicturesControl hubUrl={effective} agreed={uploadsAgreed} />
           <GameFactsControl hubUrl={effective} agreed={uploadsAgreed} />
           <GamePicturesControl hubUrl={effective} agreed={uploadsAgreed} />
         </>

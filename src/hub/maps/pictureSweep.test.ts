@@ -146,7 +146,12 @@ describe("which maps a sweep sends pictures of", () => {
   it("wants the ones the hub answered anything but have for", () => {
     const rows = ["Alpha", "Beta", "Gamma"].map(surveyed);
     const answers: HaveResult[] = [
-      { keyed_on: "map", map_name: "Alpha", variant: "minimap", status: "have" },
+      {
+        keyed_on: "map",
+        map_name: "Alpha",
+        variant: "minimap",
+        status: "have",
+      },
       {
         keyed_on: "map",
         map_name: "Beta",
