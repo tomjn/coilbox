@@ -17,11 +17,12 @@ import {
 } from "@/blueprint/footprint";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
-import { addBase } from "./bases";
+import { addBase, setOrigin } from "./bases";
 import { sceneContents } from "./contents";
 import { addActor } from "./editing";
-import { addGroup, pathKey } from "./groups";
+import { addGroup, addWaypoint, pathKey } from "./groups";
 import {
+  addedPointWords,
   buildTrouble,
   facingWords,
   MAP_KEY_HELP,
@@ -32,6 +33,7 @@ import {
   moveOnMap,
   nextEntry,
   nextStep,
+  originMovedWords,
   placeInList,
   pointFrom,
   positionIn,
@@ -595,6 +597,24 @@ describe("what is said", () => {
       expect(buildTrouble([], "actor:a1")).toBe("");
       expect(buildTrouble([], "zone:z1")).toBe("");
     });
+  });
+
+  it("names an added path point by which one of how many, counted off the document rather than assumed (issue #2359)", () => {
+    const { doc, paths } = withGroupPath();
+    const after = addWaypoint(doc, "g1", 0, { x: 800, z: 700 });
+
+    expect(addedPointWords(paths, after, "g1", 0)).toBe(
+      "Added Group 1, point 3 of 3.",
+    );
+  });
+
+  it("says a base's origin moved to where it actually landed on the build grid, not the point clicked (issue #2359)", () => {
+    const doc = laidOut();
+    const after = setOrigin(doc, "b1", { x: 1234, z: 1234 });
+
+    expect(originMovedWords(after, "b1")).toBe(
+      "Moved the base's origin, now at x 1240, z 1240.",
+    );
   });
 
   it("uses the engine's own facing order", () => {

@@ -320,6 +320,47 @@ export function movedWords(
   return `Moved ${step} ${heading}, now at ${spotWords(pos)}.${buildTrouble(marks, key)}`;
 }
 
+/**
+ * What adding a point to a path being drawn said, read out of the order once
+ * the point has landed on it (issue #2359).
+ *
+ * A point is only ever added at the end, so the order's length after the edit
+ * is both which point this is and how many there now are. Read from `after`
+ * rather than counted before the click, so it cannot say a number the
+ * document does not hold. The shape, "point N of M", is the one the cycle
+ * already says when it steps onto a path's point (issue #2314). A second
+ * shape for the same fact would be a second thing to learn.
+ */
+export function addedPointWords(
+  paths: PathSource[],
+  after: Scenario,
+  groupId: string,
+  order: number,
+): string {
+  const found = after.groups.find((group) => group.id === groupId)?.orders[
+    order
+  ];
+  const total = found && orderWaypoints(found)?.length;
+  if (!total) return "Nothing added.";
+  return `Added ${pathLabel(paths, groupId)}, point ${total} of ${total}.`;
+}
+
+/**
+ * What moving a base's origin said, read out of the base once it has landed
+ * (issue #2359).
+ *
+ * A base's origin snaps to the engine's build grid on the way down, the same
+ * as one of its buildings dragged by an arrow key (issue #1517), so where it
+ * lands is not always the point that was clicked. Read from `after` rather
+ * than the click, so the words cannot disagree with where the base actually
+ * stands.
+ */
+export function originMovedWords(after: Scenario, baseId: string): string {
+  const base = after.bases.find((one) => one.id === baseId);
+  if (!base) return "Nothing moved.";
+  return `Moved the base's origin, now at ${spotWords(base.origin)}.`;
+}
+
 /** What a turn did. The position comes with it because a turn does not move a
  *  building but does change which squares it covers. */
 export function turnedWords(
