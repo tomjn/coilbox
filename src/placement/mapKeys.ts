@@ -51,6 +51,12 @@ export type MapKeyAction =
   | { kind: "resize"; step: number; heading: Heading }
   /** Select the next or previous thing the map holds. */
   | { kind: "cycle"; by: 1 | -1 }
+  /** Step to the next or previous thing the map holds and add it to what is
+   *  already selected, taking it back out if the step landed on something
+   *  already in (issue #2354). The map's own way of growing a selection,
+   *  answering the same toggle a Shift-click or a Contents row's Shift+Enter
+   *  makes. */
+  | { kind: "cycleAdd"; by: 1 | -1 }
   /** Turn what is selected a quarter turn. */
   | { kind: "turn"; steps: 1 | -1 }
   | { kind: "delete" }
@@ -150,6 +156,10 @@ export function mapKeyAction(
     case ",":
     case "<":
       return { kind: "cycle", by: -1 };
+    case "a":
+      return { kind: "cycleAdd", by: 1 };
+    case "A":
+      return { kind: "cycleAdd", by: -1 };
     case "r":
       return state.selected ? { kind: "turn", steps: 1 } : null;
     case "R":

@@ -90,6 +90,23 @@ describe("stepping through what is on the map", () => {
   });
 });
 
+describe("growing a selection from the map's own keys (issue #2354)", () => {
+  it("steps forward and adds on A, back and adds on Shift A", () => {
+    expect(mapKeyAction({ key: "a" }, empty)).toEqual({
+      kind: "cycleAdd",
+      by: 1,
+    });
+    expect(mapKeyAction({ key: "A", shiftKey: true }, empty)).toEqual({
+      kind: "cycleAdd",
+      by: -1,
+    });
+  });
+
+  it("works with nothing selected too, the same as a plain step", () => {
+    expect(mapKeyAction({ key: "a" }, empty)).toBeTruthy();
+  });
+});
+
 describe("acting on what is selected", () => {
   it("turns on R and back on Shift R", () => {
     expect(mapKeyAction({ key: "r" }, holding)).toEqual({
@@ -173,7 +190,6 @@ describe("keys that are not ours", () => {
   });
 
   it("leaves an ordinary letter alone", () => {
-    expect(mapKeyAction({ key: "a" }, holding)).toBeNull();
     expect(mapKeyAction({ key: "n" }, holding)).toBeNull();
   });
 });
