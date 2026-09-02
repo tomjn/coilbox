@@ -215,26 +215,29 @@ function UnitSlotEditor({
 }
 
 /**
- * The mission as it is stored: a title that is never blank, and none of the
- * objective rows the author added and never filled in.
+ * The mission as it is stored: a title that is never blank.
  *
- * Only the stored copy is shaped this way. The drawer keeps showing what was
- * typed, so a row waiting to be filled in stays on screen while it is empty.
+ * An objective row is kept exactly as typed, blank or not (issue #2264). The
+ * list used to strip any blank row on save, a second, unstated removal rule
+ * alongside the row's own "Remove objective" button. Two rules for the one
+ * outcome meant a row blanked out as a placeholder vanished with nothing
+ * having said it would. The button is the one rule now, and it is the one an
+ * author can see.
  */
 function stored(mission: CampaignMission): CampaignMission {
   return {
     ...mission,
     title: mission.title.trim() || "Untitled mission",
-    objectives: mission.objectives.map((o) => o.trim()).filter(Boolean),
+    objectives: mission.objectives.map((o) => o.trim()),
   };
 }
 
 /**
  * Whether writing `a` would leave anything on disk that writing `b` did not.
  *
- * The stored shapes rather than the raw ones, so an objective row added and
- * still empty is not a change waiting to be saved, and neither is a title
- * somebody put a space on the end of.
+ * The stored shape rather than the raw one, so a title somebody put a space
+ * on the end of, or an objective with trailing whitespace, is not a change
+ * waiting to be saved.
  */
 function changed(a: CampaignMission, b: CampaignMission): boolean {
   return a !== b && JSON.stringify(stored(a)) !== JSON.stringify(stored(b));

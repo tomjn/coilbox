@@ -266,8 +266,9 @@ function Briefing({
               Objectives
             </span>
             <ul className="flex flex-col gap-1.5">
-              {mission.objectives.map((o) => (
-                <li key={o} className="flex items-start gap-2 text-sm">
+              {mission.objectives.map((o, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a plain ordered string list with no stable id, and a blank objective (issue #2264) can repeat
+                <li key={i} className="flex items-start gap-2 text-sm">
                   <Target className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span>{o}</span>
                 </li>
