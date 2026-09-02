@@ -20,7 +20,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { ListChecks, Plus, Trash2 } from "lucide-react";
+import { Copy, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -29,6 +29,7 @@ import type { Scenario, ScenarioObjective } from "../../model";
 import { EditorPanel, TextField } from "./panels";
 import {
   addObjective,
+  duplicateObjective,
   editObjective,
   nextObjectiveId,
   removeObjective,
@@ -164,6 +165,11 @@ function ObjectiveForm({
 }) {
   const edit = (patch: Partial<Omit<ScenarioObjective, "id">>) =>
     onChange(editObjective(scenario, objective.id, patch));
+  const duplicate = () => {
+    const id = nextObjectiveId(scenario);
+    onChange(duplicateObjective(scenario, objective.id, id));
+    onSelect(id);
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -188,7 +194,15 @@ function ObjectiveForm({
         <Button
           size="sm"
           variant="ghost"
-          className="ml-auto h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          className="ml-auto h-7 gap-1.5 px-2 text-xs"
+          onClick={duplicate}
+        >
+          <Copy className="size-3.5" /> Duplicate
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
           onClick={() => {
             onChange(removeObjective(scenario, objective.id));
             onSelect(null);
