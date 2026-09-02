@@ -35,7 +35,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { useFieldText } from "@/lib/useFieldText";
 import { loadedCampaigns } from "../../../campaign/campaigns";
@@ -43,7 +43,8 @@ import { clipIsAttached } from "../../../campaign/scenarioMedia";
 import type { Scenario, ScenarioDialogue } from "../../model";
 import { dialogueClipUrl, readDialogueClip } from "../../scenarioMedia";
 import { deleteScenarioMedia, importScenarioMedia } from "../../storage";
-import { EditorPanel, TextField } from "./panels";
+import type { MissionIssue } from "../../validate";
+import { EditorPanel, FieldProblem, TextField } from "./panels";
 import {
   addDialogue,
   dialogueMedia,
@@ -53,6 +54,7 @@ import {
   portraitDrawable,
   removeDialogue,
 } from "./registries";
+import { entryFieldProblem } from "./triggerProblems";
 
 /** What the file dialog offers for each of the two clips. The engine reads more
  *  image formats than these, but these are the ones a portrait is drawn in.
@@ -87,9 +89,15 @@ async function dropClip(scenarioId: string, file: string): Promise<void> {
 export function DialoguePanel({
   scenario,
   onChange,
+  issues,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** What the validator has found wrong with the mission (issue #2339). A
+   *  line with no text is the one of these a line's own field can show, the
+   *  way a team select already does (issue #2307): the rest name a placement
+   *  or a def rather than a field on this panel. */
+  issues: MissionIssue[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -153,6 +161,7 @@ export function DialoguePanel({
               scenario={scenario}
               onChange={onChange}
               onSelect={setSelectedId}
+              issues={issues}
             />
           </div>
         )}
@@ -205,11 +214,13 @@ function DialogueForm({
   scenario,
   onChange,
   onSelect,
+  issues,
 }: {
   line: ScenarioDialogue;
   scenario: Scenario;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
+  issues: MissionIssue[];
 }) {
   // The words are held here while they are typed and written when the box is
   // left, because every change is saved. That copy follows the line when the
@@ -218,6 +229,13 @@ function DialogueForm({
   // it and the box carried on showing the words from before the step back.
   const [text, setText] = useFieldText(line.text);
   const [error, setError] = useState<string | null>(null);
+  const textDescribedBy = useId();
+  // `checkText` in validate.ts reports this as a warning, never an error: a
+  // blank line still plays, it just opens the radio panel on an empty
+  // message until somebody writes it. So this is shown next to the field the
+  // same way a difficulty range problem is, without claiming the text was
+  // refused.
+  const textProblem = entryFieldProblem(issues, "dialogue", line.id, "text");
 
   const edit = (patch: Partial<Omit<ScenarioDialogue, "id">>) =>
     onChange(editDialogue(scenario, line.id, patch));
@@ -298,16 +316,20 @@ function DialogueForm({
         </Button>
       </div>
 
-      <Textarea
-        aria-label="What is said"
-        value={text}
-        placeholder="Contact! Raiders inbound from the north pass."
-        className="min-h-16 text-xs"
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          if (text !== line.text) edit({ text });
-        }}
-      />
+      <div className="flex flex-col gap-0.5">
+        <Textarea
+          aria-label="What is said"
+          aria-describedby={textDescribedBy}
+          value={text}
+          placeholder="Contact! Raiders inbound from the north pass."
+          className="min-h-16 text-xs"
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            if (text !== line.text) edit({ text });
+          }}
+        />
+        <FieldProblem id={textDescribedBy} problem={textProblem} />
+      </div>
 
       {error && (
         <p className="rounded bg-destructive/15 px-2 py-1.5 text-[11px] text-destructive">
