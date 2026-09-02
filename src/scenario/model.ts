@@ -702,9 +702,9 @@ function namedBlueprints(blueprints: BaseBlueprint[]): BaseBlueprint[] {
   return blueprints.map((blueprint, i) => {
     if (named(blueprint)) return blueprint;
     let n = i + 1;
-    while (taken.has(`Layout ${n}`)) n++;
-    taken.add(`Layout ${n}`);
-    return { ...blueprint, name: `Layout ${n}` };
+    while (taken.has(`Blueprint ${n}`)) n++;
+    taken.add(`Blueprint ${n}`);
+    return { ...blueprint, name: `Blueprint ${n}` };
   });
 }
 

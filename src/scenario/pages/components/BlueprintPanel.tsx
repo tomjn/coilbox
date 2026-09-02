@@ -175,7 +175,7 @@ export function BlueprintPanel({
       carryBlueprint(current, imported.layout, crypto.randomUUID()),
     );
     setStatus(
-      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Layouts on the mode strip, or with the pin beside it under Contents.`,
+      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode strip, or with the pin beside it under Contents.`,
     );
   }
 
@@ -241,7 +241,7 @@ export function BlueprintPanel({
           `"${name}" is in your library.`,
           name === layout.name
             ? null
-            : `A layout there was already called "${layout.name}".`,
+            : `A blueprint there was already called "${layout.name}".`,
           units.length === 0
             ? "This game's units have not been read, so nothing is recorded about how much ground its buildings stand on, and its picture draws each of them as one build square until it is saved again."
             : null,
@@ -307,7 +307,7 @@ export function BlueprintPanel({
       summary={
         layouts.length === 0
           ? "Take a base out of a game, or send one back"
-          : `${layouts.length} layout${layouts.length === 1 ? "" : "s"}`
+          : `${layouts.length} blueprint${layouts.length === 1 ? "" : "s"}`
       }
     >
       <div className="space-y-4">
@@ -382,7 +382,7 @@ export function BlueprintPanel({
         )}
 
         <section className="space-y-2">
-          <h3 className="text-xs font-medium">Layouts in this scenario</h3>
+          <h3 className="text-xs font-medium">Blueprints in this scenario</h3>
           {layouts.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               None yet. Draw a base on the map, or open a game's file above.
@@ -423,7 +423,7 @@ export function BlueprintPanel({
                         }
                       >
                         <Pencil className="mr-1 size-3.5" />
-                        {editing === layout.id ? "Close" : "Edit the layout"}
+                        {editing === layout.id ? "Close" : "Edit the blueprint"}
                       </Button>
                       <Button
                         size="sm"
@@ -449,11 +449,11 @@ export function BlueprintPanel({
                     {openLayout?.id === layout.id && (
                       <div className="space-y-2 pt-1">
                         <p className="text-[11px] text-muted-foreground">
-                          A layout is a shape rather than a place, so this draws
-                          on a build grid and loads no map. Editing it here
-                          edits the layout itself, so every base placed from it
-                          changes. To change one base only, drag its buildings
-                          on the map above.
+                          A blueprint is a shape rather than a place, so this
+                          draws on a build grid and loads no map. Editing it
+                          here edits the blueprint itself, so every base placed
+                          from it changes. To change one base only, drag its
+                          buildings on the map above.
                         </p>
                         <BlueprintEditor
                           blueprint={openLayout}
@@ -532,7 +532,7 @@ function FileContents({
 
       {report.blueprints.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          There are no layouts in this file coilbox can read.
+          There are no blueprints in this file coilbox can read.
         </p>
       ) : (
         <ul className="space-y-1.5">
@@ -593,9 +593,9 @@ function FileContents({
       {!report.checked && report.blueprints.length > 0 && (
         <p className="text-[11px] text-amber-200/80">
           Coilbox has not read this game's units yet, so nothing here has been
-          checked against them. This file holds every layout every game sharing
-          a data directory has saved, and another game's looks exactly like this
-          one's until the names are checked.
+          checked against them. This file holds every blueprint every game
+          sharing a data directory has saved, and another game's looks exactly
+          like this one's until the names are checked.
         </p>
       )}
 
@@ -611,7 +611,7 @@ function FileContents({
 
       {!anyone && report.blueprints.length > 0 && (
         <p className="text-[11px] text-amber-200/80">
-          This scenario has no participants yet. A layout can still be added,
+          This scenario has no participants yet. A blueprint can still be added,
           and putting one on the map cannot be done until there is somebody for
           the base to belong to. Add a participant in the setup above.
         </p>

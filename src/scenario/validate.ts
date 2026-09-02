@@ -748,7 +748,7 @@ const PART: Record<string, string> = {
   // game vendored reads that key. The editor calls it a base.
   prefabs: "Base",
   bases: "Base",
-  blueprints: "Layout",
+  blueprints: "Blueprint",
   zones: "Zone",
   triggers: "Trigger",
   objectives: "Objective",

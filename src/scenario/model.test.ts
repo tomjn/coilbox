@@ -318,7 +318,7 @@ describe("parseScenario — bases", () => {
     const s = parseScenario(
       withBase({ blueprints: [{ ...blueprint, name: undefined }] }),
     );
-    expect(s?.blueprints[0].name).toBe("Layout 1");
+    expect(s?.blueprints[0].name).toBe("Blueprint 1");
   });
 
   /** Issue #1414. Every layout written before this build was named after the id
@@ -327,20 +327,23 @@ describe("parseScenario — bases", () => {
     const s = parseScenario(
       withBase({ blueprints: [{ ...blueprint, name: "bp1" }] }),
     );
-    expect(s?.blueprints[0].name).toBe("Layout 1");
+    expect(s?.blueprints[0].name).toBe("Blueprint 1");
   });
 
   it("does not number one onto a name somebody chose", () => {
     const s = parseScenario(
       withBase({
         blueprints: [
-          { ...blueprint, id: "bp0", name: "Layout 2" },
+          { ...blueprint, id: "bp0", name: "Blueprint 2" },
           { ...blueprint, name: "  " },
         ],
         bases: [base, { ...base, id: "b0", blueprint: "bp0" }],
       }),
     );
-    expect(s?.blueprints.map((b) => b.name)).toEqual(["Layout 2", "Layout 3"]);
+    expect(s?.blueprints.map((b) => b.name)).toEqual([
+      "Blueprint 2",
+      "Blueprint 3",
+    ]);
   });
 
   /** Issue #1418. The array is the build order and this says whether that order
@@ -471,7 +474,7 @@ describe("parseScenario — reading a schema 1 document", () => {
     expect(s?.blueprints).toEqual([
       {
         id: "pf1",
-        name: "Layout 1",
+        name: "Blueprint 1",
         buildings: [
           { def: "armlab", offset: { x: 0, z: 0 }, facing: 2 },
           { def: "armsolar", offset: { x: 96, z: 0 }, facing: 0 },

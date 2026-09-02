@@ -375,7 +375,7 @@ export function BaseControls({
                 {sharedWith === 1
                   ? "One other base is"
                   : `${sharedWith} other bases are`}{" "}
-                placed from this layout.{" "}
+                placed from this blueprint.{" "}
                 {sharedEdit
                   ? "Adding, moving, turning, converting or deleting a building here changes it for all of them."
                   : "Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand."}
@@ -385,7 +385,7 @@ export function BaseControls({
                   htmlFor="base-shared-layout"
                   className="text-[11px] font-medium"
                 >
-                  Edit the layout they all use
+                  Edit the blueprint they all use
                 </Label>
                 <Switch
                   id="base-shared-layout"

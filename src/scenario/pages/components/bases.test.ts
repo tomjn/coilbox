@@ -487,13 +487,13 @@ describe("naming a layout", () => {
       origin: { x: 0, z: 0 },
       buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
     });
-    expect(one.blueprints[0].name).toBe("Layout 1");
+    expect(one.blueprints[0].name).toBe("Blueprint 1");
     const two = addBase(one, "b3", "bp3", {
       team: "p0",
       origin: { x: 500, z: 0 },
       buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
     });
-    expect(two.blueprints[1].name).toBe("Layout 2");
+    expect(two.blueprints[1].name).toBe("Blueprint 2");
   });
 });
 

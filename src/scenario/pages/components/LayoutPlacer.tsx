@@ -114,7 +114,9 @@ export function LayoutPlacer({
         value={choice ? layoutChoiceKey(choice) : ""}
         onValueChange={(next) => onChoice(parseLayoutChoice(next))}
         options={options}
-        placeholder={options.length === 0 ? "No layouts yet" : "Pick a layout…"}
+        placeholder={
+          options.length === 0 ? "No blueprints yet" : "Pick a blueprint…"
+        }
         disabled={options.length === 0}
       />
       <TeamSelect

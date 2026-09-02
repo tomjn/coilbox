@@ -561,9 +561,9 @@ const basesMode: EditorMode = {
  */
 const layoutsMode: EditorMode = {
   id: "layouts",
-  label: "Layouts",
+  label: "Blueprints",
   icon: Blocks,
-  hint: "Pick a layout and a team, then click the map to place the whole base.",
+  hint: "Pick a blueprint and a team, then click the map to place the whole base.",
   use: ({ scenario, onChange, onSelect, layout: choice, onLayout }) => {
     const [team, setTeam] = useState("");
     const participants = scenario.setup.participants;

@@ -172,8 +172,8 @@ export function copyName(taken: string[], name: string): string {
 export function nextLayoutName(blueprints: BaseBlueprint[]): string {
   const taken = new Set(blueprints.map((b) => b.name));
   let n = 1;
-  while (taken.has(`Layout ${n}`)) n++;
-  return `Layout ${n}`;
+  while (taken.has(`Blueprint ${n}`)) n++;
+  return `Blueprint ${n}`;
 }
 
 /**

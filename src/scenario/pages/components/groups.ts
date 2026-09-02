@@ -401,7 +401,7 @@ export function baseLabels(
     bases.map(
       (base) =>
         blueprints.find((b) => b.id === base.blueprint)?.name ??
-        "a layout that is gone",
+        "a blueprint that is gone",
     ),
   );
 }
