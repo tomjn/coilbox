@@ -16,6 +16,7 @@ import { Plus, Trash2, Variable } from "lucide-react";
 import { useFieldText } from "@/lib/useFieldText";
 import type { ExtensionTypes } from "../../extensions";
 import type { Scenario } from "../../model";
+import { notifyDeleted } from "./deleteNotice";
 import { EditorPanel, NameField } from "./panels";
 import {
   addVar,
@@ -29,12 +30,18 @@ export function VarPanel({
   scenario,
   onChange,
   extensions,
+  onUndo,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
   /** The types the scenario's game declares, so a rename carries over a
    *  reference one of its own parameters holds (issue #913). */
   extensions: ExtensionTypes;
+  /** The page's own step back, the same one Cmd+Z and the map toolbar call.
+   *  Handed to an undeclare's undo notice so that button does exactly what
+   *  the shortcut does rather than a second way of getting there (issue
+   *  #2280). */
+  onUndo: () => void;
 }) {
   const names = Object.keys(scenario.vars);
 
@@ -87,7 +94,10 @@ export function VarPanel({
                   variant="ghost"
                   className="size-7 shrink-0 p-0 text-destructive hover:text-destructive"
                   aria-label={`Undeclare ${name}`}
-                  onClick={() => onChange(removeVar(scenario, name))}
+                  onClick={() => {
+                    onChange(removeVar(scenario, name));
+                    notifyDeleted(`Undeclared variable "${name}".`, onUndo);
+                  }}
                 >
                   <Trash2 className="size-3.5" />
                 </Button>

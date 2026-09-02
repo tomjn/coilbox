@@ -20,8 +20,14 @@
  * nonsense one.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
+import { useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_EXTENSIONS } from "../../extensions";
 import { NO_GATE } from "../../gating";
@@ -34,6 +40,26 @@ import {
   undoEdit,
 } from "./history";
 import { TriggerPanel } from "./TriggerPanel";
+
+// The panel's delete notice has no shell here (issue #2280), the same gap
+// `ScenarioBuilderPage.dom.test.tsx` fills for its own toasts. Captured rather
+// than rendered, so a test can read the message and fire the action the way a
+// click on the toast's own Undo button would.
+const toasted = vi.hoisted(() => ({
+  calls: [] as {
+    message: string;
+    id: string;
+    action: { onClick: () => void };
+  }[],
+}));
+vi.mock("sonner", () => ({
+  toast: (
+    message: string,
+    opts: { id: string; action: { onClick: () => void } },
+  ) => {
+    toasted.calls.push({ message, id: opts.id, action: opts.action });
+  },
+}));
 
 /**
  * A longer budget than the 5000ms default, and this one is mitigation rather
@@ -58,7 +84,10 @@ import { TriggerPanel } from "./TriggerPanel";
  */
 vi.setConfig({ testTimeout: 30_000 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  toasted.calls.length = 0;
+});
 
 function trigger(patch: Partial<ScenarioTrigger> = {}): ScenarioTrigger {
   const id = patch.id ?? "wave-one";
@@ -108,6 +137,25 @@ function scenario(triggers: ScenarioTrigger[]): Scenario {
 function PanelHarness({ triggers }: { triggers: ScenarioTrigger[] }) {
   const [document, setDocument] = useState(() => scenario(triggers));
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
+  // Read at the moment a step is taken rather than at the last render, the
+  // same reason ScenarioEditPage keeps its own copies: a delete's notice binds
+  // `onUndo` at the click that fires it, and firing the notice's action later
+  // must see the document that delete produced, not whatever this closure held
+  // when the button was drawn.
+  const documentRef = useRef(document);
+  documentRef.current = document;
+  const historyRef = useRef(history);
+  historyRef.current = history;
+
+  // Shared by the harness's own Undo button and by `onUndo`, so a test that
+  // fires a toast's action is exercising the exact function Cmd+Z and the map
+  // toolbar call, not a lookalike (issue #2280).
+  const stepBack = () => {
+    const step = undoEdit(historyRef.current, documentRef.current);
+    if (!step) return;
+    setHistory(step.history);
+    setDocument(step.document);
+  };
 
   return (
     <>
@@ -124,16 +172,9 @@ function PanelHarness({ triggers }: { triggers: ScenarioTrigger[] }) {
         note={null}
         picking={null}
         onPick={() => {}}
+        onUndo={stepBack}
       />
-      <button
-        type="button"
-        onClick={() => {
-          const step = undoEdit(history, document);
-          if (!step) return;
-          setHistory(step.history);
-          setDocument(step.document);
-        }}
-      >
+      <button type="button" onClick={stepBack}>
         Undo
       </button>
       <button
@@ -385,6 +426,61 @@ describe("which trigger the panel is on when one is deleted", () => {
     undo();
 
     expect(asInput(nameBox()).value).toBe("wave-two");
+  });
+});
+
+/**
+ * Deleting a trigger from the panel has no confirm dialog and no undo button
+ * of its own nearby (issue #2280). The notice this fires names the trigger,
+ * and its own action is the page's real undo, so the trigger comes back
+ * whether an author clicks that action or presses Cmd+Z instead.
+ */
+describe("deleting a trigger's notice", () => {
+  const del = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Delete/ }));
+
+  it("names the trigger in the notice", () => {
+    openPanel([trigger({ id: "wave-one" })]);
+
+    del();
+
+    expect(toasted.calls).toHaveLength(1);
+    expect(toasted.calls[0].message).toBe('Deleted trigger "wave-one".');
+  });
+
+  it("is undoable through Cmd+Z alone, with no toast involved", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    del();
+    undo();
+
+    expect(asInput(nameBox()).value).toBe("wave-two");
+  });
+
+  it("restores the trigger when the notice's own action is used", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-two");
+
+    del();
+    act(() => toasted.calls[0].action.onClick());
+
+    expect(asInput(nameBox()).value).toBe("wave-two");
+  });
+
+  it("uses one fixed notice id so several deletes in a row replace it rather than stacking", () => {
+    openPanel([
+      trigger({ id: "wave-one" }),
+      trigger({ id: "wave-two" }),
+      trigger({ id: "wave-three" }),
+    ]);
+
+    del();
+    del();
+
+    expect(toasted.calls).toHaveLength(2);
+    expect(toasted.calls[0].id).toBe(toasted.calls[1].id);
+    expect(toasted.calls[0].message).not.toBe(toasted.calls[1].message);
   });
 });
 

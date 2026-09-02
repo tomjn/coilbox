@@ -30,6 +30,7 @@ import type { ExtensionTypes } from "../../extensions";
 import type { PaletteGate } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
+import { notifyDeleted } from "./deleteNotice";
 import { EditorPanel, FieldProblem } from "./panels";
 import { AddStep, StepRow } from "./TriggerSteps";
 import {
@@ -85,6 +86,7 @@ export function TriggerPanel({
   note,
   picking,
   onPick,
+  onUndo,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
@@ -100,6 +102,10 @@ export function TriggerPanel({
   /** The point the map is waiting for, or null when it is not waiting. */
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
+  /** The page's own step back, the same one Cmd+Z and the map toolbar call.
+   *  Handed to a delete's undo notice so that button does exactly what the
+   *  shortcut does rather than a second way of getting there (issue #2280). */
+  onUndo: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedTrigger(scenario.triggers, selectedId);
@@ -182,6 +188,7 @@ export function TriggerPanel({
               onPick={onPick}
               onChange={onChange}
               onSelect={setSelectedId}
+              onUndo={onUndo}
             />
           </div>
         )}
@@ -250,6 +257,7 @@ function TriggerForm({
   onPick,
   onChange,
   onSelect,
+  onUndo,
 }: {
   trigger: ScenarioTrigger;
   scenario: Scenario;
@@ -267,6 +275,7 @@ function TriggerForm({
   /** Puts the panel on the trigger named, the way picking a row does. Used to
    *  land on a fresh duplicate the moment it exists. */
   onSelect: (id: string) => void;
+  onUndo: () => void;
 }) {
   const at = scenario.triggers.indexOf(trigger);
   const edit = (patch: Partial<Omit<ScenarioTrigger, "id">>) =>
@@ -328,6 +337,7 @@ function TriggerForm({
           onClick={() => {
             onChange(removeTrigger(scenario, trigger.id));
             onPick(null);
+            notifyDeleted(`Deleted trigger "${trigger.name}".`, onUndo);
           }}
         >
           <Trash2 className="size-3.5" /> Delete

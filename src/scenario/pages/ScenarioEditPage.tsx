@@ -400,9 +400,12 @@ export default function ScenarioEditPage() {
           rather than scrolling off above the map (issue #2276). Sticky
           within the editor's own scroll container (picoframe's `<main>`),
           thin (no padding beyond the border) so it costs the map as little
-          height as possible, and left plain so the save indicator, an
-          always-present problems button and undo/redo (later issues in this
-          milestone) have a row to land in without another restructure. */}
+          height as possible, and left plain so the save indicator and an
+          always-present problems button have a row to land in without
+          another restructure. Undo and redo stayed off it: they already have
+          a home on the map toolbar, and issue #2280 answered "a panel delete
+          has no visible way back" with a notice at the delete itself rather
+          than a second pair of buttons up here. */}
         <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/50 bg-background py-2">
           <Link
             to={BACK}
@@ -606,8 +609,13 @@ export default function ScenarioEditPage() {
           note={note}
           picking={pick}
           onPick={setPick}
+          onUndo={undo}
         />
-        <ObjectivePanel scenario={scenario} onChange={(next) => apply(next)} />
+        <ObjectivePanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          onUndo={undo}
+        />
         <DialoguePanel scenario={scenario} onChange={(next) => apply(next)} />
         <RestrictionPanel
           scenario={scenario}
@@ -628,6 +636,7 @@ export default function ScenarioEditPage() {
           scenario={scenario}
           onChange={(next) => apply(next)}
           extensions={extensions}
+          onUndo={undo}
         />
       </div>
     </UnitGameProvider>
