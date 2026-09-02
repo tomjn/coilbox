@@ -151,6 +151,9 @@ function TeamStart({
   const counts = startUnits(team);
   const [r, g, b] = participant.color;
   const switchId = `no-commander-${participant.id}`;
+  // On when the mission places this team's start itself. The document records
+  // that as `noCommander`, because the engine spawns nothing for them.
+  const missionPlacesStart = team.noCommander === true;
 
   return (
     <div className="flex flex-col gap-2.5 rounded-md border border-border/40 p-2.5">
@@ -166,7 +169,7 @@ function TeamStart({
           </Label>
           <Switch
             id={switchId}
-            checked={team.noCommander === true}
+            checked={missionPlacesStart}
             onCheckedChange={onNoCommander}
           />
         </div>
@@ -319,13 +322,13 @@ function AmountPair({
         {label}
       </span>
       <AmountBox
-        label={`${who}'s ${label.toLowerCase()} metal`}
+        label={`${label} metal for ${who}`}
         placeholder="Metal"
         value={pair?.metal}
         onCommit={(value) => onAmount(field, "metal", value)}
       />
       <AmountBox
-        label={`${who}'s ${label.toLowerCase()} energy`}
+        label={`${label} energy for ${who}`}
         placeholder="Energy"
         value={pair?.energy}
         onCommit={(value) => onAmount(field, "energy", value)}
