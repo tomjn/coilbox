@@ -20,6 +20,7 @@ import {
   nudgeSentence,
   nudgeToFit,
   nudgeWords,
+  previewArmed,
   previewChecks,
   previewCount,
   previewMovable,
@@ -784,5 +785,41 @@ describe("previewNote", () => {
   it("stands down while the map is waiting for a point", () => {
     expect(previewNote(clean, null, true)).toBeNull();
     expect(previewNote(clashing, "nowhere", true)).toBeNull();
+  });
+});
+
+/**
+ * Issue #2349. The ghost that is armed to place is a different thing from
+ * `previewNote`'s sentence, but both stand down for the same reason: the
+ * click that is coming answers the outstanding question rather than placing
+ * what is armed. This pins that `previewArmed` uses the very flag
+ * `previewNote` does, so the two cannot drift into disagreeing about it.
+ */
+describe("previewArmed", () => {
+  const clean = {
+    total: 1,
+    clashes: 0,
+    unstable: 0,
+    tooDeep: 0,
+    tooShallow: 0,
+    unjudged: 0,
+    absent: 0,
+  };
+
+  it("carries what is armed while nothing is waiting for a point", () => {
+    expect(previewArmed("a ghost", false)).toBe("a ghost");
+    expect(previewArmed(null, false)).toBeNull();
+  });
+
+  it("stands down whatever is armed while the map is waiting for a point", () => {
+    expect(previewArmed("a ghost", true)).toBeNull();
+  });
+
+  it("agrees with previewNote about the same click, in both directions", () => {
+    for (const answering of [false, true]) {
+      const drawsGhost = previewArmed("a ghost", answering) !== null;
+      const saysSentence = previewNote(clean, null, answering) !== null;
+      expect(drawsGhost).toBe(saysSentence);
+    }
   });
 });
