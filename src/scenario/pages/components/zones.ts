@@ -14,6 +14,7 @@
 
 import type { Heading } from "@/placement/mapKeys";
 import type { Point, Scenario, ScenarioZone } from "../../model";
+import { turnedAbout } from "./editing";
 
 /**
  * The smallest a zone may be, in elmos: the side of a box, or the radius of a
@@ -314,6 +315,44 @@ export function moveZone(
   const zones = editZone(scenario.zones, ref.id, (zone) =>
     dragZone(zone, ref.handle, delta),
   );
+  return zones === scenario.zones ? scenario : { ...scenario, zones };
+}
+
+/**
+ * The document with the zone this key names turned `steps` quarter turns about
+ * `pivot`, as part of turning a whole selection as one shape (issue #2353).
+ *
+ * A zone does turn, which is the one thing about this that reads as a surprise.
+ * It is an axis-aligned box, so it cannot face north-east, but a quarter turn
+ * never asks it to: turn both corners and a box is still a box, with its width
+ * and its height swapped. So a long thin zone laid east to west comes back laid
+ * north to south, which is what turning the base it was drawn round should do
+ * to it. A circle turns to itself and only its centre moves.
+ *
+ * Both corners are turned and then put back the right way round, because the
+ * corner that was the north-west one is not after a quarter turn.
+ */
+export function turnZone(
+  scenario: Scenario,
+  key: string,
+  pivot: Point,
+  steps: number,
+): Scenario {
+  const ref = parseZoneKey(key);
+  if (!ref) return scenario;
+  const zones = editZone(scenario.zones, ref.id, (zone) => {
+    if (zone.shape === "circle") {
+      const center = round(turnedAbout(zone.center, pivot, steps));
+      return { ...zone, center };
+    }
+    return {
+      ...zone,
+      ...normaliseBox(
+        turnedAbout(zone.min, pivot, steps),
+        turnedAbout(zone.max, pivot, steps),
+      ),
+    };
+  });
   return zones === scenario.zones ? scenario : { ...scenario, zones };
 }
 

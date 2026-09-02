@@ -154,6 +154,7 @@ import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import { scenarioPlacements } from "./placements";
 import type { RowFocus } from "./problemTargets";
+import { turnSelectionAround } from "./rigidTurn";
 import {
   addedWords,
   addKeys,
@@ -1194,6 +1195,11 @@ export const ScenarioMapScene = forwardRef<
           {selection.length > 1 && (
             <SelectionCountBar
               what={countWords(selection)}
+              onTurnTogether={() =>
+                onChange((doc) =>
+                  turnSelectionAround(doc, selection, 1, layoutEdit),
+                )
+              }
               onClear={() => setSelection(NO_SELECTION)}
             />
           )}
@@ -1655,16 +1661,31 @@ function ScenarioSelectionBar({
  */
 function SelectionCountBar({
   what,
+  onTurnTogether,
   onClear,
 }: {
   /** The tally, as `countWords` reads it: "4 actors, 1 group and 2 base
    *  buildings". */
   what: string;
+  /** Swing the whole selection a quarter turn about its own middle, which is
+   *  the other meaning of turning several things at once (issue #2353). It
+   *  lives here rather than beside the Turn button below, because that button
+   *  is the primary's and this one is the selection's. */
+  onTurnTogether: () => void;
   onClear: () => void;
 }) {
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-primary/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <span className="text-[11px]">{what} selected</span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 text-xs"
+        onClick={onTurnTogether}
+        title="Turn all of it as one shape, so it moves round its own middle (T)"
+      >
+        Turn together
+      </Button>
       <Button
         size="sm"
         variant="ghost"

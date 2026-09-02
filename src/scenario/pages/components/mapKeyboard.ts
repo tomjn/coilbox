@@ -145,8 +145,12 @@ export function turnOnMap(
  * pointing at something just deleted names.
  */
 export function positionIn(things: MapThings, key: string): Point | null {
-  const { scenario } = things;
+  return positionOn(things.scenario, key);
+}
 
+/** {@link positionIn} for a caller holding only the document, which is all
+ *  either of them ever reads. */
+export function positionOn(scenario: Scenario, key: string): Point | null {
   const zone = parseZoneKey(key);
   if (zone) {
     const found = scenario.zones.find((one) => one.id === zone.id);
@@ -681,6 +685,9 @@ export const MAP_KEY_HELP =
   "Hold Shift for ten squares, Alt for one elmo. " +
   "With nothing selected the arrows move the view's cursor instead. " +
   "R turns, Shift R turns the other way. Delete removes. " +
+  "T turns everything selected as one shape instead, so a base swings round " +
+  "its own middle rather than each building spinning where it stands, and " +
+  "Shift T swings it the other way. " +
   "S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. " +
   "North and east make it bigger, south and west make it smaller. " +
   "Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. " +

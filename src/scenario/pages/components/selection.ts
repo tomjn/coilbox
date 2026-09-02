@@ -26,11 +26,9 @@
  * Turning a building writes its facing and nothing else on purpose (issue
  * #1523): the point its layout names is what the engine is asked about at every
  * facing, and writing a new position instead makes a building creep a square per
- * full circle. Swinging a whole selection about a common centre would write a
- * new position for every building in it, which is that creep on every turn, and
- * would ask a zone to rotate when a zone is an axis-aligned box that cannot.
- * Rotating a selection as one rigid body is a different operation and is not
- * this one.
+ * full circle. Swinging a whole selection about a common centre is a different
+ * operation on a key of its own, and it is in `rigidTurn.ts`, which is also
+ * where the reason it does not creep is written down.
  */
 
 import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
@@ -542,7 +540,7 @@ export function marqueeWords(caught: number, after: MapSelection): string {
  * bases each read out in full is not. A selection that turned up clean says
  * nothing, the same silence `buildTrouble` keeps for one thing that is fine.
  */
-function manyBuildTrouble(
+export function manyBuildTrouble(
   selection: MapSelection,
   marks: readonly FootprintMark[],
 ): string {
