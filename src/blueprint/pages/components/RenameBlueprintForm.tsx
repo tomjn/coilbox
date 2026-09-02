@@ -74,7 +74,7 @@ export function RenameBlueprintForm({
     >
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={id} className="text-xs font-medium">
-          Layout name
+          Blueprint name
         </Label>
         <Input
           id={id}
@@ -82,12 +82,12 @@ export function RenameBlueprintForm({
           // step nobody asked for.
           autoFocus
           value={text}
-          placeholder="What this layout is called"
+          placeholder="What this blueprint is called"
           onChange={(e) => setText(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
           What the library, the pickers and anybody you share it with call this
-          layout. Two layouts can share a name, so this is yours to say.
+          blueprint. Two blueprints can share a name, so this is yours to say.
         </p>
       </div>
 
