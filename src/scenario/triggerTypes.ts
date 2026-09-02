@@ -266,6 +266,69 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
 };
 
 /**
+ * The band a condition or action sits under in the add-step dropdown (issue
+ * #2273). Before this, both lists were one flat run of options, so choosing
+ * what a trigger does meant reading every entry rather than the handful in the
+ * band an author already knows they want.
+ *
+ * A condition and an action never share a name (`TYPE_DESCRIPTIONS`'s own
+ * rule), so one map serves both tables. `ACTION_GROUP_ORDER` and
+ * `CONDITION_GROUP_ORDER` say what order the bands are offered in. A game's own
+ * type is never in this table, so `AddStep` falls back to `GAME_TYPE_GROUP`
+ * rather than dropping it.
+ */
+export const TYPE_GROUPS: Record<string, string> = {
+  // Conditions.
+  units_in_zone: "Units",
+  unit_count: "Units",
+  unit_dead: "Units",
+  unit_health_below: "Units",
+  unit_built: "Units",
+  unit_captured: "Units",
+  var: "Variables",
+  time_elapsed: "Time",
+  zone_held_for: "Time",
+  // Actions.
+  spawn_group: "Units",
+  wake_group: "Units",
+  give_orders: "Units",
+  gift_units: "Units",
+  release_group: "Units",
+  unlock_unit: "Units",
+  set_var: "Variables",
+  add_var: "Variables",
+  enable_trigger: "Trigger flow",
+  disable_trigger: "Trigger flow",
+  complete_objective: "Objectives",
+  fail_objective: "Objectives",
+  dialogue: "Presentation",
+  play_sound: "Presentation",
+  reveal_area: "Presentation",
+  camera_pan: "Presentation",
+  map_marker: "Presentation",
+  victory: "Ending",
+  defeat: "Ending",
+};
+
+/** The bands `AddStep` offers for the conditions list, in the order shown. */
+export const CONDITION_GROUP_ORDER = ["Units", "Variables", "Time"] as const;
+
+/** The bands `AddStep` offers for the actions list, in the order shown. */
+export const ACTION_GROUP_ORDER = [
+  "Units",
+  "Variables",
+  "Trigger flow",
+  "Objectives",
+  "Presentation",
+  "Ending",
+] as const;
+
+/** The band a game's own condition or action types fall under, since a
+ *  declaration says nothing about which of coilbox's bands it belongs in.
+ *  Always offered last, after every built-in band. */
+export const GAME_TYPE_GROUP = "Game types";
+
+/**
  * The runtime version that added a condition or action, for the types that did
  * not ship in version 1.
  *
