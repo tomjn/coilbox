@@ -25,7 +25,12 @@ import { editedScenario } from "./edits";
 import { addGroup, pathKey } from "./groups";
 import { scenarioPaths } from "./orderPaths";
 import { scenarioPlacements } from "./placements";
-import { type MapSelection, primaryKey, selectOne } from "./selection";
+import {
+  type MapSelection,
+  primaryKey,
+  selectOne,
+  toggleKey,
+} from "./selection";
 import { useMapKeyboard } from "./useMapKeyboard";
 import { addZone } from "./zones";
 
@@ -170,7 +175,10 @@ function Harness({
     onChange: (edit) => setScenario((doc) => editedScenario(doc, edit)),
     selection,
     onSelect: (key) => setSelection(selectOne(key)),
-    onEntry: (entry) => setSelection(selectOne(entry.key)),
+    onEntry: (entry, add) =>
+      setSelection(
+        add ? toggleKey(selection, entry.key) : selectOne(entry.key),
+      ),
     onPlace: onPlace ?? null,
     placing,
     snap: undefined,
@@ -256,6 +264,57 @@ describe("choosing what the keys act on", () => {
   it("says so rather than going quiet when there is nothing to step to", () => {
     render(<Harness initial={newScenario("Empty")} />);
     fireEvent.keyDown(map(), { key: "." });
+
+    expect(said()).toContain("Nothing on the map yet");
+  });
+});
+
+/**
+ * Growing a selection from the map's own keys, without leaving it for the
+ * Contents popover (issue #2354).
+ *
+ * `A` steps the same ring `.` and `,` walk, but toggles the stop it lands on
+ * into what is already selected instead of replacing it: the same toggle a
+ * Shift-click on the map or Shift+Enter on a Contents row makes, said in the
+ * same words.
+ */
+describe("growing a selection from the map's own keys (issue #2354)", () => {
+  it("adds the next thing on A, keeping what was already selected", () => {
+    render(<Harness initial={laidOut()} />);
+    fireEvent.keyDown(map(), { key: "." }); // selects the actor
+    expect(selected()).toBe("actor:a1");
+
+    fireEvent.keyDown(map(), { key: "a" });
+
+    expect(selected()).toBe("group:g1#0");
+    expect(said()).toBe("Added Group 1, unit 1, armpw. 2 selected.");
+  });
+
+  it("adds the previous thing on Shift A", () => {
+    render(<Harness initial={laidOut()} startSelection={["group:g1#0"]} />);
+    fireEvent.keyDown(map(), { key: "A", shiftKey: true });
+
+    expect(selected()).toBe("actor:a1");
+    expect(said()).toBe("Added actor, armcom. 2 selected.");
+  });
+
+  it("takes it back out when the step lands on something already selected", () => {
+    render(
+      <Harness
+        initial={laidOut()}
+        startSelection={["actor:a1", "group:g1#0"]}
+      />,
+    );
+    // Primary is the group, so stepping back with Shift A lands on the actor,
+    // which is already in.
+    fireEvent.keyDown(map(), { key: "A", shiftKey: true });
+
+    expect(said()).toBe("Removed actor, armcom. 1 selected.");
+  });
+
+  it("says the same thing the plain cycle says when there is nothing to step to", () => {
+    render(<Harness initial={newScenario("Empty")} />);
+    fireEvent.keyDown(map(), { key: "a" });
 
     expect(said()).toContain("Nothing on the map yet");
   });
@@ -424,6 +483,17 @@ describe("resizing a zone from the keyboard (issue #2313)", () => {
 
     expect(actor()).toBe("116,200,0");
     expect(said()).toContain("Moved 16 east");
+  });
+
+  it("drops resize mode when A grows the selection too, not only when a plain step replaces it (issue #2354)", () => {
+    withZoneSelected();
+    fireEvent.keyDown(map(), { key: "s" });
+    fireEvent.keyDown(map(), { key: "a" }); // wraps round, adding the actor
+
+    fireEvent.keyDown(map(), { key: "ArrowRight" });
+
+    expect(said()).toContain("Moved");
+    expect(said()).not.toContain("Grew");
   });
 });
 
@@ -611,6 +681,9 @@ describe("keys the map does not take", () => {
     fireEvent.keyDown(map(), { key: "?" });
 
     expect(said()).toContain("Arrow keys move what is selected");
+    expect(said()).toContain(
+      "A steps to the next thing and adds it to what is already selected",
+    );
   });
 });
 
@@ -637,11 +710,10 @@ describe("reading the whole map's problems on demand (issue #2315)", () => {
 /**
  * The keys acting on a selection the pointer built (issue #2279).
  *
- * The selection is handed to the harness rather than made here, because there is
- * no key that builds one: `.` and `,` replace the selection, and a selection is
- * grown with a Shift-click on the map or on a Contents row. What these pin is
- * the other half, that every key which acts on the selection acts on all of it
- * and says so in one sentence rather than three.
+ * The selection is handed to the harness rather than built with `A` here,
+ * because `A` is pinned on its own below (issue #2354). What these pin is the
+ * other half, that every key which acts on the selection acts on all of it and
+ * says so in one sentence rather than three.
  */
 describe("a selection of more than one", () => {
   const three = ["actor:a1", "group:g1#0", "base:b1#0"];

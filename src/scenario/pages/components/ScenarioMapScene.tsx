@@ -924,10 +924,15 @@ export const ScenarioMapScene = forwardRef<
   /** Picking something out of the list is the same two things a click that
    *  lands on it would be: it is selected, and it is on screen. A step of the
    *  keyboard's cycle (issue #2314) is picked the same way: only the key,
-   *  position and span a `ContentEntry` also carries are read. */
+   *  position and span a `ContentEntry` also carries are read.
+   *
+   *  `add` is the map's own way of growing a selection from the keyboard
+   *  (issue #2354): the keyboard's cycle-and-add keys pass it through so the
+   *  stop is toggled into the selection rather than replacing it, the same
+   *  toggle a Shift-click makes. Nothing else that picks an entry does. */
   const pickEntry = useCallback(
-    (entry: MapStep) => {
-      setSelected(entry.key);
+    (entry: MapStep, add = false) => {
+      setSelected(entry.key, add);
       focusOn(entry.pos, entry.span);
     },
     [focusOn, setSelected],

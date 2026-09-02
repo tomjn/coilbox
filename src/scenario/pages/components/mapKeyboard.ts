@@ -686,6 +686,8 @@ export const MAP_KEY_HELP =
   "Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. " +
   "Escape lets go of the selection. " +
   "More than one thing can be selected at once, and then every one of those keys acts on all of it. " +
-  "Full stop and comma replace the selection rather than growing it: to grow one, open Contents and press Shift with Enter on a row, which adds that row instead of replacing what is selected. " +
+  "Full stop and comma replace the selection rather than growing it. " +
+  "A steps to the next thing and adds it to what is already selected, Shift A steps to the previous thing and adds it the same way; landing on something already selected takes it back out. " +
+  "Contents' Shift with Enter on a row adds that row the same way. " +
   "P reads how many of the buildings on the map cannot be built where they stand. " +
   "Question mark reads this out again.";

@@ -61,12 +61,16 @@ import {
   turnOnMap,
 } from "./mapKeyboard";
 import {
+  addedWords,
   deletedManyWords,
+  inSelection,
   type MapSelection,
   movedManyWords,
   moveSelection,
   primaryKey,
+  removedWords,
   removeSelection,
+  toggleKey,
   turnedManyWords,
   turnSelection,
 } from "./selection";
@@ -89,8 +93,13 @@ export interface MapKeyboardDeps {
    * Select a stop on the cycle's ring and take the camera to it, exactly as
    * picking it out of the contents list does. A contents entry satisfies this
    * (issue #2314): only its key, position and span are read.
+   *
+   * `add` is the map's own way of growing a selection (issue #2354): the stop
+   * is toggled into what is already selected rather than replacing it, the
+   * same toggle a Shift-click on the map or Shift+Enter on a Contents row
+   * makes. Omitted or false replaces, which is what a plain step does.
    */
-  onEntry: (step: MapStep) => void;
+  onEntry: (step: MapStep, add?: boolean) => void;
   /**
    * What a click on bare ground would do, already resolved to whatever the map
    * is waiting for: a point for a trigger, the next point of a path being
@@ -237,6 +246,33 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
           say(
             selectionWords(things, step.key) +
               placeInList(things.entries, step.key),
+          );
+          return;
+        }
+
+        case "cycleAdd": {
+          // The map's own way of growing a selection (issue #2354): step onto
+          // the next stop, same ring the plain cycle walks, and toggle it into
+          // what is already selected instead of replacing it. That is the same
+          // gesture a Shift-click on the map or Shift+Enter on a Contents row
+          // makes, so the wording here is theirs too rather than a new
+          // sentence.
+          const steps = mapSteps(things.entries, things.paths);
+          const step = nextStep(steps, things.entries, selected, action.by);
+          if (!step) {
+            say(
+              "Nothing on the map yet. Pick a mode and press Enter to place.",
+            );
+            return;
+          }
+          onEntry(step, true);
+          readCursor();
+          const after = toggleKey(selection, step.key);
+          const named = thingWords(things, step.key);
+          say(
+            inSelection(after, step.key)
+              ? addedWords(named, after)
+              : removedWords(named, after),
           );
           return;
         }
