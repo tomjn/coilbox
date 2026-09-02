@@ -18,7 +18,7 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { ArrowDown, ArrowUp, Plus, Trash2, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Plus, Trash2, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -34,6 +34,7 @@ import { AddStep, StepRow } from "./TriggerSteps";
 import {
   addStep,
   addTrigger,
+  duplicateTrigger,
   editTrigger,
   moveStep,
   moveTrigger,
@@ -179,6 +180,7 @@ export function TriggerPanel({
               picking={picking}
               onPick={onPick}
               onChange={onChange}
+              onSelect={setSelectedId}
             />
           </div>
         )}
@@ -246,6 +248,7 @@ function TriggerForm({
   picking,
   onPick,
   onChange,
+  onSelect,
 }: {
   trigger: ScenarioTrigger;
   scenario: Scenario;
@@ -260,10 +263,18 @@ function TriggerForm({
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
+  /** Puts the panel on the trigger named, the way picking a row does. Used to
+   *  land on a fresh duplicate the moment it exists. */
+  onSelect: (id: string) => void;
 }) {
   const at = scenario.triggers.indexOf(trigger);
   const edit = (patch: Partial<Omit<ScenarioTrigger, "id">>) =>
     onChange(editTrigger(scenario, trigger.id, patch));
+  const duplicate = () => {
+    const id = nextTriggerId(scenario);
+    onChange(duplicateTrigger(scenario, trigger.id, id));
+    onSelect(id);
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -300,7 +311,15 @@ function TriggerForm({
         <Button
           size="sm"
           variant="ghost"
-          className="ml-auto h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          className="ml-auto h-7 gap-1.5 px-2 text-xs"
+          onClick={duplicate}
+        >
+          <Copy className="size-3.5" /> Duplicate
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
           // The selection is left on the deleted trigger's id rather than
           // cleared. Nothing else answers to that id, so the panel shows no form
           // until a step back puts the trigger itself back, and then the author

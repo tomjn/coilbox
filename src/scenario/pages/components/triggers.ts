@@ -41,6 +41,7 @@ import {
   type ParamSpec,
   type TypeSpec,
 } from "../../triggerTypes";
+import { copyName } from "./duplicate";
 import {
   buildingTargets,
   groupSize,
@@ -130,6 +131,51 @@ export function addTrigger(scenario: Scenario, id: string): Scenario {
     actions: [],
   };
   return { ...scenario, triggers: [...scenario.triggers, trigger] };
+}
+
+/**
+ * A copy of a trigger, placed right after the one it came from (issue #2278).
+ * The most common reason to want a second trigger is that it is nearly the
+ * same as one that exists, so this is the shortcut around rebuilding it
+ * condition by condition and action by action.
+ *
+ * `newId` is minted by the caller with {@link nextTriggerId}, the same way
+ * `addTrigger` takes its id, so the panel can select the copy the moment it is
+ * on screen without searching the document back for it.
+ *
+ * The name is suffixed with {@link copyName}, the scenario list's own way of
+ * telling two copies apart, so duplicating the same trigger three times reads
+ * as three distinct rows rather than "wave" repeated three times.
+ *
+ * Everything else is `structuredClone`d rather than spread, because a
+ * trigger's conditions, actions and difficulty range are all nested objects: a
+ * shallow copy would leave the copy's step list and the original's as the same
+ * array, and editing a parameter on one would edit the other.
+ *
+ * A reference the trigger carries, `enable_trigger` naming another trigger, or
+ * a condition naming a zone or an objective, is left pointing at what it
+ * always pointed at. The copy is a copy of this trigger's behaviour, not a
+ * copy of everything it touches, so rewriting those would change what the
+ * duplicate does instead of only adding a second one that does it.
+ */
+export function duplicateTrigger(
+  scenario: Scenario,
+  id: string,
+  newId: string,
+): Scenario {
+  const at = scenario.triggers.findIndex((t) => t.id === id);
+  if (at < 0) return scenario;
+  const copy: ScenarioTrigger = {
+    ...structuredClone(scenario.triggers[at]),
+    id: newId,
+    name: copyName(
+      scenario.triggers[at].name,
+      scenario.triggers.map((t) => t.name),
+    ),
+  };
+  const triggers = scenario.triggers.slice();
+  triggers.splice(at + 1, 0, copy);
+  return { ...scenario, triggers };
 }
 
 /** The document without a trigger. Actions naming it are left alone, exactly as

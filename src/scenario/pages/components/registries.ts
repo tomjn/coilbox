@@ -116,6 +116,34 @@ export function removeObjective(scenario: Scenario, id: string): Scenario {
     : { ...marked, objectives };
 }
 
+/**
+ * A copy of an objective, placed right after the one it came from (issue
+ * #2278). `newId` is minted by the caller with {@link nextObjectiveId}, the
+ * way `addObjective` takes its id, so the panel can select the copy as soon as
+ * it exists.
+ *
+ * The text and the kind are carried over unchanged rather than suffixed the
+ * way a trigger's name is: an objective's text is what the player reads on
+ * their panel, not an editor-only label, and "Copy of Hold the landing pad" is
+ * not a mission brief anybody meant to ship. The fresh id and the row's
+ * position right below the original are what tell the two apart on screen.
+ *
+ * An objective is a flat record, so the spread below is already a full copy:
+ * there is no nested list or object here for a shallow copy to leave shared.
+ */
+export function duplicateObjective(
+  scenario: Scenario,
+  id: string,
+  newId: string,
+): Scenario {
+  const at = scenario.objectives.findIndex((o) => o.id === id);
+  if (at < 0) return scenario;
+  const copy: ScenarioObjective = { ...scenario.objectives[at], id: newId };
+  const objectives = scenario.objectives.slice();
+  objectives.splice(at + 1, 0, copy);
+  return { ...scenario, objectives };
+}
+
 /* -------------------------------------------------------------------------- *
  * Dialogue.
  *
@@ -162,6 +190,39 @@ export function removeDialogue(scenario: Scenario, id: string): Scenario {
   return dialogue.length === marked.dialogue.length
     ? scenario
     : { ...marked, dialogue };
+}
+
+/**
+ * A copy of a dialogue line, placed right after the one it came from (issue
+ * #2278). `newId` is minted by the caller with {@link nextDialogueId}, the way
+ * `addDialogue` takes its id.
+ *
+ * The speaker and the words are carried over unchanged, for the same reason an
+ * objective's text is: both are what the player hears, not an editor label, so
+ * nothing here prefixes "Copy of" onto a line of in-game dialogue.
+ *
+ * `portrait` and `audio` are carried over unchanged too, and on purpose. Both
+ * are bare file names in *the scenario's* media folder rather than the line's
+ * own, so a second line naming the same file is two lines sharing one piece of
+ * art the way two conditions can share one zone. There is no second file to
+ * copy the way {@link duplicateScenario} copies a whole scenario's media into
+ * a new scenario's own folder. That copy exists because a scenario has its own
+ * media folder keyed by scenario id, and a dialogue line does not.
+ *
+ * A dialogue line is a flat record beyond that, so the spread below is already
+ * a full copy.
+ */
+export function duplicateDialogue(
+  scenario: Scenario,
+  id: string,
+  newId: string,
+): Scenario {
+  const at = scenario.dialogue.findIndex((d) => d.id === id);
+  if (at < 0) return scenario;
+  const copy: ScenarioDialogue = { ...scenario.dialogue[at], id: newId };
+  const dialogue = scenario.dialogue.slice();
+  dialogue.splice(at + 1, 0, copy);
+  return { ...scenario, dialogue };
 }
 
 /** The clips one line holds, for deleting them off disk when the line goes. */

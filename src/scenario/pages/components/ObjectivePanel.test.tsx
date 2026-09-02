@@ -202,3 +202,33 @@ describe("which objective the panel is on when an edit is stepped over", () => {
     expect(stored().objectives.map((o) => o.id)).toEqual(["hold", "escort"]);
   });
 });
+
+/** Duplicating an objective from the panel (issue #2278). The copy logic
+ *  itself is pinned in `registries.test.ts`. This is what only the panel can
+ *  get wrong: selection and undo. */
+describe("duplicating an objective", () => {
+  const duplicate = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Duplicate/ }));
+
+  it("adds the copy right after the original and selects it, ready to edit", () => {
+    openPanel([objective(), objective({ id: "escort", text: "Escort them." })]);
+
+    duplicate();
+
+    expect(stored().objectives.map((o) => o.id)).toEqual([
+      "hold",
+      "objective-1",
+      "escort",
+    ]);
+    expect((textBox() as HTMLInputElement).value).toBe("Hold the pad.");
+  });
+
+  it("is one undo step", () => {
+    openPanel([objective()]);
+
+    duplicate();
+    undo();
+
+    expect(stored().objectives.map((o) => o.id)).toEqual(["hold"]);
+  });
+});

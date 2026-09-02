@@ -11,6 +11,8 @@ import {
   buildableMode,
   buildableWarning,
   dialogueMedia,
+  duplicateDialogue,
+  duplicateObjective,
   editDialogue,
   editObjective,
   nameIssue,
@@ -147,6 +149,39 @@ describe("objectives", () => {
     expect(next.triggers[0].actions[0].params.objective).toBe("hold");
     expect(loads(next)).toBe(true);
   });
+
+  /**
+   * Issue #2278. Unlike a trigger's name, an objective's text is what the
+   * player reads, not an editor label, so the copy carries it unchanged rather
+   * than prefixing "Copy of" onto a mission brief nobody meant to ship. The
+   * fresh id and the row sitting right below the original are what tell the
+   * two apart.
+   */
+  it("copies an objective right after the original, text and all, under a fresh id", () => {
+    const next = duplicateObjective(document(), "hold", "objective-9");
+
+    expect(next.objectives.map((o) => o.id)).toEqual(["hold", "objective-9"]);
+    expect(next.objectives[1]).toEqual({
+      id: "objective-9",
+      kind: "primary",
+      text: "Hold the pad.",
+      hidden: false,
+    });
+    expect(loads(next)).toBe(true);
+  });
+
+  it("leaves the original alone when the copy is edited", () => {
+    const next = duplicateObjective(document(), "hold", "objective-9");
+    const edited = editObjective(next, "objective-9", { text: "Changed." });
+
+    expect(edited.objectives[0].text).toBe("Hold the pad.");
+    expect(edited.objectives[1].text).toBe("Changed.");
+  });
+
+  it("hands the same document back for an objective that is not there", () => {
+    const before = document();
+    expect(duplicateObjective(before, "nope", "objective-9")).toBe(before);
+  });
 });
 
 describe("dialogue", () => {
@@ -216,6 +251,55 @@ describe("dialogue", () => {
 
   it("deletes a line", () => {
     expect(removeDialogue(document(), "warn").dialogue).toEqual([]);
+  });
+
+  /**
+   * Issue #2278. The speaker and the words are what the player hears, so the
+   * copy carries them unchanged rather than prefixing "Copy of" onto a line of
+   * dialogue.
+   */
+  it("copies a line right after the original, speaker and words and all, under a fresh id", () => {
+    const withClip = editDialogue(document(), "warn", {
+      portrait: "hq.png",
+      audio: "hq.ogg",
+    });
+
+    const next = duplicateDialogue(withClip, "warn", "line-9");
+
+    expect(next.dialogue.map((d) => d.id)).toEqual(["warn", "line-9"]);
+    expect(next.dialogue[1]).toEqual({
+      id: "line-9",
+      speaker: "HQ",
+      text: "Contact.",
+      portrait: "hq.png",
+      audio: "hq.ogg",
+    });
+    expect(loads(next)).toBe(true);
+  });
+
+  /** Both lines name the same file in the scenario's own media folder, which
+   *  is correct: a clip belongs to the scenario, not to the line, so there is
+   *  no second file for a duplicate to copy the way duplicating a whole
+   *  scenario copies its media into a new folder. */
+  it("shares the original's clip rather than copying it", () => {
+    const withClip = editDialogue(document(), "warn", { portrait: "hq.png" });
+    const next = duplicateDialogue(withClip, "warn", "line-9");
+
+    expect(next.dialogue[0].portrait).toBe("hq.png");
+    expect(next.dialogue[1].portrait).toBe("hq.png");
+  });
+
+  it("leaves the original alone when the copy is edited", () => {
+    const next = duplicateDialogue(document(), "warn", "line-9");
+    const edited = editDialogue(next, "line-9", { text: "Changed." });
+
+    expect(edited.dialogue[0].text).toBe("Contact.");
+    expect(edited.dialogue[1].text).toBe("Changed.");
+  });
+
+  it("hands the same document back for a line that is not there", () => {
+    const before = document();
+    expect(duplicateDialogue(before, "nope", "line-9")).toBe(before);
   });
 });
 

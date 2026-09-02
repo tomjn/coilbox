@@ -236,3 +236,32 @@ describe("a dialogue line's words commit rules", () => {
     expect(stored()[0].text).toBe("Move out.");
   });
 });
+
+/** Duplicating a line from the panel (issue #2278). The copy logic itself is
+ *  pinned in `registries.test.ts`. This is what only the panel can get wrong:
+ *  selection and undo. */
+describe("duplicating a dialogue line", () => {
+  const duplicate = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Duplicate/ }));
+
+  it("adds the copy right after the original and selects it, ready to edit", () => {
+    openPanel([line(), line({ id: "closing", speaker: "HQ", text: "Out." })]);
+
+    duplicate();
+
+    expect(stored().map((d) => d.id)).toEqual(["opening", "line-1", "closing"]);
+    expect(asTextarea(textBox()).value).toBe("Move out.");
+    expect((screen.getByLabelText("Speaker") as HTMLInputElement).value).toBe(
+      "Control",
+    );
+  });
+
+  it("is one undo step", () => {
+    openPanel([line()]);
+
+    duplicate();
+    undo();
+
+    expect(stored().map((d) => d.id)).toEqual(["opening"]);
+  });
+});

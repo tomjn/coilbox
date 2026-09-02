@@ -351,6 +351,58 @@ describe("which trigger the panel is on when one is deleted", () => {
   });
 });
 
+/**
+ * Duplicating a trigger from the panel (issue #2278). The logic that builds
+ * the copy is pinned in `triggers.test.ts`. This is the part only the panel
+ * can get wrong: which trigger ends up selected, and how undo unwinds it.
+ */
+describe("duplicating a trigger", () => {
+  const duplicate = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Duplicate/ }));
+
+  it("adds the copy right after the original and selects it, ready to edit", () => {
+    openPanel([trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]);
+    select("wave-one");
+
+    duplicate();
+
+    expect(stored().map((t) => t.id)).toEqual([
+      "wave-one",
+      "trigger-1",
+      "wave-two",
+    ]);
+    expect(asInput(nameBox()).value).toBe("Copy of wave-one");
+  });
+
+  // Duplicating selects the copy, the same way "New trigger" selects what it
+  // just added, so one undo removes it in one step and leaves the selection
+  // on an id that no longer resolves. That is the same shape as undoing a new
+  // trigger ("shows no form when an undo takes the selected trigger away",
+  // above): the panel shows no form rather than guessing an author meant to
+  // land back on the trigger the copy was made from.
+  it("is one undo step: the copy is gone and the panel shows no form", () => {
+    openPanel([trigger({ id: "wave-one" })]);
+    select("wave-one");
+
+    duplicate();
+    undo();
+
+    expect(stored().map((t) => t.id)).toEqual(["wave-one"]);
+    expect(screen.queryByLabelText("Trigger name")).toBeNull();
+  });
+
+  it("redoes the duplicate back in when redone", () => {
+    openPanel([trigger({ id: "wave-one" })]);
+    select("wave-one");
+
+    duplicate();
+    undo();
+    redo();
+
+    expect(stored().map((t) => t.id)).toEqual(["wave-one", "trigger-1"]);
+  });
+});
+
 describe("a trigger's cooldown when the document moves under it", () => {
   it("shows the wait an undo put back", () => {
     openPanel([trigger({ repeat: true, cooldown: 30 })]);
