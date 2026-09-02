@@ -56,7 +56,10 @@ import { ObjectivePanel } from "./components/ObjectivePanel";
 import { orderPathId } from "./components/orderPaths";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
-import { DeleteScenarioForm } from "./components/ScenarioRowMenu";
+import {
+  DELETE_SCENARIO_DESCRIPTION,
+  DeleteScenarioForm,
+} from "./components/ScenarioRowMenu";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { SetupPanel } from "./components/SetupPanel";
 import { createScenarioSaver, type ScenarioSaver } from "./components/saving";
@@ -267,6 +270,8 @@ export default function ScenarioEditPage() {
   const openTest = () =>
     drawer.open({
       title: `Test ${scenario.name} in game`,
+      description:
+        "Compiles the mission, checks it loads, then starts the engine.",
       width: "32rem",
       content: (
         <ScenarioTestDrawer scenario={scenario} origin={loaded?.origin} />
@@ -282,6 +287,8 @@ export default function ScenarioEditPage() {
     );
     drawer.open({
       title: `Share ${scenario.name}`,
+      description:
+        "Get the code, link and file that let someone else load this scenario.",
       width: "28rem",
       content: (
         <ShareScenarioForm
@@ -335,6 +342,7 @@ export default function ScenarioEditPage() {
   const confirmDelete = () =>
     drawer.open({
       title: `Delete ${scenario.name}`,
+      description: DELETE_SCENARIO_DESCRIPTION,
       width: "24rem",
       content: (
         <DeleteScenarioForm
@@ -511,6 +519,7 @@ export default function ScenarioEditPage() {
           open={showProblems}
           onOpenChange={setShowProblems}
           title={`Problems in ${scenario.name}`}
+          description="Issues found while compiling the mission, with a fix where one exists."
           width="32rem"
         >
           <MissionProblemsList problems={problems} scenario={scenario} />
@@ -523,6 +532,7 @@ export default function ScenarioEditPage() {
           open={showLua}
           onOpenChange={setShowLua}
           title={`${scenario.name} as mission.lua`}
+          description="The compiled mission.lua, updated as you edit."
           width="44rem"
         >
           <MissionLuaView scenario={scenario} />

@@ -30,6 +30,11 @@ import {
 import { ErrorBanner } from "../../../content/pages/components/states";
 import type { Scenario } from "../../model";
 
+/** Shared with the editor's own delete confirmation, so the drawer description
+ *  is written once (issue #2281). */
+export const DELETE_SCENARIO_DESCRIPTION =
+  "Deleting a scenario cannot be undone.";
+
 export function ScenarioRowMenu({
   scenario,
   editable,
@@ -61,6 +66,7 @@ export function ScenarioRowMenu({
   const confirmDelete = () =>
     drawer.open({
       title: `Delete ${scenario.name}`,
+      description: DELETE_SCENARIO_DESCRIPTION,
       width: "24rem",
       content: (
         <DeleteScenarioForm
