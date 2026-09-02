@@ -41,9 +41,13 @@ import {
   type TriggerStep,
 } from "../../model";
 import {
+  ACTION_GROUP_ORDER,
+  CONDITION_GROUP_ORDER,
+  GAME_TYPE_GROUP,
   isUnitDefParam,
   type ParamSpec,
   TYPE_DESCRIPTIONS,
+  TYPE_GROUPS,
 } from "../../triggerTypes";
 import { OrderRow } from "./GroupControls";
 import { orderOfKind, targetOptions, withOrder, withoutOrder } from "./groups";
@@ -265,6 +269,12 @@ export function StepRow({
  * shown where a built-in type shows its own (issue #2286). A game's type that
  * ships no description of its own says so rather than falling back to a list of
  * its parameter names, which is not a description of what the type does.
+ *
+ * The options are banded by `TYPE_GROUPS` (issue #2273) so the dropdown reads as
+ * a handful of short named lists rather than one long undifferentiated one. A
+ * game's own type carries no band of its own, so it falls back to
+ * `GAME_TYPE_GROUP`, offered after every built-in band rather than dropped or
+ * left to sort wherever its name happens to land.
  */
 export function AddStep({
   list,
@@ -286,20 +296,32 @@ export function AddStep({
   const table = stepTypes(list, extensions);
   const declared =
     list === "conditions" ? extensions.conditions : extensions.actions;
-  const options = Object.entries(table).map(([type, spec]) => {
-    const defaults = stepDefaults(spec, { scenario, unitDefs });
-    const reason = gate[type] ?? defaults.needs;
-    return {
-      value: type,
-      label: stepLabel(type, extensions),
-      description:
-        declared[type]?.description ??
-        TYPE_DESCRIPTIONS[type] ??
-        "No description.",
-      trailing: reason,
-      disabled: reason !== undefined,
-    };
-  });
+  const groupOrder =
+    list === "conditions" ? CONDITION_GROUP_ORDER : ACTION_GROUP_ORDER;
+  const groupRank = new Map<string, number>(
+    groupOrder.map((group, index) => [group, index]),
+  );
+  const options = Object.entries(table)
+    .map(([type, spec]) => {
+      const defaults = stepDefaults(spec, { scenario, unitDefs });
+      const reason = gate[type] ?? defaults.needs;
+      return {
+        value: type,
+        label: stepLabel(type, extensions),
+        description:
+          declared[type]?.description ??
+          TYPE_DESCRIPTIONS[type] ??
+          "No description.",
+        trailing: reason,
+        disabled: reason !== undefined,
+        group: TYPE_GROUPS[type] ?? GAME_TYPE_GROUP,
+      };
+    })
+    .sort(
+      (a, b) =>
+        (groupRank.get(a.group) ?? groupOrder.length) -
+        (groupRank.get(b.group) ?? groupOrder.length),
+    );
 
   return (
     <OptionSelect
