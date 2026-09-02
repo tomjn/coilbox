@@ -11,6 +11,7 @@ import {
   addStep,
   addTrigger,
   applyPoint,
+  duplicateTrigger,
   editTrigger,
   moveStep,
   moveTrigger,
@@ -193,6 +194,116 @@ describe("the trigger list", () => {
     ]);
     expect(moveTrigger(before, "open", -1)).toBe(before);
     expect(moveTrigger(before, "close", 1)).toBe(before);
+  });
+});
+
+describe("duplicateTrigger", () => {
+  it("inserts a copy right after the original, under the fresh id it was given", () => {
+    const s = duplicateTrigger(document(), "open", "trigger-9");
+
+    expect(s.triggers.map((t) => t.id)).toEqual(["open", "trigger-9", "close"]);
+  });
+
+  it("suffixes the name the way copyName names any other copy", () => {
+    const s = duplicateTrigger(document(), "open", "trigger-9");
+
+    expect(s.triggers[1].name).toBe("Copy of open");
+  });
+
+  it("keeps the name unique across repeated duplication of the same trigger", () => {
+    let s = document();
+    s = duplicateTrigger(s, "open", "trigger-a");
+    s = duplicateTrigger(s, "open", "trigger-b");
+    s = duplicateTrigger(s, "open", "trigger-c");
+
+    const named = (id: string) => s.triggers.find((t) => t.id === id)?.name;
+    expect(named("trigger-a")).toBe("Copy of open");
+    expect(named("trigger-b")).toBe("Copy of open (2)");
+    expect(named("trigger-c")).toBe("Copy of open (3)");
+  });
+
+  it("carries the source trigger's fields over", () => {
+    const source = trigger("wave", {
+      enabled: false,
+      repeat: true,
+      cooldown: 30,
+      difficulty: { atLeast: "hard" },
+      conditions: {
+        op: "any",
+        conditions: [{ type: "timer", params: { seconds: 10 } }],
+      },
+      actions: [{ type: "victory", params: {} }],
+    });
+    const before = withTriggers(source);
+
+    const s = duplicateTrigger(before, "wave", "trigger-9");
+    const copy = s.triggers[1];
+
+    expect(copy).toMatchObject({
+      id: "trigger-9",
+      enabled: false,
+      repeat: true,
+      cooldown: 30,
+      difficulty: { atLeast: "hard" },
+      conditions: {
+        op: "any",
+        conditions: [{ type: "timer", params: { seconds: 10 } }],
+      },
+      actions: [{ type: "victory", params: {} }],
+    });
+  });
+
+  /**
+   * The point of using `structuredClone` rather than a shallow spread. A
+   * trigger's conditions, actions and difficulty range are nested objects, so
+   * a shallow copy would leave the copy's step list and the original's as one
+   * array, and editing a parameter on one would edit the other a week later.
+   */
+  it("is a deep copy: editing the copy's steps and difficulty leaves the original alone", () => {
+    const source = trigger("wave", {
+      difficulty: { atLeast: "hard" },
+      conditions: {
+        op: "all",
+        conditions: [{ type: "timer", params: { seconds: 10 } }],
+      },
+      actions: [{ type: "victory", params: {} }],
+    });
+    const before = withTriggers(source);
+
+    const s = duplicateTrigger(before, "wave", "trigger-9");
+    const copy = s.triggers[1];
+    if (copy.difficulty) copy.difficulty.atLeast = "normal";
+    copy.conditions.conditions[0].params.seconds = 999;
+    copy.actions[0].params.mutated = true;
+
+    const original = before.triggers[0];
+    expect(original.difficulty).toEqual({ atLeast: "hard" });
+    expect(original.conditions.conditions[0].params.seconds).toBe(10);
+    expect(original.actions[0].params).toEqual({});
+  });
+
+  /**
+   * A reference the trigger carries points at something else in the document,
+   * not at the trigger it is copied out of, so a copy leaves it alone rather
+   * than repointing it at the copy or at anything else.
+   */
+  it("leaves a reference to another trigger pointing at the original", () => {
+    const before = withTriggers(
+      trigger("open"),
+      trigger("closer", {
+        actions: [{ type: "enable_trigger", params: { trigger: "open" } }],
+      }),
+    );
+
+    const s = duplicateTrigger(before, "closer", "trigger-9");
+    const copy = s.triggers.find((t) => t.id === "trigger-9");
+
+    expect(copy?.actions[0].params).toEqual({ trigger: "open" });
+  });
+
+  it("hands the same document back for a trigger that is not there", () => {
+    const before = document();
+    expect(duplicateTrigger(before, "nope", "trigger-9")).toBe(before);
   });
 });
 
