@@ -767,6 +767,7 @@ export default function ScenarioEditPage() {
         <DialoguePanel
           scenario={scenario}
           onChange={(next) => apply(next)}
+          onUndo={undo}
           issues={missionIssues}
         />
         <RestrictionPanel

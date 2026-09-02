@@ -44,6 +44,7 @@ import type { Scenario, ScenarioDialogue } from "../../model";
 import { dialogueClipUrl, readDialogueClip } from "../../scenarioMedia";
 import { deleteScenarioMedia, importScenarioMedia } from "../../storage";
 import type { MissionIssue } from "../../validate";
+import { notifyDeleted } from "./deleteNotice";
 import { EditorPanel, FieldProblem, TextField } from "./panels";
 import {
   addDialogue,
@@ -89,10 +90,16 @@ async function dropClip(scenarioId: string, file: string): Promise<void> {
 export function DialoguePanel({
   scenario,
   onChange,
+  onUndo,
   issues,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The page's own step back, the same one Cmd+Z and the map toolbar call.
+   *  Handed to a delete's undo notice so that button does exactly what the
+   *  shortcut does rather than a second way of getting there (issue #2280,
+   *  issue #2306). */
+  onUndo: () => void;
   /** What the validator has found wrong with the mission (issue #2339). A
    *  line with no text is the one of these a line's own field can show, the
    *  way a team select already does (issue #2307): the rest name a placement
@@ -161,6 +168,7 @@ export function DialoguePanel({
               scenario={scenario}
               onChange={onChange}
               onSelect={setSelectedId}
+              onUndo={onUndo}
               issues={issues}
             />
           </div>
@@ -208,18 +216,32 @@ function DialogueRow({
   );
 }
 
+/** What the delete notice calls a line: who says it and what they say, cut
+ *  short so the toast reads as a line rather than a paragraph, and the id it
+ *  was minted with if the author deleted it before writing anything. The same
+ *  shape as {@link objectiveLabel} in ObjectivePanel. */
+function dialogueLabel(line: ScenarioDialogue): string {
+  const speaker = line.speaker.trim();
+  const text = line.text.trim();
+  const said = speaker && text ? `${speaker}: ${text}` : speaker || text;
+  if (!said) return line.id;
+  return said.length > 40 ? `${said.slice(0, 40)}…` : said;
+}
+
 /** The selected line: its id, who says it, what they say, and its clips. */
 function DialogueForm({
   line,
   scenario,
   onChange,
   onSelect,
+  onUndo,
   issues,
 }: {
   line: ScenarioDialogue;
   scenario: Scenario;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
+  onUndo: () => void;
   issues: MissionIssue[];
 }) {
   // The words are held here while they are typed and written when the box is
@@ -310,6 +332,19 @@ function DialogueForm({
             for (const file of clips) {
               void dropClip(scenario.id, file).catch(() => {});
             }
+            // Undo puts the line straight back, id, words and clip
+            // references included: it is one more step in the same history
+            // as everything else on this page. What it cannot promise back is
+            // the clip itself. `dropClip` above deletes the file off disk
+            // (issue #871's campaign exemption aside), and that deletion has
+            // no undo of its own, so the notice says so rather than
+            // implying Undo is as complete here as it is everywhere else
+            // (issue #2306).
+            const message =
+              clips.length > 0
+                ? `Deleted dialogue line "${dialogueLabel(line)}". Undo brings back the line; its clip may already be gone.`
+                : `Deleted dialogue line "${dialogueLabel(line)}".`;
+            notifyDeleted(message, onUndo);
           }}
         >
           <Trash2 className="size-3.5" /> Delete
