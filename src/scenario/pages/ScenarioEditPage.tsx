@@ -36,6 +36,7 @@ import type { Scenario } from "../model";
 import { saveEditedScenario } from "../saveIntoGame";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { deleteScenario, isEditable, type LoadedScenario } from "../storage";
+import type { MissionIssue } from "../validate";
 import { missionProblemCount } from "../wording";
 import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
@@ -54,6 +55,11 @@ import { MissionLuaView } from "./components/MissionLuaView";
 import { MissionProblemsList } from "./components/MissionProblemsList";
 import { ObjectivePanel } from "./components/ObjectivePanel";
 import { orderPathId } from "./components/orderPaths";
+import {
+  type ProblemTarget,
+  problemTarget,
+  type RowFocus,
+} from "./components/problemTargets";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
 import {
@@ -77,6 +83,21 @@ import { useScenarioMapExtent } from "./components/useScenarioMapExtent";
 import { VarPanel } from "./components/VarPanel";
 
 const BACK = "/scenario-builder";
+
+/**
+ * How long to hold a problem row's navigation back once the drawer that held
+ * it is asked to close, in milliseconds.
+ *
+ * The drawer is picoframe's own `Drawer`, built on a Radix `Dialog` with no
+ * `onCloseAutoFocus` of its own exposed to override: closing it restores
+ * keyboard focus to whatever opened it (the header's Problems button) once
+ * its own close animation ends, and that restore would otherwise land after
+ * this page's own focus on the destination row and win. 200ms is that
+ * animation's exact length, `pf-drawer-out-right` (and the left/bottom
+ * equivalents) in `@picoframe/frame`'s `drawerStyles.js`. This is that
+ * number plus a margin for the two renders in between.
+ */
+const DRAWER_CLOSE_FOCUS_DELAY_MS = 250;
 
 /**
  * Editor for one scenario. The document's name and description, the skirmish
@@ -165,6 +186,51 @@ export default function ScenarioEditPage() {
       ? "problems"
       : "clean";
   const [showProblems, setShowProblems] = useState(false);
+  // Where a mission problem's own row points, once it has been activated
+  // (issue #2271): which panel, or the map, it names and a token that
+  // changes on every activation, so the second click on the same row still
+  // scrolls and focuses rather than being a no-op because nothing changed.
+  const [problemFocus, setProblemFocus] = useState<{
+    target: ProblemTarget;
+    token: number;
+  } | null>(null);
+  const problemFocusTokenRef = useRef(0);
+  const problemFocusTimeoutRef = useRef<number | undefined>(undefined);
+  useEffect(
+    () => () => window.clearTimeout(problemFocusTimeoutRef.current),
+    [],
+  );
+  /** A problem row was activated: close the drawer, and once its own close
+   *  animation has had time to restore focus to the button that opened it,
+   *  ask the panel or the map that owns the problem to take it from there. A
+   *  row with no target ({@link problemTarget} returned null) never calls
+   *  this at all, so there is nothing to guard here. */
+  const onActivateProblem = useCallback((issue: MissionIssue) => {
+    const target = problemTarget(issue.path);
+    if (!target) return;
+    setShowProblems(false);
+    window.clearTimeout(problemFocusTimeoutRef.current);
+    problemFocusTokenRef.current += 1;
+    const token = problemFocusTokenRef.current;
+    problemFocusTimeoutRef.current = window.setTimeout(() => {
+      setProblemFocus({ target, token });
+    }, DRAWER_CLOSE_FOCUS_DELAY_MS);
+  }, []);
+  const rowFocus = (
+    kind: "trigger" | "objective" | "variable" | "map",
+  ): RowFocus | null => {
+    const target = problemFocus?.target;
+    if (!target || target.kind !== kind) return null;
+    const id =
+      target.kind === "trigger"
+        ? target.triggerId
+        : target.kind === "objective"
+          ? target.id
+          : target.kind === "variable"
+            ? target.name
+            : target.key;
+    return { id, token: problemFocus.token };
+  };
   const [showLua, setShowLua] = useState(false);
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
   // Both are also held in refs, because an edit and a step through the history
@@ -533,7 +599,11 @@ export default function ScenarioEditPage() {
           description="Issues found while compiling the mission, with a fix where one exists."
           width="32rem"
         >
-          <MissionProblemsList problems={problems} scenario={scenario} />
+          <MissionProblemsList
+            problems={problems}
+            scenario={scenario}
+            onActivate={onActivateProblem}
+          />
         </Drawer>
 
         {/* Controlled for the same reason: the compiled mission is recompiled
@@ -602,6 +672,7 @@ export default function ScenarioEditPage() {
             undo,
             redo,
           }}
+          focus={rowFocus("map")}
         />
 
         {/* The panels: the parts of the document the map cannot show. Triggers
@@ -619,11 +690,13 @@ export default function ScenarioEditPage() {
           picking={pick}
           onPick={setPick}
           onUndo={undo}
+          focus={rowFocus("trigger")}
         />
         <ObjectivePanel
           scenario={scenario}
           onChange={(next) => apply(next)}
           onUndo={undo}
+          focus={rowFocus("objective")}
         />
         <DialoguePanel scenario={scenario} onChange={(next) => apply(next)} />
         <RestrictionPanel
@@ -646,6 +719,7 @@ export default function ScenarioEditPage() {
           onChange={(next) => apply(next)}
           extensions={extensions}
           onUndo={undo}
+          focus={rowFocus("variable")}
         />
       </div>
     </UnitGameProvider>
