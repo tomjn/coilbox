@@ -20,6 +20,7 @@ vi.mock("@/lib/springTexture", () => ({
     loaded.push(url);
     return new THREE.Texture();
   },
+  springTextureFailed: () => false,
   paintTeamColour: (material: THREE.Material) => {
     painted.push(material);
   },
@@ -28,7 +29,10 @@ vi.mock("@/lib/springTexture", () => ({
   },
 }));
 
-const { buildModel } = await import("./unitModel");
+const { buildModel, prepareTextureAtlas } = await import("./unitModel");
+type UnitTextureAtlas = NonNullable<
+  Awaited<ReturnType<typeof prepareTextureAtlas>>
+>;
 
 function texture(name: string, file = ""): UnitModelTexture {
   return {
@@ -249,6 +253,111 @@ describe("buildModel merged", () => {
   it("leaves the piece tree alone when it is not asked for", () => {
     const built = buildModel(twoPieces());
     expect(built.object.getObjectByName("turret")).toBeDefined();
+    built.dispose();
+  });
+});
+
+/** The same two pieces and two textures, as the `.3do` an atlas is built for. */
+function twoPieces3do(over: Partial<UnitModelResult> = {}): UnitModelResult {
+  return {
+    ...twoPieces(),
+    format: "3do",
+    path: "objects3d/test.3do",
+    texture2: undefined,
+    ...over,
+  };
+}
+
+/** Both of `twoPieces3do`'s textures in one sheet, each a quarter of it. */
+function bothInOneSheet(): UnitTextureAtlas {
+  return {
+    texture: new THREE.Texture(),
+    place: new Map([
+      ["abc_skin_dds.dds", { u: 0, v: 0, du: 0.5, dv: 0.5 }],
+      ["abc_other_dds.dds", { u: 0.5, v: 0.5, du: 0.5, dv: 0.5 }],
+    ]),
+  };
+}
+
+function uvsOf(mesh: THREE.Mesh): number[] {
+  return [...(mesh.geometry.getAttribute("uv").array as Float32Array)];
+}
+
+describe("prepareTextureAtlas", () => {
+  /** An `.s3o` names one texture for the whole model, so it is already down to
+   *  one material and a sheet would only copy that texture. */
+  it("has nothing to pack for an s3o", async () => {
+    expect(await prepareTextureAtlas(twoPieces())).toBeNull();
+  });
+
+  it("has nothing to pack for a 3do naming a single texture", async () => {
+    const one = twoPieces3do({
+      textures: [texture("skin.dds", "abc_skin_dds.dds")],
+    });
+    expect(await prepareTextureAtlas(one)).toBeNull();
+  });
+
+  /** A `.3do` names its team-colour regions rather than painting them, so those
+   *  have no file behind them and nothing to pack. */
+  it("has nothing to pack when only one texture resolved to a file", async () => {
+    const mostlyTeam = twoPieces3do({
+      textures: [
+        texture("skin.dds", "abc_skin_dds.dds"),
+        { ...texture("logo"), teamColour: true },
+      ],
+    });
+    expect(await prepareTextureAtlas(mostlyTeam)).toBeNull();
+  });
+});
+
+describe("buildModel with an atlas", () => {
+  /** The whole point: two textures were two materials and two draw calls, and
+   *  one sheet makes them one of each (issue #2311). */
+  it("merges the faces of two textures into one mesh", () => {
+    const built = buildModel(twoPieces3do(), undefined, {
+      merge: true,
+      atlas: bothInOneSheet(),
+    });
+    expect(meshes(built.object)).toHaveLength(1);
+    expect(triangles(built.object)).toBe(3);
+    built.dispose();
+  });
+
+  /**
+   * A `.3do` face is stretched over the whole of its texture, so its corners are
+   * the corners of the unit square and have to come out as the corners of its
+   * tile. A face left on the unit square would sample the whole sheet.
+   */
+  it("rewrites the texture coordinates into the tile", () => {
+    const built = buildModel(twoPieces3do(), undefined, {
+      atlas: bothInOneSheet(),
+    });
+    const [skin, , other] = meshes(built.object);
+    expect(uvsOf(skin)).toEqual([0, 0, 0.5, 0, 0.5, 0.5]);
+    expect(uvsOf(other)).toEqual([0.5, 0.5, 1, 0.5, 1, 1]);
+    built.dispose();
+  });
+
+  /** A texture the sheet does not hold keeps the material it always had, so a
+   *  model the packer only partly covered still draws whole. */
+  it("leaves a texture that is not in the sheet on its own material", () => {
+    const half = bothInOneSheet();
+    half.place.delete("abc_other_dds.dds");
+    const built = buildModel(twoPieces3do(), undefined, {
+      merge: true,
+      atlas: half,
+    });
+    expect(meshes(built.object)).toHaveLength(2);
+    const [, other] = meshes(built.object);
+    expect(uvsOf(other)).toEqual([0, 0, 1, 0, 1, 1]);
+    built.dispose();
+  });
+
+  /** No sheet is exactly what it was before, which is what the lone-model
+   *  viewer and every `.s3o` on the map get. */
+  it("draws a mesh per texture with no sheet at all", () => {
+    const built = buildModel(twoPieces3do(), undefined, { merge: true });
+    expect(meshes(built.object)).toHaveLength(2);
     built.dispose();
   });
 });
