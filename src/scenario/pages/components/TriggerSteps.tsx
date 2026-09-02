@@ -543,6 +543,8 @@ function ParamControl({
           label={label}
           point={asPoint(value)}
           asking={isAsking(picking, { ref: at, param: name })}
+          ariaInvalid={ariaInvalid}
+          describedBy={describedBy}
           onAsk={(on) => onPick(on ? { ref: at, param: name } : null)}
         />
       );
@@ -840,11 +842,20 @@ function PointField({
   label,
   point,
   asking,
+  ariaInvalid,
+  describedBy,
   onAsk,
 }: {
   label: string;
   point: Point | null;
   asking: boolean;
+  /** Whether the validator has flagged this point, for example off the map
+   *  (issue #2343). Every other parameter kind already carries this through
+   *  to its own control. This was the one left silent to a screen reader,
+   *  though `FieldProblem`'s message was already on screen next to it. */
+  ariaInvalid?: boolean;
+  /** The id of this field's message paragraph, `FieldProblem`'s. */
+  describedBy?: string;
   onAsk: (on: boolean) => void;
 }) {
   return (
@@ -852,6 +863,8 @@ function PointField({
     <div
       role="group"
       aria-label={label}
+      aria-invalid={ariaInvalid}
+      aria-describedby={describedBy}
       className="flex min-w-0 flex-1 items-center gap-1.5"
     >
       <Button

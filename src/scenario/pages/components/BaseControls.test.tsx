@@ -11,7 +11,7 @@
  * validator rather than a hand-built issue naming the compiled key directly.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useMemo, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { newScenario } from "../../create";
@@ -111,5 +111,117 @@ describe("a base's own team the validator has flagged", () => {
 
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(field.getAttribute("aria-describedby")).toBe(message.id);
+  });
+});
+
+/**
+ * A base standing off the map, and its buildings standing off the map or
+ * sharing an id with an actor (issue #2343). None of these names a control
+ * `aria-invalid` can sit on, so each is a row-level note in the buildings
+ * popover, in the validator's own words. A building's id is minted and shown
+ * nowhere else in this popover, so a message about it is named "Building N".
+ */
+describe("a base and its buildings the validator has flagged", () => {
+  function withBaseIssues(): Scenario {
+    const base = newScenario("Demo");
+    const team = base.setup.participants[0]?.id ?? "you";
+    return {
+      ...base,
+      actors: [
+        {
+          id: "hero",
+          unitDef: "armcom",
+          team,
+          pos: { x: 100, z: 100 },
+          facing: 0,
+        },
+      ],
+      blueprints: [
+        {
+          id: "layout",
+          name: "Outpost",
+          buildings: [
+            { def: "armllt", offset: { x: 0, z: 0 }, facing: 0 },
+            { def: "armllt", offset: { x: -500, z: 0 }, facing: 0 },
+          ],
+        },
+      ],
+      bases: [
+        {
+          id: "outpost",
+          blueprint: "layout",
+          team,
+          origin: { x: 300, z: 300 },
+          buildings: [{ id: "hero" }, {}],
+        },
+      ],
+    };
+  }
+
+  function BaseIssuesHarness() {
+    const [document] = useState<Scenario>(withBaseIssues);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+    const base = document.bases[0];
+
+    return (
+      <BaseControls
+        base={base}
+        buildings={baseBuildings(document.blueprints, base)}
+        index={0}
+        layoutName="Outpost"
+        ordered={false}
+        sharedWith={0}
+        sharedEdit={false}
+        overlaps={[]}
+        unstable={[]}
+        tooDeep={[]}
+        tooShallow={[]}
+        absent={[]}
+        onMap=""
+        participants={document.setup.participants}
+        units={[]}
+        unitsLoading={false}
+        sides={[]}
+        gameArchive={undefined}
+        moving={false}
+        issues={issues}
+        onEdit={() => {}}
+        onRename={() => {}}
+        onOrdered={() => {}}
+        onMoveBuilding={() => {}}
+        onPlay={() => {}}
+        onSharedEdit={() => {}}
+        onQueue={() => {}}
+        onMove={() => {}}
+        onSnapToGrid={() => {}}
+        onSubstitute={() => {}}
+        onDelete={() => {}}
+      />
+    );
+  }
+
+  it("names the building whose id collides with the actor's", () => {
+    render(<BaseIssuesHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "Outpost" }));
+
+    expect(
+      screen.getByText(
+        'Building 1: "hero" already names an actor or another building, and a trigger naming it would reach only one of them.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it("names the building standing off the map", () => {
+    render(<BaseIssuesHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "Outpost" }));
+
+    expect(
+      screen.getByText(
+        "Building 2: -200,300 is off the map. Spring measures a map from its north-west corner, so x and z start at 0.",
+      ),
+    ).toBeTruthy();
   });
 });

@@ -45,6 +45,13 @@
  * drawer alone: a team the setup no longer has, and a range that can never
  * apply at any setting (issue #2307, extending #2287's pattern from the
  * Triggers panel).
+ *
+ * A base standing off the map is said the same way, as a row-level note
+ * rather than a field problem, because its origin is dragged on the map
+ * rather than typed here. So is one of its buildings standing off the map or
+ * sharing an id with an actor or another building, named by which building it
+ * is since a building's id is minted and shown nowhere else in this popover
+ * (issue #2343).
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
@@ -91,10 +98,33 @@ import {
   withoutQueued,
 } from "./bases";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
-import { FieldProblem } from "./panels";
+import { FieldProblem, RowProblem } from "./panels";
 import { SubstituteBaseForm } from "./SubstituteBaseForm";
 import { TeamSelect } from "./TeamSelect";
 import { entryFieldProblem } from "./triggerProblems";
+
+/**
+ * What is wrong with one of a base's buildings, in the validator's own words,
+ * named by which building it is (issue #2343): standing off the map, or
+ * sharing an id with an actor or another building. A building's id is minted
+ * and shown nowhere in this popover, so a message about it says "Building N"
+ * the way the queue and the build order above already number the rows they
+ * name.
+ */
+function buildingProblem(
+  issues: MissionIssue[],
+  baseId: string,
+  index: number,
+  field: string,
+): string | null {
+  const problem = entryFieldProblem(
+    issues,
+    "prefabs",
+    baseId,
+    `buildings[${index}].${field}`,
+  );
+  return problem ? `Building ${index + 1}: ${problem}` : null;
+}
 
 export function BaseControls({
   base,
@@ -242,6 +272,13 @@ export function BaseControls({
   // The compiled mission spells a base "prefabs", the key `at()` in
   // validate.ts writes it under (see PART in validate.ts).
   const teamProblem = entryFieldProblem(issues, "prefabs", base.id, "team");
+  const originProblem = entryFieldProblem(issues, "prefabs", base.id, "origin");
+  const buildingNotes = buildings
+    .flatMap((_, i) => [
+      buildingProblem(issues, base.id, i, "offset"),
+      buildingProblem(issues, base.id, i, "id"),
+    ])
+    .filter((message): message is string => message !== null);
 
   return (
     <>
@@ -391,6 +428,11 @@ export function BaseControls({
             name={layoutName}
             onRename={onRename}
           />
+
+          <RowProblem problem={originProblem} />
+          {buildingNotes.map((message) => (
+            <RowProblem key={message} problem={message} />
+          ))}
 
           {sharedWith > 0 && (
             <div className="space-y-2 rounded bg-sky-950/60 px-2 py-1.5 text-[11px] text-sky-100">

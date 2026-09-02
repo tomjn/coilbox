@@ -18,6 +18,10 @@
  * that can never apply at any setting, and an order aimed at something the
  * document no longer places (issue #2307, extending #2287's pattern from the
  * Triggers panel).
+ *
+ * A group standing off the map is said the same way, but as a row-level note
+ * rather than a field problem (issue #2343): its position is dragged on the
+ * map, not typed here, so there is no control for `aria-invalid` to sit on.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -51,7 +55,7 @@ import {
   withoutUnit,
   withUnit,
 } from "./groups";
-import { FieldProblem } from "./panels";
+import { FieldProblem, RowProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
 import { entryFieldProblem } from "./triggerProblems";
 
@@ -96,6 +100,7 @@ export function GroupControls({
   const size = groupSize(group);
   const teamDescribedBy = useId();
   const teamProblem = entryFieldProblem(issues, "groups", group.id, "team");
+  const posProblem = entryFieldProblem(issues, "groups", group.id, "pos");
 
   return (
     <>
@@ -123,6 +128,7 @@ export function GroupControls({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 space-y-3">
+          <RowProblem problem={posProblem} />
           <div className="space-y-1.5">
             {group.units.map((entry, index) => (
               <UnitRow

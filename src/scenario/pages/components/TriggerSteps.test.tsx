@@ -21,6 +21,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { NO_EXTENSIONS } from "../../extensions";
 import type { Scenario, ScenarioParam } from "../../model";
+import type { MissionIssue } from "../../validate";
 import {
   type EditHistory,
   emptyHistory,
@@ -71,10 +72,12 @@ function StepHarness({
   type,
   params,
   list = "actions",
+  issues = [],
 }: {
   type: string;
   params: Params;
   list?: StepList;
+  issues?: MissionIssue[];
 }) {
   const [document, setDocument] = useState<Params>(params);
   const [history, setHistory] = useState<EditHistory<Params>>(emptyHistory);
@@ -94,7 +97,7 @@ function StepHarness({
         unsupported={undefined}
         units={[]}
         unitsLoading={false}
-        issues={[]}
+        issues={issues}
         picking={null}
         onPick={() => {}}
         onParam={(name, value) => {
@@ -278,5 +281,37 @@ describe("a trigger step's number parameter commit rules", () => {
 
     expect(stored()).toEqual({ seconds: 30 });
     expect(asInput(field).value).toBe("30");
+  });
+});
+
+/**
+ * A trigger step's own point parameter the validator has flagged, for
+ * example off the map (issue #2343). `checkPositions` already matches this
+ * the same way it matches any other reference kind (see #2339's correction),
+ * so the message was already on screen next to the field. What was missing
+ * is the `aria-invalid`/`aria-describedby` association every other parameter
+ * kind gets, which `PointField` did not take as props at all.
+ */
+describe("a trigger step's point parameter the validator has flagged", () => {
+  it("marks the point invalid and says why, next to it", () => {
+    const issues: MissionIssue[] = [
+      {
+        path: 'triggers["t1"].actions[0].params.pos',
+        message: "-50,50 is off the map.",
+      },
+    ];
+    render(
+      <StepHarness
+        type="camera_pan"
+        params={{ pos: { x: -50, z: 50 } }}
+        issues={issues}
+      />,
+    );
+
+    const field = screen.getByRole("group");
+    const message = screen.getByText("-50,50 is off the map.");
+
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
   });
 });

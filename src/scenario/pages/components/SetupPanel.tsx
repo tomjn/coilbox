@@ -68,9 +68,9 @@ import { getProfile } from "@/profile/profile";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
 import type { LoadedScenario } from "../../storage";
-import { defsMissingFrom, unitDefsIn } from "../../validate";
+import { defsMissingFrom, type MissionIssue, unitDefsIn } from "../../validate";
 import { MissionHomeActions } from "./MissionHomeActions";
-import { EditorPanel } from "./panels";
+import { EditorPanel, RowProblem } from "./panels";
 import { StartConditions } from "./StartConditions";
 import {
   applyPresetSetup,
@@ -85,6 +85,7 @@ import {
   setScenarioMap,
 } from "./setup";
 import { startsSummary } from "./teams";
+import { entryProblem } from "./triggerProblems";
 
 /**
  * How long the panel waits for an edit to settle before writing it.
@@ -126,6 +127,7 @@ function placedList(scenario: Scenario): string {
 export function SetupPanel({
   scenario,
   loaded,
+  issues,
   onChange,
 }: {
   scenario: Scenario;
@@ -135,6 +137,12 @@ export function SetupPanel({
    * needs it, because the game is what the move is about.
    */
   loaded?: LoadedScenario;
+  /** What the validator has found wrong with the mission (issue #2343): a
+   *  participant whose team has no engine number, said next to the table
+   *  that mints participant ids rather than in `ParticipantsTable` itself,
+   *  which the singleplayer launcher also renders and has no mission to ask
+   *  about. */
+  issues: MissionIssue[];
   onChange: (next: Scenario) => void;
 }) {
   const drawer = useDrawer();
@@ -328,6 +336,18 @@ export function SetupPanel({
     ...(Object.keys(scenario.teams).length ? [startsSummary(scenario)] : []),
   ].join(" · ");
 
+  // A participant whose team the validator could not give an engine number
+  // to (issue #2343): a spectator with start conditions set, or a stale
+  // entry left over from a participant that is gone. Named by the row it
+  // belongs to, since `teams["<id>"]` is keyed by participant id and says
+  // nothing more readable than that itself.
+  const teamNotes = rows
+    .map((p) => {
+      const problem = entryProblem(issues, "teams", p.id);
+      return problem ? `${p.name || "This participant"}: ${problem}` : null;
+    })
+    .filter((message): message is string => message !== null);
+
   return (
     <EditorPanel
       title="Setup"
@@ -461,6 +481,9 @@ export function SetupPanel({
                 )
               }
             />
+            {teamNotes.map((message) => (
+              <RowProblem key={message} problem={message} />
+            ))}
             {/* Keyed by participant id, so it belongs beside the table that
                 mints those ids rather than in a panel of its own. */}
             <StartConditions
