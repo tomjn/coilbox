@@ -260,19 +260,27 @@ function Briefing({
           cutscenePlayback={mission.cutscenePlayback}
         />
 
-        {mission.objectives.length > 0 && (
+        {/* A blank row is kept in the stored mission so the editor never
+            deletes a placeholder out from under whoever is typing (issue
+            #2264). That is an editor concern only: a player reading this
+            screen gets nothing from an empty bullet, so blank rows are
+            skipped here rather than shown. */}
+        {mission.objectives.some((o) => o.trim() !== "") && (
           <div className="flex flex-col gap-2">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Objectives
             </span>
             <ul className="flex flex-col gap-1.5">
-              {mission.objectives.map((o, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: a plain ordered string list with no stable id, and a blank objective (issue #2264) can repeat
-                <li key={i} className="flex items-start gap-2 text-sm">
-                  <Target className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <span>{o}</span>
-                </li>
-              ))}
+              {mission.objectives.map(
+                (o, i) =>
+                  o.trim() !== "" && (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a plain ordered string list with no stable id, and a blank objective (issue #2264) can repeat
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Target className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      <span>{o}</span>
+                    </li>
+                  ),
+              )}
             </ul>
           </div>
         )}
