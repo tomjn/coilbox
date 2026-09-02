@@ -6,8 +6,8 @@
       "name": "coilbox",
       "dependencies": {
         "@fontsource-variable/oxanium": "^5.3.0",
-        "@picoframe/frame": "0.7.0",
-        "@picoframe/plugin-sdk": "0.7.0",
+        "@picoframe/frame": "^0.8.0",
+        "@picoframe/plugin-sdk": "^0.8.0",
         "@shadcn/react": "^0.2.1",
         "@tauri-apps/api": "^2.11.0",
         "@tauri-apps/plugin-deep-link": "2.4.9",
@@ -231,9 +231,9 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.137.0", "", {}, "sha512-WT+Gb24i8hmvo85AIv2oEYouEXkRlKAlT9WaCa3TfLgNCN+GhrJOGZuIlMouAh38Qe4QOx26eUOVsq70qXrywA=="],
 
-    "@picoframe/frame": ["@picoframe/frame@0.7.0", "", { "dependencies": { "@tauri-apps/plugin-opener": "^2.5.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.7", "sonner": "^2.0.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-9/aofgJFu30GsRZPhKp07fOnxRnYQjrfyn4XQ0qqKcdqvHGC7Ga0zKLG8DwfrvsrmzWsp8x3zk2vrJAjv8PA0A=="],
+    "@picoframe/frame": ["@picoframe/frame@0.8.0", "", { "dependencies": { "@tauri-apps/plugin-opener": "^2.5.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.7", "sonner": "^2.0.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-yblA0nlNeKFPi4BXsZw9gHwuUlm59/tS6GncVk/doo+OfvMBvXl/DODibbrGg5GPljo+Rl3Vum6AaPF9iyfZsA=="],
 
-    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.7.0", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-Hq2aEv8DeXPgqMgeIbCFU2B27z9WulcZdHjBI3Ih3oIQfWbdu8xv/3PMV+lUdQ1tfXzTzxi4e+5FvuF0SjzXBA=="],
+    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.8.0", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-TbXHyqBggL44LpZh0X5bQvc5wKTxe8SOgcd7E3yKboLT2Sl+4Xd1KVxQPUSC8Zl9lCoon7Kt3UBKYoQXlbbmPQ=="],
 
     "@radix-ui/number": ["@radix-ui/number@1.1.3", "", {}, "sha512-Road2bidD0uu/1BGDOWNdPI06g0lIRy6IF9GZcIrDK2KGItfor8IQwQa+yM2ERgHM1MmHxaxpTzk0/Jp42lNfA=="],
 
