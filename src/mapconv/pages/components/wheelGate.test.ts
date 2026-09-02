@@ -1,8 +1,8 @@
 /**
- * The truth table `releaseWheel` is for (issue #2317): a wheel over sky always
- * scrolls the page, and a wheel over the map only zooms once the view has been
- * clicked into. `groundHit` is the approximate ray/plane test that stands in
- * for a raycast against the terrain (issue #2326).
+ * The truth table `releaseWheel` is for (issue #2331): a wheel over sky
+ * always scrolls the page, and a wheel over the map always zooms, with no
+ * click needed first. `groundHit` is the approximate ray/plane test that
+ * stands in for a raycast against the terrain (issue #2326).
  */
 
 import { describe, expect, it } from "vitest";
@@ -10,17 +10,12 @@ import { describe, expect, it } from "vitest";
 import { groundHit, releaseWheel } from "./wheelGate";
 
 describe("releaseWheel", () => {
-  it("releases a wheel over sky, armed or not", () => {
-    expect(releaseWheel(false, false)).toBe(true);
-    expect(releaseWheel(false, true)).toBe(true);
+  it("releases a wheel over sky", () => {
+    expect(releaseWheel(false)).toBe(true);
   });
 
-  it("releases a wheel over the map that has not been clicked into", () => {
-    expect(releaseWheel(true, false)).toBe(true);
-  });
-
-  it("keeps a wheel over the map once the view is armed, so it zooms", () => {
-    expect(releaseWheel(true, true)).toBe(false);
+  it("keeps a wheel over the map, so it zooms", () => {
+    expect(releaseWheel(true)).toBe(false);
   });
 });
 

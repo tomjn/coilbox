@@ -10,17 +10,15 @@
  * canvas readback, classifying pixels against the flat sky colour sampled off
  * the map), the sky share was 76.9% at the scenario's opening framed shot, 38.2%
  * at a normal working zoom, and 0.0% zoomed in far enough to place a unit
- * precisely. A raycast miss alone does nothing at that last, ordinary distance:
- * the map is everywhere the pointer could be.
+ * precisely.
  *
- * So a hit does not keep the wheel on its own. It only zooms once the view is
- * armed: clicked into since the pointer was last outside it. Armed drops the
- * moment the pointer leaves, so returning to the view after reading the rest of
- * the page always scrolls first and needs a fresh click to zoom again, and the
- * very first pass over a freshly opened page always scrolls.
+ * The hit alone decides it (issue #2331): terrain under the cursor zooms, a
+ * miss scrolls the page, with no click needed first. At the zoom someone
+ * actually works at the map fills the view, so scrolling past it needs the
+ * pointer off the map rather than a way to arm and disarm the wheel.
  */
-export function releaseWheel(hit: boolean, armed: boolean): boolean {
-  return !hit || !armed;
+export function releaseWheel(hit: boolean): boolean {
+  return !hit;
 }
 
 /**

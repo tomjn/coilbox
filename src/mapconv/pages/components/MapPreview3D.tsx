@@ -973,14 +973,13 @@ uniform vec2 wPlane;`,
         // event is to stop it reaching the canvas first. A capture-phase
         // listener on `host` runs before that.
         //
-        // Unlike the unit page, a raycast miss is not most of the fix here: a
-        // hit does not release the wheel on its own, because at a normal
-        // working zoom the map is behind nearly every pixel (`wheelGate.ts`
-        // has the measurement). A hit only keeps the wheel once the view is
-        // armed by a click, so the very first pass over a freshly opened page
-        // always scrolls, and leaving the view disarms it again. Skipped
-        // entirely when a wheel could never zoom anyway, so a spinning preview
-        // with `enableZoom={false}` pays nothing for a gate it doesn't need.
+        // A hit alone decides it (issue #2331): terrain under the cursor
+        // zooms, a miss scrolls, no click needed first. At a normal working
+        // zoom the map is behind nearly every pixel (`wheelGate.ts` has the
+        // measurement), so scrolling past it needs the pointer off the map
+        // rather than a click. Skipped entirely when a wheel could never zoom
+        // anyway, so a spinning preview with `enableZoom={false}` pays nothing
+        // for a gate it doesn't need.
         //
         // "Hit" is approximate rather than a raycast against the actual
         // displaced terrain (`groundHit` in `wheelGate.ts`, issue #2326):
@@ -994,7 +993,6 @@ uniform vec2 wPlane;`,
           const groundY = ((reliefMin + reliefMax) / 2) * s;
           const halfWidth = planeW / 2;
           const halfDepth = planeH / 2;
-          let armed = false;
           const onWheel = (event: WheelEvent) => {
             const rect = renderer.domElement.getBoundingClientRect();
             pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1007,24 +1005,14 @@ uniform vec2 wPlane;`,
               halfWidth,
               halfDepth,
             );
-            if (releaseWheel(hit, armed)) event.stopPropagation();
-          };
-          const onPointerDown = () => {
-            armed = true;
-          };
-          const onPointerLeave = () => {
-            armed = false;
+            if (releaseWheel(hit)) event.stopPropagation();
           };
           host.addEventListener("wheel", onWheel, {
             capture: true,
             passive: true,
           });
-          host.addEventListener("pointerdown", onPointerDown);
-          host.addEventListener("pointerleave", onPointerLeave);
           stopWheelGate = () => {
             host.removeEventListener("wheel", onWheel, { capture: true });
-            host.removeEventListener("pointerdown", onPointerDown);
-            host.removeEventListener("pointerleave", onPointerLeave);
           };
         }
 
@@ -1302,7 +1290,6 @@ uniform vec2 wPlane;`,
           </div>
           <p className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
             <Box size={12} /> height {minHeight} → {maxHeight} · drag to orbit
-            {interactive && enableZoom && " · click, then scroll to zoom"}
           </p>
           {sky && (
             <p

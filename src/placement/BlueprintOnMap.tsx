@@ -478,8 +478,7 @@ export function BlueprintOnMap({
         footer={
           <>
             {mapName} · click or drag to stand the layout somewhere else · this
-            changes the layout in no way · right-drag to turn the view · scroll
-            to zoom once clicked
+            changes the layout in no way · right-drag to turn the view
           </>
         }
       />
