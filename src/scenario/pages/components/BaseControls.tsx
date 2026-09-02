@@ -39,6 +39,12 @@
  * which is what puts this game's own answers in it (issue #1531). Without them
  * a queued unit converts only where the game's naming happens to reach it, and
  * every answer given here was thrown away when the drawer closed.
+ *
+ * The team select and the difficulty range also carry what the validator
+ * found wrong with them, next to the field rather than left to the problems
+ * drawer alone: a team the setup no longer has, and a range that can never
+ * apply at any setting (issue #2307, extending #2287's pattern from the
+ * Triggers panel).
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
@@ -52,6 +58,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useId } from "react";
 import { buildingFootprints } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { offGridBuildings } from "@/blueprint/offGrid";
@@ -75,6 +82,7 @@ import {
 } from "@/placement/LayoutControls";
 import type { Participant } from "@/play/config";
 import type { PlacedBuilding, ScenarioBase } from "../../model";
+import type { MissionIssue } from "../../validate";
 import {
   buildableBy,
   movedQueued,
@@ -83,8 +91,10 @@ import {
   withoutQueued,
 } from "./bases";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
+import { FieldProblem } from "./panels";
 import { SubstituteBaseForm } from "./SubstituteBaseForm";
 import { TeamSelect } from "./TeamSelect";
+import { entryFieldProblem } from "./triggerProblems";
 
 export function BaseControls({
   base,
@@ -109,6 +119,7 @@ export function BaseControls({
   sides,
   gameArchive,
   moving,
+  issues,
   onEdit,
   onRename,
   onOrdered,
@@ -177,6 +188,8 @@ export function BaseControls({
   gameArchive: string | undefined;
   /** Whether the map is waiting for a click to move the base. */
   moving: boolean;
+  /** What the validator has found wrong with the mission (issue #2307). */
+  issues: MissionIssue[];
   /** Change the base's own fields, as {@link editBase} takes them. */
   onEdit: (patch: Partial<Pick<ScenarioBase, "team" | "difficulty">>) => void;
   /** Rename the layout, which names a copy when it is shared and `sharedEdit`
@@ -225,15 +238,25 @@ export function BaseControls({
     units.length > 0
       ? offGridBuildings(buildings, buildingFootprints(units), base.origin)
       : [];
+  const teamDescribedBy = useId();
+  // The compiled mission spells a base "prefabs", the key `at()` in
+  // validate.ts writes it under (see PART in validate.ts).
+  const teamProblem = entryFieldProblem(issues, "prefabs", base.id, "team");
 
   return (
     <>
-      <TeamSelect
-        participants={participants}
-        value={base.team}
-        onValueChange={(team) => onEdit({ team })}
-        className="w-32"
-      />
+      <div className="flex flex-col gap-0.5">
+        <TeamSelect
+          participants={participants}
+          value={base.team}
+          onValueChange={(team) => onEdit({ team })}
+          className="w-32"
+          ariaLabel="Team"
+          ariaInvalid={teamProblem !== null}
+          describedBy={teamDescribedBy}
+        />
+        <FieldProblem id={teamDescribedBy} problem={teamProblem} />
+      </div>
 
       <Popover>
         <PopoverTrigger asChild>
@@ -455,6 +478,12 @@ export function BaseControls({
             <DifficultyRangeFields
               value={base.difficulty}
               onChange={(difficulty) => onEdit({ difficulty })}
+              problem={entryFieldProblem(
+                issues,
+                "prefabs",
+                base.id,
+                "difficulty",
+              )}
             />
           </div>
 

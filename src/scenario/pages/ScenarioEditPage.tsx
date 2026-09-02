@@ -736,6 +736,7 @@ export default function ScenarioEditPage() {
             redo,
           }}
           focus={rowFocus("map")}
+          issues={missionIssues}
         />
 
         {/* The panels: the parts of the document the map cannot show. Triggers

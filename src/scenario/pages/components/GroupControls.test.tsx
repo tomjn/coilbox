@@ -20,10 +20,11 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { GroupUnit } from "../../model";
-import { UnitRow } from "./GroupControls";
+import { newScenario } from "../../create";
+import type { GroupUnit, Scenario } from "../../model";
+import { GroupControls, UnitRow } from "./GroupControls";
 import { MAX_GROUP_COUNT } from "./groups";
 import {
   type EditHistory,
@@ -31,6 +32,7 @@ import {
   recordEdit,
   undoEdit,
 } from "./history";
+import { missionProblemsIn } from "./useMissionProblems";
 
 afterEach(cleanup);
 
@@ -145,5 +147,83 @@ describe("a group's unit count commit rules", () => {
 
     expect(documentCount()).toBe("1");
     expect(asInput(countBox()).value).toBe("1");
+  });
+});
+
+/**
+ * A group's own team, and one of its own orders, pointing at something the
+ * document no longer has (issue #2307, extending #2287's pattern from the
+ * Triggers panel). The issues here come from the real validator
+ * (`missionProblemsIn`), not a hand-built one, so this is pinned against what
+ * the drawer would say too.
+ */
+describe("a group's own fields the validator has flagged", () => {
+  function withGhosts(): Scenario {
+    const base = newScenario("Demo");
+    return {
+      ...base,
+      setup: { ...base.setup, participants: [] },
+      groups: [
+        {
+          id: "wave",
+          team: "ghost",
+          units: [{ def: "armpw", count: 2 }],
+          pos: { x: 200, z: 200 },
+          orders: [{ kind: "guard", target: "boss" }],
+          dormant: false,
+        },
+      ],
+    };
+  }
+
+  function GroupHarness() {
+    const [document, setDocument] = useState<Scenario>(withGhosts);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <GroupControls
+        group={document.groups[0]}
+        participants={document.setup.participants}
+        units={[]}
+        unitsLoading={false}
+        targets={[]}
+        issues={issues}
+        onEdit={(patch) =>
+          setDocument((doc) => ({
+            ...doc,
+            groups: [{ ...doc.groups[0], ...patch }],
+          }))
+        }
+        onDelete={() => {}}
+        drawing={null}
+        onDraw={() => {}}
+      />
+    );
+  }
+
+  it("marks the team field invalid and says why, next to it", () => {
+    render(<GroupHarness />);
+
+    const field = screen.getByLabelText("Team");
+    const message = screen.getByText('no team called "ghost"');
+
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
+  });
+
+  it("marks an order's target invalid and says why, next to it", () => {
+    render(<GroupHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /order/i }));
+
+    const field = screen.getByLabelText("Order target");
+    const message = screen.getByText(
+      'nothing called "boss" for an order to aim at',
+    );
+
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
   });
 });

@@ -11,11 +11,18 @@
  * left, because every change to the document is saved and a keystroke per file
  * write is not what typing "12" should mean. Mount this keyed by the group's id
  * so moving the selection reseeds them.
+ *
+ * The team select, the difficulty range and each order's target also carry
+ * what the validator found wrong with them, next to the field rather than
+ * left to the problems drawer alone: a team the setup no longer has, a range
+ * that can never apply at any setting, and an order aimed at something the
+ * document no longer places (issue #2307, extending #2287's pattern from the
+ * Triggers panel).
  */
 
 import { Button, Input } from "@picoframe/frame";
 import { Boxes, Pencil, Plus, Route, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -29,6 +36,7 @@ import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { GroupUnit, ScenarioGroup, ScenarioOrder } from "../../model";
+import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import {
   clampCount,
@@ -43,7 +51,9 @@ import {
   withoutUnit,
   withUnit,
 } from "./groups";
+import { FieldProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
+import { entryFieldProblem } from "./triggerProblems";
 
 /** What each order kind does, in the words an author would use. */
 const ORDER_LABELS: Record<OrderKind, string> = {
@@ -60,6 +70,7 @@ export function GroupControls({
   units,
   unitsLoading,
   targets,
+  issues,
   onEdit,
   onDelete,
   drawing,
@@ -72,6 +83,8 @@ export function GroupControls({
   unitsLoading: boolean;
   /** Everything a guard or attack order can be pointed at. */
   targets: TargetOption[];
+  /** What the validator has found wrong with the mission (issue #2307). */
+  issues: MissionIssue[];
   /** Change the group's own fields, as {@link editGroup} takes them. */
   onEdit: (patch: Partial<Omit<ScenarioGroup, "id">>) => void;
   /** Delete the whole group, units, orders and all. */
@@ -81,15 +94,23 @@ export function GroupControls({
   onDraw: (order: number | null) => void;
 }) {
   const size = groupSize(group);
+  const teamDescribedBy = useId();
+  const teamProblem = entryFieldProblem(issues, "groups", group.id, "team");
 
   return (
     <>
-      <TeamSelect
-        participants={participants}
-        value={group.team}
-        onValueChange={(team) => onEdit({ team })}
-        className="w-32"
-      />
+      <div className="flex flex-col gap-0.5">
+        <TeamSelect
+          participants={participants}
+          value={group.team}
+          onValueChange={(team) => onEdit({ team })}
+          className="w-32"
+          ariaLabel="Team"
+          ariaInvalid={teamProblem !== null}
+          describedBy={teamDescribedBy}
+        />
+        <FieldProblem id={teamDescribedBy} problem={teamProblem} />
+      </div>
 
       <Popover>
         <PopoverTrigger asChild>
@@ -142,6 +163,12 @@ export function GroupControls({
             <DifficultyRangeFields
               value={group.difficulty}
               onChange={(difficulty) => onEdit({ difficulty })}
+              problem={entryFieldProblem(
+                issues,
+                "groups",
+                group.id,
+                "difficulty",
+              )}
             />
           </div>
 
@@ -182,6 +209,12 @@ export function GroupControls({
               order={order}
               targets={targets}
               drawing={drawing === index}
+              problem={entryFieldProblem(
+                issues,
+                "groups",
+                group.id,
+                `orders[${index}].target`,
+              )}
               onDraw={(on) => onDraw(on ? index : null)}
               onChange={(next) =>
                 onEdit({ orders: withOrder(group.orders, index, next) })
@@ -306,6 +339,7 @@ export function OrderRow({
   order,
   targets,
   drawing,
+  problem = null,
   onDraw,
   onChange,
   onRemove,
@@ -313,6 +347,11 @@ export function OrderRow({
   order: ScenarioOrder;
   targets: TargetOption[];
   drawing: boolean;
+  /** Why this order's target is wrong, in the validator's own words (issue
+   *  #2307, `checkOrders` in `validate.ts`): nothing given, or nothing the
+   *  document still places by that name. Null for a path order, which
+   *  `checkOrders` does not check. */
+  problem?: string | null;
   onDraw: (on: boolean) => void;
   onChange: (next: ScenarioOrder) => void;
   onRemove: () => void;
@@ -321,77 +360,84 @@ export function OrderRow({
   // an order either carries a path or carries a target.
   const path = "waypoints" in order ? order : null;
   const aimed = "waypoints" in order ? null : order;
+  const describedBy = useId();
 
   return (
-    <div className="flex items-center gap-1.5">
-      <OptionSelect
-        size="sm"
-        className="w-28 shrink-0"
-        value={order.kind}
-        onValueChange={(kind) => {
-          if (kind !== "move" && kind !== "patrol" && kind !== "fight") {
-            onDraw(false);
-          }
-          onChange(orderOfKind(kind as OrderKind, order));
-        }}
-        options={ORDER_KINDS.map((kind) => ({
-          value: kind,
-          label: ORDER_LABELS[kind],
-        }))}
-      />
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1.5">
+        <OptionSelect
+          size="sm"
+          className="w-28 shrink-0"
+          value={order.kind}
+          onValueChange={(kind) => {
+            if (kind !== "move" && kind !== "patrol" && kind !== "fight") {
+              onDraw(false);
+            }
+            onChange(orderOfKind(kind as OrderKind, order));
+          }}
+          options={ORDER_KINDS.map((kind) => ({
+            value: kind,
+            label: ORDER_LABELS[kind],
+          }))}
+        />
 
-      {path ? (
-        <>
-          <Button
-            size="sm"
-            variant={drawing ? "default" : "outline"}
-            className="h-7 shrink-0 gap-1.5 px-2 text-xs"
-            onClick={() => onDraw(!drawing)}
-          >
-            <Pencil className="size-3.5" />
-            {drawing ? "Click the map" : "Draw"}
-          </Button>
-          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {path.waypoints.length === 0
-              ? "no points yet"
-              : `${path.waypoints.length} point${path.waypoints.length === 1 ? "" : "s"}`}
-          </span>
-          {path.waypoints.length > 0 && (
+        {path ? (
+          <>
             <Button
               size="sm"
-              variant="ghost"
-              className="h-7 shrink-0 px-2 text-xs"
-              onClick={() => onChange({ ...path, waypoints: [] })}
+              variant={drawing ? "default" : "outline"}
+              className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+              onClick={() => onDraw(!drawing)}
             >
-              Clear
+              <Pencil className="size-3.5" />
+              {drawing ? "Click the map" : "Draw"}
             </Button>
-          )}
-        </>
-      ) : (
-        aimed && (
-          <OptionSelect
-            size="sm"
-            className="min-w-0 flex-1"
-            value={aimed.target}
-            onValueChange={(target) => onChange({ ...aimed, target })}
-            placeholder={
-              targets.length ? "Pick a target" : "Nothing to point at"
-            }
-            disabled={targets.length === 0}
-            options={targets}
-          />
-        )
-      )}
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {path.waypoints.length === 0
+                ? "no points yet"
+                : `${path.waypoints.length} point${path.waypoints.length === 1 ? "" : "s"}`}
+            </span>
+            {path.waypoints.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => onChange({ ...path, waypoints: [] })}
+              >
+                Clear
+              </Button>
+            )}
+          </>
+        ) : (
+          aimed && (
+            <OptionSelect
+              size="sm"
+              className="min-w-0 flex-1"
+              value={aimed.target}
+              onValueChange={(target) => onChange({ ...aimed, target })}
+              placeholder={
+                targets.length ? "Pick a target" : "Nothing to point at"
+              }
+              disabled={targets.length === 0}
+              options={targets}
+              ariaLabel="Order target"
+              ariaInvalid={problem !== null}
+              describedBy={describedBy}
+            />
+          )
+        )}
 
-      <Button
-        size="sm"
-        variant="ghost"
-        className="size-7 shrink-0 p-0 text-destructive hover:text-destructive"
-        aria-label="Remove this order"
-        onClick={onRemove}
-      >
-        <X className="size-3.5" />
-      </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="size-7 shrink-0 p-0 text-destructive hover:text-destructive"
+          aria-label="Remove this order"
+          onClick={onRemove}
+        >
+          <X className="size-3.5" />
+        </Button>
+      </div>
+      {aimed && <FieldProblem id={describedBy} problem={problem} />}
     </div>
   );
 }
