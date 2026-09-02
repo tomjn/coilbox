@@ -18,11 +18,13 @@
  */
 
 import { cn } from "@picoframe/frame";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Crosshair, Maximize2, Minimize2 } from "lucide-react";
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -62,6 +64,33 @@ export type SurfaceGround =
     }
   /** Flat ground with a build grid on it, `extent` elmos across. */
   | { kind: "grid"; extent: number };
+
+/**
+ * What makes the working area answer the keyboard (issue #2269).
+ *
+ * Handed in rather than owned here, because what a key means is about the thing
+ * being edited and this file knows nothing about that. What the surface owns is
+ * the part that is true of any 3D working area: it can be reached with Tab, it
+ * says so while it has the focus, it has somewhere to speak from, and it draws a
+ * marker at the point the keys act on.
+ *
+ * Left out entirely by a surface with no keyboard interface yet, and then
+ * nothing about it changes.
+ */
+export interface SurfaceKeyboard {
+  /** What the working area is called, for whoever tabbed into it. */
+  label: string;
+  /** What the keys do. Read out when the area takes the focus. */
+  help: string;
+  /** The last thing the keys did, announced politely. The token is what makes
+   *  the same sentence twice running two announcements rather than one. */
+  said: { text: string; token: number };
+  /** Where the keys are acting, in words, written beside the marker at the
+   *  middle of the view. Null before there is a scene to have a middle. */
+  cursor: string | null;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
+  onFocus: () => void;
+}
 
 /** What the surface says when there is no scene to show. */
 export function SurfaceMessage({
@@ -107,6 +136,7 @@ export function PlacementSurface({
   chrome,
   note,
   footer,
+  keyboard,
 }: {
   ground: SurfaceGround;
   /** Handed the built scene, and null when it goes. */
@@ -131,6 +161,8 @@ export function PlacementSurface({
   note?: ReactNode;
   /** The strip under the view, for what the mouse does here. */
   footer?: ReactNode;
+  /** What the keys do here, for a surface that answers them (issue #2269). */
+  keyboard?: SurfaceKeyboard;
 }) {
   const sceneRef = useRef<MapScene3D | null>(null);
   const [expanded, setExpanded] = useExpanded();
@@ -192,7 +224,9 @@ export function PlacementSurface({
       {stand ?? (
         <>
           <div className="relative min-h-0 flex-1">
-            <GroundView ground={ground} grid={grid} onScene={takeScene} />
+            <KeyboardGround keyboard={keyboard}>
+              <GroundView ground={ground} grid={grid} onScene={takeScene} />
+            </KeyboardGround>
 
             {bars && (
               <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
@@ -253,6 +287,98 @@ export function PlacementSurface({
         </>
       )}
     </Surface>
+  );
+}
+
+/**
+ * The ground, wrapped in the thing that takes the keyboard (issue #2269).
+ *
+ * The wrapper is around the scene only, not around the whole surface. Everything
+ * else here is ordinary web content: a mode strip, a selection bar, a contents
+ * list. Only the scene is a working area where the arrows have to mean north and
+ * south rather than "scroll", which is what `role="application"` says and what
+ * makes it worth saying about as little of the page as possible.
+ *
+ * The ring shows whenever the area has the focus rather than only on
+ * `:focus-visible`. It is not saying "you tabbed here", it is saying "the keys
+ * go here now", which is as true after a click as after a Tab, and is the one
+ * thing a person who has just clicked the map has no other way of knowing. It is
+ * also drawn as an element over the scene rather than as a ring on the wrapper,
+ * because the canvas fills the wrapper exactly and would cover it.
+ */
+function KeyboardGround({
+  keyboard,
+  children,
+}: {
+  keyboard?: SurfaceKeyboard;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const helpId = useId();
+  const [focused, setFocused] = useState(false);
+  // A pointer over the map means the pointer is what is being aimed with, and
+  // the preview under it says where a click would land. Two cursors saying two
+  // different things is worse than one, so the keyboard's marker stands down
+  // until a key brings it back.
+  const [pointing, setPointing] = useState(false);
+
+  if (!keyboard) return <>{children}</>;
+
+  const marker = focused && !pointing;
+
+  return (
+    <div
+      ref={ref}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a working area where the arrow keys mean north and south rather than scrolling is what role="application" is for, and it has to be reachable with Tab to be worth having (issue #2269).
+      tabIndex={0}
+      role="application"
+      aria-label={keyboard.label}
+      aria-describedby={helpId}
+      className="relative h-full w-full outline-none"
+      onKeyDown={(event) => {
+        setPointing(false);
+        keyboard.onKeyDown(event);
+      }}
+      onFocus={() => {
+        setFocused(true);
+        keyboard.onFocus();
+      }}
+      onBlur={() => setFocused(false)}
+      // The canvas swallows the press that would otherwise focus this: three's
+      // orbit controls call preventDefault on it to stop the browser starting a
+      // drag of its own. So the focus is taken here instead, and clicking the
+      // map is a way into the keys as well as a way to select something.
+      onPointerDown={() => ref.current?.focus({ preventScroll: true })}
+      onPointerMove={() => {
+        if (!pointing) setPointing(true);
+      }}
+    >
+      {children}
+
+      {marker && (
+        <span className="pointer-events-none absolute inset-0 z-10 ring-2 ring-inset ring-primary" />
+      )}
+
+      {marker && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1">
+          <Crosshair className="size-7 text-primary drop-shadow-[0_0_2px_rgba(0,0,0,0.9)]" />
+          {keyboard.cursor && (
+            <span className="rounded bg-card/80 px-1.5 py-0.5 font-mono text-[11px] backdrop-blur">
+              {keyboard.cursor}
+            </span>
+          )}
+        </div>
+      )}
+
+      <p id={helpId} className="sr-only">
+        {keyboard.help}
+      </p>
+      {/* Remounted on every token, so the same sentence said twice is a change
+          inside the region and is therefore said twice. */}
+      <div aria-live="polite" className="sr-only">
+        <p key={keyboard.said.token}>{keyboard.said.text}</p>
+      </div>
+    </div>
   );
 }
 
