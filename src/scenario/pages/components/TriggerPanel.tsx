@@ -23,13 +23,14 @@ import { useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { useFieldProblem } from "@/lib/useFieldProblem";
 import { useFieldText } from "@/lib/useFieldText";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import type { PaletteGate } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
-import { EditorPanel } from "./panels";
+import { EditorPanel, FieldProblem } from "./panels";
 import { AddStep, StepRow } from "./TriggerSteps";
 import {
   addStep,
@@ -283,9 +284,9 @@ function TriggerForm({
           name={trigger.name}
           onRename={(name) => {
             const next = renameTrigger(scenario, trigger.id, name);
-            if (next === scenario) return false;
+            if (next === scenario) return "A trigger needs a name";
             onChange(next);
-            return true;
+            return null;
           }}
         />
         <Button
@@ -412,6 +413,8 @@ function TriggerForm({
  * The trigger's name. A label and nothing else since issue #2205: it is not what
  * anything points at, so it may be anything but empty, and an empty box is put
  * back rather than stored because a row with no label cannot be picked out.
+ * `onRename` says why instead of returning a bare yes or no, and `FieldProblem`
+ * shows that reason next to the box (issue #2275).
  *
  * The box follows the name when the name changes on its own, which is what undo
  * and redo do (issue #2185). That used to be free here, because the form around
@@ -424,30 +427,47 @@ function TriggerName({
   onRename,
 }: {
   name: string;
-  onRename: (name: string) => boolean;
+  /** Null commits the rename. A reason puts the old name back and shows why. */
+  onRename: (name: string) => string | null;
 }) {
   const [name, setName] = useFieldText(stored);
+  const { problem, refuse, clear, describedBy } = useFieldProblem();
 
   return (
-    <Input
-      aria-label="Trigger name"
-      value={name}
-      onChange={(e) => setName(e.target.value)}
-      onBlur={() => {
-        if (name.trim() === stored) return setName(stored);
-        if (!onRename(name)) setName(stored);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      }}
-      className="h-7 w-52 font-mono text-xs"
-    />
+    <div className="flex flex-col gap-0.5">
+      <Input
+        aria-label="Trigger name"
+        aria-invalid={problem !== null}
+        aria-describedby={describedBy}
+        value={name}
+        onChange={(e) => {
+          setName(e.target.value);
+          clear();
+        }}
+        onBlur={() => {
+          if (name.trim() === stored) return setName(stored);
+          const reason = onRename(name);
+          if (reason === null) return clear();
+          setName(stored);
+          refuse(reason);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className="h-7 w-52 font-mono text-xs"
+      />
+      <FieldProblem id={describedBy} problem={problem} />
+    </div>
   );
 }
 
 /**
  * How long a repeating trigger waits between firings. Seconds, because that is
  * what the runtime reads and what an author thinks in.
+ *
+ * An empty box is a deliberate clear, not a refusal: it says the trigger has no
+ * wait, so it commits silently. Anything else that is not a positive number is
+ * refused the same way it always was, but now says why (issue #2275).
  *
  * The box follows the wait when the wait changes on its own, which is what an
  * undo does (issue #2185). Nothing remounts this field: the form it sits in is
@@ -465,38 +485,55 @@ function CooldownField({
   const [text, setText] = useFieldText(
     seconds === undefined ? "" : String(seconds),
   );
+  const { problem, refuse, clear, describedBy } = useFieldProblem();
 
   const commit = () => {
-    const next = Number(text.trim());
-    if (text.trim() === "" || !Number.isFinite(next) || next <= 0) {
+    const trimmed = text.trim();
+    if (trimmed === "") {
+      clear();
       setText("");
       return onChange(undefined);
     }
+    const next = Number(trimmed);
+    if (!Number.isFinite(next) || next <= 0) {
+      refuse("Cooldown is a number of seconds");
+      setText("");
+      return onChange(undefined);
+    }
+    clear();
     setText(String(next));
     if (next !== seconds) onChange(next);
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Label htmlFor="trigger-cooldown" className="text-xs font-medium">
-        Waits
-      </Label>
-      <Input
-        id="trigger-cooldown"
-        type="number"
-        min={0}
-        value={text}
-        placeholder="0"
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-        className="h-7 w-20 text-xs"
-      />
-      <span className="text-xs text-muted-foreground">
-        seconds between firings
-      </span>
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2">
+        <Label htmlFor="trigger-cooldown" className="text-xs font-medium">
+          Waits
+        </Label>
+        <Input
+          id="trigger-cooldown"
+          type="number"
+          min={0}
+          aria-invalid={problem !== null}
+          aria-describedby={describedBy}
+          value={text}
+          placeholder="0"
+          onChange={(e) => {
+            setText(e.target.value);
+            clear();
+          }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          className="h-7 w-20 text-xs"
+        />
+        <span className="text-xs text-muted-foreground">
+          seconds between firings
+        </span>
+      </div>
+      <FieldProblem id={describedBy} problem={problem} />
     </div>
   );
 }
