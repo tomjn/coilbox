@@ -300,6 +300,7 @@ export function MapPreview3D({
   enableZoom = true,
   enablePan = true,
   initialWater,
+  stillWater = false,
   onScene,
 }: {
   /** File path to the heightmap image (mapconv flow); resolved via `mc_image_info`. */
@@ -374,6 +375,20 @@ export function MapPreview3D({
   /** Seed the water toggle explicitly (used when the chrome is hidden); undefined
    * falls back to the map's own water heuristic (and to "no water" for wireframe). */
   initialWater?: boolean;
+  /**
+   * Draw the water as a flat sheet instead of rippling it (issue #2292).
+   *
+   * The ripple is worked out per vertex on the main thread, and on the 241 by
+   * 241 water plane that measured at 3.1 ms a frame in the app's own webview,
+   * which is a fifth of a 60 Hz frame spent before anything else is drawn. It
+   * also holds the whole scene at 60 Hz, because a surface that ripples is a
+   * change every frame and there is nothing on demand about that.
+   *
+   * Worth it on a map being admired, not on one being worked on, so an editing
+   * surface asks for still water and gets its idle back. Only the ripple stops.
+   * The water is still drawn, still coloured by depth and still reflects.
+   */
+  stillWater?: boolean;
   /** Handed the built scene so a view can add its own content to the map and
    * retune the camera. Called with null when that scene is torn down, which is
    * the point at which anything the view added is already gone. Changing the
@@ -1012,9 +1027,11 @@ uniform vec2 wPlane;`,
           const animate = () => {
             animationFrame = requestAnimationFrame(animate);
             const spinning = !!controls?.autoRotate;
-            const waterVisible = !!waterRef.current?.visible;
-            if (!spinning && !waterVisible && !cloudTex) return;
-            if (waterVisible) rippleWater(performance.now() / 1000);
+            // Still water is water like any other, it just never changes, so it
+            // is no longer a reason to draw a frame (issue #2292).
+            const rippling = !stillWater && !!waterRef.current?.visible;
+            if (!spinning && !rippling && !cloudTex) return;
+            if (rippling) rippleWater(performance.now() / 1000);
             // Drift the overcast slowly across the sky.
             if (cloudTex) {
               cloudTex.offset.x += 0.00002;
@@ -1096,6 +1113,7 @@ uniform vec2 wPlane;`,
       interactive,
       enableZoom,
       enablePan,
+      stillWater,
       reduceMotion,
     ],
   );
