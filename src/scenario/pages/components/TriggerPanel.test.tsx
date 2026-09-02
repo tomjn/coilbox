@@ -252,6 +252,43 @@ describe("a trigger's name commit rules", () => {
 });
 
 /**
+ * Why an empty name was refused (issue #2275). The field used to answer with
+ * silence: the box reverted and nothing on screen said the row needs a label.
+ */
+describe("a trigger's name when the rename is refused", () => {
+  it("shows the reason next to the field", () => {
+    openPanel([trigger({ id: "wave-one" })]);
+
+    commit(nameBox(), "   ");
+
+    const message = screen.getByText("A trigger needs a name");
+    expect(nameBox().getAttribute("aria-invalid")).toBe("true");
+    expect(nameBox().getAttribute("aria-describedby")).toBe(message.id);
+  });
+
+  it("clears the reason as soon as the field is edited again", () => {
+    openPanel([trigger({ id: "wave-one" })]);
+
+    commit(nameBox(), "   ");
+    fireEvent.change(nameBox(), { target: { value: "first-wave" } });
+
+    expect(screen.queryByText("A trigger needs a name")).toBeNull();
+    expect(nameBox().getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it("clears the reason once a valid rename commits", () => {
+    openPanel([trigger({ id: "wave-one" })]);
+
+    commit(nameBox(), "   ");
+    commit(nameBox(), "first-wave");
+
+    expect(stored()[0].name).toBe("first-wave");
+    expect(screen.queryByText("A trigger needs a name")).toBeNull();
+    expect(nameBox().getAttribute("aria-invalid")).toBe("false");
+  });
+});
+
+/**
  * Which trigger the panel is on after a rename is stepped over (issue #2202).
  *
  * The selection used to be held by name, and a rename changed the name, so an
@@ -451,5 +488,52 @@ describe("a trigger's cooldown commit rules", () => {
 
     expect(stored()[0].cooldown).toBeUndefined();
     expect(asInput(cooldownBox()).value).toBe("");
+  });
+});
+
+/**
+ * Why a wait was refused (issue #2275). Emptying the box is a deliberate
+ * clear and stays silent. A number that cannot be a wait, such as one that is
+ * not positive, now says so next to the field instead of just vanishing.
+ */
+describe("a trigger's cooldown when the value is refused", () => {
+  it("shows the reason next to the field for a number that is not positive", () => {
+    openPanel([trigger({ repeat: true, cooldown: 30 })]);
+
+    commit(cooldownBox(), "-5");
+
+    const message = screen.getByText("Cooldown is a number of seconds");
+    expect(cooldownBox().getAttribute("aria-invalid")).toBe("true");
+    expect(cooldownBox().getAttribute("aria-describedby")).toBe(message.id);
+  });
+
+  it("says nothing when the box is emptied on purpose", () => {
+    openPanel([trigger({ repeat: true, cooldown: 30 })]);
+
+    commit(cooldownBox(), "");
+
+    expect(screen.queryByText("Cooldown is a number of seconds")).toBeNull();
+    expect(cooldownBox().getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it("clears the reason as soon as the field is edited again", () => {
+    openPanel([trigger({ repeat: true, cooldown: 30 })]);
+
+    commit(cooldownBox(), "-5");
+    fireEvent.change(cooldownBox(), { target: { value: "60" } });
+
+    expect(screen.queryByText("Cooldown is a number of seconds")).toBeNull();
+    expect(cooldownBox().getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it("clears the reason once a valid wait commits", () => {
+    openPanel([trigger({ repeat: true, cooldown: 30 })]);
+
+    commit(cooldownBox(), "-5");
+    commit(cooldownBox(), "60");
+
+    expect(stored()[0].cooldown).toBe(60);
+    expect(screen.queryByText("Cooldown is a number of seconds")).toBeNull();
+    expect(cooldownBox().getAttribute("aria-invalid")).toBe("false");
   });
 });
