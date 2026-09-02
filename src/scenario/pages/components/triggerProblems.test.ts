@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MissionIssue } from "../../validate";
-import { paramProblem, triggerFieldProblem } from "./triggerProblems";
+import {
+  entryFieldProblem,
+  paramProblem,
+  triggerFieldProblem,
+} from "./triggerProblems";
 
 describe("paramProblem", () => {
   it("finds the issue whose path names exactly this parameter", () => {
@@ -145,5 +149,70 @@ describe("triggerFieldProblem", () => {
     ];
 
     expect(triggerFieldProblem(issues, "open", "difficulty")).toBeNull();
+  });
+});
+
+describe("entryFieldProblem", () => {
+  it("finds the issue at an actor's own team", () => {
+    const issues: MissionIssue[] = [
+      { path: 'actors["hero"].team', message: 'no team called "ghost"' },
+    ];
+
+    expect(entryFieldProblem(issues, "actors", "hero", "team")).toBe(
+      'no team called "ghost"',
+    );
+  });
+
+  it("finds the issue at a group's own difficulty range", () => {
+    const issues: MissionIssue[] = [
+      {
+        path: 'groups["wave"].difficulty',
+        message: "it is only there from hard up and only up to easy",
+        severity: "warning",
+      },
+    ];
+
+    expect(entryFieldProblem(issues, "groups", "wave", "difficulty")).toBe(
+      "it is only there from hard up and only up to easy",
+    );
+  });
+
+  it("finds the issue at one of a group's own order targets, by index", () => {
+    const issues: MissionIssue[] = [
+      {
+        path: 'groups["wave"].orders[1].target',
+        message: 'nothing called "boss" for an order to aim at',
+      },
+    ];
+
+    expect(
+      entryFieldProblem(issues, "groups", "wave", "orders[1].target"),
+    ).toBe('nothing called "boss" for an order to aim at');
+  });
+
+  it("does not claim a different order's target in the same group", () => {
+    const issues: MissionIssue[] = [
+      { path: 'groups["wave"].orders[0].target', message: "elsewhere" },
+    ];
+
+    expect(
+      entryFieldProblem(issues, "groups", "wave", "orders[1].target"),
+    ).toBeNull();
+  });
+
+  it("does not claim another entry's same field", () => {
+    const issues: MissionIssue[] = [
+      { path: 'actors["villain"].team', message: "elsewhere" },
+    ];
+
+    expect(entryFieldProblem(issues, "actors", "hero", "team")).toBeNull();
+  });
+
+  it("does not claim a different registry's entry with the same id", () => {
+    const issues: MissionIssue[] = [
+      { path: 'groups["hero"].team', message: "elsewhere" },
+    ];
+
+    expect(entryFieldProblem(issues, "actors", "hero", "team")).toBeNull();
   });
 });

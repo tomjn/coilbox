@@ -95,6 +95,7 @@ import {
   type Scenario,
   type ScenarioZone,
 } from "../../model";
+import type { MissionIssue } from "../../validate";
 import { ActorControls } from "./ActorControls";
 import { BaseControls } from "./BaseControls";
 import {
@@ -237,9 +238,14 @@ export const ScenarioMapScene = forwardRef<
      * picking the matching row out of Contents already does.
      */
     focus?: RowFocus | null;
+    /** What the validator has found wrong with the mission, so the selection
+     *  bar's own fields can say what it is rather than leaving that to the
+     *  problems drawer alone (issue #2307, extending #2287's pattern from the
+     *  Triggers panel). */
+    issues?: MissionIssue[];
   }
 >(function ScenarioMapScene(
-  { scenario, onChange, extensions, picking, history, focus },
+  { scenario, onChange, extensions, picking, history, focus, issues = [] },
   ref,
 ) {
   const mapName = scenario.setup.mapName;
@@ -685,6 +691,7 @@ export const ScenarioMapScene = forwardRef<
       units={gameUnits.units}
       unitsLoading={gameUnits.loading}
       targets={targetOptions(scenario, pickedGroup.id)}
+      issues={issues}
       onEdit={(patch) => {
         onChange((doc) => editGroup(doc, pickedGroup.id, patch));
         if (patch.units?.length === 0) setSelected(null);
@@ -991,6 +998,7 @@ export const ScenarioMapScene = forwardRef<
                   key={pickedActor.id}
                   actor={pickedActor}
                   participants={scenario.setup.participants}
+                  issues={issues}
                   onEdit={(patch) =>
                     onChange((doc) => editActor(doc, pickedActor.id, patch))
                   }
@@ -1059,6 +1067,7 @@ export const ScenarioMapScene = forwardRef<
                   sides={gameSides}
                   gameArchive={gameUnits.archive}
                   moving={moving === pickedBase.id}
+                  issues={issues}
                   onEdit={(patch) =>
                     onChange((doc) => editBase(doc, pickedBase.id, patch))
                   }

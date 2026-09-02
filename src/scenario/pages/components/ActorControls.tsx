@@ -23,10 +23,17 @@
  * neither is stored as it is shown. Health is a percentage of a fraction and
  * full health is no override at all, so `hp` is absent at 100%. The display name
  * is dropped when it is blank, so an actor with no name has no `name` either.
+ *
+ * The team select and the difficulty range also carry what the validator
+ * found wrong with them, next to the field rather than left to the problems
+ * drawer alone: a team the setup no longer has, and a range that can never
+ * apply at any setting (issue #2307, extending #2287's pattern from the
+ * Triggers panel).
  */
 
 import { Button, Input } from "@picoframe/frame";
 import { SlidersHorizontal } from "lucide-react";
+import { useId } from "react";
 
 import { Label } from "@/components/ui/label";
 import {
@@ -40,9 +47,12 @@ import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ActorState, Facing, ScenarioActor } from "../../model";
+import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { MIN_ACTOR_HP } from "./editing";
+import { FieldProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
+import { entryFieldProblem } from "./triggerProblems";
 
 /** The engine's four facings, in the order it numbers them. */
 const FACINGS: { value: string; label: string }[] = [
@@ -55,11 +65,14 @@ const FACINGS: { value: string; label: string }[] = [
 export function ActorControls({
   actor,
   participants,
+  issues,
   onEdit,
   onState,
 }: {
   actor: ScenarioActor;
   participants: Participant[];
+  /** What the validator has found wrong with the mission (issue #2307). */
+  issues: MissionIssue[];
   /** Change the actor's own fields, as {@link editActor} takes them. */
   onEdit: (patch: Partial<Omit<ScenarioActor, "id">>) => void;
   /** Replace the actor's overrides, which are normalised on the way in. */
@@ -71,15 +84,23 @@ export function ActorControls({
   );
   const health = Number(shown);
   const [name, setName] = useFieldText(state.name ?? "");
+  const teamDescribedBy = useId();
+  const teamProblem = entryFieldProblem(issues, "actors", actor.id, "team");
 
   return (
     <>
-      <TeamSelect
-        participants={participants}
-        value={actor.team}
-        onValueChange={(team) => onEdit({ team })}
-        className="w-32"
-      />
+      <div className="flex flex-col gap-0.5">
+        <TeamSelect
+          participants={participants}
+          value={actor.team}
+          onValueChange={(team) => onEdit({ team })}
+          className="w-32"
+          ariaLabel="Team"
+          ariaInvalid={teamProblem !== null}
+          describedBy={teamDescribedBy}
+        />
+        <FieldProblem id={teamDescribedBy} problem={teamProblem} />
+      </div>
       <Popover>
         <PopoverTrigger asChild>
           <Button
@@ -148,6 +169,12 @@ export function ActorControls({
             <DifficultyRangeFields
               value={actor.difficulty}
               onChange={(difficulty) => onEdit({ difficulty })}
+              problem={entryFieldProblem(
+                issues,
+                "actors",
+                actor.id,
+                "difficulty",
+              )}
             />
           </div>
         </PopoverContent>

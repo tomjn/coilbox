@@ -1,7 +1,9 @@
 /**
- * Which of a mission's problems belong to a trigger's own field, or to one
- * parameter of one of its steps, so the panel that owns the fault can say so
- * next to it rather than leaving that to the drawer alone (issue #2287).
+ * Which of a mission's problems belong to a trigger's own field, to one
+ * parameter of one of its steps, or to a field of an actor, a group or a base
+ * the validator names by id the same way, so the panel that owns the fault
+ * can say so next to it rather than leaving that to the drawer alone (issue
+ * #2287, extended to actors, groups and bases by issue #2307).
  *
  * A dangling reference is not a typo a field can quietly absorb the way a
  * refused rename is: a zone dropdown pointed at a zone that has been deleted
@@ -11,12 +13,16 @@
  * on screen it names.
  *
  * The paths themselves are `compile.ts`'s: a trigger is `triggers["<id>"]`,
- * because `trigger()` writes the document's own id straight through, and a
- * step is `.conditions[<i>]` or `.actions[<i>]` by its position in that
+ * an actor is `actors["<id>"]`, a group is `groups["<id>"]` and a base is
+ * `prefabs["<id>"]`, because every registry writes the document's own id
+ * straight through and `at()` in `validate.ts` names each entry the same way.
+ * A step is `.conditions[<i>]` or `.actions[<i>]` by its position in a
  * trigger's list, because `trigger()` maps each list in order with no
  * reindexing. A parameter sits under `.params.<name>`, which also catches
  * what `validate.ts` reports underneath it: an `amount`'s `.var`, and an
- * `orders` parameter's `[n].target`.
+ * `orders` parameter's `[n].target`. A group's own `orders` field is checked
+ * the same `checkOrders` way, directly under `groups["<id>"].orders`, with no
+ * `.params` in between.
  */
 
 import type { MissionIssue } from "../../validate";
@@ -43,9 +49,17 @@ function messagesUnder(issues: MissionIssue[], prefix: string): string | null {
     : found.map((issue) => issue.message).join(" ");
 }
 
+/** The compiled path an entry of a registry list sits at, keyed by its own
+ *  id: `actors["hero"]`, `groups["g1"]`, `prefabs["b1"]`, `triggers["open"]`.
+ *  Every registry `compile.ts` writes spells it this way, because `at()` in
+ *  `validate.ts` names each entry by the same id the document gave it. */
+function entryPath(list: string, id: string): string {
+  return `${list}[${JSON.stringify(id)}]`;
+}
+
 /** The compiled path a trigger's own field sits at. */
 function triggerPath(triggerId: string): string {
-  return `triggers[${JSON.stringify(triggerId)}]`;
+  return entryPath("triggers", triggerId);
 }
 
 /** The compiled path a condition or action sits at. */
@@ -79,5 +93,23 @@ export function triggerFieldProblem(
   triggerId: string,
   field: string,
 ): string | null {
-  return messagesUnder(issues, `${triggerPath(triggerId)}.${field}`);
+  return entryFieldProblem(issues, "triggers", triggerId, field);
+}
+
+/**
+ * What is wrong with one field of one entry of a registry the validator names
+ * by id: an actor's, a group's or a base's own `team`, an actor's, a group's
+ * or a base's own `difficulty`, or one of a group's own `orders[<i>].target`
+ * (issue #2307). The same match {@link triggerFieldProblem} makes for a
+ * trigger's own field, generalised to `list` so a caller names the registry
+ * it is asking about: `"actors"`, `"groups"` or `"prefabs"` (the compiled
+ * name a base placement takes, per `validate.ts`'s `PART` table).
+ */
+export function entryFieldProblem(
+  issues: MissionIssue[],
+  list: string,
+  id: string,
+  field: string,
+): string | null {
+  return messagesUnder(issues, `${entryPath(list, id)}.${field}`);
 }

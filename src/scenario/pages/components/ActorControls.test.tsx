@@ -23,9 +23,10 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ActorState, ScenarioActor } from "../../model";
+import { newScenario } from "../../create";
+import type { ActorState, Scenario, ScenarioActor } from "../../model";
 import { ActorControls } from "./ActorControls";
 import { MIN_ACTOR_HP, normaliseActorState } from "./editing";
 import {
@@ -34,6 +35,7 @@ import {
   recordEdit,
   undoEdit,
 } from "./history";
+import { missionProblemsIn } from "./useMissionProblems";
 
 afterEach(cleanup);
 
@@ -65,6 +67,7 @@ function ActorHarness({ initial }: { initial?: ActorState }) {
       <ActorControls
         actor={document}
         participants={[]}
+        issues={[]}
         onEdit={(patch) => edit({ ...document, ...patch })}
         // What `setActorState` does with what the bar hands it.
         onState={(state) =>
@@ -227,5 +230,63 @@ describe("an actor's display name commit rules", () => {
     commit(nameBox(), "Rook");
 
     expect(stored()).toEqual({ hp: 0.5, invulnerable: true, name: "Rook" });
+  });
+});
+
+/**
+ * An actor's team pointing at a participant the setup no longer has (issue
+ * #2307, extending #2287's pattern from the Triggers panel). The issues here
+ * come from the real validator (`missionProblemsIn`), not a hand-built one,
+ * so this is pinned against what the drawer would say too.
+ */
+describe("an actor's team the validator has flagged", () => {
+  function withGhostTeam(): Scenario {
+    const base = newScenario("Demo");
+    return {
+      ...base,
+      setup: { ...base.setup, participants: [] },
+      actors: [
+        {
+          id: "hero",
+          unitDef: "armcom",
+          team: "ghost",
+          pos: { x: 100, z: 100 },
+          facing: 0,
+        },
+      ],
+    };
+  }
+
+  function TeamHarness() {
+    const [document, setDocument] = useState<Scenario>(withGhostTeam);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <ActorControls
+        actor={document.actors[0]}
+        participants={document.setup.participants}
+        issues={issues}
+        onEdit={(patch) =>
+          setDocument((doc) => ({
+            ...doc,
+            actors: [{ ...doc.actors[0], ...patch }],
+          }))
+        }
+        onState={() => {}}
+      />
+    );
+  }
+
+  it("marks the team field invalid and says why, next to it", () => {
+    render(<TeamHarness />);
+
+    const field = screen.getByLabelText("Team");
+    const message = screen.getByText('no team called "ghost"');
+
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(message.id);
   });
 });

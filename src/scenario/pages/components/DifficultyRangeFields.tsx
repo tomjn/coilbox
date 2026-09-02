@@ -69,9 +69,15 @@ export function DifficultyRangeFields({
   /** The new range, or undefined once it bounds nothing. */
   onChange: (range: DifficultyRange | undefined) => void;
   /** Why this range never applies at any setting, in the validator's own
-   *  words (issue #2287, `checkDifficulty` in `validate.ts`). Only the
-   *  trigger panel has anything to pass here today: an actor's, a group's and
-   *  a base's own difficulty range are not read the validator's issues yet. */
+   *  words (issue #2287, `checkDifficulty` in `validate.ts`). An actor's, a
+   *  group's, a base's and a trigger's own difficulty range all take this the
+   *  same way (issue #2307).
+   *
+   *  `checkDifficulty` reports this as a warning, never an error: the
+   *  mission still plays, and what is lost is one placement or trigger at
+   *  every setting, not a launch. So this is shown next to the field, but
+   *  does not mark it `aria-invalid` the way a dangling reference does -
+   *  that would claim the range was refused, and it was not. */
   problem?: string | null;
 }) {
   const range = value ?? {};
@@ -88,7 +94,6 @@ export function DifficultyRangeFields({
               onChange(rangeWith(value, "atLeast", next))
             }
             options={options("Any difficulty")}
-            ariaInvalid={problem !== null}
             describedBy={describedBy}
           />
         </Field>
@@ -98,7 +103,6 @@ export function DifficultyRangeFields({
             value={range.atMost ?? ANY}
             onValueChange={(next) => onChange(rangeWith(value, "atMost", next))}
             options={options("Any difficulty")}
-            ariaInvalid={problem !== null}
             describedBy={describedBy}
           />
         </Field>
