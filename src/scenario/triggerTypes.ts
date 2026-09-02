@@ -58,6 +58,19 @@ export interface ParamSpec {
   optional?: boolean;
   /** The allowed strings, for `kind: "enum"`. */
   values?: readonly string[];
+  /**
+   * What the editor calls this parameter, in place of its schema key. Absent
+   * falls back to the key itself, which is today's behaviour and what a game's
+   * own `missions/extensions.lua` gets until it declares one (issue #2274).
+   */
+  label?: string;
+  /**
+   * The number the runtime substitutes when this optional number is left out,
+   * shown in the placeholder as "default 1" rather than the bare word
+   * "default". Only set where the runtime actually puts a fixed number back
+   * in: `min` and `max` mean unbounded when left out, which is not this.
+   */
+  default?: number;
 }
 
 /** The parameters one condition or action type takes, keyed by parameter name. */
@@ -84,15 +97,15 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   units_in_zone: {
     zone: { kind: "zoneId" },
     team: { kind: "teamId", optional: true },
-    unitDefs: { kind: "strings", optional: true },
-    min: { kind: "number", optional: true },
-    max: { kind: "number", optional: true },
+    unitDefs: { kind: "strings", optional: true, label: "unit types" },
+    min: { kind: "number", optional: true, label: "at least" },
+    max: { kind: "number", optional: true, label: "at most" },
   },
   unit_count: {
     team: { kind: "teamId" },
-    unitDefs: { kind: "strings", optional: true },
-    min: { kind: "number", optional: true },
-    max: { kind: "number", optional: true },
+    unitDefs: { kind: "strings", optional: true, label: "unit types" },
+    min: { kind: "number", optional: true, label: "at least" },
+    max: { kind: "number", optional: true, label: "at most" },
   },
   unit_dead: {
     actor: { kind: "actorId" },
@@ -100,24 +113,25 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   unit_health_below: {
     actor: { kind: "actorId" },
     /** Fraction of maximum health, 0 to 1. */
-    fraction: { kind: "number" },
+    fraction: { kind: "number", label: "health fraction" },
   },
   unit_built: {
     team: { kind: "teamId" },
-    unitDef: { kind: "string" },
-    count: { kind: "number", optional: true },
+    unitDef: { kind: "string", label: "unit type" },
+    // Matches the runtime's own fallback in coilbox_unit_conditions.lua.
+    count: { kind: "number", optional: true, default: 1 },
   },
   unit_captured: {
     actor: { kind: "actorId" },
     /** The capturing team. Absent means any. */
-    team: { kind: "teamId", optional: true },
+    team: { kind: "teamId", optional: true, label: "capturing team" },
   },
   time_elapsed: {
     seconds: { kind: "number" },
   },
   var: {
-    name: { kind: "varName" },
-    op: { kind: "enum", values: VAR_OPS },
+    name: { kind: "varName", label: "variable" },
+    op: { kind: "enum", values: VAR_OPS, label: "comparison" },
     /** A number, or another var to compare against: "kills reached the quota"
      *  when the quota is itself a var (issue #808). */
     value: { kind: "amount" },
@@ -131,7 +145,7 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
      * the zone, so "hold the keep" is not satisfied by a scout parked in a
      * keep an enemy army is also sitting in (issue #802). Gaia is not anyone.
      */
-    uncontested: { kind: "boolean", optional: true },
+    uncontested: { kind: "boolean", optional: true, label: "uncontested only" },
   },
 };
 
@@ -151,14 +165,14 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
    *  are: this is the mission letting go, not a transfer (issue #812). */
   release_group: { group: { kind: "groupId" } },
   set_var: {
-    name: { kind: "varName" },
+    name: { kind: "varName", label: "variable" },
     value: { kind: "amount" },
   },
   /** Move a var by a number, or by what another var holds: "add the bonus to
    *  the score" (issue #808). */
   add_var: {
-    name: { kind: "varName" },
-    value: { kind: "amount" },
+    name: { kind: "varName", label: "variable" },
+    value: { kind: "amount", label: "amount" },
   },
   enable_trigger: { trigger: { kind: "triggerId" } },
   disable_trigger: { trigger: { kind: "triggerId" } },
@@ -173,18 +187,19 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     seconds: { kind: "number", optional: true },
   },
   unlock_unit: {
-    unitDef: { kind: "string" },
+    unitDef: { kind: "string", label: "unit type" },
     team: { kind: "teamId", optional: true },
   },
   /** Whose camera moves, and whose map gets the label. Absent means everyone,
    *  which is what a single player scenario wants (issue #827). */
   camera_pan: {
-    pos: { kind: "point" },
-    seconds: { kind: "number", optional: true },
+    pos: { kind: "point", label: "position" },
+    // Matches M.DEFAULT_PAN_SECONDS in coilbox_view.lua.
+    seconds: { kind: "number", optional: true, default: 1 },
     team: { kind: "teamId", optional: true },
   },
   map_marker: {
-    pos: { kind: "point" },
+    pos: { kind: "point", label: "position" },
     text: { kind: "string", optional: true },
     team: { kind: "teamId", optional: true },
   },
