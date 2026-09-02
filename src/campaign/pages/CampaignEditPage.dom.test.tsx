@@ -54,6 +54,7 @@ const {
   useCampaigns,
   useScenarios,
   refreshCampaigns,
+  useUnitsyncThumbnails,
 } = vi.hoisted(() => ({
   campaignSave: vi.fn(async (_args: { id: string; json: string }) => ({})),
   campaignMediaDelete: vi.fn(
@@ -65,6 +66,7 @@ const {
   useCampaigns: vi.fn(),
   useScenarios: vi.fn(),
   refreshCampaigns: vi.fn(async () => []),
+  useUnitsyncThumbnails: vi.fn(() => ({ thumbs: new Map() })),
 }));
 vi.mock("../bindings", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../bindings")),
@@ -79,9 +81,7 @@ vi.mock("@/play/presets", () => ({
   useSkirmishPresets: () => ({ presets: [] }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
-vi.mock("@/content/config", () => ({
-  useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
-}));
+vi.mock("@/content/config", () => ({ useUnitsyncThumbnails }));
 // Both reach for stored media through the coilbox:// protocol, which a test has
 // no business standing up, and neither is part of removing a mission.
 // The field itself reaches for stored media through the coilbox:// protocol,
@@ -187,6 +187,7 @@ beforeEach(() => {
   campaignSave.mockClear();
   campaignMediaDelete.mockClear();
   refreshCampaigns.mockClear();
+  useUnitsyncThumbnails.mockReturnValue({ thumbs: new Map() });
   // The Presentation disclosure remembers itself in localStorage, which
   // outlives a render, so each test starts from "never chosen".
   localStorage.clear();
@@ -1036,6 +1037,50 @@ describe("what a mission row says", () => {
 
     expect(screen.getByText("BAR 1.0").className).not.toMatch(/amber/);
     expect(screen.getByText("Comet Catcher").className).not.toMatch(/amber/);
+  });
+});
+
+/**
+ * A mission with no panorama used to reserve the same full-width 80px strip
+ * as one that had art, just to caption the absence with "No panorama" (issue
+ * #2266). The map thumbnail is the mission's real identity in that case, so
+ * it now fills a slimmer band instead, and the strip disappears entirely when
+ * there is no thumbnail either rather than sitting empty.
+ */
+describe("a mission card's header strip with no panorama", () => {
+  it("skips the strip entirely when there is neither panorama nor thumbnail", () => {
+    show([plain("m1", "Ridge")]);
+
+    expect(screen.queryByText("No panorama")).toBeNull();
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    expect(li.querySelector("img")).toBeNull();
+    // Nothing precedes the row content: the strip contributes no element.
+    expect(li.firstElementChild?.className).toContain("p-3");
+  });
+
+  it("promotes the map thumbnail to a slim full-width band", () => {
+    useUnitsyncThumbnails.mockReturnValue({
+      thumbs: new Map([["Comet Catcher", { url: "thumb://comet-catcher" }]]),
+    });
+    show([
+      {
+        ...plain("m1", "Ridge"),
+        snapshot: { ...source.setup, mapName: "Comet Catcher" },
+      },
+    ]);
+
+    expect(screen.queryByText("No panorama")).toBeNull();
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    const img = li.querySelector("img") as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.src).toBe("thumb://comet-catcher");
+    expect(img.className).toContain("h-10");
+    expect(img.className).toContain("w-full");
+    expect(img.className).toContain("object-cover");
+    // Slimmer than the 80px band a panorama gets, and not the small cornered
+    // overlay that band uses to show the same thumbnail alongside art.
+    expect(img.className).not.toContain("size-16");
+    expect(img.className).not.toContain("absolute");
   });
 });
 
