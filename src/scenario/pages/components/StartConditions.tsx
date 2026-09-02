@@ -6,8 +6,8 @@
  * thing this section is a column of, and the same panel is where removing one
  * already asks what becomes of its start units and its bank.
  *
- * Three of the four fields are economy. The fourth, "the mission places this
- * team's start", is the adoption contract: it is what a vendoring game reads
+ * Three of the four fields are economy. The fourth, "no automatic commander
+ * for this team", is the adoption contract: it is what a vendoring game reads
  * through `GG.CoilboxMission.suppressesStart`, and marking every team is what
  * makes `suppressesEveryStart()` true and keeps a game's faction and start spot
  * pickers out of a mission that is already playing. So the switch says what it
@@ -162,7 +162,7 @@ function TeamStart({
         <span className="text-xs font-medium">{participant.name}</span>
         <div className="ml-auto flex items-center gap-2">
           <Label htmlFor={switchId} className="text-xs font-normal">
-            The mission places this team's start
+            No automatic commander for this team
           </Label>
           <Switch
             id={switchId}
@@ -319,13 +319,13 @@ function AmountPair({
         {label}
       </span>
       <AmountBox
-        label={`${who}'s ${label.toLowerCase()} metal`}
+        label={`${label} metal for ${who}`}
         placeholder="Metal"
         value={pair?.metal}
         onCommit={(value) => onAmount(field, "metal", value)}
       />
       <AmountBox
-        label={`${who}'s ${label.toLowerCase()} energy`}
+        label={`${label} energy for ${who}`}
         placeholder="Energy"
         value={pair?.energy}
         onCommit={(value) => onAmount(field, "energy", value)}
