@@ -46,6 +46,9 @@ export type MapKeyAction =
   | { kind: "move"; delta: Point; step: number; heading: Heading }
   /** Nothing is selected, so the view's own cursor moves instead. */
   | { kind: "pan"; delta: Point; step: number; heading: Heading }
+  /** Grow or shrink the zone that is selected, `step` elmos in the direction
+   *  named. Only reachable while resize mode is on. */
+  | { kind: "resize"; step: number; heading: Heading }
   /** Select the next or previous thing the map holds. */
   | { kind: "cycle"; by: 1 | -1 }
   /** Turn what is selected a quarter turn. */
@@ -54,6 +57,9 @@ export type MapKeyAction =
   /** Act at the cursor: answer whatever the map is waiting for, or place what
    *  the current mode places. */
   | { kind: "act" }
+  /** Switch what the arrows do to the zone that is selected, between moving it
+   *  and changing its size (issue #2313). */
+  | { kind: "toggleResize" }
   /** Let go of the selection. */
   | { kind: "clear" }
   /** Read the key list out. */
@@ -78,6 +84,12 @@ export interface MapKeyState {
   /** Whether anything is selected, which is what decides between moving a
    *  thing and moving the cursor. */
   selected: boolean;
+  /** Whether what is selected is a zone, so it has a size the S key can put
+   *  into resize mode. Nothing else on the map does (issue #2313). */
+  resizable?: boolean;
+  /** Whether resize mode is currently on for the zone that is selected. Ignored
+   *  unless `resizable` is also true. */
+  resizing?: boolean;
 }
 
 /** Engine coordinates run east and south from the map's north-west corner. */
@@ -120,6 +132,8 @@ export function mapKeyAction(
   const arrow = HEADINGS[press.key];
   if (arrow) {
     const step = stepElmos(press);
+    if (state.resizable && state.resizing)
+      return { kind: "resize", step, heading: arrow.heading };
     const delta = { x: arrow.x * step, z: arrow.z * step };
     return state.selected
       ? { kind: "move", delta, step, heading: arrow.heading }
@@ -137,6 +151,11 @@ export function mapKeyAction(
       return state.selected ? { kind: "turn", steps: 1 } : null;
     case "R":
       return state.selected ? { kind: "turn", steps: -1 } : null;
+    case "s":
+    case "S":
+      // Only while a zone is selected: nothing else on the map has a size to
+      // put into resize mode.
+      return state.resizable ? { kind: "toggleResize" } : null;
     case "Delete":
     case "Backspace":
       return state.selected ? { kind: "delete" } : null;

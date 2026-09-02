@@ -19,6 +19,8 @@ import {
 
 const holding = { selected: true };
 const empty = { selected: false };
+const resizingZone = { selected: true, resizable: true, resizing: true };
+const zoneSelected = { selected: true, resizable: true, resizing: false };
 
 describe("which way the arrows go", () => {
   it("puts Up north and Down south, which is z running the other way", () => {
@@ -108,6 +110,45 @@ describe("acting on what is selected", () => {
   it("has nothing to turn or delete when nothing is selected", () => {
     expect(mapKeyAction({ key: "r" }, empty)).toBeNull();
     expect(mapKeyAction({ key: "Delete" }, empty)).toBeNull();
+  });
+});
+
+describe("resize mode (issue #2313)", () => {
+  it("toggles on S only while a zone is selected", () => {
+    expect(mapKeyAction({ key: "s" }, zoneSelected)).toEqual({
+      kind: "toggleResize",
+    });
+    expect(mapKeyAction({ key: "S", shiftKey: true }, zoneSelected)).toEqual({
+      kind: "toggleResize",
+    });
+    expect(mapKeyAction({ key: "s" }, holding)).toBeNull();
+    expect(mapKeyAction({ key: "s" }, empty)).toBeNull();
+  });
+
+  it("turns an arrow into a resize once resize mode is on", () => {
+    expect(mapKeyAction({ key: "ArrowUp" }, resizingZone)).toEqual({
+      kind: "resize",
+      heading: "north",
+      step: STEP_ELMOS,
+    });
+    expect(mapKeyAction({ key: "ArrowRight" }, resizingZone)).toEqual({
+      kind: "resize",
+      heading: "east",
+      step: STEP_ELMOS,
+    });
+  });
+
+  it("still moves while resize mode is off, even on a resizable selection", () => {
+    expect(mapKeyAction({ key: "ArrowUp" }, zoneSelected)?.kind).toBe("move");
+  });
+
+  it("takes ten squares with Shift and one elmo with Alt while resizing, the same as a move", () => {
+    expect(
+      mapKeyAction({ key: "ArrowUp", shiftKey: true }, resizingZone),
+    ).toMatchObject({ kind: "resize", step: STEP_ELMOS * COARSE_SQUARES });
+    expect(
+      mapKeyAction({ key: "ArrowUp", altKey: true }, resizingZone),
+    ).toMatchObject({ kind: "resize", step: FINE_ELMOS });
   });
 });
 
