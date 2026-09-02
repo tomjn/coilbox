@@ -153,6 +153,7 @@ import type { RowFocus } from "./problemTargets";
 import {
   addedWords,
   addKeys,
+  countSelection,
   countWords,
   entryKeys,
   inSelection,
@@ -1154,8 +1155,14 @@ export const ScenarioMapScene = forwardRef<
             <ScenarioSelectionBar
               placement={picked}
               // Everything selected, so the buttons say what they will do rather
-              // than naming one thing and doing six (issue #2279).
-              count={selection.length > 1 ? selection.length : undefined}
+              // than naming one thing and doing six (issue #2279). Counted as
+              // an author counts, which is the number the bar above says: a
+              // group is one thing however many of its units the box caught.
+              count={
+                selection.length > 1
+                  ? countSelection(selection).total
+                  : undefined
+              }
               onTurnPreview={setTurning}
               onTurn={() =>
                 onChange((doc) =>
