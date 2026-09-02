@@ -159,7 +159,10 @@ function UnplacedLayouts({
             <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
               {layout.detail}
             </span>
-            <div className="flex shrink-0 items-center gap-2">
+            {/* gap-3 rather than the row's default gap-2: Delete has no
+                confirmation, so it gets more room than the row's default
+                spacing rather than the same amount (#2284). */}
+            <div className="flex shrink-0 items-center gap-3">
               <Button
                 size="sm"
                 variant="ghost"
@@ -174,8 +177,8 @@ function UnplacedLayouts({
                 <MapPin className="size-3.5" />
               </Button>
               {/* Ghost-destructive, matching the row menu's delete item
-                  (ScenarioRowMenu), so Delete reads as different from Place
-                  rather than as its twin one pixel away (#2284). */}
+                  (ScenarioRowMenu), so Delete reads as different from
+                  Place. */}
               <Button
                 size="sm"
                 variant="ghost"
