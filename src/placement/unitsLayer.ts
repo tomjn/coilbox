@@ -19,7 +19,11 @@
 import * as THREE from "three";
 
 import type { UnitModelResult } from "@/content/bindings";
-import { type BuiltModel, buildModel } from "@/content/unitModel";
+import {
+  type BuiltModel,
+  buildModel,
+  prepareTextureAtlas,
+} from "@/content/unitModel";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Rgb } from "@/play/config";
 import { animates, eased, fadeAt } from "./arrivals";
@@ -325,7 +329,13 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     if (!model?.root) return { built: markerFor(colour), drawable: false };
     // Merged, because a model on the map is only ever drawn standing still and
     // its piece tree costs a draw call a piece for every unit placed (#2293).
-    const built = buildModel(model, colour, { merge: true });
+    //
+    // The sheet is waited for rather than swapped in later: the merged model is
+    // cloned once per placement, and a clone keeps the meshes it was made with,
+    // so a sheet arriving afterwards would reach none of them (#2311). An
+    // `.s3o` has nothing to pack and answers immediately.
+    const atlas = await prepareTextureAtlas(model);
+    const built = buildModel(model, colour, { merge: true, atlas });
     prototypes.set(key, built);
     return { built, drawable: true };
   };
