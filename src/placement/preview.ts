@@ -548,8 +548,10 @@ export function previewMovable(count: PreviewCount): boolean {
 }
 
 /** What is left unsaid about this spot, when anything is. Appended rather than
- *  colouring the sentence, because an unknown is not a refusal (issue #1491). */
-function unjudgedClause(count: PreviewCount): string {
+ *  colouring the sentence, because an unknown is not a refusal (issue #1491).
+ *  Exported for {@link mapProblemsWords} in `mapKeyboard.ts`, which says the
+ *  same thing about the whole map rather than about one spot (issue #2315). */
+export function unjudgedClause(count: PreviewCount): string {
   if (count.unjudged === 0) return "";
   if (count.unjudged === count.total) {
     return count.total === 1
