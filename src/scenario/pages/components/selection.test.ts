@@ -7,9 +7,10 @@ import {
   type Standing,
 } from "@/blueprint/footprint";
 import { newScenario } from "../../create";
-import type { Scenario } from "../../model";
+import type { Scenario, ScenarioZone } from "../../model";
 import { sceneContents } from "./contents";
 import { recordEdit, undoEdit } from "./history";
+import { scenarioPaths } from "./orderPaths";
 import { scenarioPlacements } from "./placements";
 import {
   addKeys,
@@ -204,12 +205,12 @@ describe("a marquee", () => {
 
   it("takes every unit standing in it and nothing outside it", () => {
     const box = boxFromDrag({ x: 0, z: 0 }, { x: 150, z: 150 });
-    expect(keysInBox(placements, box)).toEqual(["actor:a1"]);
+    expect(keysInBox(placements, [], [], box)).toEqual(["actor:a1"]);
   });
 
   it("takes a whole group when the box is round all of it", () => {
     const box = boxFromDrag({ x: 800, z: 800 }, { x: 1200, z: 1200 });
-    expect(keysInBox(placements, box)).toEqual([
+    expect(keysInBox(placements, [], [], box)).toEqual([
       "group:g1#0",
       "group:g1#1",
       "group:g1#2",
@@ -220,9 +221,79 @@ describe("a marquee", () => {
     expect(
       keysInBox(
         placements,
+        [],
+        [],
         boxFromDrag({ x: 9000, z: 9000 }, { x: 9500, z: 9500 }),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("a marquee catching zones", () => {
+  const zones: ScenarioZone[] = [
+    {
+      id: "z1",
+      name: "Landing",
+      shape: "box",
+      min: { x: 3000, z: 3000 },
+      max: { x: 3400, z: 3400 },
+    },
+    {
+      id: "z2",
+      name: "Watch circle",
+      shape: "circle",
+      center: { x: 5000, z: 5000 },
+      radius: 200,
+    },
+  ];
+
+  it("takes a box zone only when the box covers the whole of it", () => {
+    const covers = boxFromDrag({ x: 2900, z: 2900 }, { x: 3500, z: 3500 });
+    expect(keysInBox([], zones, [], covers)).toEqual(["zone:z1"]);
+  });
+
+  it("leaves a zone bigger than the box alone, even when the box is drawn well inside it", () => {
+    const inside = boxFromDrag({ x: 3100, z: 3100 }, { x: 3200, z: 3200 });
+    expect(keysInBox([], zones, [], inside)).toEqual([]);
+  });
+
+  it("takes a circular zone only when the box covers its whole rim, not just its centre", () => {
+    const covers = boxFromDrag({ x: 4700, z: 4700 }, { x: 5300, z: 5300 });
+    expect(keysInBox([], zones, [], covers)).toEqual(["zone:z2"]);
+    const centreOnly = boxFromDrag({ x: 4900, z: 4900 }, { x: 5100, z: 5100 });
+    expect(keysInBox([], zones, [], centreOnly)).toEqual([]);
+  });
+});
+
+describe("a marquee catching path points", () => {
+  const doc = document();
+  const withPath: Scenario = {
+    ...doc,
+    groups: [
+      {
+        ...doc.groups[0],
+        orders: [
+          {
+            kind: "move",
+            waypoints: [
+              { x: 6000, z: 6000 },
+              { x: 7000, z: 7000 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const paths = scenarioPaths(withPath);
+
+  it("catches a point standing in the box without catching the rest of its path", () => {
+    const box = boxFromDrag({ x: 5900, z: 5900 }, { x: 6100, z: 6100 });
+    expect(keysInBox([], [], paths, box)).toEqual(["path:g1#0@0"]);
+  });
+
+  it("catches nothing when neither waypoint stands in the box", () => {
+    const box = boxFromDrag({ x: 9000, z: 9000 }, { x: 9500, z: 9500 });
+    expect(keysInBox([], [], paths, box)).toEqual([]);
   });
 });
 
