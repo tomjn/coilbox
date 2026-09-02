@@ -21,6 +21,12 @@ import { Check, Loader2, TriangleAlert } from "lucide-react";
  * the DOM. It is also the app's only `aria-live` region under the scenario
  * and campaign editors: a screen reader hears a write land or fail without
  * the page needing one of its own.
+ *
+ * The row it sits in is a flex container with a `gap`, which puts space on
+ * both sides of every item it contains, even an empty one. So the idle
+ * container is `sr-only` rather than merely empty: `sr-only` takes it out of
+ * flow, which keeps the mounted `div` (and its identity) but stops it
+ * widening the gap either side of it.
  */
 export type SaveState =
   /** Nothing written yet this session, so there is nothing to report. */
@@ -66,7 +72,11 @@ export function SaveStatus({
   return (
     <div
       role="status"
-      className="flex items-center gap-1.5 text-xs text-muted-foreground"
+      className={
+        state.kind === "idle"
+          ? "sr-only"
+          : "flex items-center gap-1.5 text-xs text-muted-foreground"
+      }
     >
       {state.kind === "saving" && (
         <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" />
