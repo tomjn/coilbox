@@ -85,21 +85,6 @@ import { VarPanel } from "./components/VarPanel";
 const BACK = "/scenario-builder";
 
 /**
- * How long to hold a problem row's navigation back once the drawer that held
- * it is asked to close, in milliseconds.
- *
- * The drawer is picoframe's own `Drawer`, built on a Radix `Dialog` with no
- * `onCloseAutoFocus` of its own exposed to override: closing it restores
- * keyboard focus to whatever opened it (the header's Problems button) once
- * its own close animation ends, and that restore would otherwise land after
- * this page's own focus on the destination row and win. 200ms is that
- * animation's exact length, `pf-drawer-out-right` (and the left/bottom
- * equivalents) in `@picoframe/frame`'s `drawerStyles.js`. This is that
- * number plus a margin for the two renders in between.
- */
-const DRAWER_CLOSE_FOCUS_DELAY_MS = 250;
-
-/**
  * Editor for one scenario. The document's name and description, the skirmish
  * setup it is played on, and the map it is authored on as a 3D scene. The
  * placement modes and panels that hang off that scene arrive in #757 onwards.
@@ -195,26 +180,29 @@ export default function ScenarioEditPage() {
     token: number;
   } | null>(null);
   const problemFocusTokenRef = useRef(0);
-  const problemFocusTimeoutRef = useRef<number | undefined>(undefined);
-  useEffect(
-    () => () => window.clearTimeout(problemFocusTimeoutRef.current),
-    [],
-  );
-  /** A problem row was activated: close the drawer, and once its own close
-   *  animation has had time to restore focus to the button that opened it,
-   *  ask the panel or the map that owns the problem to take it from there. A
-   *  row with no target ({@link problemTarget} returned null) never calls
-   *  this at all, so there is nothing to guard here. */
+  // Set by `onActivateProblem`, read and cleared by the drawer's own
+  // `onCloseAutoFocus` once its close animation actually ends, rather than
+  // guessed at with a timer (issue #2310). Empty when the drawer closed some
+  // other way, which leaves picoframe's own restore-to-opener default in
+  // place.
+  const pendingProblemFocusRef = useRef<{
+    target: ProblemTarget;
+    token: number;
+  } | null>(null);
+  /** A problem row was activated: close the drawer, and hand the panel or
+   *  the map that owns the problem a target to take it from there once the
+   *  drawer's own close animation ends. A row with no target
+   *  ({@link problemTarget} returned null) never calls this at all, so there
+   *  is nothing to guard here. */
   const onActivateProblem = useCallback((issue: MissionIssue) => {
     const target = problemTarget(issue.path);
     if (!target) return;
-    setShowProblems(false);
-    window.clearTimeout(problemFocusTimeoutRef.current);
     problemFocusTokenRef.current += 1;
-    const token = problemFocusTokenRef.current;
-    problemFocusTimeoutRef.current = window.setTimeout(() => {
-      setProblemFocus({ target, token });
-    }, DRAWER_CLOSE_FOCUS_DELAY_MS);
+    pendingProblemFocusRef.current = {
+      target,
+      token: problemFocusTokenRef.current,
+    };
+    setShowProblems(false);
   }, []);
   const rowFocus = (
     kind: "trigger" | "objective" | "variable" | "map",
@@ -598,6 +586,13 @@ export default function ScenarioEditPage() {
           title={`Problems in ${scenario.name}`}
           description="Issues found while compiling the mission, with a fix where one exists."
           width="32rem"
+          onCloseAutoFocus={(event) => {
+            const pending = pendingProblemFocusRef.current;
+            if (!pending) return;
+            pendingProblemFocusRef.current = null;
+            event.preventDefault();
+            setProblemFocus(pending);
+          }}
         >
           <MissionProblemsList
             problems={problems}
