@@ -1922,6 +1922,223 @@ describe("the mission row's other controls, now a row can be dragged", () => {
   });
 });
 
+/**
+ * Reordering by typing a position (issue #2394).
+ *
+ * Dragging answered the seven-clicks complaint for anyone holding a pointer
+ * and for nobody else. This is the reorder that costs one action from a
+ * keyboard, so what has to hold is the pair the issue names: the mission that
+ * moved keeps the focus, and the move is said out loud. And because the box
+ * takes a number typed by hand, the answers to a bad one are as much a part of
+ * it as the answers to a good one.
+ */
+function positionBox(title: string): HTMLInputElement {
+  return screen.getByLabelText(`Move ${title} to position`) as HTMLInputElement;
+}
+
+/** Focus a mission's position box, type `value`, and press Enter. */
+function typePosition(title: string, value: string) {
+  const box = positionBox(title);
+  box.focus();
+  fireEvent.change(box, { target: { value } });
+  fireEvent.keyDown(box, { key: "Enter" });
+}
+
+/** What the mission list's live region is saying. */
+function said(): string {
+  const regions = document.querySelectorAll("[aria-live='polite']");
+  if (regions.length !== 1) {
+    throw new Error(`${regions.length} live regions, expected one`);
+  }
+  return regions[0].textContent ?? "";
+}
+
+describe("moving a mission to a position typed in", () => {
+  it("moves it the whole way in one go, not one press per place", async () => {
+    show(four());
+
+    typePosition("First", "4");
+
+    expect(await savedTitles()).toEqual(["Second", "Third", "Fourth", "First"]);
+    expect(campaignSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves a mission up the list as well as down", async () => {
+    show(four());
+
+    typePosition("Fourth", "2");
+
+    expect(await savedTitles()).toEqual(["First", "Fourth", "Second", "Third"]);
+  });
+
+  it("leaves the focus on the mission that moved", async () => {
+    show(four());
+
+    typePosition("First", "4");
+    await savedTitles();
+
+    // The same box, now the last row's. A reorder that dropped the author back
+    // on the document body would leave them nowhere in a list that has just
+    // changed shape.
+    //
+    // This pins the requirement rather than the code that meets it. Both
+    // happy-dom and the macOS webview keep the focus on a node React moves, so
+    // it passes with the page's own refocus taken out, which is what makes the
+    // refocus a guard against the engines neither of those two stands in for.
+    expect(document.activeElement).toBe(positionBox("First"));
+    expect(
+      positionBox("First").closest<HTMLElement>("[data-mission-row]")?.dataset
+        .missionRow,
+    ).toBe("3");
+  });
+
+  it("says where the mission went", async () => {
+    show(four());
+
+    typePosition("First", "4");
+    await savedTitles();
+
+    expect(said()).toBe("Moved First to position 4 of 4.");
+  });
+
+  it("shows the position the mission is at, and follows it when it moves", () => {
+    show(four());
+
+    expect(positionBox("Second").value).toBe("2");
+
+    // Moved by something else entirely, so the box has to follow rather than
+    // keep showing the place the mission has left.
+    fireEvent.click(screen.getByRole("button", { name: "Move Second up" }));
+
+    expect(positionBox("Second").value).toBe("1");
+  });
+
+  it("refuses a position past the end of the list", async () => {
+    show(four());
+
+    typePosition("First", "9");
+
+    await nothingWritten();
+    expect(positionBox("First").value).toBe("1");
+    expect(said()).toBe("Give First a position between 1 and 4.");
+  });
+
+  it("refuses a position before the first", async () => {
+    show(four());
+
+    typePosition("Third", "0");
+
+    await nothingWritten();
+    expect(positionBox("Third").value).toBe("3");
+    expect(said()).toBe("Give Third a position between 1 and 4.");
+  });
+
+  it("refuses a position that is not a whole place in the list", async () => {
+    show(four());
+
+    typePosition("First", "2.5");
+
+    await nothingWritten();
+    expect(positionBox("First").value).toBe("1");
+    expect(said()).toBe("Give First a position between 1 and 4.");
+  });
+
+  it("refuses an empty box", async () => {
+    show(four());
+
+    typePosition("First", "");
+
+    await nothingWritten();
+    expect(positionBox("First").value).toBe("1");
+    expect(said()).toBe("Give First a position between 1 and 4.");
+  });
+
+  it("refuses a word, which the box will not hold in the first place", async () => {
+    show(four());
+    const box = positionBox("First");
+
+    // A number box keeps nothing it cannot read as a number, so a typed word
+    // never reaches the value at all and arrives here as an empty box. The
+    // press still has to be answered, and answered the same way.
+    fireEvent.change(box, { target: { value: "last" } });
+    expect(box.value).toBe("");
+
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    await nothingWritten();
+    expect(positionBox("First").value).toBe("1");
+    expect(said()).toBe("Give First a position between 1 and 4.");
+  });
+
+  it("writes nothing for the position the mission is already in, and says so", async () => {
+    show(four());
+
+    typePosition("Second", "2");
+
+    await nothingWritten();
+    expect(said()).toBe("Second is already at position 2.");
+  });
+
+  it("abandons what was typed when the box is left without pressing Enter", async () => {
+    show(four());
+    const box = positionBox("First");
+
+    // A 1 on the way to 10 must not move anything when Tab takes the focus
+    // away before the second digit.
+    fireEvent.change(box, { target: { value: "3" } });
+    fireEvent.blur(box);
+
+    await nothingWritten();
+    expect(positionBox("First").value).toBe("1");
+    expect(said()).toBe("");
+  });
+
+  it("has nothing to offer a campaign of one mission", () => {
+    show([plain("m1", "First")]);
+
+    // The only position it could be given is the one it is in, which is why
+    // both of its arrows are dead too.
+    expect(positionBox("First").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("says an arrow move and a dropped row too, in the same words", async () => {
+    show(four());
+
+    fireEvent.click(screen.getByRole("button", { name: "Move Third up" }));
+    await vi.waitFor(() =>
+      expect(said()).toBe("Moved Third to position 2 of 4."),
+    );
+
+    dragRowTo(0, middleOf(3) + 10);
+    await vi.waitFor(() =>
+      expect(said()).toBe("Moved First to position 4 of 4."),
+    );
+  });
+
+  it("never starts a drag from the position box", async () => {
+    show(four());
+    stackRows();
+    const box = positionBox("First");
+
+    press(box, middleOf(0));
+    fireEvent.pointerMove(box, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+
+    expect(dropLine()).toBeNull();
+
+    fireEvent.pointerUp(box, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+
+    await nothingWritten();
+  });
+});
+
 /** Stands in for the mission briefing, naming the mission it was asked for. */
 function PlayerBriefing() {
   const { missionId } = useParams();
