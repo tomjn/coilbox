@@ -227,3 +227,62 @@ describe("a group's own fields the validator has flagged", () => {
     expect(field.getAttribute("aria-describedby")).toBe(message.id);
   });
 });
+
+/**
+ * A group standing off the map (issue #2343). Its position is dragged on the
+ * map rather than typed here, so there is no field for `aria-invalid` to sit
+ * on: this is a row-level note in the units popover instead, in the
+ * validator's own words.
+ */
+describe("a group standing off the map", () => {
+  function withOffMapGroup(): Scenario {
+    const base = newScenario("Demo");
+    return {
+      ...base,
+      groups: [
+        {
+          id: "wave",
+          team: base.setup.participants[0]?.id ?? "you",
+          units: [{ def: "armpw", count: 2 }],
+          pos: { x: -50, z: 100 },
+          orders: [],
+          dormant: false,
+        },
+      ],
+    };
+  }
+
+  function OffMapHarness() {
+    const [document] = useState<Scenario>(withOffMapGroup);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <GroupControls
+        group={document.groups[0]}
+        participants={document.setup.participants}
+        units={[]}
+        unitsLoading={false}
+        targets={[]}
+        issues={issues}
+        onEdit={() => {}}
+        onDelete={() => {}}
+        drawing={null}
+        onDraw={() => {}}
+      />
+    );
+  }
+
+  it("says so in the units popover, in the validator's own words", () => {
+    render(<OffMapHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /unit/i }));
+
+    expect(
+      screen.getByText(
+        "-50,100 is off the map. Spring measures a map from its north-west corner, so x and z start at 0.",
+      ),
+    ).toBeTruthy();
+  });
+});

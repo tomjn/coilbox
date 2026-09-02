@@ -29,6 +29,10 @@
  * drawer alone: a team the setup no longer has, and a range that can never
  * apply at any setting (issue #2307, extending #2287's pattern from the
  * Triggers panel).
+ *
+ * An actor standing off the map is said the same way, but as a row-level note
+ * rather than a field problem (issue #2343): its position is dragged on the
+ * map, not typed here, so there is no control for `aria-invalid` to sit on.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -50,7 +54,7 @@ import type { ActorState, Facing, ScenarioActor } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { MIN_ACTOR_HP } from "./editing";
-import { FieldProblem } from "./panels";
+import { FieldProblem, RowProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
 import { entryFieldProblem } from "./triggerProblems";
 
@@ -86,6 +90,7 @@ export function ActorControls({
   const [name, setName] = useFieldText(state.name ?? "");
   const teamDescribedBy = useId();
   const teamProblem = entryFieldProblem(issues, "actors", actor.id, "team");
+  const posProblem = entryFieldProblem(issues, "actors", actor.id, "pos");
 
   return (
     <>
@@ -112,6 +117,7 @@ export function ActorControls({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 space-y-3">
+          <RowProblem problem={posProblem} />
           <Field label="Facing">
             <OptionSelect
               size="sm"

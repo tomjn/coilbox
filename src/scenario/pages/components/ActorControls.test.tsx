@@ -290,3 +290,56 @@ describe("an actor's team the validator has flagged", () => {
     expect(field.getAttribute("aria-describedby")).toBe(message.id);
   });
 });
+
+/**
+ * An actor standing off the map (issue #2343). Its position is dragged on the
+ * map rather than typed here, so there is no field for `aria-invalid` to sit
+ * on: this is a row-level note in the Details popover instead, in the
+ * validator's own words.
+ */
+describe("an actor standing off the map", () => {
+  function withOffMapActor(): Scenario {
+    const base = newScenario("Demo");
+    return {
+      ...base,
+      actors: [
+        {
+          id: "hero",
+          unitDef: "armcom",
+          team: base.setup.participants[0]?.id ?? "you",
+          pos: { x: -50, z: 100 },
+          facing: 0,
+        },
+      ],
+    };
+  }
+
+  function OffMapHarness() {
+    const [document] = useState<Scenario>(withOffMapActor);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <ActorControls
+        actor={document.actors[0]}
+        participants={document.setup.participants}
+        issues={issues}
+        onEdit={() => {}}
+        onState={() => {}}
+      />
+    );
+  }
+
+  it("says so in the Details popover, in the validator's own words", () => {
+    render(<OffMapHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /Details/ }));
+
+    expect(
+      screen.getByText(
+        "-50,100 is off the map. Spring measures a map from its north-west corner, so x and z start at 0.",
+      ),
+    ).toBeTruthy();
+  });
+});
