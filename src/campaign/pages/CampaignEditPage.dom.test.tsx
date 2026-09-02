@@ -30,6 +30,7 @@
  */
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -37,7 +38,15 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useParams } from "react-router";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  Route,
+  type RouteObject,
+  RouterProvider,
+  Routes,
+  useParams,
+} from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The drawer is the app shell's, and nothing opened in it bears on removal.
@@ -871,6 +880,257 @@ describe("two edits made close together", () => {
     await waitFor(() => expect(onDisk).toHaveLength(2));
 
     expect(await screen.findByText(SAVED)).toBeTruthy();
+  });
+});
+
+/**
+ * A file imported and then replaced inside one unwritten save window used to
+ * leak (issue #2374). The clean-up compared the document from before the
+ * window against the one that landed, and a file that arrived and left again
+ * in between was named by neither, so nothing ever deleted it.
+ *
+ * The drawer's `onSave` is grabbed straight off the mocked `drawer.open` call
+ * and invoked directly, rather than through a rendered drawer: the real
+ * drawer waits for the save to finish before it would let a second edit fire,
+ * which is exactly the race this needs to skip past.
+ */
+describe("importing and replacing a mission file before either write lands", () => {
+  /** The `onSave` the last Edit click handed the drawer, callable on its own. */
+  function missionOnSave(): (updated: CampaignMission) => Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const { content } = drawerOpen.mock.calls.at(-1)?.[0] as {
+      content: { props: { onSave: (m: CampaignMission) => Promise<void> } };
+    };
+    return content.props.onSave;
+  }
+
+  it("still deletes a file imported and then cleared before either write lands", async () => {
+    const { onDisk, release } = twoWrites(1);
+    show([mission()]);
+    const onSave = missionOnSave();
+    const base = mission();
+
+    // Import a cutscene, then clear the slot again before the import's own
+    // write has landed: the likelier route the issue describes, since picking
+    // media goes through an OS dialog and two imports in a row will not
+    // normally beat the write.
+    void onSave({ ...base, cutscene: { kind: "file", file: "intro.mp4" } });
+    void onSave({ ...base, cutscene: undefined });
+    release();
+
+    await waitFor(() => expect(onDisk).toHaveLength(2));
+    await waitFor(() =>
+      expect(campaignMediaDelete).toHaveBeenCalledWith({
+        campaignId: "c1",
+        file: "intro.mp4",
+      }),
+    );
+  });
+
+  it("keeps a file cleared and then named again inside the same window", async () => {
+    const { onDisk, release } = twoWrites(1);
+    show([mission()]);
+    const onSave = missionOnSave();
+    const base = mission();
+
+    // Clear the panorama the mission already had on disk, then put the same
+    // file back before either write lands. It passes through an unwritten
+    // document that does not name it, but the document that actually lands
+    // does, so it must survive: gathering files across the window must not
+    // turn into deleting anything that was ever in transit.
+    void onSave({ ...base, panorama: undefined });
+    void onSave({ ...base, panorama: { kind: "file", file: "shore.jpg" } });
+    release();
+
+    await waitFor(() => expect(onDisk).toHaveLength(2));
+    await waitFor(() =>
+      expect(onDisk.at(-1)?.missions[0].panorama).toEqual({
+        kind: "file",
+        file: "shore.jpg",
+      }),
+    );
+    // Long enough for a wrongful delete to have shown up if the fix over-reaches.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+  });
+
+  it("still cleans up a file replaced after its own save has already landed", async () => {
+    show([mission()]);
+    const base = mission();
+
+    // Wrapped in `act` because it calls straight through to `onSave` rather
+    // than going through `fireEvent`, and this test needs React to have
+    // actually applied the resulting state before it reopens the drawer for
+    // the second edit, the way a real second edit would find it.
+    await act(() =>
+      missionOnSave()({
+        ...base,
+        cutscene: { kind: "file", file: "act1.mp4" },
+      }),
+    );
+    campaignMediaDelete.mockClear();
+
+    // Not a race this time: the first import's write has fully landed,
+    // delete included, before the replacement is asked for. Reopening the
+    // drawer picks up a fresh `onSave` bound to the state that write left
+    // behind, the way a real second edit would.
+    await act(() =>
+      missionOnSave()({
+        ...base,
+        cutscene: { kind: "file", file: "act2.mp4" },
+      }),
+    );
+
+    expect(campaignMediaDelete).toHaveBeenCalledWith({
+      campaignId: "c1",
+      file: "act1.mp4",
+    });
+    expect(campaignMediaDelete).not.toHaveBeenCalledWith({
+      campaignId: "c1",
+      file: "act2.mp4",
+    });
+  });
+});
+
+/**
+ * Switching to another campaign while a write for the first is still in
+ * flight (issue #2385). Every in-app link to the editor goes through the
+ * campaign list, which unmounts the page, so this needs a route change that
+ * lands on two edit URLs without unmounting: `createMemoryRouter` plus an
+ * imperative `navigate`, the same shape `OpenFromArchivePage.dom.test.tsx`
+ * uses for the sibling case in issue #1906.
+ *
+ * `undeleted` is keyed to one campaign id, but it only ever initialised when
+ * it was empty, so it never noticed the id underneath it had changed. A drop
+ * made on the newly opened campaign was folded into the old campaign's
+ * pending clean-up instead of its own.
+ */
+describe("switching to another campaign while a write is still in flight", () => {
+  const ROUTES: RouteObject[] = [
+    { path: "/campaign-builder/:id", element: <CampaignEditPage /> },
+  ];
+
+  /** Two campaigns, each with one mission holding one imported panorama, so
+   *  a drop on either is a file the other must never be handed. */
+  function showTwoCampaigns() {
+    useCampaigns.mockReturnValue({
+      campaigns: [
+        {
+          campaign: {
+            ...campaign([
+              {
+                ...plain("m1", "Alpha"),
+                panorama: { kind: "file", file: "shore.jpg" },
+              },
+            ]),
+            id: "c1",
+          },
+          source: "local",
+        },
+        {
+          campaign: {
+            ...campaign([
+              {
+                ...plain("m2", "Bravo"),
+                panorama: { kind: "file", file: "beach.jpg" },
+              },
+            ]),
+            id: "c2",
+            title: "Second campaign",
+          },
+          source: "local",
+        },
+      ],
+      loading: false,
+      error: null,
+    });
+    useScenarios.mockReturnValue({ scenarios: [], loading: false });
+    const router = createMemoryRouter(ROUTES, {
+      initialEntries: ["/campaign-builder/c1"],
+    });
+    render(<RouterProvider router={router} />);
+    return router;
+  }
+
+  /** Hold the first write to `campaignSave` open until `release()`, so every
+   *  edit asked for while it is still in flight queues up behind it rather
+   *  than landing before the next one is even asked for. Later calls fall
+   *  back to the default mock, which resolves at once. */
+  function holdFirstSave(): { release: () => void } {
+    let resolve = () => {};
+    const gate = new Promise<void>((r) => {
+      resolve = r;
+    });
+    campaignSave.mockImplementationOnce(async () => {
+      await gate;
+      return {};
+    });
+    return { release: () => resolve() };
+  }
+
+  function removeMission(title: string) {
+    fireEvent.click(screen.getByRole("button", { name: `Remove ${title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  }
+
+  it("still deletes the newly opened campaign's own dropped file, rather than leaving it untracked", async () => {
+    const { release } = holdFirstSave();
+    const router = showTwoCampaigns();
+
+    // Drop c1's panorama. The write is held, so nothing has landed yet.
+    removeMission("Alpha");
+
+    await act(async () => {
+      await router.navigate("/campaign-builder/c2");
+    });
+    await screen.findByText("1. Bravo");
+
+    // Drop c2's own panorama, while c1's write from before the switch is
+    // still unwritten.
+    removeMission("Bravo");
+    release();
+
+    await waitFor(() =>
+      expect(campaignMediaDelete).toHaveBeenCalledWith({
+        campaignId: "c2",
+        file: "beach.jpg",
+      }),
+    );
+  });
+
+  it("never hands campaign B's file to campaign A's delete pass", async () => {
+    const { release } = holdFirstSave();
+    const router = showTwoCampaigns();
+
+    // c1: drop the panorama, write held.
+    removeMission("Alpha");
+
+    await act(async () => {
+      await router.navigate("/campaign-builder/c2");
+    });
+    await screen.findByText("1. Bravo");
+
+    // c2: drop its own panorama while c1's write is still unwritten.
+    removeMission("Bravo");
+
+    await act(async () => {
+      await router.navigate("/campaign-builder/c1");
+    });
+    await screen.findByText("1. Alpha");
+
+    // c1 again: a second drop, which becomes the last write asked for and so
+    // the only one whose clean-up runs.
+    removeMission("Alpha");
+    release();
+
+    await waitFor(() => expect(campaignMediaDelete).toHaveBeenCalled());
+    // Long enough for a call using the wrong campaign id to have shown up.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(campaignMediaDelete).not.toHaveBeenCalledWith({
+      campaignId: "c1",
+      file: "beach.jpg",
+    });
   });
 });
 
