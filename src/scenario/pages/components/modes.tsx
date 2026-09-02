@@ -156,7 +156,8 @@ export interface EditorMode {
   id: string;
   label: string;
   icon: LucideIcon;
-  /** One line under the strip saying what a click will do. */
+  /** What a click will do, said in the strip under the map alongside the
+   *  gestures that are true whatever the mode (issue #2285). */
   hint: string;
   /** Resolve the mode against the current document. A hook. */
   use: (ctx: ModeContext) => ModeBehaviour;
@@ -169,7 +170,10 @@ const selectMode: EditorMode = {
   id: "select",
   label: "Select",
   icon: MousePointer2,
-  hint: "Drag a unit to move it. Click a zone, then drag its orange middle handle to move that. Click bare ground to deselect.",
+  // Dragging a unit and dragging a zone's handle are true in every mode, so the
+  // strip under the map says both for all of them. This says the one thing that
+  // is only true here (issue #2285).
+  hint: "Click bare ground to deselect.",
   use: () => ({ place: null }),
 };
 

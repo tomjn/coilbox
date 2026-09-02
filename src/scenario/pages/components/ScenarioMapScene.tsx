@@ -60,10 +60,8 @@ import {
 } from "@/placement/placements";
 import { clampToMap } from "@/placement/pointer";
 import {
-  nudgeSentence,
   previewChecks,
-  previewSentence,
-  previewTrouble,
+  previewNote,
   turnedMarks,
   withoutBuilding,
 } from "@/placement/preview";
@@ -510,6 +508,11 @@ export const ScenarioMapScene = forwardRef<
     ? movingBase
     : null;
 
+  // Whether the map is waiting for a point: a path being drawn, a base being
+  // moved, or a point a panel asked for. While one of those is outstanding its
+  // bar is the only thing the map says over the terrain (issue #2285).
+  const answering = !!(drawingPath || moving || picking);
+
   // Answering a question the author asked is what a click means while one is
   // outstanding, in whatever mode: a point on a path being drawn, or the place
   // a base is being moved to, rather than something new being placed.
@@ -567,6 +570,11 @@ export const ScenarioMapScene = forwardRef<
     occupied: footprints,
     placements: units.placements,
   });
+  // The one thing said over the terrain about where the pointer is: what the
+  // squares under it mean and where the whole thing would fit instead, in one
+  // sentence, and nothing at all while a question is waiting for a click
+  // (issue #2285).
+  const spot = previewNote(preview.count, preview.nudge, answering);
 
   // Taking the offer of a spot the layout fits (issue #1482). A key rather than
   // a button, because the offer is about where the pointer is and the pointer
@@ -942,41 +950,24 @@ export const ScenarioMapScene = forwardRef<
             </TooltipProvider>
             {behaviour.controls}
           </div>
-          <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-            {mode.hint}
-          </p>
           {/* What the squares under the pointer are saying, said in words as
               well: a mark is a colour, and a colour on its own is not a
-              statement anybody can act on (issue #1464). */}
-          {preview.count && (
+              statement anybody can act on (issue #1464). It carries the offer
+              of a spot the whole thing fits (issue #1482) in the same breath,
+              because the offer only exists where the spot is trouble, and two
+              chips for one thought was two rows of the wall this column had
+              become (issue #2285). */}
+          {spot && (
             <p
               className={`w-fit rounded px-2 py-1 text-[11px] backdrop-blur ${
-                previewTrouble(preview.count)
+                spot.trouble
                   ? "bg-amber-950/80 text-amber-200"
                   : "bg-card/70 text-muted-foreground"
               }`}
             >
-              {previewSentence(preview.count)}
+              {spot.text}
             </p>
           )}
-          {/* Where it would fit instead, offered rather than done: the engine
-              builds one of a pair of overlapping buildings, and a ruined base
-              with buildings inside each other is a real thing an author might
-              mean, so nothing moves until somebody asks (issue #1482). */}
-          {preview.nudge && (
-            <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-              {nudgeSentence(preview.nudge)}
-            </p>
-          )}
-          {/* What is true of the whole map at once, said once here rather than
-              per base in a popover two clicks away (issue #1496). Held back
-              until the reads have settled, so an editor opening does not greet
-              anybody with a warning that clears itself. */}
-          <UncheckedNote
-            unchecked={units.settled ? sceneUnchecked(footprints) : null}
-            flattened={units.heightsUnread}
-          />
-          <WaterlessNote floor={waterless} />
           {picked && (
             <ScenarioSelectionBar
               placement={picked}
@@ -1315,16 +1306,42 @@ export const ScenarioMapScene = forwardRef<
         </>
       }
       note={
-        <UnitsNote
-          units={units}
-          gameName={scenario.setup.gameName}
-          drawing={units.drawing}
-        />
+        <>
+          {/* What is true of the whole map at once, said once rather than per
+              base in a popover two clicks away (issue #1496). Held back until
+              the reads have settled, so an editor opening does not greet
+              anybody with a warning that clears itself.
+
+              Down here with the count of what was drawn rather than over the
+              ground the author is working on (issue #2285): all three are
+              statements about how far the whole scene can be trusted, none of
+              them changes while anybody works, and none is answered by doing
+              anything to the spot under the pointer. Left-aligned inside a
+              corner that otherwise right-aligns, because these are sentences
+              rather than the tally under them. */}
+          <div className="flex max-w-full flex-col items-end gap-1 text-left">
+            <UncheckedNote
+              unchecked={units.settled ? sceneUnchecked(footprints) : null}
+              flattened={units.heightsUnread}
+            />
+            <WaterlessNote floor={waterless} />
+          </div>
+          <UnitsNote
+            units={units}
+            gameName={scenario.setup.gameName}
+            drawing={units.drawing}
+          />
+        </>
       }
+      // What the hands do here, which is the mode's own line as much as it is
+      // the camera's (issue #2285). It was a chip over the terrain, and in
+      // Select mode it said word for word what the rest of this strip already
+      // said.
       footer={
         <>
-          {mapName} · drag or middle-drag to pan · drag a unit to move it · drag
-          a zone's middle handle to move it · right-drag to turn the view
+          {mapName} · {mode.hint} · drag or middle-drag to pan · drag a unit to
+          move it · drag a zone's middle handle to move it · right-drag to turn
+          the view
         </>
       }
     />

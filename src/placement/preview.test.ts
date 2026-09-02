@@ -23,6 +23,7 @@ import {
   previewChecks,
   previewCount,
   previewMovable,
+  previewNote,
   previewSentence,
   previewTrouble,
   sameCount,
@@ -729,5 +730,59 @@ describe("turnedMarks", () => {
     for (const key of ["actor:a1", "group:g1#0", "base:b9#0", "nonsense"]) {
       expect(turnedMarks(doc, key, footprintOf, [], standingOf)).toEqual([]);
     }
+  });
+});
+
+/** Issue #2285: which of the map's notes belongs over the terrain, and how many
+ *  of them at once. */
+describe("previewNote", () => {
+  const clean = {
+    total: 2,
+    clashes: 0,
+    unstable: 0,
+    tooDeep: 0,
+    tooShallow: 0,
+    unjudged: 0,
+    absent: 0,
+  };
+  const clashing = { ...clean, clashes: 1 };
+
+  it("says nothing when the pointer is carrying nothing", () => {
+    expect(previewNote(null, null, false)).toBeNull();
+  });
+
+  it("says what the squares mean, and is not a warning when they are fine", () => {
+    expect(previewNote(clean, null, false)).toEqual({
+      text: "2 buildings, and they all have room here.",
+      trouble: false,
+    });
+  });
+
+  it("carries the offer of a better spot in the same sentence", () => {
+    expect(
+      previewNote(
+        clashing,
+        { delta: { x: 32, z: 0 }, squares: { x: 2, z: 0 } },
+        false,
+      ),
+    ).toEqual({
+      text: "1 of 2 wants ground another building has, in red. Press N to put it down 2 squares east instead, outlined, where it fits.",
+      trouble: true,
+    });
+  });
+
+  it("says so when the search found nowhere, still in one sentence", () => {
+    expect(previewNote(clashing, "nowhere", false)).toEqual({
+      text: `1 of 2 wants ground another building has, in red. Nothing within ${NUDGE_LIMIT} squares of here fits.`,
+      trouble: true,
+    });
+  });
+
+  /** The click that is coming answers the question rather than placing what the
+   *  pointer holds, so a sentence about where that would land is about a click
+   *  nobody is about to make. */
+  it("stands down while the map is waiting for a point", () => {
+    expect(previewNote(clean, null, true)).toBeNull();
+    expect(previewNote(clashing, "nowhere", true)).toBeNull();
   });
 });

@@ -617,3 +617,40 @@ export function previewSentence(count: PreviewCount): string {
   }
   return parts.join(" ") + unjudgedClause(count);
 }
+
+/** The one thing the map says over the terrain about the spot under the
+ *  pointer, from {@link previewNote}. */
+export interface PreviewNote {
+  text: string;
+  /** Whether this is a warning, which is what colours it amber. */
+  trouble: boolean;
+}
+
+/**
+ * What the map says over the terrain about the spot under the pointer, as one
+ * sentence (issue #2285).
+ *
+ * The count and the offer were two chips, one under the other, and they are
+ * never apart: an offer exists only where the spot is trouble that a different
+ * spot could put right. Saying them together is what lets the surface hold
+ * itself to a single note over the ground the author is working on.
+ *
+ * Nothing at all while the map is waiting for a point. A click then answers
+ * that question rather than placing what the pointer is carrying, so a sentence
+ * about where that would land describes a click nobody is about to make.
+ */
+export function previewNote(
+  count: PreviewCount | null,
+  nudge: NudgeOffer,
+  /** Whether a bar is waiting for a point: a path being drawn, a base being
+   *  moved, or a point a panel asked for. */
+  answering: boolean,
+): PreviewNote | null {
+  if (!count || answering) return null;
+  const offer = nudgeSentence(nudge);
+  const said = previewSentence(count);
+  return {
+    text: offer ? `${said} ${offer}` : said,
+    trouble: previewTrouble(count),
+  };
+}
