@@ -132,7 +132,7 @@ import {
 } from "./groups";
 import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
-import { moveOnMap } from "./mapKeyboard";
+import { moveOnMap, pointFrom } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
@@ -1473,23 +1473,6 @@ function PointFields({
       </Button>
     </form>
   );
-}
-
-/** The point two typed fields name, or null when they do not name one on this
- *  map. Whole elmos, which is what a scenario stores. */
-export function pointFrom(
-  x: string,
-  z: string,
-  worldWidth: number,
-  worldHeight: number,
-): Point | null {
-  const east = Number(x.trim());
-  const south = Number(z.trim());
-  if (!x.trim() || !z.trim()) return null;
-  if (!Number.isFinite(east) || !Number.isFinite(south)) return null;
-  if (east < 0 || east > worldWidth) return null;
-  if (south < 0 || south > worldHeight) return null;
-  return { x: Math.round(east), z: Math.round(south) };
 }
 
 /**

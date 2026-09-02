@@ -228,7 +228,10 @@ export function thingWords(things: MapThings, key: string): string {
       : placement.kind === "group"
         ? `unit ${placement.index + 1}`
         : `building ${placement.index + 1}`;
-  const named = entry ? `${entry.label}, ` : "";
+  // An actor nobody has named is listed under its own unit type, so saying the
+  // entry's name as well would be saying "armcom, actor, armcom".
+  const named =
+    entry && entry.label !== placement.def ? `${entry.label}, ` : "";
   return `${named}${where}, ${placement.def}`;
 }
 
@@ -305,6 +308,33 @@ export function placeInList(
   const at = here ? entries.findIndex((entry) => entry.key === here) : -1;
   if (at < 0) return "";
   return ` ${at + 1} of ${entries.length}.`;
+}
+
+/**
+ * The point two typed fields name, or null when they do not name one on this
+ * map.
+ *
+ * The answer to a question the map is waiting for that needs no map at all
+ * (issue #2269). A trigger's point is often one the author already has, copied
+ * off another trigger or read off a start position, and it is the one way of
+ * answering that asks nothing of eyesight or of a steady hand.
+ *
+ * Held to the map, because a point off it is a point the mission cannot use, and
+ * rounded to whole elmos, which is what a scenario stores.
+ */
+export function pointFrom(
+  x: string,
+  z: string,
+  worldWidth: number,
+  worldHeight: number,
+): Point | null {
+  const east = Number(x.trim());
+  const south = Number(z.trim());
+  if (!x.trim() || !z.trim()) return null;
+  if (!Number.isFinite(east) || !Number.isFinite(south)) return null;
+  if (east < 0 || east > worldWidth) return null;
+  if (south < 0 || south > worldHeight) return null;
+  return { x: Math.round(east), z: Math.round(south) };
 }
 
 /**
