@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario, ScenarioObjective } from "../../model";
+import { notifyDeleted } from "./deleteNotice";
 import { EditorPanel, TextField } from "./panels";
 import {
   addObjective,
@@ -38,9 +39,14 @@ import {
 export function ObjectivePanel({
   scenario,
   onChange,
+  onUndo,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
+  /** The page's own step back, the same one Cmd+Z and the map toolbar call.
+   *  Handed to a delete's undo notice so that button does exactly what the
+   *  shortcut does rather than a second way of getting there (issue #2280). */
+  onUndo: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
@@ -106,6 +112,7 @@ export function ObjectivePanel({
               scenario={scenario}
               onChange={onChange}
               onSelect={setSelectedId}
+              onUndo={onUndo}
             />
           </div>
         )}
@@ -151,17 +158,28 @@ function ObjectiveRow({
   );
 }
 
+/** What the delete notice calls an objective: its own words if it has any,
+ *  cut short so the toast reads as a line rather than a paragraph, and the id
+ *  it was minted with if the author deleted it before typing anything. */
+function objectiveLabel(objective: ScenarioObjective): string {
+  const text = objective.text.trim();
+  if (!text) return objective.id;
+  return text.length > 40 ? `${text.slice(0, 40)}…` : text;
+}
+
 /** The selected objective: its id, its words, and how it is shown. */
 function ObjectiveForm({
   objective,
   scenario,
   onChange,
   onSelect,
+  onUndo,
 }: {
   objective: ScenarioObjective;
   scenario: Scenario;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
+  onUndo: () => void;
 }) {
   const edit = (patch: Partial<Omit<ScenarioObjective, "id">>) =>
     onChange(editObjective(scenario, objective.id, patch));
@@ -206,6 +224,10 @@ function ObjectiveForm({
           onClick={() => {
             onChange(removeObjective(scenario, objective.id));
             onSelect(null);
+            notifyDeleted(
+              `Deleted objective "${objectiveLabel(objective)}".`,
+              onUndo,
+            );
           }}
         >
           <Trash2 className="size-3.5" /> Delete
