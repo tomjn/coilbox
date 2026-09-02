@@ -70,6 +70,7 @@ import {
   nextZoneName,
   type ZoneShape,
   zoneFromDrag,
+  zoneFromPoint,
   zoneKey,
 } from "./zones";
 
@@ -189,13 +190,23 @@ const zonesMode: EditorMode = {
   id: "zones",
   label: "Zones",
   icon: Square,
-  hint: "Drag anywhere to draw a zone, inside another one if you like. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on.",
+  hint: "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on.",
   use: ({ onChange, onSelect }) => {
     const [shape, setShape] = useState<ZoneShape>("box");
     const [draft, setDraft] = useState<ScenarioZone | null>(null);
 
     return {
-      place: null,
+      // A keyboard press has one point, not two, so Enter cannot draw a zone
+      // corner to corner the way a drag does. It puts one down at the default
+      // size instead, selected straight away so an author can size it with
+      // the S key and the arrows (issue #2313).
+      place: (pos: Point) => {
+        const id = crypto.randomUUID();
+        onChange((doc) =>
+          addZone(doc, zoneFromPoint(shape, pos, id, nextZoneName(doc.zones))),
+        );
+        onSelect(zoneKey(id));
+      },
       // Left undefined rather than empty when there is no draft, so the surface
       // is handed the same list twice running and does not redraw for nothing.
       draftZones: draft ? [draft] : undefined,
@@ -686,3 +697,9 @@ export const EDITOR_MODES: EditorMode[] = [
 /** The mode that places a whole layout, which the contents list switches to
  *  when an author asks to put an unplaced one back (issue #1450). */
 export const LAYOUTS_MODE_ID = layoutsMode.id;
+
+/** The mode that draws zones, which the surface has to know apart from the
+ *  others now that it places as well as draws (issue #2313): a zone's own
+ *  handles have to stay pickable by pointer even while a click on bare ground
+ *  places one, which is not true of the other modes that place something. */
+export const ZONES_MODE_ID = zonesMode.id;
