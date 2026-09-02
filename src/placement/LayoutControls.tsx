@@ -264,8 +264,8 @@ export function LayoutNotes({
 
       {elsewhere && (
         <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
-          Drawn for {designedFor}. A layout shaped around one map's terrain does
-          not always fit another's.
+          Drawn for {designedFor}. A blueprint shaped around one map's terrain
+          does not always fit another's.
         </p>
       )}
 
@@ -359,8 +359,8 @@ export function WaterlessNote({
     <p className="w-fit rounded bg-cyan-950/80 px-2 py-1 text-[11px] text-cyan-200 backdrop-blur">
       This map has no water on it: nothing on it is below the waterline, and its
       lowest ground is {Math.round(floor)} elmos. Every building here that needs
-      water is refused wherever it stands, marked in cyan. This layout wants a
-      map with a coast rather than a different spot on this one.
+      water is refused wherever it stands, marked in cyan. This blueprint wants
+      a map with a coast rather than a different spot on this one.
     </p>
   );
 }
@@ -473,8 +473,9 @@ export function BuildOrderPopover({
             </ol>
 
             <p className="text-[11px] text-muted-foreground">
-              The selected building is the one in green. The order is the layout
-              itself, so a base placed from it anywhere is built the same way.
+              The selected building is the one in green. The order is the
+              blueprint itself, so a base placed from it anywhere is built the
+              same way.
             </p>
 
             <div className="flex items-center gap-1.5 border-t border-border/60 pt-3">
@@ -501,8 +502,9 @@ export function BuildOrderPopover({
         ) : (
           <p className="text-xs text-muted-foreground">
             These buildings are in the order they were clicked, which is not an
-            opening. Turn this on to say what gets built first, and the layout
-            becomes a build order that can be followed, watched and shared.
+            opening. Turn this on to say what gets built first, and the
+            blueprint becomes a build order that can be followed, watched and
+            shared.
           </p>
         )}
       </PopoverContent>

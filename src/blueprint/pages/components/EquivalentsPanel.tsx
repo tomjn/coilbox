@@ -138,11 +138,11 @@ export function EquivalentsPanel({
       </div>
       <p className="max-w-prose text-xs text-muted-foreground">
         Which of this game's buildings coilbox treats as each side's version of
-        the same thing. It uses these first when a layout of this game is said
-        in another side, ahead of anything it can read off a unit's name. Each
-        answer says where it came from: you picked it while converting, or this
-        game's own published table brought it when you asked coilbox to read
-        one.
+        the same thing. It uses these first when a blueprint of this game is
+        said in another side, ahead of anything it can read off a unit's name.
+        Each answer says where it came from: you picked it while converting, or
+        this game's own published table brought it when you asked coilbox to
+        read one.
         {mixed &&
           ` The ${mine} holding an answer you gave ${mine === 1 ? "is" : "are"} first, because reading a game's table brings enough at once to lose them in.`}
       </p>
@@ -224,7 +224,7 @@ export function EquivalentsPanel({
         </ul>
       )}
       <p className="max-w-prose text-xs text-muted-foreground">
-        Forgetting one is how a wrong answer is corrected. The next layout of
+        Forgetting one is how a wrong answer is corrected. The next blueprint of
         this game you convert asks about it again, and keeps whatever you say
         then.
         {anyUnsourced &&

@@ -239,14 +239,14 @@ export function sourceSummary(source: BlueprintSource): string {
 function summaryOf(source: BlueprintSource): string {
   switch (source.kind) {
     case "pack":
-      return `Imported from a file of layouts, ${source.file}.`;
+      return `Imported from a file of blueprints, ${source.file}.`;
     case "file":
       return `Imported from the file ${source.file}.`;
     case "code":
       // The honest answer rather than a shrug. A code is the layout and
       // nothing else, so there is no file, no author and no site to name, and
       // saying so beats a card that looks like it forgot.
-      return "Imported from a code somebody shared. A code carries the layout and nothing about where it came from, so that is the whole of what is known about it.";
+      return "Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it.";
     case "hub":
       return source.author
         ? `Imported from the community hub, published by ${source.author}.`
@@ -314,7 +314,7 @@ function parseBlueprintSource(value: unknown): BlueprintSource | undefined {
 }
 
 /** What a layout is called when its author has not said. */
-export const UNTITLED = "Untitled layout";
+export const UNTITLED = "Untitled blueprint";
 
 /** The archive name of the game a layout's unit names belong to, or empty when
  *  it names none. */
@@ -467,7 +467,7 @@ export function libraryGames(records: StoredBlueprint[]): string[] {
  * up.
  *
  * Two layouts of one name are legal, because the id is what tells them apart,
- * but a library where three cards say "Untitled layout" is a library nobody can
+ * but a library where three cards say "Untitled blueprint" is a library nobody can
  * use. Case-insensitive, because two names differing only in case read as the
  * same name.
  */

@@ -359,7 +359,7 @@ describe("SubstitutionPanel", () => {
         "armmex",
       );
       const html = markup({ sides: [], table: opaque });
-      expect(html).toContain("Say this layout in");
+      expect(html).toContain("Say this blueprint in");
       expect(html).not.toContain("says nothing about which of its buildings");
     });
   });

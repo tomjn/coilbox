@@ -366,6 +366,6 @@ describe("uniqueLayoutName", () => {
   });
 
   it("falls back to a name when it is given none", () => {
-    expect(uniqueLayoutName("   ", [])).toBe("Untitled layout");
+    expect(uniqueLayoutName("   ", [])).toBe("Untitled blueprint");
   });
 });

@@ -21,7 +21,7 @@ export function BlueprintPackWriteButton({
   const openWrite = async () => {
     const { WritePackForm } = await import("./WritePackForm");
     drawer.open({
-      title: "Save a pack of layouts",
+      title: "Save a pack of blueprints",
       // As wide as the one that reads a pack: the same rows with the same
       // drawings on them want the same room.
       width: "34rem",

@@ -396,7 +396,7 @@ export function BlueprintEditor({
         ground={{ kind: "grid", extent: GRID_EXTENT }}
         onScene={setHandle}
         frame={frame}
-        frameLabel="Frame layout"
+        frameLabel="Frame blueprint"
         chrome={undoRedo && <HistoryControls {...undoRedo} />}
         bars={
           <>
@@ -438,10 +438,10 @@ export function BlueprintEditor({
                     }
                   />
                   <p className="text-xs text-muted-foreground">
-                    A layout is a shape rather than a place, so there is no map
-                    here and no team. Every building sits at an offset from the
-                    layout's own middle, and the squares under them are the
-                    ground the engine will give them.
+                    A blueprint is a shape rather than a place, so there is no
+                    map here and no team. Every building sits at an offset from
+                    the blueprint's own middle, and the squares under them are
+                    the ground the engine will give them.
                   </p>
                   <LayoutNotes
                     overlaps={overlaps}
@@ -491,7 +491,7 @@ export function BlueprintEditor({
 
             <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
               {unitDef
-                ? "Click the ground to put one down. Escape stops placing. Drag a building to move it within the layout."
+                ? "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
                 : "Pick a building to start placing. Drag one to move it, click bare ground to deselect."}
             </p>
 
@@ -598,7 +598,7 @@ function DrawnNote({
 }) {
   if (placed === 0) return null;
   const problem = gameMissing
-    ? `${gameName || "This layout's game"} is not installed, so nothing can be drawn with its models.`
+    ? `${gameName || "This blueprint's game"} is not installed, so nothing can be drawn with its models.`
     : missing.length > 0
       ? `${missing.length} unit type${missing.length === 1 ? "" : "s"} not in ${gameName}, drawn as boxes: ${missing.join(", ")}`
       : null;

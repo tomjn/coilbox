@@ -252,8 +252,8 @@ function PackSideChoiceList({
     <div className="flex flex-col gap-2 rounded border border-border/50 p-2">
       <p className="text-xs text-muted-foreground">
         {offer.from.length === 1
-          ? `These are ${offer.from[0]}'s layouts, and this game has another side's version of what is in them.`
-          : `These layouts are ${offer.from.join(" and ")}'s.`}{" "}
+          ? `These are ${offer.from[0]}'s blueprints, and this game has another side's version of what is in them.`
+          : `These blueprints are ${offer.from.join(" and ")}'s.`}{" "}
         Coilbox does not know which side you play, so they are kept as they are
         unless you say otherwise.
       </p>

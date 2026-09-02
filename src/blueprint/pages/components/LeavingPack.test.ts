@@ -83,14 +83,14 @@ describe("LeavingPack", () => {
 
   it("counts what is ticked on the button that writes it", () => {
     expect(markup()).toContain("2 of 3 ticked");
-    expect(markup()).toContain("2 layouts");
-    expect(markup({ taking: new Set(["a"]) })).toContain("1 layout");
+    expect(markup()).toContain("2 blueprints");
+    expect(markup({ taking: new Set(["a"]) })).toContain("1 blueprint");
   });
 
   it("names what a game's file has nowhere to keep, next to the button", () => {
     const html = markup();
-    expect(html).toContain("which game 2 layouts are for");
-    expect(html).toContain("the footprints 2 layouts carry");
+    expect(html).toContain("which game 2 blueprints are for");
+    expect(html).toContain("the footprints 2 blueprints carry");
   });
 
   it("says nothing about losses when there is nothing to lose", () => {

@@ -177,7 +177,7 @@ export default function BlueprintDetailPage() {
         {error ? (
           <ErrorBanner message={error} />
         ) : (
-          <EmptyState label="That layout isn't in your library. It may have been deleted." />
+          <EmptyState label="That blueprint isn't in your library. It may have been deleted." />
         )}
       </div>
     );
@@ -418,7 +418,7 @@ function DuplicateBlueprintButton({
       toast.success(`"${copy.layout.name}" is yours to change.`);
       navigate(blueprintRoute(copy.id));
     } catch (e) {
-      toast.error(`That layout could not be copied: ${message(e)}`);
+      toast.error(`That blueprint could not be copied: ${message(e)}`);
     } finally {
       setBusy(false);
     }

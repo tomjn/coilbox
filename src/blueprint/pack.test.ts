@@ -472,9 +472,9 @@ describe("packStrips", () => {
       kept({ game: { name: GAME, shortname: "BA" } }),
     ]);
     expect(said).toEqual([
-      "the map 1 layout was designed for",
-      "which game 2 layouts are for",
-      "the footprints 1 layout carries",
+      "the map 1 blueprint was designed for",
+      "which game 2 blueprints are for",
+      "the footprints 1 blueprint carries",
     ]);
   });
 
@@ -492,7 +492,7 @@ describe("packWriteSummary", () => {
         kept: 0,
       }),
     ).toBe(
-      "Wrote into /games/blueprints.json: added 2 layouts and replaced 1 layout.",
+      "Wrote into /games/blueprints.json: added 2 blueprints and replaced 1 blueprint.",
     );
   });
 
@@ -503,7 +503,7 @@ describe("packWriteSummary", () => {
       kept: 2,
       backup: "/games/blueprints.json.20260813-090530.bak",
     });
-    expect(said).toContain("added 1 layout.");
+    expect(said).toContain("added 1 blueprint.");
     expect(said).toContain(
       "The file it was is kept at /games/blueprints.json.20260813-090530.bak.",
     );

@@ -169,7 +169,7 @@ export function ImportPackForm({
     setError(null);
     try {
       const src = await open({
-        title: "Open a file of layouts",
+        title: "Open a file of blueprints",
         multiple: false,
         filters: [{ name: "Blueprints", extensions: ["json"] }],
       });
@@ -222,10 +222,10 @@ export function ImportPackForm({
     <div className="flex flex-col">
       <div className="flex flex-col gap-3 p-4">
         <p className="text-xs text-muted-foreground">
-          A file of layouts is what the community gallery hands you, and what a
-          game writes its own saved bases into. Coilbox reads every layout in
-          it, draws each one, and keeps only the ones you tick. The file itself
-          is never written to.
+          A file of blueprints is what the community gallery hands you, and what
+          a game writes its own saved bases into. Coilbox reads every blueprint
+          in it, draws each one, and keeps only the ones you tick. The file
+          itself is never written to.
         </p>
         <Button variant="outline" className="gap-1.5" onClick={pickFile}>
           <FolderOpen className="size-4" />
@@ -257,7 +257,7 @@ export function ImportPackForm({
         <p className="border-t px-4 py-4 text-xs text-muted-foreground">
           {identify(file.text).kind === "blueprint"
             ? "That is a single coilbox blueprint rather than a file of them. Import it with the Import button instead."
-            : "There are no layouts in this file that coilbox can read."}
+            : "There are no blueprints in this file that coilbox can read."}
         </p>
       ) : null}
 
