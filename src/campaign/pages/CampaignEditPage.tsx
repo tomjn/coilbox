@@ -603,27 +603,36 @@ export default function CampaignEditPage() {
                   className="overflow-hidden rounded-lg border border-border/50 bg-card"
                 >
                   {/* Header strip: the mission panorama, with the map minimap
-                      overlaid so a mission is identifiable at a glance. */}
-                  <div className="relative h-20">
-                    {m.panorama ? (
-                      <PanoramaScroller
-                        campaignId={campaign.id}
-                        panorama={m.panorama}
-                        className="h-20 rounded-none"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center bg-muted text-xs text-muted-foreground">
-                        No panorama
-                      </div>
-                    )}
-                    {thumb && (
-                      <img
-                        src={thumb}
-                        alt=""
-                        className="absolute right-2 top-2 size-16 rounded border border-black/50 object-cover shadow-md"
-                      />
-                    )}
-                  </div>
+                      overlaid so a mission is identifiable at a glance. With
+                      no panorama the minimap is the mission's real identity,
+                      so it fills a slimmer band instead of a full-height strip
+                      captioning the absence. With neither, there is nothing
+                      to show and the strip is skipped rather than left as an
+                      empty band. */}
+                  {(m.panorama || thumb) && (
+                    <div className={m.panorama ? "relative h-20" : "h-10"}>
+                      {m.panorama ? (
+                        <PanoramaScroller
+                          campaignId={campaign.id}
+                          panorama={m.panorama}
+                          className="h-20 rounded-none"
+                        />
+                      ) : (
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="h-10 w-full rounded-none object-cover"
+                        />
+                      )}
+                      {m.panorama && thumb && (
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="absolute right-2 top-2 size-16 rounded border border-black/50 object-cover shadow-md"
+                        />
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-3 p-3">
                     <div className="flex flex-col">
