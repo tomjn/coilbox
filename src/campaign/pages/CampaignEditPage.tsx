@@ -487,7 +487,7 @@ export default function CampaignEditPage() {
         onOpenChange={setStoredArtOpen}
         className="flex flex-col gap-2"
       >
-        <h2 className="text-sm font-medium">
+        <h2 className="text-base font-semibold">
           <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md py-1 text-left hover:text-foreground/80">
             <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
             Presentation
@@ -557,7 +557,7 @@ export default function CampaignEditPage() {
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">
+          <h2 className="text-base font-semibold">
             Missions ({campaign.missions.length})
           </h2>
           <div className="flex flex-wrap items-center gap-2">
