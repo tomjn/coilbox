@@ -11,7 +11,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { type SaveState, SaveStatus } from "@/components/SaveStatus";
 import {
@@ -143,6 +143,14 @@ export default function ScenarioEditPage() {
     scenario,
     mapExtent,
     gameUnits.loading ? undefined : gameUnits.units,
+  );
+  // The same problems, flattened for the panels that put one next to the
+  // field it is about (issue #2287). The drawer keeps the split between what
+  // stops a launch and what merely plays wrong. A field just needs to know
+  // whether it is the reason, not which of the two lists that reason sits in.
+  const missionIssues = useMemo(
+    () => [...problems.blocking, ...problems.warnings],
+    [problems],
   );
   const problemCount = missionProblemCount(
     problems.blocking.length,
@@ -607,6 +615,7 @@ export default function ScenarioEditPage() {
           gate={gate}
           extensions={extensions}
           note={note}
+          issues={missionIssues}
           picking={pick}
           onPick={setPick}
           onUndo={undo}

@@ -94,6 +94,7 @@ function StepHarness({
         unsupported={undefined}
         units={[]}
         unitsLoading={false}
+        issues={[]}
         picking={null}
         onPick={() => {}}
         onParam={(name, value) => {

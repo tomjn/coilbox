@@ -29,10 +29,12 @@ import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import type { PaletteGate } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";
+import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { notifyDeleted } from "./deleteNotice";
 import { EditorPanel, FieldProblem } from "./panels";
 import { AddStep, StepRow } from "./TriggerSteps";
+import { triggerFieldProblem } from "./triggerProblems";
 import {
   addStep,
   addTrigger,
@@ -84,6 +86,7 @@ export function TriggerPanel({
   gate,
   extensions,
   note,
+  issues,
   picking,
   onPick,
   onUndo,
@@ -99,6 +102,10 @@ export function TriggerPanel({
   extensions: ExtensionTypes;
   /** Which runtime the palette is measured against, when it stops anything. */
   note: string | null;
+  /** What the validator has found wrong with the mission, so the field a
+   *  problem is about can say what it is rather than leaving that to the
+   *  problems drawer alone (issue #2287). */
+  issues: MissionIssue[];
   /** The point the map is waiting for, or null when it is not waiting. */
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
@@ -184,6 +191,7 @@ export function TriggerPanel({
               unitDefs={unitDefs}
               gate={gate}
               extensions={extensions}
+              issues={issues}
               picking={picking}
               onPick={onPick}
               onChange={onChange}
@@ -253,6 +261,7 @@ function TriggerForm({
   unitDefs,
   gate,
   extensions,
+  issues,
   picking,
   onPick,
   onChange,
@@ -269,6 +278,8 @@ function TriggerForm({
   /** The types the scenario's game declares for itself, which both pickers
    *  offer on top of coilbox's own. */
   extensions: ExtensionTypes;
+  /** What the validator has found wrong with the mission (issue #2287). */
+  issues: MissionIssue[];
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
@@ -386,6 +397,7 @@ function TriggerForm({
         <DifficultyRangeFields
           value={trigger.difficulty}
           onChange={(difficulty) => edit({ difficulty })}
+          problem={triggerFieldProblem(issues, trigger.id, "difficulty")}
         />
       </div>
 
@@ -398,6 +410,7 @@ function TriggerForm({
         unitDefs={unitDefs}
         gate={gate.conditions}
         extensions={extensions}
+        issues={issues}
         picking={picking}
         onPick={onPick}
         onChange={onChange}
@@ -411,6 +424,7 @@ function TriggerForm({
         unitDefs={unitDefs}
         gate={gate.actions}
         extensions={extensions}
+        issues={issues}
         picking={picking}
         onPick={onPick}
         onChange={onChange}
@@ -558,6 +572,7 @@ function StepSection({
   unitDefs,
   gate,
   extensions,
+  issues,
   picking,
   onPick,
   onChange,
@@ -572,6 +587,8 @@ function StepSection({
   gate: Record<string, string>;
   /** The types the scenario's game declares for itself. */
   extensions: ExtensionTypes;
+  /** What the validator has found wrong with the mission (issue #2287). */
+  issues: MissionIssue[];
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
@@ -633,6 +650,7 @@ function StepSection({
               unsupported={gate[step.type]}
               units={units}
               unitsLoading={unitsLoading}
+              issues={issues}
               picking={picking}
               onPick={onPick}
               onParam={(name, value) =>
