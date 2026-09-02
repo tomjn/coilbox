@@ -184,18 +184,24 @@ export function TextField({
   placeholder,
   onCommit,
   className,
+  describedBy,
 }: {
   value: string;
   label: string;
   placeholder?: string;
   onCommit: (value: string) => void;
   className?: string;
+  /** The id of a {@link FieldProblem} this field's value is about, so a
+   *  screen reader reads the problem the moment the field is focused rather
+   *  than only once the value it explains has already been left. */
+  describedBy?: string;
 }) {
   const [text, setText] = useFieldText(value);
 
   return (
     <Input
       aria-label={label}
+      aria-describedby={describedBy}
       value={text}
       placeholder={placeholder}
       onChange={(e) => setText(e.target.value)}
