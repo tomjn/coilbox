@@ -148,6 +148,14 @@ export default function CampaignEditPage() {
     if (loaded?.source === "local" && loadedId !== loaded.campaign.id) {
       setCampaign(loaded.campaign);
       setLoadedId(loaded.campaign.id);
+      // `undeleted` only ever initialised when empty, so it never noticed
+      // this id change and kept folding the newly opened campaign's files
+      // into the old campaign's pending clean-up (issue #2385). A write
+      // already queued for the old campaign still lands and still writes
+      // its own document correctly, but its delete pass is given up on here.
+      // Losing that one delete is a smaller loss than handing another
+      // campaign's filenames to it.
+      undeleted.current = null;
     }
   }, [loaded, loadedId]);
 
@@ -169,10 +177,13 @@ export default function CampaignEditPage() {
   // from and the one it is asking for, so a file that only ever existed in a
   // document that never reached disk is still remembered.
   //
-  // The campaign id travels with the set because these refs outlive a route
-  // change under the same component instance (see the seeding effect above),
-  // so a write for one campaign landing while another is mid-edit must not
-  // reach into the wrong campaign's set.
+  // The campaign id travels with the set, and the set itself is cleared by
+  // the seeding effect above the moment that id changes, because this ref
+  // outlives a route change under the same component instance (issue
+  // #2385). Without both, a route change while a write is still in flight
+  // could fold the newly opened campaign's files into the old campaign's
+  // pending clean-up, and a write for one campaign landing could then be
+  // handed filenames that only ever lived in another campaign's folder.
   const undeleted = useRef<{ id: string; files: Set<string> } | null>(null);
   if (!saver.current) {
     saver.current = createDocumentSaver<Campaign>({
