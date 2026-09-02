@@ -714,6 +714,7 @@ export default function ScenarioEditPage() {
         <SetupPanel
           scenario={scenario}
           loaded={loaded}
+          issues={missionIssues}
           onChange={(next) => apply(next)}
         />
 
