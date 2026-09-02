@@ -37,9 +37,14 @@ import {
   parsePlacementKey,
   placementKey,
 } from "@/placement/placements";
-import { baseBuildings, type Point, type Scenario } from "../../model";
+import {
+  baseBuildings,
+  type Point,
+  type Scenario,
+  type ScenarioZone,
+} from "../../model";
 import type { ContentEntry } from "./contents";
-import { groupSize, parsePathKey } from "./groups";
+import { groupSize, orderWaypoints, parsePathKey, pathKey } from "./groups";
 import {
   buildTrouble,
   type LayoutEditFor,
@@ -47,7 +52,8 @@ import {
   removeOnMap,
   turnOnMap,
 } from "./mapKeyboard";
-import { parseZoneKey } from "./zones";
+import { type PathSource, pathPointPosition } from "./orderPaths";
+import { parseZoneKey, zoneKey } from "./zones";
 
 /**
  * What is selected on the map, in the order it was chosen.
@@ -115,14 +121,14 @@ export function addKeys(
 export function stillThere(
   selection: MapSelection,
   placements: Placement[],
-  scenario: Pick<Scenario, "zones">,
+  scenario: Pick<Scenario, "zones" | "groups" | "triggers">,
 ): MapSelection {
   const drawn = new Set(placements.map((one) => one.key));
   const zones = new Set(scenario.zones.map((one) => one.id));
   return selection.filter((key) => {
     const zone = parseZoneKey(key);
     if (zone) return zones.has(zone.id);
-    if (parsePathKey(key)) return true;
+    if (parsePathKey(key)) return pathPointPosition(scenario, key) !== null;
     return drawn.has(key);
   });
 }
@@ -158,7 +164,63 @@ export function inBox(box: SelectionBox, pos: Point): boolean {
 }
 
 /**
- * Every drawn unit standing inside a marquee.
+ * Whether a zone is caught by a marquee: the box has to cover the whole of
+ * it, not merely touch it.
+ *
+ * A zone is a sheet of ground rather than a point, so "the box touches it" is
+ * the wrong question to ask: a zone kilometres across would be swept up by a
+ * box drawn anywhere inside it, and an author dragging a box round a few
+ * actors standing in a landing zone would get the zone too, and everything
+ * else it overlaps. Requiring the box to cover the zone whole is the rule
+ * most drawing programs use for a shape rather than a point, and it is also
+ * why a zone bigger than the box is never caught this way: only a box at
+ * least as big as the zone can cover it. A circle is covered the same way, by
+ * its whole rim rather than its centre, so a box has to reach a whole radius
+ * past the middle on every side.
+ */
+function zoneInBox(zone: ScenarioZone, box: SelectionBox): boolean {
+  if (zone.shape === "circle") {
+    return (
+      zone.center.x - zone.radius >= box.minX &&
+      zone.center.x + zone.radius <= box.maxX &&
+      zone.center.z - zone.radius >= box.minZ &&
+      zone.center.z + zone.radius <= box.maxZ
+    );
+  }
+  return (
+    zone.min.x >= box.minX &&
+    zone.max.x <= box.maxX &&
+    zone.min.z >= box.minZ &&
+    zone.max.z <= box.maxZ
+  );
+}
+
+/**
+ * Every waypoint of every path standing inside a marquee, whichever order or
+ * path source it belongs to.
+ *
+ * A point is caught on its own rather than with the rest of its path or the
+ * group that owns it. A waypoint already moves and deletes on its own
+ * (`moveTarget` and `removalPlace` below never fold one into its neighbours
+ * the way a group's units are folded into one move), so a box that catches
+ * some of a path's points and leaves the rest asks nothing of the move and
+ * delete rules that they do not already answer correctly.
+ */
+function pathKeysInBox(paths: PathSource[], box: SelectionBox): string[] {
+  const out: string[] = [];
+  for (const source of paths) {
+    source.orders.forEach((order, orderIndex) => {
+      orderWaypoints(order)?.forEach((point, waypointIndex) => {
+        if (inBox(box, point))
+          out.push(pathKey(source.id, orderIndex, waypointIndex));
+      });
+    });
+  }
+  return out;
+}
+
+/**
+ * Every drawn unit, whole zone and path point standing inside a marquee.
  *
  * The box is ground rather than screen, because it is the box the drag drew on
  * the ground and drawing one shape while selecting by another would be a lie
@@ -172,14 +234,24 @@ export function inBox(box: SelectionBox, pos: Point): boolean {
  * Every unit is kept, including all of a group's, rather than one key per entry.
  * A delete works through the keys it is given, so a whole group swept up this
  * way is a whole group deleted, and a move dedupes for itself.
+ *
+ * A zone is a shape rather than a point, so it is caught by `zoneInBox`
+ * instead: the box has to cover it whole. A path point is a point, the same
+ * as a unit, so it is caught by `pathKeysInBox` one at a time.
  */
 export function keysInBox(
   placements: Placement[],
+  zones: ScenarioZone[],
+  paths: PathSource[],
   box: SelectionBox,
 ): string[] {
-  return placements
+  const units = placements
     .filter((placement) => inBox(box, placement.pos))
     .map((placement) => placement.key);
+  const caughtZones = zones
+    .filter((zone) => zoneInBox(zone, box))
+    .map((zone) => zoneKey(zone.id));
+  return [...units, ...caughtZones, ...pathKeysInBox(paths, box)];
 }
 
 /**
