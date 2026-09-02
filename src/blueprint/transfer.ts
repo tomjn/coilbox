@@ -154,7 +154,7 @@ export function encodePayloadCode(payload: BlueprintPayload): BlueprintCode {
   if (result.ok) return result;
   return {
     ok: false,
-    message: `This layout is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry. Export it as a file and send that instead.`,
+    message: `This blueprint is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry. Export it as a file and send that instead.`,
   };
 }
 

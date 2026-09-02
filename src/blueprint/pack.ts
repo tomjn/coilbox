@@ -521,9 +521,9 @@ function buildings(n: number): string {
   return `${n} building${n === 1 ? "" : "s"}`;
 }
 
-/** "1 layout" or "3 layouts", for the same reason. */
+/** "1 blueprint" or "3 blueprints", for the same reason. */
 function layouts(n: number): string {
-  return `${n} layout${n === 1 ? "" : "s"}`;
+  return `${n} blueprint${n === 1 ? "" : "s"}`;
 }
 
 /**

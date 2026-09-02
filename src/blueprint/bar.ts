@@ -87,7 +87,7 @@ function parseFile(text: string): {
   // save, so that is what an empty file looks like in the wild.
   if (saved === undefined || saved === 0) return { root: value, entries: [] };
   if (!Array.isArray(saved)) {
-    return raise("This file's savedBlueprints is not a list of layouts.");
+    return raise("This file's savedBlueprints is not a list of blueprints.");
   }
   return { root: value, entries: saved };
 }

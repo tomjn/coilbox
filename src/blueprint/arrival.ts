@@ -174,27 +174,27 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
     case "unnamed":
       notes.push({
         tone: "note",
-        text: "This layout does not say which game it is for, so its unit names have not been checked against anything.",
+        text: "This blueprint does not say which game it is for, so its unit names have not been checked against anything.",
       });
       break;
     case "unread":
       notes.push({
         tone: "note",
-        text: `This layout is for ${game.wanted}. Coilbox is still reading your games, so it does not know yet whether you have it.`,
+        text: `This blueprint is for ${game.wanted}. Coilbox is still reading your games, so it does not know yet whether you have it.`,
       });
       break;
     case "missing":
       notes.push({
         tone: "warn",
         text: into
-          ? `This layout is for ${game.wanted}, and this mission is for ${into}.`
-          : `This layout is for ${game.wanted}, which is not installed here. It will be kept exactly as it is, and its buildings can be checked once you have that game.`,
+          ? `This blueprint is for ${game.wanted}, and this mission is for ${into}.`
+          : `This blueprint is for ${game.wanted}, which is not installed here. It will be kept exactly as it is, and its buildings can be checked once you have that game.`,
       });
       break;
     case "other-version":
       notes.push({
         tone: "note",
-        text: `This layout is for ${game.wanted}. ${into ? `This mission is for ${game.here}` : `You have ${game.here}`}, which is the same game at another version, so a unit it names may have moved since.`,
+        text: `This blueprint is for ${game.wanted}. ${into ? `This mission is for ${game.here}` : `You have ${game.here}`}, which is the same game at another version, so a unit it names may have moved since.`,
       });
       break;
     case "installed":
@@ -217,7 +217,7 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
     } else if (!known) {
       notes.push({
         tone: "note",
-        text: "Coilbox has not read that game's units yet, so this layout has not been checked against them.",
+        text: "Coilbox has not read that game's units yet, so this blueprint has not been checked against them.",
       });
     }
   }
@@ -227,7 +227,7 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
   if (wasCalled) {
     notes.push({
       tone: "note",
-      text: `A layout ${into ? "in this scenario" : "in your library"} is already called "${wasCalled}", so this one is kept as "${name}".`,
+      text: `A blueprint ${into ? "in this scenario" : "in your library"} is already called "${wasCalled}", so this one is kept as "${name}".`,
     });
   }
 
