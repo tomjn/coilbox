@@ -151,6 +151,7 @@ import {
 } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
+import { scenarioPlacements } from "./placements";
 import type { RowFocus } from "./problemTargets";
 import {
   addedWords,
@@ -632,6 +633,21 @@ export const ScenarioMapScene = forwardRef<
     () => baseFootprints(units.placements, gameUnits.units, units.ground),
     [units.placements, gameUnits.units, units.ground],
   );
+  // The same two questions, asked of a document the keyboard has not drawn yet
+  // (issue #2315): a move or a turn has to hear the verdict the document will
+  // carry once the edit lands, not the one `footprints` above still holds from
+  // before the key was pressed. Flattened the same way `units.placements` is,
+  // through the same snap, so the two never disagree about where a building
+  // will actually stand.
+  const footprintsAt = useCallback(
+    (doc: Scenario) =>
+      baseFootprints(
+        scenarioPlacements(doc, snap),
+        gameUnits.units,
+        units.ground,
+      ),
+    [snap, gameUnits.units, units.ground],
+  );
   // The same two questions asked about a layout the pointer is carrying rather
   // than about one the document holds, so an author placing a whole base sees
   // where it lands before they land it (issue #1464). Built once per game and
@@ -995,6 +1011,7 @@ export const ScenarioMapScene = forwardRef<
     layoutEdit,
     cursorAt,
     panBy,
+    footprintsAt,
   });
   // The one live region the map speaks through, lent to the pointer so a
   // Shift-click and an arrow key are announced in the same voice (issue #2279).
