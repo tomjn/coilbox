@@ -11,6 +11,7 @@
  */
 
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 import { unitModelTextureUrl } from "@/lib/assetUrl";
 import {
@@ -30,6 +31,26 @@ import type { UnitModelPiece, UnitModelResult } from "./bindings";
  * viewer says how many there were rather than quietly miscolouring them.
  */
 const UNTEXTURED = 0x9aa0a6;
+
+/** How the model is put together, for a caller that draws many copies of it. */
+export interface BuildModelOptions {
+  /**
+   * Bake the piece tree down to one mesh per material (issue #2293).
+   *
+   * A model arrives as a tree of pieces and every texture group in every piece
+   * is its own mesh, which is its own draw call. Measured in the app, that is
+   * 6.8 meshes for a SplinterFaction unit and 77 for a Balanced Annihilation
+   * one, and a map that draws two hundred units pays it two hundred times.
+   * Merging the pieces that share a material into one mesh drops that to the
+   * number of textures the model uses, which on both games is one or two.
+   *
+   * Only safe where the model is drawn in one pose, because the pieces stop
+   * being separate objects and cannot be moved apart again. The scenario map is
+   * that case: nothing there animates a piece. The lone-model viewer is not
+   * asked to merge, so anything wanting the tree back can still have it.
+   */
+  merge?: boolean;
+}
 
 /** What a built model hands back: the object to add, its extent, and cleanup. */
 export interface BuiltModel {
@@ -55,6 +76,53 @@ function modelTexture(file: string): THREE.Texture {
 }
 
 /**
+ * The same meshes drawn as one per material instead of one per piece.
+ *
+ * Each piece's geometry is moved into the place the tree stands it in, then the
+ * geometries sharing a material are joined. Two meshes drawn with different
+ * textures cannot become one, so the materials are left exactly as they are and
+ * the count of them is what is left.
+ *
+ * Nothing when the join fails, which leaves the caller with its piece tree. It
+ * needs every geometry to carry the same attributes, and these all come from the
+ * one builder above, so this is a guard rather than a case that happens.
+ */
+function mergedPieces(
+  object: THREE.Group,
+): { object: THREE.Group; geometries: THREE.BufferGeometry[] } | null {
+  const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const parts: THREE.BufferGeometry[] = [];
+  object.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const moved = node.geometry.clone();
+    moved.applyMatrix4(node.matrixWorld);
+    parts.push(moved);
+    const material = node.material as THREE.Material;
+    const batch = batches.get(material);
+    if (batch) batch.push(moved);
+    else batches.set(material, [moved]);
+  });
+
+  const merged = new THREE.Group();
+  const geometries: THREE.BufferGeometry[] = [];
+  for (const [material, batch] of batches) {
+    const one = batch.length === 1 ? batch[0] : mergeGeometries(batch, false);
+    if (!one) {
+      for (const spent of geometries) spent.dispose();
+      for (const spent of parts) spent.dispose();
+      return null;
+    }
+    geometries.push(one);
+    merged.add(new THREE.Mesh(one, material));
+  }
+  // The joined copies, not the ones the merge handed back.
+  for (const spent of parts) {
+    if (!geometries.includes(spent)) spent.dispose();
+  }
+  return { object: merged, geometries };
+}
+
+/**
  * Build the whole model as a group of meshes, parented and offset the way the
  * file's piece tree says.
  *
@@ -71,6 +139,7 @@ function modelTexture(file: string): THREE.Texture {
 export function buildModel(
   model: UnitModelResult,
   teamColour: THREE.ColorRepresentation = TEAM_COLOUR,
+  options: BuildModelOptions = {},
 ): BuiltModel {
   const geometries: THREE.BufferGeometry[] = [];
   const materials = new Map<string, THREE.MeshStandardMaterial>();
@@ -135,10 +204,26 @@ export function buildModel(
   const object = new THREE.Group();
   if (model.root) object.add(addPiece(model.root));
   object.updateMatrixWorld(true);
+  // Taken from the tree, so a merged model is framed and plated on exactly the
+  // extent the piece tree has.
+  const box = new THREE.Box3().setFromObject(object);
+
+  const drawn = options.merge ? mergedPieces(object) : null;
+  if (drawn) {
+    for (const g of geometries) g.dispose();
+    return {
+      object: drawn.object,
+      box,
+      dispose: () => {
+        for (const g of drawn.geometries) g.dispose();
+        for (const m of materials.values()) m.dispose();
+      },
+    };
+  }
 
   return {
     object,
-    box: new THREE.Box3().setFromObject(object),
+    box,
     dispose: () => {
       for (const g of geometries) g.dispose();
       for (const m of materials.values()) m.dispose();
