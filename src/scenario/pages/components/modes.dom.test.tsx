@@ -19,8 +19,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Placement } from "@/placement/placements";
 import type { GestureKeys, GroundDragPhase } from "@/placement/useMapEditing";
 import { newScenario } from "../../create";
-import type { Point, ScenarioZone } from "../../model";
+import type { Point, Scenario, ScenarioZone } from "../../model";
 import { EDITOR_MODES } from "./modes";
+import type { PathSource } from "./orderPaths";
 
 afterEach(cleanup);
 
@@ -75,19 +76,26 @@ interface Seen {
 }
 
 /** The mode, resolved, with everything it produced written out where the test
- *  can reach it. */
-function drive(onSelectMany: (keys: string[], add: boolean) => void): {
+ *  can reach it. `scenario` and `paths` default to nothing to catch beyond
+ *  `drawn`, and can be overridden to drive what the box has to test against
+ *  (issue #2355). */
+function drive(
+  onSelectMany: (keys: string[], add: boolean) => void,
+  scenario: Scenario = newScenario("Marquee"),
+  paths: PathSource[] = [],
+): {
   latest: () => Seen;
 } {
   const seen: Seen = { draw: null, draftZones: undefined };
   function Harness() {
     const behaviour = selectMode.use({
-      scenario: newScenario("Marquee"),
+      scenario,
       onChange: () => {},
       selected: null,
       selectedNow: () => null,
       onSelect: () => {},
       placements: drawn,
+      paths,
       onSelectMany,
       layoutEdit: () => "own",
       layout: null,
@@ -174,6 +182,65 @@ describe("Select mode's marquee", () => {
 
     expect(caught).toHaveBeenCalledWith(["actor:a1", "actor:a2"], false);
     expect(latest().draftZones).toBeUndefined();
+  });
+
+  it("catches a zone fully covered by the box alongside the units in it", async () => {
+    const caught = vi.fn();
+    const scenario: Scenario = {
+      ...newScenario("Marquee"),
+      zones: [
+        {
+          id: "z1",
+          name: "Landing",
+          shape: "box",
+          min: { x: 150, z: 150 },
+          max: { x: 250, z: 250 },
+        },
+      ],
+    };
+    const { latest } = drive(caught, scenario);
+    act(() => {
+      latest().draw?.({ x: 0, z: 0 }, { x: 400, z: 400 }, "end", {
+        add: false,
+      });
+    });
+    await frame();
+
+    expect(caught).toHaveBeenCalledWith(
+      ["actor:a1", "actor:a2", "zone:z1"],
+      false,
+    );
+  });
+
+  it("catches only the path points standing in the box, not the rest of the path", async () => {
+    const caught = vi.fn();
+    const paths: PathSource[] = [
+      {
+        id: "g1",
+        label: "Group 1",
+        orders: [
+          {
+            kind: "move",
+            waypoints: [
+              { x: 350, z: 350 },
+              { x: 9000, z: 9000 },
+            ],
+          },
+        ],
+      },
+    ];
+    const { latest } = drive(caught, newScenario("Marquee"), paths);
+    act(() => {
+      latest().draw?.({ x: 0, z: 0 }, { x: 400, z: 400 }, "end", {
+        add: false,
+      });
+    });
+    await frame();
+
+    expect(caught).toHaveBeenCalledWith(
+      ["actor:a1", "actor:a2", "path:g1#0@0"],
+      false,
+    );
   });
 
   it("says the box was added to rather than instead of, when Shift was held", async () => {

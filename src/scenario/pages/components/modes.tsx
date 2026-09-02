@@ -75,6 +75,7 @@ import {
 import { isTypingTarget } from "./history";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
 import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
+import type { PathSource } from "./orderPaths";
 import { boxFromDrag, keysInBox } from "./selection";
 import { TeamSelect } from "./TeamSelect";
 import {
@@ -116,6 +117,12 @@ export interface ModeContext {
    * out what is standing inside the box it was dragged out over (issue #2279).
    */
   placements: Placement[];
+  /**
+   * Every path the document draws, a group's own and the ones its triggers
+   * hand out. Only the marquee reads it, to work out which waypoints stand
+   * inside the box it was dragged out over (issue #2355).
+   */
+  paths: PathSource[];
   /** Select several things at once: instead of what is selected, or as well as
    *  it when `add` (issue #2279). Only the marquee uses it. */
   onSelectMany: (keys: string[], add: boolean) => void;
@@ -218,7 +225,7 @@ const selectMode: EditorMode = {
   // strip under the map says both for all of them. This says the ones that are
   // only true here (issue #2285).
   hint: "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on.",
-  use: ({ placements, onSelectMany }) => {
+  use: ({ scenario, placements, paths, onSelectMany }) => {
     const [band, setBand] = useState<ScenarioZone | null>(null);
     // The box is redrawn on the next frame rather than on every pointer move.
     // Drawing it rebuilds the zones layer, and a burst of moves between two
@@ -273,7 +280,10 @@ const selectMode: EditorMode = {
           return;
         }
         queue(null);
-        onSelectMany(keysInBox(placements, box), keys.add);
+        onSelectMany(
+          keysInBox(placements, scenario.zones, paths, box),
+          keys.add,
+        );
       },
     };
   },
