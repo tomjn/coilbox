@@ -16,9 +16,15 @@
  * them.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
+import { useRef, useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Scenario, ScenarioObjective, ScenarioTrigger } from "../../model";
 import {
   type EditHistory,
@@ -28,7 +34,30 @@ import {
 } from "./history";
 import { ObjectivePanel } from "./ObjectivePanel";
 
-afterEach(cleanup);
+// The panel's delete notice has no shell here (issue #2280), the same gap
+// `ScenarioBuilderPage.dom.test.tsx` fills for its own toasts. Captured rather
+// than rendered, so a test can read the message and fire the action the way a
+// click on the toast's own Undo button would.
+const toasted = vi.hoisted(() => ({
+  calls: [] as {
+    message: string;
+    id: string;
+    action: { onClick: () => void };
+  }[],
+}));
+vi.mock("sonner", () => ({
+  toast: (
+    message: string,
+    opts: { id: string; action: { onClick: () => void } },
+  ) => {
+    toasted.calls.push({ message, id: opts.id, action: opts.action });
+  },
+}));
+
+afterEach(() => {
+  cleanup();
+  toasted.calls.length = 0;
+});
 
 function objective(patch: Partial<ScenarioObjective> = {}): ScenarioObjective {
   return {
@@ -99,6 +128,25 @@ function PanelHarness({
     scenario(objectives, triggers),
   );
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
+  // Read at the moment a step is taken rather than at the last render, the
+  // same reason ScenarioEditPage keeps its own copies: a delete's notice binds
+  // `onUndo` at the click that fires it, and firing the notice's action later
+  // must see the document that delete produced, not whatever this closure held
+  // when the button was drawn.
+  const documentRef = useRef(document);
+  documentRef.current = document;
+  const historyRef = useRef(history);
+  historyRef.current = history;
+
+  // Shared by the harness's own Undo button and by `onUndo`, so a test that
+  // fires a toast's action is exercising the exact function Cmd+Z and the map
+  // toolbar call, not a lookalike (issue #2280).
+  const stepBack = () => {
+    const step = undoEdit(historyRef.current, documentRef.current);
+    if (!step) return;
+    setHistory(step.history);
+    setDocument(step.document);
+  };
 
   return (
     <>
@@ -108,16 +156,9 @@ function PanelHarness({
           setHistory(recordEdit(history, document, next));
           setDocument(next);
         }}
+        onUndo={stepBack}
       />
-      <button
-        type="button"
-        onClick={() => {
-          const step = undoEdit(history, document);
-          if (!step) return;
-          setHistory(step.history);
-          setDocument(step.document);
-        }}
-      >
+      <button type="button" onClick={stepBack}>
         Undo
       </button>
       <output>{JSON.stringify(document)}</output>
@@ -230,5 +271,66 @@ describe("duplicating an objective", () => {
     undo();
 
     expect(stored().objectives.map((o) => o.id)).toEqual(["hold"]);
+  });
+});
+
+/**
+ * Deleting an objective from the panel has no confirm dialog and no undo
+ * button of its own nearby (issue #2280). The notice this fires names what
+ * went, and its own action is the page's real undo, so the objective comes
+ * back whether an author clicks that action or presses Cmd+Z instead.
+ */
+describe("deleting an objective", () => {
+  const del = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Delete/ }));
+
+  it("names the objective by its text in the notice", () => {
+    openPanel([objective({ text: "Hold the pad." })]);
+
+    del();
+
+    expect(toasted.calls).toHaveLength(1);
+    expect(toasted.calls[0].message).toBe('Deleted objective "Hold the pad.".');
+  });
+
+  it("falls back to the id when the objective has no text yet", () => {
+    openPanel([objective({ id: "hold", text: "" })]);
+
+    del();
+
+    expect(toasted.calls[0].message).toBe('Deleted objective "hold".');
+  });
+
+  it("is undoable through Cmd+Z alone, with no toast involved", () => {
+    openPanel([objective()]);
+
+    del();
+    undo();
+
+    expect(stored().objectives.map((o) => o.id)).toEqual(["hold"]);
+  });
+
+  it("restores the objective when the notice's own action is used", () => {
+    openPanel([objective()]);
+
+    del();
+    act(() => toasted.calls[0].action.onClick());
+
+    expect(stored().objectives.map((o) => o.id)).toEqual(["hold"]);
+  });
+
+  it("uses one fixed notice id so several deletes in a row replace it rather than stacking", () => {
+    openPanel([
+      objective({ id: "hold", text: "Hold the pad." }),
+      objective({ id: "escort", text: "Escort them." }),
+    ]);
+
+    del();
+    fireEvent.click(screen.getByRole("button", { name: /Escort them\./ }));
+    del();
+
+    expect(toasted.calls).toHaveLength(2);
+    expect(toasted.calls[0].id).toBe(toasted.calls[1].id);
+    expect(toasted.calls[0].message).not.toBe(toasted.calls[1].message);
   });
 });
