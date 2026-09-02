@@ -19,6 +19,7 @@ import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
+import { notifyDeleted } from "./deleteNotice";
 import { EditorPanel } from "./panels";
 import {
   addBuildableUnit,
@@ -50,12 +51,18 @@ export function RestrictionPanel({
   onChange,
   units,
   unitsLoading,
+  onUndo,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
   /** The scenario's game's units, for picking what is restricted. */
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
+  /** The page's own step back, the same one Cmd+Z and the map toolbar call.
+   *  Handed to a removal's undo notice so that button does exactly what the
+   *  shortcut does rather than a second way of getting there (issue #2280,
+   *  issue #2306). */
+  onUndo: () => void;
 }) {
   const mode = buildableMode(scenario);
   const buildable = scenario.restrictions.buildable;
@@ -106,9 +113,13 @@ export function RestrictionPanel({
                       <Chip
                         label={def}
                         remove={`Take ${def} off the list`}
-                        onRemove={() =>
-                          onChange(removeBuildableUnit(scenario, def))
-                        }
+                        onRemove={() => {
+                          onChange(removeBuildableUnit(scenario, def));
+                          notifyDeleted(
+                            `Took "${def}" off the buildable list.`,
+                            onUndo,
+                          );
+                        }}
                       />
                     </li>
                   ))}
@@ -145,7 +156,13 @@ export function RestrictionPanel({
                   <Chip
                     label={name}
                     remove={`Allow ${name} again`}
-                    onRemove={() => onChange(removeCommand(scenario, name))}
+                    onRemove={() => {
+                      onChange(removeCommand(scenario, name));
+                      notifyDeleted(
+                        `Took "${name}" off the withheld list.`,
+                        onUndo,
+                      );
+                    }}
                   />
                 </li>
               ))}
