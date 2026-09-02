@@ -24,7 +24,7 @@
  */
 
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SnapBuilding } from "@/blueprint/footprint";
 import { mapKeyAction } from "@/placement/mapKeys";
@@ -42,12 +42,17 @@ import {
   nextEntry,
   placeInList,
   removeOnMap,
+  resizedWords,
+  resizeLimitWords,
+  resizeModeWords,
+  resizeOnMap,
   selectionWords,
   spotWords,
   thingWords,
   turnedWords,
   turnOnMap,
 } from "./mapKeyboard";
+import { parseZoneKey } from "./zones";
 
 /** Where the view is looking, and how high the ground is there. */
 export interface MapCursor {
@@ -102,6 +107,23 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
   const latest = useRef(deps);
   latest.current = deps;
 
+  // Whether the S key has put the zone that is selected into resize mode
+  // (issue #2313). A ref beside the state, the same pattern `latest` is, so
+  // the key handler below reads the current value rather than the one it
+  // closed over when it was built.
+  const [resizing, setResizing] = useState(false);
+  const resizingRef = useRef(resizing);
+  resizingRef.current = resizing;
+
+  // Resize mode belongs to one selection, not to the map in general: picking
+  // something else, or letting go of the selection, drops back to move so an
+  // author never finds arrows still resizing a zone they left behind.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps.selected is the trigger, not read in the body. The reset does not care what the selection changed to, only that it did.
+  useEffect(() => {
+    resizingRef.current = false;
+    setResizing(false);
+  }, [deps.selected]);
+
   const say = useCallback((text: string) => {
     setSaid((was) => ({ text, token: was.token + 1 }));
   }, []);
@@ -130,7 +152,12 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
         layoutEdit,
         panBy,
       } = latest.current;
-      const action = mapKeyAction(event, { selected: !!selected });
+      const resizable = !!selected && !!parseZoneKey(selected);
+      const action = mapKeyAction(event, {
+        selected: !!selected,
+        resizable,
+        resizing: resizable && resizingRef.current,
+      });
       if (!action) return;
       event.preventDefault();
 
@@ -180,6 +207,41 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
               action.step,
             ),
           );
+          return;
+        }
+
+        case "resize": {
+          if (!selected) return;
+          const key = selected;
+          const after = resizeOnMap(
+            things.scenario,
+            key,
+            action.heading,
+            action.step,
+          );
+          if (after === things.scenario) {
+            say(resizeLimitWords(things, key));
+            return;
+          }
+          onChange((doc) => resizeOnMap(doc, key, action.heading, action.step));
+          say(
+            resizedWords(
+              { ...things, scenario: after },
+              key,
+              action.heading,
+              action.step,
+            ),
+          );
+          return;
+        }
+
+        case "toggleResize": {
+          if (!selected) return;
+          const key = selected;
+          const next = !resizingRef.current;
+          resizingRef.current = next;
+          setResizing(next);
+          say(resizeModeWords(things, key, next));
           return;
         }
 
