@@ -1153,12 +1153,10 @@ async fn unitsync_map_minimaps<R: Runtime>(
     let asset_dir = match assets {
         Some(true) => match hub_asset_dir(&app) {
             Some(dir) => Some(dir.to_string_lossy().into_owned()),
-            None => {
-                return Ok(CliResult::err(
-                    "no cache directory on this platform, so there is nowhere to write the minimaps"
-                        .to_string(),
-                ))
-            }
+            None => return Ok(CliResult::err(
+                "no cache directory on this platform, so there is nowhere to write the minimaps"
+                    .to_string(),
+            )),
         },
         _ => None,
     };
