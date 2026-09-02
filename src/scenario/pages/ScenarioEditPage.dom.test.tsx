@@ -89,11 +89,27 @@ vi.mock("./components/useScenarioGate", () => ({
   useScenarioGate: () => ({ gate: undefined, extensions: undefined }),
 }));
 
+// The two targets a routed Cmd+D can call (issue #2277), captured so a test
+// can say what each returns and check which was asked. What each panel does
+// with a real call is its own file's concern, TriggerPanel.test.tsx. This
+// file only owns the choice between them.
+const handles = vi.hoisted(() => ({
+  triggerPanel: { duplicateSelected: vi.fn(() => false) },
+  mapScene: { duplicateSelected: vi.fn(() => false) },
+}));
+
 // The editing surface and the panels under it. The header is what is under
 // test, and a WebGL scene is not something happy-dom draws.
-vi.mock("./components/ScenarioMapScene", () => ({
-  ScenarioMapScene: () => null,
-}));
+vi.mock("./components/ScenarioMapScene", async () => {
+  const { forwardRef, useImperativeHandle } =
+    await vi.importActual<typeof import("react")>("react");
+  return {
+    ScenarioMapScene: forwardRef((_props: unknown, ref: unknown) => {
+      useImperativeHandle(ref as never, () => handles.mapScene, []);
+      return null;
+    }),
+  };
+});
 vi.mock("./components/ScenarioTestDrawer", () => ({
   ScenarioTestDrawer: () => null,
 }));
@@ -104,13 +120,22 @@ vi.mock("./components/SetupPanel", () => ({ SetupPanel: () => null }));
 // matters here is only that ScenarioEditPage hands the right one the right
 // `focus` request, so each is stood in for by a stub that renders it back as
 // text.
-vi.mock("./components/TriggerPanel", () => ({
-  TriggerPanel: ({ focus }: { focus: RowFocus | null }) => (
-    <div data-testid="trigger-panel-focus">
-      {focus ? JSON.stringify(focus) : ""}
-    </div>
-  ),
-}));
+vi.mock("./components/TriggerPanel", async () => {
+  const { forwardRef, useImperativeHandle } =
+    await vi.importActual<typeof import("react")>("react");
+  return {
+    TriggerPanel: forwardRef(
+      ({ focus }: { focus: RowFocus | null }, ref: unknown) => {
+        useImperativeHandle(ref as never, () => handles.triggerPanel, []);
+        return (
+          <div data-testid="trigger-panel-focus">
+            {focus ? JSON.stringify(focus) : ""}
+          </div>
+        );
+      },
+    ),
+  };
+});
 vi.mock("./components/ObjectivePanel", () => ({
   ObjectivePanel: ({ focus }: { focus: RowFocus | null }) => (
     <div data-testid="objective-panel-focus">
@@ -205,6 +230,8 @@ afterEach(() => {
   // otherwise leak their state into whichever test runs next.
   useGameUnits.mockReturnValue({ units: [], loading: false });
   useMissionProblems.mockReturnValue({ blocking: [], warnings: [] });
+  handles.triggerPanel.duplicateSelected.mockReturnValue(false);
+  handles.mapScene.duplicateSelected.mockReturnValue(false);
 });
 
 describe("the scenario editor's header", () => {
@@ -214,6 +241,7 @@ describe("the scenario editor's header", () => {
     expect(openMenuByKeyboard("Beachhead")).toEqual([
       expect.stringContaining("Duplicate"),
       expect.stringContaining("Share"),
+      expect.stringContaining("Keyboard shortcuts"),
       expect.stringContaining("Delete"),
     ]);
   });
@@ -335,6 +363,7 @@ describe("the scenario editor's header", () => {
 
     expect(openMenuByKeyboard("Landing")).toEqual([
       expect.stringContaining("Share"),
+      expect.stringContaining("Keyboard shortcuts"),
     ]);
   });
 });
@@ -471,6 +500,73 @@ describe("a mission problem's row navigation", () => {
     await wait();
 
     expect(document.activeElement).toBe(problemsButton);
+  });
+});
+
+/**
+ * Cmd+Enter opens Test in game (issue #2277), the action an author repeats
+ * most and, before this, the only one of the header's three with no key.
+ */
+describe("Cmd+Enter", () => {
+  it("opens Test in game", () => {
+    edit(local);
+
+    fireEvent.keyDown(window, { key: "Enter", metaKey: true });
+
+    expect(opened.map((o) => o.title)).toEqual(["Test Beachhead in game"]);
+  });
+
+  it("does nothing while the author is typing", () => {
+    edit(local);
+
+    fireEvent.keyDown(screen.getByLabelText("Scenario name"), {
+      key: "Enter",
+      metaKey: true,
+    });
+
+    expect(opened).toEqual([]);
+  });
+});
+
+/**
+ * Cmd+D duplicates the selected placement, or the trigger being edited (issue
+ * #2277). Both live behind a ref this page holds, because each is owned by
+ * its own component: the map's selection and the trigger panel's focus check
+ * are pinned in `ScenarioMapScene`'s own tests and in TriggerPanel.test.tsx's
+ * "duplicateSelected" describe. What belongs here is only the choice between
+ * the two refs.
+ */
+describe("Cmd+D", () => {
+  it("tries the trigger panel first, and does not also ask the map when it claims the shortcut", () => {
+    handles.triggerPanel.duplicateSelected.mockReturnValue(true);
+    edit(local);
+
+    fireEvent.keyDown(window, { key: "d", metaKey: true });
+
+    expect(handles.triggerPanel.duplicateSelected).toHaveBeenCalledTimes(1);
+    expect(handles.mapScene.duplicateSelected).not.toHaveBeenCalled();
+  });
+
+  it("falls through to the map's selected placement when the trigger panel has nothing to duplicate", () => {
+    handles.triggerPanel.duplicateSelected.mockReturnValue(false);
+    edit(local);
+
+    fireEvent.keyDown(window, { key: "d", metaKey: true });
+
+    expect(handles.triggerPanel.duplicateSelected).toHaveBeenCalledTimes(1);
+    expect(handles.mapScene.duplicateSelected).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing while the author is typing", () => {
+    edit(local);
+
+    fireEvent.keyDown(screen.getByLabelText("Scenario name"), {
+      key: "d",
+      metaKey: true,
+    });
+
+    expect(handles.triggerPanel.duplicateSelected).not.toHaveBeenCalled();
+    expect(handles.mapScene.duplicateSelected).not.toHaveBeenCalled();
   });
 });
 
