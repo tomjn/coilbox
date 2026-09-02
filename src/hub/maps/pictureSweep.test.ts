@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { MapMinimapRow, MapMinimapsResult } from "@/content/bindings";
 import type { AssetKey, HaveResult } from "../assets/have";
-import type { AssetUpload } from "../assets/upload";
 import {
   MAP_PICTURES_SUBJECT,
   type MapPictureSweepProgress,
