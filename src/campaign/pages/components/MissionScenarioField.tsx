@@ -34,6 +34,10 @@ import { ScenarioPickerList } from "./ScenarioPicker";
  *
  * The picker is a popover rather than a drawer because this sits inside the
  * mission editor's own drawer, and the app has one drawer.
+ *
+ * No heading of its own. The drawer's Scenario group is the heading now (issue
+ * #2261), and two of them a size apart saying the same word read as two
+ * different things.
  */
 export function MissionScenarioField({
   mission,
@@ -61,7 +65,6 @@ export function MissionScenarioField({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium">Scenario</span>
       <p className="text-xs text-muted-foreground">
         What the mission runtime plays once the engine is up: spawns, zones,
         triggers, objectives and dialogue. Attaching copies the scenario into

@@ -1,9 +1,14 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Image, Plus, Trash2, Undo2, X } from "lucide-react";
+import { ChevronRight, Image, Plus, Trash2, Undo2, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type SaveState, SaveStatus } from "@/components/SaveStatus";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -45,6 +50,7 @@ import {
   DECORATIVE_DEFAULTS,
   PlaybackTuning,
 } from "./MediaPlayer";
+import { MissionFacts, MissionSetup } from "./MissionFacts";
 import {
   MissionMapBackground,
   MissionMapSideGraphic,
@@ -55,6 +61,13 @@ import {
   MissionUnitBackground,
   MissionUnitSideGraphic,
 } from "./MissionUnitPreview";
+import {
+  contentSummary,
+  presentationSummary,
+  rulesSummary,
+  scenarioSummary,
+  useMissionGroups,
+} from "./missionEditorGroups";
 import { PanoramaScroller } from "./PanoramaScroller";
 import { UnitRestrictions } from "./UnitRestrictions";
 import { useMissionUnit } from "./useMissionUnit";
@@ -316,6 +329,58 @@ function PreviewBox({ children }: { children: ReactNode }) {
 }
 
 /**
+ * One of the drawer's four groups: a heading that opens and shuts it, what it
+ * is holding said beside that heading, and the fields themselves.
+ *
+ * The same disclosure the campaign page puts its own art pickers behind, so a
+ * heading with a chevron and a summary already means one thing in this editor.
+ * The heading sits a size above the field labels inside it, which is the other
+ * half of the fix: every header in here used to be the same size, so the spin
+ * speed of a background preview read as loudly as the mission's title.
+ *
+ * Shut takes the fields out of the tree rather than hiding them, which is what
+ * makes shutting them worth anything. The scenario field, the media importers
+ * and the unit picker each mount a unitsync scan, and a cold archive cache
+ * makes that scan cost about 23 seconds before the drawer will paint (issue
+ * #2265). Three of the four groups start shut, so opening a mission to fix a
+ * typo asks the engine for nothing.
+ */
+function Group({
+  title,
+  summary,
+  open,
+  onOpenChange,
+  children,
+}: {
+  title: string;
+  summary: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={onOpenChange}
+      className="flex flex-col gap-3"
+    >
+      <h3 className="text-base font-semibold">
+        <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md py-1 text-left hover:text-foreground/80">
+          <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+          {title}
+          <span className="truncate text-xs font-normal text-muted-foreground">
+            {summary}
+          </span>
+        </CollapsibleTrigger>
+      </h3>
+      <CollapsibleContent className="flex flex-col gap-5 border-l border-border/50 pl-4">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/**
  * Drawer body for editing one campaign mission. Saves as you go, the way the
  * page it sits on does (issue #2260).
  *
@@ -354,6 +419,7 @@ export function MissionEditorDrawer({
   onSave: (mission: CampaignMission) => Promise<void>;
 }) {
   const drawer = useDrawer();
+  const [groups, setGroup] = useMissionGroups();
   const [mission, setMission] = useState<CampaignMission>(initial);
   const [save, setSave] = useState<SaveState>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
@@ -548,11 +614,23 @@ export function MissionEditorDrawer({
       {/* Stuck a hair above the scrollport rather than at it, because that box
           carries a padding of its own and content would otherwise show through
           the gap above this bar. */}
-      <div className="sticky -top-1 z-10 -mx-1 -mt-1 flex flex-wrap items-center justify-between gap-2 bg-background px-1 pb-2 pt-1">
-        <p className="text-xs text-muted-foreground">
-          Changes save as you make them.
-        </p>
-        <SaveStatus state={save} onRetry={() => void persist(mission)} />
+      <div className="sticky -top-1 z-10 -mx-1 -mt-1 flex flex-col gap-1.5 bg-background px-1 pb-2 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Changes save as you make them.
+          </p>
+          <SaveStatus state={save} onRetry={() => void persist(mission)} />
+        </div>
+        {/* The mission row's own two lines, kept on screen whatever is shut
+            below (issue #2261). Three of the four groups start collapsed, and
+            the two facts that decide whether the mission can be played at all
+            - the game and the map - live in one of them. This is the same
+            summary the campaign page draws on the row this drawer was opened
+            from, so the answer does not change on the way in. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-1.5">
+          <MissionSetup snapshot={mission.snapshot} />
+          <MissionFacts mission={mission} />
+        </div>
       </div>
 
       {error && (
@@ -563,324 +641,352 @@ export function MissionEditorDrawer({
         </Alert>
       )}
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="mission-title" className="text-sm font-medium">
-          Title
-        </Label>
-        <Input
-          id="mission-title"
-          value={mission.title}
-          onChange={(e) => edit({ title: e.target.value })}
-          onBlur={persistTyped}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="mission-subtitle" className="text-sm font-medium">
-          Subtitle
-        </Label>
-        <Input
-          id="mission-subtitle"
-          value={mission.subtitle ?? ""}
-          placeholder="Location line shown under the title"
-          onChange={(e) => edit({ subtitle: e.target.value || undefined })}
-          onBlur={persistTyped}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="mission-briefing" className="text-sm font-medium">
-          Briefing
-        </Label>
-        <p className="text-xs text-muted-foreground">
-          Markdown supported. Embed bundled media with{" "}
-          <code className="font-mono">![](images/art.jpg)</code> — image, audio
-          or video by file extension.
-        </p>
-        <Textarea
-          id="mission-briefing"
-          value={mission.briefing}
-          className="min-h-28"
-          onChange={(e) => edit({ briefing: e.target.value })}
-          onBlur={persistTyped}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Objectives</span>
-        <ul className="flex flex-col gap-1.5">
-          {mission.objectives.map((o, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: objectives are a plain ordered string list with no stable id
-            <li key={i} className="flex items-center gap-1.5">
-              <Input
-                value={o}
-                placeholder={`Objective ${i + 1}`}
-                onChange={(e) => setObjective(i, e.target.value)}
-                onBlur={persistTyped}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={`Remove objective ${i + 1}`}
-                onClick={() => removeObjective(i)}
-              >
-                <X className="size-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-        <Button
-          size="sm"
-          variant="outline"
-          className="self-start gap-1.5"
-          onClick={addObjective}
-        >
-          <Plus className="size-4" /> Add objective
-        </Button>
-      </div>
-
-      {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Switch> control (implicit label association) */}
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="flex flex-col">
-          <span className="font-medium">Skippable</span>
-          <span className="text-xs text-muted-foreground">
-            Playable even if the previous mission is incomplete.
-          </span>
-        </span>
-        <Switch
-          checked={mission.skippable}
-          onCheckedChange={(v) => patch({ skippable: v })}
-        />
-      </label>
-
-      <MissionScenarioField
-        mission={mission}
-        onChange={(next) => {
-          setMission(next);
-          void persist(next);
-        }}
-      />
-
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Panorama</span>
-        <p className="text-xs text-muted-foreground">
-          The briefing backdrop: a horizontally-tiling image, a looping muted
-          video, the mission's map as a full-screen spinning 3D preview, or one
-          of the game's units turning on the spot.
-        </p>
-        <SlotSourceSelect
-          value={slotSourceValue(panoramaSlot)}
-          onValueChange={(v) => patchSlot("panorama", v, panoramaSlot)}
-        />
-        {mission.panoramaMap ? (
-          <>
-            <MapPreviewTuning
-              config={mission.panoramaMap}
-              onChange={(panoramaMap) => patch({ panoramaMap })}
-            />
-            <PreviewBox>
-              <MissionMapBackground
-                mapName={mission.snapshot.mapName}
-                config={mission.panoramaMap}
-              />
-            </PreviewBox>
-          </>
-        ) : mission.panoramaUnit ? (
-          <UnitSlotEditor
-            gameName={mission.snapshot.gameName}
-            variant="background"
-            config={mission.panoramaUnit}
-            onChange={(panoramaUnit) => patch({ panoramaUnit })}
+      <Group
+        title="Content"
+        summary={contentSummary(mission)}
+        open={groups.content}
+        onOpenChange={(o) => setGroup("content", o)}
+      >
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="mission-title" className="text-sm font-medium">
+            Title
+          </Label>
+          <Input
+            id="mission-title"
+            value={mission.title}
+            onChange={(e) => edit({ title: e.target.value })}
+            onBlur={persistTyped}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
           />
-        ) : (
-          <>
-            {mission.panorama && (
-              <PanoramaScroller
-                campaignId={campaignId}
-                panorama={mission.panorama}
-                playback={mission.panoramaPlayback}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="mission-subtitle" className="text-sm font-medium">
+            Subtitle
+          </Label>
+          <Input
+            id="mission-subtitle"
+            value={mission.subtitle ?? ""}
+            placeholder="Location line shown under the title"
+            onChange={(e) => edit({ subtitle: e.target.value || undefined })}
+            onBlur={persistTyped}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="mission-briefing" className="text-sm font-medium">
+            Briefing
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Markdown supported. Embed bundled media with{" "}
+            <code className="font-mono">![](images/art.jpg)</code> — image,
+            audio or video by file extension.
+          </p>
+          <Textarea
+            id="mission-briefing"
+            value={mission.briefing}
+            className="min-h-28"
+            onChange={(e) => edit({ briefing: e.target.value })}
+            onBlur={persistTyped}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Objectives</span>
+          <ul className="flex flex-col gap-1.5">
+            {mission.objectives.map((o, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: objectives are a plain ordered string list with no stable id
+              <li key={i} className="flex items-center gap-1.5">
+                <Input
+                  value={o}
+                  placeholder={`Objective ${i + 1}`}
+                  onChange={(e) => setObjective(i, e.target.value)}
+                  onBlur={persistTyped}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={`Remove objective ${i + 1}`}
+                  onClick={() => removeObjective(i)}
+                >
+                  <X className="size-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <Button
+            size="sm"
+            variant="outline"
+            className="self-start gap-1.5"
+            onClick={addObjective}
+          >
+            <Plus className="size-4" /> Add objective
+          </Button>
+        </div>
+
+        {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Switch> control (implicit label association) */}
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="flex flex-col">
+            <span className="font-medium">Skippable</span>
+            <span className="text-xs text-muted-foreground">
+              Playable even if the previous mission is incomplete.
+            </span>
+          </span>
+          <Switch
+            checked={mission.skippable}
+            onCheckedChange={(v) => patch({ skippable: v })}
+          />
+        </label>
+      </Group>
+
+      <Group
+        title="Scenario"
+        summary={scenarioSummary(mission)}
+        open={groups.scenario}
+        onOpenChange={(o) => setGroup("scenario", o)}
+      >
+        <MissionScenarioField
+          mission={mission}
+          onChange={(next) => {
+            setMission(next);
+            void persist(next);
+          }}
+        />
+      </Group>
+
+      <Group
+        title="Presentation"
+        summary={presentationSummary(mission)}
+        open={groups.presentation}
+        onOpenChange={(o) => setGroup("presentation", o)}
+      >
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Panorama</span>
+          <p className="text-xs text-muted-foreground">
+            The briefing backdrop: a horizontally-tiling image, a looping muted
+            video, the mission's map as a full-screen spinning 3D preview, or
+            one of the game's units turning on the spot.
+          </p>
+          <SlotSourceSelect
+            value={slotSourceValue(panoramaSlot)}
+            onValueChange={(v) => patchSlot("panorama", v, panoramaSlot)}
+          />
+          {mission.panoramaMap ? (
+            <>
+              <MapPreviewTuning
+                config={mission.panoramaMap}
+                onChange={(panoramaMap) => patch({ panoramaMap })}
               />
-            )}
-            {mission.panorama &&
-              (refIsVideo(mission.panorama) ? (
-                <PlaybackTuning
+              <PreviewBox>
+                <MissionMapBackground
+                  mapName={mission.snapshot.mapName}
+                  config={mission.panoramaMap}
+                />
+              </PreviewBox>
+            </>
+          ) : mission.panoramaUnit ? (
+            <UnitSlotEditor
+              gameName={mission.snapshot.gameName}
+              variant="background"
+              config={mission.panoramaUnit}
+              onChange={(panoramaUnit) => patch({ panoramaUnit })}
+            />
+          ) : (
+            <>
+              {mission.panorama && (
+                <PanoramaScroller
+                  campaignId={campaignId}
+                  panorama={mission.panorama}
                   playback={mission.panoramaPlayback}
+                />
+              )}
+              {mission.panorama &&
+                (refIsVideo(mission.panorama) ? (
+                  <PlaybackTuning
+                    playback={mission.panoramaPlayback}
+                    defaults={DECORATIVE_DEFAULTS}
+                    decorative
+                    showAutoplay
+                    showLoop
+                    showMuted
+                    onChange={(panoramaPlayback) => patch({ panoramaPlayback })}
+                  />
+                ) : (
+                  <PlaybackTuning
+                    playback={mission.panoramaPlayback}
+                    defaults={DECORATIVE_DEFAULTS}
+                    showScroll
+                    onChange={(panoramaPlayback) => patch({ panoramaPlayback })}
+                  />
+                ))}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={pickImage}
+                >
+                  <Image className="size-4" />{" "}
+                  {mission.panorama ? "Replace media" : "Choose image or video"}
+                </Button>
+                <ArchiveMediaImportButton
+                  campaignId={campaignId}
+                  gameName={mission.snapshot.gameName}
+                  mediaType="image"
+                  onImported={importPanoramaFromArchive}
+                />
+                {mission.panorama && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5"
+                    onClick={removeImage}
+                  >
+                    <Trash2 className="size-4" /> Remove
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Side graphic</span>
+          <p className="text-xs text-muted-foreground">
+            Shown beside the briefing card: a still image, a looping muted
+            video, or the mission's map or one of the game's units as a
+            drag-to-rotate spinning preview layered over the backdrop.
+          </p>
+          <SlotSourceSelect
+            value={slotSourceValue(sideGraphicSlot)}
+            onValueChange={(v) => patchSlot("sideGraphic", v, sideGraphicSlot)}
+          />
+          {mission.sideGraphicMap ? (
+            <>
+              <MapPreviewTuning
+                config={mission.sideGraphicMap}
+                onChange={(sideGraphicMap) => patch({ sideGraphicMap })}
+              />
+              <PreviewBox>
+                <MissionMapSideGraphic
+                  mapName={mission.snapshot.mapName}
+                  config={mission.sideGraphicMap}
+                />
+              </PreviewBox>
+            </>
+          ) : mission.sideGraphicUnit ? (
+            <UnitSlotEditor
+              gameName={mission.snapshot.gameName}
+              variant="side"
+              config={mission.sideGraphicUnit}
+              onChange={(sideGraphicUnit) => patch({ sideGraphicUnit })}
+            />
+          ) : (
+            <>
+              <CampaignImageField
+                campaignId={campaignId}
+                kind="sideGraphic"
+                value={mission.sideGraphic}
+                onChange={(sideGraphic) => patch({ sideGraphic })}
+                label="Image or video"
+                help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
+                gameName={mission.snapshot.gameName}
+                allowVideo
+                preview={
+                  <div className="rounded-md border border-border/50 bg-muted p-2">
+                    <CampaignImage
+                      campaignId={campaignId}
+                      image={mission.sideGraphic}
+                      alt=""
+                      className="mx-auto max-h-40 object-contain"
+                    />
+                  </div>
+                }
+              />
+              {refIsVideo(mission.sideGraphic) && (
+                <PlaybackTuning
+                  playback={mission.sideGraphicPlayback}
                   defaults={DECORATIVE_DEFAULTS}
                   decorative
                   showAutoplay
                   showLoop
                   showMuted
-                  onChange={(panoramaPlayback) => patch({ panoramaPlayback })}
+                  onChange={(sideGraphicPlayback) =>
+                    patch({ sideGraphicPlayback })
+                  }
                 />
-              ) : (
-                <PlaybackTuning
-                  playback={mission.panoramaPlayback}
-                  defaults={DECORATIVE_DEFAULTS}
-                  showScroll
-                  onChange={(panoramaPlayback) => patch({ panoramaPlayback })}
-                />
-              ))}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={pickImage}
-              >
-                <Image className="size-4" />{" "}
-                {mission.panorama ? "Replace media" : "Choose image or video"}
-              </Button>
-              <ArchiveMediaImportButton
-                campaignId={campaignId}
-                gameName={mission.snapshot.gameName}
-                mediaType="image"
-                onImported={importPanoramaFromArchive}
-              />
-              {mission.panorama && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1.5"
-                  onClick={removeImage}
-                >
-                  <Trash2 className="size-4" /> Remove
-                </Button>
               )}
-            </div>
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Side graphic</span>
-        <p className="text-xs text-muted-foreground">
-          Shown beside the briefing card: a still image, a looping muted video,
-          or the mission's map or one of the game's units as a drag-to-rotate
-          spinning preview layered over the backdrop.
-        </p>
-        <SlotSourceSelect
-          value={slotSourceValue(sideGraphicSlot)}
-          onValueChange={(v) => patchSlot("sideGraphic", v, sideGraphicSlot)}
-        />
-        {mission.sideGraphicMap ? (
-          <>
-            <MapPreviewTuning
-              config={mission.sideGraphicMap}
-              onChange={(sideGraphicMap) => patch({ sideGraphicMap })}
-            />
-            <PreviewBox>
-              <MissionMapSideGraphic
-                mapName={mission.snapshot.mapName}
-                config={mission.sideGraphicMap}
-              />
-            </PreviewBox>
-          </>
-        ) : mission.sideGraphicUnit ? (
-          <UnitSlotEditor
+        <div className="flex flex-col gap-2">
+          <MissionAvField
+            campaignId={campaignId}
+            kind="audio"
+            value={mission.voiceover}
+            onChange={(voiceover) => patch({ voiceover })}
+            label="Briefing voiceover"
+            help="Optional audio played on the briefing screen."
             gameName={mission.snapshot.gameName}
-            variant="side"
-            config={mission.sideGraphicUnit}
-            onChange={(sideGraphicUnit) => patch({ sideGraphicUnit })}
           />
-        ) : (
-          <>
-            <CampaignImageField
-              campaignId={campaignId}
-              kind="sideGraphic"
-              value={mission.sideGraphic}
-              onChange={(sideGraphic) => patch({ sideGraphic })}
-              label="Image or video"
-              help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
-              gameName={mission.snapshot.gameName}
-              allowVideo
-              preview={
-                <div className="rounded-md border border-border/50 bg-muted p-2">
-                  <CampaignImage
-                    campaignId={campaignId}
-                    image={mission.sideGraphic}
-                    alt=""
-                    className="mx-auto max-h-40 object-contain"
-                  />
-                </div>
-              }
+          {mission.voiceover && (
+            <PlaybackTuning
+              playback={mission.voiceoverPlayback}
+              defaults={CUE_DEFAULTS}
+              showLoop
+              showMuted
+              onChange={(voiceoverPlayback) => patch({ voiceoverPlayback })}
             />
-            {refIsVideo(mission.sideGraphic) && (
-              <PlaybackTuning
-                playback={mission.sideGraphicPlayback}
-                defaults={DECORATIVE_DEFAULTS}
-                decorative
-                showAutoplay
-                showLoop
-                showMuted
-                onChange={(sideGraphicPlayback) =>
-                  patch({ sideGraphicPlayback })
-                }
-              />
-            )}
-          </>
-        )}
-      </div>
+          )}
+        </div>
 
-      <div className="flex flex-col gap-2">
-        <MissionAvField
-          campaignId={campaignId}
-          kind="audio"
-          value={mission.voiceover}
-          onChange={(voiceover) => patch({ voiceover })}
-          label="Briefing voiceover"
-          help="Optional audio played on the briefing screen."
-          gameName={mission.snapshot.gameName}
-        />
-        {mission.voiceover && (
-          <PlaybackTuning
-            playback={mission.voiceoverPlayback}
-            defaults={CUE_DEFAULTS}
-            showLoop
-            showMuted
-            onChange={(voiceoverPlayback) => patch({ voiceoverPlayback })}
+        <div className="flex flex-col gap-2">
+          <MissionAvField
+            campaignId={campaignId}
+            kind="video"
+            value={mission.cutscene}
+            onChange={(cutscene) => patch({ cutscene })}
+            label="Intro cutscene"
+            help="Optional video offered on the briefing screen."
+            gameName={mission.snapshot.gameName}
           />
-        )}
-      </div>
+          {mission.cutscene && (
+            <PlaybackTuning
+              playback={mission.cutscenePlayback}
+              defaults={CUE_DEFAULTS}
+              showAutoplay
+              showLoop
+              showMuted
+              onChange={(cutscenePlayback) => patch({ cutscenePlayback })}
+            />
+          )}
+        </div>
+      </Group>
 
-      <div className="flex flex-col gap-2">
-        <MissionAvField
-          campaignId={campaignId}
-          kind="video"
-          value={mission.cutscene}
-          onChange={(cutscene) => patch({ cutscene })}
-          label="Intro cutscene"
-          help="Optional video offered on the briefing screen."
-          gameName={mission.snapshot.gameName}
-        />
-        {mission.cutscene && (
-          <PlaybackTuning
-            playback={mission.cutscenePlayback}
-            defaults={CUE_DEFAULTS}
-            showAutoplay
-            showLoop
-            showMuted
-            onChange={(cutscenePlayback) => patch({ cutscenePlayback })}
+      <Group
+        title="Rules"
+        summary={rulesSummary(mission)}
+        open={groups.rules}
+        onOpenChange={(o) => setGroup("rules", o)}
+      >
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Unit restrictions</span>
+          <UnitRestrictions
+            gameName={mission.snapshot.gameName}
+            disabledUnits={mission.disabledUnits}
+            onChange={(disabledUnits) => patch({ disabledUnits })}
           />
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Unit restrictions</span>
-        <UnitRestrictions
-          gameName={mission.snapshot.gameName}
-          disabledUnits={mission.disabledUnits}
-          onChange={(disabledUnits) => patch({ disabledUnits })}
-        />
-      </div>
+        </div>
+      </Group>
 
       <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border/50 bg-background py-3">
         <RevertButton disabled={!changed(mission, initial)} onRevert={revert} />

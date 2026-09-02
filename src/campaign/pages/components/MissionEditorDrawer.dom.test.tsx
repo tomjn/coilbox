@@ -18,6 +18,7 @@
  */
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -157,11 +158,15 @@ const EXITS = {
   },
 } as const;
 
-/** Wait for the drawer to have gone, so its closing write has run. */
+/**
+ * Wait for the drawer to have gone, so its closing write has run.
+ *
+ * Title, because it is in the group that is open when the drawer opens. This
+ * used to watch for "Briefing voiceover", which now starts inside a collapsed
+ * group and so is never on screen to wait for (issue #2261).
+ */
 async function drawerClosed() {
-  await waitFor(() =>
-    expect(screen.queryByText("Briefing voiceover")).toBeNull(),
-  );
+  await waitFor(() => expect(screen.queryByLabelText("Title")).toBeNull());
 }
 
 /** Type into a labelled text box, without leaving it. */
@@ -171,8 +176,18 @@ function type(label: string, value: string) {
   return field;
 }
 
+/** Open one of the drawer's groups, if it is not already open. */
+function expand(group: string) {
+  const trigger = screen.getByRole("button", {
+    name: new RegExp(`^${group}`),
+  });
+  if (trigger.getAttribute("data-state") === "closed") fireEvent.click(trigger);
+}
+
 /** Choose or replace one media slot, through the OS file dialog. */
 async function pickMedia(label: string, choose: string) {
+  // The media slots live in the Presentation group, which starts collapsed.
+  expand("Presentation");
   const field = screen.getByText(label).parentElement;
   if (!field) throw new Error(`no ${label} field`);
   const button = [...field.querySelectorAll("button")].find((b) =>
@@ -197,6 +212,9 @@ beforeEach(() => {
   campaignMediaDelete.mockClear();
   campaignMediaImport.mockClear();
   campaignMediaImport.mockResolvedValue({ file: "imported-1.ogg" });
+  // Which groups are open is remembered across drawers, so one test opening
+  // one would otherwise decide what the next test sees (issue #2261).
+  localStorage.clear();
 });
 
 describe("a text box", () => {
@@ -294,7 +312,9 @@ describe("every way out of the drawer (issue #2260)", () => {
 
     await tick();
     expect(saved).toEqual([]);
-    expect(screen.getByText("Briefing voiceover")).toBeTruthy();
+    // Still on screen: the sentinel is Title rather than the voiceover field,
+    // which now starts inside a collapsed group (issue #2261).
+    expect(screen.getByLabelText("Title")).toBeTruthy();
   });
 });
 
@@ -587,6 +607,152 @@ describe("an import", () => {
       { kind: "file", file: "imported-1.ogg" },
       { kind: "file", file: "imported-2.ogg" },
     ]);
+  });
+});
+
+describe("the four groups (issue #2261)", () => {
+  /** The trigger for one group, whose accessible name carries its summary. */
+  const header = (group: string) =>
+    screen.getByRole("button", { name: new RegExp(`^${group}`) });
+
+  it("opens the mission itself and starts the other three shut", () => {
+    openDrawer(mission());
+
+    expect(header("Content").getAttribute("data-state")).toBe("open");
+    for (const group of ["Scenario", "Presentation", "Rules"]) {
+      expect(header(group).getAttribute("data-state")).toBe("closed");
+    }
+    expect(screen.getByLabelText("Title")).toBeTruthy();
+  });
+
+  it("takes a shut group's fields out of the page rather than hiding them", () => {
+    // Which is the whole point of shutting them: the media importers and the
+    // unit picker each mount a unitsync scan, and a scan nobody asked for is
+    // what makes opening this drawer cost tens of seconds (issue #2265).
+    openDrawer(mission());
+
+    expect(screen.queryByText("Briefing voiceover")).toBeNull();
+    expect(screen.queryByText("Panorama")).toBeNull();
+    expect(screen.queryByText("Unit restrictions")).toBeNull();
+
+    expand("Presentation");
+
+    expect(screen.getByText("Briefing voiceover")).toBeTruthy();
+  });
+
+  it("says what each shut group is holding when it is holding nothing", () => {
+    openDrawer(mission());
+
+    expect(header("Content").textContent).toContain(
+      "No briefing, 0 objectives",
+    );
+    expect(header("Scenario").textContent).toContain("No scenario attached");
+    expect(header("Presentation").textContent).toContain(
+      "No panorama, side graphic, voiceover or cutscene",
+    );
+    expect(header("Rules").textContent).toContain("No restrictions");
+  });
+
+  it("says what each shut group is holding when something is set", () => {
+    openDrawer(
+      mission({
+        briefing: "Hold the line",
+        objectives: ["Survive"],
+        voiceover: { kind: "file", file: "brief.ogg" },
+        disabledUnits: ["armcom", "corcom"],
+      }),
+    );
+
+    expect(header("Content").textContent).toContain(
+      "Briefing written, 1 objective",
+    );
+    expect(header("Presentation").textContent).toContain("Voiceover");
+    expect(header("Rules").textContent).toContain("2 units banned");
+  });
+
+  it("keeps the summary honest as the mission is edited", async () => {
+    openDrawer(mission());
+
+    screen.getByRole("button", { name: "Add objective" }).click();
+
+    await waitFor(() =>
+      expect(header("Content").textContent).toContain("1 objective"),
+    );
+  });
+
+  it("saves a field in a group that was shut and then opened", async () => {
+    const saved: CampaignMission[] = [];
+    openDrawer(mission(), async (m) => {
+      saved.push(m);
+    });
+
+    expand("Presentation");
+    await pickVoiceover();
+
+    await waitFor(() =>
+      expect(saved.at(-1)?.voiceover).toEqual({
+        kind: "file",
+        file: "imported-1.ogg",
+      }),
+    );
+  });
+
+  it("still saves a field in a group that was shut and opened again", async () => {
+    const saved: CampaignMission[] = [];
+    openDrawer(mission(), async (m) => {
+      saved.push(m);
+    });
+
+    // Content holds the text boxes, so shutting and reopening it is the way to
+    // ask whether a remount costs the autosave path anything.
+    header("Content").click();
+    await waitFor(() => expect(screen.queryByLabelText("Subtitle")).toBeNull());
+    expand("Content");
+
+    fireEvent.blur(type("Subtitle", "Sector 9"));
+
+    await waitFor(() => expect(saved.at(-1)?.subtitle).toBe("Sector 9"));
+  });
+
+  it("opens both when two are toggled in the same tick", () => {
+    // Found in the running app: the setter built the next map from the render
+    // it was created in, so two clicks React batched together left only the
+    // second one open.
+    openDrawer(mission());
+
+    act(() => {
+      header("Scenario").click();
+      header("Rules").click();
+    });
+
+    expect(header("Scenario").getAttribute("data-state")).toBe("open");
+    expect(header("Rules").getAttribute("data-state")).toBe("open");
+  });
+
+  it("remembers which groups were left open", async () => {
+    openDrawer(mission());
+    expand("Rules");
+    await EXITS["the Close button"]();
+    await drawerClosed();
+    cleanup();
+
+    openDrawer(mission());
+
+    expect(header("Rules").getAttribute("data-state")).toBe("open");
+  });
+
+  it("says the game, the map and the facts whatever is shut", () => {
+    // The two that decide whether the mission can be played at all live in
+    // the snapshot, which no group holds, so the header carries them.
+    openDrawer(
+      mission({
+        snapshot: { ...mission().snapshot, gameName: "Zero-K", mapName: "" },
+      }),
+    );
+
+    expect(screen.getByText("Zero-K")).toBeTruthy();
+    expect(screen.getByText("No map")).toBeTruthy();
+    expect(screen.getByText("No briefing")).toBeTruthy();
   });
 });
 
