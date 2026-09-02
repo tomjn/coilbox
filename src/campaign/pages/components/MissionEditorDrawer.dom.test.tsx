@@ -18,6 +18,7 @@
  */
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -711,6 +712,21 @@ describe("the four groups (issue #2261)", () => {
     fireEvent.blur(type("Subtitle", "Sector 9"));
 
     await waitFor(() => expect(saved.at(-1)?.subtitle).toBe("Sector 9"));
+  });
+
+  it("opens both when two are toggled in the same tick", () => {
+    // Found in the running app: the setter built the next map from the render
+    // it was created in, so two clicks React batched together left only the
+    // second one open.
+    openDrawer(mission());
+
+    act(() => {
+      header("Scenario").click();
+      header("Rules").click();
+    });
+
+    expect(header("Scenario").getAttribute("data-state")).toBe("open");
+    expect(header("Rules").getAttribute("data-state")).toBe("open");
   });
 
   it("remembers which groups were left open", async () => {

@@ -24,7 +24,7 @@
  * nothing.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { scenarioContents } from "@/scenario/listing";
 import { refIsVideo } from "../../../lib/assetUrl";
 import type { CampaignMission } from "../../model";
@@ -83,10 +83,17 @@ export function useMissionGroups(): [
     }
   });
 
+  // The answer as it stands, which is ahead of `open` for a second toggle in
+  // the same tick. Building the next map from this render's copy instead lost
+  // every toggle but the last.
+  const latest = useRef(open);
+  latest.current = open;
+
   return [
     open,
     (key, next) => {
-      const all = { ...open, [key]: next };
+      const all = { ...latest.current, [key]: next };
+      latest.current = all;
       setOpen(all);
       try {
         localStorage.setItem(KEY, JSON.stringify(all));
