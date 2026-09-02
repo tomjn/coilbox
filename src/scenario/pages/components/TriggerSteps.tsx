@@ -78,6 +78,33 @@ function asPoint(v: ScenarioParam | undefined): Point | null {
   return typeof x === "number" && typeof z === "number" ? { x, z } : null;
 }
 
+/**
+ * The accessible name for one parameter's control: the step type, its plain
+ * label, and its schema key when the label says something the key does not,
+ * so an author reading Mission Lua can still trace the field back to what
+ * compiled it (issue #2274). The key is left out when the label already is
+ * it, so a field like `zone` is not read out twice.
+ */
+function paramAccessibleName(
+  typeLabel: string,
+  name: string,
+  friendly: string,
+): string {
+  return friendly === name
+    ? `${typeLabel} ${friendly}`
+    : `${typeLabel} ${friendly}, ${name}`;
+}
+
+/** The number a `default` in a parameter's spec substitutes when the box is
+ *  left empty, as a placeholder ("default 1"), or a plain word saying the
+ *  field can be left out when no fixed number is known (`min` and `max` mean
+ *  unbounded, not a particular number). Required fields show nothing, since
+ *  there is nothing to leave out. */
+function numberPlaceholder(optional: boolean, defaultValue?: number): string {
+  if (!optional) return "";
+  return defaultValue === undefined ? "optional" : `default ${defaultValue}`;
+}
+
 /** Whether the map is waiting for the point this field asked for. */
 function isAsking(picking: PointTarget | null, want: PointTarget): boolean {
   return (
@@ -314,15 +341,16 @@ function ParamField({
   onPick: (target: PointTarget | null) => void;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
-  const label = `${typeLabel} ${name}`;
+  const friendly = spec.label ?? name;
+  const label = paramAccessibleName(typeLabel, name, friendly);
   // An optional parameter that is set can be put back to whatever the runtime
   // does by default, which is what leaving it out means.
   const clearable = spec.optional === true && value !== undefined;
 
   return (
     <div className="flex items-start gap-2">
-      <span className="w-20 shrink-0 pt-1 text-right font-mono text-[11px] text-muted-foreground">
-        {name}
+      <span className="w-20 shrink-0 pt-1 text-right text-[11px] text-muted-foreground">
+        {friendly}
       </span>
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <ParamControl
@@ -379,6 +407,7 @@ function ParamControl({
   onPick: (target: PointTarget | null) => void;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
+  const friendly = spec.label ?? name;
   const options = registryOptions(scenario, spec.kind);
   if (options) {
     if (spec.kind === "teamId") {
@@ -399,7 +428,7 @@ function ParamControl({
         options={options}
         disabled={options.length === 0}
         placeholder={
-          options.length === 0 ? "Nothing to pick yet" : `Pick a ${name}`
+          options.length === 0 ? "Nothing to pick yet" : `Pick a ${friendly}`
         }
       />
     );
@@ -412,6 +441,7 @@ function ParamControl({
           label={label}
           value={asNumber(value)}
           optional={spec.optional === true}
+          placeholder={numberPlaceholder(spec.optional === true, spec.default)}
           onChange={onChange}
         />
       );
@@ -440,7 +470,7 @@ function ParamControl({
           value={asString(value)}
           onValueChange={onChange}
           options={(spec.values ?? []).map((v) => ({ value: v, label: v }))}
-          placeholder={`Pick a ${name}`}
+          placeholder={`Pick a ${friendly}`}
         />
       );
     case "point":
@@ -502,11 +532,13 @@ function NumberField({
   label,
   value,
   optional,
+  placeholder,
   onChange,
 }: {
   label: string;
   value: number | undefined;
   optional: boolean;
+  placeholder: string;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
   const stored = value === undefined ? "" : String(value);
@@ -531,7 +563,7 @@ function NumberField({
       aria-label={label}
       type="number"
       value={text}
-      placeholder={optional ? "default" : ""}
+      placeholder={placeholder}
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -601,6 +633,7 @@ function AmountField({
           label={label}
           value={asNumber(value)}
           optional={optional}
+          placeholder={numberPlaceholder(optional)}
           onChange={onChange}
         />
       ) : (
