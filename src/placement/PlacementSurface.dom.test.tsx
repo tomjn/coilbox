@@ -12,6 +12,11 @@
  * still looks right and answers nobody.
  */
 
+import {
+  memoryStorage,
+  PersistentStoreProvider,
+  type SettingsStorage,
+} from "@picoframe/frame";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlacementSurface, type SurfaceKeyboard } from "./PlacementSurface";
@@ -25,28 +30,40 @@ vi.mock("@/mapconv/pages/components/MapPreview3D", () => ({
 
 afterEach(cleanup);
 
-function surface(keyboard?: Partial<SurfaceKeyboard>) {
+// PlacementSurface remembers its own height through the frame's settings
+// store (issue #2320), which throws if it is rendered outside a
+// PersistentStoreProvider. A storage the caller can hand back in lets the
+// persistence tests below render twice against the same backing store, the
+// way two launches of the app would share one settings file.
+function surface(
+  keyboard?: Partial<SurfaceKeyboard>,
+  storage: SettingsStorage = memoryStorage(),
+) {
   const onKeyDown = vi.fn();
   const onFocus = vi.fn();
   render(
-    <PlacementSurface
-      ground={{ kind: "grid", extent: 1024 }}
-      onScene={() => {}}
-      keyboard={{
-        label: "Scenario map",
-        help: "Arrow keys move what is selected.",
-        said: { text: "", token: 0 },
-        cursor: "x 100, z 200",
-        onKeyDown,
-        onFocus,
-        ...keyboard,
-      }}
-    />,
+    <PersistentStoreProvider storage={storage}>
+      <PlacementSurface
+        ground={{ kind: "grid", extent: 1024 }}
+        onScene={() => {}}
+        keyboard={{
+          label: "Scenario map",
+          help: "Arrow keys move what is selected.",
+          said: { text: "", token: 0 },
+          cursor: "x 100, z 200",
+          onKeyDown,
+          onFocus,
+          ...keyboard,
+        }}
+      />
+    </PersistentStoreProvider>,
   );
-  return { onKeyDown, onFocus };
+  return { onKeyDown, onFocus, storage };
 }
 
 const area = () => screen.getByRole("application", { name: "Scenario map" });
+const handle = () =>
+  screen.getByRole("separator", { name: "Resize the working area" });
 
 describe("reaching the map with the keyboard", () => {
   it("is in the tab order", () => {
@@ -136,12 +153,105 @@ describe("the marker at the point the keys act on", () => {
 describe("a surface with no keyboard interface", () => {
   it("is left exactly as it was", () => {
     render(
-      <PlacementSurface
-        ground={{ kind: "grid", extent: 1024 }}
-        onScene={() => {}}
-      />,
+      <PersistentStoreProvider storage={memoryStorage()}>
+        <PlacementSurface
+          ground={{ kind: "grid", extent: 1024 }}
+          onScene={() => {}}
+        />
+      </PersistentStoreProvider>,
     );
 
     expect(screen.queryByRole("application")).toBeNull();
+  });
+});
+
+/**
+ * The height handle (issue #2320).
+ *
+ * happy-dom does no layout, so nothing here can see the card grow or shrink in
+ * pixels. What it can pin is the part that is logic rather than layout: the
+ * separator answers the keyboard within bounds, and what it lands on survives
+ * a remount, which is what standing the app back up after a restart does.
+ */
+describe("the height handle", () => {
+  it("is a horizontal separator with the current height and its bounds", () => {
+    surface();
+
+    const el = handle();
+    expect(el.getAttribute("aria-orientation")).toBe("horizontal");
+    expect(el.getAttribute("aria-valuenow")).toBe("480");
+    expect(el.getAttribute("aria-valuemin")).toBe("240");
+    expect(el.getAttribute("aria-valuemax")).toBe("960");
+  });
+
+  it("is in the tab order on its own stop", () => {
+    surface();
+
+    expect(handle().getAttribute("tabindex")).toBe("0");
+  });
+
+  it("grows on ArrowDown and shrinks on ArrowUp, in steps", () => {
+    surface();
+
+    fireEvent.keyDown(handle(), { key: "ArrowDown" });
+    expect(handle().getAttribute("aria-valuenow")).toBe("512");
+
+    fireEvent.keyDown(handle(), { key: "ArrowUp" });
+    fireEvent.keyDown(handle(), { key: "ArrowUp" });
+    expect(handle().getAttribute("aria-valuenow")).toBe("448");
+  });
+
+  it("stops at the minimum rather than going below it", () => {
+    surface();
+
+    for (let i = 0; i < 20; i++) {
+      fireEvent.keyDown(handle(), { key: "ArrowUp" });
+    }
+
+    expect(handle().getAttribute("aria-valuenow")).toBe("240");
+  });
+
+  it("stops at the maximum rather than going above it", () => {
+    surface();
+
+    for (let i = 0; i < 20; i++) {
+      fireEvent.keyDown(handle(), { key: "ArrowDown" });
+    }
+
+    expect(handle().getAttribute("aria-valuenow")).toBe("960");
+  });
+
+  it("leaves other keys, on the map or elsewhere, alone", () => {
+    const { onKeyDown } = surface();
+    fireEvent.keyDown(handle(), { key: "Enter" });
+
+    expect(handle().getAttribute("aria-valuenow")).toBe("480");
+    expect(onKeyDown).not.toHaveBeenCalled();
+  });
+
+  it("does not swallow the map's own arrow keys", () => {
+    const { onKeyDown } = surface();
+    fireEvent.keyDown(area(), { key: "ArrowDown" });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+    expect(handle().getAttribute("aria-valuenow")).toBe("480");
+  });
+
+  it("remembers a height set by the keyboard across a remount", () => {
+    const storage = memoryStorage();
+    surface(undefined, storage);
+    fireEvent.keyDown(handle(), { key: "ArrowDown" });
+    expect(handle().getAttribute("aria-valuenow")).toBe("512");
+    cleanup();
+
+    surface(undefined, storage);
+    expect(handle().getAttribute("aria-valuenow")).toBe("512");
+  });
+
+  it("is not offered in the expanded view", () => {
+    surface();
+    fireEvent.click(screen.getByTitle("Fill the window"));
+
+    expect(screen.queryByRole("separator")).toBeNull();
   });
 });
