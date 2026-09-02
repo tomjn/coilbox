@@ -8,10 +8,12 @@ import {
   Eye,
   Pencil,
   Plus,
+  TriangleAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { type SaveState, SaveStatus } from "@/components/SaveStatus";
+import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -54,6 +56,11 @@ import {
 import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
 
 const BACK = "/campaign-builder";
+
+/** The full text behind the stale-scenario badge, said once for a screen
+ * reader and again as the badge's hover title. */
+const STALE_SCENARIO_WARNING =
+  "The scenario has been edited since this copy was attached.";
 
 /** Build a fresh mission from a preset, deep-copying its setup into the snapshot. */
 function missionFromPreset(preset: SkirmishPreset): CampaignMission {
@@ -487,7 +494,7 @@ export default function CampaignEditPage() {
         onOpenChange={setStoredArtOpen}
         className="flex flex-col gap-2"
       >
-        <h2 className="text-sm font-medium">
+        <h2 className="text-base font-semibold">
           <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md py-1 text-left hover:text-foreground/80">
             <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
             Presentation
@@ -557,7 +564,7 @@ export default function CampaignEditPage() {
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">
+          <h2 className="text-base font-semibold">
             Missions ({campaign.missions.length})
           </h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -639,32 +646,56 @@ export default function CampaignEditPage() {
                         <ArrowDown className="size-4" />
                       </Button>
                     </div>
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-sm font-medium">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      {/* The only bold line on the card: everything below is
+                          one muted metadata row, so a scan down the list reads
+                          titles first and details only on demand. */}
+                      <span className="truncate text-sm font-semibold">
                         {i + 1}. {m.title}
                       </span>
-                      {/* Against the title, because that is where the briefing
-                          screen puts it: a location line under the name. */}
-                      {m.subtitle && (
-                        <span className="truncate text-xs text-muted-foreground">
-                          {m.subtitle}
-                        </span>
-                      )}
-                      <MissionSetup snapshot={m.snapshot} />
-                      <MissionFacts mission={m} />
-                      {attachment.state === "stale" && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-amber-600 dark:text-amber-500">
-                            The scenario has been edited since this copy was
-                            attached.
-                          </span>
-                          <MissionScenarioUpdateButton
-                            mission={m}
-                            attachment={attachment}
-                            onUpdate={applyMission}
-                          />
-                        </div>
-                      )}
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+                        {/* Against the title, because that is where the
+                            briefing screen puts it: a location line under the
+                            name. */}
+                        {m.subtitle && (
+                          <>
+                            <span className="truncate">{m.subtitle}</span>
+                            <span aria-hidden="true">·</span>
+                          </>
+                        )}
+                        <MissionSetup snapshot={m.snapshot} />
+                        <span aria-hidden="true">·</span>
+                        <MissionFacts mission={m} />
+                        {/* A badge rather than a sentence, so a stale
+                            attachment is a shape to notice in one scan pass
+                            rather than a paragraph to read. The full warning
+                            stays in the DOM for a screen reader and on hover,
+                            the same split the fact chips above already use. */}
+                        {attachment.state === "stale" && (
+                          <>
+                            <Badge
+                              variant="outline"
+                              title={STALE_SCENARIO_WARNING}
+                              className="gap-1 border-amber-600/40 text-amber-600 dark:border-amber-500/40 dark:text-amber-500"
+                            >
+                              <TriangleAlert
+                                className="size-3"
+                                aria-hidden="true"
+                              />
+                              Out of date
+                              <span className="sr-only">
+                                {" "}
+                                {STALE_SCENARIO_WARNING}
+                              </span>
+                            </Badge>
+                            <MissionScenarioUpdateButton
+                              mission={m}
+                              attachment={attachment}
+                              onUpdate={applyMission}
+                            />
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-2">
                       <Button
