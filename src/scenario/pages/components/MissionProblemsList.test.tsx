@@ -10,10 +10,11 @@
  * read as a perfectly good sentence about the wrong string.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { starterScenario } from "../../create";
 import type { Scenario } from "../../model";
+import type { MissionIssue } from "../../validate";
 import { MissionProblemsList } from "./MissionProblemsList";
 import { missionProblemsIn } from "./useMissionProblems";
 
@@ -26,11 +27,15 @@ function brokenScenario(): Scenario {
   return { ...scenario, dialogue: [] };
 }
 
-function show(scenario: Scenario) {
+function show(
+  scenario: Scenario,
+  onActivate: (issue: MissionIssue) => void = () => {},
+) {
   render(
     <MissionProblemsList
       problems={missionProblemsIn(scenario)}
       scenario={scenario}
+      onActivate={onActivate}
     />,
   );
 }
@@ -70,5 +75,43 @@ describe("the problems in the mission being written", () => {
     expect(
       screen.getByText(/Every reference in this mission resolves/),
     ).toBeTruthy();
+  });
+});
+
+/**
+ * Issue #2271. `problemTarget` decides which rows have somewhere to click
+ * through to, and this is the wiring: a row it names a target for is a button
+ * that hands the issue back, and a row it does not is left as the same plain
+ * text the list always showed, so the two kinds of row are told apart by role
+ * as well as by look.
+ */
+describe("activating a problem row", () => {
+  it("is a button for a problem a panel owns, and calls onActivate with it", () => {
+    const onActivate = vi.fn();
+    show(brokenScenario(), onActivate);
+
+    const row = screen.getByRole("button", {
+      name: /no dialogue line called "briefing"/,
+    });
+    fireEvent.click(row);
+
+    expect(onActivate).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        message: 'no dialogue line called "briefing"',
+      }),
+    );
+  });
+
+  /** A team with no engine team has no panel of its own: `setup.participants`
+   *  is who has one, and `problemTarget` leaves `teams["…"]` unclaimed. */
+  it("is plain text for a problem naming a team, which no panel owns", () => {
+    const scenario: Scenario = {
+      ...starterScenario("Demo"),
+      teams: { ghost: {} },
+    };
+    show(scenario);
+
+    const message = screen.getByText(/"ghost" has no engine team/);
+    expect(message.closest("button")).toBeNull();
   });
 });
