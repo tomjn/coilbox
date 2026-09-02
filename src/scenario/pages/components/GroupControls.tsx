@@ -22,6 +22,9 @@
  * A group standing off the map is said the same way, but as a row-level note
  * rather than a field problem (issue #2343): its position is dragged on the
  * map, not typed here, so there is no control for `aria-invalid` to sit on.
+ * One of the group's own unit rows naming a def the game has not got is a
+ * row-level note under that row for the same reason: the picker sets the def
+ * once and adds a row, it does not edit one (issue #2346).
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -134,6 +137,12 @@ export function GroupControls({
               <UnitRow
                 key={entry.def}
                 entry={entry}
+                problem={entryFieldProblem(
+                  issues,
+                  "groups",
+                  group.id,
+                  `units[${index}].def`,
+                )}
                 onCount={(count) =>
                   onEdit({ units: withUnit(group.units, index, { count }) })
                 }
@@ -258,10 +267,15 @@ export function GroupControls({
  */
 export function UnitRow({
   entry,
+  problem = null,
   onCount,
   onRemove,
 }: {
   entry: GroupUnit;
+  /** What the validator found wrong with this unit type, in its own words
+   *  (issue #2346): a def the game has not got. There is no control here for
+   *  `aria-invalid` to sit on, so this is a row-level note instead. */
+  problem?: string | null;
   onCount: (count: number) => void;
   onRemove: () => void;
 }) {
@@ -274,31 +288,34 @@ export function UnitRow({
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="min-w-0 flex-1 truncate font-mono text-xs">
-        {entry.def}
-      </span>
-      <Input
-        aria-label={`How many ${entry.def}`}
-        type="number"
-        min={1}
-        value={count}
-        onChange={(e) => setCount(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-        className="h-7 w-16 text-xs"
-      />
-      <Button
-        size="sm"
-        variant="ghost"
-        className="size-7 p-0 text-destructive hover:text-destructive"
-        aria-label={`Remove ${entry.def}`}
-        onClick={onRemove}
-      >
-        <X className="size-3.5" />
-      </Button>
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate font-mono text-xs">
+          {entry.def}
+        </span>
+        <Input
+          aria-label={`How many ${entry.def}`}
+          type="number"
+          min={1}
+          value={count}
+          onChange={(e) => setCount(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          className="h-7 w-16 text-xs"
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="size-7 p-0 text-destructive hover:text-destructive"
+          aria-label={`Remove ${entry.def}`}
+          onClick={onRemove}
+        >
+          <X className="size-3.5" />
+        </Button>
+      </div>
+      <RowProblem problem={problem} />
     </div>
   );
 }
