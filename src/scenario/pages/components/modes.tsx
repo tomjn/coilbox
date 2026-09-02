@@ -79,6 +79,7 @@ import { boxFromDrag, keysInBox } from "./selection";
 import { TeamSelect } from "./TeamSelect";
 import {
   addZone,
+  MARQUEE_ZONE_ID,
   nextZoneName,
   type ZoneShape,
   zoneFromDrag,
@@ -194,10 +195,6 @@ export interface EditorMode {
   use: (ctx: ModeContext) => ModeBehaviour;
 }
 
-/** The id a marquee's rectangle carries while it is being dragged out. Never
- *  written to the document, and not a UUID, so it cannot collide with a zone. */
-const MARQUEE_ID = "marquee";
-
 /**
  * Looking without touching: pick things up, move them, turn them, put nothing
  * new down, and take hold of several at once (issue #2279).
@@ -267,7 +264,7 @@ const selectMode: EditorMode = {
           // that would select what was inside the box the author was shown
           // rather than the one they drew.
           queue({
-            id: MARQUEE_ID,
+            id: MARQUEE_ZONE_ID,
             name: "Selecting",
             shape: "box",
             min: { x: box.minX, z: box.minZ },

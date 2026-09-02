@@ -1,0 +1,173 @@
+/**
+ * A selection marquee is not drawn like a zone (issue #2279).
+ *
+ * The marquee travels to the map through the same list a half-drawn zone does,
+ * because a rectangle dragged out on the ground is exactly what this layer
+ * already draws. That reuse is the whole reason the two once looked identical,
+ * and both are made by the same gesture - a left-drag on bare ground, with only
+ * the mode telling them apart - so looking alike is the one thing they must not
+ * do.
+ *
+ * What follows pins the difference from both sides: the marquee has no fill and
+ * a dashed edge, and a zone being dragged out is untouched. Nothing renders
+ * here. The scene is a bag to hang objects off, and what is asserted is what was
+ * hung in it.
+ */
+
+import * as THREE from "three";
+import { describe, expect, it } from "vitest";
+
+import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { ScenarioZone } from "../../model";
+import { MARQUEE_ZONE_ID } from "./zones";
+import { createZonesLayer } from "./zonesLayer";
+
+/** Enough of a scene to hang objects off. Nothing here renders. */
+function scene(): MapScene3D {
+  return {
+    scene: new THREE.Scene(),
+    scale: 1,
+    render: () => {},
+  } as unknown as MapScene3D;
+}
+
+function layer() {
+  return createZonesLayer({
+    handle: scene(),
+    worldWidth: 4096,
+    worldHeight: 4096,
+    // Flat ground, so the drape does not change what is being asserted.
+    groundAt: () => 0,
+  });
+}
+
+const box = (id: string): ScenarioZone => ({
+  id,
+  name: id === MARQUEE_ZONE_ID ? "Selecting" : "Landing site",
+  shape: "box",
+  min: { x: 1000, z: 1000 },
+  max: { x: 1400, z: 1400 },
+});
+
+/** Everything one zone was drawn as, flattened out of its group. */
+function drawn(root: THREE.Object3D, at: number): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
+  root.children[at].traverse((one) => {
+    if (one !== root.children[at]) out.push(one);
+  });
+  return out;
+}
+
+const meshes = (parts: THREE.Object3D[]) =>
+  parts.filter((one) => one instanceof THREE.Mesh);
+const lines = (parts: THREE.Object3D[]) =>
+  parts.filter((one) => one instanceof THREE.Line);
+
+describe("a selection marquee against a zone being drawn", () => {
+  it("draws the marquee as lines and nothing else, so there is no sheet of ground", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID)], null);
+
+    const parts = drawn(zones.root, 0);
+    expect(meshes(parts)).toHaveLength(0);
+    expect(lines(parts)).toHaveLength(2);
+  });
+
+  it("still draws a zone with its filled sheet", () => {
+    const zones = layer();
+    zones.draw([box("z1")], null);
+
+    const parts = drawn(zones.root, 0);
+    expect(meshes(parts).length).toBeGreaterThan(0);
+  });
+
+  it("dashes the marquee's edge, where a zone's is solid", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID), box("z1")], null);
+
+    const marquee = lines(drawn(zones.root, 0)).map(
+      (one) => (one as THREE.Line).material.constructor.name,
+    );
+    const zone = lines(drawn(zones.root, 1)).map(
+      (one) => (one as THREE.Line).material.constructor.name,
+    );
+    expect(marquee).toContain("LineDashedMaterial");
+    expect(zone).not.toContain("LineDashedMaterial");
+  });
+
+  it("gives the dashes a length, so they are dashes rather than one long one", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID)], null);
+
+    const dashed = lines(drawn(zones.root, 0)).find(
+      (one) =>
+        (one as THREE.Line).material.constructor.name === "LineDashedMaterial",
+    ) as THREE.Line;
+    const material = dashed.material as THREE.LineDashedMaterial;
+    expect(material.dashSize).toBeGreaterThan(0);
+    expect(material.gapSize).toBe(material.dashSize);
+    // Thirty-two dashes and thirty-two gaps round a 400 by 400 box: a dash is a
+    // fraction of a side rather than a whole one.
+    expect(material.dashSize).toBeLessThan(400);
+  });
+
+  it("draws the marquee in neither the zone's blue nor a path's green", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID)], null);
+
+    const colours = lines(drawn(zones.root, 0)).map((one) =>
+      ((one as THREE.Line).material as THREE.LineBasicMaterial).color.getHex(),
+    );
+    expect(colours).not.toContain(0x38bdf8);
+    expect(colours).not.toContain(0x86efac);
+    // White over dark, so whichever one the ground washes out the other stands.
+    expect(colours).toContain(0xffffff);
+    expect(colours).toContain(0x0f172a);
+  });
+
+  it("does not clash with the plate under a selected unit, which is its own blue", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID)], null);
+
+    const colours = lines(drawn(zones.root, 0)).map((one) =>
+      ((one as THREE.Line).material as THREE.LineBasicMaterial).color.getHex(),
+    );
+    expect(colours).not.toContain(0x7dd3fc);
+  });
+
+  it("gives the marquee no key, so nothing can select it or take hold of it", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID), box("z1")], null);
+
+    expect(zones.has(`zone:${MARQUEE_ZONE_ID}`)).toBe(false);
+    expect(zones.has("zone:z1")).toBe(true);
+  });
+
+  it("leaves a zone being dragged out exactly as it was, marquee or no marquee", () => {
+    const alone = layer();
+    alone.draw([box("draft-zone")], null);
+    const beside = layer();
+    beside.draw([box(MARQUEE_ZONE_ID), box("draft-zone")], null);
+
+    const shape = (parts: THREE.Object3D[]) =>
+      parts.map((one) => [
+        one.type,
+        (
+          (one as THREE.Mesh).material as THREE.MeshBasicMaterial
+        ).color.getHex(),
+        ((one as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity,
+      ]);
+    // Asserted non-empty first, or two zones that drew nothing would agree.
+    expect(shape(drawn(alone.root, 0)).length).toBeGreaterThan(1);
+    expect(shape(drawn(beside.root, 1))).toEqual(shape(drawn(alone.root, 0)));
+  });
+
+  it("takes the marquee away when it is drawn without one", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID), box("z1")], null);
+    zones.draw([box("z1")], null);
+
+    expect(zones.root.children).toHaveLength(1);
+    expect(meshes(drawn(zones.root, 0)).length).toBeGreaterThan(0);
+  });
+});
