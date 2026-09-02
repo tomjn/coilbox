@@ -144,6 +144,10 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
             return;
           }
           onEntry(entry);
+          // Landing on a thing takes the camera to it, and the cursor is the
+          // point the camera is looking at, so the marker's label has moved
+          // too. Read after, because that is when the camera has arrived.
+          readCursor();
           say(
             selectionWords(things, entry.key) +
               placeInList(things.entries, entry.key),

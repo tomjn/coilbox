@@ -346,8 +346,8 @@ export function pointFrom(
  */
 export const MAP_KEY_HELP =
   "Map keys. Full stop and comma step through what is on the map. " +
-  "Arrow keys move what is selected one build square north, south, east or west; " +
-  "hold Shift for ten squares, Alt for one elmo. " +
+  "Arrow keys move what is selected one build square north, south, east or west. " +
+  "Hold Shift for ten squares, Alt for one elmo. " +
   "With nothing selected the arrows move the view's cursor instead. " +
   "R turns, Shift R turns the other way. Delete removes. " +
   "Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. " +
