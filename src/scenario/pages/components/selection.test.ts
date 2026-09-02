@@ -7,10 +7,11 @@ import {
   type Standing,
 } from "@/blueprint/footprint";
 import { newScenario } from "../../create";
-import type { Scenario, ScenarioZone } from "../../model";
+import type { Scenario, ScenarioOrder, ScenarioZone } from "../../model";
 import { sceneContents } from "./contents";
+import { pathKey } from "./groups";
 import { recordEdit, undoEdit } from "./history";
-import { scenarioPaths } from "./orderPaths";
+import { orderPathId, scenarioPaths } from "./orderPaths";
 import { scenarioPlacements } from "./placements";
 import {
   addKeys,
@@ -33,6 +34,7 @@ import {
   turnedManyWords,
   turnSelection,
 } from "./selection";
+import { ordersParam } from "./triggers";
 
 /** A single-building footprint mark with the verdict a test wants, built the
  *  way `baseFootprints` builds a real one, mirroring the helper of the same
@@ -184,6 +186,135 @@ describe("the selection as a set", () => {
     const doc = document();
     const gone = { ...doc, zones: [] };
     expect(stillThere(["zone:z1"], scenarioPlacements(gone), gone)).toEqual([]);
+  });
+});
+
+describe("dropping a path point stillThere no longer holds (issue #2365)", () => {
+  const march: ScenarioOrder = {
+    kind: "move",
+    waypoints: [
+      { x: 6000, z: 6000 },
+      { x: 6100, z: 6100 },
+      { x: 6200, z: 6200 },
+    ],
+  };
+
+  /** A document with a group's own path and a trigger's held one, both three
+   *  points long, so shortening either can be tested the same way. */
+  function withPaths(): Scenario {
+    const doc = document();
+    return {
+      ...doc,
+      groups: [{ ...doc.groups[0], orders: [march] }],
+      triggers: [
+        {
+          id: "trigger-1",
+          name: "trigger-1",
+          enabled: true,
+          repeat: false,
+          conditions: { op: "all", conditions: [] },
+          actions: [
+            {
+              type: "give_orders",
+              params: { group: "g1", orders: ordersParam([march]) },
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  const held = orderPathId({
+    trigger: 0,
+    list: "actions",
+    step: 0,
+    param: "orders",
+  });
+
+  it("keeps a point whose index the path still holds", () => {
+    const doc = withPaths();
+    const key = pathKey("g1", 0, 2);
+    expect(stillThere([key], scenarioPlacements(doc), doc)).toEqual([key]);
+  });
+
+  it("drops a later point once the path is shortened past it", () => {
+    const doc = withPaths();
+    const key = pathKey("g1", 0, 2);
+    const shortened: Scenario = {
+      ...doc,
+      groups: [
+        {
+          ...doc.groups[0],
+          orders: [{ ...march, waypoints: [march.waypoints[0]] }],
+        },
+      ],
+    };
+    expect(stillThere([key], scenarioPlacements(shortened), shortened)).toEqual(
+      [],
+    );
+  });
+
+  it("drops a point removed from the middle, once the indices after it shift", () => {
+    const doc = withPaths();
+    // The point that was at index 2 is dropped once index 1 is removed and
+    // everything after it shifts down: index 2 no longer exists.
+    const middleRemoved: Scenario = {
+      ...doc,
+      groups: [
+        {
+          ...doc.groups[0],
+          orders: [
+            { ...march, waypoints: [march.waypoints[0], march.waypoints[2]] },
+          ],
+        },
+      ],
+    };
+    expect(
+      stillThere(
+        [pathKey("g1", 0, 2)],
+        scenarioPlacements(middleRemoved),
+        middleRemoved,
+      ),
+    ).toEqual([]);
+    // The point at index 0 is untouched by that shift and survives.
+    expect(
+      stillThere(
+        [pathKey("g1", 0, 0)],
+        scenarioPlacements(middleRemoved),
+        middleRemoved,
+      ),
+    ).toEqual([pathKey("g1", 0, 0)]);
+  });
+
+  it("drops a trigger-held point the same way a group's own is dropped", () => {
+    const doc = withPaths();
+    const key = pathKey(held, 0, 2);
+    expect(stillThere([key], scenarioPlacements(doc), doc)).toEqual([key]);
+
+    const trigger = doc.triggers[0];
+    const step = trigger.actions[0];
+    const shortened: Scenario = {
+      ...doc,
+      triggers: [
+        {
+          ...trigger,
+          actions: [
+            {
+              ...step,
+              params: {
+                ...step.params,
+                orders: ordersParam([
+                  { ...march, waypoints: [march.waypoints[0]] },
+                ]),
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(stillThere([key], scenarioPlacements(shortened), shortened)).toEqual(
+      [],
+    );
   });
 });
 

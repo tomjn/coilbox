@@ -182,7 +182,10 @@ export function pathLabel(sources: PathSource[], id: string): string {
 
 /** The orders a path's id points at, wherever they live: a group's own, or
  *  the ones a trigger holds. Undefined when the id names neither. */
-function ordersAt(scenario: Scenario, id: string): ScenarioOrder[] | undefined {
+function ordersAt(
+  scenario: Pick<Scenario, "groups" | "triggers">,
+  id: string,
+): ScenarioOrder[] | undefined {
   const held = parseOrderPathId(id);
   if (!held) return scenario.groups.find((group) => group.id === id)?.orders;
   const trigger = scenario.triggers[held.trigger];
@@ -202,7 +205,7 @@ function ordersAt(scenario: Scenario, id: string): ScenarioOrder[] | undefined {
  * thing on the map follows.
  */
 export function pathPointPosition(
-  scenario: Scenario,
+  scenario: Pick<Scenario, "groups" | "triggers">,
   key: string,
 ): Point | null {
   const ref = parsePathKey(key);

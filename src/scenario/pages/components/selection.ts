@@ -54,7 +54,7 @@ import {
   removeOnMap,
   turnOnMap,
 } from "./mapKeyboard";
-import type { PathSource } from "./orderPaths";
+import { type PathSource, pathPointPosition } from "./orderPaths";
 import { parseZoneKey, zoneKey } from "./zones";
 
 /**
@@ -123,14 +123,14 @@ export function addKeys(
 export function stillThere(
   selection: MapSelection,
   placements: Placement[],
-  scenario: Pick<Scenario, "zones">,
+  scenario: Pick<Scenario, "zones" | "groups" | "triggers">,
 ): MapSelection {
   const drawn = new Set(placements.map((one) => one.key));
   const zones = new Set(scenario.zones.map((one) => one.id));
   return selection.filter((key) => {
     const zone = parseZoneKey(key);
     if (zone) return zones.has(zone.id);
-    if (parsePathKey(key)) return true;
+    if (parsePathKey(key)) return pathPointPosition(scenario, key) !== null;
     return drawn.has(key);
   });
 }
