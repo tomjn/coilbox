@@ -111,12 +111,7 @@ import {
   substituteQueues,
 } from "./bases";
 import { ContentsList } from "./ContentsList";
-import {
-  type ContentEntry,
-  contentsSelection,
-  sceneContents,
-  unplacedLayouts,
-} from "./contents";
+import { contentsSelection, sceneContents, unplacedLayouts } from "./contents";
 import {
   canTurn,
   duplicatePlacement,
@@ -140,7 +135,7 @@ import {
 } from "./groups";
 import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
-import { moveOnMap, pointFrom } from "./mapKeyboard";
+import { type MapStep, moveOnMap, pointFrom } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
@@ -771,9 +766,11 @@ export const ScenarioMapScene = forwardRef<
   );
 
   /** Picking something out of the list is the same two things a click that
-   *  lands on it would be: it is selected, and it is on screen. */
+   *  lands on it would be: it is selected, and it is on screen. A step of the
+   *  keyboard's cycle (issue #2314) is picked the same way: only the key,
+   *  position and span a `ContentEntry` also carries are read. */
   const pickEntry = useCallback(
-    (entry: ContentEntry) => {
+    (entry: MapStep) => {
       setSelected(entry.key);
       focusOn(entry.pos, entry.span);
     },

@@ -8,6 +8,7 @@ import {
   orderPathId,
   parseOrderPathId,
   pathLabel,
+  pathPointPosition,
   removePathWaypoint,
   scenarioPaths,
 } from "./orderPaths";
@@ -292,6 +293,41 @@ describe("movePathWaypoint", () => {
     expect(movePathWaypoint(scenario, "zone:z1", { x: 1, z: 1 })).toBe(
       scenario,
     );
+  });
+});
+
+describe("pathPointPosition (issue #2314)", () => {
+  it("reads a group's own point straight out of the document", () => {
+    expect(pathPointPosition(document(), pathKey("g1", 0, 1))).toEqual({
+      x: 500,
+      z: 300,
+    });
+  });
+
+  it("reads a trigger's held point the same way", () => {
+    expect(pathPointPosition(document(), pathKey(held, 0, 0))).toEqual({
+      x: 900,
+      z: 900,
+    });
+  });
+
+  it("catches up with an edit already applied to the document, rather than a stale copy of it", () => {
+    const moved = movePathWaypoint(document(), pathKey("g1", 0, 1), {
+      x: 10,
+      z: 10,
+    });
+    expect(pathPointPosition(moved, pathKey("g1", 0, 1))).toEqual({
+      x: 510,
+      z: 310,
+    });
+  });
+
+  it("is null when the key names no point the document still holds", () => {
+    expect(pathPointPosition(document(), pathKey("g1", 0, 9))).toBeNull();
+    expect(
+      pathPointPosition(document(), pathKey("step:9:actions:0:orders", 0, 0)),
+    ).toBeNull();
+    expect(pathPointPosition(document(), "zone:z1")).toBeNull();
   });
 });
 

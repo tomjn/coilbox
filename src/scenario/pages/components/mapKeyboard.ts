@@ -38,11 +38,12 @@ import {
   removePlacement,
   turnPlacement,
 } from "./editing";
-import { orderWaypoints, parsePathKey } from "./groups";
+import { orderWaypoints, parsePathKey, pathKey } from "./groups";
 import {
   movePathWaypoint,
   type PathSource,
   pathLabel,
+  pathPointPosition,
   removePathWaypoint,
 } from "./orderPaths";
 import { moveZone, parseZoneKey, removeZone, resizeZone } from "./zones";
@@ -157,12 +158,11 @@ export function positionIn(things: MapThings, key: string): Point | null {
         };
   }
 
-  const path = parsePathKey(key);
-  if (path) {
-    const source = things.paths.find((one) => one.id === path.groupId);
-    const order = source?.orders[path.order];
-    const points = order ? orderWaypoints(order) : null;
-    return points?.[path.waypoint] ?? null;
+  // Out of the document rather than out of `things.paths`: that list is a
+  // snapshot the caller may be holding from before this call's own edit, and
+  // only the document is guaranteed to have caught up with it (issue #2314).
+  if (parsePathKey(key)) {
+    return pathPointPosition(scenario, key);
   }
 
   const ref = parsePlacementKey(key);
@@ -227,9 +227,13 @@ export function thingWords(things: MapThings, key: string): string {
 
   const path = parsePathKey(key);
   if (path) {
+    const source = things.paths.find((one) => one.id === path.groupId);
+    const order = source?.orders[path.order];
+    const total = order && orderWaypoints(order)?.length;
+    const of = total ? ` of ${total}` : "";
     return `${pathLabel(things.paths, path.groupId)}, point ${
       path.waypoint + 1
-    }`;
+    }${of}`;
   }
 
   const placement = things.placements.find((one) => one.key === key);
@@ -376,6 +380,96 @@ export function nextEntry(
   return entries[next];
 }
 
+/**
+ * A stop the keyboard's cycle can land on: a contents entry, or a point on a
+ * path. A path's points are not contents entries of their own (issue #2314),
+ * so this is the smaller shape `mapSteps` and `nextStep` need to put both on
+ * one ring: enough to select the thing and look at it, nothing a path point
+ * does not have.
+ */
+export interface MapStep {
+  key: string;
+  pos: Point;
+  span: number;
+}
+
+/** The points of one path, each a stop of its own, in the order they are
+ *  drawn. */
+function pathSteps(source: PathSource): MapStep[] {
+  return source.orders.flatMap((order, orderIndex) => {
+    const points = orderWaypoints(order);
+    if (!points) return [];
+    return points.map<MapStep>((point, waypoint) => ({
+      key: pathKey(source.id, orderIndex, waypoint),
+      pos: point,
+      span: 0,
+    }));
+  });
+}
+
+/**
+ * The full ring the cycle walks: the contents list, with a group's own path
+ * points following the group they belong to, and a trigger's held orders --
+ * which own no place in that list -- carried after everything else (issue
+ * #2314).
+ *
+ * A group's points sit right after the group rather than in a list of their
+ * own, because the group is already how a click or a cycle says which path is
+ * meant: putting the points anywhere else would be a second way to reach the
+ * same thing, and PR #2316 already chose one selection model over two.
+ */
+export function mapSteps(
+  entries: ContentEntry[],
+  paths: PathSource[],
+): MapStep[] {
+  const owned = new Map(
+    paths
+      .filter((source) =>
+        entries.some(
+          (entry) => entry.kind === "group" && entry.id === source.id,
+        ),
+      )
+      .map((source) => [source.id, source] as const),
+  );
+  const held = paths.filter((source) => !owned.has(source.id));
+  const woven = entries.flatMap((entry): MapStep[] => {
+    const source = entry.kind === "group" ? owned.get(entry.id) : undefined;
+    return source ? [entry, ...pathSteps(source)] : [entry];
+  });
+  return [...woven, ...held.flatMap(pathSteps)];
+}
+
+/** Where in `steps` the current selection sits: the stop whose own key
+ *  matches, which a path point's always does, or -- for a sub-key a step's
+ *  key carries no index for, such as a base's third building -- the entry it
+ *  belongs to, the same rule `nextEntry` follows. */
+function stepIndex(
+  steps: MapStep[],
+  entries: ContentEntry[],
+  selected: string | null,
+): number {
+  if (!selected) return -1;
+  const exact = steps.findIndex((step) => step.key === selected);
+  if (exact >= 0) return exact;
+  const canonical = contentsSelection(entries, selected);
+  return canonical ? steps.findIndex((step) => step.key === canonical) : -1;
+}
+
+/** The next stop on the ring `mapSteps` lays out. Wraps, the same as
+ *  `nextEntry`, so an author never falls off the end of a path any more than
+ *  off the end of the contents list. */
+export function nextStep(
+  steps: MapStep[],
+  entries: ContentEntry[],
+  selected: string | null,
+  by: 1 | -1,
+): MapStep | null {
+  if (steps.length === 0) return null;
+  const at = stepIndex(steps, entries, selected);
+  if (at < 0) return by === 1 ? steps[0] : steps[steps.length - 1];
+  return steps[(at + by + steps.length) % steps.length];
+}
+
 /** How far through the list the selection is, so an author knows where they
  *  are rather than only what they are on. */
 export function placeInList(
@@ -423,7 +517,8 @@ export function pointFrom(
  * discover is not one.
  */
 export const MAP_KEY_HELP =
-  "Map keys. Full stop and comma step through what is on the map. " +
+  "Map keys. Full stop and comma step through what is on the map, " +
+  "including a path's points, which follow the group they belong to. " +
   "Arrow keys move what is selected one build square north, south, east or west. " +
   "Hold Shift for ten squares, Alt for one elmo. " +
   "With nothing selected the arrows move the view's cursor instead. " +
