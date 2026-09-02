@@ -48,6 +48,7 @@ import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
   absentIn,
   baseFootprints,
+  dragKeys,
   noSlopeIn,
   overlappingIn,
   type Placement,
@@ -111,7 +112,12 @@ import {
   substituteQueues,
 } from "./bases";
 import { ContentsList } from "./ContentsList";
-import { contentsSelection, sceneContents, unplacedLayouts } from "./contents";
+import {
+  type ContentEntry,
+  contentsSelection,
+  sceneContents,
+  unplacedLayouts,
+} from "./contents";
 import {
   canTurn,
   duplicatePlacement,
@@ -135,10 +141,35 @@ import {
 } from "./groups";
 import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
-import { type MapStep, moveOnMap, pointFrom } from "./mapKeyboard";
+import {
+  type MapStep,
+  type MapThings,
+  moveOnMap,
+  pointFrom,
+  thingWords,
+} from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
+import {
+  addedWords,
+  addKeys,
+  countSelection,
+  countWords,
+  entryKeys,
+  inSelection,
+  type MapSelection,
+  marqueeWords,
+  moveSelection,
+  NO_SELECTION,
+  primaryKey,
+  removedWords,
+  removeSelection,
+  selectOne,
+  stillThere,
+  toggleKey,
+  turnSelection,
+} from "./selection";
 import { modeDigit } from "./shortcuts";
 import { startMarkers } from "./startPositions";
 import { type MapCursor, useMapKeyboard } from "./useMapKeyboard";
@@ -310,15 +341,92 @@ export const ScenarioMapScene = forwardRef<
   // An author who has asked for less motion gets the steps and not the film.
   const reduceMotion = useReduceMotion();
   const [modeId, setModeId] = useState(EDITOR_MODES[0].id);
-  const [selected, showSelected] = useState<string | null>(null);
+  /**
+   * Everything selected on the map, newest last (issue #2279).
+   *
+   * `selected` below is the last of them, and it is what every bar, panel and
+   * layer that only ever handled one thing goes on reading. That is what makes a
+   * multi-selection an addition to this file rather than a rewrite of it: the
+   * only things that read the whole list are the ones that act on all of it.
+   */
+  const [selection, showSelection] = useState<MapSelection>(NO_SELECTION);
   // Also held in a ref, because a click that selects something and the click
   // that acts on that selection can both land before React renders: placing a
   // building adds it to the base the click before it selected (issue #904).
-  const selectedRef = useRef<string | null>(null);
-  const setSelected = useCallback((key: string | null) => {
-    selectedRef.current = key;
-    showSelected(key);
+  const selectionRef = useRef<MapSelection>(NO_SELECTION);
+  const setSelection = useCallback((next: MapSelection) => {
+    selectionRef.current = next;
+    showSelection(next);
   }, []);
+  const selected = primaryKey(selection);
+  /** What a click does to the selection: this instead of what was selected, or
+   *  with Shift held, this as well, or out again if it was already in. */
+  const setSelected = useCallback(
+    (key: string | null, add = false) => {
+      setSelection(add ? toggleKey(selectionRef.current, key) : selectOne(key));
+    },
+    [setSelection],
+  );
+  // Said through the map's own live region, which `useMapKeyboard` owns. Held in
+  // a ref because that hook is resolved further down this render and the
+  // callbacks above are built before it.
+  const sayRef = useRef<(text: string) => void>(() => {});
+  // What the announcements name things by, filled in below once the document has
+  // been flattened into the three lists that name them. A ref for the same
+  // reason: a click reads it when the click happens, not when the handler was
+  // built.
+  const thingsRef = useRef<MapThings>({
+    scenario,
+    entries: [],
+    placements: [],
+    paths: [],
+  });
+
+  const groups = scenario.groups;
+  /**
+   * What a click on the map selects.
+   *
+   * A drawn path line stands for the orders that drew it: the line is the
+   * easiest thing on a big map to hit and the orders are what an author who hit
+   * it wants (#842). A group's line means the group, because a group has units
+   * to select and controls to open. A trigger's line means itself, because it
+   * has neither, and selecting it is what puts knobs on its points.
+   */
+  const select = useCallback(
+    (key: string | null, add = false) => {
+      const line = key ? parsePathLineKey(key) : null;
+      const meant = line
+        ? groups.some((one) => one.id === line)
+          ? placementKey("group", line, 0)
+          : key
+        : key;
+      setSelected(meant, add);
+      // Only a Shift-click says anything. A plain click replaces the selection,
+      // and the bar that opens for it is the account of that. Six Shift-clicks
+      // would otherwise be six sentences nobody asked for (issue #2279).
+      if (!add || !meant) return;
+      const named = thingWords(thingsRef.current, meant);
+      const after = selectionRef.current;
+      sayRef.current(
+        inSelection(after, meant)
+          ? addedWords(named, after)
+          : removedWords(named, after),
+      );
+    },
+    [groups, setSelected],
+  );
+
+  /** What a marquee selects: everything inside the box, instead of what was
+   *  selected or as well as it (issue #2279). */
+  const selectMany = useCallback(
+    (keys: string[], add: boolean) => {
+      const after = add ? addKeys(selectionRef.current, keys) : keys;
+      setSelection(after);
+      sayRef.current(marqueeWords(keys.length, after));
+    },
+    [setSelection],
+  );
+
   // Which base the author asked to edit the shared layout of (issue #1414).
   // Held against the base rather than as a mode of the editor, so working on
   // another base is back to the answer that loses nobody's work: a copy.
@@ -339,8 +447,10 @@ export const ScenarioMapScene = forwardRef<
       scenario,
       onChange,
       selected,
-      selectedNow: () => selectedRef.current,
+      selectedNow: () => primaryKey(selectionRef.current),
       onSelect: setSelected,
+      placements: units.placements,
+      onSelectMany: selectMany,
       layoutEdit,
       layout: layoutChoice,
       onLayout: setLayoutChoice,
@@ -368,14 +478,14 @@ export const ScenarioMapScene = forwardRef<
   }, []);
 
   // What `ScenarioEditPage`'s routed Cmd+D calls (issue #2277). Read through
-  // `selectedRef` rather than the `selected` this closure was rendered with,
+  // `selectionRef` rather than the `selected` this closure was rendered with,
   // the same reason a click reads it that way: the selection can have changed
   // in a tick this render has not caught up with yet.
   useImperativeHandle(
     ref,
     () => ({
       duplicateSelected: () => {
-        const key = selectedRef.current;
+        const key = primaryKey(selectionRef.current);
         if (!key) return false;
         // A mutable box rather than a reassigned `let`, the same shape
         // `modes.tsx`'s Bases placement uses to read out of `onChange`'s
@@ -425,26 +535,6 @@ export const ScenarioMapScene = forwardRef<
     [startPositions, setup],
   );
   useScenarioStarts(handle, starts, assets, units.groundAt);
-
-  const groups = scenario.groups;
-  /**
-   * What a click on the map selects.
-   *
-   * A drawn path line stands for the orders that drew it: the line is the
-   * easiest thing on a big map to hit and the orders are what an author who hit
-   * it wants (#842). A group's line means the group, because a group has units
-   * to select and controls to open. A trigger's line means itself, because it
-   * has neither, and selecting it is what puts knobs on its points.
-   */
-  const select = useCallback(
-    (key: string | null) => {
-      const line = key ? parsePathLineKey(key) : null;
-      if (!line) return setSelected(key);
-      const group = groups.some((one) => one.id === line);
-      setSelected(group ? placementKey("group", line, 0) : key);
-    },
-    [groups, setSelected],
-  );
 
   const picked = units.placements.find((p) => p.key === selected) ?? null;
   // A group is what is being worked on whether one of its units or one of its
@@ -645,6 +735,7 @@ export const ScenarioMapScene = forwardRef<
     worldHeight: assets.worldHeight,
     groundAt: units.groundAt,
     selected,
+    selectedKeys: selection,
     footprintAt,
     // A zone is a sheet lying over the ground, so it steps aside for a mode
     // that puts things on the ground: otherwise a zone covering a corner of the
@@ -663,10 +754,26 @@ export const ScenarioMapScene = forwardRef<
     onHover: preview.onHover,
     onDragUnit: preview.onDragUnit,
     onDragGround: behaviour.draw ?? null,
+    // A drag of something in the selection carries the whole selection with it,
+    // so a marquee round a cluster of bases is one drag rather than one per base
+    // (issue #2279). A group's units come along together whichever way it was
+    // reached, which is what `dragKeys` already answers.
+    carries: (key) => {
+      const held = selectionRef.current;
+      const carried = inSelection(held, key) ? held : [key];
+      return carried.flatMap((one) => dragKeys(units.placements, one));
+    },
     // The same edit the arrow keys make, through the same function, so a drag
-    // and a nudge cannot drift apart (issue #2269).
-    onMove: (key, delta) =>
-      onChange((doc) => moveOnMap(doc, key, delta, snap, layoutEdit)),
+    // and a nudge cannot drift apart (issue #2269). One `onChange` for the whole
+    // selection, because one call is one step of the history (`history.ts`).
+    onMove: (key, delta) => {
+      const held = selectionRef.current;
+      if (!inSelection(held, key)) {
+        onChange((doc) => moveOnMap(doc, key, delta, snap, layoutEdit));
+        return;
+      }
+      onChange((doc) => moveSelection(doc, held, delta, snap, layoutEdit));
+    },
   });
 
   // A drawn unit is described by the entry it belongs to, and each of the three
@@ -727,9 +834,27 @@ export const ScenarioMapScene = forwardRef<
 
   // What the document has put on the map, for the list that finds it again.
   const entries = useMemo(() => sceneContents(scenario), [scenario]);
-  const listed = contentsSelection(entries, selected);
+  /** Which rows the list lights up: every entry anything selected belongs to,
+   *  so a marquee round three bases lights three rows (issue #2279). */
+  const listed = useMemo(() => {
+    const out = new Set<string>();
+    for (const key of selection) {
+      const entry = contentsSelection(entries, key);
+      if (entry) out.add(entry);
+    }
+    return out;
+  }, [entries, selection]);
   // And what it holds without placing, which the map cannot show at all.
   const layouts = useMemo(() => unplacedLayouts(scenario), [scenario]);
+
+  // The document, and the three lists the map draws it as, kept where a click
+  // handler built earlier in this render can reach them to name what it just
+  // added to the selection.
+  const things = useMemo<MapThings>(
+    () => ({ scenario, entries, placements: units.placements, paths }),
+    [scenario, entries, units.placements, paths],
+  );
+  thingsRef.current = things;
 
   /**
    * Look closely at a point on the map.
@@ -775,6 +900,35 @@ export const ScenarioMapScene = forwardRef<
       focusOn(entry.pos, entry.span);
     },
     [focusOn, setSelected],
+  );
+
+  /**
+   * A row put into the selection, or taken back out of it (issue #2279).
+   *
+   * The whole of what the row stands for goes in: every one of a base's
+   * buildings, every one of a group's units. A row is one thing an author can
+   * name, so adding one adds that thing rather than the first slice of it, and
+   * a selection built here behaves exactly like a marquee drawn round the same
+   * thing.
+   *
+   * The camera stays where it is, unlike a plain pick. Somebody choosing six
+   * rows is building a selection, not asking to be flown to each of them in
+   * turn.
+   */
+  const toggleEntry = useCallback(
+    (entry: ContentEntry) => {
+      const keys = entryKeys(scenario, entry);
+      const held = selectionRef.current;
+      const had = keys.some((key) => inSelection(held, key));
+      const after = had
+        ? held.filter((key) => !keys.includes(key))
+        : addKeys(held, keys);
+      setSelection(after);
+      sayRef.current(
+        had ? removedWords(entry.label, after) : addedWords(entry.label, after),
+      );
+    },
+    [scenario, setSelection],
   );
 
   const onScene = useCallback((handle: MapScene3D | null) => {
@@ -825,9 +979,9 @@ export const ScenarioMapScene = forwardRef<
   }, []);
 
   const keys = useMapKeyboard({
-    things: { scenario, entries, placements: units.placements, paths },
+    things,
     onChange,
-    selected,
+    selection,
     onSelect: setSelected,
     onEntry: pickEntry,
     onPlace,
@@ -836,6 +990,24 @@ export const ScenarioMapScene = forwardRef<
     cursorAt,
     panBy,
   });
+  // The one live region the map speaks through, lent to the pointer so a
+  // Shift-click and an arrow key are announced in the same voice (issue #2279).
+  sayRef.current = keys.say;
+
+  /**
+   * Keys pointing at things the document no longer holds, dropped.
+   *
+   * An undo, a delete taken from a panel, or an edit that emptied a group can
+   * all leave a selection naming units nobody is drawing any more, and the next
+   * Delete would then work through keys that mean nothing. Off the drawn list
+   * rather than the document, because that is the list the keys address.
+   */
+  useEffect(() => {
+    const held = selectionRef.current;
+    if (held.length === 0 || !units.settled) return;
+    const kept = stillThere(held, units.placements, scenario);
+    if (kept.length !== held.length) setSelection(kept);
+  }, [units.placements, units.settled, scenario, setSelection]);
 
   // Mirrored in refs so a mission problem's row can land on whatever the map
   // currently holds without retriggering every time an unrelated edit gives
@@ -972,18 +1144,41 @@ export const ScenarioMapScene = forwardRef<
               {spot.text}
             </p>
           )}
+          {/* How much is in hand, and the way to put it all down. Its own bar in
+              this column rather than a note in the corner: the corner is for
+              what is true of the whole scene (issue #2350), and this is what the
+              Turn and Delete buttons directly under it are about to act on. */}
+          {selection.length > 1 && (
+            <SelectionCountBar
+              what={countWords(selection)}
+              onClear={() => setSelection(NO_SELECTION)}
+            />
+          )}
           {picked && (
             <ScenarioSelectionBar
               placement={picked}
+              // Everything selected, so the buttons say what they will do rather
+              // than naming one thing and doing six (issue #2279). Counted as
+              // an author counts, which is the number the bar above says: a
+              // group is one thing however many of its units the box caught.
+              count={
+                selection.length > 1
+                  ? countSelection(selection).total
+                  : undefined
+              }
               onTurnPreview={setTurning}
               onTurn={() =>
                 onChange((doc) =>
-                  turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
+                  selection.length > 1
+                    ? turnSelection(doc, selection, 1, layoutEdit)
+                    : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
                 )
               }
               onDelete={() => {
                 onChange((doc) =>
-                  removePlacement(doc, picked.key, layoutEdit(picked.id)),
+                  selection.length > 1
+                    ? removeSelection(doc, selection, layoutEdit)
+                    : removePlacement(doc, picked.key, layoutEdit(picked.id)),
                 );
                 setSelected(null);
               }}
@@ -1293,6 +1488,7 @@ export const ScenarioMapScene = forwardRef<
                 selected={listed}
                 participants={scenario.setup.participants}
                 onPick={pickEntry}
+                onToggle={toggleEntry}
                 // Armed rather than placed. Where a base stands is the reason
                 // the author deleted it, so the next click on the map is the
                 // placement and this only gets them ready to make it (#1450).
@@ -1338,14 +1534,14 @@ export const ScenarioMapScene = forwardRef<
         </>
       }
       // What the hands do here, which is the mode's own line as much as it is
-      // the camera's (issue #2285). It was a chip over the terrain, and in
-      // Select mode it said word for word what the rest of this strip already
-      // said.
+      // the camera's (issue #2285). What the left button does on bare ground is
+      // the mode's to say now: it pans in every mode but the two that took it,
+      // Zones to draw one and Select to drag a marquee (issue #2279), so the
+      // shared half only claims the middle button.
       footer={
         <>
-          {mapName} · {mode.hint} · drag or middle-drag to pan · drag a unit to
-          move it · drag a zone's middle handle to move it · right-drag to turn
-          the view
+          {mapName} · {mode.hint} · middle-drag to pan · drag a unit to move it
+          · drag a zone's middle handle to move it · right-drag to turn the view
         </>
       }
     />
@@ -1361,12 +1557,16 @@ export const ScenarioMapScene = forwardRef<
  */
 function ScenarioSelectionBar({
   placement,
+  count,
   onTurn,
   onTurnPreview,
   onDelete,
   children,
 }: {
   placement: Placement;
+  /** How many things the buttons will act on, when it is more than the one this
+   *  bar names (issue #2279). Left out for a selection of one. */
+  count?: number;
   onTurn: () => void;
   /** Whether a turn is being considered, which draws where it would go. */
   onTurnPreview: (on: boolean) => void;
@@ -1385,7 +1585,11 @@ function ScenarioSelectionBar({
             ? `group unit ${placement.index + 1}`
             : `base building ${placement.index + 1}`
       }
-      turnable={canTurn(placement.key)}
+      count={count}
+      // A selection of several always has a Turn to offer, because "turn what
+      // turns" is a thing to do even when this one is a group. On its own the
+      // button says why it cannot.
+      turnable={count !== undefined || canTurn(placement.key)}
       turnHint="A group's units all face south"
       onTurn={onTurn}
       onTurnPreview={onTurnPreview}
@@ -1393,6 +1597,41 @@ function ScenarioSelectionBar({
     >
       {children}
     </SelectionBar>
+  );
+}
+
+/**
+ * How much is selected, and the way to put it all down (issue #2279).
+ *
+ * Its own bar above the one for the primary, because the two say different
+ * things: that one names one thing and opens its panel, this one is the account
+ * of what the Turn and Delete beneath it are about to act on. Without it the
+ * only sign that Delete is about to remove six things is that six plates are
+ * lit somewhere on the map, which is not something an author reads before
+ * pressing a button.
+ */
+function SelectionCountBar({
+  what,
+  onClear,
+}: {
+  /** The tally, as `countWords` reads it: "4 actors, 1 group and 2 base
+   *  buildings". */
+  what: string;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-primary/60 bg-card/85 p-1 pl-2 backdrop-blur">
+      <span className="text-[11px]">{what} selected</span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 text-xs"
+        onClick={onClear}
+        title="Let go of all of it (Esc)"
+      >
+        Clear
+      </Button>
+    </div>
   );
 }
 

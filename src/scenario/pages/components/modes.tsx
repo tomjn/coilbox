@@ -26,7 +26,14 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { useBlueprintLibrary } from "@/blueprint/store";
 import { blueprintFromPayload } from "@/blueprint/transfer";
@@ -34,9 +41,13 @@ import { knownUnits } from "@/blueprint/units";
 import { useUnitsyncScan } from "@/content/config";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
-import { parsePlacementKey, placementKey } from "@/placement/placements";
+import {
+  type Placement,
+  parsePlacementKey,
+  placementKey,
+} from "@/placement/placements";
 import type { PreviewBuilding } from "@/placement/preview";
-import type { GroundDragPhase } from "@/placement/useMapEditing";
+import type { GestureKeys, GroundDragPhase } from "@/placement/useMapEditing";
 import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
@@ -64,9 +75,11 @@ import {
 import { isTypingTarget } from "./history";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
 import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
+import { boxFromDrag, keysInBox } from "./selection";
 import { TeamSelect } from "./TeamSelect";
 import {
   addZone,
+  MARQUEE_ZONE_ID,
   nextZoneName,
   type ZoneShape,
   zoneFromDrag,
@@ -98,6 +111,14 @@ export interface ModeContext {
   /** Select what was just placed, so it can be turned or deleted straight
    *  away. Null clears the selection, which is how a mode lets go of it. */
   onSelect: (key: string | null) => void;
+  /**
+   * Every unit the map is currently drawing. Only the marquee reads it, to work
+   * out what is standing inside the box it was dragged out over (issue #2279).
+   */
+  placements: Placement[];
+  /** Select several things at once: instead of what is selected, or as well as
+   *  it when `add` (issue #2279). Only the marquee uses it. */
+  onSelectMany: (keys: string[], add: boolean) => void;
   /** Whether an edit to a base names the layout every base placed from it uses,
    *  or gives that base a copy of its own. Only bases read it. */
   layoutEdit: (baseId: string) => LayoutEdit;
@@ -128,8 +149,18 @@ export interface ModeBehaviour {
    * away, so a mode can show what it is about to make and write the document
    * only on "end". A mode that sets this takes the left button off the camera,
    * which pans on the middle button instead while the mode is current.
+   *
+   * `keys` is what was held when the drag began, which the marquee reads to tell
+   * a new selection from one being added to (issue #2279).
    */
-  draw?: ((from: Point, to: Point, phase: GroundDragPhase) => void) | null;
+  draw?:
+    | ((
+        from: Point,
+        to: Point,
+        phase: GroundDragPhase,
+        keys: GestureKeys,
+      ) => void)
+    | null;
   /**
    * What a click at a point would put on the ground, shown under the pointer
    * before the click (issue #1464). Null in a mode that has nothing worth
@@ -164,18 +195,88 @@ export interface EditorMode {
   use: (ctx: ModeContext) => ModeBehaviour;
 }
 
-/** Looking without touching: pick things up, move them, turn them, but put
- *  nothing new down. Where the editor opens, so a stray click on a scenario you
- *  are only reading cannot add to it. */
+/**
+ * Looking without touching: pick things up, move them, turn them, put nothing
+ * new down, and take hold of several at once (issue #2279).
+ *
+ * Where the editor opens, so a stray click on a scenario you are only reading
+ * cannot add to it. It is also the one mode with a spare gesture to give a
+ * marquee: a drag across bare ground here was a pan, and the middle button pans
+ * anyway, which is the same trade Zones mode already makes for the drag that
+ * draws a zone.
+ *
+ * The box is dragged out on the ground rather than across the screen, and what
+ * it selects is what is standing inside that ground. Under a camera anybody has
+ * turned the two are not the same rectangle, and drawing one while selecting by
+ * the other would be a picture that lies about what is about to happen.
+ */
 const selectMode: EditorMode = {
   id: "select",
   label: "Select",
   icon: MousePointer2,
   // Dragging a unit and dragging a zone's handle are true in every mode, so the
-  // strip under the map says both for all of them. This says the one thing that
-  // is only true here (issue #2285).
-  hint: "Click bare ground to deselect.",
-  use: () => ({ place: null }),
+  // strip under the map says both for all of them. This says the ones that are
+  // only true here (issue #2285).
+  hint: "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on.",
+  use: ({ placements, onSelectMany }) => {
+    const [band, setBand] = useState<ScenarioZone | null>(null);
+    // The box is redrawn on the next frame rather than on every pointer move.
+    // Drawing it rebuilds the zones layer, and a burst of moves between two
+    // frames should cost one rebuild rather than twenty, which is the trade
+    // issue #2348 made for the wheel.
+    const pending = useRef<ScenarioZone | null>(null);
+    const frame = useRef<number | null>(null);
+    useEffect(
+      () => () => {
+        if (frame.current !== null) cancelAnimationFrame(frame.current);
+      },
+      [],
+    );
+    const queue = useCallback((next: ScenarioZone | null) => {
+      pending.current = next;
+      if (next === null) {
+        if (frame.current !== null) cancelAnimationFrame(frame.current);
+        frame.current = null;
+        setBand(null);
+        return;
+      }
+      if (frame.current !== null) return;
+      frame.current = requestAnimationFrame(() => {
+        frame.current = null;
+        setBand(pending.current);
+      });
+    }, []);
+
+    return {
+      place: null,
+      // Left undefined rather than empty when there is no box, so the surface is
+      // handed the same list twice running and does not redraw for nothing.
+      draftZones: band ? [band] : undefined,
+      draw: (from, to, phase, keys) => {
+        if (phase === "cancel") {
+          queue(null);
+          return;
+        }
+        const box = boxFromDrag(from, to);
+        if (phase === "move") {
+          // Built here rather than through `zoneFromDrag`, which holds a zone to
+          // a minimum size. A marquee has no minimum: a box drawn smaller than
+          // that would select what was inside the box the author was shown
+          // rather than the one they drew.
+          queue({
+            id: MARQUEE_ZONE_ID,
+            name: "Selecting",
+            shape: "box",
+            min: { x: box.minX, z: box.minZ },
+            max: { x: box.maxX, z: box.maxZ },
+          });
+          return;
+        }
+        queue(null);
+        onSelectMany(keysInBox(placements, box), keys.add);
+      },
+    };
+  },
 };
 
 /** The id a half-drawn zone carries. Never written to the document, and not a

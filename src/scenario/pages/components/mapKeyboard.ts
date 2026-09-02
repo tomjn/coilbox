@@ -526,4 +526,7 @@ export const MAP_KEY_HELP =
   "S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. " +
   "North and east make it bigger, south and west make it smaller. " +
   "Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. " +
-  "Escape lets go of the selection. Question mark reads this out again.";
+  "Escape lets go of the selection. " +
+  "More than one thing can be selected at once, and then every one of those keys acts on all of it. " +
+  "Full stop and comma replace the selection rather than growing it: to grow one, open Contents and press Shift with Enter on a row, which adds that row instead of replacing what is selected. " +
+  "Question mark reads this out again.";

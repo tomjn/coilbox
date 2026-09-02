@@ -48,6 +48,26 @@ export type ZoneHandle = "move" | "nw" | "ne" | "sw" | "se" | "radius";
 export type ZoneShape = ScenarioZone["shape"];
 
 /**
+ * The id the selection marquee carries while it is being dragged out
+ * (issue #2279).
+ *
+ * A marquee is not a zone and is never written to the document. It travels as
+ * one because a rectangle dragged out on the ground is exactly what the zones
+ * layer already draws, and the layer tells the two apart by this id.
+ *
+ * A plain string rather than a UUID, so it can never collide with a real zone's,
+ * and here rather than beside the mode that makes it: the layer that draws it
+ * has to recognise it, and this is the file both of them already share.
+ */
+export const MARQUEE_ZONE_ID = "marquee";
+
+/** Whether this is the selection marquee rather than a zone. What decides
+ *  between drawing a sheet of ground and drawing a box round a selection. */
+export function isMarqueeZone(zone: ScenarioZone): boolean {
+  return zone.id === MARQUEE_ZONE_ID;
+}
+
+/**
  * The key a drawn zone is picked by.
  *
  * The same namespace as unit placements, so one selection covers both, and

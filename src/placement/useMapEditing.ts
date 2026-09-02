@@ -88,6 +88,13 @@ export interface OverlayLayer {
  *  away by the browser before it finished. */
 export type GroundDragPhase = "move" | "end" | "cancel";
 
+/** What was held down while a gesture was made. Only Shift so far, which is what
+ *  says "as well as what is already selected" rather than "instead of it"
+ *  (issue #2279). */
+export interface GestureKeys {
+  add: boolean;
+}
+
 /** A drawn unit being dragged, and how far it has been carried, in elmos. */
 export interface UnitDrag {
   key: string;
@@ -110,6 +117,17 @@ export interface MapEditingDeps {
   /** Placement key currently selected, so the plate can be drawn under it. */
   selected: string | null;
   /**
+   * Everything selected, when the surface holds more than one (issue #2279).
+   *
+   * Two things read it. Every one of them gets a plate, not just `selected`. And
+   * a press on something already in it leaves the selection alone, so a drag
+   * carries the whole of it rather than collapsing it to whatever was pressed,
+   * which is what every editor with a marquee does.
+   *
+   * Left out by a surface with one selection, and then it is `selected` alone.
+   */
+  selectedKeys?: readonly string[];
+  /**
    * The ground the building a key names stands on, or null for anything that is
    * not a building (issue #1716).
    *
@@ -123,8 +141,10 @@ export interface MapEditingDeps {
    * selected gets a plate and only the models can be grabbed.
    */
   footprintAt?: ((key: string) => Rect | null) | null;
-  /** A click on a drawn unit, or on empty ground with nothing to place. */
-  onSelect: (key: string | null) => void;
+  /** A click on a drawn unit, or on empty ground with nothing to place. `add` is
+   *  Shift held: this as well as what is already selected, rather than instead
+   *  of it (issue #2279). */
+  onSelect: (key: string | null, add?: boolean) => void;
   /** A click on empty ground in a mode that places something. Null in a mode
    *  that places nothing, which is what makes that mode read-only. */
   onPlace: ((pos: Point) => void) | null;
@@ -145,9 +165,17 @@ export interface MapEditingDeps {
    * Called as the drag moves and once more when it ends, so a mode can show the
    * shape it is drawing and write the document only at the end. Null in a mode
    * that draws nothing, which is what leaves the left button panning the camera.
+   *
+   * `keys` is what was held when the drag began, which a marquee reads to decide
+   * between growing the selection and replacing it (issue #2279).
    */
   onDragGround:
-    | ((from: Point, to: Point, phase: GroundDragPhase) => void)
+    | ((
+        from: Point,
+        to: Point,
+        phase: GroundDragPhase,
+        keys: GestureKeys,
+      ) => void)
     | null;
   /**
    * A drag of a drawn unit, as it moves, and null the moment it ends
@@ -235,6 +263,9 @@ interface GroundDrag {
   origin: Point;
   to: Point;
   moved: boolean;
+  /** What was held when the press landed, so a marquee released with Shift long
+   *  since let go still means what the author asked for. */
+  keys: GestureKeys;
 }
 
 /**
@@ -265,6 +296,9 @@ export function useMapEditing(deps: MapEditingDeps): void {
     /** What the press was over when it was not something to pick up, so a
      *  release that turns out to be a click can still select it. */
     let pressedKey: string | null = null;
+    /** What was held when the press landed. Read on release, so a click that
+     *  selects still knows whether Shift was down when it began. */
+    let pressedKeys: GestureKeys = { add: false };
 
     /** The map position a pointer is over, or null when the ray misses the
      *  ground plane entirely, which only happens looking at the horizon. */
@@ -309,6 +343,14 @@ export function useMapEditing(deps: MapEditingDeps): void {
     const grabbable = (key: string): boolean =>
       overlayFor(key)?.grabbable?.(key) ?? true;
 
+    /** Everything selected right now, which for a surface with one selection is
+     *  that one thing. */
+    const selectionNow = (): readonly string[] => {
+      const { selectedKeys, selected } = latest.current;
+      if (selectedKeys) return selectedKeys;
+      return selected ? [selected] : [];
+    };
+
     /** What the pointer is over. Only the drawn layers are raycast: the terrain
      *  would answer flat, and nothing else is pickable. */
     const pick = (event: PointerEvent): PointerTargets => {
@@ -345,22 +387,32 @@ export function useMapEditing(deps: MapEditingDeps): void {
      * mode.
      */
     const squareHandle = (event: PointerEvent): string | null => {
-      const key = latest.current.selected;
-      if (!key) return null;
-      const rect = footprintOf(key);
-      if (!rect) return null;
+      const keys = selectionNow();
+      if (keys.length === 0) return null;
       const at = groundPoint(event);
-      return at && onGround(at, rect) ? key : null;
+      if (!at) return null;
+      // Any of them, not only the primary: a marquee round a base selects a
+      // dozen buildings and every one of their squares is a handle for the
+      // whole selection (issue #2279). A rectangle test each, so this stays
+      // arithmetic rather than a ray through the scene.
+      return (
+        keys.find((key) => {
+          const rect = footprintOf(key);
+          return !!rect && onGround(at, rect);
+        }) ?? null
+      );
     };
 
-    /** Whether the pointer is over the selected thing, by its model or by the
+    /** Whether the pointer is over something selected, by its model or by the
      *  square it stands on. What the hand cursor is about. */
     const overSelection = (event: PointerEvent): boolean => {
-      const key = latest.current.selected;
-      if (!key) return false;
+      const keys = selectionNow();
+      if (keys.length === 0) return false;
       if (squareHandle(event)) return true;
-      const object = layer.objects.get(key);
-      return !!object && grabbable(key) && hits(event, object);
+      return keys.some((key) => {
+        const object = layer.objects.get(key);
+        return !!object && grabbable(key) && hits(event, object);
+      });
     };
 
     /** Move the objects a drag is carrying, without touching the document. */
@@ -375,10 +427,12 @@ export function useMapEditing(deps: MapEditingDeps): void {
         );
         const at = worldToScene(to, worldWidth, worldHeight, handle.scale);
         member.object.position.set(at.x, groundAt(to) * handle.scale, at.z);
-        // The plate follows what is being dragged, unless a footprint is being
-        // drawn for it, which says which one it is far better than a plate.
-        if (member.key === drag.key && !drag.held) plate.show(member.object);
       }
+      // The plates follow what is being dragged, unless a footprint is being
+      // drawn for it, which says which one it is far better than a plate. Every
+      // carried object rather than the one that was pressed, because a drag can
+      // now be carrying a whole marquee's worth (issue #2279).
+      if (!drag.held) plate.show(drag.members.map((one) => one.object));
       handle.render();
     };
 
@@ -395,12 +449,17 @@ export function useMapEditing(deps: MapEditingDeps): void {
      * the ground the building actually has, is what issue #1716 is about.
      */
     const followSelection = () => {
-      const key = latest.current.selected;
-      const object = key ? layer.objects.get(key) : undefined;
-      if (object && key && !footprintOf(key)) plate.show(object);
-      else plate.hide();
+      plate.show(platedObjects());
       handle.render();
     };
+
+    /** The drawn objects a plate goes under: everything selected that the units
+     *  layer drew and that has no footprint of its own. */
+    const platedObjects = (): THREE.Object3D[] =>
+      selectionNow().flatMap((key) => {
+        const object = layer.objects.get(key);
+        return object && !footprintOf(key) ? [object] : [];
+      });
 
     // An edit redraws the units, and the object a key names afterwards is not
     // the one that was selected before it. The layer says when its new objects
@@ -416,6 +475,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
       pressed = { x: event.clientX, y: event.clientY };
+      pressedKeys = { add: event.shiftKey };
       const { select, grab } = pick(event);
       const origin = groundPoint(event);
       // Nothing drawn was hit, but the selected building's square is a handle
@@ -442,7 +502,13 @@ export function useMapEditing(deps: MapEditingDeps): void {
         // under the press is remembered, so a click can still select it.
         pressedKey = select;
         if (gesture === "draw" && origin) {
-          band = { from: pressed, origin, to: origin, moved: false };
+          band = {
+            from: pressed,
+            origin,
+            to: origin,
+            moved: false,
+            keys: pressedKeys,
+          };
           handle.controls.enabled = false;
         }
         return;
@@ -462,7 +528,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
           held: false,
         };
         handle.controls.enabled = false;
-        latest.current.onSelect(key);
+        takeHold(key);
         return;
       }
 
@@ -490,6 +556,24 @@ export function useMapEditing(deps: MapEditingDeps): void {
       // The camera pans on this button, so it has to stand down for the
       // duration or the map would slide out from under what is being dragged.
       handle.controls.enabled = false;
+      takeHold(key);
+    };
+
+    /**
+     * What a press on something it can pick up does to the selection.
+     *
+     * A press on something already selected leaves the selection alone, so a
+     * drag carries the whole of it rather than collapsing a marquee down to
+     * whichever unit the pointer happened to land on (issue #2279). Shift makes
+     * the press a toggle, and a press on anything else replaces the selection
+     * the way it always did.
+     */
+    const takeHold = (key: string) => {
+      if (pressedKeys.add) {
+        latest.current.onSelect(key, true);
+        return;
+      }
+      if (selectionNow().includes(key)) return;
       latest.current.onSelect(key);
     };
 
@@ -521,7 +605,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
         const at = groundPoint(event);
         if (!at) return;
         band.to = at;
-        latest.current.onDragGround?.(band.origin, at, "move");
+        latest.current.onDragGround?.(band.origin, at, "move", band.keys);
         return;
       }
 
@@ -550,10 +634,12 @@ export function useMapEditing(deps: MapEditingDeps): void {
       const drawn = band;
       const from = pressed;
       const over = pressedKey;
+      const held = pressedKeys;
       drag = null;
       band = null;
       pressed = null;
       pressedKey = null;
+      pressedKeys = { add: false };
       handle.controls.enabled = true;
       dom.style.cursor = drawingCursor(latest.current);
       if (gesture) {
@@ -568,7 +654,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
       }
       if (drawn?.moved) {
         const at = groundPoint(event) ?? drawn.to;
-        latest.current.onDragGround?.(drawn.origin, at, "end");
+        latest.current.onDragGround?.(drawn.origin, at, "end", drawn.keys);
         return;
       }
       // Nothing was picked up and nothing was drawn, so this was either a click
@@ -579,13 +665,16 @@ export function useMapEditing(deps: MapEditingDeps): void {
       // a zone is chosen: the press could not, because it might have been the
       // start of a pan or of a zone drawn inside this one.
       if (over) {
-        latest.current.onSelect(over);
+        latest.current.onSelect(over, held.add);
         return;
       }
       const place = latest.current.onPlace;
       const at = groundPoint(event);
       if (place && at) place(at);
-      else latest.current.onSelect(null);
+      // Shift held is somebody building a selection, and a stray click on bare
+      // ground in the middle of that should not throw the whole thing away
+      // (issue #2279).
+      else if (!held.add) latest.current.onSelect(null);
     };
 
     const onPointerCancel = () => {
@@ -598,11 +687,17 @@ export function useMapEditing(deps: MapEditingDeps): void {
       if (drag && !drag.overlay) carry({ x: 0, z: 0 });
       if (drag?.overlay) drag.overlay.drag(drag.key, { x: 0, z: 0 });
       if (band?.moved)
-        latest.current.onDragGround?.(band.origin, band.to, "cancel");
+        latest.current.onDragGround?.(
+          band.origin,
+          band.to,
+          "cancel",
+          band.keys,
+        );
       drag = null;
       band = null;
       pressed = null;
       pressedKey = null;
+      pressedKeys = { add: false };
       handle.controls.enabled = true;
     };
 
@@ -634,17 +729,21 @@ export function useMapEditing(deps: MapEditingDeps): void {
   // an object just placed, a delete that leaves nothing selected, a bar that
   // chose something. A redraw of the units is followed above, off the layer's
   // own signal rather than off a render.
-  const { selected, footprintAt } = deps;
+  const { selected, selectedKeys, footprintAt } = deps;
   useEffect(() => {
     const plate = plateRef.current;
     if (!handle || !layer || !plate) return;
-    const object = selected ? layer.objects.get(selected) : undefined;
+    const keys = selectedKeys ?? (selected ? [selected] : []);
     // A building has a footprint and its footprint says it is selected, so
     // nothing goes under it (issue #1716).
-    if (object && selected && !footprintAt?.(selected)) plate.show(object);
-    else plate.hide();
+    plate.show(
+      keys.flatMap((key) => {
+        const object = layer.objects.get(key);
+        return object && !footprintAt?.(key) ? [object] : [];
+      }),
+    );
     handle.render();
-  }, [handle, layer, selected, footprintAt]);
+  }, [handle, layer, selected, selectedKeys, footprintAt]);
 
   // The cursor says whether a gesture on bare ground will make something.
   const { onPlace, onDragGround } = deps;

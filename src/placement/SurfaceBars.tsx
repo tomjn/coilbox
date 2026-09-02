@@ -90,6 +90,7 @@ export function HistoryControls({
 export function SelectionBar({
   def,
   what,
+  count,
   turnable,
   turnHint,
   onTurn,
@@ -101,6 +102,15 @@ export function SelectionBar({
   def: string;
   /** What it is, in the caller's own words: "base building 3", "actor". */
   what: string;
+  /**
+   * How many things the two buttons will act on, when the surface holds more
+   * than the one this bar names (issue #2279). Left out by a surface with one
+   * selection, and then the buttons read as they always did.
+   *
+   * On the buttons rather than only in the bar's name, because a Delete that
+   * says "Delete" and removes six things is a button that lied about itself.
+   */
+  count?: number;
   turnable: boolean;
   /** Why it cannot be turned, when it cannot. */
   turnHint?: string;
@@ -132,21 +142,30 @@ export function SelectionBar({
         className="h-7 gap-1.5 px-2 text-xs"
         onClick={onTurn}
         disabled={!turnable}
-        title={turnable ? "Turn a quarter turn" : turnHint}
+        title={
+          !turnable
+            ? turnHint
+            : count === undefined
+              ? "Turn a quarter turn"
+              : "Turn everything selected that turns a quarter turn. A group and a zone do not."
+        }
         onPointerEnter={() => onTurnPreview?.(true)}
         onPointerLeave={() => onTurnPreview?.(false)}
         onFocus={() => onTurnPreview?.(true)}
         onBlur={() => onTurnPreview?.(false)}
       >
         <RotateCw className="size-3.5" /> Turn
+        {count === undefined ? "" : " all"}
       </Button>
       <Button
         size="sm"
         variant="ghost"
         className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
         onClick={onDelete}
+        title={count === undefined ? undefined : `Delete all ${count} of them`}
       >
         <Trash2 className="size-3.5" /> Delete
+        {count === undefined ? "" : ` ${count}`}
       </Button>
     </div>
   );

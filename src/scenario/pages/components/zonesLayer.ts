@@ -29,6 +29,7 @@ import { worldToScene } from "@/placement/scene";
 import type { Point, ScenarioZone } from "../../model";
 import {
   dragZone,
+  isMarqueeZone,
   parseZoneKey,
   zoneCenter,
   zoneExtent,
@@ -61,6 +62,29 @@ const SELECTED_COLOR = 0xfacc15;
 /** What the handle that moves a whole zone is drawn in. Neither the white of
  *  the corners that resize it nor the yellow of the zone it sits on. */
 const MOVE_HANDLE_COLOR = 0xf97316;
+
+/**
+ * What a selection marquee is drawn in (issue #2279).
+ *
+ * Black and white alternating, which is what a selection marquee has looked like
+ * since before any of this, and the reason it looks like that is the reason it
+ * is used here: the two colours are drawn on top of each other, so whichever one
+ * the ground underneath washes out, the other one is still there. That matters
+ * on a map, where the same box is dragged over dark grass, pale sand and snow in
+ * one gesture.
+ *
+ * Not green. A path is `0x86efac` and is drawn as a line lying on the ground,
+ * which is exactly what a marquee is, so a green box would read as somebody's
+ * order path. Not the zone's own sky blue for the same reason in reverse: that
+ * is the thing a marquee was being mistaken for.
+ */
+const MARQUEE_COLOR = 0xffffff;
+const MARQUEE_BACKING_COLOR = 0x0f172a;
+
+/** How many dashes go round a marquee, however big it is or how far away the
+ *  camera is. A dash measured in elmos would be a solid line on a box drawn
+ *  round two units and a dotted one round half the map. */
+const MARQUEE_DASHES = 32;
 
 export interface ZonesLayerDeps {
   handle: MapScene3D;
@@ -174,6 +198,74 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
     geometry.computeBoundingSphere();
   };
 
+  /**
+   * The selection marquee: a box round what a drag is about to select
+   * (issue #2279).
+   *
+   * An outline and nothing else. A zone is a piece of ground and is drawn as
+   * one, a translucent sheet with a solid edge, and a marquee that borrowed
+   * that read as a zone being drawn - which is the one thing it must not,
+   * because both gestures are a left-drag on bare ground and only the mode
+   * tells them apart. So the two are as different as they can be: no fill at
+   * all, and a dashed edge rather than a solid one.
+   *
+   * Two lines on the same points, a black one under a dashed white one, so the
+   * white shows over dark ground and the black shows through the gaps over
+   * pale ground. Neither is depth tested, the same as a zone's outline, so a
+   * box drawn across a ridge is a box rather than two halves.
+   */
+  const buildMarquee = (zone: ScenarioZone): THREE.Group => {
+    const centre = zoneCenter(zone);
+    const group = new THREE.Group();
+    const at = worldToScene(
+      centre,
+      deps.worldWidth,
+      deps.worldHeight,
+      handle.scale,
+    );
+    group.position.set(at.x, deps.groundAt(centre) * handle.scale, at.z);
+    group.scale.setScalar(handle.scale);
+
+    const ring = outlinePoints(zone).map(
+      (offset) => new THREE.Vector3(offset.x, relief(centre, offset), offset.z),
+    );
+    // Closed by hand rather than drawn as a LineLoop, because the dashes are
+    // measured along the line and the closing side has to be measured with it.
+    const closed = [...ring, ring[0]];
+
+    const backingGeometry = new THREE.BufferGeometry().setFromPoints(closed);
+    const backingMaterial = new THREE.LineBasicMaterial({
+      color: MARQUEE_BACKING_COLOR,
+      transparent: true,
+      opacity: 0.8,
+      depthTest: false,
+    });
+    const backing = new THREE.Line(backingGeometry, backingMaterial);
+    backing.renderOrder = 3;
+    group.add(backing);
+
+    const dashGeometry = new THREE.BufferGeometry().setFromPoints(closed);
+    const dashMaterial = new THREE.LineDashedMaterial({
+      color: MARQUEE_COLOR,
+      depthTest: false,
+    });
+    const dashes = new THREE.Line(dashGeometry, dashMaterial);
+    // A dash is measured in the geometry's own units, which are elmos here, so
+    // the perimeter has to be walked before a dash length can be chosen. Written
+    // onto the material afterwards for that reason.
+    dashes.computeLineDistances();
+    const walked = dashGeometry.getAttribute("lineDistance");
+    const perimeter = walked.getX(walked.count - 1);
+    const dash = perimeter / (MARQUEE_DASHES * 2);
+    dashMaterial.dashSize = dash;
+    dashMaterial.gapSize = dash;
+    dashes.renderOrder = 4;
+    group.add(dashes);
+
+    owned.push(backingGeometry, backingMaterial, dashGeometry, dashMaterial);
+    return group;
+  };
+
   const buildZone = (zone: ScenarioZone, selected: boolean): THREE.Group => {
     const centre = zoneCenter(zone);
     const colour = selected ? SELECTED_COLOR : ZONE_COLOR;
@@ -256,6 +348,13 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
     owned = [];
     keys.clear();
     for (const zone of zones) {
+      // A marquee is a box being dragged out, not a thing on the map, so it is
+      // drawn and nothing more: no key, so nothing can pick it, select it or
+      // take hold of it (issue #2279).
+      if (isMarqueeZone(zone)) {
+        root.add(buildMarquee(zone));
+        continue;
+      }
       root.add(buildZone(zone, zone.id === selected));
       keys.add(zoneKey(zone.id));
       for (const name of zoneHandles(zone)) keys.add(zoneKey(zone.id, name));

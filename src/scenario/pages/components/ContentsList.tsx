@@ -46,6 +46,7 @@ export function ContentsList({
   selected,
   participants,
   onPick,
+  onToggle,
   onPlaceLayout,
   onDeleteLayout,
 }: {
@@ -53,12 +54,22 @@ export function ContentsList({
   /** The layouts the scenario holds and no base places, which are in the
    *  document and nowhere on the map (#1424). */
   layouts: LayoutEntry[];
-  /** The entry the map's selection belongs to, as `contentsSelection` reads
-   *  it, so clicking a unit lights up its entry here. */
-  selected: string | null;
+  /** Every entry the map's selection reaches, as `contentsSelection` reads each
+   *  key, so clicking a unit lights up its entry here and a marquee round three
+   *  bases lights three rows (issue #2279). */
+  selected: ReadonlySet<string>;
   /** The setup's participants, for the colour a team's things are drawn in. */
   participants: Participant[];
   onPick: (entry: ContentEntry) => void;
+  /**
+   * Add this row to the selection, or take it back out (issue #2279).
+   *
+   * Shift on the row, which is the same gesture as a Shift-click on the map and
+   * reaches the keyboard for nothing: a row is a button, and Shift with Enter or
+   * Space on a focused button is a click carrying Shift like any other. That is
+   * the way somebody who cannot use the marquee builds a selection.
+   */
+  onToggle: (entry: ContentEntry) => void;
   /** Arm the Layouts mode with this layout, so the next click on the map puts
    *  a base of it down (#1450). */
   onPlaceLayout: (layout: LayoutEntry) => void;
@@ -73,10 +84,15 @@ export function ContentsList({
 
   return (
     <div className="max-h-80 overflow-y-auto">
+      {entries.length > 0 && (
+        <p className="px-2 py-1 text-[11px] text-muted-foreground">
+          Shift-click a row to select it as well, rather than instead.
+        </p>
+      )}
       <ul>
         {entries.map((entry) => {
           const Icon = ICONS[entry.kind];
-          const current = entry.key === selected;
+          const current = selected.has(entry.key);
           return (
             <li key={entry.key}>
               <Button
@@ -86,7 +102,13 @@ export function ContentsList({
                   "h-auto w-full justify-start gap-2 px-2 py-1.5 font-normal",
                   current && "bg-muted",
                 )}
-                onClick={() => onPick(entry)}
+                // Shift adds this row to the selection instead of replacing it,
+                // and does not take the camera anywhere: an author picking six
+                // things out of the list is not asking to be flown to each of
+                // them (issue #2279).
+                onClick={(event) =>
+                  event.shiftKey ? onToggle(entry) : onPick(entry)
+                }
               >
                 <Icon className="size-3.5 shrink-0 text-muted-foreground" />
                 {entry.team !== null && (
@@ -101,6 +123,10 @@ export function ContentsList({
                 <span className="min-w-0 flex-1 truncate text-left text-xs">
                   {entry.label}
                 </span>
+                {/* Said rather than only shown, because the tick is the one
+                    thing on the row that says it is part of a selection an
+                    author cannot see the whole of. */}
+                {current && <span className="sr-only">selected</span>}
                 <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                   {entry.detail}
                 </span>
