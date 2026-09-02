@@ -187,4 +187,11 @@ describe("the rest of the table", () => {
   it("reads the keys out on a question mark", () => {
     expect(mapKeyAction({ key: "?" }, empty)).toEqual({ kind: "help" });
   });
+
+  it("reads the map's problems on P, whether or not anything is selected (issue #2315)", () => {
+    expect(mapKeyAction({ key: "p" }, empty)).toEqual({ kind: "problems" });
+    expect(mapKeyAction({ key: "P", shiftKey: true }, holding)).toEqual({
+      kind: "problems",
+    });
+  });
 });
