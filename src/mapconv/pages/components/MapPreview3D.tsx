@@ -302,6 +302,7 @@ export function MapPreview3D({
   enablePan = true,
   initialWater,
   stillWater = false,
+  clearAir = false,
   onScene,
 }: {
   /** File path to the heightmap image (mapconv flow); resolved via `mc_image_info`. */
@@ -390,6 +391,17 @@ export function MapPreview3D({
    * The water is still drawn, still coloured by depth and still reflects.
    */
   stillWater?: boolean;
+  /**
+   * Skip the distance fog `atmosphere.fogColor` would otherwise draw (issue #2332).
+   *
+   * The fog band runs from `BASE * 0.6` to `BASE * 2.8` while the camera can
+   * orbit out to `BASE * 3`, so pulling back far enough to see the whole map
+   * is exactly when it fogs into a flat coloured square. Fine on a map being
+   * admired, wrong on one being worked on, so an editing surface asks for
+   * clear air. Nothing else about the fogged map changes when this is off,
+   * it is simply never attached.
+   */
+  clearAir?: boolean;
   /** Handed the built scene so a view can add its own content to the map and
    * retune the camera. Called with null when that scene is torn down, which is
    * the point at which anything the view added is already gone. Changing the
@@ -887,7 +899,7 @@ uniform vec2 wPlane;`,
         // viewRange, which a standalone preview lacks, so they're derived from the
         // fixed scene scale. Attached only after the reflection capture above, so it
         // never tints the water's environment map.
-        if (appearance?.fogColor)
+        if (appearance?.fogColor && !clearAir)
           scene.fog = new THREE.Fog(
             colorFrom(appearance.fogColor, 0xb3b3cc),
             BASE * 0.6,
@@ -1169,6 +1181,7 @@ uniform vec2 wPlane;`,
       enableZoom,
       enablePan,
       stillWater,
+      clearAir,
       reduceMotion,
     ],
   );
