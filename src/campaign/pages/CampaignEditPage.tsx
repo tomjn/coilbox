@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   Eye,
+  GripVertical,
   Pencil,
   Plus,
   TriangleAlert,
@@ -46,6 +47,7 @@ import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
 import { MissionFacts, MissionSetup } from "./components/MissionFacts";
 import { MissionRemoveButton } from "./components/MissionRemoveButton";
 import { MissionScenarioUpdateButton } from "./components/MissionScenarioUpdateButton";
+import { useMissionDrag } from "./components/missionDrag";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
 import {
@@ -110,6 +112,28 @@ export function duplicateMission(
     id: crypto.randomUUID(),
     title: copyTitle(mission.title, taken),
   };
+}
+
+/**
+ * Where a dragged mission would land, drawn along the edge of the card it
+ * would land against (issue #2262).
+ *
+ * The author has to see the answer before letting go, not after, so this is
+ * the one thing on the page that has to be readable at a glance mid-gesture:
+ * a solid accent bar in the app's own primary colour, with a ring in the page
+ * background behind it so it stays visible over a mission's panorama art as
+ * well as over a plain card.
+ */
+function DropLine({ atEnd = false }: { atEnd?: boolean }) {
+  return (
+    <span
+      data-drop-line={atEnd ? "end" : "before"}
+      aria-hidden="true"
+      className={`absolute inset-x-0 z-10 h-1 rounded-full bg-primary ring-1 ring-background ${
+        atEnd ? "bottom-0" : "top-0"
+      }`}
+    />
+  );
 }
 
 /** Editor for one local campaign: its fields, ordered mission list, and export. */
@@ -253,6 +277,27 @@ export default function CampaignEditPage() {
     await saver.current?.settled();
   }, []);
 
+  /** Take the mission at `from` out of the list and put it back at `to`.
+   *
+   *  The one reorder on this page. The arrow buttons call it a step at a time
+   *  and a dragged row calls it with wherever it was dropped, so both write
+   *  the same way and neither can drift from the other. It sits up here with
+   *  the hooks rather than beside the other mission actions because the drag
+   *  hook below is a hook, and the page returns early further down. */
+  const moveTo = useCallback(
+    (from: number, to: number) => {
+      if (!campaign) return;
+      if (from === to || to < 0 || to >= campaign.missions.length) return;
+      const missions = campaign.missions.slice();
+      const [carried] = missions.splice(from, 1);
+      if (!carried) return;
+      missions.splice(to, 0, carried);
+      void persist({ ...campaign, missions });
+    },
+    [campaign, persist],
+  );
+  const { drag, listProps } = useMissionDrag(moveTo);
+
   if (loading && !campaign) return <DetailLoading backTo={BACK} />;
   if (loaded?.source === "bundled") {
     return (
@@ -280,13 +325,7 @@ export default function CampaignEditPage() {
     setSave({ kind: "unsaved" });
   };
 
-  const move = (index: number, dir: -1 | 1) => {
-    const j = index + dir;
-    if (j < 0 || j >= campaign.missions.length) return;
-    const missions = campaign.missions.slice();
-    [missions[index], missions[j]] = [missions[j], missions[index]];
-    void persist({ ...campaign, missions });
-  };
+  const move = (index: number, dir: -1 | 1) => moveTo(index, index + dir);
 
   /** Persist, and take off disk whatever the new document stops naming once
    *  that document is the one on disk. Every edit that can drop or replace an
@@ -632,15 +671,30 @@ export default function CampaignEditPage() {
             scenario.
           </div>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul
+            {...listProps}
+            className={`flex flex-col gap-3 ${drag ? "select-none" : ""}`}
+          >
             {campaign.missions.map((m, i) => {
               const thumb = thumbs.get(m.snapshot.mapName)?.url;
               const attachment = scenarioAttachment(m, scenarios);
               return (
                 <li
                   key={m.id}
-                  className="overflow-hidden rounded-lg border border-border/50 bg-card"
+                  data-mission-row={i}
+                  className={`relative overflow-hidden rounded-lg border border-border/50 bg-card ${
+                    drag?.from === i ? "opacity-50" : ""
+                  }`}
                 >
+                  {/* Where the mission lands if it is let go now (issue
+                      #2262). Drawn on the card it would land above, and on
+                      the bottom edge of the last card for the end of the
+                      list, because the card is clipped to its own rounded
+                      corners and a line in the gap between two cards would be
+                      cut off by both. */}
+                  {drag?.gap === i && <DropLine />}
+                  {drag?.gap === campaign.missions.length &&
+                    i === campaign.missions.length - 1 && <DropLine atEnd />}
                   {/* Header strip: the mission panorama, with the map minimap
                       overlaid so a mission is identifiable at a glance. With
                       no panorama the minimap is the mission's real identity,
@@ -674,6 +728,24 @@ export default function CampaignEditPage() {
                   )}
 
                   <div className="flex items-center gap-3 p-3">
+                    {/* Drag to reorder (issue #2262). A handle rather than the
+                        whole card, so selecting a title or pressing one of the
+                        row's five buttons never starts a drag by accident.
+
+                        It is hidden from a screen reader and stays out of the
+                        tab order on purpose. The two arrow buttons beside it
+                        do the same move, they are named, and they work without
+                        a pointer, which a drag never can. A focusable handle
+                        would only add a tab stop that does nothing when it is
+                        reached. */}
+                    <span
+                      data-drag-handle
+                      aria-hidden="true"
+                      title="Drag to reorder"
+                      className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground active:cursor-grabbing"
+                    >
+                      <GripVertical className="size-4" />
+                    </span>
                     <div className="flex flex-col">
                       <Button
                         size="icon"
