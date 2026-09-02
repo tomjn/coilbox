@@ -21,7 +21,8 @@ import { addBase } from "./bases";
 import { sceneContents } from "./contents";
 import { addActor } from "./editing";
 import { editedScenario } from "./edits";
-import { addGroup } from "./groups";
+import { addGroup, pathKey } from "./groups";
+import { scenarioPaths } from "./orderPaths";
 import { type MapSelection, primaryKey, selectOne } from "./selection";
 import { useMapKeyboard } from "./useMapKeyboard";
 import { addZone } from "./zones";
@@ -64,6 +65,29 @@ function withZone(): Scenario {
     center: { x: 2000, z: 2000 },
     radius: 300,
   });
+}
+
+/** `laidOut`, with the group given a two-point move order, for the tests that
+ *  reach a path's points from the keyboard (issue #2314). */
+function withGroupPath(): Scenario {
+  const doc = laidOut();
+  return {
+    ...doc,
+    groups: [
+      {
+        ...doc.groups[0],
+        orders: [
+          {
+            kind: "move",
+            waypoints: [
+              { x: 550, z: 600 },
+              { x: 700, z: 650 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
 }
 
 /** The drawn units, as the scene would report them. Only their names are read
@@ -127,7 +151,7 @@ function Harness({
       scenario,
       entries: sceneContents(scenario),
       placements: drawn(scenario),
-      paths: [],
+      paths: scenarioPaths(scenario),
     },
     onChange: (edit) => setScenario((doc) => editedScenario(doc, edit)),
     selection,
@@ -171,6 +195,14 @@ function Harness({
           ? scenario.zones[0].radius
           : "gone"}
       </p>
+      <p data-testid="path">
+        {(() => {
+          const order = scenario.groups[0]?.orders[0];
+          return order && "waypoints" in order
+            ? order.waypoints.map((p) => `${p.x},${p.z}`).join(" ")
+            : "gone";
+        })()}
+      </p>
     </>
   );
 }
@@ -180,6 +212,7 @@ const said = () => screen.getByTestId("said").textContent;
 const selected = () => screen.getByTestId("selected").textContent;
 const actor = () => screen.getByTestId("actor").textContent;
 const zone = () => screen.getByTestId("zone").textContent;
+const path = () => screen.getByTestId("path").textContent;
 
 describe("choosing what the keys act on", () => {
   it("selects the first thing on the map and says what it is", () => {
@@ -375,6 +408,87 @@ describe("resizing a zone from the keyboard (issue #2313)", () => {
 
     expect(actor()).toBe("116,200,0");
     expect(said()).toContain("Moved 16 east");
+  });
+});
+
+describe("reaching a path's points from a selected group (issue #2314)", () => {
+  /** Cycles onto the group's first point: actor, then group, then the point. */
+  function withPointSelected() {
+    render(<Harness initial={withGroupPath()} />);
+    fireEvent.keyDown(map(), { key: "." });
+    fireEvent.keyDown(map(), { key: "." });
+    fireEvent.keyDown(map(), { key: "." });
+    expect(selected()).toBe(pathKey("g1", 0, 0));
+  }
+
+  it("steps from the group onto its first point, naming which point of how many", () => {
+    withPointSelected();
+
+    expect(said()).toBe("Group 1, point 1 of 2, at x 550, z 600. 2 of 3.");
+  });
+
+  it("steps on to the path's next point, then off it onto the base", () => {
+    withPointSelected();
+    fireEvent.keyDown(map(), { key: "." });
+
+    expect(selected()).toBe(pathKey("g1", 0, 1));
+    expect(said()).toContain("Group 1, point 2 of 2");
+
+    fireEvent.keyDown(map(), { key: "." });
+
+    expect(selected()).toBe("base:b1#0");
+  });
+
+  it("steps backwards from the base onto the path's last point, then the group", () => {
+    render(<Harness initial={withGroupPath()} />);
+    fireEvent.keyDown(map(), { key: "," }); // wraps to the base, the last thing
+
+    expect(selected()).toBe("base:b1#0");
+
+    fireEvent.keyDown(map(), { key: "," });
+    expect(selected()).toBe(pathKey("g1", 0, 1));
+
+    fireEvent.keyDown(map(), { key: "," });
+    expect(selected()).toBe(pathKey("g1", 0, 0));
+
+    fireEvent.keyDown(map(), { key: "," });
+    expect(selected()).toBe("group:g1#0");
+  });
+
+  it("moves the point an arrow names, using the move already wired to a point (issue #2314)", () => {
+    withPointSelected();
+    fireEvent.keyDown(map(), { key: "ArrowRight" });
+
+    expect(path()).toBe("566,600 700,650");
+    expect(said()).toContain("Moved 16 east");
+  });
+
+  it("deletes the point Delete names and lands on nothing, the same as anything else", () => {
+    withPointSelected();
+    fireEvent.keyDown(map(), { key: "Delete" });
+
+    expect(path()).toBe("700,650");
+    expect(selected()).toBe("none");
+  });
+
+  it("lets go of the whole selection on Escape, the same one step as anywhere else on the ring", () => {
+    withPointSelected();
+    fireEvent.keyDown(map(), { key: "Escape" });
+
+    expect(selected()).toBe("none");
+    expect(said()).toBe("Nothing selected.");
+  });
+
+  it("does not resize a point on S, since only a zone is resizable", () => {
+    withPointSelected();
+    fireEvent.keyDown(map(), { key: "s" });
+    const before = said();
+    fireEvent.keyDown(map(), { key: "ArrowUp" });
+
+    // The arrow still moved the point rather than nothing happening, which is
+    // what it would do had S put the point into a resize mode meant for zones.
+    expect(said()).not.toBe(before);
+    expect(said()).toContain("Moved");
   });
 });
 

@@ -180,6 +180,38 @@ export function pathLabel(sources: PathSource[], id: string): string {
   );
 }
 
+/** The orders a path's id points at, wherever they live: a group's own, or
+ *  the ones a trigger holds. Undefined when the id names neither. */
+function ordersAt(scenario: Scenario, id: string): ScenarioOrder[] | undefined {
+  const held = parseOrderPathId(id);
+  if (!held) return scenario.groups.find((group) => group.id === id)?.orders;
+  const trigger = scenario.triggers[held.trigger];
+  const step = trigger && stepsOf(trigger, held.list)[held.step];
+  return step ? paramOrders(step.params[held.param]) : undefined;
+}
+
+/**
+ * Where the waypoint a key names stands, read straight out of the document
+ * (issue #2314).
+ *
+ * Not out of a `PathSource` list a caller may be holding: an edit just made to
+ * the document moves a waypoint in a freshly built copy of it, and a
+ * `PathSource` computed before that edit still describes the copy that came
+ * before. Reading it back from the document is the only way an announcement
+ * of what a move just did can be trusted, the same rule every other kind of
+ * thing on the map follows.
+ */
+export function pathPointPosition(
+  scenario: Scenario,
+  key: string,
+): Point | null {
+  const ref = parsePathKey(key);
+  if (!ref) return null;
+  const order = ordersAt(scenario, ref.groupId)?.[ref.order];
+  if (!order || !("waypoints" in order)) return null;
+  return order.waypoints[ref.waypoint] ?? null;
+}
+
 /** Apply a change to the orders a trigger holds, or hand the document back when
  *  the key names nothing it has. */
 function editHeldOrders(

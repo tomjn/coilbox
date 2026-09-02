@@ -142,6 +142,7 @@ import {
 import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
 import {
+  type MapStep,
   type MapThings,
   moveOnMap,
   pointFrom,
@@ -890,9 +891,11 @@ export const ScenarioMapScene = forwardRef<
   );
 
   /** Picking something out of the list is the same two things a click that
-   *  lands on it would be: it is selected, and it is on screen. */
+   *  lands on it would be: it is selected, and it is on screen. A step of the
+   *  keyboard's cycle (issue #2314) is picked the same way: only the key,
+   *  position and span a `ContentEntry` also carries are read. */
   const pickEntry = useCallback(
-    (entry: ContentEntry) => {
+    (entry: MapStep) => {
       setSelected(entry.key);
       focusOn(entry.pos, entry.span);
     },
