@@ -68,8 +68,8 @@ export function useWidgetFiles() {
         if (collected > 0) {
           toast.success(
             collected === 1
-              ? "A layout saved in game is in your library."
-              : `${collected} layouts saved in game are in your library.`,
+              ? "A blueprint saved in game is in your library."
+              : `${collected} blueprints saved in game are in your library.`,
           );
         }
         if (skipped > 0) {

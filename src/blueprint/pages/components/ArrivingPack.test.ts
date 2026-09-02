@@ -205,14 +205,14 @@ describe("ArrivingPack", () => {
       // This pack is one player's Armada layouts with somebody's Cortex one
       // dropped in, which is worth saying rather than rounding off.
       expect(markup({ conversion: conversion() })).toContain(
-        "These layouts are Armada and Cortex&#x27;s.",
+        "These blueprints are Armada and Cortex&#x27;s.",
       );
       const one = conversion();
       expect(
         markup({
           conversion: { ...one, offer: { ...one.offer, from: ["Armada"] } },
         }),
-      ).toContain("These are Armada&#x27;s layouts");
+      ).toContain("These are Armada&#x27;s blueprints");
     });
 
     it("says how much of the pack the choice covers once it is made", () => {

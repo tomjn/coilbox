@@ -22,14 +22,14 @@ describe("PageHeader", () => {
     render(
       <PageHeader
         title="Base blueprints"
-        description="Layouts of buildings you can put down anywhere."
+        description="Blueprints of buildings you can put down anywhere."
         actions={<button type="button">New blueprint</button>}
       />,
     );
 
     const heading = screen.getByRole("heading", { name: "Base blueprints" });
     const description = screen.getByText(
-      "Layouts of buildings you can put down anywhere.",
+      "Blueprints of buildings you can put down anywhere.",
     );
     const button = screen.getByRole("button", { name: "New blueprint" });
 

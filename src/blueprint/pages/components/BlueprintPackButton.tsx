@@ -23,7 +23,7 @@ export function BlueprintPackButton({
   const openPack = async () => {
     const { ImportPackForm } = await import("./ImportPackForm");
     drawer.open({
-      title: "Open a pack of layouts",
+      title: "Open a pack of blueprints",
       // Wider than the single layout import: this is a list to skim, and thirty
       // rows each carrying a drawing want the room.
       width: "34rem",

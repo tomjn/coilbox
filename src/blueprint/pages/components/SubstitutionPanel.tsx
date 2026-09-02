@@ -212,7 +212,7 @@ export function SubstitutionPanel({
       ) : sideNames.length > 0 ? (
         <div className="space-y-1.5">
           <Label htmlFor="substitute-side" className="text-xs font-medium">
-            Say this layout in
+            Say this blueprint in
           </Label>
           <OptionSelect
             value={toSide}

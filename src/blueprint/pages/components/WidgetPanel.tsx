@@ -161,7 +161,7 @@ export function WidgetPanel({
         <p>
           Open the panel with the <code>coilbox_blueprints</code> action: bind a
           key to it, or type <code>/coilbox_blueprints</code> in the console.
-          Turn a layout with [ and ], place it with a click, and put it down
+          Turn a blueprint with [ and ], place it with a click, and put it down
           with right click or escape.
         </p>
         <p>

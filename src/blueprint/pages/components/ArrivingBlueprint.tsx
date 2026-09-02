@@ -117,7 +117,7 @@ function SideChoice({ conversion }: { conversion: ArrivingConversion }) {
   return (
     <div className="flex flex-col gap-2 rounded border border-border/50 p-2">
       <p className="text-xs text-muted-foreground">
-        Every building of this layout is {offer.from}'s, and this game has{" "}
+        Every building of this blueprint is {offer.from}'s, and this game has{" "}
         {offer.to.length === 1 ? `${offer.to[0]}'s` : "the other sides'"}{" "}
         version of it. Coilbox does not know which side you play, so it is kept
         as {offer.from} unless you say otherwise.

@@ -60,7 +60,7 @@ export function BlueprintCardMenu({
           record={record}
           onDone={(saved) => {
             drawer.close();
-            toast.success(`That layout is now "${saved.layout.name}".`);
+            toast.success(`That blueprint is now "${saved.layout.name}".`);
           }}
         />
       ),
@@ -74,7 +74,7 @@ export function BlueprintCardMenu({
       await saveBlueprint(copy);
       toast.success(`"${copy.layout.name}" is yours to change.`);
     } catch (e) {
-      toast.error(`That layout could not be copied: ${message(e)}`);
+      toast.error(`That blueprint could not be copied: ${message(e)}`);
     } finally {
       setBusy(false);
     }

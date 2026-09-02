@@ -197,7 +197,11 @@ export function LeavingPack({
             <Download className="mr-1.5 size-4" aria-hidden />
           )}
           Write{" "}
-          {count === 0 ? "them" : count === 1 ? "1 layout" : `${count} layouts`}{" "}
+          {count === 0
+            ? "them"
+            : count === 1
+              ? "1 blueprint"
+              : `${count} blueprints`}{" "}
           into a game's file
         </Button>
         <Button

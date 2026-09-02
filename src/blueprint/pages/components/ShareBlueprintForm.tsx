@@ -58,7 +58,7 @@ export function ShareBlueprintForm({ record }: { record: StoredBlueprint }) {
     return (
       <ChallengeCodeView
         code={code.code}
-        helpText="Anyone who pastes this into Blueprints → Import gets this layout, and coilbox tells them there whether their game has the units it names."
+        helpText="Anyone who pastes this into Blueprints → Import gets this blueprint, and coilbox tells them there whether their game has the units it names."
         onExportFile={saveFile}
       />
     );

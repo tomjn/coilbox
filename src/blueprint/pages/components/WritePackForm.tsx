@@ -146,7 +146,7 @@ export function WritePackForm({
         }
         onWriteToFile={() =>
           void write({
-            title: "Save a file of layouts",
+            title: "Save a file of blueprints",
             defaultPath: "blueprints.json",
           })
         }

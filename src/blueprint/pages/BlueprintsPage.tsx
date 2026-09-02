@@ -106,7 +106,7 @@ export default function BlueprintsPage() {
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
         title="Base blueprints"
-        description="Layouts of buildings you can put down anywhere. A blueprint has no map and no team, so the same one works in a mission, in a skirmish, and in somebody else's game."
+        description="Blueprints of buildings you can put down anywhere. A blueprint has no map and no team, so the same one works in a mission, in a skirmish, and in somebody else's game."
         actions={
           <>
             <BlueprintPackButton
@@ -114,7 +114,7 @@ export default function BlueprintsPage() {
                 toast.success(
                   kept.length === 1
                     ? `"${kept[0].layout.name}" is in your library.`
-                    : `${kept.length} layouts are in your library.`,
+                    : `${kept.length} blueprints are in your library.`,
                 );
               }}
             />
