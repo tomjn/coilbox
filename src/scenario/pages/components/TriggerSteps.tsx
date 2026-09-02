@@ -40,7 +40,11 @@ import {
   type ScenarioParam,
   type TriggerStep,
 } from "../../model";
-import { isUnitDefParam, type ParamSpec } from "../../triggerTypes";
+import {
+  isUnitDefParam,
+  type ParamSpec,
+  TYPE_DESCRIPTIONS,
+} from "../../triggerTypes";
 import { OrderRow } from "./GroupControls";
 import { orderOfKind, targetOptions, withOrder, withoutOrder } from "./groups";
 import { TeamSelect } from "./TeamSelect";
@@ -258,7 +262,9 @@ export function StepRow({
  * A type the game declares itself (#776) is offered on the same footing as
  * coilbox's own, and is never gated: the game implements it, so the game can run
  * it. What it looks like is the game's to say, so its declared description is
- * shown where a built-in type shows its parameter names.
+ * shown where a built-in type shows its own (issue #2286). A game's type that
+ * ships no description of its own says so rather than falling back to a list of
+ * its parameter names, which is not a description of what the type does.
  */
 export function AddStep({
   list,
@@ -288,7 +294,8 @@ export function AddStep({
       label: stepLabel(type, extensions),
       description:
         declared[type]?.description ??
-        (Object.keys(spec).join(", ") || undefined),
+        TYPE_DESCRIPTIONS[type] ??
+        "No description.",
       trailing: reason,
       disabled: reason !== undefined,
     };
