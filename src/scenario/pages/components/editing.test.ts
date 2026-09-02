@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGridSnap } from "@/blueprint/footprint";
+import { BUILD_SQUARE, buildGridSnap } from "@/blueprint/footprint";
 import { dragKeys } from "@/placement/placements";
 import { draggedBuilding } from "@/placement/preview";
 import { newScenario } from "../../create";
@@ -7,6 +7,7 @@ import type { Point, Scenario } from "../../model";
 import {
   addActor,
   canTurn,
+  duplicatePlacement,
   editActor,
   MIN_ACTOR_HP,
   movePlacement,
@@ -494,5 +495,98 @@ describe("setActorState", () => {
     const withState = setActorState(document(), "a1", { invulnerable: true });
     const cleared = setActorState(withState, "a1", { invulnerable: false });
     expect(cleared.actors[0].state).toBeUndefined();
+  });
+});
+
+/** Cmd+D on the map (issue #2277). */
+describe("duplicatePlacement", () => {
+  it("copies an actor one build square east and south, under a fresh id", () => {
+    const before = document();
+    const made = duplicatePlacement(before, "actor:a1");
+    if (!made) throw new Error("expected a copy");
+    expect(made.scenario.actors).toHaveLength(2);
+    const copy = made.scenario.actors[1];
+    expect(copy.id).not.toBe("a1");
+    expect(copy).toEqual({
+      ...before.actors[0],
+      id: copy.id,
+      pos: { x: 100 + BUILD_SQUARE, z: 200 + BUILD_SQUARE },
+    });
+    expect(made.key).toBe(`actor:${copy.id}`);
+    // The original is untouched.
+    expect(before.actors).toHaveLength(1);
+  });
+
+  it("copies a whole group, orders and all, under a fresh id", () => {
+    const withOrders: Scenario = {
+      ...document(),
+      groups: [
+        {
+          ...document().groups[0],
+          orders: [{ kind: "move", waypoints: [{ x: 500, z: 500 }] }],
+        },
+      ],
+    };
+    const made = duplicatePlacement(withOrders, "group:g1#0");
+    if (!made) throw new Error("expected a copy");
+    expect(made.scenario.groups).toHaveLength(2);
+    const copy = made.scenario.groups[1];
+    expect(copy.id).not.toBe("g1");
+    expect(copy).toEqual({
+      ...withOrders.groups[0],
+      id: copy.id,
+      pos: { x: 1000 + BUILD_SQUARE, z: 1000 + BUILD_SQUARE },
+    });
+    expect(made.key).toBe(`group:${copy.id}#0`);
+  });
+
+  it("copies a base into its own layout, offset, under a fresh id", () => {
+    const withRole: Scenario = {
+      ...document(),
+      bases: [
+        {
+          ...document().bases[0],
+          buildings: [{ id: "factory-1", queue: ["armsolar"] }],
+        },
+      ],
+    };
+    const made = duplicatePlacement(withRole, "base:b1#0");
+    if (!made) throw new Error("expected a copy");
+    expect(made.scenario.bases).toHaveLength(2);
+    expect(made.scenario.blueprints).toHaveLength(2);
+    const copy = made.scenario.bases[1];
+    expect(copy.id).not.toBe("b1");
+    expect(copy.origin).toEqual({
+      x: 2000 + BUILD_SQUARE,
+      z: 2000 + BUILD_SQUARE,
+    });
+    const layout = made.scenario.blueprints.find(
+      (b) => b.id === copy.blueprint,
+    );
+    // A layout of its own, not the original's, with the same geometry.
+    expect(copy.blueprint).not.toBe("bp1");
+    expect(layout?.buildings.map((b) => b.def)).toEqual(["armsolar", "armllt"]);
+    // The building a trigger could address gets a fresh id of its own, so
+    // nothing that already points at "factory-1" now also names the copy.
+    expect(copy.buildings[0].id).not.toBe("factory-1");
+    expect(copy.buildings[0].queue).toEqual(["armsolar"]);
+    expect(made.key).toBe(`base:${copy.id}#0`);
+  });
+
+  it("makes nothing of a base with no buildings", () => {
+    const empty: Scenario = {
+      ...document(),
+      bases: [{ ...document().bases[0], buildings: [] }],
+      blueprints: [{ id: "bp1", name: "Empty", buildings: [] }],
+    };
+    expect(duplicatePlacement(empty, "base:b1#0")).toBeNull();
+  });
+
+  it("leaves a zone or a path point alone, and a key naming nothing", () => {
+    const before = document();
+    expect(duplicatePlacement(before, "zone:z1")).toBeNull();
+    expect(duplicatePlacement(before, "path:g1:0:0")).toBeNull();
+    expect(duplicatePlacement(before, "actor:gone")).toBeNull();
+    expect(duplicatePlacement(before, "nonsense")).toBeNull();
   });
 });
