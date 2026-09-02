@@ -621,6 +621,35 @@ export function previewSentence(count: PreviewCount): string {
 }
 
 /**
+ * What a click on bare ground would do, from the same three conditions that
+ * decide whether anything is armed to place ({@link previewArmed}) and what
+ * the terrain says about the spot ({@link previewNote}): a path being drawn,
+ * a base's origin being moved, a point a panel asked for, or -- when none of
+ * those is outstanding -- whatever is armed going down as normal (issue
+ * #2359).
+ *
+ * Computed once and handed everywhere a click's meaning matters, so the ghost,
+ * the sentence over the terrain and the keyboard's own announcement can never
+ * name three different clicks.
+ */
+export type PlaceKind =
+  | { kind: "path"; groupId: string; order: number }
+  | { kind: "moving"; baseId: string }
+  | { kind: "picking" }
+  | { kind: "arm" };
+
+export function placeKind(
+  drawingPath: { groupId: string; order: number } | null,
+  moving: string | null,
+  picking: unknown,
+): PlaceKind {
+  if (drawingPath) return { kind: "path", ...drawingPath };
+  if (moving) return { kind: "moving", baseId: moving };
+  if (picking) return { kind: "picking" };
+  return { kind: "arm" };
+}
+
+/**
  * Whatever is armed to place, or nothing at all while the map is waiting for
  * a point (issue #2349).
  *

@@ -20,6 +20,7 @@ import {
   nudgeSentence,
   nudgeToFit,
   nudgeWords,
+  placeKind,
   previewArmed,
   previewChecks,
   previewCount,
@@ -820,6 +821,63 @@ describe("previewArmed", () => {
       const drawsGhost = previewArmed("a ghost", answering) !== null;
       const saysSentence = previewNote(clean, null, answering) !== null;
       expect(drawsGhost).toBe(saysSentence);
+    }
+  });
+});
+
+/**
+ * Issue #2359. `placeKind` is the one rule `ScenarioMapScene` derives
+ * `answering` from (which stands the ghost and the sentence down) and hands
+ * the keyboard so Enter can name what a click would actually do. Pinning the
+ * priority here is what keeps all three from drifting into naming three
+ * different clicks.
+ */
+describe("placeKind", () => {
+  const clean = {
+    total: 1,
+    clashes: 0,
+    unstable: 0,
+    tooDeep: 0,
+    tooShallow: 0,
+    unjudged: 0,
+    absent: 0,
+  };
+
+  it("is a path being drawn first, whatever else is also outstanding", () => {
+    expect(
+      placeKind({ groupId: "g1", order: 0 }, "b1", { message: "pick" }),
+    ).toEqual({ kind: "path", groupId: "g1", order: 0 });
+  });
+
+  it("is a base being moved next, when no path is being drawn", () => {
+    expect(placeKind(null, "b1", { message: "pick" })).toEqual({
+      kind: "moving",
+      baseId: "b1",
+    });
+  });
+
+  it("is a panel's question last, when neither a path nor a base is outstanding", () => {
+    expect(placeKind(null, null, { message: "pick" })).toEqual({
+      kind: "picking",
+    });
+  });
+
+  it("is whatever is armed when nothing is outstanding", () => {
+    expect(placeKind(null, null, null)).toEqual({ kind: "arm" });
+  });
+
+  it("agrees with previewArmed and previewNote about whether a click is spoken for", () => {
+    for (const [drawingPath, moving, picking] of [
+      [{ groupId: "g1", order: 0 }, null, null],
+      [null, "b1", null],
+      [null, null, { message: "pick" }],
+      [null, null, null],
+    ] as const) {
+      const answering = placeKind(drawingPath, moving, picking).kind !== "arm";
+      const drawsGhost = previewArmed("a ghost", answering) !== null;
+      const saysSentence = previewNote(clean, null, answering) !== null;
+      expect(drawsGhost).toBe(!answering);
+      expect(saysSentence).toBe(!answering);
     }
   });
 });
