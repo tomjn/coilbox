@@ -15,9 +15,13 @@
  * leaves the rest of the base where it is.
  */
 
-import type { SnapBuilding } from "@/blueprint/footprint";
+import { BUILD_SQUARE, type SnapBuilding } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
-import { type PlacementRef, parsePlacementKey } from "@/placement/placements";
+import {
+  type PlacementRef,
+  parsePlacementKey,
+  placementKey,
+} from "@/placement/placements";
 import type {
   ActorState,
   Facing,
@@ -26,7 +30,13 @@ import type {
   ScenarioActor,
   ScenarioGroup,
 } from "../../model";
-import { editBaseLayout, type LayoutEdit, removeBuilding } from "./bases";
+import { baseBuildings } from "../../model";
+import {
+  addBase,
+  editBaseLayout,
+  type LayoutEdit,
+  removeBuilding,
+} from "./bases";
 
 /** Positions are whole elmos. The engine takes fractions, but nothing in an
  *  editor gains from writing 1023.9997 into a document. */
@@ -253,6 +263,92 @@ export function removePlacement(
   }
 
   return removeBuilding(scenario, ref.id, ref.index, how);
+}
+
+/** How far a duplicate lands from the placement it was copied from, in
+ *  elmos: one build square, so the copy is never drawn stacked exactly on the
+ *  original with nothing on screen to tell the two apart. */
+const DUPLICATE_OFFSET = BUILD_SQUARE;
+
+/**
+ * A copy of the placement this key names, offset one build square so it is
+ * never drawn on top of the original, with a fresh id so nothing that already
+ * addresses the original - a base building's own addressable id, most of all -
+ * now also names the copy.
+ *
+ * Null for a key naming anything {@link parsePlacementKey} does not: a zone or
+ * a point on a path, which Cmd+D leaves alone (issue #2277). Null too when the
+ * key names a placement the document no longer has, the same "gone" case
+ * every other map key answers with nothing done.
+ *
+ * A base is duplicated with its own copy of the layout it was placed from
+ * rather than sharing the original's, the same choice {@link addBase} makes
+ * for a base drawn fresh: the two are separate registries, and a duplicate
+ * that silently shared geometry with the base it was copied from would turn
+ * one edit into two.
+ */
+export function duplicatePlacement(
+  scenario: Scenario,
+  key: string,
+): { scenario: Scenario; key: string } | null {
+  const ref = parsePlacementKey(key);
+  if (!ref) return null;
+  const shift = (pos: Point): Point =>
+    round({ x: pos.x + DUPLICATE_OFFSET, z: pos.z + DUPLICATE_OFFSET });
+
+  if (ref.kind === "actor") {
+    const actor = scenario.actors.find((one) => one.id === ref.id);
+    if (!actor) return null;
+    const id = crypto.randomUUID();
+    const actors = [
+      ...scenario.actors,
+      { ...actor, id, pos: shift(actor.pos) },
+    ];
+    return {
+      scenario: { ...scenario, actors },
+      key: placementKey("actor", id),
+    };
+  }
+
+  if (ref.kind === "group") {
+    const group = scenario.groups.find((one) => one.id === ref.id);
+    if (!group) return null;
+    const id = crypto.randomUUID();
+    const groups = [
+      ...scenario.groups,
+      { ...group, id, pos: shift(group.pos) },
+    ];
+    return {
+      scenario: { ...scenario, groups },
+      key: placementKey("group", id, 0),
+    };
+  }
+
+  const base = scenario.bases.find((one) => one.id === ref.id);
+  if (!base) return null;
+  const buildings = baseBuildings(scenario.blueprints, base);
+  if (buildings.length === 0) return null;
+  const layout = scenario.blueprints.find((one) => one.id === base.blueprint);
+  const id = crypto.randomUUID();
+  return {
+    scenario: addBase(scenario, id, crypto.randomUUID(), {
+      team: base.team,
+      origin: shift(base.origin),
+      name: layout?.name,
+      designedFor: layout?.designedFor,
+      buildings: buildings.map((building) => ({
+        def: building.def,
+        offset: building.offset,
+        facing: building.facing,
+        // A fresh id for any building a trigger can address, so the copy
+        // never answers to the id the original does.
+        id: building.id === undefined ? undefined : crypto.randomUUID(),
+        queue: building.queue,
+        repeat: building.repeat,
+      })),
+    }),
+    key: placementKey("base", id, 0),
+  };
 }
 
 /**

@@ -27,6 +27,7 @@ import {
   render,
   screen,
 } from "@testing-library/react";
+import type { Ref } from "react";
 import { useMemo, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_EXTENSIONS } from "../../extensions";
@@ -40,7 +41,7 @@ import {
   undoEdit,
 } from "./history";
 import type { RowFocus } from "./problemTargets";
-import { TriggerPanel } from "./TriggerPanel";
+import { TriggerPanel, type TriggerPanelHandle } from "./TriggerPanel";
 import { setStepParam } from "./triggers";
 import { missionProblemsIn } from "./useMissionProblems";
 
@@ -144,10 +145,15 @@ function PanelHarness({
   triggers,
   zones = [],
   focus = null,
+  panelRef,
 }: {
   triggers: ScenarioTrigger[];
   zones?: ScenarioZone[];
   focus?: RowFocus | null;
+  /** So a test can call `duplicateSelected()` the way a routed Cmd+D does
+   *  (issue #2277), without a keydown of its own: that routing is
+   *  `ScenarioEditPage`'s concern, pinned separately in its own dom test. */
+  panelRef?: Ref<TriggerPanelHandle>;
 }) {
   const [document, setDocument] = useState(() => scenario(triggers, zones));
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
@@ -184,6 +190,7 @@ function PanelHarness({
   return (
     <>
       <TriggerPanel
+        ref={panelRef}
         scenario={document}
         onChange={(next) => {
           setHistory(recordEdit(history, document, next));
@@ -559,6 +566,61 @@ describe("duplicating a trigger", () => {
     redo();
 
     expect(stored().map((t) => t.id)).toEqual(["wave-one", "trigger-1"]);
+  });
+});
+
+/**
+ * The ref `ScenarioEditPage` routes a page-level Cmd+D through (issue #2277).
+ * Its own dom test pins that the page picks this over the map's selected
+ * placement. This pins what the panel itself does with the call: the exact
+ * same copy the button makes, but only when the author's focus is inside the
+ * form of the trigger it would duplicate.
+ */
+describe("duplicateSelected, the handle a routed Cmd+D calls", () => {
+  it("duplicates the selected trigger when focus is inside its form", () => {
+    const ref = { current: null as TriggerPanelHandle | null };
+    render(
+      <PanelHarness
+        triggers={[trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]}
+        panelRef={ref}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Triggers/ }));
+    select("wave-two");
+    nameBox().focus();
+
+    let did = false;
+    act(() => {
+      did = ref.current?.duplicateSelected() ?? false;
+    });
+
+    expect(did).toBe(true);
+    expect(stored().map((t) => t.id)).toEqual([
+      "wave-one",
+      "wave-two",
+      "trigger-1",
+    ]);
+    expect(asInput(nameBox()).value).toBe("Copy of wave-two");
+  });
+
+  it("does nothing when focus is outside the form, so a stale trigger selection cannot steal a Cmd+D meant elsewhere", () => {
+    const ref = { current: null as TriggerPanelHandle | null };
+    render(
+      <PanelHarness triggers={[trigger({ id: "wave-one" })]} panelRef={ref} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Triggers/ }));
+    // Focus is on the panel's own disclosure button, not inside the form:
+    // the same starting point a page-level Cmd+D sees when the author has
+    // been working on the map instead.
+    screen.getByRole("button", { name: /^Triggers/ }).focus();
+
+    let did = true;
+    act(() => {
+      did = ref.current?.duplicateSelected() ?? false;
+    });
+
+    expect(did).toBe(false);
+    expect(stored().map((t) => t.id)).toEqual(["wave-one"]);
   });
 });
 

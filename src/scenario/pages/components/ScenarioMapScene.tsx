@@ -9,9 +9,11 @@ import {
   Unplug,
 } from "lucide-react";
 import {
+  forwardRef,
   type ReactNode,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -31,6 +33,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import { useFieldText } from "@/lib/useFieldText";
@@ -112,6 +120,7 @@ import {
 } from "./contents";
 import {
   canTurn,
+  duplicatePlacement,
   editActor,
   removePlacement,
   setActorState,
@@ -136,6 +145,7 @@ import { moveOnMap, pointFrom } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
+import { modeDigit } from "./shortcuts";
 import { startMarkers } from "./startPositions";
 import { type MapCursor, useMapKeyboard } from "./useMapKeyboard";
 import { useScenarioPaths } from "./useScenarioPaths";
@@ -179,50 +189,59 @@ const NOTHING: FootprintMark[] = [];
  * built on the first (issue #904). What is selected is read the same way, for
  * the same reason.
  */
-export function ScenarioMapScene({
-  scenario,
-  onChange,
-  extensions,
-  picking,
-  history,
-  focus,
-}: {
-  scenario: Scenario;
-  onChange: (edit: ScenarioEdit) => void;
-  /** The condition and action types the scenario's game declares for itself, so
-   *  an action a game declared carrying orders draws its path too (issue #957).
-   *  Read once by the page and handed to every panel that needs it. */
-  extensions?: ExtensionTypes;
-  /** The editor's undo history. Owned by the page, because it covers the panels
-   *  too, and shown here because this is where the author's hands are. */
-  history?: {
-    canUndo: boolean;
-    canRedo: boolean;
-    undo: () => void;
-    redo: () => void;
-  };
-  /**
-   * A point a panel under the map has asked the author to click, or null when
-   * nothing is waiting. It joins the same queue a path being drawn and a base
-   * being moved are in, so however the question was asked there is one bar
-   * saying the map is waiting and one click that answers it.
-   */
-  picking?: {
-    message: ReactNode;
-    onPick: (pos: Point) => void;
-    onDone: () => void;
-    /** The path the points are going into, when they are going into one, so it
-     *  is the path drawn with knobs while the author draws it (#847). */
-    pathId?: string;
-  } | null;
-  /**
-   * An entry a mission problem's row points at (issue #2271): a placement off
-   * the map, a zone with nothing in it. `id` is the same selection key
-   * `sceneContents` hands `ContentsList`, so landing on it is exactly what
-   * picking the matching row out of Contents already does.
-   */
-  focus?: RowFocus | null;
-}) {
+/** What a caller outside the map can ask it to do, reached through a ref
+ *  (issue #2277): duplicate whichever placement is currently selected. */
+export interface ScenarioMapSceneHandle {
+  /** Duplicate the selected placement, one build square east and south of it,
+   *  selected in its own place. False, and nothing done, when nothing that
+   *  Cmd+D duplicates is selected: no placement at all, or a zone or a path
+   *  point, which are not placements `duplicatePlacement` reaches. */
+  duplicateSelected: () => boolean;
+}
+
+export const ScenarioMapScene = forwardRef<
+  ScenarioMapSceneHandle,
+  {
+    scenario: Scenario;
+    onChange: (edit: ScenarioEdit) => void;
+    /** The condition and action types the scenario's game declares for itself, so
+     *  an action a game declared carrying orders draws its path too (issue #957).
+     *  Read once by the page and handed to every panel that needs it. */
+    extensions?: ExtensionTypes;
+    /** The editor's undo history. Owned by the page, because it covers the panels
+     *  too, and shown here because this is where the author's hands are. */
+    history?: {
+      canUndo: boolean;
+      canRedo: boolean;
+      undo: () => void;
+      redo: () => void;
+    };
+    /**
+     * A point a panel under the map has asked the author to click, or null when
+     * nothing is waiting. It joins the same queue a path being drawn and a base
+     * being moved are in, so however the question was asked there is one bar
+     * saying the map is waiting and one click that answers it.
+     */
+    picking?: {
+      message: ReactNode;
+      onPick: (pos: Point) => void;
+      onDone: () => void;
+      /** The path the points are going into, when they are going into one, so it
+       *  is the path drawn with knobs while the author draws it (#847). */
+      pathId?: string;
+    } | null;
+    /**
+     * An entry a mission problem's row points at (issue #2271): a placement off
+     * the map, a zone with nothing in it. `id` is the same selection key
+     * `sceneContents` hands `ContentsList`, so landing on it is exactly what
+     * picking the matching row out of Contents already does.
+     */
+    focus?: RowFocus | null;
+  }
+>(function ScenarioMapScene(
+  { scenario, onChange, extensions, picking, history, focus },
+  ref,
+) {
   const mapName = scenario.setup.mapName;
   // The map's own 16 bit heights as well as the picture of them, because the
   // buildings placed here are checked against the ground they stand on and the
@@ -329,6 +348,55 @@ export function ScenarioMapScene({
     }),
   );
   const behaviour = behaviours[EDITOR_MODES.indexOf(mode)];
+
+  // 1 to 6 switch mode, outside a text field (issue #2277). A window listener
+  // rather than the map's own `onKeyDown`, because the strip these pick from
+  // sits above the map and a mode switch is as much for an author who has not
+  // touched the map yet as for one who has. The map's own key table in
+  // `mapKeys.ts` never claims a bare digit, so this reaches the author
+  // whether or not the map itself holds the focus - which is also the moment
+  // switching mode is asked for most.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target as HTMLElement | null)) return;
+      const at = modeDigit(event);
+      if (at === null || at >= EDITOR_MODES.length) return;
+      event.preventDefault();
+      setModeId(EDITOR_MODES[at].id);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // What `ScenarioEditPage`'s routed Cmd+D calls (issue #2277). Read through
+  // `selectedRef` rather than the `selected` this closure was rendered with,
+  // the same reason a click reads it that way: the selection can have changed
+  // in a tick this render has not caught up with yet.
+  useImperativeHandle(
+    ref,
+    () => ({
+      duplicateSelected: () => {
+        const key = selectedRef.current;
+        if (!key) return false;
+        // A mutable box rather than a reassigned `let`, the same shape
+        // `modes.tsx`'s Bases placement uses to read out of `onChange`'s
+        // callback: TypeScript cannot see that the callback runs
+        // synchronously, so it will not narrow a plain reassignment back out
+        // of `T | null` after the call.
+        const outcome: { made: { scenario: Scenario; key: string } | null } = {
+          made: null,
+        };
+        onChange((doc) => {
+          outcome.made = duplicatePlacement(doc, key);
+          return outcome.made ? outcome.made.scenario : doc;
+        });
+        if (!outcome.made) return false;
+        setSelected(outcome.made.key);
+        return true;
+      },
+    }),
+    [onChange, setSelected],
+  );
 
   // A zone key names either the zone or one of its resize handles, and both
   // mean the same zone is what is selected.
@@ -845,23 +913,26 @@ export function ScenarioMapScene({
             reads as one panel rather than a solid strip beside naked
             controls (issue #1188). */}
           <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              value={mode.id}
-              onValueChange={(next) => next && setModeId(next)}
-              aria-label="Placement mode"
-            >
-              {EDITOR_MODES.map((m) => (
-                <ToggleGroupItem
-                  key={m.id}
-                  value={m.id}
-                  className="h-8 gap-1.5"
-                >
-                  <m.icon className="size-3.5" /> {m.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <TooltipProvider>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={mode.id}
+                onValueChange={(next) => next && setModeId(next)}
+                aria-label="Placement mode"
+              >
+                {EDITOR_MODES.map((m, i) => (
+                  <Tooltip key={m.id}>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem value={m.id} className="h-8 gap-1.5">
+                        <m.icon className="size-3.5" /> {m.label}
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent>{i + 1}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </ToggleGroup>
+            </TooltipProvider>
             {behaviour.controls}
           </div>
           <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
@@ -1250,7 +1321,7 @@ export function ScenarioMapScene({
       }
     />
   );
-}
+});
 
 /**
  * What is selected, said the way this document names it.

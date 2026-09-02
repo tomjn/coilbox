@@ -19,9 +19,23 @@
 
 import { Button, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2, Zap } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { useFieldProblem } from "@/lib/useFieldProblem";
 import { useFieldText } from "@/lib/useFieldText";
@@ -33,6 +47,7 @@ import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { notifyDeleted } from "./deleteNotice";
 import { focusListRow } from "./focusListRow";
+import { modKeyLabel } from "./history";
 import { EditorPanel, type EditorPanelHandle, FieldProblem } from "./panels";
 import type { RowFocus } from "./problemTargets";
 import { AddStep, StepRow } from "./TriggerSteps";
@@ -80,51 +95,94 @@ function selectedTrigger(
   return triggers.find((t) => t.id === selectedId) ?? null;
 }
 
-export function TriggerPanel({
-  scenario,
-  onChange,
-  units,
-  unitsLoading,
-  gate,
-  extensions,
-  note,
-  issues,
-  picking,
-  onPick,
-  onUndo,
-  focus,
-}: {
-  scenario: Scenario;
-  onChange: (next: Scenario) => void;
-  /** The scenario's game's units, for a parameter naming a unit type. */
-  units: UnitDatasetEntry[];
-  unitsLoading: boolean;
-  /** What the runtime that will play this scenario can and cannot run. Passed
-   *  in because the panels that rename a reference need the same read. */
-  gate: PaletteGate;
-  extensions: ExtensionTypes;
-  /** Which runtime the palette is measured against, when it stops anything. */
-  note: string | null;
-  /** What the validator has found wrong with the mission, so the field a
-   *  problem is about can say what it is rather than leaving that to the
-   *  problems drawer alone (issue #2287). */
-  issues: MissionIssue[];
-  /** The point the map is waiting for, or null when it is not waiting. */
-  picking: PointTarget | null;
-  onPick: (target: PointTarget | null) => void;
-  /** The page's own step back, the same one Cmd+Z and the map toolbar call.
-   *  Handed to a delete's undo notice so that button does exactly what the
-   *  shortcut does rather than a second way of getting there (issue #2280). */
-  onUndo: () => void;
-  /** A trigger a mission problem's row points at (issue #2271): expand the
-   *  panel, select it and land the cursor on its row in the list. */
-  focus?: RowFocus | null;
-}) {
+/** What a caller outside the panel can ask it to do, reached through a ref
+ *  (issue #2277): duplicate whichever trigger the author's focus is on. */
+export interface TriggerPanelHandle {
+  /**
+   * Duplicate the trigger the author's focus is currently inside the open
+   * form of. False, and nothing done, when it is not: `ScenarioEditPage`'s
+   * Cmd+D falls through to the map's selected placement then, rather than
+   * duplicating whichever trigger this panel happens to default to when
+   * nobody has picked one.
+   */
+  duplicateSelected: () => boolean;
+}
+
+export const TriggerPanel = forwardRef<
+  TriggerPanelHandle,
+  {
+    scenario: Scenario;
+    onChange: (next: Scenario) => void;
+    /** The scenario's game's units, for a parameter naming a unit type. */
+    units: UnitDatasetEntry[];
+    unitsLoading: boolean;
+    /** What the runtime that will play this scenario can and cannot run.
+     *  Passed in because the panels that rename a reference need the same
+     *  read. */
+    gate: PaletteGate;
+    extensions: ExtensionTypes;
+    /** Which runtime the palette is measured against, when it stops
+     *  anything. */
+    note: string | null;
+    /** What the validator has found wrong with the mission, so the field a
+     *  problem is about can say what it is rather than leaving that to the
+     *  problems drawer alone (issue #2287). */
+    issues: MissionIssue[];
+    /** The point the map is waiting for, or null when it is not waiting. */
+    picking: PointTarget | null;
+    onPick: (target: PointTarget | null) => void;
+    /** The page's own step back, the same one Cmd+Z and the map toolbar
+     *  call. Handed to a delete's undo notice so that button does exactly
+     *  what the shortcut does rather than a second way of getting there
+     *  (issue #2280). */
+    onUndo: () => void;
+    /** A trigger a mission problem's row points at (issue #2271): expand the
+     *  panel, select it and land the cursor on its row in the list. */
+    focus?: RowFocus | null;
+  }
+>(function TriggerPanel(
+  {
+    scenario,
+    onChange,
+    units,
+    unitsLoading,
+    gate,
+    extensions,
+    note,
+    issues,
+    picking,
+    onPick,
+    onUndo,
+    focus,
+  },
+  ref,
+) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedTrigger(scenario.triggers, selectedId);
   const unitDefs = useMemo(() => units.map((u) => u.name), [units]);
   const panelRef = useRef<EditorPanelHandle>(null);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  // Wraps the open form, so a Cmd+D routed here can tell "the author is
+  // looking at this trigger" from "this is merely the one the panel defaults
+  // to" by whether their focus is inside it (issue #2277).
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // The one place the copy is built, so the Duplicate button and a routed
+  // Cmd+D make the exact same edit (issue #2278, issue #2277).
+  const duplicateNow = useCallback((): boolean => {
+    if (!selected) return false;
+    const id = nextTriggerId(scenario);
+    onChange(duplicateTrigger(scenario, selected.id, id));
+    setSelectedId(id);
+    return true;
+  }, [scenario, selected, onChange]);
+
+  const duplicateSelected = useCallback((): boolean => {
+    if (!formRef.current?.contains(document.activeElement)) return false;
+    return duplicateNow();
+  }, [duplicateNow]);
+
+  useImperativeHandle(ref, () => ({ duplicateSelected }), [duplicateSelected]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: focus.id and focus.token are the trigger, not the object identity. ScenarioEditPage cannot hand this a stable `focus` reference without a ref per panel, and depending on the object would refire this, and steal focus back, on every unrelated edit that re-renders it with an equal but new one.
   useEffect(() => {
@@ -209,7 +267,7 @@ export function TriggerPanel({
         </div>
 
         {selected && (
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1" ref={formRef}>
             <TriggerForm
               key={selected.id}
               trigger={selected}
@@ -223,7 +281,7 @@ export function TriggerPanel({
               picking={picking}
               onPick={onPick}
               onChange={onChange}
-              onSelect={setSelectedId}
+              onDuplicate={duplicateNow}
               onUndo={onUndo}
             />
           </div>
@@ -237,7 +295,7 @@ export function TriggerPanel({
       </div>
     </EditorPanel>
   );
-}
+});
 
 /** One trigger in the list: what it is called, what it holds, and whether it is
  *  armed. */
@@ -298,7 +356,7 @@ function TriggerForm({
   picking,
   onPick,
   onChange,
-  onSelect,
+  onDuplicate,
   onUndo,
 }: {
   trigger: ScenarioTrigger;
@@ -316,77 +374,80 @@ function TriggerForm({
   picking: PointTarget | null;
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
-  /** Puts the panel on the trigger named, the way picking a row does. Used to
-   *  land on a fresh duplicate the moment it exists. */
-  onSelect: (id: string) => void;
+  /** Makes the copy and selects it, ready to edit. Owned by the panel rather
+   *  than built here, so this button and a routed Cmd+D make the same edit
+   *  (issue #2277). */
+  onDuplicate: () => void;
   onUndo: () => void;
 }) {
   const at = scenario.triggers.indexOf(trigger);
   const edit = (patch: Partial<Omit<ScenarioTrigger, "id">>) =>
     onChange(editTrigger(scenario, trigger.id, patch));
-  const duplicate = () => {
-    const id = nextTriggerId(scenario);
-    onChange(duplicateTrigger(scenario, trigger.id, id));
-    onSelect(id);
-  };
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <TriggerName
-          name={trigger.name}
-          onRename={(name) => {
-            const next = renameTrigger(scenario, trigger.id, name);
-            if (next === scenario) return "A trigger needs a name";
-            onChange(next);
-            return null;
-          }}
-        />
-        <Button
-          size="sm"
-          variant="ghost"
-          className="size-7 p-0"
-          aria-label="Move this trigger up"
-          disabled={at <= 0}
-          onClick={() => onChange(moveTrigger(scenario, trigger.id, -1))}
-        >
-          <ArrowUp className="size-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="size-7 p-0"
-          aria-label="Move this trigger down"
-          disabled={at < 0 || at >= scenario.triggers.length - 1}
-          onClick={() => onChange(moveTrigger(scenario, trigger.id, 1))}
-        >
-          <ArrowDown className="size-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="ml-auto h-7 gap-1.5 px-2 text-xs"
-          onClick={duplicate}
-        >
-          <Copy className="size-3.5" /> Duplicate
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-          // The selection is left on the deleted trigger's id rather than
-          // cleared. Nothing else answers to that id, so the panel shows no form
-          // until a step back puts the trigger itself back, and then the author
-          // is on the trigger they were on (issue #2205).
-          onClick={() => {
-            onChange(removeTrigger(scenario, trigger.id));
-            onPick(null);
-            notifyDeleted(`Deleted trigger "${trigger.name}".`, onUndo);
-          }}
-        >
-          <Trash2 className="size-3.5" /> Delete
-        </Button>
-      </div>
+      <TooltipProvider>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <TriggerName
+            name={trigger.name}
+            onRename={(name) => {
+              const next = renameTrigger(scenario, trigger.id, name);
+              if (next === scenario) return "A trigger needs a name";
+              onChange(next);
+              return null;
+            }}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="size-7 p-0"
+            aria-label="Move this trigger up"
+            disabled={at <= 0}
+            onClick={() => onChange(moveTrigger(scenario, trigger.id, -1))}
+          >
+            <ArrowUp className="size-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="size-7 p-0"
+            aria-label="Move this trigger down"
+            disabled={at < 0 || at >= scenario.triggers.length - 1}
+            onClick={() => onChange(moveTrigger(scenario, trigger.id, 1))}
+          >
+            <ArrowDown className="size-3.5" />
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-7 gap-1.5 px-2 text-xs"
+                onClick={onDuplicate}
+              >
+                <Copy className="size-3.5" /> Duplicate
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{modKeyLabel()} D</TooltipContent>
+          </Tooltip>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+            // The selection is left on the deleted trigger's id rather than
+            // cleared. Nothing else answers to that id, so the panel shows no form
+            // until a step back puts the trigger itself back, and then the author
+            // is on the trigger they were on (issue #2205).
+            onClick={() => {
+              onChange(removeTrigger(scenario, trigger.id));
+              onPick(null);
+              notifyDeleted(`Deleted trigger "${trigger.name}".`, onUndo);
+            }}
+          >
+            <Trash2 className="size-3.5" /> Delete
+          </Button>
+        </div>
+      </TooltipProvider>
 
       <p className="text-[11px] text-muted-foreground">
         Triggers are evaluated in this order, and other triggers point at this

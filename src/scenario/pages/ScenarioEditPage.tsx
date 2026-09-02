@@ -4,6 +4,7 @@ import {
   Check,
   Copy,
   FileCode2,
+  Keyboard,
   Loader2,
   MoreVertical,
   Rocket,
@@ -21,6 +22,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useUnitsyncScan } from "@/content/config";
 import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
@@ -48,6 +55,7 @@ import {
   isRedoKey,
   isTypingTarget,
   isUndoKey,
+  modKeyLabel,
   redoEdit,
   undoEdit,
 } from "./components/history";
@@ -61,15 +69,23 @@ import {
   type RowFocus,
 } from "./components/problemTargets";
 import { RestrictionPanel } from "./components/RestrictionPanel";
-import { ScenarioMapScene } from "./components/ScenarioMapScene";
+import {
+  ScenarioMapScene,
+  type ScenarioMapSceneHandle,
+} from "./components/ScenarioMapScene";
 import {
   DELETE_SCENARIO_DESCRIPTION,
   DeleteScenarioForm,
 } from "./components/ScenarioRowMenu";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { SetupPanel } from "./components/SetupPanel";
+import { ShortcutsList } from "./components/ShortcutsList";
 import { createScenarioSaver, type ScenarioSaver } from "./components/saving";
-import { TriggerPanel } from "./components/TriggerPanel";
+import { isDuplicateKey, isTestKey } from "./components/shortcuts";
+import {
+  TriggerPanel,
+  type TriggerPanelHandle,
+} from "./components/TriggerPanel";
 import {
   applyPoint,
   type PointTarget,
@@ -234,6 +250,11 @@ export default function ScenarioEditPage() {
   // whether this document is one of a game's own missions.
   const loadedRef = useRef<LoadedScenario | undefined>(loaded);
   loadedRef.current = loaded;
+  // Cmd+D's two possible targets (issue #2277), reached through a ref because
+  // both the trigger being edited and the map's selected placement are owned
+  // by their own components rather than lifted here.
+  const triggerPanelRef = useRef<TriggerPanelHandle>(null);
+  const mapSceneRef = useRef<ScenarioMapSceneHandle>(null);
 
   // Seed the editable copy once this id's document is available, and re-seed if
   // the route id changes under the same component instance.
@@ -308,6 +329,26 @@ export default function ScenarioEditPage() {
   const undo = useCallback(() => step(undoEdit), [step]);
   const redo = useCallback(() => step(redoEdit), [step]);
 
+  // Read through the refs rather than the `scenario`/`loaded` this render
+  // holds, so this can sit above the early returns below and still say
+  // nothing when there is, as yet, no document to test (issue #2277).
+  const openTest = useCallback(() => {
+    const current = scenarioRef.current;
+    if (!current) return;
+    drawer.open({
+      title: `Test ${current.name} in game`,
+      description:
+        "Compiles the mission, checks it loads, then starts the engine.",
+      width: "32rem",
+      content: (
+        <ScenarioTestDrawer
+          scenario={current}
+          origin={loadedRef.current?.origin}
+        />
+      ),
+    });
+  }, [drawer]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target as HTMLElement | null)) return;
@@ -317,28 +358,32 @@ export default function ScenarioEditPage() {
       } else if (isRedoKey(event)) {
         event.preventDefault();
         redo();
+      } else if (isTestKey(event)) {
+        event.preventDefault();
+        openTest();
+      } else if (isDuplicateKey(event)) {
+        event.preventDefault();
+        // The trigger panel claims this first, and only when the author's
+        // focus is inside the form of the trigger it would duplicate: that is
+        // the one unambiguous "editing this" signal available here. The map's
+        // selected placement is the fallback, so a selection left over from
+        // earlier work does not silently steal a duplicate meant for the
+        // trigger in front of the author, and neither fires when nothing is
+        // selected anywhere (issue #2277).
+        if (!triggerPanelRef.current?.duplicateSelected()) {
+          mapSceneRef.current?.duplicateSelected();
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo]);
+  }, [undo, redo, openTest]);
 
   if (loading && !scenario) return <DetailLoading backTo={BACK} />;
   if (loaded && !isEditable(loaded)) {
     return <ReadOnlyScenario loaded={loaded} />;
   }
   if (!scenario) return <NotFound backTo={BACK} label="scenario" />;
-
-  const openTest = () =>
-    drawer.open({
-      title: `Test ${scenario.name} in game`,
-      description:
-        "Compiles the mission, checks it loads, then starts the engine.",
-      width: "32rem",
-      content: (
-        <ScenarioTestDrawer scenario={scenario} origin={loaded?.origin} />
-      ),
-    });
 
   // Share: the same code, link and file the list offers (issue #1336), loaded
   // on demand so the editor does not carry the export path until it is asked
@@ -360,6 +405,17 @@ export default function ScenarioEditPage() {
       ),
     });
   };
+
+  // The page's own shortcuts, listed for an author who has not found them by
+  // trial and error (issue #2277). Not a mode of its own on the map, so this
+  // sits with Share and Delete rather than beside Test in game.
+  const openShortcuts = () =>
+    drawer.open({
+      title: "Keyboard shortcuts",
+      description: "What this editor answers to, beyond the mouse.",
+      width: "24rem",
+      content: <ShortcutsList />,
+    });
 
   // Duplicate: a copy of the document as it stands, its dialogue clips copied
   // into the copy's own media folder, opened in place of this one (issue
@@ -531,9 +587,16 @@ export default function ScenarioEditPage() {
             {/* Testing belongs with the setup, because the setup is all a launch
               consumes: the game named there decides whether the scenario is
               played as itself or through the test mutator. */}
-            <Button size="sm" onClick={openTest}>
-              <Rocket className="size-4" /> Test in game
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" onClick={openTest}>
+                    <Rocket className="size-4" /> Test in game
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{modKeyLabel()} Enter</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {/* What can be done to the scenario as a document rather than to
               its contents: sharing it, and deleting it (issue #2203). The
               moment an author wants either is usually with the scenario open,
@@ -563,6 +626,10 @@ export default function ScenarioEditPage() {
                 )}
                 <DropdownMenuItem onSelect={() => void openShare()}>
                   <Share2 className="size-4" aria-hidden="true" /> Share
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={openShortcuts}>
+                  <Keyboard className="size-4" aria-hidden="true" /> Keyboard
+                  shortcuts
                 </DropdownMenuItem>
                 {deletable && (
                   <DropdownMenuItem
@@ -657,6 +724,7 @@ export default function ScenarioEditPage() {
           live on the map: it is the surface an author spends the time on, and
           the one that covers the page when it is expanded. */}
         <ScenarioMapScene
+          ref={mapSceneRef}
           scenario={scenario}
           onChange={(next) => apply(next)}
           extensions={extensions}
@@ -674,6 +742,7 @@ export default function ScenarioEditPage() {
           first, because everything under them is something a trigger points
           at. */}
         <TriggerPanel
+          ref={triggerPanelRef}
           scenario={scenario}
           onChange={(next) => apply(next)}
           units={gameUnits.units}
