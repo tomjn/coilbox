@@ -33,7 +33,7 @@
  * this one.
  */
 
-import type { SnapBuilding } from "@/blueprint/footprint";
+import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
 import {
   type Placement,
   parsePlacementKey,
@@ -43,6 +43,7 @@ import { baseBuildings, type Point, type Scenario } from "../../model";
 import type { ContentEntry } from "./contents";
 import { groupSize, parsePathKey } from "./groups";
 import {
+  buildTrouble,
   type LayoutEditFor,
   moveOnMap,
   removeOnMap,
@@ -459,15 +460,40 @@ export function marqueeWords(caught: number, after: MapSelection): string {
   return selectionCountWords(after);
 }
 
+/**
+ * How many of a selection's things cannot be built where they now stand, said
+ * as one tally rather than as one sentence per building (issue #2315).
+ *
+ * What a blind author needs from a move or a turn of several things at once is
+ * the shape of the trouble, not `buildTrouble`'s single sentence repeated once
+ * per building: "6 cannot be built where they stand" is one breath, and six
+ * bases each read out in full is not. A selection that turned up clean says
+ * nothing, the same silence `buildTrouble` keeps for one thing that is fine.
+ */
+function manyBuildTrouble(
+  selection: MapSelection,
+  marks: readonly FootprintMark[],
+): string {
+  const troubled = selection.filter(
+    (key) => buildTrouble(marks, key) !== "",
+  ).length;
+  if (troubled === 0) return "";
+  const stand = troubled === 1 ? "it stands" : "they stand";
+  return ` ${troubled} cannot be built where ${stand}.`;
+}
+
 /** What a move of more than one thing did. No position, because there is no one
- *  position for four things to now be at. */
+ *  position for four things to now be at. `marks` is read off the document as
+ *  it stands after the move, the same as a single move reads it (issue
+ *  #2315). */
 export function movedManyWords(
   before: MapSelection,
   heading: string,
   step: number,
+  marks: readonly FootprintMark[],
 ): string {
   const count = countSelection(before);
-  return `Moved ${count.total} things ${step} ${heading}.`;
+  return `Moved ${count.total} things ${step} ${heading}.${manyBuildTrouble(before, marks)}`;
 }
 
 /**
@@ -475,14 +501,21 @@ export function movedManyWords(
  *
  * Both halves, because a mixed selection usually has something in it that does
  * not turn, and a turn that silently did less than was asked is the thing an
- * author needs to hear about.
+ * author needs to hear about. `selection` and `marks` carry the buildability
+ * tally the same way {@link movedManyWords} does (issue #2315).
  */
-export function turnedManyWords(turned: number, left: number): string {
+export function turnedManyWords(
+  turned: number,
+  left: number,
+  selection: MapSelection,
+  marks: readonly FootprintMark[],
+): string {
   if (turned === 0)
     return "None of these turn. A group's units all face south.";
   const done = `Turned ${turned}.`;
-  if (left === 0) return done;
-  return `${done} ${left} ${left === 1 ? "does" : "do"} not turn.`;
+  const rest =
+    left === 0 ? "" : ` ${left} ${left === 1 ? "does" : "do"} not turn.`;
+  return `${done}${rest}${manyBuildTrouble(selection, marks)}`;
 }
 
 /** What a delete of more than one thing removed. The tally rather than a list,
