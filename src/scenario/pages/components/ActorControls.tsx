@@ -33,6 +33,9 @@
  * An actor standing off the map is said the same way, but as a row-level note
  * rather than a field problem (issue #2343): its position is dragged on the
  * map, not typed here, so there is no control for `aria-invalid` to sit on.
+ * A unit type the game has not got is a third row-level note for the same
+ * reason: `unitDef` is picked once at placement rather than edited here
+ * (issue #2346).
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -91,6 +94,15 @@ export function ActorControls({
   const teamDescribedBy = useId();
   const teamProblem = entryFieldProblem(issues, "actors", actor.id, "team");
   const posProblem = entryFieldProblem(issues, "actors", actor.id, "pos");
+  // The unit type is picked once at placement and is not a field this popover
+  // edits, the same reason `pos` above is a row-level note rather than a
+  // field problem (issue #2346).
+  const unitDefProblem = entryFieldProblem(
+    issues,
+    "actors",
+    actor.id,
+    "unitDef",
+  );
 
   return (
     <>
@@ -118,6 +130,7 @@ export function ActorControls({
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 space-y-3">
           <RowProblem problem={posProblem} />
+          <RowProblem problem={unitDefProblem} />
           <Field label="Facing">
             <OptionSelect
               size="sm"

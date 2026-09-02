@@ -343,3 +343,55 @@ describe("an actor standing off the map", () => {
     ).toBeTruthy();
   });
 });
+
+/**
+ * An actor whose unit type nothing in the game defines (issue #2346). Its
+ * `unitDef` is picked once at placement rather than edited here, so this is
+ * a row-level note in the Details popover too, in the validator's own words.
+ */
+describe("an actor whose unit type the game has not got", () => {
+  function withUnknownUnit(): Scenario {
+    const base = newScenario("Demo");
+    return {
+      ...base,
+      actors: [
+        {
+          id: "hero",
+          unitDef: "notaunit",
+          team: base.setup.participants[0]?.id ?? "you",
+          pos: { x: 100, z: 100 },
+          facing: 0,
+        },
+      ],
+    };
+  }
+
+  function UnknownUnitHarness() {
+    const [document] = useState<Scenario>(withUnknownUnit);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document, undefined, [
+        { name: "armcom" },
+      ]);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <ActorControls
+        actor={document.actors[0]}
+        participants={document.setup.participants}
+        issues={issues}
+        onEdit={() => {}}
+        onState={() => {}}
+      />
+    );
+  }
+
+  it("says so in the Details popover, in the validator's own words", () => {
+    render(<UnknownUnitHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /Details/ }));
+
+    expect(
+      screen.getByText('no unit type called "notaunit" in the game'),
+    ).toBeTruthy();
+  });
+});
