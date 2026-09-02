@@ -151,30 +151,41 @@ function flat(shape: THREE.Shape): THREE.ShapeGeometry {
 }
 
 export interface SelectionPlate {
-  /** Put the plate under an object, sized and turned to it. */
-  show: (object: THREE.Object3D) => void;
+  /** Put a plate under each of these, sized to it. Everything else the plate was
+   *  marking is taken away, so an empty list is the way to show nothing. */
+  show: (objects: THREE.Object3D[]) => void;
   hide: () => void;
   dispose: () => void;
 }
 
+/** One plate, and the size it was last built at, so a drag that calls this on
+ *  every move rebuilds nothing while the unit being carried stays the size it
+ *  was. */
+interface Plate {
+  group: THREE.Group;
+  built: { x: number; z: number } | null;
+  geometries: THREE.BufferGeometry[];
+}
+
 /**
- * The plate drawn under whatever is selected.
+ * The plates drawn under whatever is selected.
  *
- * Its own object rather than a change to the drawn unit, so a redraw of the
- * units layer cannot lose it, and depth tested so the unit standing on it hides
- * the half of it underneath: a plate drawn over the model it belongs to reads as
- * a sticker rather than as ground.
+ * Their own objects rather than a change to the drawn units, so a redraw of the
+ * units layer cannot lose them, and depth tested so the unit standing on one
+ * hides the half of it underneath: a plate drawn over the model it belongs to
+ * reads as a sticker rather than as ground.
  *
- * The geometry is rebuilt only when the size changes, because a drag calls this
- * on every move and the unit being carried is the same size all the way.
+ * As many as the selection has units in it (issue #2279), from a pool that grows
+ * to the largest selection of the session and is emptied when the scene goes. A
+ * marquee round a base is a plate per building, which is what makes a selection
+ * of twelve something an author can see rather than infer.
  */
 export function createSelectionPlate(handle: MapScene3D): SelectionPlate {
-  const group = new THREE.Group();
-  group.visible = false;
+  const root = new THREE.Group();
   // Under the models rather than over them, so the depth test decides what is
   // seen rather than the draw order.
-  group.renderOrder = 1;
-  handle.scene.add(group);
+  root.renderOrder = 1;
+  handle.scene.add(root);
 
   const fillMaterial = new THREE.MeshBasicMaterial({
     color: PLATE_COLOR,
@@ -191,57 +202,76 @@ export function createSelectionPlate(handle: MapScene3D): SelectionPlate {
     depthWrite: false,
   });
 
-  let built: { x: number; z: number } | null = null;
-  let geometries: THREE.BufferGeometry[] = [];
+  const plates: Plate[] = [];
 
-  const build = (half: PlateHalf) => {
-    group.clear();
-    for (const spent of geometries) spent.dispose();
-    geometries = [];
+  const build = (plate: Plate, half: PlateHalf) => {
+    plate.group.clear();
+    for (const spent of plate.geometries) spent.dispose();
+    plate.geometries = [];
 
     const fill = flat(shapeOf(hexagon(half)));
-    group.add(new THREE.Mesh(fill, fillMaterial));
-    geometries.push(fill);
+    plate.group.add(new THREE.Mesh(fill, fillMaterial));
+    plate.geometries.push(fill);
 
     const inner = hexagonInset(half, plateBorder(half, MIN_BORDER_ELMOS));
     if (inner) {
       const ring = shapeOf(hexagon(half));
       ring.holes.push(holeOf(inner));
       const border = flat(ring);
-      group.add(new THREE.Mesh(border, borderMaterial));
-      geometries.push(border);
+      plate.group.add(new THREE.Mesh(border, borderMaterial));
+      plate.geometries.push(border);
     }
-    built = { x: half.x, z: half.z };
+    plate.built = { x: half.x, z: half.z };
   };
 
-  const show = (object: THREE.Object3D) => {
-    const bounds = new THREE.Box3().setFromObject(object);
-    const size = bounds.getSize(new THREE.Vector3());
-    // The bounds are the model as it stands, turned and all, so a plate along
-    // the map's own axes already fits it. Turning the plate with the unit would
-    // want the box taken before the turn, and would buy nothing: what is under
-    // a selected unit is ground rather than part of the unit.
-    const half = plateHalf(size, MIN_PLATE_ELMOS * handle.scale);
-    if (!built || built.x !== half.x || built.z !== half.z) build(half);
-    // A hair of clearance, so the plate is not fighting the ground it lies on.
-    group.position.set(
-      object.position.x,
-      object.position.y + handle.scale,
-      object.position.z,
-    );
-    group.visible = true;
+  /** The `at`th plate, made if the selection has never been this big before. */
+  const plateAt = (at: number): Plate => {
+    const held = plates[at];
+    if (held) return held;
+    const group = new THREE.Group();
+    group.visible = false;
+    root.add(group);
+    const made: Plate = { group, built: null, geometries: [] };
+    plates.push(made);
+    return made;
+  };
+
+  const show = (objects: THREE.Object3D[]) => {
+    objects.forEach((object, at) => {
+      const plate = plateAt(at);
+      const bounds = new THREE.Box3().setFromObject(object);
+      const size = bounds.getSize(new THREE.Vector3());
+      // The bounds are the model as it stands, turned and all, so a plate along
+      // the map's own axes already fits it. Turning the plate with the unit
+      // would want the box taken before the turn, and would buy nothing: what
+      // is under a selected unit is ground rather than part of the unit.
+      const half = plateHalf(size, MIN_PLATE_ELMOS * handle.scale);
+      if (!plate.built || plate.built.x !== half.x || plate.built.z !== half.z)
+        build(plate, half);
+      // A hair of clearance, so the plate is not fighting the ground it lies on.
+      plate.group.position.set(
+        object.position.x,
+        object.position.y + handle.scale,
+        object.position.z,
+      );
+      plate.group.visible = true;
+    });
+    for (let at = objects.length; at < plates.length; at++)
+      plates[at].group.visible = false;
   };
 
   return {
     show,
-    hide: () => {
-      group.visible = false;
-    },
+    hide: () => show([]),
     dispose: () => {
-      group.clear();
-      group.removeFromParent();
-      for (const spent of geometries) spent.dispose();
-      geometries = [];
+      for (const plate of plates) {
+        plate.group.clear();
+        for (const spent of plate.geometries) spent.dispose();
+        plate.geometries = [];
+      }
+      plates.length = 0;
+      root.clear();
+      root.removeFromParent();
       fillMaterial.dispose();
       borderMaterial.dispose();
     },
