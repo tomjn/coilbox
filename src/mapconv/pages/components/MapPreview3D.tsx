@@ -22,7 +22,6 @@ import {
   skyboxFromDds,
   skyboxNote,
 } from "../../skyboxNote";
-import { releaseWheel } from "./wheelGate";
 
 export type { HeightWords };
 
@@ -542,7 +541,7 @@ export function MapPreview3D({
   // on any dependency change or unmount, so navigating away leaks no GL context.
   useCanvas3D(
     containerRef,
-    ({ renderer, host, resize: fitCanvas }) => {
+    ({ renderer, resize: fitCanvas }) => {
       if (!srcs || worldWidth <= 0 || worldHeight <= 0) return;
 
       let cancelled = false;
@@ -553,9 +552,6 @@ export function MapPreview3D({
       let spinStart: (() => void) | undefined;
       let spinEnd: (() => void) | undefined;
       let handedOver = false;
-      // Torn down in `dispose` when the wheel gate below was actually set up
-      // (`interactive && enableZoom`).
-      let stopWheelGate: (() => void) | undefined;
       // Claim nothing about the sky until this build has tried to read one.
       setSkyProblem(null);
 
@@ -857,10 +853,6 @@ uniform vec2 wPlane;`,
           // top-down / zoomed-out view stays under the clouds — they read as a high
           // ceiling, never a sheet drawn over the map.
           cloudMesh.position.y = Math.max(maxHeight * s, 0) + BASE * 3.5;
-          // Left out of the wheel gate's raycast below: a ray toward open sky can
-          // still cross this plane's height within its bounds, which would read
-          // as a hit on what is, on screen, empty sky above the horizon.
-          cloudMesh.raycast = () => {};
           scene.add(cloudMesh);
           disposables.push(cloudGeo, cloudMat, cloudTex);
         }
@@ -969,53 +961,6 @@ uniform vec2 wPlane;`,
         };
         renderRef.current = render;
         controls.addEventListener("change", render);
-
-        // A wheel over open sky lets the page scroll under the view rather than
-        // zooming into it, the way `ModelViewport` does it for the unit page:
-        // OrbitControls listens for `wheel` on the canvas itself and always
-        // calls `preventDefault`, so the only way to let the page have the
-        // event is to stop it reaching the canvas first. A capture-phase
-        // listener on `host` runs before that.
-        //
-        // Unlike the unit page, a raycast miss is not most of the fix here: a
-        // hit does not release the wheel on its own, because at a normal
-        // working zoom the map is behind nearly every pixel (`wheelGate.ts`
-        // has the measurement). A hit only keeps the wheel once the view is
-        // armed by a click, so the very first pass over a freshly opened page
-        // always scrolls, and leaving the view disarms it again. Skipped
-        // entirely when a wheel could never zoom anyway, so a spinning preview
-        // with `enableZoom={false}` pays nothing for a gate it doesn't need.
-        if (interactive && enableZoom) {
-          const raycaster = new THREE.Raycaster();
-          const pointer = new THREE.Vector2();
-          let armed = false;
-          const onWheel = (event: WheelEvent) => {
-            const rect = renderer.domElement.getBoundingClientRect();
-            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            raycaster.setFromCamera(pointer, camera);
-            const hit =
-              raycaster.intersectObjects(scene.children, true).length > 0;
-            if (releaseWheel(hit, armed)) event.stopPropagation();
-          };
-          const onPointerDown = () => {
-            armed = true;
-          };
-          const onPointerLeave = () => {
-            armed = false;
-          };
-          host.addEventListener("wheel", onWheel, {
-            capture: true,
-            passive: true,
-          });
-          host.addEventListener("pointerdown", onPointerDown);
-          host.addEventListener("pointerleave", onPointerLeave);
-          stopWheelGate = () => {
-            host.removeEventListener("wheel", onWheel, { capture: true });
-            host.removeEventListener("pointerdown", onPointerDown);
-            host.removeEventListener("pointerleave", onPointerLeave);
-          };
-        }
 
         // Animated water ripples. The scene otherwise renders on demand (orbit /
         // resize / toggle); this is the only continuous loop, and it runs only
@@ -1132,7 +1077,6 @@ uniform vec2 wPlane;`,
           if (handedOver) onSceneRef.current?.(null);
           if (animationFrame !== undefined)
             cancelAnimationFrame(animationFrame);
-          stopWheelGate?.();
           if (controls) {
             if (renderRef.current)
               controls.removeEventListener("change", renderRef.current);
@@ -1291,7 +1235,6 @@ uniform vec2 wPlane;`,
           </div>
           <p className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
             <Box size={12} /> height {minHeight} → {maxHeight} · drag to orbit
-            {interactive && enableZoom && " · click, then scroll to zoom"}
           </p>
           {sky && (
             <p
