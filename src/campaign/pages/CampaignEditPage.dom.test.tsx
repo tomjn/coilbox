@@ -877,25 +877,21 @@ describe("two edits made close together", () => {
  * the end of itself, and what it lost was the part nothing else on the page
  * says: whether a scenario is attached and whether the mission can be skipped.
  *
- * What is pinned here is the split. Each fact has a line and a kind of its own,
- * the counts hold their place whether or not there is anything to count, and
- * none of it is a sentence any more.
+ * What is pinned here is the split: each fact keeps its own kind, the counts
+ * hold their place whether or not there is anything to count, and none of it
+ * is a sentence any more. Issue #2263 then merged the split facts back onto
+ * one muted row beneath the title, so scanning a list reads bold titles first
+ * and drops into a fact only when the title alone is not enough.
  */
 describe("what a mission row says", () => {
-  /** The column of lines beside a row's move buttons. */
+  /** The column of lines beside a row's move buttons: the title, then the
+   * one metadata row every fact below it shares. */
   const columnOf = (title: string) =>
     screen.getByText(title).parentElement as HTMLElement;
 
-  /**
-   * The lines under a row's title, in the order they are drawn. The last of
-   * them is icons and digits, so it is named rather than read out.
-   */
-  const linesUnder = (title: string) =>
-    [...columnOf(title).children]
-      .slice(1)
-      .map((el) =>
-        el.querySelector("svg") ? "the mission facts" : el.textContent,
-      );
+  /** The single muted row a row's subtitle, setup and facts share. */
+  const metadataRowOf = (title: string) =>
+    columnOf(title).children[1] as HTMLElement;
 
   /** Every chip in a row, by the phrase it carries. */
   const chipsOf = (title: string) =>
@@ -903,23 +899,26 @@ describe("what a mission row says", () => {
       el.getAttribute("title"),
     );
 
-  it("gives the subtitle, the setup and the facts a line each", () => {
+  it("puts the subtitle, the setup and the facts on one metadata row", () => {
     show([{ ...plain("m1", "Ridge"), subtitle: "Northern Isles" }]);
 
-    expect(linesUnder("1. Ridge")).toEqual([
-      "Northern Isles",
-      "No game · No map",
-      "the mission facts",
-    ]);
+    // One row beside the title, not one each: subtitle, setup and facts all
+    // land inside it rather than as siblings of their own.
+    expect(columnOf("1. Ridge").children).toHaveLength(2);
+    const row = metadataRowOf("1. Ridge");
+    expect(row.textContent).toContain("Northern Isles");
+    expect(row.textContent).toContain("No game · No map");
+    expect(row.querySelector("svg")).toBeTruthy();
   });
 
-  it("gives a mission with no subtitle no line to hold it", () => {
+  it("gives a mission with no subtitle the same row, minus the subtitle", () => {
     show([plain("m1", "Ridge")]);
 
-    expect(linesUnder("1. Ridge")).toEqual([
-      "No game · No map",
-      "the mission facts",
-    ]);
+    expect(columnOf("1. Ridge").children).toHaveLength(2);
+    const row = metadataRowOf("1. Ridge");
+    expect(row.textContent).not.toContain("Northern Isles");
+    expect(row.textContent).toContain("No game · No map");
+    expect(row.querySelector("svg")).toBeTruthy();
   });
 
   it("stops packing the facts into one line joined by dots", () => {
