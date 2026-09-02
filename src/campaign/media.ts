@@ -77,16 +77,23 @@ export function droppedMediaFiles(prev: Campaign, next: Campaign): string[] {
 }
 
 /**
- * Delete the files `next` leaves behind. Best-effort: a file that will not go is
- * wasted disk space, which is not worth failing an edit the author has already
- * made and stopping them saving it.
+ * Delete whatever `candidates` names that `next` does not. Best-effort: a file
+ * that will not go is wasted disk space, which is not worth failing an edit
+ * the author has already made and stopping them saving it.
+ *
+ * `candidates` is not necessarily one document's files: a caller tracking
+ * every unwritten edit rather than just the oldest document can hand this the
+ * whole accumulated set, so a file that arrived and left again before either
+ * edit reached disk is still found (issue #2374).
  */
-export async function deleteDroppedMedia(
+export async function deleteUnnamedMedia(
   campaignId: string,
-  prev: Campaign,
+  candidates: Iterable<string>,
   next: Campaign,
 ): Promise<void> {
-  for (const file of droppedMediaFiles(prev, next)) {
+  const kept = campaignMediaFiles(next);
+  for (const file of candidates) {
+    if (kept.has(file)) continue;
     try {
       const { deleted } = await campaignMediaDelete({ campaignId, file });
       // The document named a file neither folder held. Nothing to do about it
@@ -99,4 +106,16 @@ export async function deleteDroppedMedia(
       console.error("could not delete campaign media", file, e);
     }
   }
+}
+
+/**
+ * Delete the files `next` leaves behind, comparing it against one earlier
+ * document. Best-effort, for the same reason `deleteUnnamedMedia` is.
+ */
+export async function deleteDroppedMedia(
+  campaignId: string,
+  prev: Campaign,
+  next: Campaign,
+): Promise<void> {
+  await deleteUnnamedMedia(campaignId, campaignMediaFiles(prev), next);
 }

@@ -37,7 +37,7 @@ import { campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { copyTitle } from "../duplicate";
 import { campaignUnplayableReason } from "../listing";
-import { deleteDroppedMedia } from "../media";
+import { campaignMediaFiles, deleteUnnamedMedia } from "../media";
 import { missionFromScenario, scenarioAttachment } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
@@ -160,14 +160,20 @@ export default function CampaignEditPage() {
   // so a handler that waits for a write reads it as it was before that write
   // and never after it. Preview is the one thing here that has to know.
   const writeFailed = useRef(false);
-  // The document as it stood before the first media drop this session that is
-  // still on disk, or null when nothing is owed (issue #2232). A document
-  // rather than a list of filenames, because what goes is worked out by
-  // comparing this against the document that lands: the queue drops a
-  // superseded write's result, so the only document there is to compare
-  // against is the newest one, and a file some later edit names again is then
-  // kept rather than deleted out from under it.
-  const undeleted = useRef<Campaign | null>(null);
+  // Every file any document has named since the first media edit this session
+  // that is still on disk, or null when nothing is owed (issue #2232). Files
+  // rather than one document, because a file imported and then replaced
+  // before either edit reaches disk is named by neither the oldest document
+  // nor the newest, so comparing just those two missed it (issue #2374). Each
+  // `persistMedia` call folds in the files of both the document it started
+  // from and the one it is asking for, so a file that only ever existed in a
+  // document that never reached disk is still remembered.
+  //
+  // The campaign id travels with the set because these refs outlive a route
+  // change under the same component instance (see the seeding effect above),
+  // so a write for one campaign landing while another is mid-edit must not
+  // reach into the wrong campaign's set.
+  const undeleted = useRef<{ id: string; files: Set<string> } | null>(null);
   if (!saver.current) {
     saver.current = createDocumentSaver<Campaign>({
       write: async (document) => {
@@ -192,7 +198,7 @@ export default function CampaignEditPage() {
         const dropped = undeleted.current;
         undeleted.current = null;
         if (dropped?.id === written.id) {
-          await deleteDroppedMedia(written.id, dropped, written);
+          await deleteUnnamedMedia(written.id, dropped.files, written);
         }
         // Re-reading the campaign list is what keeps the sidebar and the
         // campaigns page in step, and it is a separate read. One that fails
@@ -266,15 +272,26 @@ export default function CampaignEditPage() {
    *  a file nothing on this page can see again (issue #2210). `media.ts` owns
    *  which slots those are.
    *
-   *  The document to compare against is remembered rather than the files, and
-   *  it is the oldest one still owed a delete: a second drop made while the
-   *  first is unwritten is owed too, and the older document names both. The
-   *  delete itself is `onWritten`'s, because that is the one place that knows a
+   *  What is remembered is the files, not the document: a second drop made
+   *  while the first is unwritten is owed too, and a file that arrives and
+   *  leaves again inside that window is named by neither the document that
+   *  window started from nor the one it ends on, so comparing only those two
+   *  missed it (issue #2374). Folding both this edit's `campaign` and its
+   *  `next` into the running set catches it either way, and a file some later
+   *  edit names again stays in the set but is then kept, because the delete
+   *  only ever drops what the written document does not name. The delete
+   *  itself is `onWritten`'s, because that is the one place that knows a
    *  write landed and which document landed. An author who gives up on a
    *  refused write leaves the files on disk, which is the failure worth
    *  having. */
   const persistMedia = async (next: Campaign) => {
-    undeleted.current ??= campaign;
+    undeleted.current ??= { id: campaign.id, files: new Set() };
+    for (const file of campaignMediaFiles(campaign)) {
+      undeleted.current.files.add(file);
+    }
+    for (const file of campaignMediaFiles(next)) {
+      undeleted.current.files.add(file);
+    }
     await persist(next);
   };
 

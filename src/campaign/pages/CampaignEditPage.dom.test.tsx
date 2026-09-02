@@ -30,6 +30,7 @@
  */
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -871,6 +872,115 @@ describe("two edits made close together", () => {
     await waitFor(() => expect(onDisk).toHaveLength(2));
 
     expect(await screen.findByText(SAVED)).toBeTruthy();
+  });
+});
+
+/**
+ * A file imported and then replaced inside one unwritten save window used to
+ * leak (issue #2374). The clean-up compared the document from before the
+ * window against the one that landed, and a file that arrived and left again
+ * in between was named by neither, so nothing ever deleted it.
+ *
+ * The drawer's `onSave` is grabbed straight off the mocked `drawer.open` call
+ * and invoked directly, rather than through a rendered drawer: the real
+ * drawer waits for the save to finish before it would let a second edit fire,
+ * which is exactly the race this needs to skip past.
+ */
+describe("importing and replacing a mission file before either write lands", () => {
+  /** The `onSave` the last Edit click handed the drawer, callable on its own. */
+  function missionOnSave(): (updated: CampaignMission) => Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const { content } = drawerOpen.mock.calls.at(-1)?.[0] as {
+      content: { props: { onSave: (m: CampaignMission) => Promise<void> } };
+    };
+    return content.props.onSave;
+  }
+
+  it("still deletes a file imported and then cleared before either write lands", async () => {
+    const { onDisk, release } = twoWrites(1);
+    show([mission()]);
+    const onSave = missionOnSave();
+    const base = mission();
+
+    // Import a cutscene, then clear the slot again before the import's own
+    // write has landed: the likelier route the issue describes, since picking
+    // media goes through an OS dialog and two imports in a row will not
+    // normally beat the write.
+    void onSave({ ...base, cutscene: { kind: "file", file: "intro.mp4" } });
+    void onSave({ ...base, cutscene: undefined });
+    release();
+
+    await waitFor(() => expect(onDisk).toHaveLength(2));
+    await waitFor(() =>
+      expect(campaignMediaDelete).toHaveBeenCalledWith({
+        campaignId: "c1",
+        file: "intro.mp4",
+      }),
+    );
+  });
+
+  it("keeps a file cleared and then named again inside the same window", async () => {
+    const { onDisk, release } = twoWrites(1);
+    show([mission()]);
+    const onSave = missionOnSave();
+    const base = mission();
+
+    // Clear the panorama the mission already had on disk, then put the same
+    // file back before either write lands. It passes through an unwritten
+    // document that does not name it, but the document that actually lands
+    // does, so it must survive: gathering files across the window must not
+    // turn into deleting anything that was ever in transit.
+    void onSave({ ...base, panorama: undefined });
+    void onSave({ ...base, panorama: { kind: "file", file: "shore.jpg" } });
+    release();
+
+    await waitFor(() => expect(onDisk).toHaveLength(2));
+    await waitFor(() =>
+      expect(onDisk.at(-1)?.missions[0].panorama).toEqual({
+        kind: "file",
+        file: "shore.jpg",
+      }),
+    );
+    // Long enough for a wrongful delete to have shown up if the fix over-reaches.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(campaignMediaDelete).not.toHaveBeenCalled();
+  });
+
+  it("still cleans up a file replaced after its own save has already landed", async () => {
+    show([mission()]);
+    const base = mission();
+
+    // Wrapped in `act` because it calls straight through to `onSave` rather
+    // than going through `fireEvent`, and this test needs React to have
+    // actually applied the resulting state before it reopens the drawer for
+    // the second edit, the way a real second edit would find it.
+    await act(() =>
+      missionOnSave()({
+        ...base,
+        cutscene: { kind: "file", file: "act1.mp4" },
+      }),
+    );
+    campaignMediaDelete.mockClear();
+
+    // Not a race this time: the first import's write has fully landed,
+    // delete included, before the replacement is asked for. Reopening the
+    // drawer picks up a fresh `onSave` bound to the state that write left
+    // behind, the way a real second edit would.
+    await act(() =>
+      missionOnSave()({
+        ...base,
+        cutscene: { kind: "file", file: "act2.mp4" },
+      }),
+    );
+
+    expect(campaignMediaDelete).toHaveBeenCalledWith({
+      campaignId: "c1",
+      file: "act1.mp4",
+    });
+    expect(campaignMediaDelete).not.toHaveBeenCalledWith({
+      campaignId: "c1",
+      file: "act2.mp4",
+    });
   });
 });
 
