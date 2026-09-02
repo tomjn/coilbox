@@ -43,7 +43,6 @@ import {
   noSlopeIn,
   overlappingIn,
   type Placement,
-  parsePlacementKey,
   placementKey,
   sceneUnchecked,
   sceneWaterless,
@@ -51,6 +50,7 @@ import {
   tooShallowIn,
   unstableIn,
 } from "@/placement/placements";
+import { clampToMap } from "@/placement/pointer";
 import {
   nudgeSentence,
   previewChecks,
@@ -69,6 +69,7 @@ import {
   focusCamera,
   focusDistance,
   mapSceneStatus,
+  sceneToWorld,
   worldToScene,
 } from "@/placement/scene";
 import { useLayoutPreview } from "@/placement/useLayoutPreview";
@@ -112,7 +113,6 @@ import {
 import {
   canTurn,
   editActor,
-  movePlacement,
   removePlacement,
   setActorState,
   turnPlacement,
@@ -132,25 +132,16 @@ import {
 } from "./groups";
 import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
+import { moveOnMap, pointFrom } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID } from "./modes";
-import {
-  movePathWaypoint,
-  pathLabel,
-  removePathWaypoint,
-  scenarioPaths,
-} from "./orderPaths";
+import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
 import { startMarkers } from "./startPositions";
+import { type MapCursor, useMapKeyboard } from "./useMapKeyboard";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
 import { useScenarioZones } from "./useScenarioZones";
-import {
-  moveZone,
-  parseZoneKey,
-  removeZone,
-  renameZone,
-  zoneExtent,
-} from "./zones";
+import { parseZoneKey, removeZone, renameZone, zoneExtent } from "./zones";
 
 /** How long one building of a build order stands on screen before the next one
  *  arrives. Slow enough to read the base going up, brisk enough that a
@@ -588,21 +579,10 @@ export function ScenarioMapScene({
     onHover: preview.onHover,
     onDragUnit: preview.onDragUnit,
     onDragGround: behaviour.draw ?? null,
-    onMove: (key, delta) => {
-      if (parseZoneKey(key))
-        return onChange((doc) => moveZone(doc, key, delta));
-      if (parsePathKey(key))
-        return onChange((doc) => movePathWaypoint(doc, key, delta));
-      onChange((doc) =>
-        movePlacement(
-          doc,
-          key,
-          delta,
-          snap,
-          layoutEdit(parsePlacementKey(key)?.id),
-        ),
-      );
-    },
+    // The same edit the arrow keys make, through the same function, so a drag
+    // and a nudge cannot drift apart (issue #2269).
+    onMove: (key, delta) =>
+      onChange((doc) => moveOnMap(doc, key, delta, snap, layoutEdit)),
   });
 
   // A drawn unit is described by the entry it belongs to, and each of the three
@@ -715,6 +695,61 @@ export function ScenarioMapScene({
     setHandle(handle);
   }, []);
 
+  /**
+   * The point the view is looking at, which is what the keyboard aims with
+   * (issue #2269).
+   *
+   * The camera's own target rather than a cursor of its own: it is already on
+   * screen, already held over the map by the surface, and already the thing the
+   * Frame button and the contents list move. One cursor, moved by everything
+   * that moves the view.
+   */
+  const cursorAt = useCallback((): MapCursor | null => {
+    const handle = sceneRef.current;
+    if (!handle) return null;
+    const { target } = handle.controls;
+    const pos = clampToMap(
+      sceneToWorld(
+        { x: target.x, z: target.z },
+        assets.worldWidth,
+        assets.worldHeight,
+        handle.scale,
+      ),
+      assets.worldWidth,
+      assets.worldHeight,
+    );
+    return { pos, height: units.groundAt(pos) };
+  }, [assets.worldWidth, assets.worldHeight, units.groundAt]);
+
+  /** Move that point, camera and all, and draw the one frame it needs. The
+   *  surface's own clamp catches the edges of the map, off the change the
+   *  controls fire. */
+  const panBy = useCallback((delta: Point) => {
+    const handle = sceneRef.current;
+    if (!handle) return;
+    const { camera, controls, render, scale } = handle;
+    const step = { x: delta.x * scale, z: delta.z * scale };
+    controls.target.x += step.x;
+    controls.target.z += step.z;
+    camera.position.x += step.x;
+    camera.position.z += step.z;
+    controls.update();
+    render();
+  }, []);
+
+  const keys = useMapKeyboard({
+    things: { scenario, entries, placements: units.placements, paths },
+    onChange,
+    selected,
+    onSelect: setSelected,
+    onEntry: pickEntry,
+    onPlace,
+    snap,
+    layoutEdit,
+    cursorAt,
+    panBy,
+  });
+
   // Mirrored in refs so a mission problem's row can land on whatever the map
   // currently holds without retriggering every time an unrelated edit gives
   // `entries` a new array identity. The effect below only has to run again
@@ -791,6 +826,14 @@ export function ScenarioMapScene({
       onScene={onScene}
       frameLabel="Frame map"
       stand={stand}
+      keyboard={{
+        label: mapName ? `Scenario map, ${mapName}` : "Scenario map",
+        help: keys.help,
+        said: keys.said,
+        cursor: keys.cursor,
+        onKeyDown: keys.onKeyDown,
+        onFocus: keys.onFocus,
+      }}
       bars={
         <>
           {/* The whole row shares one backdrop rather than each control finding
@@ -1065,12 +1108,18 @@ export function ScenarioMapScene({
                 </>
               }
               onDone={() => setDrawing(null)}
+              onAt={onPlace}
+              worldWidth={assets.worldWidth}
+              worldHeight={assets.worldHeight}
             />
           )}
           {moving && (
             <ClickMapBar
               message="Click the map to put this base's origin there, buildings and all"
               onDone={() => setMovingBase(null)}
+              onAt={onPlace}
+              worldWidth={assets.worldWidth}
+              worldHeight={assets.worldHeight}
             />
           )}
           {playing && (
@@ -1098,7 +1147,13 @@ export function ScenarioMapScene({
             />
           )}
           {picking && !drawingPath && !moving && (
-            <ClickMapBar message={picking.message} onDone={picking.onDone} />
+            <ClickMapBar
+              message={picking.message}
+              onDone={picking.onDone}
+              onAt={onPlace}
+              worldWidth={assets.worldWidth}
+              worldHeight={assets.worldHeight}
+            />
           )}
           {pathRef && selected && (
             <PathBar
@@ -1308,24 +1363,46 @@ export function ZoneBar({
 }
 
 /**
- * A question the map is waiting for an answer to: a path being drawn, or a base
- * being moved.
+ * A question the map is waiting for an answer to: a path being drawn, a base
+ * being moved, or a point a trigger asked for.
  *
  * Its own bar rather than a line in the panel that asked, because while one of
  * these is outstanding the click that answers it is also the click that would
  * otherwise place something, and that is worth saying where it cannot be missed.
+ *
+ * It also carries the answer that needs no map at all: two numbers typed in
+ * (issue #2269). A trigger's point is often one an author already knows, copied
+ * off another trigger or read out of a start position, and aiming a 3D view at a
+ * number you already have is work nobody should have to do. It is also the one
+ * way of answering that asks nothing of eyesight or of a steady hand.
  */
 function ClickMapBar({
   message,
   onDone,
+  onAt,
+  worldWidth,
+  worldHeight,
 }: {
   message: ReactNode;
   onDone: () => void;
+  /** Answer with a point, exactly as a click on the map would. Left out when
+   *  the map has nothing to answer with, which is a question whose asker has
+   *  gone. */
+  onAt?: ((pos: Point) => void) | null;
+  worldWidth: number;
+  worldHeight: number;
 }) {
   return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
+    <div className="flex w-fit flex-wrap items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <MapPin className="size-3.5 text-lime-300" />
       <span className="text-[11px]">{message}</span>
+      {onAt && (
+        <PointFields
+          onAt={onAt}
+          worldWidth={worldWidth}
+          worldHeight={worldHeight}
+        />
+      )}
       <Button
         size="sm"
         variant="ghost"
@@ -1335,6 +1412,66 @@ function ClickMapBar({
         Done
       </Button>
     </div>
+  );
+}
+
+/**
+ * Two numbers and a button, as the answer to a point the map is waiting for.
+ *
+ * Held to the map, because a point off it is a point the mission cannot use, and
+ * cleared after each answer so a question that takes several points is several
+ * pairs of numbers rather than an editing job.
+ */
+function PointFields({
+  onAt,
+  worldWidth,
+  worldHeight,
+}: {
+  onAt: (pos: Point) => void;
+  worldWidth: number;
+  worldHeight: number;
+}) {
+  const [x, setX] = useState("");
+  const [z, setZ] = useState("");
+  const at = pointFrom(x, z, worldWidth, worldHeight);
+
+  return (
+    <form
+      className="flex items-center gap-1"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!at) return;
+        onAt(at);
+        setX("");
+        setZ("");
+      }}
+    >
+      <Input
+        aria-label="X in elmos"
+        inputMode="numeric"
+        placeholder="x"
+        value={x}
+        onChange={(event) => setX(event.target.value)}
+        className="h-7 w-16 text-xs"
+      />
+      <Input
+        aria-label="Z in elmos"
+        inputMode="numeric"
+        placeholder="z"
+        value={z}
+        onChange={(event) => setZ(event.target.value)}
+        className="h-7 w-16 text-xs"
+      />
+      <Button
+        type="submit"
+        size="sm"
+        variant="outline"
+        disabled={!at}
+        className="h-7 px-2 text-xs"
+      >
+        Use
+      </Button>
+    </form>
   );
 }
 
