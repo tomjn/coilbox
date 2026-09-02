@@ -74,7 +74,10 @@ describe("a campaign mission's compiled scenario", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Mission Lua/ }));
 
-    const lua = screen.getByText(/^-- Compiled by coilbox/).textContent ?? "";
+    const lua = screen
+      .getAllByTestId("mission-lua-line-text")
+      .map((el) => el.textContent)
+      .join("\n");
     expect(lua).toContain('"As attached"');
     expect(lua).not.toContain('"Renamed since"');
   });
