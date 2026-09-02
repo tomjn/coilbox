@@ -178,6 +178,12 @@ function buildMarker(colour: THREE.Color): BuiltModel {
  * group of one unit is one model on the GPU. The build cache outlives a redraw,
  * so moving one unit does not re-read every model in the document.
  *
+ * Each of those models is merged down to one mesh per material as it is built,
+ * so a placement costs a draw call a texture rather than a draw call a piece
+ * (issue #2293). Every placement is still its own object, which is what picking,
+ * the selection plate, dragging and the arrive and leave animations all hang
+ * off.
+ *
  * `draw` is asynchronous and may be called again before it finishes. A later
  * call abandons the earlier one rather than interleaving with it.
  */
@@ -317,7 +323,9 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     // A model that read but has no pieces draws nothing at all, which is the
     // same problem as a missing one from the map's point of view.
     if (!model?.root) return { built: markerFor(colour), drawable: false };
-    const built = buildModel(model, colour);
+    // Merged, because a model on the map is only ever drawn standing still and
+    // its piece tree costs a draw call a piece for every unit placed (#2293).
+    const built = buildModel(model, colour, { merge: true });
     prototypes.set(key, built);
     return { built, drawable: true };
   };
