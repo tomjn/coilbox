@@ -145,8 +145,12 @@ export function turnOnMap(
  * pointing at something just deleted names.
  */
 export function positionIn(things: MapThings, key: string): Point | null {
-  const { scenario } = things;
+  return positionOn(things.scenario, key);
+}
 
+/** {@link positionIn} for a caller holding only the document, which is all
+ *  either of them ever reads. */
+export function positionOn(scenario: Scenario, key: string): Point | null {
   const zone = parseZoneKey(key);
   if (zone) {
     const found = scenario.zones.find((one) => one.id === zone.id);

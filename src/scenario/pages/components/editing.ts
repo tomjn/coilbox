@@ -177,6 +177,34 @@ export function turnFacing(facing: Facing, steps: number): Facing {
 }
 
 /**
+ * A point turned `steps` quarter turns about another point, the same way round
+ * as {@link turnFacing} turns a facing.
+ *
+ * One quarter turn is `x' = x0 - z0 + z`, `z' = z0 + x0 - x`, which sends a
+ * point due south of the pivot to due east of it: exactly the way a facing of
+ * south becomes a facing of east. Position and facing turning opposite ways
+ * would tear a cluster apart rather than turn it.
+ *
+ * A quarter turn is addition and subtraction, so on the whole elmos a document
+ * stores there is no rounding here at all, and four of them are the point
+ * itself again rather than nearly it. That exactness is the whole reason a
+ * selection can be turned about a common centre when a single building cannot
+ * be re-snapped (issue #1523): nothing is measured, nothing is put back on a
+ * grid, and so nothing creeps.
+ */
+export function turnedAbout(pos: Point, pivot: Point, steps: number): Point {
+  const quarters = ((steps % 4) + 4) % 4;
+  let out = pos;
+  for (let turn = 0; turn < quarters; turn++) {
+    out = {
+      x: pivot.x - pivot.z + out.z,
+      z: pivot.z + pivot.x - out.x,
+    };
+  }
+  return out;
+}
+
+/**
  * The document with the thing this key names turned, or the same document when
  * it has no facing.
  *
