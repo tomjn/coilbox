@@ -88,6 +88,10 @@ struct Args {
     /// an argument because three thousand map names is past what Windows takes
     /// on a command line.
     maps_file: Option<String>,
+    /// `--map-minimaps`: name every installed map's minimap, and with
+    /// `--asset-dir` encode it as the hub's `minimap` asset too (issue #2379).
+    /// `--maps-file` narrows it to the maps the hub said it wanted.
+    map_minimaps: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
     /// `--map-meta`: batch-read every map's mapinfo metadata in one Init.
@@ -883,6 +887,47 @@ fn run() -> i32 {
         };
     }
 
+    // Map minimaps: name every map's minimap, and with --asset-dir encode it as
+    // the hub's asset too (issue #2379). Both passes of one sweep run through
+    // here. The first takes no asset dir and stops at the identity, and the
+    // second is given the maps the hub asked for.
+    if args.map_minimaps {
+        let only = match args.maps_file.as_deref() {
+            None => None,
+            Some(path) => match std::fs::read_to_string(path)
+                .map_err(|e| e.to_string())
+                .and_then(|text| {
+                    serde_json::from_str::<Vec<String>>(&text).map_err(|e| e.to_string())
+                }) {
+                Ok(names) => Some(names),
+                Err(e) => {
+                    minimap::emit_assets_error(format!("could not read maps file {path}: {e}"));
+                    return 1;
+                }
+            },
+        };
+        let asset_dir = args.asset_dir.clone();
+        return match std::panic::catch_unwind(|| {
+            minimap::assets(
+                &args.lib,
+                only.as_deref(),
+                cache_dir,
+                asset_dir.as_deref().map(Path::new),
+            )
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                minimap::emit_assets_error(
+                    "worker panicked while reading the maps' minimaps".into(),
+                );
+                1
+            }
+        };
+    }
+
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
         let asset_dir = args.asset_dir.as_deref().map(Path::new);
@@ -971,6 +1016,7 @@ fn parse_args() -> Result<Args, String> {
     let mut map_catalog = false;
     let mut keys_only = false;
     let mut maps_file = None;
+    let mut map_minimaps = false;
     let mut map_info = false;
     let mut map_meta = false;
     let mut map_skybox = false;
@@ -1031,6 +1077,7 @@ fn parse_args() -> Result<Args, String> {
             "--map-catalog" => map_catalog = true,
             "--keys-only" => keys_only = true,
             "--maps-file" => maps_file = it.next(),
+            "--map-minimaps" => map_minimaps = true,
             "--map-info" => map_info = true,
             "--map-meta" => map_meta = true,
             "--map-skybox" => map_skybox = true,
@@ -1157,6 +1204,7 @@ fn parse_args() -> Result<Args, String> {
         map_catalog,
         keys_only,
         maps_file,
+        map_minimaps,
         map_info,
         map_meta,
         map_skybox,
@@ -1586,6 +1634,7 @@ mod tests {
             map_catalog: false,
             keys_only: false,
             maps_file: None,
+            map_minimaps: false,
             map_info: false,
             map_meta: false,
             map_skybox: false,

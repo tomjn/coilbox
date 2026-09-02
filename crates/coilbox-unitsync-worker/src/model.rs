@@ -134,6 +134,94 @@ pub struct ThumbnailsOutput {
     pub errors: Vec<String>,
 }
 
+/// One map in the batch `--map-minimaps` walk: the identity of its minimap, and
+/// the encoded asset when the caller asked for one (issue #2379).
+///
+/// The identity is answerable without encoding anything, which is what makes the
+/// walk two passes: the whole library is read for `sourceHash`, the hub is asked
+/// which of them it wants, and only those are encoded. `source_hash` is over the
+/// texture unitsync handed over, so it is the same string either pass produces
+/// for the same map.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMinimapRow {
+    /// unitsync's versioned name for the map, which is the whole of a map
+    /// asset's key alongside the variant.
+    pub map_name: String,
+    /// sha256 over the RGB565 texture, framed by variant and side. What the have
+    /// check compares on, and known before any encode.
+    pub source_hash: String,
+    /// The name the map's archive declares for itself. Provenance on the row,
+    /// never identity.
+    pub source_archive: String,
+    /// The map's size in elmos, which a map row on the hub requires. A map that
+    /// cannot say is skipped rather than sent without them.
+    pub map_width: u32,
+    pub map_height: u32,
+    /// The encoded picture, only when this pass was asked for assets.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<MapOverlayAsset>,
+}
+
+/// Why a map in the walk produced no row. The first six are one picture's
+/// reasons, restated here so the frontend reads one list, and the last three are
+/// about the walk rather than about a texture.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum MapMinimapSkip {
+    NoSource,
+    Blank,
+    ReadFailed,
+    NoBounds,
+    EncodeFailed,
+    TooLarge,
+    NotWritten,
+    /// No metal infomap, so the map's size in elmos is unknown. The hub requires
+    /// both on a map row and refuses one without them, and a picture with no
+    /// proportions could not be stretched back to the map's shape anyway.
+    NoExtent,
+    /// The map lives in a loose `.sdd` folder, which is somebody's working copy
+    /// (issue #1890). unitsync's map API is keyed on the name, so a map a folder
+    /// claims cannot be read from the release archive with any certainty.
+    WorkingFolder,
+    /// The library lists this map twice. The name is the whole key, so the second
+    /// listing is dropped: a have check refuses a batch asking about one picture
+    /// twice.
+    DuplicateMap,
+}
+
+impl From<MapOverlaySkip> for MapMinimapSkip {
+    fn from(why: MapOverlaySkip) -> Self {
+        match why {
+            MapOverlaySkip::NoSource => Self::NoSource,
+            MapOverlaySkip::Blank => Self::Blank,
+            MapOverlaySkip::ReadFailed => Self::ReadFailed,
+            MapOverlaySkip::NoBounds => Self::NoBounds,
+            MapOverlaySkip::EncodeFailed => Self::EncodeFailed,
+            MapOverlaySkip::TooLarge => Self::TooLarge,
+            MapOverlaySkip::NotWritten => Self::NotWritten,
+        }
+    }
+}
+
+/// One map the walk did not produce a row for, and why.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMinimapSkipped {
+    pub map_name: String,
+    pub reason: MapMinimapSkip,
+}
+
+/// Output of the batch `--map-minimaps` mode: one row per map that has a picture
+/// worth offering, and one skip per map that has not.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MapMinimapsOutput {
+    pub maps: Vec<MapMinimapRow>,
+    pub skipped: Vec<MapMinimapSkipped>,
+    pub errors: Vec<String>,
+}
+
 /// A rendered minimap, returned by the lazy `minimap` mode.
 ///
 /// `asset` and `assetSkipped` only appear when the caller asked for hub assets
