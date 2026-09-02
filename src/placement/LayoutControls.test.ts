@@ -214,7 +214,7 @@ describe("LayoutNotes", () => {
       const html = markup({ offGrid: off, onSnapToGrid: () => {} });
       expect(html).toContain("do not agree with the build grid");
       expect(html).toContain("Building 2");
-      expect(html).toContain("Put the layout on the build grid");
+      expect(html).toContain("Put the blueprint on the build grid");
     });
 
     it("says nothing when the grid agrees", () => {

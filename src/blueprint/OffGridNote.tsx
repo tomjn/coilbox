@@ -40,10 +40,10 @@ export function OffGridNote({
   return (
     <div className="space-y-2 rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
       <p>
-        This layout's numbers do not agree with the build grid. Building
+        This blueprint's numbers do not agree with the build grid. Building
         {one ? " " : "s "}
         {listed(offGrid)} {one ? "is" : "are"} drawn where the engine will build{" "}
-        {one ? "it" : "them"}, which is not the position the layout holds for{" "}
+        {one ? "it" : "them"}, which is not the position the blueprint holds for{" "}
         {one ? "it" : "them"}. Nothing has been changed.
       </p>
       <Button
@@ -52,7 +52,7 @@ export function OffGridNote({
         className="h-7 w-full px-2 text-[11px]"
         onClick={onSnap}
       >
-        Put the layout on the build grid
+        Put the blueprint on the build grid
       </Button>
     </div>
   );

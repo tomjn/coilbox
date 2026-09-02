@@ -393,7 +393,7 @@ export function BlueprintOnMap({
         }}
         onScene={setHandle}
         frame={frame}
-        frameLabel="Frame layout"
+        frameLabel="Frame blueprint"
         stand={stand}
         bars={
           <>

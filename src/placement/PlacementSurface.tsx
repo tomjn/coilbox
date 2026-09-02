@@ -275,7 +275,7 @@ export function PlacementSurface({
                 <GridToggle
                   on={grid}
                   onChange={setGrid}
-                  showTitle="Show the build grid the layout stands on"
+                  showTitle="Show the build grid the blueprint stands on"
                 />
               )}
               <ResetViewButton

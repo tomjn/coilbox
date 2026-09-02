@@ -50,6 +50,6 @@ describe("OffGridNote", () => {
   });
 
   it("offers to put the layout on the grid", () => {
-    expect(markup([off(0)])).toContain("Put the layout on the build grid");
+    expect(markup([off(0)])).toContain("Put the blueprint on the build grid");
   });
 });
