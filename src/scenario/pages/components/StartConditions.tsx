@@ -15,6 +15,14 @@
  * about rather than left to be discovered in game.
  *
  * The document edits are in `teams.ts`.
+ *
+ * A team's start units naming a def the game has not got carries what the
+ * validator found wrong with it too, as a row-level note under that team's
+ * chips rather than left to the problems drawer alone (issue #2346). There is
+ * no per-chip control for `aria-invalid` to sit on, and the chips are already
+ * grouped by def rather than by the document's own array index, so this
+ * follows `entryFieldProblem`'s "at or under" match and shows every issue
+ * `startUnits` has in one note rather than one per index.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -27,6 +35,8 @@ import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import type { Participant } from "@/play/config";
 import type { Scenario, ScenarioTeam } from "../../model";
+import type { MissionIssue } from "../../validate";
+import { RowProblem } from "./panels";
 import {
   type Amount,
   type AmountField,
@@ -41,16 +51,20 @@ import {
   startUnits,
   teamOf,
 } from "./teams";
+import { entryFieldProblem } from "./triggerProblems";
 
 export function StartConditions({
   scenario,
   participants,
+  issues,
   onChange,
 }: {
   scenario: Scenario;
   /** The participants as the table above is showing them, so a row appears the
    *  moment an AI is added rather than after the edit has been written. */
   participants: Participant[];
+  /** What the validator has found wrong with the mission (issue #2346). */
+  issues: MissionIssue[];
   onChange: (next: Scenario) => void;
 }) {
   const units = useGameUnits(scenario.setup.gameName);
@@ -89,6 +103,12 @@ export function StartConditions({
               <TeamStart
                 participant={participant}
                 team={teamOf(scenario, participant.id)}
+                problem={entryFieldProblem(
+                  issues,
+                  "teams",
+                  participant.id,
+                  "startUnits",
+                )}
                 units={units.units}
                 unitsLoading={units.loading}
                 onAddUnit={(def) =>
@@ -130,6 +150,7 @@ export function StartConditions({
 function TeamStart({
   participant,
   team,
+  problem,
   units,
   unitsLoading,
   onAddUnit,
@@ -140,6 +161,9 @@ function TeamStart({
 }: {
   participant: Participant;
   team: ScenarioTeam;
+  /** What the validator found wrong with this team's start units, in its own
+   *  words (issue #2346): a def the game has not got. */
+  problem: string | null;
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
   onAddUnit: (def: string) => void;
@@ -208,6 +232,8 @@ function TeamStart({
           onAdd={onAddUnit}
         />
       </div>
+
+      <RowProblem problem={problem} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <AmountPair
