@@ -19,9 +19,15 @@
  * nothing is written at all when the words have not changed.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useMemo, useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
+import { useMemo, useRef, useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Scenario, ScenarioDialogue, ScenarioTrigger } from "../../model";
 import { DialoguePanel } from "./DialoguePanel";
 import {
@@ -32,7 +38,30 @@ import {
 } from "./history";
 import { missionProblemsIn } from "./useMissionProblems";
 
-afterEach(cleanup);
+// The panel's delete notice has no shell here (issue #2280), the same gap
+// `ScenarioBuilderPage.dom.test.tsx` fills for its own toasts. Captured rather
+// than rendered, so a test can read the message and fire the action the way a
+// click on the toast's own Undo button would.
+const toasted = vi.hoisted(() => ({
+  calls: [] as {
+    message: string;
+    id: string;
+    action: { onClick: () => void };
+  }[],
+}));
+vi.mock("sonner", () => ({
+  toast: (
+    message: string,
+    opts: { id: string; action: { onClick: () => void } },
+  ) => {
+    toasted.calls.push({ message, id: opts.id, action: opts.action });
+  },
+}));
+
+afterEach(() => {
+  cleanup();
+  toasted.calls.length = 0;
+});
 
 function line(patch: Partial<ScenarioDialogue> = {}): ScenarioDialogue {
   return { id: "opening", speaker: "Control", text: "Move out.", ...patch };
@@ -95,6 +124,25 @@ function PanelHarness({
 }) {
   const [document, setDocument] = useState(() => scenario(dialogue, triggers));
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
+  // Read at the moment a step is taken rather than at the last render, the
+  // same reason ScenarioEditPage keeps its own copies: a delete's notice binds
+  // `onUndo` at the click that fires it, and firing the notice's action later
+  // must see the document that delete produced, not whatever this closure held
+  // when the button was drawn.
+  const documentRef = useRef(document);
+  documentRef.current = document;
+  const historyRef = useRef(history);
+  historyRef.current = history;
+
+  // Shared by the harness's own Undo button and by `onUndo`, so a test that
+  // fires a toast's action is exercising the exact function Cmd+Z and the map
+  // toolbar call, not a lookalike (issue #2280, issue #2306).
+  const stepBack = () => {
+    const step = undoEdit(historyRef.current, documentRef.current);
+    if (!step) return;
+    setHistory(step.history);
+    setDocument(step.document);
+  };
 
   return (
     <>
@@ -104,17 +152,10 @@ function PanelHarness({
           setHistory(recordEdit(history, document, next));
           setDocument(next);
         }}
+        onUndo={stepBack}
         issues={[]}
       />
-      <button
-        type="button"
-        onClick={() => {
-          const step = undoEdit(history, document);
-          if (!step) return;
-          setHistory(step.history);
-          setDocument(step.document);
-        }}
-      >
+      <button type="button" onClick={stepBack}>
         Undo
       </button>
       <output>{JSON.stringify(document)}</output>
@@ -239,6 +280,78 @@ describe("a dialogue line's words commit rules", () => {
   });
 });
 
+/**
+ * Deleting a dialogue line from the panel has no confirm dialog and no undo
+ * button of its own nearby (issue #2280, issue #2306). The notice this fires
+ * names the line, and its own action is the page's real undo, so the line
+ * comes back whether an author clicks that action or presses Cmd+Z instead.
+ *
+ * A line's clip is a separate story: deleting the line also drops its stored
+ * portrait or voice clip off disk, and that removal has no undo (it is a real
+ * `fs::remove_file` in `scenario_media_delete`). So a line with a clip gets a
+ * notice that says the clip may not come back, rather than the plain "Deleted
+ * X" every other panel's notice uses. A line with no clip gets the plain
+ * wording, because there is nothing there to overpromise about.
+ */
+describe("deleting a dialogue line's notice", () => {
+  const del = () =>
+    fireEvent.click(screen.getByRole("button", { name: /^Delete$/ }));
+
+  it("names the line in the notice when it carries no clip", () => {
+    openPanel([line()]);
+
+    del();
+
+    expect(toasted.calls).toHaveLength(1);
+    expect(toasted.calls[0].message).toBe(
+      'Deleted dialogue line "Control: Move out.".',
+    );
+  });
+
+  it("warns that the clip may not come back when the line carries one", () => {
+    openPanel([line({ portrait: "control.png" })]);
+
+    del();
+
+    expect(toasted.calls).toHaveLength(1);
+    expect(toasted.calls[0].message).toBe(
+      'Deleted dialogue line "Control: Move out.". Undo brings back the line; its clip may already be gone.',
+    );
+  });
+
+  it("is undoable through Cmd+Z alone, with no toast involved", () => {
+    openPanel([line(), line({ id: "closing", speaker: "HQ", text: "Out." })]);
+
+    del();
+    undo();
+
+    expect(stored().map((d) => d.id)).toEqual(["opening", "closing"]);
+  });
+
+  it("restores the line when the notice's own action is used", () => {
+    openPanel([line()]);
+
+    del();
+    act(() => toasted.calls[0].action.onClick());
+
+    expect(stored().map((d) => d.id)).toEqual(["opening"]);
+  });
+
+  it("uses one fixed notice id so several deletes in a row replace it rather than stacking", () => {
+    openPanel([
+      line({ id: "opening" }),
+      line({ id: "closing", speaker: "HQ", text: "Out." }),
+    ]);
+
+    del();
+    del();
+
+    expect(toasted.calls).toHaveLength(2);
+    expect(toasted.calls[0].id).toBe(toasted.calls[1].id);
+    expect(toasted.calls[0].message).not.toBe(toasted.calls[1].message);
+  });
+});
+
 /** Duplicating a line from the panel (issue #2278). The copy logic itself is
  *  pinned in `registries.test.ts`. This is what only the panel can get wrong:
  *  selection and undo. */
@@ -289,6 +402,7 @@ describe("a dialogue line's text the validator has flagged", () => {
       <DialoguePanel
         scenario={document}
         onChange={setDocument}
+        onUndo={() => {}}
         issues={issues}
       />
     );

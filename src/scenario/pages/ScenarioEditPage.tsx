@@ -767,6 +767,7 @@ export default function ScenarioEditPage() {
         <DialoguePanel
           scenario={scenario}
           onChange={(next) => apply(next)}
+          onUndo={undo}
           issues={missionIssues}
         />
         <RestrictionPanel
@@ -774,6 +775,7 @@ export default function ScenarioEditPage() {
           onChange={(next) => apply(next)}
           units={gameUnits.units}
           unitsLoading={gameUnits.loading}
+          onUndo={undo}
         />
         {/* The layouts the document holds, and the way in and out of a game's own
           blueprint file. It sits with the panels rather than on the map because
