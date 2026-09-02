@@ -39,6 +39,7 @@ import {
   redoEdit,
   undoEdit,
 } from "./history";
+import type { RowFocus } from "./problemTargets";
 import { TriggerPanel } from "./TriggerPanel";
 import { setStepParam } from "./triggers";
 import { missionProblemsIn } from "./useMissionProblems";
@@ -142,9 +143,11 @@ function scenario(
 function PanelHarness({
   triggers,
   zones = [],
+  focus = null,
 }: {
   triggers: ScenarioTrigger[];
   zones?: ScenarioZone[];
+  focus?: RowFocus | null;
 }) {
   const [document, setDocument] = useState(() => scenario(triggers, zones));
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
@@ -195,6 +198,7 @@ function PanelHarness({
         picking={null}
         onPick={() => {}}
         onUndo={stepBack}
+        focus={focus}
       />
       <button type="button" onClick={stepBack}>
         Undo
@@ -780,5 +784,49 @@ describe("a trigger's condition pointing at a zone the document no longer has", 
       "false",
     );
     expect(stored()[0].conditions.conditions[0].params.zone).toBe("south");
+  });
+});
+
+/**
+ * A mission problem's row naming a trigger (issue #2271). `ScenarioEditPage`
+ * hands the panel a `focus` request instead of the author clicking the panel
+ * open and picking the row themselves, so this pins what that request has to
+ * do on its own: open a panel that starts shut, and land on the trigger the
+ * row named rather than whichever one the list would otherwise default to.
+ */
+describe("a mission problem's row naming a trigger", () => {
+  it("expands the panel and selects the named trigger without it being clicked open first", () => {
+    render(
+      <PanelHarness
+        triggers={[trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]}
+        focus={{ id: "wave-two", token: 1 }}
+      />,
+    );
+
+    expect(asInput(nameBox()).value).toBe("wave-two");
+  });
+
+  it("puts the keyboard focus on the row it selected, so a keyboard user is not left on a drawer that just closed", async () => {
+    const scrolled = vi
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+
+    render(
+      <PanelHarness
+        triggers={[trigger({ id: "wave-one" }), trigger({ id: "wave-two" })]}
+        focus={{ id: "wave-two", token: 1 }}
+      />,
+    );
+    // The row it focuses is a frame behind the render above: it has to exist,
+    // open panel and all, before there is anything to scroll to or focus.
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+
+    const row = screen.getByRole("button", { name: /wave-two/ });
+    expect(document.activeElement).toBe(row);
+    expect(scrolled).toHaveBeenCalled();
+
+    scrolled.mockRestore();
   });
 });
