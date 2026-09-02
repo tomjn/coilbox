@@ -22,6 +22,7 @@ import { sceneContents } from "./contents";
 import { addActor } from "./editing";
 import { editedScenario } from "./edits";
 import { addGroup } from "./groups";
+import { type MapSelection, primaryKey, selectOne } from "./selection";
 import { useMapKeyboard } from "./useMapKeyboard";
 import { addZone } from "./zones";
 
@@ -107,12 +108,17 @@ function drawn(scenario: Scenario): Placement[] {
 function Harness({
   initial,
   onPlace,
+  startSelection = [],
 }: {
   initial: Scenario;
   onPlace?: (pos: Point) => void;
+  /** What is selected before a key is pressed, so a test can start from a
+   *  selection the pointer would have built (issue #2279). */
+  startSelection?: string[];
 }) {
   const [scenario, setScenario] = useState(initial);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selection, setSelection] = useState<MapSelection>(startSelection);
+  const selected = primaryKey(selection);
   // The camera's target, moved by the pan the keys ask for.
   const view = useRef<Point>({ x: 4096, z: 4096 });
 
@@ -124,9 +130,9 @@ function Harness({
       paths: [],
     },
     onChange: (edit) => setScenario((doc) => editedScenario(doc, edit)),
-    selected,
-    onSelect: setSelected,
-    onEntry: (entry) => setSelected(entry.key),
+    selection,
+    onSelect: (key) => setSelection(selectOne(key)),
+    onEntry: (entry) => setSelection(selectOne(entry.key)),
     onPlace: onPlace ?? null,
     snap: undefined,
     layoutEdit: () => "own",
@@ -427,5 +433,73 @@ describe("keys the map does not take", () => {
     fireEvent.keyDown(map(), { key: "?" });
 
     expect(said()).toContain("Arrow keys move what is selected");
+  });
+});
+
+/**
+ * The keys acting on a selection the pointer built (issue #2279).
+ *
+ * The selection is handed to the harness rather than made here, because there is
+ * no key that builds one: `.` and `,` replace the selection, and a selection is
+ * grown with a Shift-click on the map or on a Contents row. What these pin is
+ * the other half, that every key which acts on the selection acts on all of it
+ * and says so in one sentence rather than three.
+ */
+describe("a selection of more than one", () => {
+  const three = ["actor:a1", "group:g1#0", "base:b1#0"];
+
+  it("moves all of it on an arrow, and counts rather than naming", () => {
+    render(<Harness initial={laidOut()} startSelection={three} />);
+    fireEvent.keyDown(map(), { key: "ArrowRight" });
+
+    expect(said()).toBe("Moved 3 things 16 east.");
+    expect(actor()).toBe("116,200,0");
+  });
+
+  it("deletes all of it on Delete, and says what went", () => {
+    render(<Harness initial={laidOut()} startSelection={three} />);
+    fireEvent.keyDown(map(), { key: "Delete" });
+
+    expect(said()).toBe(
+      "Deleted 3: 1 actor, 1 group and 1 base building. Nothing selected.",
+    );
+    expect(actor()).toBe("gone");
+    expect(selected()).toBe("none");
+  });
+
+  it("turns what turns and says how much did not", () => {
+    render(<Harness initial={laidOut()} startSelection={three} />);
+    fireEvent.keyDown(map(), { key: "r" });
+
+    expect(said()).toBe("Turned 2. 1 does not turn.");
+    expect(actor()).toBe("100,200,1");
+  });
+
+  it("says nothing turned when nothing in the selection can", () => {
+    render(<Harness initial={laidOut()} startSelection={["group:g1#0"]} />);
+    fireEvent.keyDown(map(), { key: "r" });
+
+    expect(said()).toBe("This does not turn. A group's units all face south.");
+  });
+
+  it("lets go of the whole thing on Escape", () => {
+    render(<Harness initial={laidOut()} startSelection={three} />);
+    fireEvent.keyDown(map(), { key: "Escape" });
+
+    expect(said()).toBe("Nothing selected.");
+    expect(selected()).toBe("none");
+  });
+
+  it("replaces the selection when the list is stepped through, from the last one chosen", () => {
+    render(<Harness initial={laidOut()} startSelection={three} />);
+    // The primary is the base, which is the last entry, so stepping on wraps to
+    // the first. Nothing of the other two is left selected.
+    fireEvent.keyDown(map(), { key: "." });
+
+    expect(selected()).toBe("actor:a1");
+    expect(said()).toContain("1 of 3");
+
+    fireEvent.keyDown(map(), { key: "Delete" });
+    expect(said()).toBe("Deleted actor, armcom. Nothing selected.");
   });
 });

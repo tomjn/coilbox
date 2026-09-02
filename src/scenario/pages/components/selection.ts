@@ -40,7 +40,6 @@ import {
   placementKey,
 } from "@/placement/placements";
 import { baseBuildings, type Point, type Scenario } from "../../model";
-import type { LayoutEdit } from "./bases";
 import type { ContentEntry } from "./contents";
 import { groupSize, parsePathKey } from "./groups";
 import {
@@ -421,4 +420,75 @@ export function selectionCountWords(selection: MapSelection): string {
   if (count.total === 0) return "Nothing selected.";
   if (count.total === 1) return `${countWords(selection)} selected.`;
   return `${count.total} selected: ${countWords(selection)}.`;
+}
+
+/** Just the tally, for a sentence that has already said what happened. */
+function howMany(selection: MapSelection): string {
+  const count = countSelection(selection);
+  return count.total === 0 ? "Nothing selected." : `${count.total} selected.`;
+}
+
+/**
+ * What a Shift-click added, said after it landed.
+ *
+ * The thing is named because the author picked it out one at a time and wants to
+ * hear they got the right one. The rest is a number rather than the whole tally,
+ * because hearing the shape of the selection read out on every one of six clicks
+ * is six times longer than it needs to be. `what` is the caller's own name for
+ * it, which for the map is `thingWords`.
+ */
+export function addedWords(what: string, after: MapSelection): string {
+  return `Added ${what}. ${howMany(after)}`;
+}
+
+/** What a second Shift-click took back out. */
+export function removedWords(what: string, after: MapSelection): string {
+  return `Removed ${what}. ${howMany(after)}`;
+}
+
+/**
+ * What a marquee caught, said after the box was let go of.
+ *
+ * The whole tally here, unlike a Shift-click: nothing was named on the way in,
+ * so the tally is the only account of what is now selected. A box that caught
+ * nothing says so, because an empty box and a box the author misjudged feel the
+ * same and only one of them is worth trying again.
+ */
+export function marqueeWords(caught: number, after: MapSelection): string {
+  if (caught === 0) return `Nothing in that box. ${howMany(after)}`;
+  return selectionCountWords(after);
+}
+
+/** What a move of more than one thing did. No position, because there is no one
+ *  position for four things to now be at. */
+export function movedManyWords(
+  before: MapSelection,
+  heading: string,
+  step: number,
+): string {
+  const count = countSelection(before);
+  return `Moved ${count.total} things ${step} ${heading}.`;
+}
+
+/**
+ * What a turn of more than one thing did.
+ *
+ * Both halves, because a mixed selection usually has something in it that does
+ * not turn, and a turn that silently did less than was asked is the thing an
+ * author needs to hear about.
+ */
+export function turnedManyWords(turned: number, left: number): string {
+  if (turned === 0)
+    return "None of these turn. A group's units all face south.";
+  const done = `Turned ${turned}.`;
+  if (left === 0) return done;
+  return `${done} ${left} ${left === 1 ? "does" : "do"} not turn.`;
+}
+
+/** What a delete of more than one thing removed. The tally rather than a list,
+ *  and named before it goes because afterwards there is nothing left to name it
+ *  by. */
+export function deletedManyWords(before: MapSelection): string {
+  const count = countSelection(before);
+  return `Deleted ${count.total}: ${countWords(before)}. Nothing selected.`;
 }

@@ -30,6 +30,7 @@ import type { SnapBuilding } from "@/blueprint/footprint";
 import { mapKeyAction } from "@/placement/mapKeys";
 import type { Point } from "../../model";
 import type { ContentEntry } from "./contents";
+import { canTurn } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import { isTypingTarget } from "./history";
 import {
@@ -52,6 +53,16 @@ import {
   turnedWords,
   turnOnMap,
 } from "./mapKeyboard";
+import {
+  deletedManyWords,
+  type MapSelection,
+  movedManyWords,
+  moveSelection,
+  primaryKey,
+  removeSelection,
+  turnedManyWords,
+  turnSelection,
+} from "./selection";
 import { parseZoneKey } from "./zones";
 
 /** Where the view is looking, and how high the ground is there. */
@@ -63,7 +74,9 @@ export interface MapCursor {
 export interface MapKeyboardDeps {
   things: MapThings;
   onChange: (edit: ScenarioEdit) => void;
-  selected: string | null;
+  /** Everything selected, newest last (issue #2279). The keys act on all of it,
+   *  and the one at the end is the one they name. */
+  selection: MapSelection;
   onSelect: (key: string | null) => void;
   /** Select a contents entry and take the camera to it, exactly as picking it
    *  out of the contents list does. */
@@ -96,6 +109,10 @@ export interface MapKeyboard {
   cursor: string | null;
   onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
   onFocus: () => void;
+  /** Say something through the same live region the keys speak through, for
+   *  whatever else the surface has to announce: a Shift-click, a marquee
+   *  (issue #2279). */
+  say: (text: string) => void;
 }
 
 export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
@@ -118,11 +135,12 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
   // Resize mode belongs to one selection, not to the map in general: picking
   // something else, or letting go of the selection, drops back to move so an
   // author never finds arrows still resizing a zone they left behind.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deps.selected is the trigger, not read in the body. The reset does not care what the selection changed to, only that it did.
+  const primary = primaryKey(deps.selection);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: primary is the trigger, not read in the body. The reset does not care what the selection changed to, only that it did.
   useEffect(() => {
     resizingRef.current = false;
     setResizing(false);
-  }, [deps.selected]);
+  }, [primary]);
 
   const say = useCallback((text: string) => {
     setSaid((was) => ({ text, token: was.token + 1 }));
@@ -144,7 +162,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
       const {
         things,
         onChange,
-        selected,
+        selection,
         onSelect,
         onEntry,
         onPlace,
@@ -152,6 +170,13 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
         layoutEdit,
         panBy,
       } = latest.current;
+      // The key table only ever needed to know whether something is selected and
+      // whether it has a size, both of which are questions about the one the keys
+      // name, which is the last one chosen.
+      const selected = primaryKey(selection);
+      /** Whether the keys are acting on more than one thing, which is what
+       *  decides between naming what happened and counting it (issue #2279). */
+      const many = selection.length > 1;
       const resizable = !!selected && !!parseZoneKey(selected);
       const action = mapKeyAction(event, {
         selected: !!selected,
@@ -163,6 +188,10 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
 
       switch (action.kind) {
         case "cycle": {
+          // Stepping on replaces the selection rather than growing it, exactly
+          // as a plain click does. A selection is built up in the Contents
+          // popover, where a row is a button and Shift and Enter on one is a
+          // Shift-click like any other (issue #2279).
           const entry = nextEntry(things.entries, selected, action.by);
           if (!entry) {
             say(
@@ -185,27 +214,36 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
         case "move": {
           if (!selected) return;
           const key = selected;
-          const after = moveOnMap(
-            things.scenario,
-            key,
-            action.delta,
-            snap,
-            layoutEdit,
-          );
+          const held = selection;
+          // One `onChange` whatever the selection holds, so a nudge of six
+          // things is one step of the history (issue #2279).
+          const after = many
+            ? moveSelection(
+                things.scenario,
+                held,
+                action.delta,
+                snap,
+                layoutEdit,
+              )
+            : moveOnMap(things.scenario, key, action.delta, snap, layoutEdit);
           if (after === things.scenario) {
             say("Nothing moved.");
             return;
           }
           onChange((doc) =>
-            moveOnMap(doc, key, action.delta, snap, layoutEdit),
+            many
+              ? moveSelection(doc, held, action.delta, snap, layoutEdit)
+              : moveOnMap(doc, key, action.delta, snap, layoutEdit),
           );
           say(
-            movedWords(
-              { ...things, scenario: after },
-              key,
-              action.heading,
-              action.step,
-            ),
+            many
+              ? movedManyWords(held, action.heading, action.step)
+              : movedWords(
+                  { ...things, scenario: after },
+                  key,
+                  action.heading,
+                  action.step,
+                ),
           );
           return;
         }
@@ -248,6 +286,22 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
         case "turn": {
           if (!selected) return;
           const key = selected;
+          const held = selection;
+          if (many) {
+            // Each about its own centre, never about the selection's: see
+            // `selection.ts` for why swinging a selection as one body is a
+            // different operation rather than this one done properly.
+            const turns = held.filter((one) => canTurn(one)).length;
+            if (turns === 0) {
+              say(turnedManyWords(0, held.length));
+              return;
+            }
+            onChange((doc) =>
+              turnSelection(doc, held, action.steps, layoutEdit),
+            );
+            say(turnedManyWords(turns, held.length - turns));
+            return;
+          }
           const after = turnOnMap(
             things.scenario,
             key,
@@ -266,6 +320,16 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
         case "delete": {
           if (!selected) return;
           const key = selected;
+          const held = selection;
+          if (many) {
+            // Counted before it goes, because afterwards there is nothing left
+            // to count.
+            const what = deletedManyWords(held);
+            onChange((doc) => removeSelection(doc, held, layoutEdit));
+            onSelect(null);
+            say(what);
+            return;
+          }
           // Named before it goes, because afterwards there is nothing left to
           // name it by.
           const what = thingWords(things, key);
@@ -325,5 +389,5 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
     readCursor();
   }, [readCursor]);
 
-  return { help: MAP_KEY_HELP, said, cursor, onKeyDown, onFocus };
+  return { help: MAP_KEY_HELP, said, cursor, onKeyDown, onFocus, say };
 }
