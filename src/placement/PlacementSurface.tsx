@@ -229,7 +229,7 @@ export function PlacementSurface({
             </KeyboardGround>
 
             {bars && (
-              <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
+              <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col items-start gap-1.5">
                 {bars}
               </div>
             )}
