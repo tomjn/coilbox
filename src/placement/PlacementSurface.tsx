@@ -586,6 +586,9 @@ function GroundView({
       // none of them wants to spend a fifth of every frame rippling the sea
       // (issue #2292).
       stillWater
+      // Same reasoning, different symptom: zooming out to see the whole
+      // mission is exactly when the fog would close over it (issue #2332).
+      clearAir
       heightSrc={ground.heightSrc}
       heightRange={ground.heightRange}
       heightWords={ground.heightWords}
