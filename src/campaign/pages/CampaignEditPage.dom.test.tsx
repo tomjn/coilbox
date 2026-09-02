@@ -1923,6 +1923,62 @@ describe("the mission row's other controls, now a row can be dragged", () => {
 });
 
 /**
+ * Where the keyboard focus lands when an arrow press reaches the end of the
+ * list (issue #2397).
+ *
+ * Each arrow is switched off once its mission is already at that end, and a
+ * disabled control cannot hold focus in any engine. Measured live on macOS,
+ * the press that lands a mission at the top or the bottom drops the focus
+ * to `document.body`. happy-dom does not reproduce that part on its own,
+ * since it leaves `activeElement` on a button after disabling it, unlike a
+ * real browser, so what these tests pin is the page's own redirect: the
+ * row's other arrow, still enabled, takes the focus.
+ */
+const pair = () => [plain("m1", "First"), plain("m2", "Second")];
+
+describe("keyboard focus at the ends of the mission list (issue #2397)", () => {
+  it("moves focus to the down arrow when the up press reaches the top", async () => {
+    show(pair());
+
+    const upSecond = screen.getByRole("button", { name: "Move Second up" });
+    upSecond.focus();
+    fireEvent.click(upSecond);
+    await savedTitles();
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Move Second down" }),
+    );
+  });
+
+  it("moves focus to the up arrow when the down press reaches the bottom", async () => {
+    show(pair());
+
+    const downFirst = screen.getByRole("button", { name: "Move First down" });
+    downFirst.focus();
+    fireEvent.click(downFirst);
+    await savedTitles();
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Move First up" }),
+    );
+  });
+
+  it("leaves focus on the same arrow for a press that is not at the end", async () => {
+    show(four());
+
+    const upThird = screen.getByRole("button", { name: "Move Third up" });
+    upThird.focus();
+    fireEvent.click(upThird);
+    await savedTitles();
+
+    // Third moved to second place, which disables nothing on its row, so
+    // there is no reason to move the focus off the button the author is
+    // still pressing.
+    expect(document.activeElement).toBe(upThird);
+  });
+});
+
+/**
  * Reordering by typing a position (issue #2394).
  *
  * Dragging answered the seven-clicks complaint for anyone holding a pointer
