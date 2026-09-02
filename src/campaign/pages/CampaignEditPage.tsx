@@ -43,6 +43,7 @@ import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
 import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
 import { MissionFacts, MissionSetup } from "./components/MissionFacts";
+import { MissionPositionField } from "./components/MissionPositionField";
 import { MissionRemoveButton } from "./components/MissionRemoveButton";
 import { MissionScenarioUpdateButton } from "./components/MissionScenarioUpdateButton";
 import { useMissionDrag } from "./components/missionDrag";
@@ -159,6 +160,11 @@ export default function CampaignEditPage() {
   // A view preference, not part of the document, so it never goes through
   // `persist` (issue #2194). See `presentationOpen.ts`.
   const [storedArtOpen, setStoredArtOpen] = useStoredPresentationOpen();
+  // What the mission list last did, for the live region below it (issue
+  // #2394). Reordering rewrites the list in place and moves nothing on screen
+  // that a screen reader is looking at, so without this a mission moved by an
+  // arrow, by a drag or by a typed position is a change nobody is told about.
+  const [said, say] = useState("");
 
   // Seed the editable copy once the (local) campaign for this id is available,
   // and re-seed if the route id changes under the same component instance.
@@ -273,11 +279,14 @@ export default function CampaignEditPage() {
 
   /** Take the mission at `from` out of the list and put it back at `to`.
    *
-   *  The one reorder on this page. The arrow buttons call it a step at a time
-   *  and a dragged row calls it with wherever it was dropped, so both write
-   *  the same way and neither can drift from the other. It sits up here with
-   *  the hooks rather than beside the other mission actions because the drag
-   *  hook below is a hook, and the page returns early further down. */
+   *  The one reorder on this page. The arrow buttons call it a step at a time,
+   *  a dragged row calls it with wherever it was dropped, and a typed position
+   *  calls it with the position typed, so all three write the same way and
+   *  none of them can drift from the others. Which is also why the
+   *  announcement is made here and not in any of the three: whichever one the
+   *  author reached for, the same sentence says what happened. It sits up here
+   *  with the hooks rather than beside the other mission actions because the
+   *  drag hook below is a hook, and the page returns early further down. */
   const moveTo = useCallback(
     (from: number, to: number) => {
       if (!campaign) return;
@@ -286,6 +295,9 @@ export default function CampaignEditPage() {
       const [carried] = missions.splice(from, 1);
       if (!carried) return;
       missions.splice(to, 0, carried);
+      say(
+        `Moved ${carried.title} to position ${to + 1} of ${missions.length}.`,
+      );
       void persist({ ...campaign, missions });
     },
     [campaign, persist],
@@ -666,6 +678,29 @@ export default function CampaignEditPage() {
           </div>
         </div>
 
+        {/* What just happened to the order (issue #2394). A reorder rewrites
+            the list under the author without moving anything they are reading,
+            so a screen reader has nothing to notice unless the page says it.
+            One region for the whole list rather than one per row, because the
+            rows are the very things that move and a live region that is moved
+            in the document is not one that reliably speaks.
+
+            Mounted whether or not there is anything to say, because a live
+            region only announces text that changes in an element already in
+            the DOM, the lesson `SaveStatus` documents. Not `role="status"`,
+            which `SaveStatus` already carries at the top of this page: a
+            second one would make "the status region" ambiguous both to a
+            screen reader and to a test asking for it by role.
+
+            A live region only speaks when its text changes, so asking twice
+            running for the very same sentence is said once. Two reorders in a
+            row cannot produce it, because a mission asked to move to where it
+            already is does not move. Typing the same refused position twice
+            can, and that is the one case this says nothing about. */}
+        <p aria-live="polite" aria-atomic="true" className="sr-only">
+          {said}
+        </p>
+
         {campaign.missions.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             No missions yet. Add one from a saved skirmish preset, or from a
@@ -767,6 +802,19 @@ export default function CampaignEditPage() {
                         <ArrowDown className="size-4" />
                       </Button>
                     </div>
+                    {/* One press to reach any position, for the author who
+                        cannot drag (issue #2394). Beside the arrows rather
+                        than under them, because a third control stacked in
+                        that column would make every row taller and a
+                        ten-mission campaign is already longer than the
+                        window. */}
+                    <MissionPositionField
+                      index={i}
+                      count={campaign.missions.length}
+                      title={m.title}
+                      onMove={(to) => moveTo(i, to)}
+                      onSay={say}
+                    />
                     <div className="flex min-w-0 flex-col gap-1">
                       {/* The only bold line on the card: everything below is
                           one muted metadata row, so a scan down the list reads
