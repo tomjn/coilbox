@@ -154,3 +154,101 @@ describe("buildModel", () => {
     built.dispose();
   });
 });
+
+/** A triangle, offset along x so two of them can be told apart. */
+function face(texture: string | undefined, x: number) {
+  return {
+    texture,
+    positions: [x, 0, 0, x + 1, 0, 0, x + 1, 1, 0],
+    normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+    uvs: [0, 0, 1, 0, 1, 1],
+    indices: [0, 1, 2],
+  };
+}
+
+/**
+ * Three faces over two pieces and two textures: enough for a merge to have
+ * something to join, something it must keep apart, and a piece offset it has to
+ * carry into the vertices.
+ */
+function twoPieces(): UnitModelResult {
+  return model({
+    root: {
+      name: "base",
+      offset: [0, 0, 0],
+      groups: [face("skin.dds", 0)],
+      children: [
+        {
+          name: "turret",
+          offset: [0, 10, 0],
+          groups: [face("skin.dds", 2), face("other.dds", 4)],
+          children: [],
+        },
+      ],
+    },
+    textures: [
+      texture("skin.dds", "abc_skin_dds.dds"),
+      texture("other.dds", "abc_other_dds.dds"),
+    ],
+  });
+}
+
+function meshes(object: THREE.Object3D): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  object.traverse((node) => {
+    if (node instanceof THREE.Mesh) out.push(node);
+  });
+  return out;
+}
+
+function triangles(object: THREE.Object3D): number {
+  let total = 0;
+  for (const mesh of meshes(object)) {
+    const index = mesh.geometry.getIndex();
+    total += (index?.count ?? 0) / 3;
+  }
+  return total;
+}
+
+describe("buildModel merged", () => {
+  it("draws one mesh per material rather than one per piece", () => {
+    const tree = buildModel(twoPieces());
+    const merged = buildModel(twoPieces(), undefined, { merge: true });
+    expect(meshes(tree.object)).toHaveLength(3);
+    expect(meshes(merged.object)).toHaveLength(2);
+    tree.dispose();
+    merged.dispose();
+  });
+
+  it("keeps every triangle", () => {
+    const merged = buildModel(twoPieces(), undefined, { merge: true });
+    expect(triangles(merged.object)).toBe(3);
+    merged.dispose();
+  });
+
+  /** The pieces stop being separate objects, so where the tree stood each one
+   *  has to end up in its vertices instead. */
+  it("bakes the piece offsets into the vertices", () => {
+    const merged = buildModel(twoPieces(), undefined, { merge: true });
+    const box = new THREE.Box3().setFromObject(merged.object);
+    expect(box.max.y).toBe(11);
+    merged.dispose();
+  });
+
+  it("reports the same extent as the piece tree", () => {
+    const tree = buildModel(twoPieces());
+    const merged = buildModel(twoPieces(), undefined, { merge: true });
+    expect(merged.box.min.toArray()).toEqual(tree.box.min.toArray());
+    expect(merged.box.max.toArray()).toEqual(tree.box.max.toArray());
+    tree.dispose();
+    merged.dispose();
+  });
+
+  /** Asked for by the map alone, so the lone-model viewer still gets the tree
+   *  the file describes. */
+  it("leaves the piece tree alone when it is not asked for", () => {
+    const built = buildModel(twoPieces());
+    expect(built.object.getObjectByName("turret")).toBeDefined();
+    built.dispose();
+  });
+});
