@@ -15,6 +15,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useCallback, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { baseFootprints, type Placement } from "@/placement/placements";
+import type { PlaceKind } from "@/placement/preview";
 import { newScenario } from "../../create";
 import type { Point, Scenario } from "../../model";
 import { addBase } from "./bases";
@@ -133,10 +134,16 @@ function drawn(scenario: Scenario): Placement[] {
 function Harness({
   initial,
   onPlace,
+  placing = { kind: "arm" },
   startSelection = [],
 }: {
   initial: Scenario;
   onPlace?: (pos: Point) => void;
+  /** What a click would do, the same as `ScenarioMapScene` works out from
+   *  `drawingPath`, `moving` and `picking` (issue #2359). Defaults to
+   *  whatever is armed, which is what every test but the ones about this
+   *  needs. */
+  placing?: PlaceKind;
   /** What is selected before a key is pressed, so a test can start from a
    *  selection the pointer would have built (issue #2279). */
   startSelection?: string[];
@@ -165,6 +172,7 @@ function Harness({
     onSelect: (key) => setSelection(selectOne(key)),
     onEntry: (entry) => setSelection(selectOne(entry.key)),
     onPlace: onPlace ?? null,
+    placing,
     snap: undefined,
     layoutEdit: () => "own",
     cursorAt: () => ({ pos: view.current, height: 128 }),
@@ -525,6 +533,54 @@ describe("the view's own cursor", () => {
     fireEvent.keyDown(map(), { key: "Enter" });
 
     expect(said()).toContain("places nothing here");
+  });
+
+  it("names the path point added and which one of how many, off the document rather than the keypress (issue #2359)", () => {
+    const placed = vi.fn();
+    render(
+      <Harness
+        initial={withGroupPath()}
+        onPlace={placed}
+        placing={{ kind: "path", groupId: "g1", order: 0 }}
+      />,
+    );
+    fireEvent.keyDown(map(), { key: "Enter" });
+
+    expect(placed).toHaveBeenCalledWith({ x: 4096, z: 4096 });
+    // withGroupPath starts with 2 points, so the one Enter adds is the 3rd of
+    // 3 -- a number this reads off the order, not one the test predicts from
+    // nothing (issue #2359).
+    expect(said()).toBe("Added Group 1, point 3 of 3.");
+  });
+
+  it("says a base's origin moved, at where it actually landed on the build grid (issue #2359)", () => {
+    const placed = vi.fn();
+    render(
+      <Harness
+        initial={laidOut()}
+        onPlace={placed}
+        placing={{ kind: "moving", baseId: "b1" }}
+      />,
+    );
+    fireEvent.keyDown(map(), { key: "Enter" });
+
+    expect(placed).toHaveBeenCalledWith({ x: 4096, z: 4096 });
+    expect(said()).toBe("Moved the base's origin, now at x 4104, z 4104.");
+  });
+
+  it("says a trigger's question is answered, not that something was placed (issue #2359)", () => {
+    const placed = vi.fn();
+    render(
+      <Harness
+        initial={laidOut()}
+        onPlace={placed}
+        placing={{ kind: "picking" }}
+      />,
+    );
+    fireEvent.keyDown(map(), { key: "Enter" });
+
+    expect(placed).toHaveBeenCalledWith({ x: 4096, z: 4096 });
+    expect(said()).toBe("Answered the question at x 4096, z 4096.");
   });
 });
 
