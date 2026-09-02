@@ -442,6 +442,16 @@ export const ScenarioMapScene = forwardRef<
   const [layoutChoice, setLayoutChoice] = useState<LayoutChoice | null>(null);
   const [contentsOpen, setContentsOpen] = useState(false);
 
+  // Every path the document draws, a group's own and the ones its triggers
+  // hand out, so an author drawing either can see what they are drawing
+  // (#847). Read here, ahead of where it is otherwise needed, because the
+  // marquee also reads it, to catch the waypoints standing inside its box
+  // (issue #2355).
+  const paths = useMemo(
+    () => scenarioPaths(scenario, extensions),
+    [scenario, extensions],
+  );
+
   // Every mode is resolved on every render, in the order of a static list, so
   // each one may hold state of its own.
   const mode = EDITOR_MODES.find((m) => m.id === modeId) ?? EDITOR_MODES[0];
@@ -453,6 +463,7 @@ export const ScenarioMapScene = forwardRef<
       selectedNow: () => primaryKey(selectionRef.current),
       onSelect: setSelected,
       placements: units.placements,
+      paths,
       onSelectMany: selectMany,
       layoutEdit,
       layout: layoutChoice,
@@ -550,12 +561,6 @@ export const ScenarioMapScene = forwardRef<
         (pathRef?.groupId ?? (picked?.kind === "group" ? picked.id : null)),
     ) ?? null;
 
-  // Every path the document draws, a group's own and the ones its triggers hand
-  // out, so an author drawing either can see what they are drawing (#847).
-  const paths = useMemo(
-    () => scenarioPaths(scenario, extensions),
-    [scenario, extensions],
-  );
   const selectedLine = selected ? parsePathLineKey(selected) : null;
   // Which of them is being worked on, and so gets knobs on its points: the one a
   // panel is putting points into, failing that the one a point or a line of is
