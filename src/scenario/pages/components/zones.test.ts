@@ -3,6 +3,7 @@ import { newScenario } from "../../create";
 import type { Scenario, ScenarioZone } from "../../model";
 import {
   addZone,
+  DEFAULT_ZONE_ELMOS,
   dragZone,
   MIN_ZONE_ELMOS,
   moveZone,
@@ -11,9 +12,11 @@ import {
   parseZoneKey,
   removeZone,
   renameZone,
+  resizeZone,
   zoneCenter,
   zoneExtent,
   zoneFromDrag,
+  zoneFromPoint,
   zoneHandleOffset,
   zoneHandles,
   zoneKey,
@@ -170,6 +173,36 @@ describe("zoneFromDrag", () => {
   });
 });
 
+describe("zoneFromPoint", () => {
+  it("centres a box on the point, at the default size", () => {
+    const drawn = zoneFromPoint("box", { x: 1000, z: 2000 }, "new", "Zone 1");
+    const half = DEFAULT_ZONE_ELMOS / 2;
+    expect(drawn).toEqual({
+      id: "new",
+      name: "Zone 1",
+      shape: "box",
+      min: { x: 1000 - half, z: 2000 - half },
+      max: { x: 1000 + half, z: 2000 + half },
+    });
+  });
+
+  it("centres a circle on the point, at the default radius", () => {
+    const drawn = zoneFromPoint(
+      "circle",
+      { x: 1000, z: 2000 },
+      "new",
+      "Zone 1",
+    );
+    expect(drawn).toEqual({
+      id: "new",
+      name: "Zone 1",
+      shape: "circle",
+      center: { x: 1000, z: 2000 },
+      radius: DEFAULT_ZONE_ELMOS,
+    });
+  });
+});
+
 describe("zone geometry", () => {
   it("measures a box from its middle", () => {
     expect(zoneCenter(box)).toEqual({ x: 300, z: 400 });
@@ -307,6 +340,71 @@ describe("moveZone", () => {
     const before = document();
     expect(moveZone(before, "zone:nope", { x: 10, z: 10 })).toBe(before);
     expect(moveZone(before, "actor:a1", { x: 10, z: 10 })).toBe(before);
+  });
+});
+
+describe("resizeZone", () => {
+  it("grows a box's height on north, about its own centre, leaving its width alone", () => {
+    const next = resizeZone(document(), zoneKey("z1"), "north", 16);
+    expect(next.zones[0]).toMatchObject({
+      min: { x: 100, z: 184 },
+      max: { x: 500, z: 616 },
+    });
+  });
+
+  it("shrinks a box's height on south, about its own centre", () => {
+    const next = resizeZone(document(), zoneKey("z1"), "south", 16);
+    expect(next.zones[0]).toMatchObject({
+      min: { x: 100, z: 216 },
+      max: { x: 500, z: 584 },
+    });
+  });
+
+  it("grows a box's width on east and shrinks it on west, leaving height alone", () => {
+    const grown = resizeZone(document(), zoneKey("z1"), "east", 16);
+    expect(grown.zones[0]).toMatchObject({
+      min: { x: 84, z: 200 },
+      max: { x: 516, z: 600 },
+    });
+    const shrunk = resizeZone(document(), zoneKey("z1"), "west", 16);
+    expect(shrunk.zones[0]).toMatchObject({
+      min: { x: 116, z: 200 },
+      max: { x: 484, z: 600 },
+    });
+  });
+
+  it("grows a circle's radius on north or east and shrinks it on south or west", () => {
+    expect(
+      resizeZone(document(), zoneKey("z2"), "north", 50).zones[1],
+    ).toMatchObject({ radius: 350 });
+    expect(
+      resizeZone(document(), zoneKey("z2"), "east", 50).zones[1],
+    ).toMatchObject({ radius: 350 });
+    expect(
+      resizeZone(document(), zoneKey("z2"), "south", 50).zones[1],
+    ).toMatchObject({ radius: 250 });
+    expect(
+      resizeZone(document(), zoneKey("z2"), "west", 50).zones[1],
+    ).toMatchObject({ radius: 250 });
+  });
+
+  it("holds a shrink to the minimum size", () => {
+    const shrunk = resizeZone(document(), zoneKey("z2"), "south", 10000);
+    expect(shrunk.zones[1]).toMatchObject({ radius: MIN_ZONE_ELMOS });
+  });
+
+  it("hands back the same document when a shrink asks for no change at all", () => {
+    const atFloor: Scenario = {
+      ...newScenario("test"),
+      zones: [{ ...circle, radius: MIN_ZONE_ELMOS }],
+    };
+    expect(resizeZone(atFloor, zoneKey("z2"), "south", 10)).toBe(atFloor);
+  });
+
+  it("hands back the same document when the key names nothing", () => {
+    const before = document();
+    expect(resizeZone(before, "zone:nope", "north", 16)).toBe(before);
+    expect(resizeZone(before, "actor:a1", "north", 16)).toBe(before);
   });
 });
 

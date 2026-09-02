@@ -12,6 +12,7 @@
  * author draws one area and the mission tests another.
  */
 
+import type { Heading } from "@/placement/mapKeys";
 import type { Point, Scenario, ScenarioZone } from "../../model";
 
 /**
@@ -23,6 +24,14 @@ import type { Point, Scenario, ScenarioZone } from "../../model";
  * a medium tank, which is the smallest area worth asking a question about.
  */
 export const MIN_ZONE_ELMOS = 48;
+
+/**
+ * How big a zone is when a single point puts it down rather than a drag,
+ * which is what the keyboard has to offer instead of two corners (issue
+ * #2313). Four times the minimum: big enough to see and to find a size worth
+ * grabbing before an author has changed it at all.
+ */
+export const DEFAULT_ZONE_ELMOS = MIN_ZONE_ELMOS * 4;
 
 /**
  * Which part of a drawn zone is being dragged. A corner by its compass point,
@@ -122,6 +131,34 @@ export function zoneFromDrag(
   }
   const box = normaliseBox(from, to);
   return { id, name, shape: "box", ...atLeastMinimum(box.min, box.max) };
+}
+
+/**
+ * The zone a single point puts down, centred on it at the default size.
+ *
+ * A drag has two points and names both a place and a size in one gesture. A
+ * keyboard press at a cursor has only the one, so the size has to come from
+ * somewhere else. This is what Enter draws in Zones mode (issue #2313): a
+ * zone worth seeing and resizing afterwards, rather than one an author has to
+ * size before it exists.
+ */
+export function zoneFromPoint(
+  shape: ZoneShape,
+  at: Point,
+  id: string,
+  name: string,
+): ScenarioZone {
+  const center = round(at);
+  if (shape === "circle")
+    return { id, name, shape: "circle", center, radius: DEFAULT_ZONE_ELMOS };
+  const half = DEFAULT_ZONE_ELMOS / 2;
+  return {
+    id,
+    name,
+    shape: "box",
+    min: round({ x: center.x - half, z: center.z - half }),
+    max: round({ x: center.x + half, z: center.z + half }),
+  };
 }
 
 /** The middle of a zone, which is where it is drawn from and what a drag of the
@@ -256,6 +293,78 @@ export function moveZone(
   if (!ref) return scenario;
   const zones = editZone(scenario.zones, ref.id, (zone) =>
     dragZone(zone, ref.handle, delta),
+  );
+  return zones === scenario.zones ? scenario : { ...scenario, zones };
+}
+
+/** Whether a heading makes a zone bigger or smaller. North and east grow it,
+ *  south and west shrink it: the same sign for a box's two axes and a
+ *  circle's one radius, so the rule is one an author only has to learn once. */
+function growSign(heading: Heading): 1 | -1 {
+  return heading === "north" || heading === "east" ? 1 : -1;
+}
+
+/**
+ * A zone grown or shrunk by `step` elmos in the direction named, held to the
+ * minimum size the same way a drag is (issue #2313).
+ *
+ * A box answers on one axis at a time: north and south change its height,
+ * east and west its width, each about the zone's own centre so the edge that
+ * was not asked for does not wander. A circle has one size, its radius, and
+ * every heading answers to that.
+ *
+ * The same zone back, not a new copy of the same numbers, when the size a
+ * heading asks for is the size it already has, so a press held at the floor
+ * changes nothing rather than nothing an author can tell apart from a change.
+ */
+function growZone(
+  zone: ScenarioZone,
+  heading: Heading,
+  step: number,
+): ScenarioZone {
+  const sign = growSign(heading);
+  if (zone.shape === "circle") {
+    const radius = Math.round(
+      Math.max(MIN_ZONE_ELMOS, zone.radius + sign * step),
+    );
+    return radius === zone.radius ? zone : { ...zone, radius };
+  }
+  const axis: "x" | "z" =
+    heading === "north" || heading === "south" ? "z" : "x";
+  const lo = axis === "z" ? zone.min.z : zone.min.x;
+  const hi = axis === "z" ? zone.max.z : zone.max.x;
+  const half = (hi - lo) / 2;
+  const nextHalf = Math.max(MIN_ZONE_ELMOS / 2, half + sign * step);
+  if (nextHalf === half) return zone;
+  const mid = (lo + hi) / 2;
+  const nextLo = Math.round(mid - nextHalf);
+  const nextHi = Math.round(mid + nextHalf);
+  return axis === "z"
+    ? {
+        ...zone,
+        min: { ...zone.min, z: nextLo },
+        max: { ...zone.max, z: nextHi },
+      }
+    : {
+        ...zone,
+        min: { ...zone.min, x: nextLo },
+        max: { ...zone.max, x: nextHi },
+      };
+}
+
+/** The document with the zone this key names grown or shrunk `step` elmos in
+ *  the direction named. The same document back when the key names no zone it
+ *  holds, or when the change asked for is no change at all. */
+export function resizeZone(
+  scenario: Scenario,
+  key: string,
+  heading: Heading,
+  step: number,
+): Scenario {
+  const ref = parseZoneKey(key);
+  if (!ref) return scenario;
+  const zones = editZone(scenario.zones, ref.id, (zone) =>
+    growZone(zone, heading, step),
   );
   return zones === scenario.zones ? scenario : { ...scenario, zones };
 }
