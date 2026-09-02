@@ -12,9 +12,9 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Placement } from "@/placement/placements";
+import { baseFootprints, type Placement } from "@/placement/placements";
 import { newScenario } from "../../create";
 import type { Point, Scenario } from "../../model";
 import { addBase } from "./bases";
@@ -23,6 +23,7 @@ import { addActor } from "./editing";
 import { editedScenario } from "./edits";
 import { addGroup, pathKey } from "./groups";
 import { scenarioPaths } from "./orderPaths";
+import { scenarioPlacements } from "./placements";
 import { type MapSelection, primaryKey, selectOne } from "./selection";
 import { useMapKeyboard } from "./useMapKeyboard";
 import { addZone } from "./zones";
@@ -145,6 +146,12 @@ function Harness({
   const selected = primaryKey(selection);
   // The camera's target, moved by the pan the keys ask for.
   const view = useRef<Point>({ x: 4096, z: 4096 });
+  // No game and no ground read in this harness, so a mark only ever pins the
+  // overlap check, which needs neither (issue #2315).
+  const footprintsAt = useCallback(
+    (doc: Scenario) => baseFootprints(scenarioPlacements(doc), [], null),
+    [],
+  );
 
   const keys = useMapKeyboard({
     things: {
@@ -167,6 +174,7 @@ function Harness({
         z: view.current.z + delta.z,
       };
     },
+    footprintsAt,
   });
 
   return (
@@ -547,6 +555,26 @@ describe("keys the map does not take", () => {
     fireEvent.keyDown(map(), { key: "?" });
 
     expect(said()).toContain("Arrow keys move what is selected");
+  });
+});
+
+describe("reading the whole map's problems on demand (issue #2315)", () => {
+  it("reads the tally through the same live region, with nothing selected", () => {
+    render(<Harness initial={laidOut()} />);
+    fireEvent.keyDown(map(), { key: "p" });
+
+    // No ground and no game units in this harness, so the one building this
+    // document holds is unchecked rather than refused.
+    expect(said()).toBe(
+      "1 building, and it can be built where it stands. It has not been checked against the ground.",
+    );
+  });
+
+  it("says nothing built yet on an empty map", () => {
+    render(<Harness initial={newScenario("Empty")} />);
+    fireEvent.keyDown(map(), { key: "p" });
+
+    expect(said()).toBe("Nothing built yet.");
   });
 });
 

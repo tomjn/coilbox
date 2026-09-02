@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BUILD_SQUARE } from "@/blueprint/footprint";
+import {
+  BUILD_SQUARE,
+  type FootprintMark,
+  footprintMarks,
+  ONE_SQUARE,
+  type Standing,
+} from "@/blueprint/footprint";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
 import { sceneContents } from "./contents";
@@ -14,6 +20,7 @@ import {
   inSelection,
   keysInBox,
   movedKeys,
+  movedManyWords,
   moveSelection,
   primaryKey,
   removalOrder,
@@ -22,8 +29,25 @@ import {
   selectOne,
   stillThere,
   toggleKey,
+  turnedManyWords,
   turnSelection,
 } from "./selection";
+
+/** A single-building footprint mark with the verdict a test wants, built the
+ *  way `baseFootprints` builds a real one, mirroring the helper of the same
+ *  name in `mapKeyboard.test.ts`. */
+function markFor(
+  key: string,
+  standing: Standing,
+  overlapping = false,
+): FootprintMark {
+  const [mark] = footprintMarks(
+    [{ key, def: "armsolar", pos: { x: 0, z: 0 }, facing: 0 }],
+    () => ONE_SQUARE,
+    () => standing,
+  );
+  return { ...mark, overlapping };
+}
 
 /** How an edit to a base is written in these tests: this base's own layout,
  *  which is what every one of them places from. */
@@ -429,5 +453,48 @@ describe("what a selection is called out loud", () => {
 
   it("says nothing at all about an empty selection, leaving the sentence to the caller", () => {
     expect(countWords([])).toBe("");
+  });
+});
+
+describe("whether a move or a turn of many can be built where it landed (issue #2315)", () => {
+  it("says nothing extra when nothing selected is in trouble", () => {
+    expect(movedManyWords(MIXED, "east", 16, [])).toBe(
+      "Moved 4 things 16 east.",
+    );
+  });
+
+  it("tallies how many of the selection cannot be built where they stand", () => {
+    const marks = [markFor("base:b1#1", "slope")];
+
+    expect(movedManyWords(MIXED, "east", 16, marks)).toBe(
+      "Moved 4 things 16 east. 1 cannot be built where it stands.",
+    );
+  });
+
+  it("adds the same tally to a turn, after whatever did not turn", () => {
+    const marks = [markFor("base:b1#1", "slope")];
+
+    expect(turnedManyWords(2, 4, MIXED, marks)).toBe(
+      "Turned 2. 4 do not turn. 1 cannot be built where it stands.",
+    );
+  });
+
+  it("says nothing turned without needing the marks at all", () => {
+    expect(turnedManyWords(0, MIXED.length, MIXED, [])).toBe(
+      "None of these turn. A group's units all face south.",
+    );
+  });
+
+  it("pluralises the tally when more than one thing in the selection is in trouble", () => {
+    // Matched by key alone, so two troubled keys pin the plural without
+    // needing a selection with two real base buildings in it.
+    const marks = [
+      markFor("base:b1#1", "slope"),
+      markFor("actor:a1", "too-deep"),
+    ];
+
+    expect(movedManyWords(MIXED, "east", 16, marks)).toBe(
+      "Moved 4 things 16 east. 2 cannot be built where they stand.",
+    );
   });
 });

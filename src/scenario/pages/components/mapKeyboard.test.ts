@@ -9,6 +9,12 @@
  */
 
 import { describe, expect, it } from "vitest";
+import {
+  type FootprintMark,
+  footprintMarks,
+  ONE_SQUARE,
+  type Standing,
+} from "@/blueprint/footprint";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
 import { addBase } from "./bases";
@@ -16,9 +22,11 @@ import { sceneContents } from "./contents";
 import { addActor } from "./editing";
 import { addGroup, pathKey } from "./groups";
 import {
+  buildTrouble,
   facingWords,
   MAP_KEY_HELP,
   type MapThings,
+  mapProblemsWords,
   mapSteps,
   movedWords,
   moveOnMap,
@@ -41,6 +49,22 @@ import type { PathSource } from "./orderPaths";
 import { addZone, MIN_ZONE_ELMOS } from "./zones";
 
 const own = () => "own" as const;
+
+/** A single-building footprint mark with the verdict a test wants, built the
+ *  way `baseFootprints` builds a real one rather than hand-assembled, so a
+ *  test never drifts from the shape the real marks have. */
+function markFor(
+  key: string,
+  standing: Standing,
+  overlapping = false,
+): FootprintMark {
+  const [mark] = footprintMarks(
+    [{ key, def: "armsolar", pos: { x: 0, z: 0 }, facing: 0 }],
+    () => ONE_SQUARE,
+    () => standing,
+  );
+  return { ...mark, overlapping };
+}
 
 /** A mission with one of each thing the map can hold, so the cycle has
  *  something to walk and every branch has something to name. */
@@ -293,7 +317,7 @@ describe("turning and deleting", () => {
     const after = turnOnMap(doc, "actor:a1", 1, own);
 
     expect(after.actors[0].facing).toBe(1);
-    expect(turnedWords(things(after), "actor:a1")).toBe("Facing east.");
+    expect(turnedWords(things(after), "actor:a1", [])).toBe("Facing east.");
   });
 
   it("turns back on a negative step", () => {
@@ -495,9 +519,82 @@ describe("what is said", () => {
     const doc = laidOut();
     const after = moveOnMap(doc, "actor:a1", { x: 16, z: 0 }, undefined, own);
 
-    expect(movedWords(things(after), "actor:a1", "east", 16)).toBe(
+    expect(movedWords(things(after), "actor:a1", "east", 16, [])).toBe(
       "Moved 16 east, now at x 116, z 200.",
     );
+  });
+
+  describe("whether the thing that moved can be built where it stands (issue #2315)", () => {
+    it("says nothing extra when the mark is fine", () => {
+      const doc = laidOut();
+      const after = moveOnMap(
+        doc,
+        "base:b1#0",
+        { x: 16, z: 0 },
+        undefined,
+        own,
+      );
+      const marks = [markFor("base:b1#0", "fine")];
+
+      expect(movedWords(things(after), "base:b1#0", "east", 16, marks)).toBe(
+        "Moved 16 east, now at x 1016, z 1000.",
+      );
+    });
+
+    it("names an overlap, in the colour its square is drawn", () => {
+      const doc = laidOut();
+      const after = moveOnMap(
+        doc,
+        "base:b1#0",
+        { x: 16, z: 0 },
+        undefined,
+        own,
+      );
+      const marks = [markFor("base:b1#0", "fine", true)];
+
+      expect(movedWords(things(after), "base:b1#0", "east", 16, marks)).toBe(
+        "Moved 16 east, now at x 1016, z 1000. Cannot be built here: overlapping another building, in red.",
+      );
+    });
+
+    it("names ground too steep", () => {
+      const marks = [markFor("base:b1#0", "slope")];
+
+      expect(turnedWords(things(laidOut()), "base:b1#0", marks)).toBe(
+        "Facing south. Cannot be built here: on ground too steep for it, in amber.",
+      );
+    });
+
+    it("names water too deep and water not deep enough, both in cyan", () => {
+      expect(
+        buildTrouble([markFor("base:b1#0", "too-deep")], "base:b1#0"),
+      ).toBe(" Cannot be built here: in water too deep for it, in cyan.");
+      expect(
+        buildTrouble([markFor("base:b1#0", "too-shallow")], "base:b1#0"),
+      ).toBe(" Cannot be built here: not in deep enough water, in cyan.");
+    });
+
+    it("names both an overlap and a slope when a mark carries both", () => {
+      const marks = [markFor("base:b1#0", "slope", true)];
+
+      expect(buildTrouble(marks, "base:b1#0")).toBe(
+        " Cannot be built here: overlapping another building, in red, on ground too steep for it, in amber.",
+      );
+    });
+
+    it("stays silent for a mark nothing has judged yet, so an unread map is not noise on every press", () => {
+      expect(
+        buildTrouble([markFor("base:b1#0", "no-ground")], "base:b1#0"),
+      ).toBe("");
+      expect(
+        buildTrouble([markFor("base:b1#0", "no-slope")], "base:b1#0"),
+      ).toBe("");
+    });
+
+    it("stays silent for anything with no footprint: an actor, a group, a zone", () => {
+      expect(buildTrouble([], "actor:a1")).toBe("");
+      expect(buildTrouble([], "zone:z1")).toBe("");
+    });
   });
 
   it("uses the engine's own facing order", () => {
@@ -529,6 +626,66 @@ describe("what is said", () => {
 
   it("says a path's points are on the ring too (issue #2314)", () => {
     expect(MAP_KEY_HELP).toContain("a path's points");
+  });
+
+  it("names the problems key too (issue #2315)", () => {
+    expect(MAP_KEY_HELP).toContain("P reads how many");
+  });
+});
+
+describe("what is wrong with the whole map, on demand (issue #2315)", () => {
+  it("says nothing is built yet on an empty map", () => {
+    expect(mapProblemsWords([])).toBe("Nothing built yet.");
+  });
+
+  it("says every building has room when nothing is in trouble", () => {
+    const marks = [markFor("base:b1#0", "fine"), markFor("base:b1#1", "fine")];
+
+    expect(mapProblemsWords(marks)).toBe(
+      "2 buildings, and every one of them can be built where it stands.",
+    );
+  });
+
+  it("says one building has room, singular", () => {
+    expect(mapProblemsWords([markFor("base:b1#0", "fine")])).toBe(
+      "1 building, and it can be built where it stands.",
+    );
+  });
+
+  it("tallies overlaps, slopes and both kinds of water problem across the map", () => {
+    const marks = [
+      markFor("base:b1#0", "fine", true),
+      markFor("base:b1#1", "slope"),
+      markFor("base:b2#0", "too-deep"),
+      markFor("base:b2#1", "too-shallow"),
+      markFor("base:b3#0", "fine"),
+    ];
+
+    expect(mapProblemsWords(marks)).toBe(
+      "4 of 5 cannot be built where they stand: 1 overlapping another building, " +
+        "1 on ground too steep for it, 1 in water too deep for it, " +
+        "1 without enough water under it.",
+    );
+  });
+
+  it("drops the 'of N' when everything on the map is in trouble", () => {
+    const marks = [markFor("base:b1#0", "slope")];
+
+    expect(mapProblemsWords(marks)).toBe(
+      "1 cannot be built where it stands: 1 on ground too steep for it.",
+    );
+  });
+
+  it("adds what the ground has not judged rather than staying silent about it", () => {
+    const marks = [
+      markFor("base:b1#0", "no-ground"),
+      markFor("base:b1#1", "fine"),
+    ];
+
+    expect(mapProblemsWords(marks)).toBe(
+      "2 buildings, and every one of them can be built where it stands. " +
+        "1 of them has not been checked against the ground.",
+    );
   });
 });
 

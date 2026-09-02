@@ -19,9 +19,10 @@
  * `useMapKeyboard.ts`.
  */
 
-import type { SnapBuilding } from "@/blueprint/footprint";
+import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
 import type { Heading } from "@/placement/mapKeys";
 import { type Placement, parsePlacementKey } from "@/placement/placements";
+import { previewCount, unjudgedClause } from "@/placement/preview";
 import {
   baseBuildings,
   type Facing,
@@ -265,24 +266,140 @@ export function selectionWords(things: MapThings, key: string | null): string {
   return `${thingWords(things, key)}${way}, at ${spotWords(pos)}.`;
 }
 
+/**
+ * Whether the base building a key names is one the ground, or another
+ * building, will actually take, read off the marks `baseFootprints` already
+ * worked out for the document as it now stands (issue #2315). The same
+ * verdict its footprint square is coloured with, in words.
+ *
+ * Said as an addition only when it is bad news. A building that is fine adds
+ * nothing, the same way a move that lands cleanly says nothing about the
+ * buildings it did not touch, so an author is not told "and it can be built
+ * here" after every single arrow press: silence is what fine sounds like. A
+ * building still in trouble after the press that was meant to fix it says so
+ * again, because that repeat is the one an author needs.
+ *
+ * Nothing here that the ground has not judged: the game's units not being
+ * read, the map's heights not reading, and this def having no slope to check
+ * are all a gap in what is known rather than a refusal, and are said once
+ * about the whole map by {@link mapProblemsWords} rather than on every move of
+ * every building while the reads are still in flight.
+ *
+ * Silent for everything else the map holds too: an actor, a group, a zone and
+ * a path point stand on no footprint at all, so no mark ever names one.
+ */
+export function buildTrouble(
+  marks: readonly FootprintMark[],
+  key: string,
+): string {
+  const mark = marks.find((one) => one.key === key);
+  if (!mark) return "";
+  const reasons: string[] = [];
+  if (mark.overlapping) reasons.push("overlapping another building, in red");
+  if (mark.standing === "slope") {
+    reasons.push("on ground too steep for it, in amber");
+  } else if (mark.standing === "too-deep") {
+    reasons.push("in water too deep for it, in cyan");
+  } else if (mark.standing === "too-shallow") {
+    reasons.push("not in deep enough water, in cyan");
+  }
+  if (reasons.length === 0) return "";
+  return ` Cannot be built here: ${reasons.join(", ")}.`;
+}
+
 /** What a move did, said after the document has taken it. */
 export function movedWords(
   things: MapThings,
   key: string,
   heading: Heading,
   step: number,
+  marks: readonly FootprintMark[],
 ): string {
   const pos = positionIn(things, key);
   if (!pos) return "Nothing moved.";
-  return `Moved ${step} ${heading}, now at ${spotWords(pos)}.`;
+  return `Moved ${step} ${heading}, now at ${spotWords(pos)}.${buildTrouble(marks, key)}`;
 }
 
 /** What a turn did. The position comes with it because a turn does not move a
  *  building but does change which squares it covers. */
-export function turnedWords(things: MapThings, key: string): string {
+export function turnedWords(
+  things: MapThings,
+  key: string,
+  marks: readonly FootprintMark[],
+): string {
   const facing = facingIn(things, key);
   if (facing === null) return "This does not turn.";
-  return `Facing ${facingWords(facing)}.`;
+  return `Facing ${facingWords(facing)}.${buildTrouble(marks, key)}`;
+}
+
+/**
+ * What is wrong with the buildings on the whole map, on demand rather than
+ * only for whichever one happens to be selected (issue #2315): the same tally
+ * a carried layout's preview gives, `previewCount`, read off the marks
+ * `baseFootprints` already worked out for the document as it stands.
+ *
+ * The unchecked note in the map's corner already says this much to an author
+ * who can see it (issue #2350). This is the same fact, read out on request
+ * for one who cannot.
+ */
+export function mapProblemsWords(marks: readonly FootprintMark[]): string {
+  const count = previewCount(marks);
+  if (count.total === 0) return "Nothing built yet.";
+  const bad =
+    count.clashes +
+    count.unstable +
+    count.tooDeep +
+    count.tooShallow +
+    count.absent;
+  if (bad === 0) {
+    const room =
+      count.total === 1
+        ? "1 building, and it can be built where it stands."
+        : `${count.total} buildings, and every one of them can be built where it stands.`;
+    return room + unjudgedClause(count);
+  }
+  const parts: string[] = [];
+  if (count.clashes > 0) {
+    parts.push(
+      count.clashes === 1
+        ? "1 overlapping another building"
+        : `${count.clashes} overlapping other buildings`,
+    );
+  }
+  if (count.unstable > 0) {
+    parts.push(
+      count.unstable === 1
+        ? "1 on ground too steep for it"
+        : `${count.unstable} on ground too steep for them`,
+    );
+  }
+  if (count.tooDeep > 0) {
+    parts.push(
+      count.tooDeep === 1
+        ? "1 in water too deep for it"
+        : `${count.tooDeep} in water too deep for them`,
+    );
+  }
+  if (count.tooShallow > 0) {
+    parts.push(
+      count.tooShallow === 1
+        ? "1 without enough water under it"
+        : `${count.tooShallow} without enough water under them`,
+    );
+  }
+  if (count.absent > 0) {
+    parts.push(
+      count.absent === 1
+        ? "1 a unit this game has not got"
+        : `${count.absent} units this game has not got`,
+    );
+  }
+  const of = bad === count.total ? "" : ` of ${count.total}`;
+  const stand = bad === 1 ? "it stands" : "they stand";
+  return (
+    `${bad}${of} cannot be built where ${stand}: ${parts.join(", ")}.` +
+    unjudgedClause(count)
+  );
 }
 
 /** A zone's size, in elmos: what a resize changed and the number a resize
@@ -529,4 +646,5 @@ export const MAP_KEY_HELP =
   "Escape lets go of the selection. " +
   "More than one thing can be selected at once, and then every one of those keys acts on all of it. " +
   "Full stop and comma replace the selection rather than growing it: to grow one, open Contents and press Shift with Enter on a row, which adds that row instead of replacing what is selected. " +
+  "P reads how many of the buildings on the map cannot be built where they stand. " +
   "Question mark reads this out again.";

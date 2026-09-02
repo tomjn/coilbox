@@ -63,7 +63,10 @@ export type MapKeyAction =
   /** Let go of the selection. */
   | { kind: "clear" }
   /** Read the key list out. */
-  | { kind: "help" };
+  | { kind: "help" }
+  /** Read how many of the map's buildings cannot be built where they stand
+   *  (issue #2315), rather than only the one that happens to be selected. */
+  | { kind: "problems" };
 
 /** A compass direction, which is what an arrow means and what an announcement
  *  says. */
@@ -168,6 +171,9 @@ export function mapKeyAction(
       return state.selected ? { kind: "clear" } : null;
     case "?":
       return { kind: "help" };
+    case "p":
+    case "P":
+      return { kind: "problems" };
     default:
       return null;
   }

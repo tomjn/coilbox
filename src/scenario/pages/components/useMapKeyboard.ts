@@ -26,9 +26,9 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { SnapBuilding } from "@/blueprint/footprint";
+import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
 import { mapKeyAction } from "@/placement/mapKeys";
-import type { Point } from "../../model";
+import type { Point, Scenario } from "../../model";
 import { canTurn } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import { isTypingTarget } from "./history";
@@ -38,6 +38,7 @@ import {
   MAP_KEY_HELP,
   type MapStep,
   type MapThings,
+  mapProblemsWords,
   mapSteps,
   movedWords,
   moveOnMap,
@@ -99,6 +100,17 @@ export interface MapKeyboardDeps {
   cursorAt: () => MapCursor | null;
   /** Move the point the view is looking at, in elmos. */
   panBy: (delta: Point) => void;
+  /**
+   * The ground every base building in a document stands on, and which of them
+   * are fighting over it: `baseFootprints` worked out for whatever scenario is
+   * handed to it (issue #2315).
+   *
+   * A callback rather than a value already on `things`, because a move or a
+   * turn has to hear the verdict the document will carry after the edit lands,
+   * not the one it carried before, and only the caller knows how to weigh a
+   * document against the game's units and the map's ground.
+   */
+  footprintsAt: (scenario: Scenario) => readonly FootprintMark[];
 }
 
 /** What the surface needs to be a keyboard surface. */
@@ -173,6 +185,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
         snap,
         layoutEdit,
         panBy,
+        footprintsAt,
       } = latest.current;
       // The key table only ever needed to know whether something is selected and
       // whether it has a size, both of which are questions about the one the keys
@@ -240,14 +253,19 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
               ? moveSelection(doc, held, action.delta, snap, layoutEdit)
               : moveOnMap(doc, key, action.delta, snap, layoutEdit),
           );
+          // Read off the document the move just landed on, the same rule
+          // every position here already follows: the marks from before the
+          // press are the ground the move is leaving (issue #2315).
+          const marks = footprintsAt(after);
           say(
             many
-              ? movedManyWords(held, action.heading, action.step)
+              ? movedManyWords(held, action.heading, action.step, marks)
               : movedWords(
                   { ...things, scenario: after },
                   key,
                   action.heading,
                   action.step,
+                  marks,
                 ),
           );
           return;
@@ -298,13 +316,26 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
             // different operation rather than this one done properly.
             const turns = held.filter((one) => canTurn(one)).length;
             if (turns === 0) {
-              say(turnedManyWords(0, held.length));
+              say(turnedManyWords(0, held.length, held, []));
               return;
             }
+            const after = turnSelection(
+              things.scenario,
+              held,
+              action.steps,
+              layoutEdit,
+            );
             onChange((doc) =>
               turnSelection(doc, held, action.steps, layoutEdit),
             );
-            say(turnedManyWords(turns, held.length - turns));
+            say(
+              turnedManyWords(
+                turns,
+                held.length - turns,
+                held,
+                footprintsAt(after),
+              ),
+            );
             return;
           }
           const after = turnOnMap(
@@ -318,7 +349,13 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
             return;
           }
           onChange((doc) => turnOnMap(doc, key, action.steps, layoutEdit));
-          say(turnedWords({ ...things, scenario: after }, key));
+          say(
+            turnedWords(
+              { ...things, scenario: after },
+              key,
+              footprintsAt(after),
+            ),
+          );
           return;
         }
 
@@ -384,6 +421,12 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
 
         case "help":
           say(MAP_KEY_HELP);
+          return;
+
+        case "problems":
+          // The whole map's marks, on demand, rather than only the one thing
+          // that happens to be selected (issue #2315).
+          say(mapProblemsWords(footprintsAt(things.scenario)));
           return;
       }
     },
