@@ -10,7 +10,13 @@ import {
   Pencil,
   Plus,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { type SaveState, SaveStatus } from "@/components/SaveStatus";
 import {
@@ -165,6 +171,22 @@ export default function CampaignEditPage() {
   // that a screen reader is looking at, so without this a mission moved by an
   // arrow, by a drag or by a typed position is a change nobody is told about.
   const [said, say] = useState("");
+  // Where to send the keyboard focus once the render an arrow press just
+  // triggered has landed, for a press that disables the very button under
+  // the focus (issue #2397). The sibling arrow is captured before the
+  // click, so there is no need for a ref typed onto picoframe's `Button`,
+  // but at that moment it is still the disabled one, since it is the button
+  // about to become enabled by this same move, and a disabled control
+  // refuses focus. This effect runs once the move's re-render has actually
+  // enabled it.
+  const pendingArrowFocus = useRef<HTMLElement | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: campaign.missions is the trigger, not read in the body. A reorder is what makes the sibling arrow's disabled attribute, read by the browser rather than by this code, actually come off.
+  useEffect(() => {
+    const target = pendingArrowFocus.current;
+    if (!target) return;
+    pendingArrowFocus.current = null;
+    target.focus();
+  }, [campaign?.missions]);
 
   // Seed the editable copy once the (local) campaign for this id is available,
   // and re-seed if the route id changes under the same component instance.
@@ -331,7 +353,36 @@ export default function CampaignEditPage() {
     setSave({ kind: "unsaved" });
   };
 
-  const move = (index: number, dir: -1 | 1) => moveTo(index, index + dir);
+  /** Move a mission one place via its arrow button (issue #2397).
+   *
+   *  When the press lands the mission at either end of the list, the button
+   *  under the keyboard focus is the very one this same render disables, and
+   *  a disabled control cannot hold focus in any engine. The row's other
+   *  arrow is still enabled and sits right beside it, so that is where the
+   *  focus goes: a keyboard user walking a mission to the top with repeated
+   *  presses stays on an arrow the whole way, rather than landing on the
+   *  position box's different kind of control mid-repeat, or on the page
+   *  body with nothing focused at all.
+   *
+   *  Read from `nextElementSibling`/`previousElementSibling` rather than a
+   *  ref, because picoframe's `Button` types its props as the plain button
+   *  attributes and `ref` is not one of them (see `MissionPositionField`,
+   *  which hits the same wall for `Input`). The two arrows are the whole of
+   *  that wrapping `div`, so whichever one was not clicked is always the
+   *  other child. The focus itself is claimed by the effect above, once the
+   *  move has actually enabled that sibling. */
+  const moveArrow = (
+    event: MouseEvent<HTMLButtonElement>,
+    index: number,
+    dir: -1 | 1,
+  ) => {
+    const to = index + dir;
+    if (to === 0 || to === campaign.missions.length - 1) {
+      pendingArrowFocus.current = (event.currentTarget.nextElementSibling ??
+        event.currentTarget.previousElementSibling) as HTMLElement | null;
+    }
+    moveTo(index, to);
+  };
 
   /** Persist, and take off disk whatever the new document stops naming once
    *  that document is the one on disk. Every edit that can drop or replace an
@@ -788,7 +839,7 @@ export default function CampaignEditPage() {
                         variant="ghost"
                         aria-label={`Move ${m.title} up`}
                         disabled={i === 0}
-                        onClick={() => move(i, -1)}
+                        onClick={(e) => moveArrow(e, i, -1)}
                       >
                         <ArrowUp className="size-4" />
                       </Button>
@@ -797,7 +848,7 @@ export default function CampaignEditPage() {
                         variant="ghost"
                         aria-label={`Move ${m.title} down`}
                         disabled={i === campaign.missions.length - 1}
-                        onClick={() => move(i, 1)}
+                        onClick={(e) => moveArrow(e, i, 1)}
                       >
                         <ArrowDown className="size-4" />
                       </Button>
