@@ -29,17 +29,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SnapBuilding } from "@/blueprint/footprint";
 import { mapKeyAction } from "@/placement/mapKeys";
 import type { Point } from "../../model";
-import type { ContentEntry } from "./contents";
 import type { ScenarioEdit } from "./edits";
 import { isTypingTarget } from "./history";
 import {
   cursorWords,
   type LayoutEditFor,
   MAP_KEY_HELP,
+  type MapStep,
   type MapThings,
+  mapSteps,
   movedWords,
   moveOnMap,
-  nextEntry,
+  nextStep,
   placeInList,
   removeOnMap,
   resizedWords,
@@ -65,9 +66,12 @@ export interface MapKeyboardDeps {
   onChange: (edit: ScenarioEdit) => void;
   selected: string | null;
   onSelect: (key: string | null) => void;
-  /** Select a contents entry and take the camera to it, exactly as picking it
-   *  out of the contents list does. */
-  onEntry: (entry: ContentEntry) => void;
+  /**
+   * Select a stop on the cycle's ring and take the camera to it, exactly as
+   * picking it out of the contents list does. A contents entry satisfies this
+   * (issue #2314): only its key, position and span are read.
+   */
+  onEntry: (step: MapStep) => void;
   /**
    * What a click on bare ground would do, already resolved to whatever the map
    * is waiting for: a point for a trigger, the next point of a path being
@@ -163,21 +167,22 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
 
       switch (action.kind) {
         case "cycle": {
-          const entry = nextEntry(things.entries, selected, action.by);
-          if (!entry) {
+          const steps = mapSteps(things.entries, things.paths);
+          const step = nextStep(steps, things.entries, selected, action.by);
+          if (!step) {
             say(
               "Nothing on the map yet. Pick a mode and press Enter to place.",
             );
             return;
           }
-          onEntry(entry);
+          onEntry(step);
           // Landing on a thing takes the camera to it, and the cursor is the
           // point the camera is looking at, so the marker's label has moved
           // too. Read after, because that is when the camera has arrived.
           readCursor();
           say(
-            selectionWords(things, entry.key) +
-              placeInList(things.entries, entry.key),
+            selectionWords(things, step.key) +
+              placeInList(things.entries, step.key),
           );
           return;
         }
