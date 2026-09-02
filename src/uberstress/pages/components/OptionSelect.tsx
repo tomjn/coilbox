@@ -89,6 +89,9 @@ export function OptionSelect({
   disabled,
   className,
   size,
+  ariaLabel,
+  ariaInvalid,
+  describedBy,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -97,12 +100,24 @@ export function OptionSelect({
   disabled?: boolean;
   className?: string;
   size?: "sm" | "default";
+  ariaLabel?: string;
+  /** Marks the trigger invalid, for a field a validator has flagged (issue
+   *  #2287). */
+  ariaInvalid?: boolean;
+  /** The id of a message paragraph explaining why, `FieldProblem`'s. */
+  describedBy?: string;
 }) {
   const grouped = options.some((o) => o.group !== undefined);
 
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger size={size} className={cn("w-full", className)}>
+      <SelectTrigger
+        size={size}
+        className={cn("w-full", className)}
+        aria-label={ariaLabel}
+        aria-invalid={ariaInvalid}
+        aria-describedby={describedBy}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
