@@ -156,6 +156,17 @@ export default function CampaignEditPage() {
       // Losing that one delete is a smaller loss than handing another
       // campaign's filenames to it.
       undeleted.current = null;
+      // None of `writeFailed`, `error` or `save` carry a campaign id either,
+      // so a write refused for the old campaign was still on screen once
+      // this page opened the new one: its own "Not saved" banner, the old
+      // campaign's error message, and a Preview button held disabled by
+      // `writeFailed.current` (issue #2386). This only runs on the id
+      // actually changing, not on every render, so a genuine failure on the
+      // campaign still being edited stays up until its own next write
+      // resolves.
+      writeFailed.current = false;
+      setError(null);
+      setSave({ kind: "idle" });
     }
   }, [loaded, loadedId]);
 
