@@ -56,7 +56,10 @@ import { ObjectivePanel } from "./components/ObjectivePanel";
 import { orderPathId } from "./components/orderPaths";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
-import { DeleteScenarioForm } from "./components/ScenarioRowMenu";
+import {
+  DELETE_SCENARIO_DESCRIPTION,
+  DeleteScenarioForm,
+} from "./components/ScenarioRowMenu";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { SetupPanel } from "./components/SetupPanel";
 import { createScenarioSaver, type ScenarioSaver } from "./components/saving";
@@ -268,7 +271,7 @@ export default function ScenarioEditPage() {
     drawer.open({
       title: `Test ${scenario.name} in game`,
       description:
-        "The scenario is compiled and read back before the engine is started, so a reference that does not resolve stops here rather than playing as a trigger that never fires.",
+        "Compiles the mission, checks it loads, then starts the engine.",
       width: "32rem",
       content: (
         <ScenarioTestDrawer scenario={scenario} origin={loaded?.origin} />
@@ -339,7 +342,7 @@ export default function ScenarioEditPage() {
   const confirmDelete = () =>
     drawer.open({
       title: `Delete ${scenario.name}`,
-      description: "This can't be undone, so it asks you to confirm first.",
+      description: DELETE_SCENARIO_DESCRIPTION,
       width: "24rem",
       content: (
         <DeleteScenarioForm
