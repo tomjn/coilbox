@@ -26,12 +26,16 @@ import {
   pointFrom,
   positionIn,
   removeOnMap,
+  resizedWords,
+  resizeLimitWords,
+  resizeModeWords,
+  resizeOnMap,
   selectionWords,
   thingWords,
   turnedWords,
   turnOnMap,
 } from "./mapKeyboard";
-import { addZone } from "./zones";
+import { addZone, MIN_ZONE_ELMOS } from "./zones";
 
 const own = () => "own" as const;
 
@@ -159,6 +163,93 @@ describe("moving what a key names", () => {
 
     expect(moveOnMap(doc, "actor:gone", { x: 16, z: 0 }, undefined, own)).toBe(
       doc,
+    );
+  });
+});
+
+describe("resizing a zone (issue #2313)", () => {
+  it("grows a circle's radius on north or east", () => {
+    const doc = laidOut();
+    expect(resizeOnMap(doc, "zone:z1", "north", 50).zones[0]).toMatchObject({
+      radius: 350,
+    });
+    expect(resizeOnMap(doc, "zone:z1", "east", 50).zones[0]).toMatchObject({
+      radius: 350,
+    });
+  });
+
+  it("shrinks it on south or west", () => {
+    const doc = laidOut();
+    expect(resizeOnMap(doc, "zone:z1", "south", 50).zones[0]).toMatchObject({
+      radius: 250,
+    });
+  });
+
+  it("says what changed, the size read back from the document", () => {
+    const doc = laidOut();
+    const after = resizeOnMap(doc, "zone:z1", "north", 50);
+
+    expect(resizedWords(things(after), "zone:z1", "north", 50)).toBe(
+      "Grew 50, now radius 350 elmos.",
+    );
+  });
+
+  it("says shrank on south or west", () => {
+    const doc = laidOut();
+    const after = resizeOnMap(doc, "zone:z1", "south", 50);
+
+    expect(resizedWords(things(after), "zone:z1", "south", 50)).toBe(
+      "Shrank 50, now radius 250 elmos.",
+    );
+  });
+
+  it("says nothing resized when the key names no zone still on the map", () => {
+    expect(resizedWords(things(laidOut()), "zone:gone", "north", 50)).toBe(
+      "Nothing resized.",
+    );
+    expect(resizedWords(things(laidOut()), "actor:a1", "north", 50)).toBe(
+      "Nothing resized.",
+    );
+  });
+
+  it("holds a shrink to the minimum and says so rather than lying about a change", () => {
+    const atFloor: Scenario = {
+      ...laidOut(),
+      zones: [
+        {
+          id: "z1",
+          name: "Landing site",
+          shape: "circle",
+          center: { x: 2000, z: 2000 },
+          radius: MIN_ZONE_ELMOS,
+        },
+      ],
+    };
+
+    expect(resizeOnMap(atFloor, "zone:z1", "south", 50)).toBe(atFloor);
+    expect(resizeLimitWords(things(atFloor), "zone:z1")).toBe(
+      `Already as small as a zone gets, radius ${MIN_ZONE_ELMOS} elmos.`,
+    );
+  });
+});
+
+describe("switching resize mode on and off", () => {
+  it("announces the current size when switched on", () => {
+    expect(resizeModeWords(things(laidOut()), "zone:z1", true)).toBe(
+      "Resize mode, radius 300 elmos. Arrows change its size instead of its position: " +
+        "north and east make it bigger, south and west make it smaller. Press S again for move.",
+    );
+  });
+
+  it("announces plainly when switched off", () => {
+    expect(resizeModeWords(things(laidOut()), "zone:z1", false)).toBe(
+      "Move mode. Arrows move it again.",
+    );
+  });
+
+  it("says nothing selected when the zone named is gone", () => {
+    expect(resizeModeWords(things(laidOut()), "zone:gone", true)).toBe(
+      "Nothing selected.",
     );
   });
 });
@@ -321,6 +412,10 @@ describe("what is said", () => {
       "Escape",
     ])
       expect(MAP_KEY_HELP).toContain(key);
+  });
+
+  it("names the resize key too (issue #2313)", () => {
+    expect(MAP_KEY_HELP).toContain("S toggles resize");
   });
 });
 
