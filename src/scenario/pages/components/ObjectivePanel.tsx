@@ -21,13 +21,15 @@
 
 import { Button } from "@picoframe/frame";
 import { Copy, ListChecks, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario, ScenarioObjective } from "../../model";
 import { notifyDeleted } from "./deleteNotice";
-import { EditorPanel, TextField } from "./panels";
+import { focusListRow } from "./focusListRow";
+import { EditorPanel, type EditorPanelHandle, TextField } from "./panels";
+import type { RowFocus } from "./problemTargets";
 import {
   addObjective,
   duplicateObjective,
@@ -40,6 +42,7 @@ export function ObjectivePanel({
   scenario,
   onChange,
   onUndo,
+  focus,
 }: {
   scenario: Scenario;
   onChange: (next: Scenario) => void;
@@ -47,12 +50,29 @@ export function ObjectivePanel({
    *  Handed to a delete's undo notice so that button does exactly what the
    *  shortcut does rather than a second way of getting there (issue #2280). */
   onUndo: () => void;
+  /** An objective a mission problem's row points at (issue #2271): expand the
+   *  panel, select it and land the cursor on its row in the list. */
+  focus?: RowFocus | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
     scenario.objectives.find((o) => o.id === selectedId) ??
     scenario.objectives[0] ??
     null;
+  const panelRef = useRef<EditorPanelHandle>(null);
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus.id and focus.token are the trigger, not the object identity, the same reason TriggerPanel's matching effect gives.
+  useEffect(() => {
+    if (!focus) return;
+    panelRef.current?.open();
+    setSelectedId(focus.id);
+    const raf = requestAnimationFrame(() => {
+      const row = rowRefs.current.get(focus.id);
+      if (row) focusListRow(row);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focus?.id, focus?.token]);
 
   const count = scenario.objectives.length;
   const primary = scenario.objectives.filter(
@@ -66,6 +86,7 @@ export function ObjectivePanel({
 
   return (
     <EditorPanel
+      ref={panelRef}
       title="Objectives"
       icon={ListChecks}
       summary={
@@ -89,6 +110,10 @@ export function ObjectivePanel({
                     objective={objective}
                     current={objective.id === selected?.id}
                     onSelect={() => setSelectedId(objective.id)}
+                    rowRef={(el) => {
+                      if (el) rowRefs.current.set(objective.id, el);
+                      else rowRefs.current.delete(objective.id);
+                    }}
                   />
                 </li>
               ))}
@@ -126,13 +151,18 @@ function ObjectiveRow({
   objective,
   current,
   onSelect,
+  rowRef,
 }: {
   objective: ScenarioObjective;
   current: boolean;
   onSelect: () => void;
+  /** Registers this row's button so a mission problem's row can scroll to
+   *  and focus it (issue #2271). */
+  rowRef?: (el: HTMLButtonElement | null) => void;
 }) {
   return (
     <button
+      ref={rowRef}
       type="button"
       onClick={onSelect}
       className={`flex w-full flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left ${
