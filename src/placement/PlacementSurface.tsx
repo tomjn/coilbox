@@ -17,11 +17,12 @@
  * withdrawn with a null, and whoever took it puts their own layers on it.
  */
 
-import { cn } from "@picoframe/frame";
-import { Crosshair, Maximize2, Minimize2 } from "lucide-react";
+import { cn, useSetting } from "@picoframe/frame";
+import { Crosshair, GripHorizontal, Maximize2, Minimize2 } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useId,
@@ -36,6 +37,7 @@ import {
   ViewControls,
   ViewToggle,
 } from "@/components/ViewControls";
+import { useReduceMotion } from "@/general/display";
 import type { MapAppearance } from "@/mapconv/bindings";
 import {
   type HeightWords,
@@ -44,6 +46,14 @@ import {
 } from "@/mapconv/pages/components/MapPreview3D";
 import { GridScene } from "./GridScene";
 import { authoringCamera, clampToPlane } from "./scene";
+import {
+  clampSurfaceHeight,
+  DEFAULT_SURFACE_HEIGHT,
+  MAX_SURFACE_HEIGHT,
+  MIN_SURFACE_HEIGHT,
+  SURFACE_HEIGHT_KEY,
+  stepSurfaceHeight,
+} from "./surfaceHeight";
 
 /** What the surface is standing on. */
 export type SurfaceGround =
@@ -166,6 +176,7 @@ export function PlacementSurface({
 }) {
   const sceneRef = useRef<MapScene3D | null>(null);
   const [expanded, setExpanded] = useExpanded();
+  const surfaceHeight = useSurfaceHeight();
   // Only ever asked about by a build grid ground. Held for as long as the
   // surface is open and no longer, the way the unit builder holds its own.
   const [grid, setGrid] = useState(true);
@@ -220,7 +231,11 @@ export function PlacementSurface({
   }, []);
 
   return (
-    <Surface expanded={expanded}>
+    <Surface
+      expanded={expanded}
+      height={surfaceHeight.height}
+      dragging={surfaceHeight.dragging}
+    >
       {stand ?? (
         <>
           <div className="relative min-h-0 flex-1">
@@ -286,7 +301,164 @@ export function PlacementSurface({
           )}
         </>
       )}
+      {/* Outside the map/footer fragment, so it is offered whether or not
+          there is a scene to show: the height is a preference about the
+          working area itself, not about what is currently drawn in it. Left
+          out of the expanded view - `fixed inset-0` already fills the window,
+          which has no bottom edge of its own to drag (issue #2320). */}
+      {!expanded && (
+        <SurfaceResizeHandle
+          height={surfaceHeight.height}
+          onDrag={surfaceHeight.onDrag}
+          onCommit={surfaceHeight.onCommit}
+          onStep={surfaceHeight.onStep}
+        />
+      )}
     </Surface>
+  );
+}
+
+/**
+ * The card's own height: what the handle drags or arrow-keys it to, and what
+ * was remembered from last time (issue #2320).
+ *
+ * A view preference - how tall someone likes to work, not anything about the
+ * mission - so it lives in the frame's settings store alongside the zoom
+ * level and the sidebar's collapsed flag, rather than in the scenario
+ * document, which is written to disk on every change and shared with
+ * whoever else opens it. One key for every `PlacementSurface`, because how
+ * tall someone likes the working area is a preference about the person
+ * rather than one per document.
+ *
+ * A drag is shown as it happens without writing to that store on every
+ * pointer move: each write there is an async round trip that persists the
+ * *whole* settings map (see `settings-storage.ts`), and a pointer firing
+ * dozens of times a second would queue dozens of those. `dragHeight` holds
+ * the live value instead, the same shape `StartBoxEditor` uses for its own
+ * pointer drags, and the store is written once, on release.
+ */
+function useSurfaceHeight() {
+  const [stored, setStored] = useSetting<number>(
+    SURFACE_HEIGHT_KEY,
+    DEFAULT_SURFACE_HEIGHT,
+  );
+  const [dragHeight, setDragHeight] = useState<number | null>(null);
+  const height = clampSurfaceHeight(dragHeight ?? stored);
+
+  const onCommit = useCallback(
+    (next: number) => {
+      setDragHeight(null);
+      setStored(clampSurfaceHeight(next));
+    },
+    [setStored],
+  );
+
+  return {
+    height,
+    dragging: dragHeight !== null,
+    onDrag: setDragHeight,
+    onCommit,
+    onStep: (direction: 1 | -1) =>
+      onCommit(stepSurfaceHeight(height, direction)),
+  };
+}
+
+/**
+ * The card's bottom edge, dragged or arrow-keyed to set how tall the working
+ * area is, and remembered afterwards (issue #2320).
+ *
+ * `role="separator"` with `aria-orientation="horizontal"` rather than
+ * `role="slider"`: this is the WAI-ARIA window-splitter pattern, a line
+ * between the working area and the page below it, which is why the keys it
+ * answers are only the two that move a horizontal split - Up and Down -
+ * rather than the four a slider answers to.
+ *
+ * A separate element from the map's own `role="application"` region in
+ * `KeyboardGround`, reached on its own tab stop after everything else in the
+ * card, so it is never confusable with the map for focus order and never
+ * intercepts a key the map wants (issue #2269 made the map itself answer the
+ * keyboard, and this does not take any of that back).
+ */
+function SurfaceResizeHandle({
+  height,
+  onDrag,
+  onCommit,
+  onStep,
+}: {
+  height: number;
+  /** The live height while a drag is in progress, shown but not yet
+   *  persisted. */
+  onDrag: (next: number) => void;
+  /** A drag ended, or a key moved the height by one step: write it out. */
+  onCommit: (next: number) => void;
+  onStep: (direction: 1 | -1) => void;
+}) {
+  const dragStart = useRef<{ pointerY: number; height: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  // The pointer is tracked on the window rather than the handle, so the drag
+  // survives leaving it - exactly the shape `StartBoxEditor`'s own drags use.
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (event: PointerEvent) => {
+      const start = dragStart.current;
+      if (!start) return;
+      onDrag(
+        clampSurfaceHeight(start.height + (event.clientY - start.pointerY)),
+      );
+    };
+    const onUp = (event: PointerEvent) => {
+      const start = dragStart.current;
+      dragStart.current = null;
+      setDragging(false);
+      if (!start) return;
+      onCommit(
+        clampSurfaceHeight(start.height + (event.clientY - start.pointerY)),
+      );
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [dragging, onDrag, onCommit]);
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    dragStart.current = { pointerY: event.clientY, height };
+    setDragging(true);
+  };
+
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      onStep(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      onStep(-1);
+    }
+  };
+
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: an <hr> takes neither a tabIndex nor a keydown handler, and the WAI-ARIA window-splitter pattern calls for role="separator" on a focusable element for exactly that reason.
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize the working area"
+      aria-valuenow={height}
+      aria-valuemin={MIN_SURFACE_HEIGHT}
+      aria-valuemax={MAX_SURFACE_HEIGHT}
+      tabIndex={0}
+      className="absolute inset-x-0 bottom-0 z-10 flex h-2.5 touch-none items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+      style={{ cursor: "ns-resize" }}
+      onPointerDown={onPointerDown}
+      onKeyDown={onKeyDown}
+    >
+      <span className="pointer-events-none rounded-full bg-border/80 p-0.5">
+        <GripHorizontal className="size-3 text-muted-foreground" />
+      </span>
+    </div>
   );
 }
 
@@ -451,22 +623,46 @@ function useExpanded(): [boolean, (on: boolean) => void] {
  * Expanded it is the whole window. Not a dialog and not a second scene: the same
  * element grows, so the canvas resizes in place, the camera keeps the view it
  * had, and every bar comes along because they were always children of this.
+ *
+ * Its height was a flat `h-[30rem]` and is now `height`, the handle's own
+ * number (issue #2320). Animated on a keyboard step so the move reads as one
+ * thing happening rather than a jump cut, held still for a drag so the canvas
+ * tracks the pointer exactly, and held still altogether for `prefers-reduced-
+ * motion`, the same switch the map's own animation already answers to.
  */
 function Surface({
   expanded,
+  height,
+  dragging,
   children,
 }: {
   expanded: boolean;
+  height: number;
+  dragging: boolean;
   children: ReactNode;
 }) {
+  const reduceMotion = useReduceMotion();
   return (
     <section
       className={cn(
-        "flex flex-col overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
+        // shrink-0: the page around this is a flex column with a definite
+        // height (issue #2320's own testing found it, at 1135px on a 916px
+        // window - some ancestor's height:100% chain, not this file's doing).
+        // Without it a tall `height` is silently flex-shrunk back down well
+        // below what the handle asked for, and the DOM stops matching
+        // `aria-valuenow`. shrink-0 makes the page scroll for the difference
+        // instead, which is what stacking more panels under the map already
+        // relies on.
+        "flex shrink-0 flex-col overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
         expanded
           ? "fixed inset-0 z-50 border-0"
-          : "relative h-[30rem] rounded-lg border border-border/50",
+          : "relative rounded-lg border border-border/50",
+        !expanded &&
+          !dragging &&
+          !reduceMotion &&
+          "transition-[height] duration-150 ease-out",
       )}
+      style={expanded ? undefined : { height }}
     >
       {children}
     </section>
