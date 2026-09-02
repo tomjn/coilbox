@@ -61,6 +61,7 @@ export function ScenarioRowMenu({
   const confirmDelete = () =>
     drawer.open({
       title: `Delete ${scenario.name}`,
+      description: "This can't be undone, so it asks you to confirm first.",
       width: "24rem",
       content: (
         <DeleteScenarioForm
