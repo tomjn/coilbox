@@ -209,6 +209,63 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
 };
 
 /**
+ * One line under each condition or action's label in the add-step dropdown, in
+ * the editor's own voice (issue #2286). Before this, a type with nothing here
+ * fell back to its parameter names joined with commas, which read as the
+ * explanation of what the type does when it was only ever the schema.
+ *
+ * A game's own type carries its author's description instead
+ * (`ExtensionType.description`), and one that ships none says so rather than
+ * reaching for this table: a game's type is not coilbox's to describe.
+ *
+ * One map for both tables, same as `TYPE_RUNTIME_VERSION`, because a condition
+ * and an action never share a name.
+ */
+export const TYPE_DESCRIPTIONS: Record<string, string> = {
+  units_in_zone:
+    "Watches how many units are standing in a zone against the count you set.",
+  unit_count:
+    "Counts a team's units anywhere on the map, not just inside a zone.",
+  unit_dead: "Becomes true the moment a named actor is destroyed.",
+  unit_health_below:
+    "Trips once an actor's health drops below the fraction you set.",
+  unit_built: "Holds once a team has finished building enough of a unit type.",
+  unit_captured:
+    "True once an actor changes hands, whether captured or gifted away.",
+  time_elapsed:
+    "True once a set number of seconds has passed since the mission began.",
+  var: "Compares a variable to a number, or to another variable.",
+  zone_held_for:
+    "Holds once a team has kept a zone for the time you set, optionally only while uncontested.",
+  spawn_group:
+    "Places a group's units on the map, holding position until wake_group or give_orders sets them moving.",
+  wake_group:
+    "Places a group on the map if it isn't there yet, and sends it off on its orders.",
+  give_orders:
+    "Replaces a group's orders and puts it in motion on the new ones.",
+  gift_units:
+    "Hands a group's units to another team, though the mission keeps ordering them.",
+  release_group:
+    "Lets go of a group: its units stay put and keep their owner, and the mission stops ordering them.",
+  set_var: "Sets a variable to a number, or to what another variable holds.",
+  add_var: "Adds a number, or another variable's value, to a variable.",
+  enable_trigger: "Arms a trigger so its conditions are checked again.",
+  disable_trigger: "Disarms a trigger until something enables it again.",
+  complete_objective: "Marks an objective as done.",
+  fail_objective: "Marks an objective as failed.",
+  dialogue: "Plays one of the mission's dialogue lines.",
+  play_sound: "Plays a named sound file.",
+  reveal_area:
+    "Lifts the fog over a zone for a team, for a set time or the rest of the mission.",
+  unlock_unit: "Frees a team to build a unit type the mission had restricted.",
+  camera_pan: "Moves a team's camera to a point on the map.",
+  map_marker: "Drops a point on a team's map, labelled if you give it text.",
+  victory: "Ends the mission with a team's side winning.",
+  defeat:
+    "Ends the mission with a team's side losing, and everyone else winning.",
+};
+
+/**
  * The runtime version that added a condition or action, for the types that did
  * not ship in version 1.
  *
