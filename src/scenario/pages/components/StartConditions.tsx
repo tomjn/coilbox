@@ -6,8 +6,8 @@
  * thing this section is a column of, and the same panel is where removing one
  * already asks what becomes of its start units and its bank.
  *
- * Three of the four fields are economy. The fourth, "no automatic commander
- * for this team", is the adoption contract: it is what a vendoring game reads
+ * Three of the four fields are economy. The fourth, "the mission places this
+ * team's start", is the adoption contract: it is what a vendoring game reads
  * through `GG.CoilboxMission.suppressesStart`, and marking every team is what
  * makes `suppressesEveryStart()` true and keeps a game's faction and start spot
  * pickers out of a mission that is already playing. So the switch says what it
@@ -151,6 +151,9 @@ function TeamStart({
   const counts = startUnits(team);
   const [r, g, b] = participant.color;
   const switchId = `no-commander-${participant.id}`;
+  // On when the mission places this team's start itself. The document records
+  // that as `noCommander`, because the engine spawns nothing for them.
+  const missionPlacesStart = team.noCommander === true;
 
   return (
     <div className="flex flex-col gap-2.5 rounded-md border border-border/40 p-2.5">
@@ -162,11 +165,11 @@ function TeamStart({
         <span className="text-xs font-medium">{participant.name}</span>
         <div className="ml-auto flex items-center gap-2">
           <Label htmlFor={switchId} className="text-xs font-normal">
-            No automatic commander for this team
+            The mission places this team's start
           </Label>
           <Switch
             id={switchId}
-            checked={team.noCommander === true}
+            checked={missionPlacesStart}
             onCheckedChange={onNoCommander}
           />
         </div>
