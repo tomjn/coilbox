@@ -22,6 +22,7 @@ import {
   skyboxFromDds,
   skyboxNote,
 } from "../../skyboxNote";
+import { WheelCoalescer } from "./wheelCoalescer";
 import { groundHit, releaseWheel } from "./wheelGate";
 
 export type { HeightWords };
@@ -999,13 +1000,45 @@ uniform vec2 wPlane;`,
         // map's edge or one pixel outside, so the ray is tested against a flat
         // plane at the map's mid height and the map's own XZ bounds instead of
         // 524,288 triangles with no BVH.
+        //
+        // A hit is coalesced rather than passed straight to OrbitControls
+        // (issue #2341): a trackpad delivers wheel events faster than the
+        // display can show frames, and OrbitControls redraws the whole scene
+        // synchronously on every one it sees. The real event is swallowed
+        // here and its delta folded into `WheelCoalescer`. Once a frame, the
+        // accumulated total replays as a single synthesised `wheel` event
+        // dispatched at the canvas, so OrbitControls still does exactly what
+        // it always did, just asked to do it once per frame rather than once
+        // per event. `synthetic` tells this same listener to let that
+        // replayed event straight through rather than gating and folding it
+        // again, since it re-enters at `host` on the way down to the canvas.
         if (interactive && enableZoom) {
           const raycaster = new THREE.Raycaster();
           const pointer = new THREE.Vector2();
           const groundY = ((reliefMin + reliefMax) / 2) * s;
           const halfWidth = planeW / 2;
           const halfDepth = planeH / 2;
+          const coalescer = new WheelCoalescer();
+          const synthetic = new WeakSet<WheelEvent>();
+          let wheelFrame: number | undefined;
+          const flushWheel = () => {
+            wheelFrame = undefined;
+            const sample = coalescer.take();
+            if (!sample || cancelled) return;
+            const replay = new WheelEvent("wheel", {
+              deltaY: sample.deltaY,
+              deltaMode: sample.deltaMode,
+              clientX: sample.clientX,
+              clientY: sample.clientY,
+              ctrlKey: sample.ctrlKey,
+              bubbles: true,
+              cancelable: true,
+            });
+            synthetic.add(replay);
+            renderer.domElement.dispatchEvent(replay);
+          };
           const onWheel = (event: WheelEvent) => {
+            if (synthetic.has(event)) return;
             const rect = renderer.domElement.getBoundingClientRect();
             pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1017,14 +1050,30 @@ uniform vec2 wPlane;`,
               halfWidth,
               halfDepth,
             );
-            if (releaseWheel(hit)) event.stopPropagation();
+            if (releaseWheel(hit)) {
+              event.stopPropagation();
+              return;
+            }
+            // Block the page scroll OrbitControls would otherwise have
+            // prevented itself, then hold the event back for the next frame.
+            event.preventDefault();
+            event.stopPropagation();
+            const needsFlush = coalescer.push({
+              deltaY: event.deltaY,
+              deltaMode: event.deltaMode,
+              clientX: event.clientX,
+              clientY: event.clientY,
+              ctrlKey: event.ctrlKey,
+            });
+            if (needsFlush) wheelFrame = requestAnimationFrame(flushWheel);
           };
           host.addEventListener("wheel", onWheel, {
             capture: true,
-            passive: true,
+            passive: false,
           });
           stopWheelGate = () => {
             host.removeEventListener("wheel", onWheel, { capture: true });
+            if (wheelFrame !== undefined) cancelAnimationFrame(wheelFrame);
           };
         }
 
