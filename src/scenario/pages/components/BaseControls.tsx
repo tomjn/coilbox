@@ -52,6 +52,12 @@
  * sharing an id with an actor or another building, named by which building it
  * is since a building's id is minted and shown nowhere else in this popover
  * (issue #2343).
+ *
+ * A building's factory queue naming a unit type the game has not got is a
+ * building note the same way (issue #2346). The building's own def is not:
+ * that question is already answered here by `absent`, read off the same
+ * footprint marks the map draws in violet, and a second validator-driven
+ * sentence about the same building would only repeat it.
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
@@ -110,6 +116,12 @@ import { entryFieldProblem } from "./triggerProblems";
  * and shown nowhere in this popover, so a message about it says "Building N"
  * the way the queue and the build order above already number the rows they
  * name.
+ *
+ * A building's factory queue naming a unit type the game has not got is
+ * said the same way (issue #2346). The building's own `def` is left out of
+ * this: it is exactly what `absent` and `LayoutNotes`' violet note already
+ * say about that building (issue #1445), and a second sentence in the
+ * validator's own words would repeat it rather than add to it.
  */
 function buildingProblem(
   issues: MissionIssue[],
@@ -277,6 +289,7 @@ export function BaseControls({
     .flatMap((_, i) => [
       buildingProblem(issues, base.id, i, "offset"),
       buildingProblem(issues, base.id, i, "id"),
+      buildingProblem(issues, base.id, i, "queue"),
     ])
     .filter((message): message is string => message !== null);
 

@@ -225,3 +225,182 @@ describe("a base and its buildings the validator has flagged", () => {
     ).toBeTruthy();
   });
 });
+
+/**
+ * A building's factory queue naming a unit type the game has not got (issue
+ * #2346). The building's own `def` is left out on purpose: `absent` already
+ * says that here, read off the same footprint marks the map draws in violet,
+ * and this fixture keeps its own def known so only the queue note is under
+ * test.
+ */
+describe("a base building's queue naming a unit the game has not got", () => {
+  function withBadQueue(): Scenario {
+    const base = newScenario("Demo");
+    const team = base.setup.participants[0]?.id ?? "you";
+    return {
+      ...base,
+      blueprints: [
+        {
+          id: "layout",
+          name: "Outpost",
+          buildings: [{ def: "armllt", offset: { x: 0, z: 0 }, facing: 0 }],
+        },
+      ],
+      bases: [
+        {
+          id: "outpost",
+          blueprint: "layout",
+          team,
+          origin: { x: 300, z: 300 },
+          buildings: [{ queue: ["notaunit"] }],
+        },
+      ],
+    };
+  }
+
+  function BadQueueHarness() {
+    const [document] = useState<Scenario>(withBadQueue);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document, undefined, [
+        { name: "armllt" },
+      ]);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+    const base = document.bases[0];
+
+    return (
+      <BaseControls
+        base={base}
+        buildings={baseBuildings(document.blueprints, base)}
+        index={0}
+        layoutName="Outpost"
+        ordered={false}
+        sharedWith={0}
+        sharedEdit={false}
+        overlaps={[]}
+        unstable={[]}
+        tooDeep={[]}
+        tooShallow={[]}
+        absent={[]}
+        onMap=""
+        participants={document.setup.participants}
+        units={[]}
+        unitsLoading={false}
+        sides={[]}
+        gameArchive={undefined}
+        moving={false}
+        issues={issues}
+        onEdit={() => {}}
+        onRename={() => {}}
+        onOrdered={() => {}}
+        onMoveBuilding={() => {}}
+        onPlay={() => {}}
+        onSharedEdit={() => {}}
+        onQueue={() => {}}
+        onMove={() => {}}
+        onSnapToGrid={() => {}}
+        onSubstitute={() => {}}
+        onDelete={() => {}}
+      />
+    );
+  }
+
+  it("names the building whose queue names the unknown unit", () => {
+    render(<BadQueueHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "Outpost" }));
+
+    expect(
+      screen.getByText(
+        'Building 1: no unit type called "notaunit" in the game',
+      ),
+    ).toBeTruthy();
+  });
+});
+
+/**
+ * A building's own `def` naming a unit the game has not got, deliberately
+ * left out of this popover's validator-driven notes (issue #2346). `absent`
+ * (issue #1445) already says this, read off the same footprint marks the map
+ * draws in violet, so a second sentence in the validator's own words would
+ * only repeat it. The validator still flags the field, in the drawer, but
+ * `BaseControls` does not say it twice next to the building.
+ */
+describe("a base building's own unit type the game has not got", () => {
+  function withUnknownDef(): Scenario {
+    const base = newScenario("Demo");
+    const team = base.setup.participants[0]?.id ?? "you";
+    return {
+      ...base,
+      blueprints: [
+        {
+          id: "layout",
+          name: "Outpost",
+          buildings: [{ def: "notaunit", offset: { x: 0, z: 0 }, facing: 0 }],
+        },
+      ],
+      bases: [
+        {
+          id: "outpost",
+          blueprint: "layout",
+          team,
+          origin: { x: 300, z: 300 },
+          buildings: [{}],
+        },
+      ],
+    };
+  }
+
+  function UnknownDefHarness() {
+    const [document] = useState<Scenario>(withUnknownDef);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document, undefined, [
+        { name: "armllt" },
+      ]);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+    const base = document.bases[0];
+
+    return (
+      <BaseControls
+        base={base}
+        buildings={baseBuildings(document.blueprints, base)}
+        index={0}
+        layoutName="Outpost"
+        ordered={false}
+        sharedWith={0}
+        sharedEdit={false}
+        overlaps={[]}
+        unstable={[]}
+        tooDeep={[]}
+        tooShallow={[]}
+        absent={[]}
+        onMap=""
+        participants={document.setup.participants}
+        units={[]}
+        unitsLoading={false}
+        sides={[]}
+        gameArchive={undefined}
+        moving={false}
+        issues={issues}
+        onEdit={() => {}}
+        onRename={() => {}}
+        onOrdered={() => {}}
+        onMoveBuilding={() => {}}
+        onPlay={() => {}}
+        onSharedEdit={() => {}}
+        onQueue={() => {}}
+        onMove={() => {}}
+        onSnapToGrid={() => {}}
+        onSubstitute={() => {}}
+        onDelete={() => {}}
+      />
+    );
+  }
+
+  it("does not add a second, validator-driven note for the building's own def", () => {
+    render(<UnknownDefHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "Outpost" }));
+
+    expect(screen.queryByText(/no unit type called "notaunit"/)).toBeNull();
+  });
+});

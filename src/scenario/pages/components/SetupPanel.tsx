@@ -489,6 +489,7 @@ export function SetupPanel({
             <StartConditions
               scenario={scenario}
               participants={rows}
+              issues={issues}
               onChange={onChange}
             />
             <GameOptionsPanel

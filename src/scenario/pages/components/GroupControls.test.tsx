@@ -286,3 +286,62 @@ describe("a group standing off the map", () => {
     ).toBeTruthy();
   });
 });
+
+/**
+ * One of a group's own unit rows naming a def the game has not got (issue
+ * #2346). The picker sets the def once and adds a row rather than editing
+ * one, so this is a row-level note under that row too, in the validator's own
+ * words.
+ */
+describe("a group unit whose type the game has not got", () => {
+  function withUnknownUnit(): Scenario {
+    const base = newScenario("Demo");
+    return {
+      ...base,
+      groups: [
+        {
+          id: "wave",
+          team: base.setup.participants[0]?.id ?? "you",
+          units: [{ def: "notaunit", count: 2 }],
+          pos: { x: 200, z: 200 },
+          orders: [],
+          dormant: false,
+        },
+      ],
+    };
+  }
+
+  function UnknownUnitHarness() {
+    const [document] = useState<Scenario>(withUnknownUnit);
+    const issues = useMemo(() => {
+      const found = missionProblemsIn(document, undefined, [
+        { name: "armcom" },
+      ]);
+      return [...found.blocking, ...found.warnings];
+    }, [document]);
+
+    return (
+      <GroupControls
+        group={document.groups[0]}
+        participants={document.setup.participants}
+        units={[]}
+        unitsLoading={false}
+        targets={[]}
+        issues={issues}
+        onEdit={() => {}}
+        onDelete={() => {}}
+        drawing={null}
+        onDraw={() => {}}
+      />
+    );
+  }
+
+  it("says so under the unit row, in the validator's own words", () => {
+    render(<UnknownUnitHarness />);
+    fireEvent.click(screen.getByRole("button", { name: /unit/i }));
+
+    expect(
+      screen.getByText('no unit type called "notaunit" in the game'),
+    ).toBeTruthy();
+  });
+});
