@@ -471,6 +471,38 @@ pub fn build_map_catalog_args(
     args
 }
 
+/// Build args for the minimap walk: what every installed map's minimap would be
+/// called, in one Init (issue #2379).
+///
+/// `asset_dir` is what tells the two passes apart. Without one the walk stops at
+/// the identity, which is what a have check compares on and costs no encode. With
+/// one it encodes the hub's `minimap` asset for each map named and writes it
+/// there, which is the half worth paying only for the maps the hub asked for.
+///
+/// `maps_file` is a JSON array of map names, for the same reason the map catalog
+/// takes one: a library's worth of names is past what Windows takes on a command
+/// line.
+pub fn build_map_minimaps_args(
+    lib: &str,
+    datadir: &str,
+    maps_file: Option<&str>,
+    cache_dir: Option<&str>,
+    asset_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map-minimaps".into());
+    if let Some(path) = maps_file {
+        args.push("--maps-file".into());
+        args.push(path.into());
+    }
+    push_cache_dir(&mut args, cache_dir);
+    if let Some(dir) = asset_dir {
+        args.push("--asset-dir".into());
+        args.push(dir.into());
+    }
+    args
+}
+
 /// Build args for map-skybox mode: scan args plus the map name and the
 /// `--map-skybox` flag (read the map's `atmosphere.skyBox` DDS).
 pub fn build_map_skybox_args(lib: &str, datadir: &str, map_name: &str) -> Vec<String> {

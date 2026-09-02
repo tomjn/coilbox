@@ -12,7 +12,10 @@
 //! draw it twice would double that for nothing.
 //!
 //! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_metalmap`
-//! command does not, and no client upload path for a map is planned (#1685).
+//! command does not, and this overlay has no client upload path (#1685). The
+//! minimap gained one at #2379 and the three overlays deliberately did not: what
+//! a map is missing on the hub is a picture of itself, and these are the
+//! expensive part of the corpus.
 
 use crate::ffi::Unitsync;
 use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage, PNG_MIME};

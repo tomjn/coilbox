@@ -537,11 +537,13 @@ knowledge of any game or map.
 references, rather than the whole roster. Sensible default rather than a hard
 constraint; see §4.1.1.
 
-### 4.6.1 Map assets reach the hub through the seed alone
+### 4.6.1 Map minimaps have a client upload path, the overlays do not
 
-**Section 4.6 is a unit path. There is deliberately no client upload path for
-maps, and adding one is not an outstanding task.** Decided 2026-08-16 on
-coilbox#1685.
+**Reversed 2026-09-02 on coilbox#2379, for minimaps only.** What follows is the
+2026-08-16 decision from coilbox#1685, then what overturned half of it.
+
+The original ruling: section 4.6 is a unit path, there is deliberately no client
+upload path for maps, and adding one is not an outstanding task.
 
 The two corpora are different shapes. A game's roster has a long tail that only
 surfaces when somebody opens a blueprint naming a unit nobody has opened before,
@@ -557,16 +559,49 @@ and none of those means "this map is worth a picture". They mean somebody looked
 at it. Any of them as a trigger would spend the shared storage allowance on
 whatever people happened to click.
 
-So the map encoders have exactly one caller: the seed walk at
-`crates/coilbox-unitsync-worker/src/seed.rs`. The `unitsync_minimap`,
-`unitsync_heightmap` and `unitsync_metalmap` commands do have frontend callers,
-and every one of them asks for the picture coilbox draws rather than for the
-hub's asset. None of them passes an asset directory. The `--typemap` mode has no
-Tauri command at all, because a type map has no display path to have one for.
+#### What overturned it for minimaps
 
-What follows from it: a map nobody has seeded has no picture on the hub, and
-`src/hub/assets/picture.ts` falls through BAR's thumbnail to a drawing of the
-map's outline, so the absence is a handled state rather than a broken one.
+The reasoning was sound and the outcome was not. Every argument above is about
+what a bounded corpus makes possible, and none of them is about who would
+actually do it. The seed is a maintainer job, nobody had run one, and Settings
+meanwhile offered a button that sent what a map says. So pressing it wrote hub
+rows for maps nobody had, each with no picture and nothing that would ever fill
+one in, and the switch above it promised pictures of maps that no part of
+coilbox could send. Somebody contributing their map library in good faith made
+the catalog worse.
+
+`src/hub/maps/pictureSweep.ts` is the client path, behind "Send pictures of your
+maps", and it is the same shape as the game roster sweep: survey the library,
+ask the hub which pictures it is missing, encode only those, and spend an hourly
+allowance on them. A minimap's identity is over the texture unitsync produces, so
+the whole library can be named without encoding any of it, and the hub's answers
+are what make a second press carry on rather than start over.
+
+One thing about the ration is not the unit path's. A game's eighty writes an
+hour is per game, and the hub's own cap is per subject, so a roster walk is
+bounded at both ends. A library walk is thousands of subjects with one picture
+each, so the hub's cap never bites and a per map ration would be none at all. The
+client keeps one bucket over every map.
+
+#### The three overlays are still seed only
+
+`overlay:metal`, `overlay:type` and `overlay:height` reach the hub through the
+seed walk at `crates/coilbox-unitsync-worker/src/seed.rs` and through nothing
+else, and the arguments above still hold for them. They are also the expensive
+part of the corpus, and none of them is what a person sees on a map's page: the
+gap #2379 was about is a map with no picture on it, and the minimap is the
+picture.
+
+So the map encoders now have two callers between them. `crate::minimap::assets`
+is the client walk and takes an asset directory; the other three are the seed's
+alone. The `unitsync_minimap`, `unitsync_heightmap` and `unitsync_metalmap`
+commands still pass none, because every one of them asks for the picture coilbox
+draws rather than for the hub's asset. The `--typemap` mode has no Tauri command
+at all, because a type map has no display path to have one for.
+
+What follows from it: a map nobody has seeded and nobody has uploaded has no
+picture on the hub, and `src/hub/assets/picture.ts` falls through to a drawing of
+the map's outline, so the absence is a handled state rather than a broken one.
 
 ### 4.7 Two-tier storage: Blob as staging, repo as durable
 
@@ -604,9 +639,11 @@ not have installed, arriving from users afterwards. **A steadily growing Blob
 footprint means the promotion job has stalled** — a useful health signal, not
 just a quota to watch.
 
-Maps are not part of that long tail. A map the maintainer does not hold is
-seeded by whoever does hold it, not uploaded by whoever happened to look at it,
-because there is no client upload path for maps at all (section 4.6.1).
+A map's overlays are not part of that long tail. One the maintainer does not
+hold is seeded by whoever does, not uploaded by whoever happened to look at it,
+because there is no client upload path for them (section 4.6.1). A map's minimap
+is part of it, since coilbox#2379: it arrives from whoever has the archive, on a
+button, rationed the same way a game's pictures are.
 
 ### 4.8 Resolution order at render time
 

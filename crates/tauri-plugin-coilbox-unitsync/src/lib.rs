@@ -1113,6 +1113,69 @@ async fn unitsync_map_catalog<R: Runtime>(
     Ok(out)
 }
 
+/// `unitsync_map_minimaps` names what every installed map's minimap would be
+/// called, and with `assets` encodes the pictures themselves (issue #2379).
+///
+/// Two passes and the caller chooses which, the same shape `unitsync_map_catalog`
+/// takes and for the same reason. Without `assets` the walk reads each map's
+/// texture and hashes it, which is a have check's whole question, and `maps` then
+/// names the ones the hub said it wanted so the WebP encode is paid for those
+/// alone. A library is almost entirely maps the hub already holds.
+///
+/// One call is one `Init` however many maps it covers, and what the survey read
+/// is cached on file identity beside the map's own thumbnail, so a second sweep
+/// over an unchanged library reads no textures at all.
+#[tauri::command]
+async fn unitsync_map_minimaps<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    maps: Option<Vec<String>>,
+    assets: Option<bool>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let maps_file = match maps {
+        None => None,
+        Some(names) => {
+            let list = match serde_json::to_string(&names) {
+                Ok(s) => s,
+                Err(e) => return Ok(CliResult::err(format!("could not send the map list: {e}"))),
+            };
+            match write_temp_list("map-minimaps", &list) {
+                Ok(p) => Some(p),
+                Err(e) => return Ok(CliResult::err(e)),
+            }
+        }
+    };
+    let asset_dir = match assets {
+        Some(true) => match hub_asset_dir(&app) {
+            Some(dir) => Some(dir.to_string_lossy().into_owned()),
+            None => return Ok(CliResult::err(
+                "no cache directory on this platform, so there is nowhere to write the minimaps"
+                    .to_string(),
+            )),
+        },
+        _ => None,
+    };
+    let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = sidecar::build_map_minimaps_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        maps_file.as_ref().map(|p| p.to_string_lossy()).as_deref(),
+        cache_dir.as_deref(),
+        asset_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "map minimaps", None).await;
+    if let Some(path) = maps_file {
+        let _ = std::fs::remove_file(&path);
+    }
+    Ok(out)
+}
+
 #[tauri::command]
 async fn unitsync_map_info<R: Runtime>(
     app: AppHandle<R>,
@@ -1402,6 +1465,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_remember_render,
             unitsync_local_renders,
             unitsync_map_catalog,
+            unitsync_map_minimaps,
             unitsync_map_info,
             unitsync_map_skybox,
             unitsync_skirmish_ais,

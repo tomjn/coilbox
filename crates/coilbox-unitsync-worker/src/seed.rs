@@ -36,21 +36,28 @@
 //! and starts at the next one. Re-committing a batch it already has is harmless,
 //! because a file is named after the hash of its own bytes.
 //!
-//! ## The only caller of the map encoders, on purpose
+//! ## The only caller of three of the four map encoders
 //!
-//! Nothing else in coilbox passes an asset directory for a map. The
-//! `unitsync_minimap`, `unitsync_heightmap` and `unitsync_metalmap` commands all
-//! have frontend callers, and every one asks for the picture the app draws
-//! rather than for the hub's asset. `--typemap` has no Tauri command at all.
+//! The three overlays are this walk's alone, which is the decision from issue
+//! #1685 and not an unfinished corner. A unit picture is backfilled lazily
+//! because a roster has a long tail that only turns up when somebody opens a
+//! blueprint naming a unit nobody has opened before. The map set has no such
+//! tail: it is a fixed collection of roughly 3,575 archives, and a machine
+//! holding them can hand the lot over in one walk. Nor is there an honest
+//! trigger to hang a lazy upload on, since a map is opened from the map page,
+//! from a battle, from a scenario and from the launcher, and none of those means
+//! the map is worth a picture.
 //!
-//! That is the decision from issue #1685 and not an unfinished corner. A unit
-//! picture is backfilled lazily because a roster has a long tail that only turns
-//! up when somebody opens a blueprint naming a unit nobody has opened before. The
-//! map set has no such tail: it is a fixed collection of roughly 3,575 archives,
-//! and a machine holding them can hand the lot over in one walk. Nor is there an
-//! honest trigger to hang a lazy upload on, since a map is opened from the map
-//! page, from a battle, from a scenario and from the launcher, and none of those
-//! means the map is worth a picture.
+//! The minimap is the exception, since issue #2379. `crate::minimap::assets`
+//! walks the library for the client too, on a button in Settings, because the
+//! ruling above left a real gap: this walk is a maintainer's job, and until
+//! somebody ran one, a map on the hub had no picture and no way for the person
+//! holding the archive to give it one. The two produce identical bytes for an
+//! identical map, since both go through `crate::minimap::encode_asset`.
+//!
+//! None of the four Tauri commands passes an asset directory. `unitsync_minimap`,
+//! `unitsync_heightmap` and `unitsync_metalmap` ask for the picture the app
+//! draws rather than for the hub's asset, and `--typemap` has no command at all.
 //!
 //! ## Renders are not here
 //!

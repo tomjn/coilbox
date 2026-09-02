@@ -82,20 +82,19 @@
  * it is the suffix test `isSdd` applies everywhere else in the app. A rapid pool
  * install is a `.sdp` and is untouched by it.
  *
- * ## There is no map equivalent of this file, and there is not meant to be
+ * ## The map equivalent of this file is a button, not a lazy path
  *
- * Nothing in coilbox uploads a map picture. Map assets reach the hub through the
- * seed export in `crates/coilbox-unitsync-worker/src/seed.rs` and through nothing
- * else, which is issue #1685 and section 4.6.1 of the asset pipeline design.
+ * `src/hub/maps/pictureSweep.ts` sends a map's minimap, and it only ever runs
+ * because somebody pressed something (issue #2379). Nothing lazy sends one, and
+ * the reason is the reason this file is lazy in the first place. A blueprint
+ * names its units, so a layout is an honest list of what is worth a picture. A
+ * map is opened from the map page, from a battle, from a scenario and from the
+ * launcher, and none of those means the map is worth one. They mean somebody
+ * looked at it.
  *
- * The reason is the reason this file is lazy in the first place. A roster has a
- * long tail that only appears when somebody opens a blueprint naming a unit
- * nobody has opened before, so the client has to be able to fill a gap it finds.
- * The map set is fixed at roughly 3,575 archives and has no such tail, so a
- * machine that holds them can seed the lot at once. And a blueprint names its
- * units, whereas a map is opened from the map page, from a battle, from a
- * scenario and from the launcher, none of which means the map is worth a
- * picture.
+ * The three map overlays still reach the hub through the seed export in
+ * `crates/coilbox-unitsync-worker/src/seed.rs` and through nothing else. Section
+ * 4.6.1 of the asset pipeline design carries both halves.
  */
 
 import {

@@ -27,9 +27,10 @@ import {
  *
  * ## What it does not do
  *
- * It does not walk the library a second time for pictures. Map pictures reach
- * the hub through the seed alone, which is settled in section 4.6.1 of the asset
- * pipeline spec, so there is one map walk in coilbox and this is it.
+ * It does not send pictures. That is `./pictureSweep.ts`, on its own button
+ * (issue #2379), because the two halves of what a map contributes are paced
+ * nothing alike: these facts finish in one press and a picture spends part of an
+ * hourly allowance the whole community shares.
  *
  * ## What is worth telling somebody afterwards
  *

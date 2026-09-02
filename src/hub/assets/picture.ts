@@ -21,10 +21,11 @@ import { type AssetTier, assetTierUrl } from "./tier";
  * works with no network at all, and is the exact map the reader will play rather
  * than a picture of something with the same name.
  *
- * Rungs two and three fill up from the seed export and from nothing else. There
- * is no client upload path for a map picture and none is planned, so a map
- * nobody has seeded is drawn however many people open it. That is issue #1685,
- * and section 4.6.1 of the asset pipeline design carries the reasoning.
+ * Rungs two and three fill up two ways since issue #2379: the seed export, and
+ * anybody who has the archive pressing "Send pictures of your maps" in Settings.
+ * A map neither has covered is drawn however many people open it. Section 4.6.1
+ * of the asset pipeline design carries both decisions, including why the three
+ * overlays are still the seed's alone.
  *
  * Two and three are one row rather than two attempts, exactly as the hub says:
  * there is one row per identity and its `tier` column says which store holds it,

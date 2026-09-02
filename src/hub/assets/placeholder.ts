@@ -3,10 +3,14 @@
  * it anywhere (issue #1637).
  *
  * Every rung above this one in `./picture.ts` depends on something that can be
- * absent - an installed archive, a hub row, an entry in BAR's list - and the hub
- * holds no minimaps at all yet, so until a seed lands this is the rung the hub
- * browser actually reaches for most maps. It is worth drawing properly rather
- * than leaving as the thing nobody looks at.
+ * absent, an installed archive or a hub row, so this is the rung the hub browser
+ * reaches for a map nobody has covered. It is worth drawing properly rather than
+ * leaving as the thing nobody looks at.
+ *
+ * How much of the corpus that is has moved. It used to be nearly all of it,
+ * because the hub held no minimaps at all until a maintainer ran a seed. Since
+ * issue #2379 anybody with the archive can send one from Settings, so what
+ * reaches this rung is a map nobody has run either for.
  *
  * A description rather than a component's props, so the ladder resolves and
  * tests with nothing rendered. `./MapPicture.tsx` turns it into markup. This is

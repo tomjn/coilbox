@@ -105,11 +105,10 @@ const OUTLINE = 0.62;
 /**
  * A map nothing has a picture of, drawn rather than fetched.
  *
- * The rung that cannot fail, and the one most maps in the hub browser reach
- * today, since the hub holds no minimaps until somebody runs the seed. It says
- * the map's name and the shape of the ground, which is most of what a reader can
- * be told without a photograph, and it reads as a deliberate absence rather than
- * as a picture that failed.
+ * The rung that cannot fail, and the one a map nobody has covered reaches. It
+ * says the map's name and the shape of the ground, which is most of what a
+ * reader can be told without a photograph, and it reads as a deliberate absence
+ * rather than as a picture that failed.
  *
  * Markup in the page and not a generated image, the same choice the hub makes at
  * `components/AssetPlaceholder.tsx`: the case this covers is the one where there

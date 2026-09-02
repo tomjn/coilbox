@@ -17,10 +17,15 @@
 //! mip 1, 512px square, because that is what the hub caps a minimap at. The
 //! display render keeps whatever mip it was asked for.
 //!
-//! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_minimap`
-//! command does not, and no client upload path for a map is planned (#1685).
+//! The `unitsync_minimap` command still never passes one: what a page draws is
+//! the picture, not the hub's asset. What does is [`assets`], the batch walk
+//! behind "Send pictures of your maps" (#2379), and [`crate::seed`]. The two
+//! produce the same bytes for the same map by construction, since both go through
+//! [`encode_asset`], which is what lets a seeded map and an uploaded one answer
+//! the same have check.
 
 use crate::ffi::Unitsync;
+use crate::model::{MapMinimapRow, MapMinimapSkip, MapMinimapSkipped, MapMinimapsOutput};
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MinimapOutput, StartPos};
 use crate::model::{Thumbnail, ThumbnailsOutput};
 use base64::Engine;
@@ -381,6 +386,271 @@ pub(crate) fn asset_in_session(
         us.minimap(map_name, ASSET_MINIMAP_MIP).as_deref(),
         &crate::archive::archive_name_for_map(us, map_name),
     )
+}
+
+/// What a map's minimap came to last time it was read, beside its picture in the
+/// thumb cache. `hash` absent is a texture that was one colour.
+#[derive(Serialize, Deserialize)]
+struct CachedIdentity {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hash: Option<String>,
+}
+
+/// Cache file for a map's minimap identity: `<cache_dir>/<key>-mmid.json`.
+///
+/// Mip independent in name only: what it holds is the identity at
+/// [`ASSET_MINIMAP_MIP`], which is the one size the hub stores, and no other
+/// caller of this walk exists to want another. Distinct from the picture files
+/// beside it because `sweep_pictures` bounds those by suffix and this is not a
+/// picture.
+fn identity_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
+    let dir = cache_dir?;
+    let key = key?;
+    Some(dir.join(format!("{key}-mmid.json")))
+}
+
+/// The identity of one map's minimap, read from the texture, and the texture it
+/// was read off.
+///
+/// The texture comes back with it because the sending pass encodes the same words
+/// it hashed. Reading it twice would be two `GetMinimap` calls for one picture.
+///
+/// A blank texture is refused here rather than in the encoder, so a map that
+/// ships no minimap is never asked about either. Asking would mint an identity
+/// for a picture the walk would then decline to make.
+///
+/// The answer is written down for [`cached_identity`], including a blank one:
+/// what the survey needs to know next time is what this map came to, and "no
+/// picture in it" is an answer.
+fn read_identity(
+    us: &Unitsync,
+    map_name: &str,
+    file: Option<PathBuf>,
+) -> Result<(String, Vec<u16>), MapMinimapSkip> {
+    let pixels = us
+        .minimap(map_name, ASSET_MINIMAP_MIP)
+        .ok_or(MapMinimapSkip::NoSource)?;
+    let side = mip_side(ASSET_MINIMAP_MIP);
+    if pixels.len() != (side * side) as usize {
+        return Err(MapMinimapSkip::ReadFailed);
+    }
+    let blank = is_blank(&pixels);
+    let hash = (!blank).then(|| {
+        crate::assetencode::map_source_hash(MINIMAP_VARIANT, side, side, &source_bytes(&pixels))
+    });
+    write_identity(file, &CachedIdentity { hash: hash.clone() });
+    match hash {
+        Some(hash) => Ok((hash, pixels)),
+        None => Err(MapMinimapSkip::Blank),
+    }
+}
+
+/// Store what a map's minimap came to. An unwritable cache dir costs a re-read
+/// next time and nothing else, so nothing here is worth failing over.
+fn write_identity(file: Option<PathBuf>, identity: &CachedIdentity) {
+    let Some(file) = file else { return };
+    if let Some(dir) = file.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(bytes) = serde_json::to_vec(identity) {
+        let _ = std::fs::write(&file, bytes);
+    }
+}
+
+/// The identity of one map's minimap, from the cache where it is known and from
+/// the texture otherwise (issue #2379).
+///
+/// This is what makes pressing the button a second time bearable. The survey is
+/// over the whole library and `GetMinimap` at mip 1 is about 300ms a map, so 120
+/// maps is 37 seconds of decoding textures to ask about pictures that mostly did
+/// not move. The cache key is the archive's file identity, the same one the
+/// minimap PNG beside it is keyed on, so a map that has been reinstalled or
+/// updated is read again.
+///
+/// Only the survey reads this. The sending pass reads the texture whatever the
+/// cache says, so what it declares to the hub is always over the bytes it
+/// encoded, and a stale entry can cost a wasted question but never a wrong
+/// `source_hash`.
+fn cached_identity(
+    us: &Unitsync,
+    map_name: &str,
+    cache_dir: Option<&Path>,
+) -> Result<String, MapMinimapSkip> {
+    let key = map_cache_key(us, None, map_name);
+    let file = identity_file(cache_dir, key.as_deref());
+    let cached = file
+        .as_deref()
+        .and_then(|f| std::fs::read(f).ok())
+        .and_then(|raw| serde_json::from_slice::<CachedIdentity>(&raw).ok());
+    match cached {
+        Some(CachedIdentity { hash: Some(hash) }) => Ok(hash),
+        Some(CachedIdentity { hash: None }) => Err(MapMinimapSkip::Blank),
+        None => read_identity(us, map_name, file).map(|(hash, _)| hash),
+    }
+}
+
+/// The maps this walk covers, and the ones dropped before any texture is read.
+///
+/// Sorted and deduped for the reason the catalog walk gives: a map's name is the
+/// whole of its key, so two installs answering to one name are one map, and a
+/// have check refuses a batch asking about one picture twice.
+///
+/// A map any loose `.sdd` folder claims is dropped whole (issue #1890).
+/// unitsync's map API is keyed on the name from end to end, so a map a working
+/// folder also holds may be read out of either archive and nothing here can say
+/// which. Sending a picture that might have come out of somebody's working copy
+/// is what that closes.
+fn maps_to_walk(us: &Unitsync, only: Option<&[String]>) -> (Vec<String>, Vec<MapMinimapSkipped>) {
+    let listed: Vec<(i32, String)> = (0..us.map_count())
+        .filter_map(|index| us.map_name(index).map(|name| (index, name)))
+        .collect();
+    let working = crate::archive::maps_in_working_folders(us, &listed);
+    choose_maps(listed, &working, only)
+}
+
+/// The filter, the sort and the two drops [`maps_to_walk`] applies, without the
+/// session it takes to read a name.
+fn choose_maps(
+    listed: Vec<(i32, String)>,
+    working: &std::collections::HashSet<String>,
+    only: Option<&[String]>,
+) -> (Vec<String>, Vec<MapMinimapSkipped>) {
+    let mut names: Vec<String> = listed
+        .into_iter()
+        .map(|(_, name)| name)
+        .filter(|name| only.is_none_or(|only| only.iter().any(|wanted| wanted == name)))
+        .collect();
+    names.sort();
+
+    let mut kept: Vec<String> = Vec::with_capacity(names.len());
+    let mut skipped = Vec::new();
+    for name in names {
+        let reason = if kept.last() == Some(&name) {
+            MapMinimapSkip::DuplicateMap
+        } else if working.contains(&name) {
+            MapMinimapSkip::WorkingFolder
+        } else {
+            kept.push(name);
+            continue;
+        };
+        skipped.push(MapMinimapSkipped {
+            map_name: name,
+            reason,
+        });
+    }
+    (kept, skipped)
+}
+
+/// Every map's minimap identity, and its encoded asset when `asset_dir` is set
+/// (issue #2379).
+///
+/// The batch behind the "Send pictures of your maps" button, and the map side of
+/// what `crate::renderkey` does for units: it names a picture without making it,
+/// so the hub can be asked which ones it wants before anything is encoded. A
+/// library is mostly maps the hub already holds, and an encode it did not need is
+/// a WebP pass this machine paid for nobody.
+///
+/// One `Init` however many maps, like every other batch here. A map that will not
+/// read is a skip and not the end of the walk: the rest of the library is still
+/// worth offering.
+pub fn assets(
+    lib: &str,
+    only: Option<&[String]>,
+    cache_dir: Option<&Path>,
+    asset_dir: Option<&Path>,
+) -> MapMinimapsOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return MapMinimapsOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    let mut errors = Vec::new();
+    if us.init(false, 0) == 0 {
+        errors.push("unitsync Init returned 0 (failure); the library looks empty".into());
+    }
+    errors.extend(us.drain_errors());
+
+    let (wanted, mut skipped) = maps_to_walk(&us, only);
+    let _ = us.drain_errors();
+
+    let mut maps = Vec::with_capacity(wanted.len());
+    for map_name in wanted {
+        let row = one_map(&us, &map_name, cache_dir, asset_dir);
+        // Whatever unitsync said while reading this map belongs to this map, and
+        // the next one starts from nothing.
+        let _ = us.drain_errors();
+        match row {
+            Ok(row) => maps.push(row),
+            Err(reason) => skipped.push(MapMinimapSkipped { map_name, reason }),
+        }
+    }
+
+    errors.extend(us.drain_errors());
+    us.uninit();
+
+    MapMinimapsOutput {
+        maps,
+        skipped,
+        errors,
+    }
+}
+
+/// One map's row: its identity, its size in elmos, and the encoded picture when
+/// this pass is the one that sends.
+///
+/// The extent is read whichever pass this is, because a map that cannot say how
+/// big it is has no row on the hub at all: `map_width` and `map_height` are
+/// required on a map asset and refused on a unit one. Finding that out in the
+/// first pass is what stops the second one encoding a picture that would be
+/// turned away.
+fn one_map(
+    us: &Unitsync,
+    map_name: &str,
+    cache_dir: Option<&Path>,
+    asset_dir: Option<&Path>,
+) -> Result<MapMinimapRow, MapMinimapSkip> {
+    let (source_hash, pixels) = match asset_dir {
+        Some(_) => {
+            let file = identity_file(cache_dir, map_cache_key(us, None, map_name).as_deref());
+            let (hash, pixels) = read_identity(us, map_name, file)?;
+            (hash, Some(pixels))
+        }
+        None => (cached_identity(us, map_name, cache_dir)?, None),
+    };
+    let (width, height) = map_elmos(us, map_name, cache_dir);
+    let (Some(map_width), Some(map_height)) = (width, height) else {
+        return Err(MapMinimapSkip::NoExtent);
+    };
+    let source_archive = crate::archive::archive_name_for_map(us, map_name);
+    let asset = match (asset_dir, &pixels) {
+        (Some(dir), Some(pixels)) => Some(
+            encode_asset(dir, pixels, mip_side(ASSET_MINIMAP_MIP), &source_archive)
+                .map_err(MapMinimapSkip::from)?,
+        ),
+        _ => None,
+    };
+    Ok(MapMinimapRow {
+        map_name: map_name.to_string(),
+        source_hash,
+        source_archive,
+        map_width,
+        map_height,
+        asset,
+    })
+}
+
+/// Report a failure that stopped the walk running at all, in the walk's own
+/// shape.
+pub fn emit_assets_error(msg: String) {
+    let out = MapMinimapsOutput {
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
 
 /// A map's size in elmos, from the same `<key>-dims.json` the thumbnail pass
@@ -1022,7 +1292,110 @@ mod tests {
         let dir = temp_dir("sweep-scope");
         let png = cache_file(Some(dir.as_path()), Some("abc"), 3).expect("cache file");
         let dims = dims_file(Some(dir.as_path()), Some("abc")).expect("dims file");
+        let identity = identity_file(Some(dir.as_path()), Some("abc")).expect("identity file");
         assert!(is_swept_picture(&png));
         assert!(!is_swept_picture(&dims));
+        assert!(!is_swept_picture(&identity));
+        // And the three never write over each other.
+        assert_ne!(identity, dims);
+        assert_ne!(Some(identity), png.parent().map(|_| dims.clone()));
+    }
+
+    /// The map's name is the whole of a map asset's key, so two installs
+    /// answering to one name are one map here. A have check refuses a batch
+    /// asking about one picture twice, so a duplicate that reached it would take
+    /// the whole library's survey down with it.
+    #[test]
+    fn the_walk_asks_about_one_map_once() {
+        let listed = vec![
+            (0, "Comet Catcher Remake 1.8".to_string()),
+            (1, "AcidicQuarry 5.17".to_string()),
+            (2, "Comet Catcher Remake 1.8".to_string()),
+        ];
+        let (kept, skipped) = choose_maps(listed, &Default::default(), None);
+
+        assert_eq!(kept, ["AcidicQuarry 5.17", "Comet Catcher Remake 1.8"]);
+        assert_eq!(skipped.len(), 1);
+        assert_eq!(skipped[0].map_name, "Comet Catcher Remake 1.8");
+        assert_eq!(skipped[0].reason, MapMinimapSkip::DuplicateMap);
+    }
+
+    /// Issue #1890: a map a loose `.sdd` folder holds is somebody's working copy,
+    /// and unitsync's map API is keyed on the name, so a picture read under that
+    /// name might have come out of either archive.
+    #[test]
+    fn a_map_a_working_folder_holds_is_not_offered() {
+        let listed = vec![
+            (0, "AcidicQuarry 5.17".to_string()),
+            (1, "Mediterraneum V1".to_string()),
+        ];
+        let working = ["AcidicQuarry 5.17".to_string()].into_iter().collect();
+        let (kept, skipped) = choose_maps(listed, &working, None);
+
+        assert_eq!(kept, ["Mediterraneum V1"]);
+        assert_eq!(skipped[0].reason, MapMinimapSkip::WorkingFolder);
+    }
+
+    /// The sending pass is given the maps the hub asked for, which is what stops
+    /// it encoding the whole library to send a handful.
+    #[test]
+    fn the_second_pass_walks_only_the_maps_it_was_named() {
+        let listed = vec![
+            (0, "AcidicQuarry 5.17".to_string()),
+            (1, "Mediterraneum V1".to_string()),
+            (2, "Comet Catcher Remake 1.8".to_string()),
+        ];
+        let only = ["Mediterraneum V1".to_string()];
+        let (kept, skipped) = choose_maps(listed, &Default::default(), Some(&only));
+
+        assert_eq!(kept, ["Mediterraneum V1"]);
+        assert!(skipped.is_empty(), "a map nobody asked about is not a skip");
+    }
+
+    /// The survey is the expensive half and it is over the whole library, so what
+    /// it costs on a second press is what decides whether pressing again is
+    /// bearable. 120 maps was 37 seconds of `GetMinimap` on this machine.
+    #[test]
+    fn a_maps_identity_is_written_down_and_read_back() {
+        let dir = temp_dir("identity-cache");
+        let file = identity_file(Some(dir.as_path()), Some("abc")).expect("identity file");
+        write_identity(
+            Some(file.clone()),
+            &CachedIdentity {
+                hash: Some("deadbeef".into()),
+            },
+        );
+
+        let raw = std::fs::read(&file).expect("identity written");
+        let back: CachedIdentity = serde_json::from_slice(&raw).expect("identity parses");
+        assert_eq!(back.hash.as_deref(), Some("deadbeef"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A map with no picture in it is an answer worth keeping, not a miss. Left
+    /// out of the cache, every survey would decode the same blank texture again.
+    #[test]
+    fn a_blank_map_is_remembered_as_blank() {
+        let dir = temp_dir("identity-blank");
+        let file = identity_file(Some(dir.as_path()), Some("abc")).expect("identity file");
+        write_identity(Some(file.clone()), &CachedIdentity { hash: None });
+
+        let raw = std::fs::read(&file).expect("identity written");
+        let back: CachedIdentity = serde_json::from_slice(&raw).expect("identity parses");
+        assert_eq!(back.hash, None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// What the survey remembers has to be the string the sending pass will
+    /// declare, or the hub is being asked about one picture and offered another.
+    #[test]
+    fn the_remembered_identity_is_the_one_the_encoder_puts_on_the_asset() {
+        let dir = temp_dir("identity-agrees");
+        let pixels = texture(512);
+        let asset = encode_asset(&dir, &pixels, 512, ARCHIVE).expect("encode");
+        let surveyed = map_source_hash(MINIMAP_VARIANT, 512, 512, &source_bytes(&pixels));
+
+        assert_eq!(asset.source_hash, surveyed);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

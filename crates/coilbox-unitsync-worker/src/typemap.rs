@@ -6,9 +6,10 @@
 //! coilbox draws a type map, so this mode exists only to feed the seed walk at
 //! #1638, and without `--asset-dir` it has nothing to do.
 //!
-//! Which is the whole story for every map layer, not just this one. The seed is
-//! the only caller that asks any of them for an asset, and no client upload path
-//! for a map is planned (#1685).
+//! The seed is the only caller that asks this layer or either of the other two
+//! overlays for an asset, and none of the three has a client upload path
+//! (#1685). Only the minimap has one, at #2379, because what a map is missing on
+//! the hub is a picture of itself.
 //!
 //! A type sample is a label, not an amount: it indexes the `terrainTypes` table
 //! in the map's `mapinfo.lua`, which is what gives speed, hardness and
