@@ -1578,6 +1578,350 @@ describe("the campaign editor's presentation section", () => {
   });
 });
 
+/**
+ * Reordering by dragging a row (issue #2262).
+ *
+ * The arrows move a mission one place per click, so mission 2 reaching
+ * position 9 was seven of them. Dragging is the addition, and the thing it
+ * must not cost is the arrows: they are named, they are in the tab order, and
+ * they are the only reorder path that works without a pointer.
+ *
+ * happy-dom lays nothing out, so every box is at 0,0 until it is told
+ * otherwise. Where a dragged mission lands is decided entirely by where the
+ * rows are on screen, so each test stacks the cards itself and then drags
+ * against those positions.
+ */
+const ROW_HEIGHT = 100;
+
+/** Stack the mission cards down the page, and hand them back in order. */
+function stackRows(): HTMLElement[] {
+  const rows = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-mission-row]"),
+  );
+  rows.forEach((row, i) => {
+    row.getBoundingClientRect = () =>
+      ({
+        top: i * ROW_HEIGHT,
+        bottom: (i + 1) * ROW_HEIGHT,
+        height: ROW_HEIGHT,
+        left: 0,
+        right: 400,
+        width: 400,
+        x: 0,
+        y: i * ROW_HEIGHT,
+        toJSON: () => ({}),
+      }) as DOMRect;
+  });
+  return rows;
+}
+
+/** The middle of row `i`, in the same coordinates `stackRows` hands out. */
+function middleOf(i: number): number {
+  return i * ROW_HEIGHT + ROW_HEIGHT / 2;
+}
+
+function handleOf(row: HTMLElement): HTMLElement {
+  return row.querySelector("[data-drag-handle]") as HTMLElement;
+}
+
+/** Press `on`, and report where the pointer went down. */
+function press(on: HTMLElement, y: number) {
+  fireEvent.pointerDown(on, { pointerId: 1, clientX: 10, clientY: y });
+  return { pointerId: 1, clientX: 10, clientY: y };
+}
+
+/** The whole gesture: press a row's handle, drag to `y`, let go. */
+function dragRowTo(from: number, y: number) {
+  const rows = stackRows();
+  const handle = handleOf(rows[from]);
+  press(handle, middleOf(from));
+  fireEvent.pointerMove(handle, { pointerId: 1, clientX: 10, clientY: y });
+  fireEvent.pointerUp(handle, { pointerId: 1, clientX: 10, clientY: y });
+}
+
+/** The card the drop line is currently drawn on, and which edge it is on. */
+function dropLine(): { row: number; edge: string } | null {
+  const line = document.querySelector("[data-drop-line]");
+  if (!line) return null;
+  const row = line.closest<HTMLElement>("[data-mission-row]");
+  return {
+    row: Number(row?.dataset.missionRow),
+    edge: line.getAttribute("data-drop-line") as string,
+  };
+}
+
+const four = () => [
+  plain("m1", "First"),
+  plain("m2", "Second"),
+  plain("m3", "Third"),
+  plain("m4", "Fourth"),
+];
+
+/** The order the page last wrote, once the write has been asked for. */
+async function savedTitles(): Promise<string[]> {
+  await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+  return savedMissions().map((m) => m.title);
+}
+
+/** Long enough for a write the page did ask for to reach the plugin, so
+ *  "nothing was written" is a claim about the queue having drained rather
+ *  than about having looked too early. */
+async function nothingWritten() {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(campaignSave).not.toHaveBeenCalled();
+}
+
+describe("dragging a mission to a new position", () => {
+  it("moves it the whole way in one gesture, not one place at a time", async () => {
+    show(four());
+
+    // Down past the middle of the last card: seven arrow clicks' worth of
+    // travel in the campaign the issue describes, one gesture here.
+    dragRowTo(0, middleOf(3) + 10);
+
+    expect(await savedTitles()).toEqual(["Second", "Third", "Fourth", "First"]);
+    expect(campaignSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves a mission up the list as well as down", async () => {
+    show(four());
+
+    dragRowTo(3, middleOf(1) - 10);
+
+    expect(await savedTitles()).toEqual(["First", "Fourth", "Second", "Third"]);
+  });
+
+  it("says where the mission will land before it is let go", () => {
+    show(four());
+    const rows = stackRows();
+    const handle = handleOf(rows[0]);
+
+    press(handle, middleOf(0));
+    fireEvent.pointerMove(handle, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(2) - 10,
+    });
+
+    // Above the third card's midpoint, so it lands between Second and Third,
+    // and the line is drawn on the card it would land above.
+    expect(dropLine()).toEqual({ row: 2, edge: "before" });
+    // And nothing is written until the author lets go.
+    expect(campaignSave).not.toHaveBeenCalled();
+  });
+
+  it("draws the line under the last card when the drop is past the end", () => {
+    show(four());
+    const rows = stackRows();
+    const handle = handleOf(rows[0]);
+
+    press(handle, middleOf(0));
+    fireEvent.pointerMove(handle, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3) + 20,
+    });
+
+    expect(dropLine()).toEqual({ row: 3, edge: "end" });
+  });
+
+  it("takes the line away once the mission has landed", () => {
+    show(four());
+
+    dragRowTo(0, middleOf(2));
+
+    expect(dropLine()).toBeNull();
+  });
+
+  it("marks the card being carried, so it is clear which one is moving", () => {
+    show(four());
+    const rows = stackRows();
+
+    press(handleOf(rows[1]), middleOf(1));
+    fireEvent.pointerMove(handleOf(rows[1]), {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+
+    expect(stackRows()[1].className).toContain("opacity-50");
+    expect(stackRows()[0].className).not.toContain("opacity-50");
+  });
+
+  it("writes nothing when the mission is dropped where it started", async () => {
+    show(four());
+
+    dragRowTo(1, middleOf(1));
+
+    await nothingWritten();
+  });
+
+  it("does not treat a press that barely moves as a drag", async () => {
+    show(four());
+    const rows = stackRows();
+    const handle = handleOf(rows[0]);
+
+    press(handle, middleOf(0));
+    fireEvent.pointerMove(handle, {
+      pointerId: 1,
+      clientX: 11,
+      clientY: middleOf(0) + 2,
+    });
+
+    expect(dropLine()).toBeNull();
+
+    fireEvent.pointerUp(handle, {
+      pointerId: 1,
+      clientX: 11,
+      clientY: middleOf(0) + 2,
+    });
+
+    await nothingWritten();
+  });
+
+  it("puts the mission back when the drag is abandoned with Escape", async () => {
+    show(four());
+    const rows = stackRows();
+    const handle = handleOf(rows[0]);
+
+    press(handle, middleOf(0));
+    fireEvent.pointerMove(handle, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(dropLine()).toBeNull();
+
+    fireEvent.pointerUp(handle, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+
+    await nothingWritten();
+    expect(screen.getByText("1. First")).toBeTruthy();
+  });
+
+  it("writes nothing when the system takes the gesture away", async () => {
+    show(four());
+    const rows = stackRows();
+    const handle = handleOf(rows[0]);
+
+    press(handle, middleOf(0));
+    fireEvent.pointerMove(handle, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+    fireEvent.pointerCancel(handle, { pointerId: 1 });
+
+    expect(dropLine()).toBeNull();
+    await nothingWritten();
+  });
+});
+
+/**
+ * What a drag must not cost. Only the handle carries the gesture, so every
+ * other control on the row still does what it did, and the arrows stay the
+ * reorder path for anyone not using a pointer.
+ */
+describe("the mission row's other controls, now a row can be dragged", () => {
+  it("keeps both arrows, named after the mission they move", () => {
+    show(four());
+
+    expect(screen.getByRole("button", { name: "Move Second up" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Move Second down" }),
+    ).toBeTruthy();
+    // The ends of the list still have nowhere to go.
+    expect(
+      screen
+        .getByRole("button", { name: "Move First up" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: "Move Fourth down" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("still moves a mission one place per arrow click", async () => {
+    show(four());
+
+    fireEvent.click(screen.getByRole("button", { name: "Move Third up" }));
+
+    expect(await savedTitles()).toEqual(["First", "Third", "Second", "Fourth"]);
+  });
+
+  it("moves a mission down from the arrow too", async () => {
+    show(four());
+
+    fireEvent.click(screen.getByRole("button", { name: "Move First down" }));
+
+    expect(await savedTitles()).toEqual(["Second", "First", "Third", "Fourth"]);
+  });
+
+  it("never starts a drag from an arrow button", async () => {
+    show(four());
+    stackRows();
+    const arrow = screen.getByRole("button", { name: "Move First down" });
+
+    press(arrow, middleOf(0));
+    fireEvent.pointerMove(arrow, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+
+    expect(dropLine()).toBeNull();
+
+    fireEvent.pointerUp(arrow, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: middleOf(3),
+    });
+
+    await nothingWritten();
+  });
+
+  it("never starts a drag from the row's own actions", async () => {
+    show(four());
+    stackRows();
+
+    for (const name of ["Edit", "Preview First", "Duplicate First"]) {
+      const button = screen.getAllByRole("button", { name })[0];
+      press(button, middleOf(0));
+      fireEvent.pointerMove(button, {
+        pointerId: 1,
+        clientX: 10,
+        clientY: middleOf(3),
+      });
+      expect(dropLine()).toBeNull();
+      fireEvent.pointerUp(button, {
+        pointerId: 1,
+        clientX: 10,
+        clientY: middleOf(3),
+      });
+    }
+
+    await nothingWritten();
+  });
+
+  it("hides the drag handle from a screen reader and from the tab order", () => {
+    show(four());
+    const handle = handleOf(stackRows()[0]);
+
+    // The arrows say the same thing and can be reached without a pointer, so
+    // a handle in the tab order would only be a stop that does nothing.
+    expect(handle.getAttribute("aria-hidden")).toBe("true");
+    expect(handle.tagName).toBe("SPAN");
+    expect(handle.hasAttribute("tabindex")).toBe(false);
+  });
+});
+
 /** Stands in for the mission briefing, naming the mission it was asked for. */
 function PlayerBriefing() {
   const { missionId } = useParams();
