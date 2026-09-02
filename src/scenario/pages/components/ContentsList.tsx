@@ -159,29 +159,34 @@ function UnplacedLayouts({
             <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
               {layout.detail}
             </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="size-7 shrink-0 p-0"
-              aria-label={`Place ${layout.name}`}
-              title={`Place ${layout.name} on the map`}
-              // A layout with nothing in it would place a base that draws
-              // nothing and can never be selected again.
-              disabled={layout.empty}
-              onClick={() => onPlace(layout)}
-            >
-              <MapPin className="size-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="size-7 shrink-0 p-0"
-              aria-label={`Delete ${layout.name}`}
-              title={`Delete ${layout.name}`}
-              onClick={() => onDelete(layout)}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="size-7 p-0"
+                aria-label={`Place ${layout.name}`}
+                title={`Place ${layout.name} on the map`}
+                // A layout with nothing in it would place a base that draws
+                // nothing and can never be selected again.
+                disabled={layout.empty}
+                onClick={() => onPlace(layout)}
+              >
+                <MapPin className="size-3.5" />
+              </Button>
+              {/* Ghost-destructive, matching the row menu's delete item
+                  (ScenarioRowMenu), so Delete reads as different from Place
+                  rather than as its twin one pixel away (#2284). */}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="size-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/20"
+                aria-label={`Delete ${layout.name}`}
+                title={`Delete ${layout.name}`}
+                onClick={() => onDelete(layout)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
           </li>
         ))}
       </ul>
