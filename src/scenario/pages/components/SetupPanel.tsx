@@ -8,9 +8,14 @@
  * draft, so an author with no saved preset can give a scenario a game and a map,
  * and one with a preset can still start from it.
  *
- * One thing here is the scenario's own rather than the launcher's:
- * {@link StartConditions}, the document's `teams` block. It sits with the
- * participants because every field in it is keyed by a participant id.
+ * What each participant opens the mission with, the document's `teams` block, is
+ * `StartConditions.tsx` and is a panel of its own on the edit page. It sat here
+ * because every field in it is keyed by a participant id, which is true and was
+ * not enough: it made this the longest thing on the page, and it is the one part
+ * of the setup an author comes back to while writing triggers.
+ *
+ * The shut panel's summary still names it, because a scenario's starts are
+ * setup even when they are edited elsewhere.
  *
  * What is different is that a scenario is not just a launch payload. The map is
  * the space every coordinate is measured in, the game is what every unit def
@@ -71,7 +76,6 @@ import type { LoadedScenario } from "../../storage";
 import { defsMissingFrom, type MissionIssue, unitDefsIn } from "../../validate";
 import { MissionHomeActions } from "./MissionHomeActions";
 import { EditorPanel, RowProblem } from "./panels";
-import { StartConditions } from "./StartConditions";
 import {
   applyPresetSetup,
   holdsNothing,
@@ -484,14 +488,6 @@ export function SetupPanel({
             {teamNotes.map((message) => (
               <RowProblem key={message} problem={message} />
             ))}
-            {/* Keyed by participant id, so it belongs beside the table that
-                mints those ids rather than in a panel of its own. */}
-            <StartConditions
-              scenario={scenario}
-              participants={rows}
-              issues={issues}
-              onChange={onChange}
-            />
             <GameOptionsPanel
               selectedGame={selectedGame}
               startPosType={setup.startPosType}

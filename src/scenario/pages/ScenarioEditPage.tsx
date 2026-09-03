@@ -84,6 +84,7 @@ import {
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { SetupPanel } from "./components/SetupPanel";
 import { ShortcutsList } from "./components/ShortcutsList";
+import { StartConditions } from "./components/StartConditions";
 import { createScenarioSaver, type ScenarioSaver } from "./components/saving";
 import { isDuplicateKey, isTestKey } from "./components/shortcuts";
 import {
@@ -718,6 +719,18 @@ export default function ScenarioEditPage() {
         <SetupPanel
           scenario={scenario}
           loaded={loaded}
+          issues={missionIssues}
+          onChange={(next) => apply(next)}
+        />
+
+        {/* Straight after Setup, because it is about the participants Setup
+            declares and reads as the next question to answer about them. Its
+            own panel rather than a fifth section inside that one: setup is
+            already the game, the map, the participants and the mod options,
+            and this is the part of it an author comes back to while writing
+            triggers rather than once at the start. */}
+        <StartConditions
+          scenario={scenario}
           issues={missionIssues}
           onChange={(next) => apply(next)}
         />
