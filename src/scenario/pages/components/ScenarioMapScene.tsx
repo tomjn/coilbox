@@ -1483,19 +1483,6 @@ export const ScenarioMapScene = forwardRef<
               )}
             </ScenarioSelectionBar>
           )}
-          {/* How much is in hand, and the way to put it all down. Under the bar
-              that names the primary rather than over it: that bar is the thing
-              an author is reading and acting on, and a tally that pushed it
-              down the view every time a second thing was picked up moved the
-              controls out from under the pointer. Its own bar rather than a
-              note in the corner, because the corner is for what is true of the
-              whole scene (issue #2350). */}
-          {selection.length > 1 && (
-            <SelectionCountBar
-              what={countWords(selection)}
-              onClear={() => setSelection(NO_SELECTION)}
-            />
-          )}
           {/* What the outlined square beside the selected building means while
               a turn is being considered (issue #1541) is `turnNote` on the
               rail's Turn now. It is only ever said while the pointer is on that
@@ -1583,6 +1570,21 @@ export const ScenarioMapScene = forwardRef<
               onRename={(name) =>
                 onChange((doc) => renameZone(doc, pickedZone.id, name))
               }
+            />
+          )}
+          {/* How much is in hand, and the way to put it all down. Last in the
+              column, under every bar that names the primary, because which of
+              those is drawn depends on what the primary turned out to be: a
+              placement, a point on a path or a zone. Sitting above any one of
+              them put the tally over the bar for a zone and under the bar for a
+              unit, which is one bar moving for no reason an author could state.
+
+              Its own bar rather than a note in the corner, because the corner is
+              for what is true of the whole scene (issue #2350). */}
+          {selection.length > 1 && (
+            <SelectionCountBar
+              what={countWords(selection)}
+              onClear={() => setSelection(NO_SELECTION)}
             />
           )}
         </>
@@ -1741,12 +1743,17 @@ function SelectionCountBar({
 }
 
 /**
- * The selected zone: its name, its size, and the way to delete it.
+ * The selected zone: its name and its size.
  *
  * The name is what triggers pick a zone by, so it is the one thing about a zone
  * that cannot be set by dragging and the only field here. It is committed when
  * the box is left rather than on every keystroke, because every change to the
  * document is written to disk.
+ *
+ * What the handles do is not said. The zone is on screen with its handles drawn
+ * on it in two colours, and a sentence spelling that out was the widest thing in
+ * this bar: it pushed the size off the end of a narrow window to explain a drag
+ * an author works out by doing it once.
  *
  * Mounted per zone by its id, so moving the selection reseeds the box. A zone's
  * id is not its name, so renaming one does not reseed it, and the box has to
@@ -1788,9 +1795,6 @@ export function ZoneBar({
       />
       <span className="font-mono text-[11px] text-muted-foreground">
         {size}
-      </span>
-      <span className="text-[11px] text-muted-foreground">
-        drag the orange handle to move it, a white one to resize it
       </span>
     </div>
   );
