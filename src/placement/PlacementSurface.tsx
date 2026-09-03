@@ -142,6 +142,7 @@ export function PlacementSurface({
   frame = frameGround,
   frameLabel = "Frame",
   stand,
+  rail,
   bars,
   chrome,
   note,
@@ -160,8 +161,17 @@ export function PlacementSurface({
    *  chosen, still loading, no engine to read it with. Everything else is
    *  hidden with it, because none of it has anything to act on. */
   stand?: ReactNode;
-  /** The column down the top left: mode strip, selection bar, whatever is
-   *  waiting for a click. */
+  /**
+   * A column of buttons down the left edge, vertically centred: the tools this
+   * surface offers, the way the unit builder's viewport offers its handles.
+   *
+   * Its own slot rather than the first thing in `bars`, because it is centred
+   * and `bars` is anchored to the top. A surface with a rail moves `bars` clear
+   * of it, so neither has to know about the other.
+   */
+  rail?: ReactNode;
+  /** The column down the top left: the current tool's own controls, selection
+   *  bar, whatever is waiting for a click. */
   bars?: ReactNode;
   /** Buttons along the top right: undo and redo, a contents list, whatever acts
    *  on the document. What acts on the view instead goes in the bar of view
@@ -243,8 +253,25 @@ export function PlacementSurface({
               <GroundView ground={ground} grid={grid} onScene={takeScene} />
             </KeyboardGround>
 
+            {/* Bounded top and bottom and scrollable rather than centred on a
+                fixed point, so a short window scrolls the rail instead of
+                spilling it over the bars above and the view controls below.
+                `m-auto` on the inner column rather than `justify-center` on the
+                outer one: centring a flex container that way clips content off
+                both ends once it overflows. The unit builder's viewport does
+                the same, and for the same reason. */}
+            {rail && (
+              <div className="absolute inset-y-3 left-2 flex flex-col overflow-y-auto">
+                <div className="m-auto">{rail}</div>
+              </div>
+            )}
+
             {bars && (
-              <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col items-start gap-1.5">
+              <div
+                className={`absolute top-2 flex max-w-[calc(100%-21rem)] flex-col items-start gap-1.5 ${
+                  rail ? "left-12" : "left-2"
+                }`}
+              >
                 {bars}
               </div>
             )}

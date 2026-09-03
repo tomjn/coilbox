@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { ButtonGroup } from "@/components/ui/button-group";
 import { modKeyLabel } from "@/scenario/pages/components/history";
 
 /**
@@ -39,25 +40,34 @@ import { modKeyLabel } from "@/scenario/pages/components/history";
  * button with nowhere to go is disabled and says so, because the start of a
  * session is exactly where somebody reaches for undo first, and one that does
  * nothing silently reads as broken.
+ *
+ * One segmented pair rather than two buttons with a gap, and opaque rather than
+ * a tint of the card over the map. A translucent control sitting on terrain
+ * takes whatever is under it, so the same two buttons read differently over
+ * grass and over snow, and the icon inside them goes with it.
  */
 export function HistoryControls({
   canUndo,
   canRedo,
   undo,
   redo,
+  vertical,
 }: {
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
   redo: () => void;
+  /** Stacked rather than side by side, for a surface that keeps them in a rail
+   *  down the left edge instead of in the top corner. */
+  vertical?: boolean;
 }) {
   const mod = modKeyLabel();
   return (
-    <>
+    <ButtonGroup orientation={vertical ? "vertical" : "horizontal"}>
       <Button
-        size="sm"
+        size={vertical ? "icon" : "sm"}
         variant="outline"
-        className="bg-card/80 px-2 backdrop-blur"
+        className={vertical ? "bg-card" : "bg-card px-2"}
         onClick={undo}
         disabled={!canUndo}
         aria-label="Undo"
@@ -66,9 +76,9 @@ export function HistoryControls({
         <Undo2 className="size-3.5" />
       </Button>
       <Button
-        size="sm"
+        size={vertical ? "icon" : "sm"}
         variant="outline"
-        className="bg-card/80 px-2 backdrop-blur"
+        className={vertical ? "bg-card" : "bg-card px-2"}
         onClick={redo}
         disabled={!canRedo}
         aria-label="Redo"
@@ -76,7 +86,7 @@ export function HistoryControls({
       >
         <Redo2 className="size-3.5" />
       </Button>
-    </>
+    </ButtonGroup>
   );
 }
 

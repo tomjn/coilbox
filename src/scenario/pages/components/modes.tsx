@@ -195,6 +195,17 @@ export interface EditorMode {
   id: string;
   label: string;
   icon: LucideIcon;
+  /**
+   * What this mode makes, in one line, shown in the mode rail's tooltip under
+   * the label.
+   *
+   * The rail is icons, so the tooltip is the only place a mode says what it is,
+   * and it is where Groups and Bases say how they differ: a group is mobile
+   * units the mission drives as one, a base is buildings standing on the
+   * ground. Shorter than `hint`, which is about the gesture rather than the
+   * thing.
+   */
+  what: string;
   /** What a click will do, said in the strip under the map alongside the
    *  gestures that are true whatever the mode (issue #2285). */
   hint: string;
@@ -221,6 +232,7 @@ const selectMode: EditorMode = {
   id: "select",
   label: "Select",
   icon: MousePointer2,
+  what: "Takes hold of what is already on the map. Puts nothing down.",
   // Dragging a unit and dragging a zone's handle are true in every mode, so the
   // strip under the map says both for all of them. This says the ones that are
   // only true here (issue #2285).
@@ -305,6 +317,7 @@ const zonesMode: EditorMode = {
   id: "zones",
   label: "Zones",
   icon: Square,
+  what: "A named piece of ground, for a trigger to ask questions about.",
   hint: "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on.",
   use: ({ onChange, onSelect }) => {
     const [shape, setShape] = useState<ZoneShape>("box");
@@ -379,6 +392,7 @@ const actorsMode: EditorMode = {
   id: "actors",
   label: "Actors",
   icon: User,
+  what: "One named unit, which a trigger can watch, order and kill by name.",
   hint: "Pick a unit, then click the map to place one.",
   use: ({ scenario, onChange, onSelect }) => {
     const [unitDef, setUnitDef] = useState("");
@@ -433,7 +447,8 @@ const groupsMode: EditorMode = {
   id: "groups",
   label: "Groups",
   icon: Users,
-  hint: "Pick a unit and a count, then click the map to place a group.",
+  what: "A squad of mobile units the mission spawns, wakes and orders as one.",
+  hint: "Pick a unit and a count, then click the map to place a group. A group is the mobile half: buildings that stand from the start belong in a base.",
   use: ({ scenario, onChange, onSelect }) => {
     const [unitDef, setUnitDef] = useState("");
     const [count, setCount] = useState(DEFAULT_GROUP_COUNT);
@@ -519,7 +534,8 @@ const basesMode: EditorMode = {
   id: "bases",
   label: "Bases",
   icon: Factory,
-  hint: "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape.",
+  what: "Buildings standing on the ground from the start, laid out as one cluster.",
+  hint: "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group.",
   use: ({
     scenario,
     onChange,
@@ -689,6 +705,7 @@ const layoutsMode: EditorMode = {
   id: "layouts",
   label: "Blueprints",
   icon: Blocks,
+  what: "A base somebody already laid out, dropped whole in one click.",
   hint: "Pick a blueprint and a team, then click the map to place the whole base.",
   use: ({ scenario, onChange, onSelect, layout: choice, onLayout }) => {
     const [team, setTeam] = useState("");

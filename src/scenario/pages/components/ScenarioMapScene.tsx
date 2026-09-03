@@ -27,12 +27,12 @@ import {
 import { onBuildGrid } from "@/blueprint/offGrid";
 import { useGameSides } from "@/blueprint/useGameSides";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -1137,39 +1137,68 @@ export const ScenarioMapScene = forwardRef<
         onKeyDown: keys.onKeyDown,
         onFocus: keys.onFocus,
       }}
+      rail={
+        /* The modes as a rail down the left rather than a row across the top.
+           A row of six labelled buttons ran most of the way across the map and
+           pushed the mode's own controls onto a second line, so the toolbar took
+           two bands of the view before an author had placed anything.
+
+           One segmented group, the way the unit builder's viewport draws its
+           handles, and opaque: a translucent button on terrain takes whatever is
+           under it, so the same control reads differently over grass and over
+           snow. The tooltip is where each mode says its name, what it makes and
+           the key that reaches it. The strip had no room for the first two and
+           never showed the third anywhere else.
+
+           Undo and redo ride at the top of the same rail, one gap clear of the
+           modes: both act on the document, and a pair in the far corner was the
+           only thing over the map that did. */
+        <TooltipProvider>
+          <div className="flex flex-col gap-2">
+            {history && <HistoryControls {...history} vertical />}
+            <ButtonGroup orientation="vertical">
+              {EDITOR_MODES.map((m, i) => (
+                <Tooltip key={m.id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant={mode.id === m.id ? "default" : "outline"}
+                      className={mode.id === m.id ? undefined : "bg-card"}
+                      onClick={() => setModeId(m.id)}
+                      // The name is in the tooltip, which a pointer reaches and
+                      // a screen reader does not, so the button carries it as
+                      // its accessible name as well.
+                      aria-label={m.label}
+                      aria-pressed={mode.id === m.id}
+                    >
+                      <m.icon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-56">
+                    <p className="font-medium">{m.label}</p>
+                    <p className="opacity-80">{m.what}</p>
+                    <p className="opacity-60">Key {i + 1}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </ButtonGroup>
+          </div>
+        </TooltipProvider>
+      }
       bars={
         <>
-          {/* The whole row shares one backdrop rather than each control finding
-            its own: a mode's `controls` are arbitrary (selects, a count field,
-            a button), so painting the panel once is what makes every one of
-            them opaque over the map, present ones and any added later, rather
-            than a fix repeated per control. Same fill and blur as the mode
-            strip itself carried before this row grew one, so the toolbar
-            reads as one panel rather than a solid strip beside naked
-            controls (issue #1188). */}
-          <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
-            <TooltipProvider>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={mode.id}
-                onValueChange={(next) => next && setModeId(next)}
-                aria-label="Placement mode"
-              >
-                {EDITOR_MODES.map((m, i) => (
-                  <Tooltip key={m.id}>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem value={m.id} className="h-8 gap-1.5">
-                        <m.icon className="size-3.5" /> {m.label}
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent>{i + 1}</TooltipContent>
-                  </Tooltip>
-                ))}
-              </ToggleGroup>
-            </TooltipProvider>
-            {behaviour.controls}
-          </div>
+          {/* The mode's own controls, and only while the mode has some. Select
+              has none, so its bar is not drawn at all rather than drawn empty.
+              The row shares one backdrop rather than each control finding its
+              own: a mode's `controls` are arbitrary (selects, a count field, a
+              button), so painting the panel once is what makes every one of
+              them opaque over the map, present ones and any added later, rather
+              than a fix repeated per control (issue #1188). */}
+          {behaviour.controls && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card p-1">
+              {behaviour.controls}
+            </div>
+          )}
           {/* What the squares under the pointer are saying, said in words as
               well: a mark is a colour, and a colour on its own is not a
               statement anybody can act on (issue #1464). It carries the offer
@@ -1517,42 +1546,39 @@ export const ScenarioMapScene = forwardRef<
         </>
       }
       chrome={
-        <>
-          {history && <HistoryControls {...history} />}
-          <Popover open={contentsOpen} onOpenChange={setContentsOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 bg-card/80 backdrop-blur"
-                title="Everything this scenario holds, placed or not"
-              >
-                <List className="size-3.5" /> Contents
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-1">
-              <ContentsList
-                entries={entries}
-                layouts={layouts}
-                selected={listed}
-                participants={scenario.setup.participants}
-                onPick={pickEntry}
-                onToggle={toggleEntry}
-                // Armed rather than placed. Where a base stands is the reason
-                // the author deleted it, so the next click on the map is the
-                // placement and this only gets them ready to make it (#1450).
-                onPlaceLayout={(layout) => {
-                  setLayoutChoice({ from: "scenario", id: layout.id });
-                  setModeId(LAYOUTS_MODE_ID);
-                  setContentsOpen(false);
-                }}
-                onDeleteLayout={(layout) =>
-                  onChange((doc) => removeBlueprint(doc, layout.id))
-                }
-              />
-            </PopoverContent>
-          </Popover>
-        </>
+        <Popover open={contentsOpen} onOpenChange={setContentsOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 bg-card"
+              title="Everything this scenario holds, placed or not"
+            >
+              <List className="size-3.5" /> Contents
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-1">
+            <ContentsList
+              entries={entries}
+              layouts={layouts}
+              selected={listed}
+              participants={scenario.setup.participants}
+              onPick={pickEntry}
+              onToggle={toggleEntry}
+              // Armed rather than placed. Where a base stands is the reason
+              // the author deleted it, so the next click on the map is the
+              // placement and this only gets them ready to make it (#1450).
+              onPlaceLayout={(layout) => {
+                setLayoutChoice({ from: "scenario", id: layout.id });
+                setModeId(LAYOUTS_MODE_ID);
+                setContentsOpen(false);
+              }}
+              onDeleteLayout={(layout) =>
+                onChange((doc) => removeBlueprint(doc, layout.id))
+              }
+            />
+          </PopoverContent>
+        </Popover>
       }
       note={
         <>
