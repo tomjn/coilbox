@@ -764,6 +764,21 @@ export default function CampaignEditPage() {
           >
             {campaign.missions.map((m, i) => {
               const thumb = thumbs.get(m.snapshot.mapName)?.url;
+              // The same three sources the drawer's Presentation summary and
+              // the briefing page read the panorama slot from (issue #2402),
+              // not `m.panorama` alone: a slot has exactly one of the three
+              // set, and a map or unit source is just as much "this mission
+              // has a panorama" as an imported image or video is. Unlike the
+              // briefing page, this does not also gate a configured unit on
+              // whether it currently resolves to a model: that check exists
+              // there because the briefing needs an actual model to draw,
+              // while this row, like the drawer summary, is only stating what
+              // is configured.
+              const hasPanorama = !!(
+                m.panorama ||
+                m.panoramaMap ||
+                m.panoramaUnit
+              );
               const attachment = scenarioAttachment(m, scenarios);
               return (
                 <li
@@ -789,14 +804,22 @@ export default function CampaignEditPage() {
                       captioning the absence. With neither, there is nothing
                       to show and the strip is skipped rather than left as an
                       empty band. */}
-                  {(m.panorama || thumb) && (
-                    <div className={m.panorama ? "relative h-20" : "h-10"}>
+                  {(hasPanorama || thumb) && (
+                    <div className={hasPanorama ? "relative h-20" : "h-10"}>
                       {m.panorama ? (
                         <PanoramaScroller
                           campaignId={campaign.id}
                           panorama={m.panorama}
                           className="h-20 rounded-none"
                         />
+                      ) : hasPanorama ? (
+                        // A map or unit panorama has no static image to show
+                        // here: rendering it live would mean a 3D canvas per
+                        // row. The same gradient the briefing page falls back
+                        // to when it has no image stands in instead, with the
+                        // map thumbnail in the corner as the row's real
+                        // identity, same as the other two panorama states.
+                        <div className="h-20 w-full bg-gradient-to-br from-slate-900 to-slate-950" />
                       ) : (
                         <img
                           src={thumb}
@@ -804,7 +827,7 @@ export default function CampaignEditPage() {
                           className="h-10 w-full rounded-none object-cover"
                         />
                       )}
-                      {m.panorama && thumb && (
+                      {hasPanorama && thumb && (
                         <img
                           src={thumb}
                           alt=""

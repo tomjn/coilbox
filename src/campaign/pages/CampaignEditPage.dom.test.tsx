@@ -1428,6 +1428,70 @@ describe("a mission card's header strip with no panorama", () => {
 });
 
 /**
+ * The strip used to ask only `m.panorama`, so a mission whose panorama slot
+ * held a live map or unit preview instead of an imported image or video read
+ * as having no panorama at all: the same slim 40px band a mission with
+ * nothing configured gets, while its own drawer summary already said "Map
+ * panorama" (issue #2402). The row now asks the same question the drawer
+ * summary and the briefing page do, whether any of `panorama`,
+ * `panoramaMap` or `panoramaUnit` is set, and gets the same answer.
+ */
+describe("a mission card's header strip with a map or unit panorama", () => {
+  it("gives a map panorama the 80px band and the corner thumbnail", () => {
+    useUnitsyncThumbnails.mockReturnValue({
+      thumbs: new Map([["Comet Catcher", { url: "thumb://comet-catcher" }]]),
+    });
+    show([
+      {
+        ...plain("m1", "Ridge"),
+        panoramaMap: { style: "textured" },
+        snapshot: { ...source.setup, mapName: "Comet Catcher" },
+      },
+    ]);
+
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    const strip = li.firstElementChild as HTMLElement;
+    expect(strip.className).toContain("h-20");
+    const img = li.querySelector("img") as HTMLImageElement;
+    expect(img.src).toBe("thumb://comet-catcher");
+    expect(img.className).toContain("size-16");
+    expect(img.className).toContain("absolute");
+  });
+
+  it("gives a unit panorama the same 80px band and corner thumbnail", () => {
+    useUnitsyncThumbnails.mockReturnValue({
+      thumbs: new Map([["Comet Catcher", { url: "thumb://comet-catcher" }]]),
+    });
+    show([
+      {
+        ...plain("m1", "Ridge"),
+        panoramaUnit: { unitDef: "armbrtha" },
+        snapshot: { ...source.setup, mapName: "Comet Catcher" },
+      },
+    ]);
+
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    const strip = li.firstElementChild as HTMLElement;
+    expect(strip.className).toContain("h-20");
+    const img = li.querySelector("img") as HTMLImageElement;
+    expect(img.className).toContain("size-16");
+    expect(img.className).toContain("absolute");
+  });
+
+  it("still shows the 80px band for a map panorama with no map thumbnail to overlay", () => {
+    show([{ ...plain("m1", "Ridge"), panoramaMap: { style: "textured" } }]);
+
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    const strip = li.firstElementChild as HTMLElement;
+    expect(strip.className).toContain("h-20");
+    // No thumbnail for this map, so no corner overlay and no 40px band image
+    // either: a map or unit panorama has no static image of its own to fill
+    // the main area with.
+    expect(li.querySelector("img")).toBeNull();
+  });
+});
+
+/**
  * Reaching the two pickers without a round trip up the page (issue #2268).
  *
  * The header's "From preset" and "From scenario" buttons scroll out of view
