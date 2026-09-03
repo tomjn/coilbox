@@ -4,6 +4,7 @@ import {
   unitsyncScan,
   unitsyncUnitDataset,
 } from "@/content/bindings";
+import { loadBrandingCatalog, resolveBranding } from "@/content/branding";
 import { isSddName, isSdpName } from "@/content/format";
 import { buildTechForest } from "@/content/techForest";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
@@ -128,6 +129,9 @@ export interface GameSweepTools {
   dataset: typeof unitsyncUnitDataset;
   send: typeof publishGameFacts;
   releases: typeof dlRapidReleaseArchives;
+  /** The branding catalog links are matched against (issue #1950), read once
+   *  per sweep the way the release md5 set is. */
+  branding: typeof loadBrandingCatalog;
 }
 
 export const liveGameSweepTools: GameSweepTools = {
@@ -136,6 +140,7 @@ export const liveGameSweepTools: GameSweepTools = {
   dataset: unitsyncUnitDataset,
   send: publishGameFacts,
   releases: dlRapidReleaseArchives,
+  branding: loadBrandingCatalog,
 };
 
 export interface GameSweepTarget {
@@ -298,9 +303,10 @@ export function factionKeys(
 
 /** The factions, units and start units of one game, ready to send. */
 function factsFor(
-  { shortname, release }: Sendable,
+  { game, shortname, release }: Sendable,
   units: readonly UnitDatasetEntry[],
   sides: readonly Side[],
+  brandingEntries: Awaited<ReturnType<typeof loadBrandingCatalog>>,
 ): GameFacts {
   const keys = factionKeys(units, sides);
 
@@ -311,9 +317,24 @@ function factsFor(
   // claim that.
   const factions = gameFactions(sides);
 
+  // What the game calls itself and what it says about itself, off its own
+  // modinfo (issue #1950). `info.name` and never `game.name`: the latter falls
+  // back to the archive filename, which carries a build number.
+  const name = game.info?.name?.trim();
+  const description = game.info?.description?.trim();
+
+  // Starting links, matched out of coilbox's own branding catalog rather than
+  // read from the archive: the game says nothing about a url in its modinfo.
+  // Coverage is thin, so this is a starting value rather than a claim, which
+  // is why the hub only ever fills it into a gap.
+  const links = resolveBranding(brandingEntries, game)?.links;
+
   return {
     shortname,
     release,
+    ...(name ? { name } : {}),
+    ...(description ? { description } : {}),
+    ...(links && links.length > 0 ? { links } : {}),
     startUnits: sides
       .map((side) => side.startUnit?.trim())
       .filter((start): start is string => !!start),
@@ -366,6 +387,7 @@ export async function sweepGameFacts(
 
   onProgress({ phase: "scanning", done: 0, total: 0 });
   const { md5s } = await tools.releases({ dataDir });
+  const brandingEntries = await tools.branding();
   const scanned = await tools.scan({ enginePath, dataDir });
   const { sendable, skipped } = gamesToSend(
     scanned.games,
@@ -412,7 +434,7 @@ export async function sweepGameFacts(
       });
       const results = await tools.send(
         hubUrl,
-        factsFor(entry, dataset.units, info.sides),
+        factsFor(entry, dataset.units, info.sides, brandingEntries),
       );
       report.sent += 1;
       report.refused.push(

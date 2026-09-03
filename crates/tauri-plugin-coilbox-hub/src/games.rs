@@ -81,6 +81,13 @@ const MAX_BUILD_OPTION: usize = 128;
 /// for the whole game past this and names the field rather than the unit, which
 /// is the one thing whoever has to fix the extraction needs.
 const MAX_STATS_JSON: usize = 8_192;
+/// What the game calls itself and what it says about itself (issue #1950),
+/// bounded the way `public.game.display_name` and `.description` already are.
+const MAX_NAME: usize = 256;
+const MAX_DESCRIPTION: usize = 4_000;
+/// The most links a submission may carry, matching what the hub's own edit
+/// form caps a hand written list at.
+const MAX_LINKS: usize = 12;
 
 /// One unit as the game declares it.
 ///
@@ -128,6 +135,14 @@ pub struct GameFaction {
     pub name: String,
 }
 
+/// One place to find the game or its people (issue #1950), the shape
+/// coilbox's own branding catalog already uses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameLink {
+    pub label: String,
+    pub url: String,
+}
+
 /// One whole game, as the webview read it off the archive.
 ///
 /// No `complete` and no envelope: both are this module's to decide, and
@@ -142,6 +157,22 @@ pub struct GameFacts {
     /// The archive's declared version string, verbatim. Never parsed, here or
     /// on the hub: a version is whatever the game's author typed.
     pub release: String,
+    /// What the game calls itself, off modinfo's `name` (issue #1950). Never
+    /// the webview's own display name for a game, which falls back to the
+    /// archive filename and can carry a build number. `None` for a game whose
+    /// name could not be read, which the hub reads the same way it reads a
+    /// missing `factions`: say nothing, do not overwrite what it already holds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// What the game says about itself, off modinfo's optional `description`
+    /// tag. `None` for a game that declares none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Starting links for the game's page, matched out of coilbox's own
+    /// curated branding catalog rather than read from the archive. `None` for
+    /// a game the catalog does not recognise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub links: Option<Vec<GameLink>>,
     /// The start unit of each side that has one, which is what roots the build
     /// graph the faction keys came from.
     #[serde(default)]
@@ -239,6 +270,19 @@ fn check_and_build(game: &GameFacts) -> Result<String, String> {
     if let Some(factions) = &game.factions {
         built["factions"] = serde_json::json!(factions);
     }
+    if let Some(name) = &game.name {
+        built["name"] = serde_json::json!(name.trim());
+    }
+    if let Some(description) = &game.description {
+        built["description"] = serde_json::json!(description.trim());
+    }
+    if let Some(links) = &game.links {
+        let trimmed: Vec<Value> = links
+            .iter()
+            .map(|link| serde_json::json!({ "label": link.label.trim(), "url": link.url.trim() }))
+            .collect();
+        built["links"] = serde_json::json!(trimmed);
+    }
     let body = built.to_string();
     if body.len() > MAX_BYTES {
         return Err(format!(
@@ -297,6 +341,30 @@ fn check_game(game: &GameFacts) -> Result<(), String> {
                 &faction.name,
                 MAX_FACTION_NAME,
             )?;
+        }
+    }
+
+    if let Some(name) = &game.name {
+        text("name", name, MAX_NAME)?;
+    }
+    if let Some(description) = &game.description {
+        text("description", description, MAX_DESCRIPTION)?;
+    }
+    if let Some(links) = &game.links {
+        if links.len() > MAX_LINKS {
+            return Err(format!(
+                "{} declares {} links and the hub takes at most {MAX_LINKS}.",
+                game.shortname.trim(),
+                links.len()
+            ));
+        }
+        for link in links {
+            if link.label.trim().is_empty() {
+                return Err("a link's label is empty, and the hub requires it.".to_string());
+            }
+            if link.url.trim().is_empty() {
+                return Err("a link's url is empty, and the hub requires it.".to_string());
+            }
         }
     }
 
@@ -392,10 +460,20 @@ mod tests {
         }
     }
 
+    fn link(label: &str, url: &str) -> GameLink {
+        GameLink {
+            label: label.into(),
+            url: url.into(),
+        }
+    }
+
     fn game() -> GameFacts {
         GameFacts {
             shortname: "BA".into(),
             release: "12.24".into(),
+            name: None,
+            description: None,
+            links: None,
             start_units: vec!["armcom".into(), "corcom".into()],
             factions: Some(vec![
                 faction("armada", "Armada"),
@@ -477,6 +555,116 @@ mod tests {
             sent["factions"][0].as_object().unwrap().keys().collect();
         faction_fields.sort();
         assert_eq!(faction_fields, vec!["key", "name"]);
+    }
+
+    // --------------------------------------------------- name, description, links
+
+    /// A fixture modinfo carrying a name and a description (issue #1950): both
+    /// travel, trimmed.
+    #[test]
+    fn a_game_with_a_name_and_description_sends_both() {
+        let facts = GameFacts {
+            name: Some("  SplinterFaction  ".into()),
+            description: Some("  A tribute to the TA mod scene.  ".into()),
+            ..game()
+        };
+        let sent: Value = serde_json::from_str(&check_and_build(&facts).unwrap()).unwrap();
+
+        assert_eq!(sent["name"], "SplinterFaction");
+        assert_eq!(sent["description"], "A tribute to the TA mod scene.");
+    }
+
+    /// A fixture modinfo carrying neither (issue #1950): the body carries
+    /// neither field, rather than sending them as empty strings. Absent is
+    /// what tells the hub to leave its held value alone.
+    #[test]
+    fn a_game_with_no_name_or_description_sends_neither() {
+        let sent: Value = serde_json::from_str(&check_and_build(&game()).unwrap()).unwrap();
+
+        assert!(sent.get("name").is_none());
+        assert!(sent.get("description").is_none());
+    }
+
+    /// The links coilbox's branding catalog holds for the game travel too,
+    /// trimmed the same way name and description are.
+    #[test]
+    fn a_game_with_links_sends_them_trimmed() {
+        let facts = GameFacts {
+            links: Some(vec![link(" Website ", " https://splinterfaction.info/ ")]),
+            ..game()
+        };
+        let sent: Value = serde_json::from_str(&check_and_build(&facts).unwrap()).unwrap();
+
+        assert_eq!(
+            sent["links"],
+            serde_json::json!([{ "label": "Website", "url": "https://splinterfaction.info/" }])
+        );
+    }
+
+    /// No branding catalog match, no `links` field: absent rather than an
+    /// empty list, the way `factions` distinguishes not reported from none.
+    #[test]
+    fn a_game_with_no_links_sends_none() {
+        let sent: Value = serde_json::from_str(&check_and_build(&game()).unwrap()).unwrap();
+        assert!(sent.get("links").is_none());
+    }
+
+    /// An overlong name is refused before the game is sent, the hub's own
+    /// bound on `display_name`.
+    #[test]
+    fn an_overlong_name_is_refused() {
+        let refused = check_game(&GameFacts {
+            name: Some("x".repeat(MAX_NAME + 1)),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(refused.contains("name"), "{refused}");
+    }
+
+    /// An overlong description is refused before the game is sent, the hub's
+    /// own bound on `description`.
+    #[test]
+    fn an_overlong_description_is_refused() {
+        let refused = check_game(&GameFacts {
+            description: Some("x".repeat(MAX_DESCRIPTION + 1)),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(refused.contains("description"), "{refused}");
+    }
+
+    /// Past the hub's link cap the answer is a 400 for the whole game, so this
+    /// is refused before it is sent, the way the faction cap already is.
+    #[test]
+    fn a_game_past_the_link_cap_is_refused_before_it_is_sent() {
+        let links: Vec<GameLink> = (0..MAX_LINKS + 1)
+            .map(|n| link(&format!("Link {n}"), &format!("https://example.test/{n}")))
+            .collect();
+        let refused = check_game(&GameFacts {
+            links: Some(links),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(refused.contains("at most 12"), "{refused}");
+    }
+
+    /// A link missing its label or its url is refused, the same as a link an
+    /// owner's own edit form would drop rather than write.
+    #[test]
+    fn a_link_missing_its_label_or_url_is_refused() {
+        let no_label = check_game(&GameFacts {
+            links: Some(vec![link("", "https://example.test/")]),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(no_label.contains("label"), "{no_label}");
+
+        let no_url = check_game(&GameFacts {
+            links: Some(vec![link("Website", "")]),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(no_url.contains("url"), "{no_url}");
     }
 
     /// What a unit turns into travels with the rest of it (issue #2063).
@@ -1000,6 +1188,9 @@ mod tests {
         let two_factions = GameFacts {
             shortname: "CBTEST".into(),
             release: "1.0".into(),
+            name: None,
+            description: None,
+            links: None,
             start_units: vec!["armcom".into(), "corcom".into()],
             factions: Some(vec![
                 faction("armada", "Armada"),
