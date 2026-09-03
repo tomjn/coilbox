@@ -1,0 +1,75 @@
+id generated-4242
+title TG Conquest
+description A procedurally generated conquest of 24 systems.
+game TG
+playerFaction player
+playable player,enemy-1,enemy-2
+faction player name="Umbral Union" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Vigilant Assembly" color=#ff3524 aggression=0.3798797964118421 side=
+faction enemy-2 name="Scarlet Vanguard" color=#ffb300 aggression=0.4732333437539637 side=
+node node-0 name="Acrux" pos=-13.2,72.7 owner=enemy-2 kind=capital difficulty=5 map="Map 10" star=""
+node node-1 name="Procyon" pos=-34.8,-62.1 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-2 name="Algol" pos=-41.5,29.6 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+node node-3 name="Alcor" pos=77.9,-2.9 owner=enemy-1 kind=normal difficulty=5 map="Map 11" star=""
+node node-4 name="Castor" pos=55.2,-66.8 owner=enemy-1 kind=normal difficulty=4 map="Map 8" star=""
+node node-5 name="Polaris" pos=62.7,49.9 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-6 name="Saiph" pos=33.8,33.1 owner=neutral kind=normal difficulty=5 map="Map 10" star=""
+node node-7 name="Dubhe" pos=-60,-26.3 owner=player kind=normal difficulty=1 map="Map 0" star=""
+node node-8 name="Sargas" pos=-61.8,73.6 owner=neutral kind=normal difficulty=3 map="Map 6" star=""
+node node-9 name="Vega" pos=15.4,-0.5 owner=neutral kind=normal difficulty=4 map="Map 7" star=""
+node node-10 name="Alphard" pos=33.6,80.9 owner=enemy-2 kind=normal difficulty=5 map="Map 11" star=""
+node node-11 name="Merak" pos=-70.7,40.1 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+node node-12 name="Phecda" pos=5,-65.7 owner=neutral kind=normal difficulty=3 map="Map 4" star=""
+node node-13 name="Gacrux" pos=-17.5,1.1 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+node node-14 name="Nunki" pos=2.6,-27.1 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-15 name="Pollux" pos=-89.2,11.1 owner=player kind=normal difficulty=1 map="Map 1" star=""
+node node-16 name="Naos" pos=87.9,-28.3 owner=enemy-1 kind=capital difficulty=5 map="Map 9" star=""
+node node-17 name="Mintaka" pos=-34.6,75.1 owner=enemy-2 kind=normal difficulty=4 map="Map 7" star=""
+node node-18 name="Menkar" pos=-47.6,1.9 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-19 name="Altair" pos=-91.4,-32.3 owner=player kind=capital difficulty=1 map="Map 0" star=""
+node node-20 name="Mizar" pos=32.7,53.7 owner=neutral kind=normal difficulty=5 map="Map 10" star=""
+node node-21 name="Kochab" pos=-4.5,20.8 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-22 name="Antares" pos=44.5,-25.5 owner=enemy-1 kind=normal difficulty=5 map="Map 11" star=""
+node node-23 name="Bellatrix" pos=-74.4,-55.1 owner=player kind=normal difficulty=1 map="Map 1" star=""
+link node-6 node-20
+link node-0 node-17
+link node-13 node-21
+link node-10 node-20
+link node-8 node-17
+link node-3 node-16
+link node-2 node-18
+link node-19 node-23
+link node-9 node-21
+link node-9 node-14
+link node-13 node-18
+link node-5 node-20
+link node-7 node-18
+link node-2 node-11
+link node-7 node-19
+link node-7 node-23
+link node-9 node-13
+link node-5 node-6
+link node-11 node-15
+link node-13 node-14
+link node-8 node-11
+link node-2 node-13
+link node-2 node-21
+link node-6 node-9
+link node-9 node-22
+link node-12 node-14
+link node-1 node-12
+link node-1 node-23
+link node-3 node-22
+link node-14 node-22
+link node-5 node-10
+link node-15 node-18
+link node-4 node-22
+link node-16 node-22
+link node-15 node-19
+link node-1 node-7
+link node-2 node-17
+link node-0 node-10
+link node-2 node-8
+link node-4 node-12
+link node-4 node-16
+link node-3 node-5

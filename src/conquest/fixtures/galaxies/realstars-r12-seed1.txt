@@ -1,0 +1,65 @@
+id generated-1
+title TG Conquest
+description The 23 real star systems within 12 light years of Sol.
+game TG
+playerFaction player
+playable player,enemy-1,enemy-2
+faction player name="Gilded Syndicate" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Azure Compact" color=#ff3524 aggression=0.33285379405133425 side=
+faction enemy-2 name="Iron Ascendancy" color=#ffb300 aggression=0.36065130117349326 side=
+node node-0 name="Sol" pos=0,0,0 owner=player kind=capital difficulty=1 map="Map 1" star="G2 V"
+node node-1 name="Alpha Centauri" pos=-1.6319,-1.3645,-3.8115 owner=neutral kind=normal difficulty=1 map="Map 0" star="G2.0 V/K0 V/M5.0 V"
+node node-2 name="Barnard's Star" pos=-0.057,-5.9586,0.4892 owner=neutral kind=normal difficulty=1 map="Map 1" star="M3.5 V"
+node node-3 name="Luhman 16" pos=-3.7052,1.1814,-5.221 owner=neutral kind=normal difficulty=1 map="Map 0" star="L7.5/T0.5"
+node node-4 name="WISE 0855-0714" pos=-5.1008,5.32,-0.937 owner=neutral kind=normal difficulty=2 map="Map 2" star="Y4"
+node node-5 name="Wolf 359" pos=-7.4293,2.1133,0.9504 owner=neutral kind=normal difficulty=2 map="Map 3" star="M5.5 V"
+node node-6 name="Lalande 21185" pos=-6.5083,1.6427,4.8715 owner=neutral kind=normal difficulty=3 map="Map 4" star="M2.0 V"
+node node-7 name="Sirius" pos=-1.6088,8.0609,-2.4686 owner=neutral kind=normal difficulty=3 map="Map 5" star="A1.0 V/DA2"
+node node-8 name="BL Ceti" pos=7.5399,3.4768,-2.6898 owner=neutral kind=normal difficulty=4 map="Map 8" star="M5.5 V/M6.0 V"
+node node-9 name="Ross 154" pos=1.9082,-8.6387,-3.9086 owner=neutral kind=normal difficulty=2 map="Map 2" star="M3.5 V"
+node node-10 name="Ross 248" pos=7.371,-0.583,7.1841 owner=neutral kind=normal difficulty=3 map="Map 6" star="M5.5 V"
+node node-11 name="Epsilon Eridani" pos=6.1877,8.281,-1.7222 owner=neutral kind=normal difficulty=3 map="Map 4" star="K2.0 V"
+node node-12 name="Lacaille 9352" pos=8.4246,-2.0277,-6.2617 owner=neutral kind=normal difficulty=5 map="Map 10" star="M1.0 V"
+node node-13 name="Ross 128" pos=-10.923,0.5849,0.1536 owner=neutral kind=normal difficulty=3 map="Map 5" star="M4.0 V"
+node node-14 name="EZ Aquarii" pos=10.1878,-3.7809,-2.9732 owner=neutral kind=normal difficulty=5 map="Map 11" star="M5.0 VJ/M V/M V"
+node node-15 name="61 Cygni" pos=6.4736,-6.0951,7.136 owner=neutral kind=normal difficulty=2 map="Map 3" star="K5.0 V/K7.0 V"
+node node-16 name="Procyon" pos=-4.782,10.3372,1.0416 owner=neutral kind=normal difficulty=3 map="Map 6" star="F5 IV-V/DQZ"
+node node-17 name="GJ 725" pos=1.0781,-5.7088,9.9144 owner=neutral kind=normal difficulty=3 map="Map 4" star="M3.0 V/M3.5 V"
+node node-18 name="GX Andromedae" pos=8.3529,0.6714,8.0988 owner=neutral kind=normal difficulty=3 map="Map 5" star="M1.5 V/M3.5 V"
+node node-19 name="Epsilon Indi" pos=5.6513,-3.1532,-9.8842 owner=neutral kind=normal difficulty=5 map="Map 9" star="K4.0 V/T1.0 V/T6.0 V"
+node node-20 name="DX Cancri" pos=-6.4207,8.3809,5.3278 owner=enemy-2 kind=capital difficulty=5 map="Map 10" star="M6.0 V"
+node node-21 name="Tau Ceti" pos=10.2872,5.0212,-3.2689 owner=neutral kind=normal difficulty=4 map="Map 7" star="G8.5 V"
+node node-22 name="GJ 1061" pos=5.026,6.9174,-8.4062 owner=enemy-1 kind=capital difficulty=5 map="Map 11" star="M5.0 V"
+link node-10 node-18
+link node-8 node-21
+link node-1 node-3
+link node-5 node-13
+link node-5 node-6
+link node-12 node-14
+link node-0 node-1
+link node-4 node-5
+link node-4 node-7
+link node-12 node-19
+link node-16 node-20
+link node-8 node-11
+link node-7 node-16
+link node-4 node-16
+link node-11 node-21
+link node-2 node-9
+link node-10 node-15
+link node-0 node-2
+link node-15 node-17
+link node-3 node-4
+link node-1 node-2
+link node-0 node-3
+link node-6 node-13
+link node-8 node-12
+link node-6 node-20
+link node-11 node-22
+link node-15 node-18
+link node-8 node-22
+link node-3 node-5
+link node-21 node-22
+link node-7 node-11
+link node-12 node-21
+link node-2 node-15
