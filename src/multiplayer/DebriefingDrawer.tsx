@@ -2,12 +2,14 @@ import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Trophy, X } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 // The one place a side's one-based name is written down, shared with replay
 // detail so a Zero-K team 1 and a replay team 1 cannot drift apart.
 import { teamLabel } from "@/content/replaySideLabel";
 import type { Debriefing, DebriefingPlayer } from "./bindings";
+import { conversationHref } from "./chat/conversation";
 import {
   categoryLabel,
   formatRatingChange,
@@ -35,8 +37,8 @@ import {
  *
  * Zero-K also puts everybody who played into a `debriefing_…` chat channel, and
  * that channel is already in the chat sidebar by the time this opens, joined the
- * ordinary way. So the drawer names it rather than hosting a second copy of a
- * conversation that has a home.
+ * ordinary way. So the drawer names it and links to it (issue #2406) rather than
+ * hosting a second copy of a conversation that has a home.
  */
 export function DebriefingDrawer({
   open,
@@ -50,6 +52,11 @@ export function DebriefingDrawer({
   onClose: () => void;
 }) {
   const me = report?.players.find((player) => player.name === myUsername);
+  const navigate = useNavigate();
+  function openChatChannel(channel: string) {
+    onClose();
+    navigate(conversationHref({ kind: "channel", name: channel }));
+  }
 
   return createPortal(
     <>
@@ -87,10 +94,22 @@ export function DebriefingDrawer({
               <Scoreboard report={report} myUsername={myUsername} />
             ) : null}
             {report.chatChannel ? (
-              <p className="text-xs text-muted-foreground">
-                Talk it over in {report.chatChannel}, which is in your chat
-                list.
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Talk it over in {report.chatChannel}, which is in your chat
+                  list.
+                </p>
+                <Button
+                  variant="secondary"
+                  className="h-7 shrink-0 px-2 text-xs"
+                  onClick={() => {
+                    const channel = report.chatChannel;
+                    if (channel) openChatChannel(channel);
+                  }}
+                >
+                  Open chat
+                </Button>
+              </div>
             ) : null}
           </div>
         ) : null}
