@@ -1162,6 +1162,11 @@ export const ScenarioMapScene = forwardRef<
                   <TooltipTrigger asChild>
                     <Button
                       size="icon"
+                      // The pair the unit builder's viewport uses for the
+                      // handle it is on. `bg-card` only on the ones that are
+                      // off: an outline button has no fill of its own, and a
+                      // see-through control on terrain takes whatever is under
+                      // it.
                       variant={mode.id === m.id ? "default" : "outline"}
                       className={mode.id === m.id ? undefined : "bg-card"}
                       onClick={() => setModeId(m.id)}
