@@ -297,6 +297,68 @@ export interface LobbyState {
   partyInvites: Party[];
   /** Where we are in matchmaking. At its default on TASServer, which has none. */
   matchmaking: Matchmaking;
+  /** What the last game we played did to everybody's rating, or null before one
+   * has finished. Always null off Zero-K, the only protocol that reports one. */
+  debriefing: Debriefing | null;
+}
+
+/**
+ * What the server said about a game that has just finished (issue #2003).
+ * Mirrors the Rust `Debriefing`.
+ *
+ * Zero-K only. Neither TASServer nor Tachyon reports a result at all, so this is
+ * null on both. The rating numbers are whole points, rounded in Rust.
+ */
+export interface Debriefing {
+  /** The server's own number for the game, which its page on the website is
+   * keyed by. Not the lobby battle id: that one names a room, this names a game
+   * played in it. */
+  battleId: number;
+  /** The page with the result and the replay on it. */
+  url: string | null;
+  /** Whatever the server had to say, normally why a game did not count. */
+  message: string | null;
+  /** Which rating the game counted toward, by the server's own name for it, or
+   * null where it counted toward none. */
+  ratingCategory: string | null;
+  /** The chat channel the server put everybody who played into. Matchmaker
+   * games only. */
+  chatChannel: string | null;
+  /** One row per player, by side and then by name. Spectators are not in it. */
+  players: DebriefingPlayer[];
+}
+
+/** How one player came out of the game. Mirrors the Rust `DebriefingPlayer`. */
+export interface DebriefingPlayer {
+  name: string;
+  /** Which side they were on. */
+  ally: number;
+  won: boolean;
+  /** What the game did to their rating, in whole points. Null on a game that
+   * counted toward no rating. */
+  ratingChange: number | null;
+  /** Their rating now, in whole points. Null on an unrated game. */
+  rating: number | null;
+  /** Their rank now, 0 to 7. */
+  rank: number;
+  rankedUp: boolean;
+  rankedDown: boolean;
+  /** The rating that would take them up a rank, and the one that would take
+   * them down. Null on an unrated game. */
+  nextRankRating: number | null;
+  prevRankRating: number | null;
+  /** Experience, which goes up for playing rather than for winning. */
+  xpChange: number;
+  xp: number;
+  awards: DebriefingAward[];
+}
+
+/** One award a player earned. Mirrors the Rust `DebriefingAward`. */
+export interface DebriefingAward {
+  /** The server's identifier, such as `mostDamage`. */
+  key: string;
+  /** What to show, in the game's own words. */
+  description: string;
 }
 
 /**
@@ -422,7 +484,14 @@ export type Delta =
   | { kind: "friendRequestsChanged" }
   | { kind: "partyChanged" }
   | { kind: "matchmakingChanged" }
-  | { kind: "voteChanged" };
+  | { kind: "voteChanged" }
+  /**
+   * A game we played has finished and the server has said what it did to
+   * everybody's rating. `state.debriefing` carries the result. Zero-K only, and
+   * `battleId` is the server's number for the game, so a repeat of the same
+   * debriefing can be told from the next game's.
+   */
+  | { kind: "debriefingReceived"; battleId: number };
 
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
 export type LobbyEvent =
