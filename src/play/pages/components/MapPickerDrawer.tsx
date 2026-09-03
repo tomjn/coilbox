@@ -46,8 +46,20 @@ export function MapPickerDrawer({
       seen.add(id);
       return true;
     });
+    // Matches the map's own description too (issue #350): mapinfo.lua carries
+    // no structured play-type field on any installed map we could find, so
+    // "1v1"/"ffa"/"survival" tabs would filter almost nothing. What mappers
+    // do write, on some maps, is the type into the description text itself
+    // ("1v1 Map by...", "Survival Hill on..."), so a name-only search can't
+    // reach it. Widening to description costs nothing for maps without one.
     const q = query.trim().toLowerCase();
-    return q ? unique.filter((m) => m.name.toLowerCase().includes(q)) : unique;
+    return q
+      ? unique.filter(
+          (m) =>
+            m.name.toLowerCase().includes(q) ||
+            m.info.description?.toLowerCase().includes(q),
+        )
+      : unique;
   }, [maps, query]);
 
   return (
