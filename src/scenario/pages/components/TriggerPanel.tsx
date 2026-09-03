@@ -233,7 +233,7 @@ export const TriggerPanel = forwardRef<
         </p>
       )}
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex shrink-0 flex-col gap-2 lg:w-60">
+        <div className="flex shrink-0 flex-col gap-2 lg:w-72">
           {count === 0 ? (
             <p className="text-xs text-muted-foreground">
               A trigger runs its actions when its conditions hold. Everything a

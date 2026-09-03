@@ -109,7 +109,7 @@ export function ObjectivePanel({
       }
     >
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex shrink-0 flex-col gap-2 lg:w-60">
+        <div className="flex shrink-0 flex-col gap-2 lg:w-72">
           {count === 0 ? (
             <p className="text-xs text-muted-foreground">
               An objective is what the player is told to do. A trigger completes
