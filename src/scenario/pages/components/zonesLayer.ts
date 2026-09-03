@@ -285,11 +285,16 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
 
     const backingGeometry = new LineGeometry();
     backingGeometry.setPositions(flat);
+    // Opaque, and that is load bearing rather than a look. Three renders every
+    // opaque object before every transparent one and `renderOrder` only sorts
+    // within each of those two lists, so a translucent backing is painted over
+    // an opaque accent line whatever order they are given. What showed through
+    // was the accent at the joins, where the wider backing leaves a notch: a
+    // dark band with regular coloured flecks in it, which is what the marquee
+    // looked like and what reads as a dashed line.
     const backingMaterial = new LineMaterial({
       color: MARQUEE_BACKING_COLOR,
       linewidth: MARQUEE_BACKING_WIDTH,
-      transparent: true,
-      opacity: 0.8,
       depthTest: false,
     });
     backingMaterial.resolution.copy(viewport);

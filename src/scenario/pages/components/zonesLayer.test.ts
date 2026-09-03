@@ -133,6 +133,24 @@ describe("a selection marquee against a zone being drawn", () => {
     );
   });
 
+  /**
+   * Three renders every opaque object before every transparent one, and
+   * `renderOrder` only sorts within each of those two lists. So a translucent
+   * backing is painted over the opaque accent line whatever order the two are
+   * given, and what shows through is the accent at the joins, where the wider
+   * backing leaves a notch. That is a dark band with regular coloured flecks in
+   * it, which is what a dashed line looks like and what the marquee was
+   * mistaken for twice.
+   */
+  it("keeps both marquee lines opaque, so the backing cannot be drawn over the accent", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID)], null);
+
+    for (const one of lines(drawn(zones.root, 0))) {
+      expect((one as THREE.Mesh).material).toHaveProperty("transparent", false);
+    }
+  });
+
   it("keeps the dark line only a shade wider, so it is an edge and not a line of its own", () => {
     const zones = layer();
     zones.draw([box(MARQUEE_ZONE_ID)], null);
