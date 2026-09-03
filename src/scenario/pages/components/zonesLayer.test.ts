@@ -9,7 +9,7 @@
  * do.
  *
  * What follows pins the difference from both sides: the marquee has no fill and
- * a dashed edge, and a zone being dragged out is untouched. Nothing renders
+ * a wide white edge, and a zone being dragged out is untouched. Nothing renders
  * here. The scene is a bag to hang objects off, and what is asserted is what was
  * hung in it.
  */
@@ -96,18 +96,18 @@ describe("a selection marquee against a zone being drawn", () => {
     expect(sheets(parts).length).toBeGreaterThan(0);
   });
 
-  it("dashes the marquee's edge, where a zone's is solid", () => {
+  it("draws the marquee solid, so the white is the line rather than flecks in it", () => {
     const zones = layer();
-    zones.draw([box(MARQUEE_ZONE_ID), box("z1")], null);
+    zones.draw([box(MARQUEE_ZONE_ID)], null);
 
-    const dashed = (parts: THREE.Object3D[]) =>
-      lines(parts).some(
-        (one) =>
-          ((one as THREE.Mesh).material as { dashed?: boolean }).dashed ===
-          true,
-      );
-    expect(dashed(drawn(zones.root, 0))).toBe(true);
-    expect(dashed(drawn(zones.root, 1))).toBe(false);
+    // It was a dashed white line over a wider dark one. The dashes are a
+    // fraction of the perimeter and the backing is wider than they are, so what
+    // was on screen was a dark line with white specks in it.
+    const dashed = lines(drawn(zones.root, 0)).filter(
+      (one) =>
+        ((one as THREE.Mesh).material as { dashed?: boolean }).dashed === true,
+    );
+    expect(dashed).toHaveLength(0);
   });
 
   it("draws the marquee wide enough to see, which a plain line cannot be", () => {
@@ -127,29 +127,26 @@ describe("a selection marquee against a zone being drawn", () => {
       expect(one.width).toBeGreaterThan(1);
     }
     // The dark line under the white one is the wider of the two, so it shows
-    // either side of it as well as through its gaps.
+    // as an edge either side of it.
     expect(Math.max(...widths.map((one) => one.width))).toBeGreaterThan(
       Math.min(...widths.map((one) => one.width)),
     );
   });
 
-  it("gives the dashes a length, so they are dashes rather than one long one", () => {
+  it("keeps the dark line only a shade wider, so it is an edge and not a line of its own", () => {
     const zones = layer();
     zones.draw([box(MARQUEE_ZONE_ID)], null);
 
-    const dashed = lines(drawn(zones.root, 0)).find(
+    const widths = lines(drawn(zones.root, 0)).map(
       (one) =>
-        ((one as THREE.Mesh).material as { dashed?: boolean }).dashed === true,
-    ) as THREE.Mesh;
-    const material = dashed.material as unknown as {
-      dashSize: number;
-      gapSize: number;
-    };
-    expect(material.dashSize).toBeGreaterThan(0);
-    expect(material.gapSize).toBe(material.dashSize);
-    // Thirty-two dashes and thirty-two gaps round a 400 by 400 box: a dash is a
-    // fraction of a side rather than a whole one.
-    expect(material.dashSize).toBeLessThan(400);
+        ((one as THREE.Mesh).material as unknown as { linewidth: number })
+          .linewidth,
+    );
+    const white = Math.min(...widths);
+    const dark = Math.max(...widths);
+    // Two pixels between them is one pixel of dark either side of the white.
+    expect(dark - white).toBe(2);
+    expect(white).toBeGreaterThan(dark / 2);
   });
 
   it("draws the marquee in neither the zone's blue nor a path's green", () => {
@@ -161,9 +158,29 @@ describe("a selection marquee against a zone being drawn", () => {
     );
     expect(colours).not.toContain(0x38bdf8);
     expect(colours).not.toContain(0x86efac);
-    // White over dark, so whichever one the ground washes out the other stands.
-    expect(colours).toContain(0xffffff);
+    // The accent over dark, so the box still reads where the ground is pale.
     expect(colours).toContain(0x0f172a);
+  });
+
+  /**
+   * `THREE.Color.setStyle` answers a colour it cannot parse with a warning and
+   * no colour at all, which leaves the material white. So a marquee drawn white
+   * is not a marquee anybody chose: it is the theme read failing quietly, which
+   * is exactly what the old drawing looked like and what this stopped being.
+   *
+   * There is no document here, so what is under test is the fallback path,
+   * which is the one whose colour is written in a form three does not read.
+   */
+  it("takes a real colour from the theme, rather than the white a failed read leaves", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID)], null);
+
+    const colours = lines(drawn(zones.root, 0)).map((one) =>
+      ((one as THREE.Mesh).material as THREE.LineBasicMaterial).color.getHex(),
+    );
+    expect(colours).not.toContain(0xffffff);
+    // Something other than the backing, or the accent line is not drawn at all.
+    expect(colours.filter((c) => c !== 0x0f172a)).toHaveLength(1);
   });
 
   it("does not clash with the plate under a selected unit, which is its own blue", () => {

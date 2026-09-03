@@ -27,6 +27,7 @@ import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
+import { readThemeColor } from "@/home/art";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { worldToScene } from "@/placement/scene";
 import type { Point, ScenarioZone } from "../../model";
@@ -69,23 +70,49 @@ const MOVE_HANDLE_COLOR = 0xf97316;
 /**
  * What a selection marquee is drawn in (issue #2279).
  *
- * Black and white alternating, which is what a selection marquee has looked like
- * since before any of this, and the reason it looks like that is the reason it
- * is used here: the two colours are drawn on top of each other, so whichever one
- * the ground underneath washes out, the other one is still there. That matters
- * on a map, where the same box is dragged over dark grass, pale sand and snow in
- * one gesture.
+ * The theme's own accent, solid, with a thin dark edge round it. Nothing else
+ * on this map is that colour, and it is the colour the rest of the app already
+ * means "this is the thing you picked" with, so a box drawn in it reads as a
+ * selection without anyone having to learn a new one.
+ *
+ * It was a dashed white line over a wider dark one, on the reasoning that two
+ * colours drawn over each other survive any ground. What that actually drew was
+ * a dark line with white flecks in it: the dashes are a fraction of the
+ * perimeter and the backing is wider than they are, so the backing was most of
+ * what was on screen. The dark line stays as a halo, one pixel either side, so
+ * the box still reads where the ground under it is pale.
  *
  * Not green. A path is `0x86efac` and is drawn as a line lying on the ground,
  * which is exactly what a marquee is, so a green box would read as somebody's
  * order path. Not the zone's own sky blue for the same reason in reverse: that
  * is the thing a marquee was being mistaken for.
  */
-const MARQUEE_COLOR = 0xffffff;
 const MARQUEE_BACKING_COLOR = 0x0f172a;
 
 /**
- * How wide the marquee is drawn, in pixels, white over dark.
+ * The accent as three sees it, read out of the theme the way the welcome
+ * screen's artwork reads it. `readThemeColor` memoises against the raw custom
+ * property, so switching accent in Appearance re-reads and a drag does not
+ * force a style recalculation per frame.
+ *
+ * The separators are put back first. `THREE.Color.setStyle` parses
+ * `rgb(r, g, b)`, which is what a computed colour is, and the comma form of
+ * `hsl()`. It does not parse the space-separated form CSS also allows, which is
+ * how `FALLBACK_THEME_COLOR` is written, and what it does with one it cannot
+ * read is warn and leave the colour white. A marquee that came out white
+ * whenever the theme had not applied yet is the bug this whole function is
+ * here to fix, arriving by the back door.
+ */
+function marqueeColor(): THREE.Color {
+  const css = readThemeColor().replace(
+    /^hsla?\(([^)]*)\)$/,
+    (_, body: string) => `hsl(${body.trim().split(/\s+/).join(", ")})`,
+  );
+  return new THREE.Color().setStyle(css);
+}
+
+/**
+ * How wide the marquee is drawn, in pixels.
  *
  * `LineBasicMaterial.linewidth` is ignored by every WebGL driver, so a marquee
  * asking for a wide line got a one pixel one and read as a hairline over
@@ -93,16 +120,11 @@ const MARQUEE_BACKING_COLOR = 0x0f172a;
  * is what the lego builder's edit box already does
  * (`PIECE_EDIT_LINE_WIDTH` in `src/lego/pages/components/ModelViewport.tsx`).
  *
- * The dark line is wider so it shows either side of the white one as well as
- * through its gaps, which is what keeps the box readable over snow and sand.
+ * Two pixels between them, so the dark shows as one pixel of edge either side
+ * of the white rather than as a line of its own.
  */
-const MARQUEE_LINE_WIDTH = 3;
-const MARQUEE_BACKING_WIDTH = 5;
-
-/** How many dashes go round a marquee, however big it is or how far away the
- *  camera is. A dash measured in elmos would be a solid line on a box drawn
- *  round two units and a dotted one round half the map. */
-const MARQUEE_DASHES = 32;
+const MARQUEE_LINE_WIDTH = 4;
+const MARQUEE_BACKING_WIDTH = 6;
 
 export interface ZonesLayerDeps {
   handle: MapScene3D;
@@ -227,10 +249,10 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
    * tells them apart. So the two are as different as they can be: no fill at
    * all, and a dashed edge rather than a solid one.
    *
-   * Two lines on the same points, a solid dark one under a dashed white one, so
-   * the white shows over dark ground and the dark shows through the gaps over
-   * pale ground. Neither is depth tested, the same as a zone's outline, so a
-   * box drawn across a ridge is a box rather than two halves.
+   * Two solid lines on the same points, a slightly wider dark one under an
+   * accent-coloured one, so what is drawn is an accent line with a pixel of
+   * dark edge either side. Neither is depth tested, the same as a zone's
+   * outline, so a box drawn across a ridge is a box rather than two halves.
    *
    * Both are `Line2` rather than `THREE.Line`, which is what gives them a width
    * a driver honours: see {@link MARQUEE_LINE_WIDTH}.
@@ -250,18 +272,10 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
     const ring = outlinePoints(zone).map(
       (offset) => new THREE.Vector3(offset.x, relief(centre, offset), offset.z),
     );
-    // Closed by hand rather than drawn as a loop, because the dashes are
-    // measured along the line and the closing side has to be measured with it.
+    // Closed by hand, because `LineGeometry` draws a run of points rather than
+    // a loop and the closing side is a side like the other three.
     const closed = [...ring, ring[0]];
     const flat = closed.flatMap((point) => [point.x, point.y, point.z]);
-
-    // A dash is measured in the geometry's own units, which are elmos here, so
-    // the perimeter is walked before a dash length can be chosen.
-    let perimeter = 0;
-    for (let i = 1; i < closed.length; i++) {
-      perimeter += closed[i].distanceTo(closed[i - 1]);
-    }
-    const dash = perimeter / (MARQUEE_DASHES * 2);
 
     // Screen-space widths need the viewport size. The marquee is rebuilt on
     // every frame of the drag it exists for, so reading it here is enough: a
@@ -283,25 +297,19 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
     backing.renderOrder = 3;
     group.add(backing);
 
-    const dashGeometry = new LineGeometry();
-    dashGeometry.setPositions(flat);
-    const dashMaterial = new LineMaterial({
-      color: MARQUEE_COLOR,
+    const edgeGeometry = new LineGeometry();
+    edgeGeometry.setPositions(flat);
+    const edgeMaterial = new LineMaterial({
+      color: marqueeColor(),
       linewidth: MARQUEE_LINE_WIDTH,
-      dashed: true,
-      dashSize: dash,
-      gapSize: dash,
       depthTest: false,
     });
-    dashMaterial.resolution.copy(viewport);
-    const dashes = new Line2(dashGeometry, dashMaterial);
-    // What the dash shader measures against `dashSize`, in the geometry's own
-    // units. Nothing is dashed without it.
-    dashes.computeLineDistances();
-    dashes.renderOrder = 4;
-    group.add(dashes);
+    edgeMaterial.resolution.copy(viewport);
+    const edge = new Line2(edgeGeometry, edgeMaterial);
+    edge.renderOrder = 4;
+    group.add(edge);
 
-    owned.push(backingGeometry, backingMaterial, dashGeometry, dashMaterial);
+    owned.push(backingGeometry, backingMaterial, edgeGeometry, edgeMaterial);
     return group;
   };
 
