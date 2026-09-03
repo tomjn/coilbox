@@ -172,7 +172,6 @@ import {
   selectOne,
   stillThere,
   toggleKey,
-  turnSelection,
 } from "./selection";
 import { modeDigit } from "./shortcuts";
 import { startMarkers } from "./startPositions";
@@ -1105,10 +1104,15 @@ export const ScenarioMapScene = forwardRef<
                 picked.kind === "base"
                   ? turnNoteText(turning ? turned.length > 0 : null)
                   : null,
+              // Several things swing about the selection's own middle, which is
+              // the job the count bar's own Turn together button used to do.
+              // One button rather than two: an author who picked a cluster and
+              // pressed turn meant the cluster. Turning each where it stands is
+              // still R, and the strip under the map says so.
               onTurn: () =>
                 onChange((doc) =>
                   selection.length > 1
-                    ? turnSelection(doc, selection, 1, layoutEdit)
+                    ? turnSelectionAround(doc, selection, 1, layoutEdit)
                     : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
                 ),
             }
@@ -1304,21 +1308,6 @@ export const ScenarioMapScene = forwardRef<
               {spot.text}
             </p>
           )}
-          {/* How much is in hand, and the way to put it all down. Its own bar in
-              this column rather than a note in the corner: the corner is for
-              what is true of the whole scene (issue #2350), and this is what the
-              Turn and Delete buttons directly under it are about to act on. */}
-          {selection.length > 1 && (
-            <SelectionCountBar
-              what={countWords(selection)}
-              onTurnTogether={() =>
-                onChange((doc) =>
-                  turnSelectionAround(doc, selection, 1, layoutEdit),
-                )
-              }
-              onClear={() => setSelection(NO_SELECTION)}
-            />
-          )}
           {picked && (
             // Turning and deleting are the rail's now. What is left here is
             // what the bar was always for: naming what is selected, and the
@@ -1493,6 +1482,19 @@ export const ScenarioMapScene = forwardRef<
                 />
               )}
             </ScenarioSelectionBar>
+          )}
+          {/* How much is in hand, and the way to put it all down. Under the bar
+              that names the primary rather than over it: that bar is the thing
+              an author is reading and acting on, and a tally that pushed it
+              down the view every time a second thing was picked up moved the
+              controls out from under the pointer. Its own bar rather than a
+              note in the corner, because the corner is for what is true of the
+              whole scene (issue #2350). */}
+          {selection.length > 1 && (
+            <SelectionCountBar
+              what={countWords(selection)}
+              onClear={() => setSelection(NO_SELECTION)}
+            />
           )}
           {/* What the outlined square beside the selected building means while
               a turn is being considered (issue #1541) is `turnNote` on the
@@ -1698,40 +1700,33 @@ function ScenarioSelectionBar({
 /**
  * How much is selected, and the way to put it all down (issue #2279).
  *
- * Its own bar above the one for the primary, because the two say different
+ * Its own bar under the one for the primary, because the two say different
  * things: that one names one thing and opens its panel, this one is the account
- * of what the Turn and Delete beneath it are about to act on. Without it the
- * only sign that Delete is about to remove six things is that six plates are
- * lit somewhere on the map, which is not something an author reads before
- * pressing a button.
+ * of what the rail's Turn and Delete are about to act on. Without it the only
+ * sign that Delete is about to remove six things is that six plates are lit
+ * somewhere on the map, which is not something an author reads before pressing
+ * a button.
+ *
+ * Turning is not here. It was a Turn together button, which swung the whole
+ * selection about its own middle where the primary's Turn turned each thing
+ * where it stood, and two turns in two places for one selection is a choice
+ * nobody asked to be given: an author who picked a cluster and pressed turn
+ * meant the cluster. So the rail's Turn does that job for a selection of
+ * several, and turning each where it stands is R (issue #2353's other half is
+ * still on its own key).
  */
 function SelectionCountBar({
   what,
-  onTurnTogether,
   onClear,
 }: {
   /** The tally, as `countWords` reads it: "4 actors, 1 group and 2 base
    *  buildings". */
   what: string;
-  /** Swing the whole selection a quarter turn about its own middle, which is
-   *  the other meaning of turning several things at once (issue #2353). It
-   *  lives here rather than beside the Turn button below, because that button
-   *  is the primary's and this one is the selection's. */
-  onTurnTogether: () => void;
   onClear: () => void;
 }) {
   return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-primary/60 bg-card/85 p-1 pl-2 backdrop-blur">
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-primary/60 bg-card p-1 pl-2">
       <span className="text-[11px]">{what} selected</span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 px-2 text-xs"
-        onClick={onTurnTogether}
-        title="Turn all of it as one shape, so it moves round its own middle (T)"
-      >
-        Turn together
-      </Button>
       <Button
         size="sm"
         variant="ghost"

@@ -180,7 +180,7 @@ export function SelectionTools({
               <p className="opacity-80">
                 {count === undefined
                   ? "A quarter turn. A unit faces one of four ways and nothing in between."
-                  : "Everything selected that turns, a quarter turn. A group and a zone do not."}
+                  : "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."}
               </p>
               {turnNote && <p className="opacity-80">{turnNote}</p>}
             </TooltipContent>
