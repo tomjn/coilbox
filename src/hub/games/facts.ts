@@ -46,6 +46,13 @@ export interface GameFaction {
   name: string;
 }
 
+/** One place to find a game or its people, the shape coilbox's own branding
+ *  catalog already uses. */
+export interface GameLink {
+  label: string;
+  url: string;
+}
+
 /** One whole game. There is no `complete` here: the Rust side always sends the
  *  whole game, because a partial batch would retire the units it left out. */
 export interface GameFacts {
@@ -53,6 +60,21 @@ export interface GameFacts {
   shortname: string;
   /** The archive's declared version string, verbatim. */
   release: string;
+  /** What the game calls itself, off modinfo's `name` (issue #1950). Never
+   *  `GameItem.name`, which falls back to the archive filename, and that
+   *  carries a build number that would pin one build's name onto a row meant
+   *  to outlive every build. Left off rather than sent empty for a game whose
+   *  name could not be read. The hub fills it only when its held value is
+   *  null, so it never argues with a name an owner has since edited by hand. */
+  name?: string;
+  /** What the game calls itself, off modinfo's optional `description` tag.
+   *  Left off rather than sent empty for a game that declares none. */
+  description?: string;
+  /** Starting links for the game's page, matched out of coilbox's own
+   *  curated branding catalog rather than read from the archive. Left off
+   *  for a game the catalog does not recognise. The hub fills it only when
+   *  its held value is still empty. */
+  links?: GameLink[];
   /** The start unit of each side that has one. */
   startUnits: string[];
   /** Every faction the game has. Sending them replaces the hub's held set for
