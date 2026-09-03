@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GameItem, Side, UnitDatasetEntry } from "@/content/bindings";
+import type { BrandingEntry } from "@/content/branding";
 import { MUTATOR_FOLDER, SCRATCH_FOLDER } from "@/lib/generatedGames";
 import type { GameFacts, GameFactsResult } from "./facts";
 import {
@@ -60,6 +61,7 @@ function tools(
   units: Record<string, UnitDatasetEntry[]> = {},
   sides: Record<string, Side[]> = {},
   outcomes: GameFactsResult[] = [],
+  brandingEntries: BrandingEntry[] = [],
 ): GameSweepTools & { sent: () => GameFacts[]; mounted: () => string[] } {
   const sent: GameFacts[] = [];
   const mounted: string[] = [];
@@ -90,6 +92,9 @@ function tools(
     releases: vi.fn(async () => ({
       md5s: [],
     })) as unknown as GameSweepTools["releases"],
+    branding: vi.fn(
+      async () => brandingEntries,
+    ) as unknown as GameSweepTools["branding"],
     sent: () => sent,
     mounted: () => mounted,
   };
@@ -441,6 +446,76 @@ describe("sweepGameFacts", () => {
         ],
       },
     ]);
+  });
+
+  /// What the game calls itself, off its own modinfo (issue #1950), and never
+  /// off `GameItem.name`, which the fixture below deliberately spells
+  /// differently from `info.name` to prove the difference is not being read
+  /// by accident.
+  it("sends the name and description a game's modinfo declares", async () => {
+    const kit = tools([
+      game("Balanced Annihilation test-27055", "ba1224.sdz", {
+        name: "Balanced Annihilation",
+        description: "A classic Total Annihilation style RTS.",
+      }),
+    ]);
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.sent()[0].name).toBe("Balanced Annihilation");
+    expect(kit.sent()[0].description).toBe(
+      "A classic Total Annihilation style RTS.",
+    );
+  });
+
+  /// A field left off, the same as an unread faction set: a game whose modinfo
+  /// declares neither is not sent an empty string for either.
+  it("leaves the name and description off for a game whose modinfo declares neither", async () => {
+    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")]);
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.sent()[0]).not.toHaveProperty("name");
+    expect(kit.sent()[0]).not.toHaveProperty("description");
+  });
+
+  /// Links have no modinfo source: they come from coilbox's own branding
+  /// catalog, matched by name the way `resolveBranding` already matches art.
+  it("sends the links coilbox's branding catalog holds for the game", async () => {
+    const kit = tools(
+      [
+        game("SplinterFaction 0.1.78", "SplinterFaction.sdz", {
+          shortname: "SF",
+        }),
+      ],
+      {},
+      {},
+      [],
+      [
+        {
+          id: "splinter-faction",
+          match: { names: ["SF"] },
+          links: [{ label: "Website", url: "https://splinterfaction.info/" }],
+        },
+      ],
+    );
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.sent()[0].links).toEqual([
+      { label: "Website", url: "https://splinterfaction.info/" },
+    ]);
+  });
+
+  /// No catalog entry, and no links field. Absent rather than an empty list,
+  /// the same rule `factions` follows: a read that found nothing says nothing
+  /// rather than claiming the game has none.
+  it("leaves links off for a game the branding catalog does not recognise", async () => {
+    const kit = tools([game("Some Unlisted Mod", "unlisted.sdz")]);
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.sent()[0]).not.toHaveProperty("links");
   });
 
   /// The stats the worker read travel to the hub untouched (issue #1876). The
