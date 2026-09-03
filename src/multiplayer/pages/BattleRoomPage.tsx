@@ -31,6 +31,7 @@ import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
+import { GameTypePresetsControls } from "../battle/GameTypePresetsControls";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { matchStartAction } from "../battle/matchStart";
 import { canRejoinMatch } from "../battle/rejoin";
@@ -670,6 +671,19 @@ function BattleRoomPage() {
               onRescan={room.rescan}
             />
           )}
+          {/* Game-type presets + Balance (issue #344): unlike AutohostControls
+              this works self-hosted too (founder-direct force calls), so it
+              renders regardless of `selfHost` and only hides itself where the
+              server assigns seats (Zero-K, Tachyon — see the component doc). */}
+          <GameTypePresetsControls
+            rows={room.rows}
+            me={room.me}
+            selfHost={room.selfHost}
+            serverAssignsSeat={room.serverAssignsSeat}
+            hostControls={room.hostControls}
+            onSetBattleStatusBatch={room.setBattleStatusBatch}
+            onAutohostSend={room.autohostSend}
+          />
           {/* The `!`-command panel only makes sense with a SPADS autohost; when
               we host the battle ourselves those commands are inert (lock moves to
               the header, map changes go through the map card). */}
