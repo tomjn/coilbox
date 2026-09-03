@@ -65,6 +65,7 @@ import {
   removeTrigger,
   renameTrigger,
   type StepList,
+  setStepNegate,
   setStepParam,
   stepsOf,
   triggerSummary,
@@ -756,6 +757,19 @@ function StepSection({
                     value,
                   ),
                 )
+              }
+              // Only a condition has a truth to turn over (issue #2422).
+              onNegate={
+                conditions
+                  ? (negate) =>
+                      onChange(
+                        setStepNegate(
+                          scenario,
+                          { triggerId: trigger.id, list, index },
+                          negate,
+                        ),
+                      )
+                  : null
               }
               // Conditions hold together under one all-or-any, so their order
               // says nothing. Actions run in the order they are listed.

@@ -144,6 +144,7 @@ export function StepRow({
   picking,
   onPick,
   onParam,
+  onNegate,
   onMove,
   onRemove,
 }: {
@@ -167,6 +168,9 @@ export function StepRow({
   onPick: (target: PointTarget | null) => void;
   /** Set one parameter, or take it out when the value is undefined. */
   onParam: (name: string, value: ScenarioParam | undefined) => void;
+  /** Read this condition the other way round (issue #2422), or null on an
+   *  action, which has no truth to turn over. */
+  onNegate: ((negate: boolean) => void) | null;
   /** Move the step within its list, or null where order carries no meaning. */
   onMove: ((delta: number) => void) | null;
   onRemove: () => void;
@@ -176,6 +180,26 @@ export function StepRow({
   return (
     <li className="rounded-md border border-border/60 bg-muted/20 p-2">
       <div className="flex items-center gap-1.5">
+        {/* The row reads "not units in zone" when it is on, which is the
+            sentence the trigger makes. A button rather than a checkbox because
+            it is one word that is either there or is not, and because the
+            condition's own name has to stay the widest thing in the row. */}
+        {onNegate && (
+          <Button
+            size="sm"
+            variant={step.negate ? "default" : "outline"}
+            className="h-6 shrink-0 px-1.5 text-[11px]"
+            aria-pressed={step.negate === true}
+            title={
+              step.negate
+                ? "Holds while this condition does not. Press to read it the right way up again."
+                : "Read this condition the other way round, so it holds while the condition does not."
+            }
+            onClick={() => onNegate(step.negate !== true)}
+          >
+            not
+          </Button>
+        )}
         <span className="min-w-0 flex-1 truncate text-xs font-medium">
           {stepLabel(step.type, extensions)}
         </span>

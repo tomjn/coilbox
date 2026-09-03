@@ -100,6 +100,7 @@ function StepHarness({
         issues={issues}
         picking={null}
         onPick={() => {}}
+        onNegate={null}
         onParam={(name, value) => {
           const next = { ...document };
           if (value === undefined) delete next[name];

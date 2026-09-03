@@ -18,6 +18,7 @@ local TRIGGERS = dofile(support.root() .. "/luarules/mission_runtime/coilbox_tri
 --
 --   flag   a polled condition, true when the test says so
 --   bell   an event-driven condition, watching "ding"
+--   chime  an event-driven condition watching "ding", true when the test says so
 --   probe  an action that records that it ran
 --   ring   an action that raises "ding" from inside a firing
 --------------------------------------------------------------------------------
@@ -48,6 +49,16 @@ local function bell()
 	return { type = "bell", params = {} }
 end
 
+local function chime(name)
+	return { type = "chime", params = { name = name } }
+end
+
+--- The same condition, read the other way round (issue #2422).
+local function negated(condition)
+	condition.negate = true
+	return condition
+end
+
 local function probe(mark)
 	return { type = "probe", params = { mark = mark } }
 end
@@ -71,6 +82,12 @@ local function build(list)
 		events = { "ding" },
 		test = function()
 			return true
+		end,
+	})
+	engine:addCondition("chime", {
+		events = { "ding" },
+		test = function(params)
+			return held[params.name] == true
 		end,
 	})
 	engine:addAction("probe", function(params)
@@ -166,6 +183,70 @@ engine:frame(15)
 check("the polled tick fires the polled triggers", marks(fired) == "evented,polled,mixed", marks(fired))
 check("a trigger with one polled condition is polled, not evented",
 	marks(fired):find("mixed") ~= nil)
+
+--------------------------------------------------------------------------------
+-- Conditions read the other way round (issue #2422).
+--
+-- "The player has not built a factory" is `unit_built` with `negate = true`, so
+-- what is proved here is that a real answer is turned over, that a non-answer is
+-- not, and that a negated condition lands on the polled tick whatever the type
+-- underneath it watches.
+--------------------------------------------------------------------------------
+
+engine, fired, logs, held = build({
+	trigger("while-off", {
+		["repeat"] = true,
+		conditions = conditions("all", { negated(flag("a")) }),
+		actions = { probe("while-off") },
+	}),
+	trigger("unknown", {
+		["repeat"] = true,
+		conditions = conditions("all", { negated({ type = "mystery", params = {} }) }),
+		actions = { probe("unknown") },
+	}),
+})
+
+engine:frame(15)
+check("a negated condition holds while the one underneath it does not",
+	marks(fired) == "while-off", marks(fired))
+check("and a condition nothing implements is false either way round, so a broken "
+	.. "trigger does not fire on the first frame instead of never",
+	marks(fired):find("unknown") == nil, marks(fired))
+
+held.a = true
+engine:frame(30)
+check("it stops holding the moment the one underneath it starts",
+	marks(fired) == "while-off", marks(fired))
+
+held.a = nil
+engine:frame(45)
+check("and holds again when that stops", marks(fired) == "while-off,while-off", marks(fired))
+
+engine, fired, logs, held = build({
+	trigger("waiting", {
+		["repeat"] = true,
+		conditions = conditions("all", { negated(chime("a")) }),
+		actions = { probe("waiting") },
+	}),
+	trigger("listening", {
+		["repeat"] = true,
+		conditions = conditions("all", { chime("a") }),
+		actions = { probe("listening") },
+	}),
+})
+
+engine:frame(15)
+check("a negated condition is polled, whatever the type underneath it watches",
+	marks(fired) == "waiting", marks(fired))
+check("where the same condition read the right way up waits for its event",
+	marks(fired):find("listening") == nil, marks(fired))
+
+held.a = true
+engine:event("ding")
+check("so the event still reaches the one that is not negated",
+	marks(fired) == "waiting,listening", marks(fired))
+check("and does not reach the one that is", select(2, marks(fired):gsub("waiting", "")) == 1,
+	marks(fired))
 
 --------------------------------------------------------------------------------
 -- Firing once against repeating.

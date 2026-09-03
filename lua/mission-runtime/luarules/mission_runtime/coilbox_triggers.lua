@@ -229,6 +229,14 @@ function Engine:eventsOf(record)
 
 	local events = {}
 	for _, condition in ipairs(list) do
+		-- A negated condition polls, whatever the type underneath it watches. Its
+		-- events are the moments the answer becomes no: "the player has not built a
+		-- factory" woken only by a unit being finished is a question that can only
+		-- ever answer no, and the mission it was written for is the one where it
+		-- never fires (issue #2422).
+		if condition.negate == true then
+			return nil
+		end
 		local spec = self.conditions[condition.type]
 		if not spec or not spec.events then
 			return nil
@@ -265,6 +273,13 @@ end
 
 --- Whether one condition holds. An unimplemented or broken condition is false,
 -- never an error out of the callin that led here.
+--
+-- `condition.negate` turns a real answer over, which is how a mission asks
+-- whether something has *not* happened (issue #2422). Only a real answer: a
+-- condition nothing implements and one that raised are false whichever way
+-- round they are read, because both are the runtime saying it does not know
+-- rather than saying no. Negating either would turn a broken trigger into one
+-- that fires on the first frame.
 function Engine:test(condition)
 	local kind = tostring(condition.type)
 	local spec = self.conditions[condition.type]
@@ -279,6 +294,9 @@ function Engine:test(condition)
 		self:report("condition-error:" .. kind, "error",
 			"condition " .. kind .. " failed: " .. tostring(held))
 		return false
+	end
+	if condition.negate == true then
+		return not held
 	end
 	return not not held
 end
