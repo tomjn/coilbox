@@ -63,6 +63,64 @@ const HANDLE_ELMOS = 88;
 const ZONE_COLOR = 0x38bdf8;
 const SELECTED_COLOR = 0xfacc15;
 
+/**
+ * How far one zone's shade may wander from {@link ZONE_COLOR}: degrees of hue
+ * either way, and saturation either way as a fraction.
+ *
+ * Small on purpose. Zones overlap and nest, and every one of them being the
+ * same sky blue means a map with four of them reads as one blue shape with a
+ * confusing edge. A slight turn of the hue is enough to tell two edges apart
+ * without any of them stopping being the zone colour, which is what has to stay
+ * true: the shade separates zones from each other, it does not mean anything
+ * about a zone.
+ *
+ * Both stay well inside the blues. Anything wider would reach the green a
+ * path is drawn in and the yellow a selected zone turns.
+ */
+const ZONE_HUE_SPREAD = 22;
+const ZONE_SATURATION_SPREAD = 0.2;
+
+/**
+ * A number from 0 to 1 for a string, the same one on every machine.
+ *
+ * FNV-1a. A zone's shade has to be stable across renders, across sessions and
+ * across two people looking at the same document, so it is derived from the
+ * zone's id rather than from where it sits in the list: adding or deleting a
+ * zone leaves every other one the colour it was.
+ */
+function hashUnit(text: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  // Unsigned, then over the whole 32-bit range.
+  return (hash >>> 0) / 0xffffffff;
+}
+
+/**
+ * The shade one zone is drawn in: {@link ZONE_COLOR} turned a little, by an
+ * amount its id decides.
+ *
+ * Hue and saturation are hashed separately, so two zones that happen to land on
+ * the same hue are still told apart by how saturated they are.
+ */
+function zoneShade(id: string): THREE.Color {
+  const base = new THREE.Color(ZONE_COLOR);
+  const hsl = { h: 0, s: 0, l: 0 };
+  base.getHSL(hsl);
+  // Each hash is 0 to 1, read as an offset either side of the base colour.
+  const hue = hashUnit(id) * 2 - 1;
+  const saturation = hashUnit(`${id}:s`) * 2 - 1;
+  return new THREE.Color().setHSL(
+    // Wrapped, because a hue is a circle and the base is near enough to zero
+    // for an offset to take it past it.
+    (hsl.h + (hue * ZONE_HUE_SPREAD) / 360 + 1) % 1,
+    Math.min(1, Math.max(0, hsl.s + saturation * ZONE_SATURATION_SPREAD)),
+    hsl.l,
+  );
+}
+
 /** What the handle that moves a whole zone is drawn in. Neither the white of
  *  the corners that resize it nor the yellow of the zone it sits on. */
 const MOVE_HANDLE_COLOR = 0xf97316;
@@ -320,7 +378,13 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
 
   const buildZone = (zone: ScenarioZone, selected: boolean): THREE.Group => {
     const centre = zoneCenter(zone);
-    const colour = selected ? SELECTED_COLOR : ZONE_COLOR;
+    // The selection keeps one colour of its own. Varying that too would be a
+    // yellow that means "selected" and a shade that means nothing, said at
+    // once, and only one zone is ever selected so there is nothing to tell
+    // apart.
+    const colour = selected
+      ? new THREE.Color(SELECTED_COLOR)
+      : zoneShade(zone.id);
     const group = new THREE.Group();
     const at = worldToScene(
       centre,

@@ -211,6 +211,67 @@ describe("a selection marquee against a zone being drawn", () => {
     expect(colours).not.toContain(0x7dd3fc);
   });
 
+  it("gives two zones two shades, so a map of them is not one blue shape", () => {
+    const zones = layer();
+    zones.draw([box("ridge"), box("keep")], null);
+
+    const shadeOf = (at: number) =>
+      sheets(drawn(zones.root, at)).map((one) =>
+        (
+          (one as THREE.Mesh).material as THREE.MeshBasicMaterial
+        ).color.getHex(),
+      )[0];
+
+    expect(shadeOf(0)).not.toBe(shadeOf(1));
+  });
+
+  it("gives a zone the same shade whatever else is on the map", () => {
+    const alone = layer();
+    alone.draw([box("ridge")], null);
+    const crowded = layer();
+    // Drawn second, and after a zone that did not exist the first time. A shade
+    // read off the position in the list would move here, and an author who
+    // deleted one zone would find every other one had changed colour.
+    crowded.draw([box("keep"), box("ridge")], null);
+
+    const shadeOf = (root: THREE.Object3D, at: number) =>
+      sheets(drawn(root, at)).map((one) =>
+        (
+          (one as THREE.Mesh).material as THREE.MeshBasicMaterial
+        ).color.getHex(),
+      )[0];
+
+    expect(shadeOf(crowded.root, 1)).toBe(shadeOf(alone.root, 0));
+  });
+
+  it("keeps every shade a blue, rather than reaching a path's green", () => {
+    const zones = layer();
+    const ids = ["ridge", "keep", "yard", "pass", "landing", "perimeter"];
+    zones.draw(
+      ids.map((id) => box(id)),
+      null,
+    );
+
+    for (let at = 0; at < ids.length; at++) {
+      const colour = sheets(drawn(zones.root, at)).map(
+        (one) =>
+          ((one as THREE.Mesh).material as THREE.MeshBasicMaterial).color,
+      )[0];
+      const hsl = { h: 0, s: 0, l: 0 };
+      colour.getHSL(hsl);
+      const base = { h: 0, s: 0, l: 0 };
+      new THREE.Color(0x38bdf8).getHSL(base);
+      // A hue is a circle, so the distance is the shorter way round it.
+      const turned = Math.min(
+        Math.abs(hsl.h - base.h),
+        1 - Math.abs(hsl.h - base.h),
+      );
+      // The spread is 22 degrees either way. Anything wider would reach the
+      // green a path is drawn in.
+      expect(turned * 360).toBeLessThanOrEqual(22.001);
+    }
+  });
+
   it("gives the marquee no key, so nothing can select it or take hold of it", () => {
     const zones = layer();
     zones.draw([box(MARQUEE_ZONE_ID), box("z1")], null);
