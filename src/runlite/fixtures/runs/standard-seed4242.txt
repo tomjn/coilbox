@@ -1,0 +1,62 @@
+name Radiant Rift
+startUnit com
+seed 4242
+length standard
+difficulty 2
+ascension 0
+maxHull 100
+unlockedUnits com,mex,solar,vplant,aplant,tank,scout,con,fighter,bomber,radar,llt
+node start type=start col=0 row=0 battle=null reward=null event=null shop=null
+node c1n0 type=battle col=1 row=0 battle={"mapName":"Small A","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":0,"techTier":1} reward=null event=null shop=null
+node c1n1 type=battle col=1 row=1 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":0,"techTier":1} reward=null event=null shop=null
+node c1n2 type=battle col=1 row=2 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":0,"techTier":1} reward=null event=null shop=null
+node c2n0 type=battle col=2 row=0 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
+node c2n1 type=elite col=2 row=1 battle={"mapName":"Small B","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":25,"techTier":2} reward=null event=null shop=null
+node c2n2 type=event col=2 row=2 battle=null reward=null event={"title":"Repair Bay","body":"An automated depot offers to patch your hull — for a price in salvage.","choices":[{"label":"Dock and repair","detail":"+28 hull, -80 salvage","hull":28,"salvage":-80},{"label":"Press on","detail":"No change"}]} shop=null
+node c2n3 type=event col=2 row=3 battle=null reward=null event={"title":"Distress Signal","body":"A stranded engineering crew hails you. They offer expertise in exchange for passage.","choices":[{"label":"Take them aboard","detail":"Gain a field upgrade","perk":{"kind":"income","label":"Efficient Logistics","value":0.2}},{"label":"Requisition their cache","detail":"+40 salvage","salvage":40}]} shop=null
+node c3n0 type=reward col=3 row=0 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.1}}]} event=null shop=null
+node c3n1 type=event col=3 row=1 battle=null reward=null event={"title":"Derelict Hulk","body":"A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live.","choices":[{"label":"Strip it for salvage","detail":"+80 salvage, -14 hull","salvage":80,"hull":-14},{"label":"Leave it be","detail":"No change"}]} shop=null
+node c3n2 type=battle col=3 row=2 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
+node c3n3 type=battle col=3 row=3 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
+node c4n0 type=event col=4 row=0 battle=null reward=null event={"title":"Distress Signal","body":"A stranded engineering crew hails you. They offer expertise in exchange for passage.","choices":[{"label":"Take them aboard","detail":"Gain a field upgrade","perk":{"kind":"income","label":"Salvage Refinery","value":0.2}},{"label":"Requisition their cache","detail":"+50 salvage","salvage":50}]} shop=null
+node c4n1 type=event col=4 row=1 battle=null reward=null event={"title":"Distress Signal","body":"A stranded engineering crew hails you. They offer expertise in exchange for passage.","choices":[{"label":"Take them aboard","detail":"Gain a field upgrade","perk":{"kind":"income","label":"Efficient Logistics","value":0.2}},{"label":"Requisition their cache","detail":"+50 salvage","salvage":50}]} shop=null
+node c5n0 type=reward col=5 row=0 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.15}}]} event=null shop=null
+node c5n1 type=event col=5 row=1 battle=null reward=null event={"title":"Derelict Hulk","body":"A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live.","choices":[{"label":"Strip it for salvage","detail":"+120 salvage, -20 hull","salvage":120,"hull":-20},{"label":"Leave it be","detail":"No change"}]} shop=null
+node c6n0 type=battle col=6 row=0 battle={"mapName":"Huge","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":30,"techTier":4} reward=null event=null shop=null
+node c6n1 type=battle col=6 row=1 battle={"mapName":"Large","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":30,"techTier":4} reward=null event=null shop=null
+node c6n2 type=event col=6 row=2 battle=null reward=null event={"title":"Distress Signal","body":"A stranded engineering crew hails you. They offer expertise in exchange for passage.","choices":[{"label":"Take them aboard","detail":"Gain a field upgrade","perk":{"kind":"income","label":"Efficient Logistics","value":0.3}},{"label":"Requisition their cache","detail":"+60 salvage","salvage":60}]} shop=null
+node c6n3 type=reward col=6 row=3 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"advantage","label":"Veteran Cadre","value":0.15}}]} event=null shop=null
+node c7n0 type=shop col=7 row=0 battle=null reward=null event=null shop={"offers":[{"cost":70,"option":{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.15}}},{"cost":140,"option":{"kind":"perk","perk":{"kind":"income","label":"Efficient Logistics","value":0.3}}}],"restHull":45,"restCost":105}
+node c7n1 type=shop col=7 row=1 battle=null reward=null event=null shop={"offers":[{"cost":70,"option":{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.15}}},{"cost":140,"option":{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.3}}}],"restHull":45,"restCost":105}
+node c7n2 type=reward col=7 row=2 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.15}}]} event=null shop=null
+node c7n3 type=shop col=7 row=3 battle=null reward=null event=null shop={"offers":[{"cost":70,"option":{"kind":"perk","perk":{"kind":"advantage","label":"Veteran Cadre","value":0.15}}},{"cost":140,"option":{"kind":"perk","perk":{"kind":"advantage","label":"Veteran Cadre","value":0.15}}}],"restHull":45,"restCost":105}
+node boss type=boss col=8 row=0 battle={"mapName":"Huge","enemyAiCount":5,"enemyAiKey":"native:BARb","handicap":70,"techTier":5} reward=null event=null shop=null
+edge start c1n0
+edge start c1n1
+edge start c1n2
+edge c1n0 c2n0
+edge c1n1 c2n1
+edge c1n1 c2n2
+edge c1n2 c2n3
+edge c2n0 c3n0
+edge c2n1 c3n1
+edge c2n2 c3n2
+edge c2n3 c3n3
+edge c3n0 c4n0
+edge c3n3 c4n1
+edge c3n1 c4n0
+edge c3n2 c4n1
+edge c4n0 c5n0
+edge c4n1 c5n1
+edge c5n0 c6n0
+edge c5n0 c6n1
+edge c5n1 c6n2
+edge c5n1 c6n3
+edge c6n0 c7n0
+edge c6n1 c7n1
+edge c6n2 c7n2
+edge c6n3 c7n3
+edge c7n2 boss
+edge c7n0 boss
+edge c7n1 boss
+edge c7n3 boss

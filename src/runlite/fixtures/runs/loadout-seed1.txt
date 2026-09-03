@@ -1,0 +1,56 @@
+name Azure Frontier
+startUnit com
+seed 1
+length standard
+difficulty 2
+ascension 0
+maxHull 100
+unlockedUnits com,mex,solar,vplant,aplant,tank,scout,con,fighter,bomber,radar,llt
+node start type=start col=0 row=0 battle=null reward=null event=null shop=null
+node c1n0 type=battle col=1 row=0 battle={"mapName":"Small A","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":0,"techTier":1} reward=null event=null shop=null
+node c1n1 type=battle col=1 row=1 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":0,"techTier":1} reward=null event=null shop=null
+node c1n2 type=battle col=1 row=2 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":0,"techTier":1} reward=null event=null shop=null
+node c2n0 type=battle col=2 row=0 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
+node c2n1 type=reward col=2 row=1 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.2}}]} event=null shop=null
+node c2n2 type=shop col=2 row=2 battle=null reward=null event=null shop={"offers":[{"cost":40,"option":{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.1}}},{"cost":80,"option":{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.2}}}],"restHull":30,"restCost":60}
+node c2n3 type=battle col=2 row=3 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
+node c3n0 type=battle col=3 row=0 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
+node c3n1 type=battle col=3 row=1 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
+node c4n0 type=elite col=4 row=0 battle={"mapName":"Medium","enemyAiCount":3,"enemyAiKey":"native:BARb","handicap":35,"techTier":3} reward=null event=null shop=null
+node c4n1 type=battle col=4 row=1 battle={"mapName":"Medium","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":20,"techTier":3} reward=null event=null shop=null
+node c4n2 type=event col=4 row=2 battle=null reward=null event={"title":"Derelict Hulk","body":"A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live.","choices":[{"label":"Strip it for salvage","detail":"+100 salvage, -17 hull","salvage":100,"hull":-17},{"label":"Leave it be","detail":"No change"}]} shop=null
+node c4n3 type=battle col=4 row=3 battle={"mapName":"Medium","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":20,"techTier":3} reward=null event=null shop=null
+node c5n0 type=reward col=5 row=0 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.15}}]} event=null shop=null
+node c5n1 type=reward col=5 row=1 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.3}}]} event=null shop=null
+node c5n2 type=reward col=5 row=2 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"income","label":"Efficient Logistics","value":0.3}}]} event=null shop=null
+node c6n0 type=reward col=6 row=0 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.15}}]} event=null shop=null
+node c6n1 type=elite col=6 row=1 battle={"mapName":"Large","enemyAiCount":3,"enemyAiKey":"native:BARb","handicap":45,"techTier":4} reward=null event=null shop=null
+node c7n0 type=shop col=7 row=0 battle=null reward=null event=null shop={"offers":[{"cost":70,"option":{"kind":"perk","perk":{"kind":"advantage","label":"Overclocked Reactor","value":0.15}}},{"cost":140,"option":{"kind":"perk","perk":{"kind":"advantage","label":"Veteran Cadre","value":0.15}}}],"restHull":45,"restCost":105}
+node c7n1 type=event col=7 row=1 battle=null reward=null event={"title":"Derelict Hulk","body":"A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live.","choices":[{"label":"Strip it for salvage","detail":"+140 salvage, -23 hull","salvage":140,"hull":-23},{"label":"Leave it be","detail":"No change"}]} shop=null
+node boss type=boss col=8 row=0 battle={"mapName":"Large","enemyAiCount":5,"enemyAiKey":"native:BARb","handicap":70,"techTier":5} reward=null event=null shop=null
+edge start c1n0
+edge start c1n1
+edge start c1n2
+edge c1n0 c2n0
+edge c1n1 c2n1
+edge c1n1 c2n2
+edge c1n2 c2n3
+edge c2n0 c3n0
+edge c2n3 c3n1
+edge c2n1 c3n0
+edge c2n2 c3n1
+edge c3n0 c4n0
+edge c3n0 c4n1
+edge c3n1 c4n2
+edge c3n1 c4n3
+edge c4n0 c5n0
+edge c4n2 c5n1
+edge c4n3 c5n2
+edge c4n1 c5n1
+edge c5n0 c6n0
+edge c5n2 c6n1
+edge c5n1 c6n1
+edge c6n0 c7n0
+edge c6n1 c7n1
+edge c7n1 boss
+edge c7n0 boss
