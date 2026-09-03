@@ -4,6 +4,7 @@ import {
   aiShortNameFromDll,
   allyLetter,
   battleStartable,
+  clampBonus,
   colorIntToHex,
   deriveSync,
   hexToColorInt,
@@ -198,6 +199,7 @@ describe("membersToRows", () => {
             teamId: 2,
             mode: false,
             sync: 2,
+            handicap: 30,
           }),
           teamColor: 0x0000ff,
         }),
@@ -210,6 +212,7 @@ describe("membersToRows", () => {
     expect(row.spectator).toBe(true);
     expect(row.sync).toBe(2);
     expect(row.colorHex).toBe("#ff0000");
+    expect(row.handicap).toBe(30);
   });
 
   it("enriches human rows with country, rank and rating from the users map", () => {
@@ -258,6 +261,20 @@ describe("membersToRows", () => {
     const [row] = membersToRows(battle, "alice");
     expect(row.country).toBeUndefined();
     expect(row.rank).toBeUndefined();
+  });
+});
+
+describe("clampBonus", () => {
+  it("rounds to the nearest integer", () => {
+    expect(clampBonus(42.6)).toBe(43);
+  });
+
+  it("floors negative requests at 0", () => {
+    expect(clampBonus(-5)).toBe(0);
+  });
+
+  it("caps requests above 100", () => {
+    expect(clampBonus(150)).toBe(100);
   });
 });
 
@@ -367,6 +384,7 @@ const row = (p: Partial<MemberRow> = {}): MemberRow => ({
   ally: 0,
   side: 0,
   colorHex: "#000000",
+  handicap: 0,
   ...p,
 });
 

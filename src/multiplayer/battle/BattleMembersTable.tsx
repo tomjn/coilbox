@@ -53,6 +53,7 @@ export function BattleMembersTable({
   noteFor,
   onSetNote,
   statsSummaryFor,
+  onSetBonus,
   onAddBot,
   onSide,
   onTeam,
@@ -122,6 +123,12 @@ export function BattleMembersTable({
   /** "N games with this player…" summary from the local replay-stats database
    * (#375), shown in the note popover alongside the manual note. */
   statsSummaryFor?: (row: Row) => string | null;
+  /**
+   * Set a human row's SPADS resource bonus/handicap (issue #346). Left
+   * undefined in a self-hosted room, where there is no founder-direct
+   * equivalent of SPADS's `!force <name> bonus <n>` (see `useBattleRoom`).
+   */
+  onSetBonus?: (name: string, value: number) => void;
   onAddBot: (aiShortName: string) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
@@ -368,6 +375,11 @@ export function BattleMembersTable({
                   statsSummary={
                     row.kind === "human" && !row.self
                       ? statsSummaryFor?.(row)
+                      : undefined
+                  }
+                  onSetBonus={
+                    row.kind === "human" && onSetBonus
+                      ? (v) => onSetBonus(row.name, v)
                       : undefined
                   }
                   onSide={onSide}

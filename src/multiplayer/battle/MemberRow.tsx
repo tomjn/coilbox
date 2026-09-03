@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { NoteButton } from "../NoteButton";
 import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
+import { BonusButton } from "./BonusButton";
 import { allyLetter, type MemberRow as Row } from "./config";
 
 /**
@@ -93,6 +94,7 @@ export function MemberRow({
   note,
   onSetNote,
   statsSummary,
+  onSetBonus,
   onSide,
   onTeam,
   onAlly,
@@ -144,6 +146,13 @@ export function MemberRow({
   /** "N games with this player…" summary from the local replay-stats database
    * (#375), shown in the note popover alongside the manual note. */
   statsSummary?: string | null;
+  /**
+   * Set this player's SPADS resource bonus/handicap (issue #346). Humans
+   * only, and only offered at all in an autohost battle (see
+   * `BattleMembersTable`, which leaves this undefined in a self-hosted room:
+   * there is no founder-direct equivalent of SPADS's `!force ... bonus`).
+   */
+  onSetBonus?: (value: number) => void;
   onSide: (side: number) => void;
   onTeam: (teamId: number) => void;
   onAlly: (ally: number) => void;
@@ -303,6 +312,13 @@ export function MemberRow({
               note={note ?? ""}
               onSave={onSetNote}
               statsSummary={statsSummary}
+            />
+          )}
+          {row.kind === "human" && onSetBonus && (
+            <BonusButton
+              name={row.name}
+              confirmed={row.handicap}
+              onSend={onSetBonus}
             />
           )}
         </div>

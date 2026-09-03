@@ -527,6 +527,9 @@ function BattleRoomPage() {
             noteFor={(row) => getNote(row.userId, row.name)}
             onSetNote={(row, text) => setNote(row.userId, row.name, text)}
             statsSummaryFor={(row) => relationSummary(relationFor(row.name))}
+            // Only an autohost battle has anything to send this to: there is
+            // no founder-direct equivalent of SPADS's `!force ... bonus`.
+            onSetBonus={!room.selfHost ? room.setBonus : undefined}
             onAddBot={room.addBot}
             onSide={room.setSide}
             onTeam={room.setTeam}
