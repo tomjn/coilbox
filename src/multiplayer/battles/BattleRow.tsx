@@ -1,29 +1,30 @@
 import { Button } from "@picoframe/frame";
 import { Link as LinkIcon, Lock, LogOut, Users } from "lucide-react";
 import { memo, useState } from "react";
-import { THUMB_MINIMAP_MIP, useUnitsyncMinimap } from "../../content/config";
-import { MapThumb } from "../../content/pages/components/MapThumb";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { inviteLink } from "../../direct/invite";
 import type { Battle } from "../bindings";
+import { BattleRowMapThumb } from "./BattleRowMapThumb";
 import { battleRowAction, occupancy } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
 
 /**
  * One battle in the list: a minimap thumbnail, title (with a lock glyph when
  * passworded/locked), map · game · host, occupancy and spectators, and a join
- * affordance. When actionable, the minimap/title area is itself a button that
- * triggers the action (a second path to the action button). A running battle (host
+ * affordance. When actionable, the title area is itself a button that triggers
+ * the action (a second path to the action button). A running battle (host
  * in-game) offers "Watch live" instead of "Join": `onJoin` is reused, joining as a
  * spectator to watch the running game. `joined` highlights the battle the user is
- * in; `canJoin` gates the action (ready, not busy, not already in a battle).
- * Passworded battles act via a password popover; others via a plain button.
+ * in. `canJoin` gates the action (ready, not busy, not already in a battle).
+ * Passworded battles act via a password popover. Others act via a plain button.
  * `onJoin`'s optional `key` carries the popover password.
  *
  * The minimap renders from the LOCAL unitsync copy only (`enginePath`/`dataDir`
- * come from the selected scan target). Maps the user hasn't installed fall through
- * to MapThumb's placeholder icon — we deliberately don't substitute a remote or
- * browse-cached thumbnail here.
+ * come from the selected scan target), in `BattleRowMapThumb`. Maps the user
+ * hasn't installed fall through to a blank result there, which doubles as the
+ * "you don't have this" signal and becomes a download button in its own right
+ * (issue #2373), so it sits outside the title's join button rather than inside
+ * it: a button cannot nest inside another button.
  */
 function BattleRowInner({
   battle,
@@ -65,14 +66,8 @@ function BattleRowInner({
   // Built rather than assumed: a connection that has no link worth giving out
   // shows no button, instead of one that copies something nobody can act on.
   const invite = inviteLink(serverAddress, directRoom, String(battle.id));
-  const { url, loading } = useUnitsyncMinimap(
-    enginePath,
-    dataDir,
-    battle.map,
-    THUMB_MINIMAP_MIP,
-  );
 
-  // Clicking the minimap/title is a second path to the same action as the button:
+  // Clicking the title is a second path to the same action as the button:
   // passworded battles open the password popover, others act directly (join, or
   // watch a running battle). Only reachable when actionable (the region is a plain
   // div otherwise).
@@ -81,34 +76,25 @@ function BattleRowInner({
     else onJoin(battle);
   };
 
-  const info = (
-    <>
-      <div className="w-14 shrink-0 overflow-hidden rounded-md border border-border">
-        <MapThumb
-          url={url ?? undefined}
-          loading={loading}
-          alt={`Minimap of ${battle.map}`}
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-2 truncate text-sm font-medium">
-          {restricted && (
-            <Lock
-              className="size-3.5 shrink-0 text-muted-foreground"
-              aria-label={battle.passworded ? "Passworded" : "Locked"}
-            />
-          )}
-          <span className="truncate transition-colors group-hover/row:text-primary">
-            {battle.title}
-          </span>
-        </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {battle.map} · {battle.modname}
-          {/* Tachyon's lobby list names no founder, so there is no host to name. */}
-          {battle.host && ` · host ${battle.host}`}
-        </p>
-      </div>
-    </>
+  const details = (
+    <div className="min-w-0 flex-1">
+      <p className="flex items-center gap-2 truncate text-sm font-medium">
+        {restricted && (
+          <Lock
+            className="size-3.5 shrink-0 text-muted-foreground"
+            aria-label={battle.passworded ? "Passworded" : "Locked"}
+          />
+        )}
+        <span className="truncate transition-colors group-hover/row:text-primary">
+          {battle.title}
+        </span>
+      </p>
+      <p className="truncate text-xs text-muted-foreground">
+        {battle.map} · {battle.modname}
+        {/* Tachyon's lobby list names no founder, so there is no host to name. */}
+        {battle.host && ` · host ${battle.host}`}
+      </p>
+    </div>
   );
 
   return (
@@ -117,16 +103,21 @@ function BattleRowInner({
         joined ? "border-primary bg-primary/5" : "border-border"
       }`}
     >
+      <BattleRowMapThumb
+        battle={battle}
+        enginePath={enginePath}
+        dataDir={dataDir}
+      />
       {disabled ? (
-        <div className="flex min-w-0 flex-1 items-center gap-4">{info}</div>
+        <div className="flex min-w-0 flex-1 items-center">{details}</div>
       ) : (
         <button
           type="button"
           onClick={activate}
           aria-label={`${action.label} ${battle.title}`}
-          className="group/row flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-md text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="group/row flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {info}
+          {details}
         </button>
       )}
       <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
