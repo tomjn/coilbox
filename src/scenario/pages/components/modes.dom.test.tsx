@@ -25,7 +25,13 @@ import type { PathSource } from "./orderPaths";
 
 afterEach(cleanup);
 
-const selectMode = EDITOR_MODES[0];
+// By id rather than by position. The editor opens in Pan now, so the marquee is
+// no longer the first mode in the list and never was the point of that index.
+const selectMode =
+  EDITOR_MODES.find((mode) => mode.id === "select") ??
+  (() => {
+    throw new Error("no select mode to test the marquee on");
+  })();
 
 /** Three units in a line, so a box can be drawn round some of them. */
 const drawn: Placement[] = [

@@ -53,21 +53,23 @@ The map is drawn as a 3D scene from the same terrain data the content browser pr
 - **Frame map** puts the camera back where it opened.
 - A unit type the game does not have is drawn as a plain box, and the count of those is written in the corner so you know it is a missing unit rather than a placement you forgot.
 
-### The mode strip
+### The mode rail
 
-The toggle group above the scene decides what a click on the ground does:
+The column of buttons down the left of the scene decides what a click on the ground does. Hover one for its name, what it makes, and the number key that reaches it. The mode's own controls, a unit picker or a count, appear in a bar along the top while that mode is on.
 
 | Mode | What it does |
 | --- | --- |
-| **Select** | Nothing is placed. Click bare ground to deselect. |
+| **Pan** | Where the editor opens. Drag to move the view. Nothing is placed, and a click still selects. |
+| **Select** | Drag a box round things to select them all. Click bare ground to deselect. |
 | **Zones** | Drag to draw a zone. Pick **Box** or **Circle** first. |
 | **Actors** | Pick a unit and a team, then click to place one unit. |
 | **Groups** | Pick a unit, a team and a count, then click to place a block of them. |
 | **Bases** | Pick a building and click. Clicks add to the base you have selected, or press **New base** to start another. |
+| **Blueprints** | Pick a saved layout and a team, then click to place the whole base. Each one is drawn in the list, so you can tell them apart before you place one. |
 
 Nothing is placed until you have picked a unit, so a stray click in Actors mode with an empty picker just deselects.
 
-In Zones mode the left button is taken by the drawing drag, so middle-drag is how you pan while it is on. Zones also stop being clickable while a placing mode is active, so a zone over a corner of the map does not block placing there.
+In Select and Zones the left button is taken by the drag that draws, so middle-drag is how you pan while either is on. Pan mode is the other way out of that: it gives the left button back to the camera, which is why it is where the editor opens. Zones also stop being clickable while a placing mode is active, so a zone over a corner of the map does not block placing there.
 
 ### Move, turn and delete
 

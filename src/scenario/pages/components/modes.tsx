@@ -19,6 +19,7 @@ import {
   Blocks,
   Circle,
   Factory,
+  Hand,
   type LucideIcon,
   MousePointer2,
   Plus,
@@ -214,14 +215,37 @@ export interface EditorMode {
 }
 
 /**
+ * The camera, and nothing else. Where the editor opens.
+ *
+ * A mode that sets `draw` takes the left button off the camera, because a drag
+ * across bare ground is then the drawing gesture. Select does, so once the
+ * editor opened in Select there was no mode in the strip that panned on the
+ * button everybody reaches for, and the only way to move the map was the middle
+ * button nobody had been told about. Every drawing tool in every other editor
+ * has a hand beside it for exactly this, so this is that hand.
+ *
+ * It places nothing and draws nothing, so the camera keeps the left button.
+ * What it does not give up is the rest: a click still selects, and a drag on
+ * something still moves it, because both of those are the surface's rather than
+ * the mode's.
+ */
+const panMode: EditorMode = {
+  id: "pan",
+  label: "Pan",
+  icon: Hand,
+  what: "Moves the view. Puts nothing down and selects nothing new.",
+  hint: "Drag the map to move the view. Click something to select it, and drag it to move it. Right-drag turns the camera.",
+  use: () => ({ place: null }),
+};
+
+/**
  * Looking without touching: pick things up, move them, turn them, put nothing
  * new down, and take hold of several at once (issue #2279).
  *
- * Where the editor opens, so a stray click on a scenario you are only reading
- * cannot add to it. It is also the one mode with a spare gesture to give a
- * marquee: a drag across bare ground here was a pan, and the middle button pans
- * anyway, which is the same trade Zones mode already makes for the drag that
- * draws a zone.
+ * The one mode with a spare gesture to give a marquee: a drag across bare
+ * ground here was a pan, and the middle button pans anyway, which is the same
+ * trade Zones mode already makes for the drag that draws a zone. Pan mode is
+ * where that trade is paid back, and it is where the editor opens instead.
  *
  * The box is dragged out on the ground rather than across the screen, and what
  * it selects is what is standing inside that ground. Under a camera anybody has
@@ -817,8 +841,10 @@ const layoutsMode: EditorMode = {
   },
 };
 
-/** Every mode the editor offers, in the order the strip shows them. */
+/** Every mode the editor offers, in the order the rail shows them. The first
+ *  is the one the editor opens in. */
 export const EDITOR_MODES: EditorMode[] = [
+  panMode,
   selectMode,
   zonesMode,
   actorsMode,

@@ -175,7 +175,7 @@ export function BlueprintPanel({
       carryBlueprint(current, imported.layout, crypto.randomUUID()),
     );
     setStatus(
-      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode strip, or with the pin beside it under Contents.`,
+      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode rail, or with the pin beside it under Contents.`,
     );
   }
 
