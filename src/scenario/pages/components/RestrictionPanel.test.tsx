@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 /**
- * Removing a restriction from the panel has no confirm dialog and no undo
+ * Removing a restriction from either panel has no confirm dialog and no undo
  * button of its own nearby (issue #2280, issue #2306).
  *
- * The panel has no single named object to delete: it holds two lists, a
- * buildable rule's units and the commands withheld, and taking an entry off
+ * Neither panel has a single named object to delete: one holds a buildable
+ * rule's units and the other the commands withheld, and taking an entry off
  * either is a plain list removal rather than the kind of delete the trigger,
  * objective and variable panels have. So the notice here does not say
  * "Deleted X", it says what the list removal actually did, the same words
@@ -29,7 +29,10 @@ import {
   recordEdit,
   undoEdit,
 } from "./history";
-import { RestrictionPanel } from "./RestrictionPanel";
+import {
+  CommandRestrictionPanel,
+  UnitRestrictionPanel,
+} from "./RestrictionPanel";
 
 // The panel's removal notice has no shell here (issue #2280), the same gap
 // `ScenarioBuilderPage.dom.test.tsx` fills for its own toasts. Captured rather
@@ -115,16 +118,25 @@ function PanelHarness({
     setDocument(step.document);
   };
 
+  const change = (next: Scenario) => {
+    setHistory(recordEdit(history, document, next));
+    setDocument(next);
+  };
+
+  // Both panels, because the edit page shows both and an author's undo stack
+  // is one stack across the two of them.
   return (
     <>
-      <RestrictionPanel
+      <UnitRestrictionPanel
         scenario={document}
-        onChange={(next) => {
-          setHistory(recordEdit(history, document, next));
-          setDocument(next);
-        }}
+        onChange={change}
         units={[]}
         unitsLoading={false}
+        onUndo={stepBack}
+      />
+      <CommandRestrictionPanel
+        scenario={document}
+        onChange={change}
         onUndo={stepBack}
       />
       <button type="button" onClick={stepBack}>
@@ -135,11 +147,16 @@ function PanelHarness({
   );
 }
 
-/** The panel starts shut, the way it does on the edit page. */
-function openPanel(restrictions: Scenario["restrictions"]) {
+/** A panel starts shut, the way it does on the edit page. */
+function openPanel(restrictions: Scenario["restrictions"], title: RegExp) {
   render(<PanelHarness restrictions={restrictions} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Restrictions/ }));
+  fireEvent.click(screen.getByRole("button", { name: title }));
 }
+
+const openUnits = (restrictions: Scenario["restrictions"]) =>
+  openPanel(restrictions, /^Unit restrictions/);
+const openCommands = (restrictions: Scenario["restrictions"]) =>
+  openPanel(restrictions, /^Command restrictions/);
 
 /** The restrictions the document holds, which the harness puts on screen so a
  *  test can read them the way the rest of the editor would. */
@@ -156,7 +173,7 @@ describe("taking a unit off the buildable list", () => {
     );
 
   it("says what was taken off the list, not that it was deleted", () => {
-    openPanel({ buildable: { mode: "allow", units: ["armcom", "armpw"] } });
+    openUnits({ buildable: { mode: "allow", units: ["armcom", "armpw"] } });
 
     remove("armpw");
 
@@ -167,7 +184,7 @@ describe("taking a unit off the buildable list", () => {
   });
 
   it("is undoable through Cmd+Z alone, with no toast involved", () => {
-    openPanel({ buildable: { mode: "allow", units: ["armcom", "armpw"] } });
+    openUnits({ buildable: { mode: "allow", units: ["armcom", "armpw"] } });
 
     remove("armpw");
     undo();
@@ -176,7 +193,7 @@ describe("taking a unit off the buildable list", () => {
   });
 
   it("restores the unit when the notice's own action is used", () => {
-    openPanel({ buildable: { mode: "allow", units: ["armcom", "armpw"] } });
+    openUnits({ buildable: { mode: "allow", units: ["armcom", "armpw"] } });
 
     remove("armpw");
     act(() => toasted.calls[0].action.onClick());
@@ -185,7 +202,7 @@ describe("taking a unit off the buildable list", () => {
   });
 
   it("uses one fixed notice id so several removals in a row replace it rather than stacking", () => {
-    openPanel({
+    openUnits({
       buildable: { mode: "allow", units: ["armcom", "armpw", "armflea"] },
     });
 
@@ -205,7 +222,7 @@ describe("taking a command off the withheld list", () => {
     );
 
   it("says what was taken off the list, not that it was deleted", () => {
-    openPanel({ commands: ["selfd", "reclaim"] });
+    openCommands({ commands: ["selfd", "reclaim"] });
 
     remove("selfd");
 
@@ -216,7 +233,7 @@ describe("taking a command off the withheld list", () => {
   });
 
   it("is undoable through Cmd+Z alone, with no toast involved", () => {
-    openPanel({ commands: ["selfd", "reclaim"] });
+    openCommands({ commands: ["selfd", "reclaim"] });
 
     remove("selfd");
     undo();
@@ -225,7 +242,7 @@ describe("taking a command off the withheld list", () => {
   });
 
   it("restores the command when the notice's own action is used", () => {
-    openPanel({ commands: ["selfd", "reclaim"] });
+    openCommands({ commands: ["selfd", "reclaim"] });
 
     remove("selfd");
     act(() => toasted.calls[0].action.onClick());
@@ -234,7 +251,7 @@ describe("taking a command off the withheld list", () => {
   });
 
   it("uses one fixed notice id so several removals in a row replace it rather than stacking", () => {
-    openPanel({ commands: ["selfd", "reclaim", "capture"] });
+    openCommands({ commands: ["selfd", "reclaim", "capture"] });
 
     remove("selfd");
     remove("reclaim");

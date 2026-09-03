@@ -68,7 +68,10 @@ import {
   problemTarget,
   type RowFocus,
 } from "./components/problemTargets";
-import { RestrictionPanel } from "./components/RestrictionPanel";
+import {
+  CommandRestrictionPanel,
+  UnitRestrictionPanel,
+} from "./components/RestrictionPanel";
 import {
   ScenarioMapScene,
   type ScenarioMapSceneHandle,
@@ -771,11 +774,16 @@ export default function ScenarioEditPage() {
           onUndo={undo}
           issues={missionIssues}
         />
-        <RestrictionPanel
+        <UnitRestrictionPanel
           scenario={scenario}
           onChange={(next) => apply(next)}
           units={gameUnits.units}
           unitsLoading={gameUnits.loading}
+          onUndo={undo}
+        />
+        <CommandRestrictionPanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
           onUndo={undo}
         />
         {/* The layouts the document holds, and the way in and out of a game's own

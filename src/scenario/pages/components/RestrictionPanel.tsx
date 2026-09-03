@@ -1,19 +1,25 @@
 /**
- * The restrictions panel: what the mission's teams may build, and what they may
+ * The restrictions panels: what the mission's teams may build, and what they may
  * be ordered to do.
+ *
+ * Two panels rather than one. They are stored in the same place and share a
+ * paragraph of reach, but an author reaching for one is not thinking about the
+ * other: withholding self destruct has nothing to do with an allow list of unit
+ * defs, and one panel carrying both meant reading a screen of text about units
+ * to reach a text box for a command name.
  *
  * These are the runtime's rules, not the engine's `[RESTRICT]` block, which is
  * global and permanent. The difference is `unlock_unit`, which lifts one def for
  * one participant mid-mission, and that is the whole reason the runtime keeps
  * its own list.
  *
- * The rule binds every team the scenario declares, because the data names no
- * team. That is the one thing an author has to know before writing one, so the
+ * Both rules bind every team the scenario declares, because the data names no
+ * team. That is the one thing an author has to know before writing one, so each
  * panel says it in place rather than in a manual.
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Lock, Plus, X } from "lucide-react";
+import { Ban, Lock, Plus, X } from "lucide-react";
 import { useState } from "react";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
@@ -46,7 +52,20 @@ const COMMON_COMMANDS = [
   "onoff",
 ];
 
-export function RestrictionPanel({
+/** What a restriction reaches, said the same way on both panels because it is
+ *  the same rule. */
+function Reach() {
+  return (
+    <p className="text-xs text-muted-foreground">
+      A restriction binds every team the scenario declares, not the player
+      alone: the rule names no team. Teams the scenario says nothing about, Gaia
+      included, are untouched.
+    </p>
+  );
+}
+
+/** What the mission's teams may build. */
+export function UnitRestrictionPanel({
   scenario,
   onChange,
   units,
@@ -65,25 +84,22 @@ export function RestrictionPanel({
   onUndo: () => void;
 }) {
   const mode = buildableMode(scenario);
-  const buildable = scenario.restrictions.buildable;
-  const listed = buildable?.units ?? [];
-  const commands = scenario.restrictions.commands ?? [];
+  const listed = scenario.restrictions.buildable?.units ?? [];
   const warning = buildableWarning(scenario);
 
   return (
     <EditorPanel
-      title="Restrictions"
+      title="Unit restrictions"
       icon={Lock}
-      summary={summary(mode, listed.length, commands.length)}
+      summary={buildSummary(mode, listed.length)}
     >
       <div className="flex max-w-2xl flex-col gap-4">
+        <Reach />
         <p className="text-xs text-muted-foreground">
-          A restriction binds every team the scenario declares, not the player
-          alone: the rule names no team, and an author who wants one for the
-          player only writes it here and gives the def back to the others with{" "}
-          <code>unlock_unit</code>. Teams the scenario says nothing about, Gaia
-          included, are untouched. The mission's own spawns are too, so a
-          scenario can place a unit its teams may not build.
+          An author who wants a rule for the player only writes it here and
+          gives the def back to the others with <code>unlock_unit</code>. The
+          mission's own spawns are exempt, so a scenario can place a unit its
+          teams may not build.
         </p>
 
         <section className="flex flex-col gap-2">
@@ -146,8 +162,34 @@ export function RestrictionPanel({
             </>
           )}
         </section>
+      </div>
+    </EditorPanel>
+  );
+}
 
-        <section className="flex flex-col gap-2 border-t border-border/50 pt-4">
+/** What the mission's teams may be ordered to do. */
+export function CommandRestrictionPanel({
+  scenario,
+  onChange,
+  onUndo,
+}: {
+  scenario: Scenario;
+  onChange: (next: Scenario) => void;
+  /** The page's own step back, as {@link UnitRestrictionPanel} takes it. */
+  onUndo: () => void;
+}) {
+  const commands = scenario.restrictions.commands ?? [];
+
+  return (
+    <EditorPanel
+      title="Command restrictions"
+      icon={Ban}
+      summary={commandSummary(commands.length)}
+    >
+      <div className="flex max-w-2xl flex-col gap-4">
+        <Reach />
+
+        <section className="flex flex-col gap-2">
           <h3 className="text-xs font-medium">Commands withheld</h3>
           {commands.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
@@ -183,16 +225,17 @@ export function RestrictionPanel({
   );
 }
 
-function summary(mode: BuildableMode, units: number, commands: number): string {
-  const build =
-    mode === "none"
-      ? "Builds anything"
-      : mode === "allow"
-        ? `Only ${units} unit${units === 1 ? "" : "s"}`
-        : `${units} unit${units === 1 ? "" : "s"} withheld`;
+function buildSummary(mode: BuildableMode, units: number): string {
+  if (mode === "none") return "Builds anything";
+  return mode === "allow"
+    ? `Only ${units} unit${units === 1 ? "" : "s"}`
+    : `${units} unit${units === 1 ? "" : "s"} withheld`;
+}
+
+function commandSummary(commands: number): string {
   return commands === 0
-    ? build
-    : `${build} · ${commands} command${commands === 1 ? "" : "s"}`;
+    ? "Every command allowed"
+    : `${commands} command${commands === 1 ? "" : "s"} withheld`;
 }
 
 /** One entry of a list of names, with the button that takes it back off. */
