@@ -137,7 +137,7 @@ Each participant can be given a starting bank, free income per second, a list of
 
 ## Difficulty
 
-One scenario can be three. An actor, a group, a base and a trigger each carry an optional **Only from** and **Only up to**, over easy, normal and hard. Leave both on **Any difficulty** and the thing is always there, which is what everything you have already written says.
+One scenario can be three. An actor, a group, a base and a trigger each carry an optional **Only from** and **Only up to**, over easy, normal and hard. Leave both on **Any** and the thing is always there, which is what everything you have already written says.
 
 So the extra turret is a base marked "Only from hard". The mercy waypoint marker is a trigger marked "Only up to easy". The second wave is a group marked "Only from hard", set once on the group rather than on every trigger that sends it: a group outside its range is not placed at the start and is not placed by `spawn_group` or `wake_group` either.
 

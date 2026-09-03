@@ -28,14 +28,24 @@ import { FieldProblem } from "./panels";
 /** The value the pickers use for "no bound this way". */
 const ANY = "any";
 
+/**
+ * What that value is called on screen.
+ *
+ * One word, because the two pickers sit side by side in a popover barely wider
+ * than a unit's name and "Any difficulty" was clipped to "Any difficul" in both
+ * of them. The field's own label already asks the question, so "Only from: Any"
+ * says the whole thing and the word it lost was the one being repeated.
+ */
+const ANY_LABEL = "Any";
+
 const LABEL: Record<Difficulty, string> = {
   easy: "Easy",
   normal: "Normal",
   hard: "Hard",
 };
 
-const options = (blank: string) => [
-  { value: ANY, label: blank },
+const options = () => [
+  { value: ANY, label: ANY_LABEL },
   ...DIFFICULTIES.map((level) => ({ value: level, label: LABEL[level] })),
 ];
 
@@ -93,7 +103,7 @@ export function DifficultyRangeFields({
             onValueChange={(next) =>
               onChange(rangeWith(value, "atLeast", next))
             }
-            options={options("Any difficulty")}
+            options={options()}
             describedBy={describedBy}
           />
         </Field>
@@ -102,7 +112,7 @@ export function DifficultyRangeFields({
             size="sm"
             value={range.atMost ?? ANY}
             onValueChange={(next) => onChange(rangeWith(value, "atMost", next))}
-            options={options("Any difficulty")}
+            options={options()}
             describedBy={describedBy}
           />
         </Field>
