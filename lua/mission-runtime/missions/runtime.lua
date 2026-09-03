@@ -53,7 +53,7 @@
 
 -- 7 adds five actions and one format feature, in one version because they were
 -- written together and a game chasing six floors for one release is worse than
--- a game chasing one (issue #2422):
+-- a game chasing one:
 --
 --   * call_lua calls a function the game already has, by dotted name
 --   * build_unit tells one of the mission's units to build something, at a

@@ -1,5 +1,5 @@
 -- Coilbox mission runtime: calling a function the game already has, by name
--- (issue #2422).
+--.
 --
 -- A name and not a body. A compiled mission is data the runtime reads out of an
 -- archive, and a function written into a scenario would be source arriving from

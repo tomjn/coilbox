@@ -53,7 +53,7 @@ local function chime(name)
 	return { type = "chime", params = { name = name } }
 end
 
---- The same condition, read the other way round (issue #2422).
+--- The same condition, read the other way round.
 local function negated(condition)
 	condition.negate = true
 	return condition
@@ -185,7 +185,7 @@ check("a trigger with one polled condition is polled, not evented",
 	marks(fired):find("mixed") ~= nil)
 
 --------------------------------------------------------------------------------
--- Conditions read the other way round (issue #2422).
+-- Conditions read the other way round.
 --
 -- "The player has not built a factory" is `unit_built` with `negate = true`, so
 -- what is proved here is that a real answer is turned over, that a non-answer is

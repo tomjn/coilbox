@@ -425,7 +425,7 @@ export function setStepParam(
 
 /**
  * Read a condition the other way round, or the right way up again
- * (issue #2422).
+ *.
  *
  * The key is taken out rather than written `false` when it is off, so a
  * condition somebody turned on and off again compiles to the bytes it started

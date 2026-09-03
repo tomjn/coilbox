@@ -207,7 +207,7 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
   victory: { team: { kind: "teamId", optional: true } },
   defeat: { team: { kind: "teamId", optional: true } },
   /**
-   * Call a function the game already has, by name (issue #2422).
+   * Call a function the game already has, by name.
    *
    * A name and not a body. A mission is data the runtime reads out of an
    * archive, so a function written into a scenario would be source code
@@ -419,7 +419,7 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   /** Issue #812. A runtime behind 3 ignores it and goes on ordering a squad the
    *  mission handed the player. */
   release_group: 3,
-  /** Issue #2422. Five actions and one format feature, all landing in 7. A
+  /** Five actions and one format feature, all landing in 7. A
    *  runtime behind it has no implementation for any of them, so each is a
    *  trigger that reports itself once and does nothing. */
   call_lua: 7,

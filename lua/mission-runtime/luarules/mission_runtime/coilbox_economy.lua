@@ -1,7 +1,7 @@
 -- Coilbox mission runtime: a team's bank, what it is paid, and how much it can
 -- hold.
 --
--- Three actions and the per-frame payment behind one of them (issue #2422):
+-- Three actions and the per-frame payment behind one of them:
 --
 -- - `give_resources` moves a bank once. Positive is a gift, negative a drain.
 -- - `set_income` says what a team is paid per second from now on, replacing

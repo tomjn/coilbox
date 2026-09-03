@@ -299,7 +299,7 @@ const step = (s: TriggerStep): LuaTable =>
     ["params", sortedTbl(s.params, param)],
     // Only when it is on, so a scenario that negates nothing emits exactly the
     // bytes it always did and a runtime that has never heard of it reads a
-    // table with no new key in it (issue #2422).
+    // table with no new key in it.
     ["negate", s.negate === true ? true : undefined],
   ]);
 

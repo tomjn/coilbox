@@ -322,7 +322,7 @@ export type TriggerStep = {
   type: string;
   params: Record<string, ScenarioParam>;
   /**
-   * Hold when this condition does not (issue #2422). Only read on a condition,
+   * Hold when this condition does not. Only read on a condition,
    * because an action has no truth to turn over.
    *
    * A flag on the step rather than a `not_built` type per condition: "the

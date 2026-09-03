@@ -233,7 +233,7 @@ function Engine:eventsOf(record)
 		-- events are the moments the answer becomes no: "the player has not built a
 		-- factory" woken only by a unit being finished is a question that can only
 		-- ever answer no, and the mission it was written for is the one where it
-		-- never fires (issue #2422).
+		-- never fires.
 		if condition.negate == true then
 			return nil
 		end
@@ -275,7 +275,7 @@ end
 -- never an error out of the callin that led here.
 --
 -- `condition.negate` turns a real answer over, which is how a mission asks
--- whether something has *not* happened (issue #2422). Only a real answer: a
+-- whether something has *not* happened. Only a real answer: a
 -- condition nothing implements and one that raised are false whichever way
 -- round they are read, because both are the runtime saying it does not know
 -- rather than saying no. Negating either would turn a broken trigger into one

@@ -758,7 +758,7 @@ function StepSection({
                   ),
                 )
               }
-              // Only a condition has a truth to turn over (issue #2422).
+              // Only a condition has a truth to turn over.
               onNegate={
                 conditions
                   ? (negate) =>

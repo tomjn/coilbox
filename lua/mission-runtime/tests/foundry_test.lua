@@ -1,5 +1,5 @@
 -- Proves the five actions and the one format feature runtime 7 added
--- (issue #2422), driven by the `foundry` scenario fixture so the shapes under
+--, driven by the `foundry` scenario fixture so the shapes under
 -- test are the ones coilbox actually emits. Run it with:
 --
 --   luajit lua/mission-runtime/tests/foundry_test.lua
