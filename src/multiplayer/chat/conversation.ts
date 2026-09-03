@@ -85,3 +85,54 @@ export function conversationMessages(
   const channel = d.kind === "channel" ? d.name : d.channel;
   return state.channels[channel]?.messages ?? [];
 }
+
+/** The chat page's address for a conversation (issue #2406): the `/chat`
+ * route with the conversation named in the query string, read once by
+ * `useConversationParam`. A mention in another channel, a message
+ * notification, and the match-result drawer's link to a debriefing channel
+ * all resolve to this, so any of them can send somebody to the chat page
+ * without it knowing which one sent them.
+ *
+ * A battle points here by its underlying channel, the same one `convId`
+ * uses. Arriving this way opens it as a plain channel rather than the
+ * battle-flavoured view the room itself shows, which is close enough for
+ * "read what was said here", the only thing an outside link needs. */
+export function conversationHref(d: ConversationDescriptor): string {
+  const params =
+    d.kind === "dm"
+      ? new URLSearchParams({ dm: d.peer })
+      : new URLSearchParams({
+          channel: d.kind === "channel" ? d.name : d.channel,
+        });
+  return `/chat?${params.toString()}`;
+}
+
+/** What answering a `?channel=`/`?dm=` request (`useConversationParam`) does
+ * against live state: open the conversation it names, or explain why not.
+ * `null` means there is not yet enough state to tell (the mirror hasn't
+ * loaded), so try again once more of the snapshot has arrived.
+ *
+ * Only a channel already joined this session may be opened this way (issue
+ * #2406). The query names an intent, not permission to join on the reader's
+ * behalf, so a channel absent from the snapshot is a clean rejection rather
+ * than an autojoin. Whether arriving somewhere should join you to it is a
+ * separate question this does not answer. A DM has no "joined" state to
+ * check, so it always resolves once it is one. */
+export type ConversationRequestResult =
+  | { ok: true; descriptor: ConversationDescriptor }
+  | { ok: false; reason: string };
+
+export function resolveConversationRequest(
+  requested: ConversationDescriptor,
+  state: LobbyState | null | undefined,
+): ConversationRequestResult | null {
+  if (requested.kind !== "channel") return { ok: true, descriptor: requested };
+  if (!state) return null;
+  if (!state.channels[requested.name]) {
+    return {
+      ok: false,
+      reason: `You have not joined ${requested.name}.`,
+    };
+  }
+  return { ok: true, descriptor: requested };
+}
