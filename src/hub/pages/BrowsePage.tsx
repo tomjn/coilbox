@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
-  Download,
   Globe,
   Loader2,
   Package2,
@@ -20,14 +19,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
-import { buildDeepLink } from "@/deeplink/build";
-import { dispatchDeepLink } from "@/deeplink/bus";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import { isProfileHidden } from "../../profile/hidden";
 import {
   describeItem,
-  fetchHubItem,
   HUB_KINDS,
   type HubFilters,
   type HubItem,
@@ -41,11 +37,7 @@ import {
 } from "../browse";
 import { KindIcon } from "../components/KindIcon";
 import { hubItemRoute, useHubUrl } from "../config";
-import {
-  type HubItemPresence,
-  noteHubContainer,
-  noteHubItem,
-} from "../importRecord";
+import type { HubItemPresence } from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { FilterCombobox } from "./components/FilterCombobox";
 import { HeaderAccount } from "./components/HeaderAccount";
@@ -58,12 +50,11 @@ import { HeaderAccount } from "./components/HeaderAccount";
  * gallery only worked if you already knew what was on it. This is the same
  * gallery the website serves, over the same filters, so a player can go looking.
  *
- * This screen never imports anything itself. The button on a card fetches the
- * item's `container_url` and hands it to the deep-link handler as an
- * `import?url=` link: fetch under a byte cap, check what came back, then confirm
- * applying it. The handler drops its "may coilbox contact this host" step for a
- * URL on the configured hub (issue #1367), which is the one this page has been
- * reading from all along. Every other check it runs is unchanged.
+ * This screen never imports anything itself. Every way into a card - its
+ * title, and the View button beside it - opens the item's own page
+ * (`./ItemPage.tsx`, issue #1366), which has room for the whole description,
+ * shows what the container actually holds, and is where Import lives. A card
+ * is a summary, not a decision.
  *
  * Filtering follows the website's shape rather than growing a row of boxes. Kind
  * is a set of chips, the search box is the API's `q`, and author and tag are set
@@ -74,11 +65,6 @@ import { HeaderAccount } from "./components/HeaderAccount";
  * (issue #1368). The answer comes from `../importRecord.ts`, which keeps a
  * record of what each hub import produced, and checks that the produced thing
  * is still there before it says you have it.
- *
- * A card is a summary, so pressing its title opens the item's own page
- * (`./ItemPage.tsx`, issue #1366), which has room for the whole description and
- * imports without a dialog. Import stays on the card for somebody who has
- * already read enough here.
  *
  * Game and map need a way in that doesn't depend on the right card already being
  * on the page (issue #1357), so they get a combobox each, listing the games and
@@ -128,8 +114,6 @@ export default function BrowsePage() {
   const [page, setPage] = useState<BrowseResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [importing, setImporting] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
 
   // Typing is separate from the filter it eventually sets, so the list is not
   // refetched on every keystroke.
@@ -173,7 +157,6 @@ export default function BrowsePage() {
   const retry = useCallback(() => setFilters((f) => ({ ...f })), []);
 
   const setFilter = useCallback((key: ClickableKey | "kind", value: string) => {
-    setImportError(null);
     setFilters((f) => ({ ...f, [key]: value, page: 1 }));
   }, []);
 
@@ -200,38 +183,6 @@ export default function BrowsePage() {
         a.localeCompare(b),
       ),
     [scanData],
-  );
-
-  // Fetch the item for its container address, then hand that to the deep-link
-  // handler. It shows what came back and asks before applying it, so nothing is
-  // imported by pressing this.
-  const importItem = useCallback(
-    async (item: HubItem) => {
-      setImporting(item.id);
-      setImportError(null);
-      const result = await fetchHubItem(hubUrl, item.id);
-      setImporting(null);
-      if (!result.ok) {
-        setImportError(result.reason);
-        return;
-      }
-      const link = buildDeepLink({
-        kind: "import",
-        source: { type: "url", url: result.value.container_url },
-      });
-      if (!link.ok) {
-        setImportError(link.reason);
-        return;
-      }
-      // Say which item this address belongs to before the link goes anywhere,
-      // so the importer that finishes the job can record what it produced.
-      noteHubContainer(result.value.container_url, item.id);
-      // And what the hub says about it, so a layout imported from here can
-      // record who published it (issue #1473).
-      noteHubItem(item);
-      dispatchDeepLink(link.url);
-    },
-    [hubUrl],
   );
 
   const drawer = useDrawer();
@@ -384,14 +335,6 @@ export default function BrowsePage() {
       </PageHeader>
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {importError && (
-          <Alert variant="destructive" className="mb-3">
-            <AlertCircle size={15} />
-            <AlertDescription className="text-destructive">
-              {importError}
-            </AlertDescription>
-          </Alert>
-        )}
         {loading && (
           <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
             <Loader2 size={15} className="animate-spin" /> loading the hub…
@@ -491,9 +434,6 @@ export default function BrowsePage() {
                   <ItemActions
                     item={item}
                     presence={presence}
-                    fetching={importing === item.id}
-                    busy={importing !== null}
-                    onImport={() => importItem(item)}
                     onOpen={(route) => navigate(route)}
                   />
                 </li>
@@ -540,40 +480,34 @@ export default function BrowsePage() {
 
 /**
  * What a card offers, which depends on whether you already have the item
- * (issue #1368). Something already imported offers only Open. A second copy is
- * not a thing anybody asked for: an imported preset that has since been edited
- * is a new preset with no tie back to the hub item, so "import again" answered a
- * question nobody had. Somebody who does want a fresh copy can remove theirs
- * from the item's own page and import it.
+ * (issue #1368). Something already imported offers only Open, straight to the
+ * local copy.
  *
- * An item imported before and since deleted offers Import, and the card says
- * nothing about the history. It read as a third paragraph on a card that already
- * had a description, and a card is a summary. The item's own page has room to
- * say it, and does.
+ * Something not yet imported offers View, the same destination its title
+ * already opens: the item's own page (`./ItemPage.tsx`), where the description
+ * is in full, the container is fetched and checked, and Import actually runs
+ * (issue #1397). This button used to say Import and only navigate, which read
+ * as importing when it never did.
+ *
+ * A second copy is not a thing anybody asked for: an imported preset that has
+ * since been edited is a new preset with no tie back to the hub item, so
+ * "import again" answered a question nobody had. Somebody who does want a
+ * fresh copy can remove theirs from the item's own page and import it.
+ *
+ * An item imported before and since deleted offers View again, and the card
+ * says nothing about the history. It read as a third paragraph on a card that
+ * already had a description, and a card is a summary. The item's own page has
+ * room to say it, and does.
  */
 function ItemActions({
   item,
   presence,
-  fetching,
-  busy,
-  onImport,
   onOpen,
 }: {
   item: HubItem;
   presence: HubItemPresence;
-  /** This card's own fetch is in flight. */
-  fetching: boolean;
-  /** Some card's fetch is in flight, so no other one may start. */
-  busy: boolean;
-  onImport: () => void;
   onOpen: (route: string) => void;
 }) {
-  const importIcon = fetching ? (
-    <Loader2 className="animate-spin" />
-  ) : (
-    <Download />
-  );
-
   if (presence.state === "here") {
     return (
       // "Imported" sits with the button rather than up in the header, because
@@ -599,12 +533,10 @@ function ItemActions({
       <Button
         variant="outline"
         size="sm"
-        onClick={onImport}
-        disabled={busy}
-        aria-label={`Import ${item.title}`}
+        onClick={() => onOpen(hubItemRoute(item.id))}
+        aria-label={`View ${item.title}`}
       >
-        {importIcon}
-        {fetching ? "Fetching…" : "Import"}
+        <ArrowRight /> View
       </Button>
     </div>
   );
