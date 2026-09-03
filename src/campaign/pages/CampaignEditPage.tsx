@@ -909,14 +909,22 @@ export default function CampaignEditPage() {
                             briefing screen puts it: a location line under the
                             name. */}
                         {m.subtitle && (
-                          <>
-                            <span className="truncate">{m.subtitle}</span>
-                            <span aria-hidden="true">·</span>
-                          </>
+                          <span className="truncate">{m.subtitle}</span>
                         )}
-                        <MissionSetup snapshot={m.snapshot} />
-                        <span aria-hidden="true">·</span>
-                        <MissionFacts mission={m} />
+                        {/* Each separator shares a flex item with the text it
+                            introduces (issue #2401), rather than sitting
+                            between two items as one of its own: this row
+                            wraps when it runs out of width, and a standalone
+                            "·" is free to be the thing that lands alone on
+                            the new line. */}
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {m.subtitle && <span aria-hidden="true">·</span>}
+                          <MissionSetup snapshot={m.snapshot} />
+                        </span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span aria-hidden="true">·</span>
+                          <MissionFacts mission={m} />
+                        </span>
                         {/* The same badge the mission editor's Scenario
                             heading carries, on the same answer this row
                             already worked out (issue #2392). */}

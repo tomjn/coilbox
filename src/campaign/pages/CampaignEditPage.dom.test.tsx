@@ -1381,6 +1381,41 @@ describe("what a mission row says", () => {
     expect(screen.getByText("BAR 1.0").className).not.toMatch(/amber/);
     expect(screen.getByText("Comet Catcher").className).not.toMatch(/amber/);
   });
+
+  /**
+   * Each "·" used to be its own flex item between two others, free to land
+   * alone on a wrapped line when the row ran out of width (issue #2401). It
+   * now shares a flex item with the text it introduces, so the two can only
+   * ever wrap together.
+   */
+  it("keeps each separator dot in the same flex item as the text it introduces", () => {
+    show([{ ...plain("m1", "Ridge"), subtitle: "Northern Isles" }]);
+
+    const row = metadataRowOf("1. Ridge");
+    const dots = [...row.querySelectorAll('[aria-hidden="true"]')].filter(
+      (el) => el.textContent === "·",
+    );
+    expect(dots).toHaveLength(2);
+    // The dot before the game/map line: not a sibling of the row's other
+    // top-level items, but sharing a parent with the text it introduces.
+    expect(dots[0].parentElement).not.toBe(row);
+    expect(dots[0].parentElement?.textContent).toContain("No game");
+    // The dot before the fact chips, the same way.
+    expect(dots[1].parentElement).not.toBe(row);
+    expect(dots[1].parentElement?.querySelector("span[title]")).toBeTruthy();
+  });
+
+  it("drops the first separator along with the subtitle when there is none", () => {
+    show([plain("m1", "Ridge")]);
+
+    const row = metadataRowOf("1. Ridge");
+    const dots = [...row.querySelectorAll('[aria-hidden="true"]')].filter(
+      (el) => el.textContent === "·",
+    );
+    // Only the one before the fact chips: nothing introduces the game/map
+    // line when there is no subtitle ahead of it.
+    expect(dots).toHaveLength(1);
+  });
 });
 
 /**
