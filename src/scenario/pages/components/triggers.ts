@@ -424,6 +424,28 @@ export function setStepParam(
 }
 
 /**
+ * Read a condition the other way round, or the right way up again.
+ *
+ * The key is taken out rather than written `false` when it is off, so a
+ * condition somebody turned on and off again compiles to the bytes it started
+ * as, the same way `parseScenario` reads it.
+ */
+export function setStepNegate(
+  scenario: Scenario,
+  ref: StepRef,
+  negate: boolean,
+): Scenario {
+  return editSteps(scenario, ref.triggerId, ref.list, (steps) => {
+    const step = steps[ref.index];
+    if (!step) return steps;
+    const out = steps.slice();
+    const { negate: _was, ...rest } = step;
+    out[ref.index] = negate ? { ...rest, negate: true } : rest;
+    return out;
+  });
+}
+
+/**
  * The orders an `orders` parameter holds. A cast rather than a second
  * validation: `parseScenario` narrows the parameter with the same `parseOrders`
  * a group's own orders go through, so anything in the document is this shape

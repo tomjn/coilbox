@@ -38,10 +38,15 @@ export function isDuplicateKey(event: EditKey): boolean {
 }
 
 /**
- * The mode strip index (0 to 5) a plain "1" to "6" press names, or null for
- * anything else: a different key, or the same digit with Cmd or Ctrl held,
- * which is left alone so a browser or window shortcut on that combination
- * keeps working.
+ * The mode rail index a plain digit press names, or null for anything else: a
+ * different key, or the same digit with Cmd or Ctrl held, which is left alone
+ * so a browser or window shortcut on that combination keeps working.
+ *
+ * Every digit there is, rather than as many as the rail currently holds. Nine
+ * is the number of single digits and not a guess about the rail, and the caller
+ * already drops an index past the end of the mode list, so a mode added to the
+ * rail works from its key without this being edited too. Adding a seventh is
+ * what found that: the cap was six.
  *
  * Shift is not read here. On a layout where a digit needs Shift, `event.key`
  * already reads as the digit itself, exactly as `mapKeys.ts` takes "." and its
@@ -50,7 +55,7 @@ export function isDuplicateKey(event: EditKey): boolean {
 export function modeDigit(event: EditKey): number | null {
   if (hasMod(event)) return null;
   const n = Number(event.key);
-  if (!Number.isInteger(n) || n < 1 || n > 6) return null;
+  if (!Number.isInteger(n) || n < 1 || n > 9) return null;
   return n - 1;
 }
 

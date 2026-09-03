@@ -12,7 +12,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useMemo, useState } from "react";
+import { type ComponentProps, useMemo, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { newScenario } from "../../create";
 import { baseBuildings, type Scenario } from "../../model";
@@ -402,5 +402,91 @@ describe("a base building's own unit type the game has not got", () => {
     fireEvent.click(screen.getByRole("button", { name: "Outpost" }));
 
     expect(screen.queryByText(/no unit type called "notaunit"/)).toBeNull();
+  });
+});
+
+/**
+ * The Queue button on a building the game says builds nothing.
+ *
+ * It used to be there and open onto one sentence explaining why there was
+ * nothing behind it, which is a control that exists to say it does not work. A
+ * storage tank is not a factory and the bar should not suggest it might be.
+ *
+ * With a queue already on it the button stays, because that is a document
+ * written against a game that had those units, the validator complains about it,
+ * and hiding the button would hide the only way to read or clear the thing being
+ * complained about.
+ */
+describe("the queue button on a building that builds nothing", () => {
+  /** A game with the base's own def in it, and nothing it can build. */
+  const storageOnly = [
+    { name: "armllt", buildOptions: [] },
+  ] as unknown as ComponentProps<typeof BaseControls>["units"];
+
+  function QueueHarness({ queue }: { queue?: string[] }) {
+    const document = useMemo(() => {
+      const base = withGhostTeam();
+      return queue
+        ? { ...base, bases: [{ ...base.bases[0], buildings: [{ queue }] }] }
+        : base;
+    }, [queue]);
+    const base = document.bases[0];
+
+    return (
+      <BaseControls
+        base={base}
+        buildings={baseBuildings(document.blueprints, base)}
+        index={0}
+        layoutName="Outpost"
+        ordered={false}
+        sharedWith={0}
+        sharedEdit={false}
+        overlaps={[]}
+        unstable={[]}
+        tooDeep={[]}
+        tooShallow={[]}
+        absent={[]}
+        onMap=""
+        participants={document.setup.participants}
+        units={storageOnly}
+        unitsLoading={false}
+        sides={[]}
+        gameArchive={undefined}
+        moving={false}
+        issues={[]}
+        onEdit={() => {}}
+        onRename={() => {}}
+        onOrdered={() => {}}
+        onMoveBuilding={() => {}}
+        onPlay={() => {}}
+        onSharedEdit={() => {}}
+        onQueue={() => {}}
+        onMove={() => {}}
+        onSnapToGrid={() => {}}
+        onSubstitute={() => {}}
+        onDelete={() => {}}
+      />
+    );
+  }
+
+  it("is not offered at all", () => {
+    render(<QueueHarness />);
+
+    expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
+    // The rest of the bar is untouched, so this is the one button that went.
+    expect(screen.getByRole("button", { name: /Outpost/ })).toBeTruthy();
+  });
+
+  it("is still offered when a queue is already on it, and says why it is wrong", () => {
+    render(<QueueHarness queue={["armpw"]} />);
+
+    const button = screen.getByRole("button", { name: /1 queued/ });
+    fireEvent.click(button);
+
+    expect(screen.getByText(/builds\s+nothing in this game/)).toBeTruthy();
+    // And the queue itself is reachable, or there would be no way to clear it.
+    expect(
+      screen.getByRole("button", { name: "Take armpw out of the queue" }),
+    ).toBeTruthy();
   });
 });

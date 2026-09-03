@@ -31,6 +31,7 @@ import {
 import { useUnitsyncScan } from "@/content/config";
 import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
+import { ErrorBoundary } from "@/general/ErrorBoundary";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
 import { scenarioIsAttached } from "../../campaign/missionScenario";
@@ -68,7 +69,10 @@ import {
   problemTarget,
   type RowFocus,
 } from "./components/problemTargets";
-import { RestrictionPanel } from "./components/RestrictionPanel";
+import {
+  CommandRestrictionPanel,
+  UnitRestrictionPanel,
+} from "./components/RestrictionPanel";
 import {
   ScenarioMapScene,
   type ScenarioMapSceneHandle,
@@ -80,6 +84,7 @@ import {
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { SetupPanel } from "./components/SetupPanel";
 import { ShortcutsList } from "./components/ShortcutsList";
+import { StartConditions } from "./components/StartConditions";
 import { createScenarioSaver, type ScenarioSaver } from "./components/saving";
 import { isDuplicateKey, isTestKey } from "./components/shortcuts";
 import {
@@ -718,27 +723,59 @@ export default function ScenarioEditPage() {
           onChange={(next) => apply(next)}
         />
 
+        {/* Straight after Setup, because it is about the participants Setup
+            declares and reads as the next question to answer about them. Its
+            own panel rather than a fifth section inside that one: setup is
+            already the game, the map, the participants and the mod options,
+            and this is the part of it an author comes back to while writing
+            triggers rather than once at the start. */}
+        <StartConditions
+          scenario={scenario}
+          issues={missionIssues}
+          onChange={(next) => apply(next)}
+        />
+
         {/* The editing surface: the document's units drawn on the map, the mode
           strip that places more, and the picking and dragging that moves them.
           Zones and paths arrive in #759 onwards. */}
         {/* The history is the whole document's, panels included, but its buttons
           live on the map: it is the surface an author spends the time on, and
           the one that covers the page when it is expanded. */}
-        <ScenarioMapScene
-          ref={mapSceneRef}
-          scenario={scenario}
-          onChange={(next) => apply(next)}
-          extensions={extensions}
-          picking={picking}
-          history={{
-            canUndo: history.past.length > 0,
-            canRedo: history.future.length > 0,
-            undo,
-            redo,
-          }}
-          focus={rowFocus("map")}
-          issues={missionIssues}
-        />
+        {/* Round the map and nothing else. Everything in it is 3D: a driver, a
+          shader, a model read out of a game archive, a heightmap. Any of those
+          can throw where a form cannot, and the app-wide boundary answers a
+          throw by taking the window, so a scene that would not draw took the
+          triggers, the objectives and the setup with it and left no way to
+          reach the document at all. Here it costs the map. */}
+        <ErrorBoundary
+          fallback={
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">
+                The map could not be drawn.
+              </p>
+              <p className="mt-1">
+                Everything else on this page still works, and the scenario is
+                safe. Reload to try the map again.
+              </p>
+            </div>
+          }
+        >
+          <ScenarioMapScene
+            ref={mapSceneRef}
+            scenario={scenario}
+            onChange={(next) => apply(next)}
+            extensions={extensions}
+            picking={picking}
+            history={{
+              canUndo: history.past.length > 0,
+              canRedo: history.future.length > 0,
+              undo,
+              redo,
+            }}
+            focus={rowFocus("map")}
+            issues={missionIssues}
+          />
+        </ErrorBoundary>
 
         {/* The panels: the parts of the document the map cannot show. Triggers
           first, because everything under them is something a trigger points
@@ -771,11 +808,16 @@ export default function ScenarioEditPage() {
           onUndo={undo}
           issues={missionIssues}
         />
-        <RestrictionPanel
+        <UnitRestrictionPanel
           scenario={scenario}
           onChange={(next) => apply(next)}
           units={gameUnits.units}
           unitsLoading={gameUnits.loading}
+          onUndo={undo}
+        />
+        <CommandRestrictionPanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
           onUndo={undo}
         />
         {/* The layouts the document holds, and the way in and out of a game's own

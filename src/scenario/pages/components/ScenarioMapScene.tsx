@@ -5,7 +5,6 @@ import {
   Loader2,
   MapPin,
   MountainSnow,
-  Trash2,
   Unplug,
 } from "lucide-react";
 import {
@@ -27,12 +26,12 @@ import {
 import { onBuildGrid } from "@/blueprint/offGrid";
 import { useGameSides } from "@/blueprint/useGameSides";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -72,7 +71,8 @@ import {
   HistoryControls,
   PlaybackBar,
   SelectionBar,
-  TurnNote,
+  SelectionTools,
+  turnNoteText,
 } from "@/placement/SurfaceBars";
 import {
   focusCamera,
@@ -172,7 +172,6 @@ import {
   selectOne,
   stillThere,
   toggleKey,
-  turnSelection,
 } from "./selection";
 import { modeDigit } from "./shortcuts";
 import { startMarkers } from "./startPositions";
@@ -1068,6 +1067,89 @@ export const ScenarioMapScene = forwardRef<
     if (entry) pickEntryRef.current(entry);
   }, [focus?.id, focus?.token]);
 
+  /**
+   * How many things Turn and Delete will act on, when it is more than one.
+   * Undefined for a selection of one, and then both read as they always did.
+   */
+  const actingOn =
+    selection.length > 1 ? countSelection(selection).total : undefined;
+
+  /**
+   * What the rail's bottom group acts on, or null when nothing is selected.
+   *
+   * One set of tools for three kinds of selection, because "delete what is
+   * selected" is one thought however many kinds of thing can be selected. Only
+   * a placement turns: a zone is a footprint with no facing, and a point on a
+   * path is a point.
+   *
+   * Read in the order the surface reads a selection: a placement first, then a
+   * zone, then a point on a path. Exactly one of the three can be true at once,
+   * because all three are read off the same selected key.
+   */
+  const tools = picked
+    ? {
+        count: actingOn,
+        // A selection of several always has a Turn to offer, because "turn what
+        // turns" is a thing to do even when this one is a group. On its own,
+        // one that cannot turn is offered no turn at all: a group's units all
+        // face south, and a tool that cannot be used is one more thing to read
+        // past.
+        ...(actingOn !== undefined || canTurn(picked.key)
+          ? {
+              onTurnPreview: setTurning,
+              // What the outlined squares beside the building mean, said in the
+              // turn's own tooltip. It is only ever true while the pointer is on
+              // that button, which is where the tooltip already is.
+              turnNote:
+                picked.kind === "base"
+                  ? turnNoteText(turning ? turned.length > 0 : null)
+                  : null,
+              // Several things swing about the selection's own middle, which is
+              // the job the count bar's own Turn together button used to do.
+              // One button rather than two: an author who picked a cluster and
+              // pressed turn meant the cluster. Turning each where it stands is
+              // still R, and the strip under the map says so.
+              onTurn: () =>
+                onChange((doc) =>
+                  selection.length > 1
+                    ? turnSelectionAround(doc, selection, 1, layoutEdit)
+                    : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
+                ),
+            }
+          : {}),
+        onDelete: () => {
+          onChange((doc) =>
+            selection.length > 1
+              ? removeSelection(doc, selection, layoutEdit)
+              : removePlacement(doc, picked.key, layoutEdit(picked.id)),
+          );
+          setSelected(null);
+        },
+      }
+    : pickedZone
+      ? {
+          onDelete: () => {
+            onChange((doc) => removeZone(doc, pickedZone.id));
+            setSelected(null);
+          },
+        }
+      : pathRef && selected
+        ? {
+            deleteLabel: "Delete point",
+            onDelete: () => {
+              onChange((doc) => removePathWaypoint(doc, selected));
+              // Back to the path the point belonged to rather than to nothing,
+              // so its other points keep their knobs and a path being drawn is
+              // still being drawn.
+              setSelected(
+                pickedGroup
+                  ? placementKey("group", pathRef.groupId, 0)
+                  : pathLineKey(pathRef.groupId),
+              );
+            },
+          }
+        : null;
+
   /** What is shown instead of the map when there is no map to show. */
   const stand =
     status === "no-map" ? (
@@ -1137,39 +1219,77 @@ export const ScenarioMapScene = forwardRef<
         onKeyDown: keys.onKeyDown,
         onFocus: keys.onFocus,
       }}
+      rail={
+        /* The modes as a rail down the left rather than a row across the top.
+           A row of six labelled buttons ran most of the way across the map and
+           pushed the mode's own controls onto a second line, so the toolbar took
+           two bands of the view before an author had placed anything.
+
+           One segmented group, the way the unit builder's viewport draws its
+           handles, and opaque: a translucent button on terrain takes whatever is
+           under it, so the same control reads differently over grass and over
+           snow. The tooltip is where each mode says its name, what it makes and
+           the key that reaches it. The strip had no room for the first two and
+           never showed the third anywhere else.
+
+           Undo and redo ride at the top of the same rail, one gap clear of the
+           modes: both act on the document, and a pair in the far corner was the
+           only thing over the map that did. Turn and delete ride at the bottom
+           the same way, and only while there is something to act on. Three
+           groups: what you did, what you are doing, and what you are doing it
+           to, which is how the unit builder's viewport stacks its own. */
+        <TooltipProvider>
+          <div className="flex flex-col gap-2">
+            {history && <HistoryControls {...history} vertical />}
+            <ButtonGroup orientation="vertical">
+              {EDITOR_MODES.map((m, i) => (
+                <Tooltip key={m.id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      // The pair the unit builder's viewport uses for the
+                      // handle it is on. `bg-card` only on the ones that are
+                      // off: an outline button has no fill of its own, and a
+                      // see-through control on terrain takes whatever is under
+                      // it.
+                      variant={mode.id === m.id ? "default" : "outline"}
+                      className={mode.id === m.id ? undefined : "bg-card"}
+                      onClick={() => setModeId(m.id)}
+                      // The name is in the tooltip, which a pointer reaches and
+                      // a screen reader does not, so the button carries it as
+                      // its accessible name as well.
+                      aria-label={m.label}
+                      aria-pressed={mode.id === m.id}
+                    >
+                      <m.icon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-56">
+                    <p className="font-medium">{m.label}</p>
+                    <p className="opacity-80">{m.what}</p>
+                    <p className="opacity-60">Key {i + 1}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </ButtonGroup>
+            {tools && <SelectionTools {...tools} />}
+          </div>
+        </TooltipProvider>
+      }
       bars={
         <>
-          {/* The whole row shares one backdrop rather than each control finding
-            its own: a mode's `controls` are arbitrary (selects, a count field,
-            a button), so painting the panel once is what makes every one of
-            them opaque over the map, present ones and any added later, rather
-            than a fix repeated per control. Same fill and blur as the mode
-            strip itself carried before this row grew one, so the toolbar
-            reads as one panel rather than a solid strip beside naked
-            controls (issue #1188). */}
-          <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
-            <TooltipProvider>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={mode.id}
-                onValueChange={(next) => next && setModeId(next)}
-                aria-label="Placement mode"
-              >
-                {EDITOR_MODES.map((m, i) => (
-                  <Tooltip key={m.id}>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem value={m.id} className="h-8 gap-1.5">
-                        <m.icon className="size-3.5" /> {m.label}
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent>{i + 1}</TooltipContent>
-                  </Tooltip>
-                ))}
-              </ToggleGroup>
-            </TooltipProvider>
-            {behaviour.controls}
-          </div>
+          {/* The mode's own controls, and only while the mode has some. Select
+              has none, so its bar is not drawn at all rather than drawn empty.
+              The row shares one backdrop rather than each control finding its
+              own: a mode's `controls` are arbitrary (selects, a count field, a
+              button), so painting the panel once is what makes every one of
+              them opaque over the map, present ones and any added later, rather
+              than a fix repeated per control (issue #1188). */}
+          {behaviour.controls && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card p-1">
+              {behaviour.controls}
+            </div>
+          )}
           {/* What the squares under the pointer are saying, said in words as
               well: a mark is a colour, and a colour on its own is not a
               statement anybody can act on (issue #1464). It carries the offer
@@ -1188,50 +1308,11 @@ export const ScenarioMapScene = forwardRef<
               {spot.text}
             </p>
           )}
-          {/* How much is in hand, and the way to put it all down. Its own bar in
-              this column rather than a note in the corner: the corner is for
-              what is true of the whole scene (issue #2350), and this is what the
-              Turn and Delete buttons directly under it are about to act on. */}
-          {selection.length > 1 && (
-            <SelectionCountBar
-              what={countWords(selection)}
-              onTurnTogether={() =>
-                onChange((doc) =>
-                  turnSelectionAround(doc, selection, 1, layoutEdit),
-                )
-              }
-              onClear={() => setSelection(NO_SELECTION)}
-            />
-          )}
           {picked && (
-            <ScenarioSelectionBar
-              placement={picked}
-              // Everything selected, so the buttons say what they will do rather
-              // than naming one thing and doing six (issue #2279). Counted as
-              // an author counts, which is the number the bar above says: a
-              // group is one thing however many of its units the box caught.
-              count={
-                selection.length > 1
-                  ? countSelection(selection).total
-                  : undefined
-              }
-              onTurnPreview={setTurning}
-              onTurn={() =>
-                onChange((doc) =>
-                  selection.length > 1
-                    ? turnSelection(doc, selection, 1, layoutEdit)
-                    : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
-                )
-              }
-              onDelete={() => {
-                onChange((doc) =>
-                  selection.length > 1
-                    ? removeSelection(doc, selection, layoutEdit)
-                    : removePlacement(doc, picked.key, layoutEdit(picked.id)),
-                );
-                setSelected(null);
-              }}
-            >
+            // Turning and deleting are the rail's now. What is left here is
+            // what the bar was always for: naming what is selected, and the
+            // controls for whatever kind of thing it turned out to be.
+            <ScenarioSelectionBar placement={picked}>
               {pickedActor && (
                 <ActorControls
                   key={pickedActor.id}
@@ -1402,19 +1483,11 @@ export const ScenarioMapScene = forwardRef<
               )}
             </ScenarioSelectionBar>
           )}
-          {/* What the outlined square beside the selected building is, while a
-              turn is being considered (issue #1541). Nothing for an actor,
-              which stands on no build squares at all.
-
-              Below the bar rather than above it (issue #1716): the note appears
-              while the pointer is on the Turn button, and a note above the bar
-              pushes that button out from under the pointer, which takes the
-              note away, which puts the button back. */}
-          <TurnNote
-            moves={
-              turning && picked?.kind === "base" ? turned.length > 0 : null
-            }
-          />
+          {/* What the outlined square beside the selected building means while
+              a turn is being considered (issue #1541) is `turnNote` on the
+              rail's Turn now. It is only ever said while the pointer is on that
+              button, which is where its tooltip already is, so it does not need
+              a bar of its own across the view. */}
           {drawingPath && pickedGroup && (
             <ClickMapBar
               message={
@@ -1480,17 +1553,6 @@ export const ScenarioMapScene = forwardRef<
                 pathRef.waypoint + 1
               }`}
               hint="drag it to move it"
-              // Back to the path the point belonged to rather than to nothing, so
-              // its other points keep their knobs and a path being drawn is still
-              // being drawn.
-              onDelete={() => {
-                onChange((doc) => removePathWaypoint(doc, selected));
-                setSelected(
-                  pickedGroup
-                    ? placementKey("group", pathRef.groupId, 0)
-                    : pathLineKey(pathRef.groupId),
-                );
-              }}
             >
               {groupControls}
             </PathBar>
@@ -1508,51 +1570,59 @@ export const ScenarioMapScene = forwardRef<
               onRename={(name) =>
                 onChange((doc) => renameZone(doc, pickedZone.id, name))
               }
-              onDelete={() => {
-                onChange((doc) => removeZone(doc, pickedZone.id));
-                setSelected(null);
-              }}
+            />
+          )}
+          {/* How much is in hand, and the way to put it all down. Last in the
+              column, under every bar that names the primary, because which of
+              those is drawn depends on what the primary turned out to be: a
+              placement, a point on a path or a zone. Sitting above any one of
+              them put the tally over the bar for a zone and under the bar for a
+              unit, which is one bar moving for no reason an author could state.
+
+              Its own bar rather than a note in the corner, because the corner is
+              for what is true of the whole scene (issue #2350). */}
+          {selection.length > 1 && (
+            <SelectionCountBar
+              what={countWords(selection)}
+              onClear={() => setSelection(NO_SELECTION)}
             />
           )}
         </>
       }
       chrome={
-        <>
-          {history && <HistoryControls {...history} />}
-          <Popover open={contentsOpen} onOpenChange={setContentsOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 bg-card/80 backdrop-blur"
-                title="Everything this scenario holds, placed or not"
-              >
-                <List className="size-3.5" /> Contents
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-1">
-              <ContentsList
-                entries={entries}
-                layouts={layouts}
-                selected={listed}
-                participants={scenario.setup.participants}
-                onPick={pickEntry}
-                onToggle={toggleEntry}
-                // Armed rather than placed. Where a base stands is the reason
-                // the author deleted it, so the next click on the map is the
-                // placement and this only gets them ready to make it (#1450).
-                onPlaceLayout={(layout) => {
-                  setLayoutChoice({ from: "scenario", id: layout.id });
-                  setModeId(LAYOUTS_MODE_ID);
-                  setContentsOpen(false);
-                }}
-                onDeleteLayout={(layout) =>
-                  onChange((doc) => removeBlueprint(doc, layout.id))
-                }
-              />
-            </PopoverContent>
-          </Popover>
-        </>
+        <Popover open={contentsOpen} onOpenChange={setContentsOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 bg-card"
+              title="Everything this scenario holds, placed or not"
+            >
+              <List className="size-3.5" /> Contents
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-1">
+            <ContentsList
+              entries={entries}
+              layouts={layouts}
+              selected={listed}
+              participants={scenario.setup.participants}
+              onPick={pickEntry}
+              onToggle={toggleEntry}
+              // Armed rather than placed. Where a base stands is the reason
+              // the author deleted it, so the next click on the map is the
+              // placement and this only gets them ready to make it (#1450).
+              onPlaceLayout={(layout) => {
+                setLayoutChoice({ from: "scenario", id: layout.id });
+                setModeId(LAYOUTS_MODE_ID);
+                setContentsOpen(false);
+              }}
+              onDeleteLayout={(layout) =>
+                onChange((doc) => removeBlueprint(doc, layout.id))
+              }
+            />
+          </PopoverContent>
+        </Popover>
       }
       note={
         <>
@@ -1606,20 +1676,9 @@ export const ScenarioMapScene = forwardRef<
  */
 function ScenarioSelectionBar({
   placement,
-  count,
-  onTurn,
-  onTurnPreview,
-  onDelete,
   children,
 }: {
   placement: Placement;
-  /** How many things the buttons will act on, when it is more than the one this
-   *  bar names (issue #2279). Left out for a selection of one. */
-  count?: number;
-  onTurn: () => void;
-  /** Whether a turn is being considered, which draws where it would go. */
-  onTurnPreview: (on: boolean) => void;
-  onDelete: () => void;
   /** Controls for what kind of thing this is: an actor's team and its
    *  overrides, and whatever a group or a base grows later. */
   children?: ReactNode;
@@ -1634,15 +1693,6 @@ function ScenarioSelectionBar({
             ? `group unit ${placement.index + 1}`
             : `base building ${placement.index + 1}`
       }
-      count={count}
-      // A selection of several always has a Turn to offer, because "turn what
-      // turns" is a thing to do even when this one is a group. On its own the
-      // button says why it cannot.
-      turnable={count !== undefined || canTurn(placement.key)}
-      turnHint="A group's units all face south"
-      onTurn={onTurn}
-      onTurnPreview={onTurnPreview}
-      onDelete={onDelete}
     >
       {children}
     </SelectionBar>
@@ -1652,40 +1702,33 @@ function ScenarioSelectionBar({
 /**
  * How much is selected, and the way to put it all down (issue #2279).
  *
- * Its own bar above the one for the primary, because the two say different
+ * Its own bar under the one for the primary, because the two say different
  * things: that one names one thing and opens its panel, this one is the account
- * of what the Turn and Delete beneath it are about to act on. Without it the
- * only sign that Delete is about to remove six things is that six plates are
- * lit somewhere on the map, which is not something an author reads before
- * pressing a button.
+ * of what the rail's Turn and Delete are about to act on. Without it the only
+ * sign that Delete is about to remove six things is that six plates are lit
+ * somewhere on the map, which is not something an author reads before pressing
+ * a button.
+ *
+ * Turning is not here. It was a Turn together button, which swung the whole
+ * selection about its own middle where the primary's Turn turned each thing
+ * where it stood, and two turns in two places for one selection is a choice
+ * nobody asked to be given: an author who picked a cluster and pressed turn
+ * meant the cluster. So the rail's Turn does that job for a selection of
+ * several, and turning each where it stands is R (issue #2353's other half is
+ * still on its own key).
  */
 function SelectionCountBar({
   what,
-  onTurnTogether,
   onClear,
 }: {
   /** The tally, as `countWords` reads it: "4 actors, 1 group and 2 base
    *  buildings". */
   what: string;
-  /** Swing the whole selection a quarter turn about its own middle, which is
-   *  the other meaning of turning several things at once (issue #2353). It
-   *  lives here rather than beside the Turn button below, because that button
-   *  is the primary's and this one is the selection's. */
-  onTurnTogether: () => void;
   onClear: () => void;
 }) {
   return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-primary/60 bg-card/85 p-1 pl-2 backdrop-blur">
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-primary/60 bg-card p-1 pl-2">
       <span className="text-[11px]">{what} selected</span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 px-2 text-xs"
-        onClick={onTurnTogether}
-        title="Turn all of it as one shape, so it moves round its own middle (T)"
-      >
-        Turn together
-      </Button>
       <Button
         size="sm"
         variant="ghost"
@@ -1700,12 +1743,17 @@ function SelectionCountBar({
 }
 
 /**
- * The selected zone: its name, its size, and the way to delete it.
+ * The selected zone: its name and its size.
  *
  * The name is what triggers pick a zone by, so it is the one thing about a zone
  * that cannot be set by dragging and the only field here. It is committed when
  * the box is left rather than on every keystroke, because every change to the
  * document is written to disk.
+ *
+ * What the handles do is not said. The zone is on screen with its handles drawn
+ * on it in two colours, and a sentence spelling that out was the widest thing in
+ * this bar: it pushed the size off the end of a narrow window to explain a drag
+ * an author works out by doing it once.
  *
  * Mounted per zone by its id, so moving the selection reseeds the box. A zone's
  * id is not its name, so renaming one does not reseed it, and the box has to
@@ -1716,11 +1764,9 @@ function SelectionCountBar({
 export function ZoneBar({
   zone,
   onRename,
-  onDelete,
 }: {
   zone: ScenarioZone;
   onRename: (name: string) => void;
-  onDelete: () => void;
 }) {
   const [name, setName] = useFieldText(zone.name);
   const { halfX, halfZ } = zoneExtent(zone);
@@ -1750,17 +1796,6 @@ export function ZoneBar({
       <span className="font-mono text-[11px] text-muted-foreground">
         {size}
       </span>
-      <span className="text-[11px] text-muted-foreground">
-        drag the orange handle to move it, a white one to resize it
-      </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-        onClick={onDelete}
-      >
-        <Trash2 className="size-3.5" /> Delete
-      </Button>
     </div>
   );
 }
@@ -1890,32 +1925,18 @@ function PointFields({
 function PathBar({
   what,
   hint,
-  onDelete,
   children,
 }: {
   what: string;
   hint: string;
-  /** Left out when a whole path is what is selected rather than one of its
-   *  points, because a path is deleted by deleting the order that holds it. */
-  onDelete?: () => void;
   /** The group's controls: its team, its units and its orders. */
   children?: ReactNode;
 }) {
   return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card p-1 pl-2">
       <span className="font-mono text-[11px]">{what}</span>
       {children}
       <span className="text-[11px] text-muted-foreground">{hint}</span>
-      {onDelete && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="size-3.5" /> Delete point
-        </Button>
-      )}
     </div>
   );
 }

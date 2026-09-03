@@ -62,7 +62,6 @@ function ZoneHarness({ initial }: { initial: string }) {
           setHistory(recordEdit(history, document, next));
           setDocument(next);
         }}
-        onDelete={() => {}}
       />
       <button
         type="button"

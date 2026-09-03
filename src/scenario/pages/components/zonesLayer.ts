@@ -23,7 +23,11 @@
  */
 
 import * as THREE from "three";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
+import { readThemeColor } from "@/home/art";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { worldToScene } from "@/placement/scene";
 import type { Point, ScenarioZone } from "../../model";
@@ -59,6 +63,64 @@ const HANDLE_ELMOS = 88;
 const ZONE_COLOR = 0x38bdf8;
 const SELECTED_COLOR = 0xfacc15;
 
+/**
+ * How far one zone's shade may wander from {@link ZONE_COLOR}: degrees of hue
+ * either way, and saturation either way as a fraction.
+ *
+ * Small on purpose. Zones overlap and nest, and every one of them being the
+ * same sky blue means a map with four of them reads as one blue shape with a
+ * confusing edge. A slight turn of the hue is enough to tell two edges apart
+ * without any of them stopping being the zone colour, which is what has to stay
+ * true: the shade separates zones from each other, it does not mean anything
+ * about a zone.
+ *
+ * Both stay well inside the blues. Anything wider would reach the green a
+ * path is drawn in and the yellow a selected zone turns.
+ */
+const ZONE_HUE_SPREAD = 22;
+const ZONE_SATURATION_SPREAD = 0.2;
+
+/**
+ * A number from 0 to 1 for a string, the same one on every machine.
+ *
+ * FNV-1a. A zone's shade has to be stable across renders, across sessions and
+ * across two people looking at the same document, so it is derived from the
+ * zone's id rather than from where it sits in the list: adding or deleting a
+ * zone leaves every other one the colour it was.
+ */
+function hashUnit(text: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  // Unsigned, then over the whole 32-bit range.
+  return (hash >>> 0) / 0xffffffff;
+}
+
+/**
+ * The shade one zone is drawn in: {@link ZONE_COLOR} turned a little, by an
+ * amount its id decides.
+ *
+ * Hue and saturation are hashed separately, so two zones that happen to land on
+ * the same hue are still told apart by how saturated they are.
+ */
+function zoneShade(id: string): THREE.Color {
+  const base = new THREE.Color(ZONE_COLOR);
+  const hsl = { h: 0, s: 0, l: 0 };
+  base.getHSL(hsl);
+  // Each hash is 0 to 1, read as an offset either side of the base colour.
+  const hue = hashUnit(id) * 2 - 1;
+  const saturation = hashUnit(`${id}:s`) * 2 - 1;
+  return new THREE.Color().setHSL(
+    // Wrapped, because a hue is a circle and the base is near enough to zero
+    // for an offset to take it past it.
+    (hsl.h + (hue * ZONE_HUE_SPREAD) / 360 + 1) % 1,
+    Math.min(1, Math.max(0, hsl.s + saturation * ZONE_SATURATION_SPREAD)),
+    hsl.l,
+  );
+}
+
 /** What the handle that moves a whole zone is drawn in. Neither the white of
  *  the corners that resize it nor the yellow of the zone it sits on. */
 const MOVE_HANDLE_COLOR = 0xf97316;
@@ -66,25 +128,61 @@ const MOVE_HANDLE_COLOR = 0xf97316;
 /**
  * What a selection marquee is drawn in (issue #2279).
  *
- * Black and white alternating, which is what a selection marquee has looked like
- * since before any of this, and the reason it looks like that is the reason it
- * is used here: the two colours are drawn on top of each other, so whichever one
- * the ground underneath washes out, the other one is still there. That matters
- * on a map, where the same box is dragged over dark grass, pale sand and snow in
- * one gesture.
+ * The theme's own accent, solid, with a thin dark edge round it. Nothing else
+ * on this map is that colour, and it is the colour the rest of the app already
+ * means "this is the thing you picked" with, so a box drawn in it reads as a
+ * selection without anyone having to learn a new one.
+ *
+ * It was a dashed white line over a wider dark one, on the reasoning that two
+ * colours drawn over each other survive any ground. What that actually drew was
+ * a dark line with white flecks in it: the dashes are a fraction of the
+ * perimeter and the backing is wider than they are, so the backing was most of
+ * what was on screen. The dark line stays as a halo, one pixel either side, so
+ * the box still reads where the ground under it is pale.
  *
  * Not green. A path is `0x86efac` and is drawn as a line lying on the ground,
  * which is exactly what a marquee is, so a green box would read as somebody's
  * order path. Not the zone's own sky blue for the same reason in reverse: that
  * is the thing a marquee was being mistaken for.
  */
-const MARQUEE_COLOR = 0xffffff;
 const MARQUEE_BACKING_COLOR = 0x0f172a;
 
-/** How many dashes go round a marquee, however big it is or how far away the
- *  camera is. A dash measured in elmos would be a solid line on a box drawn
- *  round two units and a dotted one round half the map. */
-const MARQUEE_DASHES = 32;
+/**
+ * The accent as three sees it, read out of the theme the way the welcome
+ * screen's artwork reads it. `readThemeColor` memoises against the raw custom
+ * property, so switching accent in Appearance re-reads and a drag does not
+ * force a style recalculation per frame.
+ *
+ * The separators are put back first. `THREE.Color.setStyle` parses
+ * `rgb(r, g, b)`, which is what a computed colour is, and the comma form of
+ * `hsl()`. It does not parse the space-separated form CSS also allows, which is
+ * how `FALLBACK_THEME_COLOR` is written, and what it does with one it cannot
+ * read is warn and leave the colour white. A marquee that came out white
+ * whenever the theme had not applied yet is the bug this whole function is
+ * here to fix, arriving by the back door.
+ */
+function marqueeColor(): THREE.Color {
+  const css = readThemeColor().replace(
+    /^hsla?\(([^)]*)\)$/,
+    (_, body: string) => `hsl(${body.trim().split(/\s+/).join(", ")})`,
+  );
+  return new THREE.Color().setStyle(css);
+}
+
+/**
+ * How wide the marquee is drawn, in pixels.
+ *
+ * `LineBasicMaterial.linewidth` is ignored by every WebGL driver, so a marquee
+ * asking for a wide line got a one pixel one and read as a hairline over
+ * terrain. `Line2` builds each segment as screen-space geometry instead, which
+ * is what the lego builder's edit box already does
+ * (`PIECE_EDIT_LINE_WIDTH` in `src/lego/pages/components/ModelViewport.tsx`).
+ *
+ * Two pixels between them, so the dark shows as one pixel of edge either side
+ * of the white rather than as a line of its own.
+ */
+const MARQUEE_LINE_WIDTH = 4;
+const MARQUEE_BACKING_WIDTH = 6;
 
 export interface ZonesLayerDeps {
   handle: MapScene3D;
@@ -209,10 +307,13 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
    * tells them apart. So the two are as different as they can be: no fill at
    * all, and a dashed edge rather than a solid one.
    *
-   * Two lines on the same points, a black one under a dashed white one, so the
-   * white shows over dark ground and the black shows through the gaps over
-   * pale ground. Neither is depth tested, the same as a zone's outline, so a
-   * box drawn across a ridge is a box rather than two halves.
+   * Two solid lines on the same points, a slightly wider dark one under an
+   * accent-coloured one, so what is drawn is an accent line with a pixel of
+   * dark edge either side. Neither is depth tested, the same as a zone's
+   * outline, so a box drawn across a ridge is a box rather than two halves.
+   *
+   * Both are `Line2` rather than `THREE.Line`, which is what gives them a width
+   * a driver honours: see {@link MARQUEE_LINE_WIDTH}.
    */
   const buildMarquee = (zone: ScenarioZone): THREE.Group => {
     const centre = zoneCenter(zone);
@@ -229,46 +330,61 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
     const ring = outlinePoints(zone).map(
       (offset) => new THREE.Vector3(offset.x, relief(centre, offset), offset.z),
     );
-    // Closed by hand rather than drawn as a LineLoop, because the dashes are
-    // measured along the line and the closing side has to be measured with it.
+    // Closed by hand, because `LineGeometry` draws a run of points rather than
+    // a loop and the closing side is a side like the other three.
     const closed = [...ring, ring[0]];
+    const flat = closed.flatMap((point) => [point.x, point.y, point.z]);
 
-    const backingGeometry = new THREE.BufferGeometry().setFromPoints(closed);
-    const backingMaterial = new THREE.LineBasicMaterial({
+    // Screen-space widths need the viewport size. The marquee is rebuilt on
+    // every frame of the drag it exists for, so reading it here is enough: a
+    // window resized mid-drag is one frame behind and then right again.
+    const viewport = new THREE.Vector2();
+    handle.renderer.getSize(viewport);
+
+    const backingGeometry = new LineGeometry();
+    backingGeometry.setPositions(flat);
+    // Opaque, and that is load bearing rather than a look. Three renders every
+    // opaque object before every transparent one and `renderOrder` only sorts
+    // within each of those two lists, so a translucent backing is painted over
+    // an opaque accent line whatever order they are given. What showed through
+    // was the accent at the joins, where the wider backing leaves a notch: a
+    // dark band with regular coloured flecks in it, which is what the marquee
+    // looked like and what reads as a dashed line.
+    const backingMaterial = new LineMaterial({
       color: MARQUEE_BACKING_COLOR,
-      transparent: true,
-      opacity: 0.8,
+      linewidth: MARQUEE_BACKING_WIDTH,
       depthTest: false,
     });
-    const backing = new THREE.Line(backingGeometry, backingMaterial);
+    backingMaterial.resolution.copy(viewport);
+    const backing = new Line2(backingGeometry, backingMaterial);
     backing.renderOrder = 3;
     group.add(backing);
 
-    const dashGeometry = new THREE.BufferGeometry().setFromPoints(closed);
-    const dashMaterial = new THREE.LineDashedMaterial({
-      color: MARQUEE_COLOR,
+    const edgeGeometry = new LineGeometry();
+    edgeGeometry.setPositions(flat);
+    const edgeMaterial = new LineMaterial({
+      color: marqueeColor(),
+      linewidth: MARQUEE_LINE_WIDTH,
       depthTest: false,
     });
-    const dashes = new THREE.Line(dashGeometry, dashMaterial);
-    // A dash is measured in the geometry's own units, which are elmos here, so
-    // the perimeter has to be walked before a dash length can be chosen. Written
-    // onto the material afterwards for that reason.
-    dashes.computeLineDistances();
-    const walked = dashGeometry.getAttribute("lineDistance");
-    const perimeter = walked.getX(walked.count - 1);
-    const dash = perimeter / (MARQUEE_DASHES * 2);
-    dashMaterial.dashSize = dash;
-    dashMaterial.gapSize = dash;
-    dashes.renderOrder = 4;
-    group.add(dashes);
+    edgeMaterial.resolution.copy(viewport);
+    const edge = new Line2(edgeGeometry, edgeMaterial);
+    edge.renderOrder = 4;
+    group.add(edge);
 
-    owned.push(backingGeometry, backingMaterial, dashGeometry, dashMaterial);
+    owned.push(backingGeometry, backingMaterial, edgeGeometry, edgeMaterial);
     return group;
   };
 
   const buildZone = (zone: ScenarioZone, selected: boolean): THREE.Group => {
     const centre = zoneCenter(zone);
-    const colour = selected ? SELECTED_COLOR : ZONE_COLOR;
+    // The selection keeps one colour of its own. Varying that too would be a
+    // yellow that means "selected" and a shade that means nothing, said at
+    // once, and only one zone is ever selected so there is nothing to tell
+    // apart.
+    const colour = selected
+      ? new THREE.Color(SELECTED_COLOR)
+      : zoneShade(zone.id);
     const group = new THREE.Group();
     const at = worldToScene(
       centre,

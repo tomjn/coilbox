@@ -65,6 +65,7 @@ import {
   removeTrigger,
   renameTrigger,
   type StepList,
+  setStepNegate,
   setStepParam,
   stepsOf,
   triggerSummary,
@@ -233,7 +234,7 @@ export const TriggerPanel = forwardRef<
         </p>
       )}
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex shrink-0 flex-col gap-2 lg:w-60">
+        <div className="flex shrink-0 flex-col gap-2 lg:w-72">
           {count === 0 ? (
             <p className="text-xs text-muted-foreground">
               A trigger runs its actions when its conditions hold. Everything a
@@ -756,6 +757,19 @@ function StepSection({
                     value,
                   ),
                 )
+              }
+              // Only a condition has a truth to turn over.
+              onNegate={
+                conditions
+                  ? (negate) =>
+                      onChange(
+                        setStepNegate(
+                          scenario,
+                          { triggerId: trigger.id, list, index },
+                          negate,
+                        ),
+                      )
+                  : null
               }
               // Conditions hold together under one all-or-any, so their order
               // says nothing. Actions run in the order they are listed.

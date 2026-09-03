@@ -39,15 +39,20 @@ describe("isDuplicateKey", () => {
 });
 
 describe("modeDigit", () => {
-  it("reads 1 to 6 as mode indexes 0 to 5", () => {
+  it("reads 1 to 9 as mode indexes 0 to 8", () => {
     expect(modeDigit(key("1"))).toBe(0);
-    expect(modeDigit(key("6"))).toBe(5);
+    expect(modeDigit(key("9"))).toBe(8);
     expect(modeDigit(key("3"))).toBe(2);
   });
 
-  it("is null outside 1 to 6, and for anything that is not a digit", () => {
+  /**
+   * Every digit there is, rather than as many as the rail currently holds. The
+   * caller drops an index past the end of the mode list, so a mode added to the
+   * rail works from its key without this being edited too. Adding a seventh is
+   * what found the old cap of six.
+   */
+  it("is null outside 1 to 9, and for anything that is not a digit", () => {
     expect(modeDigit(key("0"))).toBeNull();
-    expect(modeDigit(key("7"))).toBeNull();
     expect(modeDigit(key("a"))).toBeNull();
     expect(modeDigit(key("Enter"))).toBeNull();
   });

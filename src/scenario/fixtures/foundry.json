@@ -1,0 +1,206 @@
+{
+  "id": "foundry",
+  "name": "Foundry",
+  "description": "A rebuild the player is bankrolled through, with a bonus for doing it the hard way.",
+  "runtimeVersion": 7,
+  "setup": {
+    "gameName": "Test Game",
+    "mapName": "Comet Catcher Redux",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Commander",
+        "side": "arm",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "rivals",
+        "kind": "ai",
+        "name": "Rivals",
+        "side": "core",
+        "color": [1, 0, 0],
+        "allyTeam": 1,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {
+    "player": {
+      "resources": {
+        "metal": 200,
+        "energy": 200
+      },
+      "income": {
+        "metal": 3,
+        "energy": 0
+      }
+    }
+  },
+  "zones": [
+    {
+      "id": "yard",
+      "name": "The yard",
+      "shape": "box",
+      "min": {
+        "x": 900,
+        "z": 900
+      },
+      "max": {
+        "x": 1500,
+        "z": 1500
+      }
+    }
+  ],
+  "actors": [
+    {
+      "id": "engineer",
+      "unitDef": "armck",
+      "team": "player",
+      "pos": {
+        "x": 1000,
+        "z": 1000
+      },
+      "facing": 0
+    },
+    {
+      "id": "works",
+      "unitDef": "armlab",
+      "team": "player",
+      "pos": {
+        "x": 1300,
+        "z": 1300
+      },
+      "facing": 0
+    }
+  ],
+  "groups": [],
+  "blueprints": [],
+  "bases": [],
+  "restrictions": {},
+  "vars": {
+    "grant": 500
+  },
+  "triggers": [
+    {
+      "id": "grant-arrives",
+      "name": "The grant arrives",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 10
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "give_resources",
+          "params": {
+            "team": "player",
+            "metal": {
+              "var": "grant"
+            },
+            "energy": -50
+          }
+        },
+        {
+          "type": "give_storage",
+          "params": {
+            "team": "player",
+            "metal": 1000,
+            "energy": 1000
+          }
+        },
+        {
+          "type": "set_income",
+          "params": {
+            "team": "player",
+            "metal": 10,
+            "energy": -5
+          }
+        },
+        {
+          "type": "build_unit",
+          "params": {
+            "builder": "engineer",
+            "unitDef": "armsolar",
+            "pos": {
+              "x": 1200,
+              "z": 1200
+            },
+            "facing": 0,
+            "count": 2
+          }
+        },
+        {
+          "type": "build_unit",
+          "params": {
+            "builder": "works",
+            "unitDef": "armpw"
+          }
+        }
+      ]
+    },
+    {
+      "id": "purist-run",
+      "name": "The bonus, for never taking the shortcut",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 120
+            }
+          },
+          {
+            "type": "unit_built",
+            "params": {
+              "team": "player",
+              "unitDef": "armfus",
+              "count": 1
+            },
+            "negate": true
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "purist"
+          }
+        },
+        {
+          "type": "call_lua",
+          "params": {
+            "func": "GG.TestGame.Applaud"
+          }
+        }
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "purist",
+      "kind": "secondary",
+      "text": "Get to two minutes without building a fusion plant.",
+      "hidden": false
+    }
+  ],
+  "dialogue": [],
+  "createdAt": "2026-09-03T00:00:00.000Z",
+  "updatedAt": "2026-09-03T00:00:00.000Z"
+}

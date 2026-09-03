@@ -194,7 +194,12 @@ function Sheet({
   return (
     <svg
       viewBox={`${sheet.left} ${sheet.top} ${sheet.width} ${sheet.height}`}
-      className="block size-full"
+      // `text-inherit` is what the plan already does, said out loud: everything
+      // here draws in `currentColor` from the wrapper's `text-primary`. It is
+      // written on the element because a container can carry a rule painting
+      // any svg inside it that has not named a colour, which the dropdown row
+      // in `select.tsx` does, and this plan is not an icon.
+      className="block size-full text-inherit"
       role="img"
       aria-label={planLabel(shape)}
     >

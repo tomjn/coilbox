@@ -13,6 +13,17 @@ import { formatErrorReport, newIssueUrl } from "./errorReport";
 
 interface Props {
   children: ReactNode;
+  /**
+   * What to show instead of the whole-page report, for a boundary put round one
+   * part of a page rather than round the app.
+   *
+   * The report below takes the window, which is right when the thing that threw
+   * is the screen and wrong when it is a panel on one: a 3D scene that cannot
+   * draw should not take the triggers, the objectives and the setup down with
+   * it. A caller passing this keeps the rest of its page and says what is
+   * missing in the space the broken part was in.
+   */
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -94,6 +105,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     const { error, route, copied } = this.state;
     if (!error) return this.props.children;
+    if (this.props.fallback !== undefined) return this.props.fallback;
 
     return (
       <main className="flex h-full min-h-0 flex-col items-center justify-center gap-4 p-10 text-center">

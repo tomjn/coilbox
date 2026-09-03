@@ -125,6 +125,23 @@ function asksForAnUncontestedHold(scenario: Scenario): boolean {
  */
 const DIFFICULTY_VERSION = 6;
 
+/**
+ * The runtime that first read a negated condition. A runtime behind this reads
+ * past the flag and answers the question the right way up, so "the player has
+ * not built a factory" holds the moment they build one, which is the exact
+ * opposite of the mission that was written.
+ */
+const NEGATED_CONDITION_VERSION = 7;
+
+/** Whether any condition asks to be read the other way round. A flag written
+ *  `false` is the question every runtime has always answered, so it asks for
+ *  nothing. */
+function negatesACondition(scenario: Scenario): boolean {
+  return scenario.triggers.some((trigger) =>
+    trigger.conditions.conditions.some((step) => step.negate === true),
+  );
+}
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -198,6 +215,9 @@ export function requiredRuntimeVersion(
   }
   if (usesDifficulty(scenario)) {
     version = Math.max(version, DIFFICULTY_VERSION);
+  }
+  if (negatesACondition(scenario)) {
+    version = Math.max(version, NEGATED_CONDITION_VERSION);
   }
   return version;
 }

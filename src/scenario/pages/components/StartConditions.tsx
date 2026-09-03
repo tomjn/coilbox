@@ -1,10 +1,18 @@
 /**
  * What each participant starts the mission with: the document's `teams` block.
  *
- * Part of the setup panel rather than a panel of its own, because every field
- * here is keyed by a `setup.participants` id. The list of participants is the
- * thing this section is a column of, and the same panel is where removing one
- * already asks what becomes of its start units and its bank.
+ * A panel of its own. It was a section inside the setup panel, on the grounds
+ * that every field here is keyed by a `setup.participants` id and the table
+ * that mints those ids is up there. That is true and it was not enough: setup
+ * is already the game, the map, the participants and the mod options, and a
+ * fifth section of four fields per team made it the longest thing on the page
+ * by a distance. This is the one part of it an author comes back to while
+ * writing triggers rather than once at the start.
+ *
+ * It reads the participants out of the document rather than out of the setup
+ * panel's own in-flight rows. That panel writes them 300ms after the last
+ * keystroke, so a participant added up there appears here a moment later, which
+ * is not something anyone can see across two collapsed panels.
  *
  * Three of the four fields are economy. The fourth, "the mission places this
  * team's start", is the adoption contract: it is what a vendoring game reads
@@ -36,7 +44,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import type { Participant } from "@/play/config";
 import type { Scenario, ScenarioTeam } from "../../model";
 import type { MissionIssue } from "../../validate";
-import { RowProblem } from "./panels";
+import { EditorPanel, RowProblem } from "./panels";
 import {
   type Amount,
   type AmountField,
@@ -47,6 +55,7 @@ import {
   setStartUnitCount,
   setTeamAmount,
   setTeamNoCommander,
+  startsSummary,
   startsWarning,
   startUnits,
   teamOf,
@@ -55,93 +64,95 @@ import { entryFieldProblem } from "./triggerProblems";
 
 export function StartConditions({
   scenario,
-  participants,
   issues,
   onChange,
 }: {
   scenario: Scenario;
-  /** The participants as the table above is showing them, so a row appears the
-   *  moment an AI is added rather than after the edit has been written. */
-  participants: Participant[];
   /** What the validator has found wrong with the mission (issue #2346). */
   issues: MissionIssue[];
   onChange: (next: Scenario) => void;
 }) {
   const units = useGameUnits(scenario.setup.gameName);
   const warning = startsWarning(scenario);
+  const participants: Participant[] = scenario.setup.participants;
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border/50 p-3">
-      <div className="flex items-center gap-2">
-        <Flag className="size-4 shrink-0 text-muted-foreground" />
-        <h3 className="text-xs font-medium">Start conditions</h3>
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        What each participant opens the mission with, which the skirmish setup
-        cannot say. Start units arrive on that team's start position, so they
-        are an opening force rather than a group placed where you clicked. A
-        team the mission declares opens on the bank set here and nothing else:
-        leaving both empty is a team with no metal and no energy, not one on the
-        game's usual allowance.
-      </p>
-
-      {warning && (
-        <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
-          {warning}
-        </p>
-      )}
-
-      {participants.length === 0 ? (
+    <EditorPanel
+      title="Start conditions"
+      icon={Flag}
+      summary={
+        participants.length === 0
+          ? "Nobody to start yet"
+          : startsSummary(scenario)
+      }
+    >
+      <div className="flex max-w-2xl flex-col gap-3">
         <p className="text-xs text-muted-foreground">
-          Add a participant above and its start conditions appear here.
+          What each participant opens the mission with, which the skirmish setup
+          cannot say. Start units arrive on that team's start position, so they
+          are an opening force rather than a group placed where you clicked. A
+          team the mission declares opens on the bank set here and nothing else:
+          leaving both empty is a team with no metal and no energy, not one on
+          the game's usual allowance.
         </p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {participants.map((participant) => (
-            <li key={participant.id}>
-              <TeamStart
-                participant={participant}
-                team={teamOf(scenario, participant.id)}
-                problem={entryFieldProblem(
-                  issues,
-                  "teams",
-                  participant.id,
-                  "startUnits",
-                )}
-                units={units.units}
-                unitsLoading={units.loading}
-                onAddUnit={(def) =>
-                  onChange(addStartUnit(scenario, participant.id, def))
-                }
-                onCount={(def, count) =>
-                  onChange(
-                    setStartUnitCount(scenario, participant.id, def, count),
-                  )
-                }
-                onRemoveUnit={(def) =>
-                  onChange(removeStartUnit(scenario, participant.id, def))
-                }
-                onAmount={(field, which, value) =>
-                  onChange(
-                    setTeamAmount(
-                      scenario,
-                      participant.id,
-                      field,
-                      which,
-                      value,
-                    ),
-                  )
-                }
-                onNoCommander={(on) =>
-                  onChange(setTeamNoCommander(scenario, participant.id, on))
-                }
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+
+        {warning && (
+          <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
+            {warning}
+          </p>
+        )}
+
+        {participants.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Add a participant under Setup and its start conditions appear here.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {participants.map((participant) => (
+              <li key={participant.id}>
+                <TeamStart
+                  participant={participant}
+                  team={teamOf(scenario, participant.id)}
+                  problem={entryFieldProblem(
+                    issues,
+                    "teams",
+                    participant.id,
+                    "startUnits",
+                  )}
+                  units={units.units}
+                  unitsLoading={units.loading}
+                  onAddUnit={(def) =>
+                    onChange(addStartUnit(scenario, participant.id, def))
+                  }
+                  onCount={(def, count) =>
+                    onChange(
+                      setStartUnitCount(scenario, participant.id, def, count),
+                    )
+                  }
+                  onRemoveUnit={(def) =>
+                    onChange(removeStartUnit(scenario, participant.id, def))
+                  }
+                  onAmount={(field, which, value) =>
+                    onChange(
+                      setTeamAmount(
+                        scenario,
+                        participant.id,
+                        field,
+                        which,
+                        value,
+                      ),
+                    )
+                  }
+                  onNoCommander={(on) =>
+                    onChange(setTeamNoCommander(scenario, participant.id, on))
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </EditorPanel>
   );
 }
 

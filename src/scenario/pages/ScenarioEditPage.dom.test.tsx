@@ -145,7 +145,8 @@ vi.mock("./components/ObjectivePanel", () => ({
 }));
 vi.mock("./components/DialoguePanel", () => ({ DialoguePanel: () => null }));
 vi.mock("./components/RestrictionPanel", () => ({
-  RestrictionPanel: () => null,
+  UnitRestrictionPanel: () => null,
+  CommandRestrictionPanel: () => null,
 }));
 vi.mock("./components/BlueprintPanel", () => ({ BlueprintPanel: () => null }));
 vi.mock("./components/VarPanel", () => ({

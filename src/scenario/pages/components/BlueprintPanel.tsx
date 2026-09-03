@@ -175,7 +175,7 @@ export function BlueprintPanel({
       carryBlueprint(current, imported.layout, crypto.randomUUID()),
     );
     setStatus(
-      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode strip, or with the pin beside it under Contents.`,
+      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode rail, or with the pin beside it under Contents.`,
     );
   }
 
@@ -302,7 +302,7 @@ export function BlueprintPanel({
 
   return (
     <EditorPanel
-      title="Base blueprints"
+      title="Blueprints in this scenario"
       icon={Blocks}
       summary={
         layouts.length === 0
@@ -312,13 +312,11 @@ export function BlueprintPanel({
     >
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3">
+          {/* Where the file lives, and nothing about how a game stores its
+              blueprints. That paragraph named Beyond All Reason on every
+              scenario, whatever game it was for, to explain a format an author
+              never has to think about. */}
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              {barFormat.label} keeps the bases a player saves in game in{" "}
-              <span className="font-mono">{barFormat.file}</span>, under
-              whichever directory the engine writes to. Coilbox reads that file
-              and writes back into it, keeping everything already in it.
-            </p>
             {gameFile && (
               <p className="break-all text-[11px] text-muted-foreground">
                 Both buttons open on{" "}
@@ -381,8 +379,8 @@ export function BlueprintPanel({
           />
         )}
 
+        {/* No heading of its own: the panel is called this now. */}
         <section className="space-y-2">
-          <h3 className="text-xs font-medium">Blueprints in this scenario</h3>
           {layouts.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               None yet. Draw a base on the map, or open a game's file above.

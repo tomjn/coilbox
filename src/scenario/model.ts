@@ -321,6 +321,25 @@ export function amountVar(value: unknown): string | null {
 export type TriggerStep = {
   type: string;
   params: Record<string, ScenarioParam>;
+  /**
+   * Hold when this condition does not. Only read on a condition, because an
+   * action has no truth to turn over.
+   *
+   * A flag on the step rather than a `not_built` type per condition: "the
+   * player has not built X" is the same question `unit_built` already asks,
+   * read the other way round, and a second table of opposites would have to
+   * grow every time the first one did.
+   *
+   * A negated condition is polled rather than event-driven, whatever the type
+   * underneath it watches. `unit_built` is woken by a unit being finished, and
+   * "has not built one" asked only on the frame somebody built something is a
+   * question that can only ever answer no. `coilbox_triggers.lua` is where that
+   * holds.
+   *
+   * Absent rather than `false` when it is off, so every document written before
+   * this compiles to the bytes it always did.
+   */
+  negate?: boolean;
 };
 
 export type ScenarioCondition = TriggerStep;
@@ -970,7 +989,12 @@ function parseStep(
   const type = id(value.type);
   if (type === undefined) return null;
   const params = parseParams(table[type], value.params);
-  return params === null ? null : { type, params };
+  if (params === null) return null;
+  // Only `true` is a negation. Absent and `false` are the same step, and the
+  // key is left off so a document round trips to the bytes it came in as.
+  return value.negate === true
+    ? { type, params, negate: true }
+    : { type, params };
 }
 
 function parseTrigger(t: Record<string, unknown>): ScenarioTrigger | null {

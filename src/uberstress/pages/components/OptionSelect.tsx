@@ -18,6 +18,15 @@ type Option = {
   /** Optional leading glyph (e.g. a faction emblem). Rendered inside the item's
    * `ItemText`, so Radix mirrors it into the trigger's selected value too. */
   icon?: ReactNode;
+  /**
+   * Optional picture of what the option is (e.g. a base layout's plan), shown
+   * to the left of the label in the dropdown only.
+   *
+   * Outside `ItemText`, unlike {@link icon}, so it is not mirrored into the
+   * trigger: a thumbnail is what an author reads a list by, and the trigger has
+   * room for a word rather than a drawing.
+   */
+  preview?: ReactNode;
   /** Optional badge pinned to the item's right edge (e.g. an AI's difficulty),
    * dropdown only. */
   trailing?: ReactNode;
@@ -41,6 +50,7 @@ function renderOption(o: Option) {
       key={o.value}
       value={o.value}
       description={o.description}
+      icon={o.preview}
       trailing={o.trailing}
       disabled={o.disabled}
     >

@@ -8,7 +8,7 @@
  * name instead of the possessive it used to read.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useMemo, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Participant } from "@/play/participants";
@@ -35,19 +35,32 @@ function participant(id: string, name: string): Participant {
   } as Participant;
 }
 
+/** A scenario the panel will draw a row for, which means one whose setup holds
+ *  the participant: the panel reads them out of the document now that it is a
+ *  panel of its own rather than a section of the setup one. */
+function withParticipant(id: string, name: string): Scenario {
+  const base = newScenario("Test");
+  return {
+    ...base,
+    setup: { ...base.setup, participants: [participant(id, name)] },
+  };
+}
+
+/** The panel starts shut, the way every panel on the edit page does. */
+function open() {
+  fireEvent.click(screen.getByRole("button", { name: /^Start conditions/ }));
+}
+
 describe("amount field names", () => {
   it("names the bank fields without a possessive", () => {
-    const scenario = newScenario("Test");
-    const you = participant("player", "You");
-
     render(
       <StartConditions
-        scenario={scenario}
-        participants={[you]}
+        scenario={withParticipant("player", "You")}
         issues={[]}
         onChange={() => {}}
       />,
     );
+    open();
 
     expect(screen.getByLabelText("Bank metal for You")).toBeTruthy();
     expect(screen.getByLabelText("Bank energy for You")).toBeTruthy();
@@ -62,7 +75,7 @@ describe("amount field names", () => {
  */
 describe("a team's start units the validator has flagged", () => {
   function withUnknownStartUnit(): Scenario {
-    const base = newScenario("Demo");
+    const base = withParticipant("player", "You");
     return {
       ...base,
       teams: { player: { startUnits: ["notaunit"] } },
@@ -77,12 +90,10 @@ describe("a team's start units the validator has flagged", () => {
       ]);
       return [...found.blocking, ...found.warnings];
     }, [document]);
-    const you = participant("player", "You");
 
     return (
       <StartConditions
         scenario={document}
-        participants={[you]}
         issues={issues}
         onChange={() => {}}
       />
@@ -91,6 +102,7 @@ describe("a team's start units the validator has flagged", () => {
 
   it("says so under that team's start units, in the validator's own words", () => {
     render(<StartUnitsHarness />);
+    open();
 
     expect(
       screen.getByText('no unit type called "notaunit" in the game'),

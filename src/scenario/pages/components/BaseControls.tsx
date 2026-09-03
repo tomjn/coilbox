@@ -271,6 +271,22 @@ export function BaseControls({
   // Null while the dataset is unread and for a def the game has not got, which
   // is why the picker below falls back to every unit rather than to nothing.
   const buildable = buildableBy(units, building.def);
+  /**
+   * Whether this building has a queue worth offering at all.
+   *
+   * A def the game says builds nothing had a Queue button that opened onto one
+   * sentence explaining why there was nothing behind it, which is a control
+   * that exists to say it does not work. A storage tank is not a factory and
+   * the bar should not suggest it might be.
+   *
+   * Unless it already holds a queue. That is a document written against a game
+   * that had those units, or against another game, and the validator flags it:
+   * hiding the button would hide the only way to read or clear the thing being
+   * complained about. `buildable` is null while the dataset is unread and for a
+   * def this game has not got, and neither is an answer, so both keep the
+   * button.
+   */
+  const queueable = buildable === null || buildable.length > 0;
   const strays = strayDefs(units, buildings);
   // Which of them the engine will not build where the layout says (#1427).
   // Only once the game's units have been read: without them every building
@@ -308,117 +324,116 @@ export function BaseControls({
         <FieldProblem id={teamDescribedBy} problem={teamProblem} />
       </div>
 
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1.5 px-2 text-xs"
-          >
-            <Hammer className="size-3.5" />
-            {queue.length === 0
-              ? "Queue"
-              : `${queue.length} queued${repeat ? " · loops" : ""}`}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-80 space-y-3">
-          {buildable !== null && buildable.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              <span className="font-mono">{building.def}</span> builds nothing
-              in this game, so a queue on it would never be started.
-            </p>
-          ) : (
-            <>
-              {buildable === null && (
-                <p className="text-xs text-muted-foreground">
-                  The game's units could not be read, so this list is every unit
-                  rather than the ones this building can make.
-                </p>
-              )}
+      {(queueable || queue.length > 0) && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1.5 px-2 text-xs"
+            >
+              <Hammer className="size-3.5" />
+              {queue.length === 0
+                ? "Queue"
+                : `${queue.length} queued${repeat ? " · loops" : ""}`}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-80 space-y-3">
+            {/* Only reachable with a queue already on it, because a def that
+                builds nothing and has no queue has no button to open this.
+                What it says is what to do about it, since those units are
+                there and will never be built. */}
+            {!queueable && (
+              <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
+                <span className="font-mono">{building.def}</span> builds nothing
+                in this game, so nothing queued on it will ever be built. Take
+                the queue off, or the mission places a factory that stands idle.
+              </p>
+            )}
+            {buildable === null && (
+              <p className="text-xs text-muted-foreground">
+                The game's units could not be read, so this list is every unit
+                rather than the ones this building can make.
+              </p>
+            )}
 
-              {queue.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Units this factory builds once the base is on the map, in
-                  order.
-                </p>
-              ) : (
-                <ol className="space-y-1.5">
-                  {queue.map((def, at) => (
-                    <li
-                      // biome-ignore lint/suspicious/noArrayIndexKey: a queue is a list of build orders, so the same def appears more than once and its place in the queue is the only thing naming it
-                      key={`${at}-${def}`}
-                      className="flex items-center gap-2"
+            {queue.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Units this factory builds once the base is on the map, in order.
+              </p>
+            ) : (
+              <ol className="space-y-1.5">
+                {queue.map((def, at) => (
+                  <li
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a queue is a list of build orders, so the same def appears more than once and its place in the queue is the only thing naming it
+                    key={`${at}-${def}`}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="w-4 shrink-0 text-right text-[11px] text-muted-foreground">
+                      {at + 1}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                      {def}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="size-7 p-0"
+                      aria-label={`Move ${def} up`}
+                      disabled={at === 0}
+                      onClick={() =>
+                        onQueue(movedQueued(queue, at, -1), repeat)
+                      }
                     >
-                      <span className="w-4 shrink-0 text-right text-[11px] text-muted-foreground">
-                        {at + 1}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                        {def}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="size-7 p-0"
-                        aria-label={`Move ${def} up`}
-                        disabled={at === 0}
-                        onClick={() =>
-                          onQueue(movedQueued(queue, at, -1), repeat)
-                        }
-                      >
-                        <ArrowUp className="size-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="size-7 p-0"
-                        aria-label={`Move ${def} down`}
-                        disabled={at === queue.length - 1}
-                        onClick={() =>
-                          onQueue(movedQueued(queue, at, 1), repeat)
-                        }
-                      >
-                        <ArrowDown className="size-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="size-7 p-0 text-destructive hover:text-destructive"
-                        aria-label={`Take ${def} out of the queue`}
-                        onClick={() =>
-                          onQueue(withoutQueued(queue, at), repeat)
-                        }
-                      >
-                        <X className="size-3.5" />
-                      </Button>
-                    </li>
-                  ))}
-                </ol>
-              )}
+                      <ArrowUp className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="size-7 p-0"
+                      aria-label={`Move ${def} down`}
+                      disabled={at === queue.length - 1}
+                      onClick={() => onQueue(movedQueued(queue, at, 1), repeat)}
+                    >
+                      <ArrowDown className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="size-7 p-0 text-destructive hover:text-destructive"
+                      aria-label={`Take ${def} out of the queue`}
+                      onClick={() => onQueue(withoutQueued(queue, at), repeat)}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ol>
+            )}
 
-              <UnitPickerButton
-                units={buildable ?? units}
-                value=""
-                loading={unitsLoading}
-                placeholder="Add to the queue"
-                size="sm"
-                onValueChange={(def) => onQueue(plusQueued(queue, def), repeat)}
+            <UnitPickerButton
+              units={buildable ?? units}
+              value=""
+              loading={unitsLoading}
+              placeholder="Add to the queue"
+              size="sm"
+              onValueChange={(def) => onQueue(plusQueued(queue, def), repeat)}
+            />
+
+            <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+              <Label htmlFor="base-repeat" className="text-xs font-medium">
+                Build the queue over and over
+              </Label>
+              <Switch
+                id="base-repeat"
+                checked={repeat}
+                disabled={queue.length === 0}
+                onCheckedChange={(on) => onQueue(queue, on)}
               />
-
-              <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-                <Label htmlFor="base-repeat" className="text-xs font-medium">
-                  Build the queue over and over
-                </Label>
-                <Switch
-                  id="base-repeat"
-                  checked={repeat}
-                  disabled={queue.length === 0}
-                  onCheckedChange={(on) => onQueue(queue, on)}
-                />
-              </div>
-            </>
-          )}
-        </PopoverContent>
-      </Popover>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Popover>
         <PopoverTrigger asChild>

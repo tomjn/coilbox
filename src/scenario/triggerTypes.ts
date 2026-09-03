@@ -206,6 +206,64 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
   /** Ends the mission. Absent team means the human player's team. */
   victory: { team: { kind: "teamId", optional: true } },
   defeat: { team: { kind: "teamId", optional: true } },
+  /**
+   * Call a function the game already has, by name.
+   *
+   * A name and not a body. A mission is data the runtime reads out of an
+   * archive, so a function written into a scenario would be source code
+   * arriving from wherever the scenario came from and running in synced Lua.
+   * Naming one the game shipped keeps what runs the game's, which is the same
+   * line `missions/extensions.lua` draws.
+   *
+   * Dotted, because what a game has to offer lives on `GG` rather than loose in
+   * a global: `GG.MyGame.StartTheStorm`.
+   */
+  call_lua: {
+    func: { kind: "string", label: "function name" },
+  },
+  /**
+   * Tell one of the mission's units to build something.
+   *
+   * `pos` is where it goes, for a construction unit. A factory has nowhere to
+   * put a building, so leaving the position out queues the unit in the factory
+   * instead, which is the same order with the same shape.
+   */
+  build_unit: {
+    builder: { kind: "actorId", label: "builder" },
+    unitDef: { kind: "string", label: "unit type" },
+    pos: { kind: "point", optional: true, label: "where to build it" },
+    facing: { kind: "number", optional: true, default: 0 },
+    // Matches M.DEFAULT_BUILD_COUNT in coilbox_groups.lua.
+    count: { kind: "number", optional: true, default: 1, label: "how many" },
+  },
+  /**
+   * Move a team's bank once: a gift when the number is positive, a drain when
+   * it is negative.
+   *
+   * Both halves are optional, so "take 1000 energy" is one field rather than a
+   * zero the author has to write beside it.
+   */
+  give_resources: {
+    team: { kind: "teamId" },
+    metal: { kind: "amount", optional: true },
+    energy: { kind: "amount", optional: true },
+  },
+  /**
+   * What a team is paid from now on, per second, replacing whatever it was
+   * being paid. Negative is a continuous drain, which is how a mission bleeds a
+   * team rather than emptying it in one go.
+   */
+  set_income: {
+    team: { kind: "teamId" },
+    metal: { kind: "amount", optional: true, label: "metal per second" },
+    energy: { kind: "amount", optional: true, label: "energy per second" },
+  },
+  /** Move how much a team can hold, which is the ceiling a gift is clamped to. */
+  give_storage: {
+    team: { kind: "teamId" },
+    metal: { kind: "amount", optional: true, label: "metal storage" },
+    energy: { kind: "amount", optional: true, label: "energy storage" },
+  },
 };
 
 /**
@@ -263,6 +321,14 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   victory: "Ends the mission with a team's side winning.",
   defeat:
     "Ends the mission with a team's side losing, and everyone else winning.",
+  call_lua: "Calls a function the game already has, by name.",
+  build_unit:
+    "Tells one of the mission's units to build something, at a point or into a factory queue.",
+  give_resources:
+    "Moves a team's metal or energy once, up for a gift and down for a drain.",
+  set_income:
+    "Sets what a team is paid per second from now on. A negative number bleeds it instead.",
+  give_storage: "Moves how much metal or energy a team can hold.",
 };
 
 /**
@@ -277,6 +343,11 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
  * type is never in this table, so `AddStep` falls back to `GAME_TYPE_GROUP`
  * rather than dropping it.
  */
+/** The band a game's own condition or action types fall under, since a
+ *  declaration says nothing about which of coilbox's bands it belongs in.
+ *  Always offered last, after every built-in band. */
+export const GAME_TYPE_GROUP = "Game types";
+
 export const TYPE_GROUPS: Record<string, string> = {
   // Conditions.
   units_in_zone: "Units",
@@ -295,6 +366,11 @@ export const TYPE_GROUPS: Record<string, string> = {
   gift_units: "Units",
   release_group: "Units",
   unlock_unit: "Units",
+  build_unit: "Units",
+  give_resources: "Economy",
+  set_income: "Economy",
+  give_storage: "Economy",
+  call_lua: "Game code",
   set_var: "Variables",
   add_var: "Variables",
   enable_trigger: "Trigger flow",
@@ -316,17 +392,17 @@ export const CONDITION_GROUP_ORDER = ["Units", "Variables", "Time"] as const;
 /** The bands `AddStep` offers for the actions list, in the order shown. */
 export const ACTION_GROUP_ORDER = [
   "Units",
+  "Economy",
   "Variables",
   "Trigger flow",
   "Objectives",
   "Presentation",
   "Ending",
+  // Last of coilbox's own bands, and read as the pair to `GAME_TYPE_GROUP`
+  // right after it: this reaches the game's Lua, and that is the game's own
+  // types. Both are about what the game brought rather than what coilbox has.
+  "Game code",
 ] as const;
-
-/** The band a game's own condition or action types fall under, since a
- *  declaration says nothing about which of coilbox's bands it belongs in.
- *  Always offered last, after every built-in band. */
-export const GAME_TYPE_GROUP = "Game types";
 
 /**
  * The runtime version that added a condition or action, for the types that did
@@ -343,6 +419,14 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   /** Issue #812. A runtime behind 3 ignores it and goes on ordering a squad the
    *  mission handed the player. */
   release_group: 3,
+  /** Five actions and one format feature, all landing in 7. A runtime behind
+   *  it has no implementation for any of them, so each is a trigger that
+   *  reports itself once and does nothing. */
+  call_lua: 7,
+  build_unit: 7,
+  give_resources: 7,
+  set_income: 7,
+  give_storage: 7,
 };
 
 /**

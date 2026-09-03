@@ -114,6 +114,18 @@ if not GROUPS then
 	return false
 end
 
+local ECONOMY, economyError = includeTable("luarules/mission_runtime/coilbox_economy.lua")
+if not ECONOMY then
+	log("error", economyError)
+	return false
+end
+
+local CALL, callError = includeTable("luarules/mission_runtime/coilbox_call.lua")
+if not CALL then
+	log("error", callError)
+	return false
+end
+
 local OBJECTIVES, objectivesError = includeTable("luarules/mission_runtime/coilbox_objectives.lua")
 if not OBJECTIVES then
 	log("error", objectivesError)
@@ -372,6 +384,8 @@ if gadgetHandler:IsSyncedCode() then
 	local reveal
 	-- What the mission's teams may build and do.
 	local restrictions
+	-- Their banks, what they are paid and how much they can hold.
+	local economy
 
 	--- Tell the triggers something happened.
 	--
@@ -549,18 +563,6 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	--- Free income, spread over the second it is quoted per.
-	local function addIncome()
-		for _, team in ipairs(teams) do
-			if team.metalIncome ~= 0 then
-				Spring.AddTeamResource(team.team, "m", team.metalIncome / Game.gameSpeed)
-			end
-			if team.energyIncome ~= 0 then
-				Spring.AddTeamResource(team.team, "e", team.energyIncome / Game.gameSpeed)
-			end
-		end
-	end
-
 	function gadget:Initialize()
 		local published, problems = publish()
 		teams = published.teams
@@ -596,6 +598,18 @@ if gadgetHandler:IsSyncedCode() then
 		-- Before the first frame, so a var is at the number its author gave it
 		-- from the first trigger that reads it.
 		published.vars = VARS.register(triggers, published)
+		-- After the vars, because every field of an economy action is an amount and
+		-- an amount may name one. Before the first frame, so the income it is
+		-- holding is the scenario's own from the frame the game starts paying.
+		economy = ECONOMY.register(triggers, published)
+		published.economy = economy
+		-- A name is walked from the gadget's own environment, which is the only
+		-- place `GG` and a game's globals can be reached from.
+		published.call = CALL.register(triggers, published, {
+			root = function()
+				return getfenv(1)
+			end,
+		})
 		-- Creating a unit has to happen inside the start suppression and at the
 		-- ground height, both of which are this file's, so the groups get the one
 		-- hook and keep the lifecycle.
@@ -741,7 +755,9 @@ if gadgetHandler:IsSyncedCode() then
 			applyResources()
 			suppressing = false
 		end
-		addIncome()
+		-- Free income, spread over the second it is quoted per. The economy module
+		-- owns the number, so a `set_income` that changed it changes what arrives.
+		economy.pay()
 		-- The greyed build icons, put back over whatever a game's own build gating
 		-- has written on top of them since (issue #955).
 		restrictions.refresh(frame)
