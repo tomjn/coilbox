@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +26,7 @@ import {
   type ConversationDescriptor,
   convId,
   isBattleChannel,
+  resolveConversationRequest,
 } from "../chat/conversation";
 import {
   HIGHLIGHT_OWN_KEY,
@@ -35,6 +37,7 @@ import { MemberActionsMenu } from "../chat/MemberActionsMenu";
 import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
+import { useConversationParam } from "../chat/useConversationParam";
 import {
   addFavourite,
   isFavourite,
@@ -236,6 +239,28 @@ function ChatPage() {
     if (active) markSeen(convId(active), conv.total);
   }, [active, conv.total, markSeen]);
 
+  // Open on the conversation a `?channel=`/`?dm=` address named (issue #2406),
+  // e.g. the match-result drawer's link to a debriefing channel. Resolved
+  // against live state rather than trusted outright: a channel not in the
+  // snapshot is one this session never joined, and the query is an intent,
+  // not permission to join it on the reader's behalf, so that fails with a
+  // toast instead of an autojoin. `requestSettled` gates the first-joined-
+  // channel fallback below, so a rejected request still lands somewhere
+  // rather than leaving the page on nothing selected.
+  const requestedConversation = useConversationParam();
+  const requestAppliedRef = useRef<ConversationDescriptor | null>(null);
+  const [requestSettled, setRequestSettled] = useState(false);
+  useEffect(() => {
+    if (!requestedConversation) return;
+    if (requestAppliedRef.current === requestedConversation) return;
+    const result = resolveConversationRequest(requestedConversation, state);
+    if (result == null) return; // mirror hasn't loaded enough to judge yet
+    requestAppliedRef.current = requestedConversation;
+    setRequestSettled(true);
+    if (result.ok) setActive(result.descriptor);
+    else toast.error(result.reason);
+  }, [requestedConversation, state]);
+
   // Open on the first joined channel when nothing is selected (initial entry, and
   // once autojoined channels arrive after connect). Battle chat is excluded — it's
   // contextual, not a standing channel. Depends on the first name (a primitive) so
@@ -247,10 +272,14 @@ function ChatPage() {
           .sort()[0]
       : undefined) ?? null;
   useEffect(() => {
-    if (active == null && firstChannel) {
+    if (
+      active == null &&
+      firstChannel &&
+      (!requestedConversation || requestSettled)
+    ) {
       setActive({ kind: "channel", name: firstChannel });
     }
-  }, [active, firstChannel]);
+  }, [active, firstChannel, requestedConversation, requestSettled]);
 
   // Leave a channel: stop the server membership, forget it (no auto-rejoin), and
   // deselect it if it was the open conversation.
