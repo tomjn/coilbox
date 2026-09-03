@@ -128,12 +128,14 @@ body,
 /* Seamless mission-panorama scroll (see PanoramaScroller): the art is tiled with
    repeat-x so it always fills the element (no solid backdrop showing through for
    narrow/tiling art), and the background scrolls by exactly one tile width per loop
-   for a seamless wrap. Tile width + duration come from per-element custom
-   properties so the speed is constant regardless of image size. */
+   for a seamless wrap. Tile size + duration come from per-element custom
+   properties so the speed is constant regardless of image size. The tile is
+   centred vertically because a capped tile is drawn wider than the element's
+   height and so overflows top and bottom. */
 .campaign-panorama {
   background-repeat: repeat-x;
-  background-size: auto 100%;
-  background-position-x: 0;
+  background-size: var(--panorama-size, auto 100%);
+  background-position: 0 center;
   animation: campaign-panorama-scroll var(--panorama-duration, 20s) linear
     infinite;
 }
