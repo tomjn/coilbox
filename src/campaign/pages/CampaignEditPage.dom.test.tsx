@@ -1384,6 +1384,33 @@ describe("what a mission row says", () => {
 });
 
 /**
+ * Every other control on the row (the drag handle, the arrow pair, the
+ * position box, the four action buttons) is a fixed width, so the title and
+ * metadata column used to be the only thing that could give: on a narrow
+ * window it gave everything, down to the mission number alone (issue #2400).
+ * The column now carries a real minimum width instead of `min-w-0`, and the
+ * row wraps once the fixed controls and that floor no longer fit one line,
+ * rather than the title losing its name.
+ */
+describe("the mission row's title column at narrow widths (issue #2400)", () => {
+  it("gives the title/metadata column a real minimum width instead of min-w-0", () => {
+    show([plain("m1", "Ridge")]);
+
+    const column = screen.getByText("1. Ridge").parentElement as HTMLElement;
+    expect(column.className).not.toContain("min-w-0");
+    expect(column.className).toMatch(/\bmin-w-32\b/);
+  });
+
+  it("lets the row wrap instead of leaving the title as the only item that can shrink", () => {
+    show([plain("m1", "Ridge")]);
+
+    const column = screen.getByText("1. Ridge").parentElement as HTMLElement;
+    const row = column.parentElement as HTMLElement;
+    expect(row.className).toContain("flex-wrap");
+  });
+});
+
+/**
  * A mission with no panorama used to reserve the same full-width 80px strip
  * as one that had art, just to caption the absence with "No panorama" (issue
  * #2266). The map thumbnail is the mission's real identity in that case, so

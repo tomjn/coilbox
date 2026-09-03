@@ -837,7 +837,15 @@ export default function CampaignEditPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 p-3">
+                  {/* flex-wrap (issue #2400): the grip, the arrow pair, the
+                      position box and the four action buttons are all a fixed
+                      width, so on a narrow window they are the wrong things to
+                      give ground. The title/metadata column below carries a
+                      real min-width instead of `min-w-0`, so it is never the
+                      one item asked to shrink toward nothing. Once the fixed
+                      controls and that floor no longer fit one line, the row
+                      wraps rather than the title losing its name. */}
+                  <div className="flex flex-wrap items-center gap-3 p-3">
                     {/* Drag to reorder (issue #2262). A handle rather than the
                         whole card, so selecting a title or pressing one of the
                         row's five buttons never starts a drag by accident.
@@ -889,7 +897,7 @@ export default function CampaignEditPage() {
                       onMove={(to) => moveTo(i, to)}
                       onSay={say}
                     />
-                    <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex min-w-32 flex-1 flex-col gap-1">
                       {/* The only bold line on the card: everything below is
                           one muted metadata row, so a scan down the list reads
                           titles first and details only on demand. */}
