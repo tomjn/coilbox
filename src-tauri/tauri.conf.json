@@ -64,7 +64,10 @@
     },
     "windows": {
       "nsis": {
-        "installerHooks": "./nsis-hooks.nsh"
+        "installerHooks": "./nsis-hooks.nsh",
+        "headerImage": "./icons/nsis-header.bmp",
+        "sidebarImage": "./icons/nsis-sidebar.bmp",
+        "installerIcon": "./icons/icon-windows.ico"
       }
     }
   },
