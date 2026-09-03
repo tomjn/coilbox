@@ -14,18 +14,52 @@ import {
 const SCROLL_SPEED_PX_PER_SEC = 25;
 
 /**
+ * How many copies of the art may show at once. One or two reads as a picture. Beyond
+ * that the repetition itself becomes the subject, and the backdrop starts competing
+ * with the text in front of it.
+ */
+const MAX_REPEATS = 2;
+
+/**
+ * The width to draw one copy of the art at.
+ *
+ * The natural width is the one that shows the whole picture, the art scaled to the
+ * element's height. That is what we want whenever it is big enough, but a short band
+ * (the 80px mission card strip) or art that is tall for its width leaves a natural
+ * tile far narrower than the element, and the art then repeats across it as a
+ * pattern. Above {@link MAX_REPEATS} copies we scale the art up instead, so it is
+ * cropped top and bottom the way `background-size: cover` crops the still backdrop.
+ * Fewer, larger copies of the art, at the cost of its edges.
+ *
+ * Returns 0 when there is nothing to measure yet, which leaves the CSS fallback in
+ * place.
+ */
+export function panoramaTileWidth(
+  /** Source image aspect ratio, width over height. */
+  ratio: number,
+  /** Rendered element width in px. */
+  width: number,
+  /** Rendered element height in px. */
+  height: number,
+): number {
+  const natural = height * ratio;
+  if (!(natural > 0)) return 0;
+  if (!(width > 0)) return natural;
+  return Math.max(natural, width / MAX_REPEATS);
+}
+
+/**
  * A seamlessly-looping horizontal scroll of a mission briefing panorama. The art is
- * tiled across the element with `background-repeat: repeat-x` (at full element
- * height, aspect-preserved) so it always fills the width — no matter how narrow the
- * source — and the background scrolls by exactly one tile width per loop for a
+ * tiled across the element with `background-repeat: repeat-x`, aspect-preserved and
+ * never shorter than the element, so it always fills the width however narrow the
+ * source is, and the background scrolls by exactly one tile width per loop for a
  * seamless wrap.
  *
  * This replaces an earlier two-copy flex track that only worked for art at least as
  * wide as the container: a narrow/tiling source left the solid backdrop showing
- * through. The tile width (and thus loop distance + duration) is measured from the
- * image's aspect ratio and the element's rendered height, so the speed stays
- * constant regardless of image size; `prefers-reduced-motion` disables the motion
- * (see index.css).
+ * through. The tile width (and thus loop distance + duration) comes from
+ * {@link panoramaTileWidth}, so the speed stays constant regardless of image size,
+ * and `prefers-reduced-motion` disables the motion (see index.css).
  *
  * An image panorama can also be held *static* (full-bleed `background-size: cover`)
  * via `playback.scroll === false`; a video panorama delegates to
@@ -74,9 +108,10 @@ export function PanoramaScroller({
     let ratio = 0;
     const apply = () => {
       if (!ratio) return;
-      const tile = el.clientHeight * ratio;
+      const tile = panoramaTileWidth(ratio, el.clientWidth, el.clientHeight);
       if (tile <= 0) return;
       el.style.setProperty("--panorama-tile", `${tile}px`);
+      el.style.setProperty("--panorama-size", `${tile}px auto`);
       el.style.setProperty(
         "--panorama-duration",
         `${Math.max(1, tile / SCROLL_SPEED_PX_PER_SEC)}s`,
