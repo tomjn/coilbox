@@ -1381,6 +1381,68 @@ describe("what a mission row says", () => {
     expect(screen.getByText("BAR 1.0").className).not.toMatch(/amber/);
     expect(screen.getByText("Comet Catcher").className).not.toMatch(/amber/);
   });
+
+  /**
+   * Each "·" used to be its own flex item between two others, free to land
+   * alone on a wrapped line when the row ran out of width (issue #2401). It
+   * now shares a flex item with the text it introduces, so the two can only
+   * ever wrap together.
+   */
+  it("keeps each separator dot in the same flex item as the text it introduces", () => {
+    show([{ ...plain("m1", "Ridge"), subtitle: "Northern Isles" }]);
+
+    const row = metadataRowOf("1. Ridge");
+    const dots = [...row.querySelectorAll('[aria-hidden="true"]')].filter(
+      (el) => el.textContent === "·",
+    );
+    expect(dots).toHaveLength(2);
+    // The dot before the game/map line: not a sibling of the row's other
+    // top-level items, but sharing a parent with the text it introduces.
+    expect(dots[0].parentElement).not.toBe(row);
+    expect(dots[0].parentElement?.textContent).toContain("No game");
+    // The dot before the fact chips, the same way.
+    expect(dots[1].parentElement).not.toBe(row);
+    expect(dots[1].parentElement?.querySelector("span[title]")).toBeTruthy();
+  });
+
+  it("drops the first separator along with the subtitle when there is none", () => {
+    show([plain("m1", "Ridge")]);
+
+    const row = metadataRowOf("1. Ridge");
+    const dots = [...row.querySelectorAll('[aria-hidden="true"]')].filter(
+      (el) => el.textContent === "·",
+    );
+    // Only the one before the fact chips: nothing introduces the game/map
+    // line when there is no subtitle ahead of it.
+    expect(dots).toHaveLength(1);
+  });
+});
+
+/**
+ * Every other control on the row (the drag handle, the arrow pair, the
+ * position box, the four action buttons) is a fixed width, so the title and
+ * metadata column used to be the only thing that could give: on a narrow
+ * window it gave everything, down to the mission number alone (issue #2400).
+ * The column now carries a real minimum width instead of `min-w-0`, and the
+ * row wraps once the fixed controls and that floor no longer fit one line,
+ * rather than the title losing its name.
+ */
+describe("the mission row's title column at narrow widths (issue #2400)", () => {
+  it("gives the title/metadata column a real minimum width instead of min-w-0", () => {
+    show([plain("m1", "Ridge")]);
+
+    const column = screen.getByText("1. Ridge").parentElement as HTMLElement;
+    expect(column.className).not.toContain("min-w-0");
+    expect(column.className).toMatch(/\bmin-w-32\b/);
+  });
+
+  it("lets the row wrap instead of leaving the title as the only item that can shrink", () => {
+    show([plain("m1", "Ridge")]);
+
+    const column = screen.getByText("1. Ridge").parentElement as HTMLElement;
+    const row = column.parentElement as HTMLElement;
+    expect(row.className).toContain("flex-wrap");
+  });
 });
 
 /**
@@ -1424,6 +1486,70 @@ describe("a mission card's header strip with no panorama", () => {
     // overlay that band uses to show the same thumbnail alongside art.
     expect(img.className).not.toContain("size-16");
     expect(img.className).not.toContain("absolute");
+  });
+});
+
+/**
+ * The strip used to ask only `m.panorama`, so a mission whose panorama slot
+ * held a live map or unit preview instead of an imported image or video read
+ * as having no panorama at all: the same slim 40px band a mission with
+ * nothing configured gets, while its own drawer summary already said "Map
+ * panorama" (issue #2402). The row now asks the same question the drawer
+ * summary and the briefing page do, whether any of `panorama`,
+ * `panoramaMap` or `panoramaUnit` is set, and gets the same answer.
+ */
+describe("a mission card's header strip with a map or unit panorama", () => {
+  it("gives a map panorama the 80px band and the corner thumbnail", () => {
+    useUnitsyncThumbnails.mockReturnValue({
+      thumbs: new Map([["Comet Catcher", { url: "thumb://comet-catcher" }]]),
+    });
+    show([
+      {
+        ...plain("m1", "Ridge"),
+        panoramaMap: { style: "textured" },
+        snapshot: { ...source.setup, mapName: "Comet Catcher" },
+      },
+    ]);
+
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    const strip = li.firstElementChild as HTMLElement;
+    expect(strip.className).toContain("h-20");
+    const img = li.querySelector("img") as HTMLImageElement;
+    expect(img.src).toBe("thumb://comet-catcher");
+    expect(img.className).toContain("size-16");
+    expect(img.className).toContain("absolute");
+  });
+
+  it("gives a unit panorama the same 80px band and corner thumbnail", () => {
+    useUnitsyncThumbnails.mockReturnValue({
+      thumbs: new Map([["Comet Catcher", { url: "thumb://comet-catcher" }]]),
+    });
+    show([
+      {
+        ...plain("m1", "Ridge"),
+        panoramaUnit: { unitDef: "armbrtha" },
+        snapshot: { ...source.setup, mapName: "Comet Catcher" },
+      },
+    ]);
+
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    const strip = li.firstElementChild as HTMLElement;
+    expect(strip.className).toContain("h-20");
+    const img = li.querySelector("img") as HTMLImageElement;
+    expect(img.className).toContain("size-16");
+    expect(img.className).toContain("absolute");
+  });
+
+  it("still shows the 80px band for a map panorama with no map thumbnail to overlay", () => {
+    show([{ ...plain("m1", "Ridge"), panoramaMap: { style: "textured" } }]);
+
+    const li = screen.getByText("1. Ridge").closest("li") as HTMLElement;
+    const strip = li.firstElementChild as HTMLElement;
+    expect(strip.className).toContain("h-20");
+    // No thumbnail for this map, so no corner overlay and no 40px band image
+    // either: a map or unit panorama has no static image of its own to fill
+    // the main area with.
+    expect(li.querySelector("img")).toBeNull();
   });
 });
 

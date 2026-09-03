@@ -764,6 +764,21 @@ export default function CampaignEditPage() {
           >
             {campaign.missions.map((m, i) => {
               const thumb = thumbs.get(m.snapshot.mapName)?.url;
+              // The same three sources the drawer's Presentation summary and
+              // the briefing page read the panorama slot from (issue #2402),
+              // not `m.panorama` alone: a slot has exactly one of the three
+              // set, and a map or unit source is just as much "this mission
+              // has a panorama" as an imported image or video is. Unlike the
+              // briefing page, this does not also gate a configured unit on
+              // whether it currently resolves to a model: that check exists
+              // there because the briefing needs an actual model to draw,
+              // while this row, like the drawer summary, is only stating what
+              // is configured.
+              const hasPanorama = !!(
+                m.panorama ||
+                m.panoramaMap ||
+                m.panoramaUnit
+              );
               const attachment = scenarioAttachment(m, scenarios);
               return (
                 <li
@@ -789,14 +804,22 @@ export default function CampaignEditPage() {
                       captioning the absence. With neither, there is nothing
                       to show and the strip is skipped rather than left as an
                       empty band. */}
-                  {(m.panorama || thumb) && (
-                    <div className={m.panorama ? "relative h-20" : "h-10"}>
+                  {(hasPanorama || thumb) && (
+                    <div className={hasPanorama ? "relative h-20" : "h-10"}>
                       {m.panorama ? (
                         <PanoramaScroller
                           campaignId={campaign.id}
                           panorama={m.panorama}
                           className="h-20 rounded-none"
                         />
+                      ) : hasPanorama ? (
+                        // A map or unit panorama has no static image to show
+                        // here: rendering it live would mean a 3D canvas per
+                        // row. The same gradient the briefing page falls back
+                        // to when it has no image stands in instead, with the
+                        // map thumbnail in the corner as the row's real
+                        // identity, same as the other two panorama states.
+                        <div className="h-20 w-full bg-gradient-to-br from-slate-900 to-slate-950" />
                       ) : (
                         <img
                           src={thumb}
@@ -804,7 +827,7 @@ export default function CampaignEditPage() {
                           className="h-10 w-full rounded-none object-cover"
                         />
                       )}
-                      {m.panorama && thumb && (
+                      {hasPanorama && thumb && (
                         <img
                           src={thumb}
                           alt=""
@@ -814,7 +837,15 @@ export default function CampaignEditPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 p-3">
+                  {/* flex-wrap (issue #2400): the grip, the arrow pair, the
+                      position box and the four action buttons are all a fixed
+                      width, so on a narrow window they are the wrong things to
+                      give ground. The title/metadata column below carries a
+                      real min-width instead of `min-w-0`, so it is never the
+                      one item asked to shrink toward nothing. Once the fixed
+                      controls and that floor no longer fit one line, the row
+                      wraps rather than the title losing its name. */}
+                  <div className="flex flex-wrap items-center gap-3 p-3">
                     {/* Drag to reorder (issue #2262). A handle rather than the
                         whole card, so selecting a title or pressing one of the
                         row's five buttons never starts a drag by accident.
@@ -866,7 +897,7 @@ export default function CampaignEditPage() {
                       onMove={(to) => moveTo(i, to)}
                       onSay={say}
                     />
-                    <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex min-w-32 flex-1 flex-col gap-1">
                       {/* The only bold line on the card: everything below is
                           one muted metadata row, so a scan down the list reads
                           titles first and details only on demand. */}
@@ -878,14 +909,22 @@ export default function CampaignEditPage() {
                             briefing screen puts it: a location line under the
                             name. */}
                         {m.subtitle && (
-                          <>
-                            <span className="truncate">{m.subtitle}</span>
-                            <span aria-hidden="true">·</span>
-                          </>
+                          <span className="truncate">{m.subtitle}</span>
                         )}
-                        <MissionSetup snapshot={m.snapshot} />
-                        <span aria-hidden="true">·</span>
-                        <MissionFacts mission={m} />
+                        {/* Each separator shares a flex item with the text it
+                            introduces (issue #2401), rather than sitting
+                            between two items as one of its own: this row
+                            wraps when it runs out of width, and a standalone
+                            "·" is free to be the thing that lands alone on
+                            the new line. */}
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {m.subtitle && <span aria-hidden="true">·</span>}
+                          <MissionSetup snapshot={m.snapshot} />
+                        </span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span aria-hidden="true">·</span>
+                          <MissionFacts mission={m} />
+                        </span>
                         {/* The same badge the mission editor's Scenario
                             heading carries, on the same answer this row
                             already worked out (issue #2392). */}
