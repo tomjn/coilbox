@@ -23,6 +23,9 @@
  */
 
 import * as THREE from "three";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { worldToScene } from "@/placement/scene";
@@ -80,6 +83,21 @@ const MOVE_HANDLE_COLOR = 0xf97316;
  */
 const MARQUEE_COLOR = 0xffffff;
 const MARQUEE_BACKING_COLOR = 0x0f172a;
+
+/**
+ * How wide the marquee is drawn, in pixels, white over dark.
+ *
+ * `LineBasicMaterial.linewidth` is ignored by every WebGL driver, so a marquee
+ * asking for a wide line got a one pixel one and read as a hairline over
+ * terrain. `Line2` builds each segment as screen-space geometry instead, which
+ * is what the lego builder's edit box already does
+ * (`PIECE_EDIT_LINE_WIDTH` in `src/lego/pages/components/ModelViewport.tsx`).
+ *
+ * The dark line is wider so it shows either side of the white one as well as
+ * through its gaps, which is what keeps the box readable over snow and sand.
+ */
+const MARQUEE_LINE_WIDTH = 3;
+const MARQUEE_BACKING_WIDTH = 5;
 
 /** How many dashes go round a marquee, however big it is or how far away the
  *  camera is. A dash measured in elmos would be a solid line on a box drawn
@@ -209,10 +227,13 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
    * tells them apart. So the two are as different as they can be: no fill at
    * all, and a dashed edge rather than a solid one.
    *
-   * Two lines on the same points, a black one under a dashed white one, so the
-   * white shows over dark ground and the black shows through the gaps over
+   * Two lines on the same points, a solid dark one under a dashed white one, so
+   * the white shows over dark ground and the dark shows through the gaps over
    * pale ground. Neither is depth tested, the same as a zone's outline, so a
    * box drawn across a ridge is a box rather than two halves.
+   *
+   * Both are `Line2` rather than `THREE.Line`, which is what gives them a width
+   * a driver honours: see {@link MARQUEE_LINE_WIDTH}.
    */
   const buildMarquee = (zone: ScenarioZone): THREE.Group => {
     const centre = zoneCenter(zone);
@@ -229,36 +250,54 @@ export function createZonesLayer(deps: ZonesLayerDeps): ZonesLayer {
     const ring = outlinePoints(zone).map(
       (offset) => new THREE.Vector3(offset.x, relief(centre, offset), offset.z),
     );
-    // Closed by hand rather than drawn as a LineLoop, because the dashes are
+    // Closed by hand rather than drawn as a loop, because the dashes are
     // measured along the line and the closing side has to be measured with it.
     const closed = [...ring, ring[0]];
+    const flat = closed.flatMap((point) => [point.x, point.y, point.z]);
 
-    const backingGeometry = new THREE.BufferGeometry().setFromPoints(closed);
-    const backingMaterial = new THREE.LineBasicMaterial({
+    // A dash is measured in the geometry's own units, which are elmos here, so
+    // the perimeter is walked before a dash length can be chosen.
+    let perimeter = 0;
+    for (let i = 1; i < closed.length; i++) {
+      perimeter += closed[i].distanceTo(closed[i - 1]);
+    }
+    const dash = perimeter / (MARQUEE_DASHES * 2);
+
+    // Screen-space widths need the viewport size. The marquee is rebuilt on
+    // every frame of the drag it exists for, so reading it here is enough: a
+    // window resized mid-drag is one frame behind and then right again.
+    const viewport = new THREE.Vector2();
+    handle.renderer.getSize(viewport);
+
+    const backingGeometry = new LineGeometry();
+    backingGeometry.setPositions(flat);
+    const backingMaterial = new LineMaterial({
       color: MARQUEE_BACKING_COLOR,
+      linewidth: MARQUEE_BACKING_WIDTH,
       transparent: true,
       opacity: 0.8,
       depthTest: false,
     });
-    const backing = new THREE.Line(backingGeometry, backingMaterial);
+    backingMaterial.resolution.copy(viewport);
+    const backing = new Line2(backingGeometry, backingMaterial);
     backing.renderOrder = 3;
     group.add(backing);
 
-    const dashGeometry = new THREE.BufferGeometry().setFromPoints(closed);
-    const dashMaterial = new THREE.LineDashedMaterial({
+    const dashGeometry = new LineGeometry();
+    dashGeometry.setPositions(flat);
+    const dashMaterial = new LineMaterial({
       color: MARQUEE_COLOR,
+      linewidth: MARQUEE_LINE_WIDTH,
+      dashed: true,
+      dashSize: dash,
+      gapSize: dash,
       depthTest: false,
     });
-    const dashes = new THREE.Line(dashGeometry, dashMaterial);
-    // A dash is measured in the geometry's own units, which are elmos here, so
-    // the perimeter has to be walked before a dash length can be chosen. Written
-    // onto the material afterwards for that reason.
+    dashMaterial.resolution.copy(viewport);
+    const dashes = new Line2(dashGeometry, dashMaterial);
+    // What the dash shader measures against `dashSize`, in the geometry's own
+    // units. Nothing is dashed without it.
     dashes.computeLineDistances();
-    const walked = dashGeometry.getAttribute("lineDistance");
-    const perimeter = walked.getX(walked.count - 1);
-    const dash = perimeter / (MARQUEE_DASHES * 2);
-    dashMaterial.dashSize = dash;
-    dashMaterial.gapSize = dash;
     dashes.renderOrder = 4;
     group.add(dashes);
 

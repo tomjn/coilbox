@@ -22,12 +22,17 @@ import type { ScenarioZone } from "../../model";
 import { MARQUEE_ZONE_ID } from "./zones";
 import { createZonesLayer } from "./zonesLayer";
 
-/** Enough of a scene to hang objects off. Nothing here renders. */
+/** Enough of a scene to hang objects off. Nothing here renders, but the
+ *  marquee's screen-space lines ask the renderer how big the viewport is, so
+ *  there is a size to read. */
 function scene(): MapScene3D {
   return {
     scene: new THREE.Scene(),
     scale: 1,
     render: () => {},
+    renderer: {
+      getSize: (into: THREE.Vector2) => into.set(1280, 720),
+    },
   } as unknown as MapScene3D;
 }
 
@@ -58,10 +63,20 @@ function drawn(root: THREE.Object3D, at: number): THREE.Object3D[] {
   return out;
 }
 
-const meshes = (parts: THREE.Object3D[]) =>
-  parts.filter((one) => one instanceof THREE.Mesh);
+/** The name of the material a part was drawn with, whether it is a mesh, a
+ *  plain line or one of the marquee's screen-space ones. */
+const materialName = (one: THREE.Object3D) =>
+  ((one as THREE.Mesh).material as THREE.Material).constructor.name;
+
+/** The sheet of ground a zone is drawn as. `Line2` is a mesh too, so a marquee
+ *  would answer `instanceof THREE.Mesh`, and what is being counted here is the
+ *  fill rather than the geometry it happens to be built from. */
+const sheets = (parts: THREE.Object3D[]) =>
+  parts.filter((one) => materialName(one) === "MeshBasicMaterial");
+
+/** Every edge drawn, a zone's plain line and the marquee's wide ones alike. */
 const lines = (parts: THREE.Object3D[]) =>
-  parts.filter((one) => one instanceof THREE.Line);
+  parts.filter((one) => materialName(one).startsWith("Line"));
 
 describe("a selection marquee against a zone being drawn", () => {
   it("draws the marquee as lines and nothing else, so there is no sheet of ground", () => {
@@ -69,7 +84,7 @@ describe("a selection marquee against a zone being drawn", () => {
     zones.draw([box(MARQUEE_ZONE_ID)], null);
 
     const parts = drawn(zones.root, 0);
-    expect(meshes(parts)).toHaveLength(0);
+    expect(sheets(parts)).toHaveLength(0);
     expect(lines(parts)).toHaveLength(2);
   });
 
@@ -78,21 +93,44 @@ describe("a selection marquee against a zone being drawn", () => {
     zones.draw([box("z1")], null);
 
     const parts = drawn(zones.root, 0);
-    expect(meshes(parts).length).toBeGreaterThan(0);
+    expect(sheets(parts).length).toBeGreaterThan(0);
   });
 
   it("dashes the marquee's edge, where a zone's is solid", () => {
     const zones = layer();
     zones.draw([box(MARQUEE_ZONE_ID), box("z1")], null);
 
-    const marquee = lines(drawn(zones.root, 0)).map(
-      (one) => (one as THREE.Line).material.constructor.name,
+    const dashed = (parts: THREE.Object3D[]) =>
+      lines(parts).some(
+        (one) =>
+          ((one as THREE.Mesh).material as { dashed?: boolean }).dashed ===
+          true,
+      );
+    expect(dashed(drawn(zones.root, 0))).toBe(true);
+    expect(dashed(drawn(zones.root, 1))).toBe(false);
+  });
+
+  it("draws the marquee wide enough to see, which a plain line cannot be", () => {
+    const zones = layer();
+    zones.draw([box(MARQUEE_ZONE_ID), box("z1")], null);
+
+    // Every driver ignores `LineBasicMaterial.linewidth`, so a width that is
+    // honoured means `LineMaterial` and nothing else (issue #2279).
+    const widths = lines(drawn(zones.root, 0)).map((one) => ({
+      material: materialName(one),
+      width: ((one as THREE.Mesh).material as unknown as { linewidth: number })
+        .linewidth,
+    }));
+    expect(widths).toHaveLength(2);
+    for (const one of widths) {
+      expect(one.material).toBe("LineMaterial");
+      expect(one.width).toBeGreaterThan(1);
+    }
+    // The dark line under the white one is the wider of the two, so it shows
+    // either side of it as well as through its gaps.
+    expect(Math.max(...widths.map((one) => one.width))).toBeGreaterThan(
+      Math.min(...widths.map((one) => one.width)),
     );
-    const zone = lines(drawn(zones.root, 1)).map(
-      (one) => (one as THREE.Line).material.constructor.name,
-    );
-    expect(marquee).toContain("LineDashedMaterial");
-    expect(zone).not.toContain("LineDashedMaterial");
   });
 
   it("gives the dashes a length, so they are dashes rather than one long one", () => {
@@ -101,9 +139,12 @@ describe("a selection marquee against a zone being drawn", () => {
 
     const dashed = lines(drawn(zones.root, 0)).find(
       (one) =>
-        (one as THREE.Line).material.constructor.name === "LineDashedMaterial",
-    ) as THREE.Line;
-    const material = dashed.material as THREE.LineDashedMaterial;
+        ((one as THREE.Mesh).material as { dashed?: boolean }).dashed === true,
+    ) as THREE.Mesh;
+    const material = dashed.material as unknown as {
+      dashSize: number;
+      gapSize: number;
+    };
     expect(material.dashSize).toBeGreaterThan(0);
     expect(material.gapSize).toBe(material.dashSize);
     // Thirty-two dashes and thirty-two gaps round a 400 by 400 box: a dash is a
@@ -116,7 +157,7 @@ describe("a selection marquee against a zone being drawn", () => {
     zones.draw([box(MARQUEE_ZONE_ID)], null);
 
     const colours = lines(drawn(zones.root, 0)).map((one) =>
-      ((one as THREE.Line).material as THREE.LineBasicMaterial).color.getHex(),
+      ((one as THREE.Mesh).material as THREE.LineBasicMaterial).color.getHex(),
     );
     expect(colours).not.toContain(0x38bdf8);
     expect(colours).not.toContain(0x86efac);
@@ -130,7 +171,7 @@ describe("a selection marquee against a zone being drawn", () => {
     zones.draw([box(MARQUEE_ZONE_ID)], null);
 
     const colours = lines(drawn(zones.root, 0)).map((one) =>
-      ((one as THREE.Line).material as THREE.LineBasicMaterial).color.getHex(),
+      ((one as THREE.Mesh).material as THREE.LineBasicMaterial).color.getHex(),
     );
     expect(colours).not.toContain(0x7dd3fc);
   });
@@ -168,6 +209,6 @@ describe("a selection marquee against a zone being drawn", () => {
     zones.draw([box("z1")], null);
 
     expect(zones.root.children).toHaveLength(1);
-    expect(meshes(drawn(zones.root, 0)).length).toBeGreaterThan(0);
+    expect(sheets(drawn(zones.root, 0)).length).toBeGreaterThan(0);
   });
 });
