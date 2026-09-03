@@ -89,6 +89,8 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_zones.lua"] = module("luarules/mission_runtime/coilbox_zones.lua"),
 		["luarules/mission_runtime/coilbox_vars.lua"] = module("luarules/mission_runtime/coilbox_vars.lua"),
 		["luarules/mission_runtime/coilbox_groups.lua"] = module("luarules/mission_runtime/coilbox_groups.lua"),
+		["luarules/mission_runtime/coilbox_economy.lua"] = module("luarules/mission_runtime/coilbox_economy.lua"),
+		["luarules/mission_runtime/coilbox_call.lua"] = module("luarules/mission_runtime/coilbox_call.lua"),
 		["luarules/mission_runtime/coilbox_objectives.lua"] = module(
 			"luarules/mission_runtime/coilbox_objectives.lua"),
 		["luarules/mission_runtime/coilbox_gameover.lua"] = module(
@@ -550,11 +552,29 @@ function M.newEngine(modOptions, files, options)
 				end
 				return snap(x), 0, snap(z)
 			end,
+			-- The bank and what the team can hold, under the engine's own four
+			-- spellings: "m" and "e" are the level, "ms" and "es" the ceiling.
 			SetTeamResource = function(team, kind, amount)
 				bank(team)[kind] = amount
 			end,
+			-- Recorded rather than banked, and deliberately: what the runtime hands
+			-- out is a running total here, which is what `start_test.lua` reads to
+			-- say the free income arrived and how much of it. A real engine would
+			-- credit the bank, and the bank in this stub is what SetTeamResource
+			-- wrote and nothing else.
+			--
+			-- The clamp is the engine's, and it is the whole reason a drain cannot
+			-- go through this call: Spring.AddTeamResource takes max(0, amount), so
+			-- it can only ever hand resources out.
 			AddTeamResource = function(team, kind, amount)
-				drip(team)[kind] = drip(team)[kind] + amount
+				drip(team)[kind] = drip(team)[kind] + (amount > 0 and amount or 0)
+			end,
+			-- Current level, then how much the team can hold. The rest of the
+			-- engine's nine returns are pull, income, expense, share, sent,
+			-- received and excess, none of which the runtime reads.
+			GetTeamResources = function(team, kind)
+				local short = kind == "metal" and "m" or "e"
+				return bank(team)[short], bank(team)[short .. "s"] or 0
 			end,
 			SetGameRulesParam = function(name, value)
 				-- A nil value erases the param, the way the engine's own does.

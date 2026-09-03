@@ -20,6 +20,11 @@
 -- on the map and stay whoever's they are, and the mission stops ordering them
 -- (issue #812).
 --
+-- `build_unit` is here rather than in a module of its own because it is an
+-- order, and this is where the runtime orders the mission's units. It names its
+-- builder the way a `guard` or an `attack` names its target, out of the same
+-- table, so an actor, a named base building and a group all work.
+--
 -- This module calls the engine, to create, order and hand over units. The
 -- layout of a spawned block is coilbox_start.lua's, and the creation itself is
 -- the gadget's, so the suppression window and the ground read stay in one place.
@@ -402,6 +407,59 @@ function M.register(engine, state, hooks)
 		end
 	end
 
+	--- Tell one of the mission's units to build something. This is `build_unit`.
+	--
+	-- The builder is named the way an order target is, so an actor, a named base
+	-- building or a group all work and a group builds one each.
+	--
+	-- A build order is the negative of the unit def id, which is the command a
+	-- player's own build click gives. With a position it is a site on the map,
+	-- put through the engine's build grid the way every other building the
+	-- runtime places is. With no position it is the same order given to a
+	-- factory, which is what queues a unit in one: a factory has nowhere to put a
+	-- building, so where is the whole difference between the two.
+	--
+	-- Each of `count` is a separate order with no options on it. The engine reads
+	-- the shift and control keys on a build order as "five of these" and "twenty
+	-- of these", so one order is exactly one unit.
+	--
+	-- Queued rather than replacing, because a mission adding a building to a
+	-- builder's list should not cancel the road it is halfway through laying.
+	function handle.build(name, unitDef, pos, facing, count)
+		local def = UnitDefNames[unitDef]
+		if not def then
+			engine:report("build-def:" .. tostring(unitDef), "error", string.format(
+				"build_unit names %s, which this game has no unit def for", tostring(unitDef)))
+			return
+		end
+
+		local builders = targetsOf(name)
+		if #builders == 0 then
+			return
+		end
+
+		local how = math.floor(tonumber(count) or 1)
+		if how < 1 then
+			how = 1
+		end
+		local face = math.floor(tonumber(facing) or 0)
+
+		local params = {}
+		if pos then
+			-- A scenario carries no height, and a building does not go where it is
+			-- dropped: the engine snaps it to the build grid and answers with the
+			-- height a builder would have used.
+			local x, y, z = Spring.Pos2BuildPos(def.id, pos.x, 0, pos.z, face)
+			params = { x, y, z, face }
+		end
+
+		for _, unitID in ipairs(builders) do
+			for _ = 1, how do
+				Spring.GiveOrderToUnit(unitID, -def.id, params, QUEUED)
+			end
+		end
+	end
+
 	--- A unit is gone. Fed from the gadget's UnitDestroyed, so a group's roll is
 	-- the units that are actually standing and a wiped group can be sent again.
 	function handle.removed(unitID)
@@ -459,6 +517,10 @@ function M.register(engine, state, hooks)
 
 	engine:addAction("release_group", function(params)
 		handle.release(params.group)
+	end)
+
+	engine:addAction("build_unit", function(params)
+		handle.build(params.builder, params.unitDef, params.pos, params.facing, params.count)
 	end)
 
 	return handle

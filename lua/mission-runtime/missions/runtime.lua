@@ -51,8 +51,31 @@
 -- picked, so a scenario that gates anything asks for 6 and one that gates
 -- nothing still asks for whatever it asked for before.
 
+-- 7 adds five actions and one format feature, in one version because they were
+-- written together and a game chasing six floors for one release is worse than
+-- a game chasing one (issue #2422):
+--
+--   * call_lua calls a function the game already has, by dotted name
+--   * build_unit tells one of the mission's units to build something, at a
+--     point or into a factory queue
+--   * give_resources moves a team's bank once, up for a gift and down for a
+--     drain
+--   * set_income says what a team is paid per second from now on, which a
+--     negative number turns into a continuous bleed
+--   * give_storage moves how much a team can hold
+--   * a condition may carry `negate = true`, and then it holds when the type
+--     underneath it does not. That is how a mission asks whether something has
+--     not happened, which is what a bonus objective for finishing without
+--     building something is made of. A negated condition is polled whatever the
+--     type underneath it watches.
+--
+-- A runtime behind 7 has no implementation for any of the five actions, so each
+-- reports itself once and does nothing, and it reads past the negation and
+-- answers the question the right way up, which is the exact opposite of the
+-- mission that was written. So a scenario using any of them asks for 7.
+
 return {
-	version = 6,
+	version = 7,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
@@ -89,5 +112,10 @@ return {
 		"map_marker",
 		"victory",
 		"defeat",
+		"call_lua",
+		"build_unit",
+		"give_resources",
+		"set_income",
+		"give_storage",
 	},
 }
