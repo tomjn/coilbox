@@ -17,10 +17,14 @@
 import { Blocks } from "lucide-react";
 import { useMemo } from "react";
 import { blueprintArrival } from "@/blueprint/arrival";
-import type { StoredBlueprint } from "@/blueprint/library";
+import type { Footprint } from "@/blueprint/footprint";
+import { footprintsFromUnits, type StoredBlueprint } from "@/blueprint/library";
+import { LayoutThumb } from "@/blueprint/pages/components/LayoutThumb";
+import { blueprintPayload } from "@/blueprint/transfer";
 import type { KnownUnits } from "@/blueprint/units";
 import { unknownBuildings, unknownUnitsWarning } from "@/blueprint/units";
 import type { InstalledGameInfo } from "@/container/gameIdentity";
+import type { UnitDatasetEntry } from "@/content/bindings";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
 import {
@@ -81,6 +85,43 @@ export function layoutPlacement(
   return { name: arrival.name, notes: arrival.notes };
 }
 
+/**
+ * A plan of what one option would place, for the picker to list it by.
+ *
+ * A name and a building count say how big a base is and nothing about its
+ * shape, so choosing between four saved bases meant placing each one to find
+ * out which was which. This is the drawing the library's own cards use, at the
+ * size a dropdown row has room for.
+ *
+ * A library layout carries its own footprints, so it draws at the right size
+ * wherever it came from. A scenario's own has none stored: they are worked out
+ * from the game's units here, the same way saving one to the library works them
+ * out. With the units unread every building falls back to one build square,
+ * which is a rough plan rather than no plan.
+ */
+function optionPreview(
+  scenario: Scenario,
+  records: readonly StoredBlueprint[],
+  value: string,
+  footprintOf: ((def: string) => Footprint | undefined) | undefined,
+) {
+  const choice = parseLayoutChoice(value);
+  if (!choice) return null;
+  const payload =
+    choice.from === "library"
+      ? (records.find((one) => one.id === choice.id)?.layout ?? null)
+      : (() => {
+          const layout = scenario.blueprints.find((b) => b.id === choice.id);
+          return layout ? blueprintPayload(layout, { footprintOf }) : null;
+        })();
+  if (!payload || payload.buildings.length === 0) return null;
+  return (
+    <span className="flex size-10 shrink-0 items-center justify-center">
+      <LayoutThumb layout={payload} />
+    </span>
+  );
+}
+
 export function LayoutPlacer({
   scenario,
   records,
@@ -89,6 +130,7 @@ export function LayoutPlacer({
   placement,
   team,
   onTeam,
+  units,
 }: {
   scenario: Scenario;
   records: readonly StoredBlueprint[];
@@ -99,10 +141,21 @@ export function LayoutPlacer({
    *  one, so this is empty only when the scenario has no participants. */
   team: string;
   onTeam: (team: string) => void;
+  /** The game's units, for the footprints a scenario's own layout is drawn at.
+   *  Empty until the dataset has been read, and then each building is drawn as
+   *  one build square. */
+  units: readonly UnitDatasetEntry[];
 }) {
+  const footprintOf = useMemo(() => footprintsFromUnits([...units]), [units]);
   const options = useMemo(
-    () => layoutOptions(scenario, records, scenario.setup.gameName),
-    [scenario, records],
+    () =>
+      layoutOptions(scenario, records, scenario.setup.gameName).map(
+        (option) => ({
+          ...option,
+          preview: optionPreview(scenario, records, option.value, footprintOf),
+        }),
+      ),
+    [scenario, records, footprintOf],
   );
   const participants = scenario.setup.participants;
 

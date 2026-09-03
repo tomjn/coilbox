@@ -810,6 +810,7 @@ const layoutsMode: EditorMode = {
           placement={placement}
           team={owner}
           onTeam={setTeam}
+          units={units}
         />
       ),
     };
