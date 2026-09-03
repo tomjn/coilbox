@@ -30,6 +30,12 @@ import {
 import type { ReactNode } from "react";
 
 import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { modKeyLabel } from "@/scenario/pages/components/history";
 
 /**
@@ -109,71 +115,103 @@ export function HistoryControls({
  * out, so the pair does not change size as the selection moves between kinds.
  */
 export function SelectionTools({
-  turnable,
-  turnHint,
   count,
   deleteLabel = "Delete",
+  turnNote,
   onTurn,
   onTurnPreview,
   onDelete,
 }: {
-  /** Whether there is anything here that turns. A zone and a path point do
-   *  not, and neither offers `onTurn` at all. */
-  turnable: boolean;
-  /** Why it cannot be turned, when it cannot. */
-  turnHint?: string;
   /** How many things the buttons will act on, when it is more than one, so a
    *  Delete that removes six says six (issue #2279). */
   count?: number;
   /** What the delete is of, for its tooltip: a point on a path rather than the
    *  thing itself. */
   deleteLabel?: string;
-  /** Left out by a selection with nothing to turn, and then only the delete is
-   *  drawn. */
+  /**
+   * What the outlined square the turn is offering means, as
+   * {@link turnNoteText} words it, or null when there is none to explain.
+   *
+   * A third line of the turn's own tooltip rather than a bar of its own
+   * somewhere else on the surface. It is only ever said while the pointer is on
+   * this button, which is where a tooltip already is, and a note that appeared
+   * across the view was answering a question about a control the reader was
+   * looking at rather than reading.
+   */
+  turnNote?: string | null;
+  /**
+   * Left out by a selection with nothing that turns, and then only the delete
+   * is drawn.
+   *
+   * Left out rather than drawn disabled. A tool that cannot be used is one more
+   * thing to read past, and the rail is read at a glance: what is in it is what
+   * can be done to what is selected.
+   */
   onTurn?: () => void;
   onTurnPreview?: (on: boolean) => void;
   onDelete: () => void;
 }) {
   const all = count === undefined ? "" : ` all ${count}`;
 
+  // Its own provider, so the component carries its tooltips wherever it is put
+  // rather than only working inside a surface that happens to have one.
   return (
-    <ButtonGroup orientation="vertical">
-      {onTurn && (
-        <Button
-          size="icon"
-          variant="outline"
-          className="bg-card"
-          onClick={onTurn}
-          disabled={!turnable}
-          aria-label={`Turn${all || " a quarter turn"}`}
-          title={
-            !turnable
-              ? turnHint
-              : count === undefined
-                ? "Turn a quarter turn"
-                : "Turn everything selected that turns a quarter turn. A group and a zone do not."
-          }
-          onPointerEnter={() => onTurnPreview?.(true)}
-          onPointerLeave={() => onTurnPreview?.(false)}
-          onFocus={() => onTurnPreview?.(true)}
-          onBlur={() => onTurnPreview?.(false)}
-        >
-          <RotateCw className="size-3.5" />
-        </Button>
-      )}
-      <Button
-        size="icon"
-        variant="outline"
-        className="bg-card text-destructive hover:text-destructive"
-        onClick={onDelete}
-        aria-label={`${deleteLabel}${all}`}
-        title={
-          count === undefined ? deleteLabel : `Delete all ${count} of them`
-        }
-      >
-        <Trash2 className="size-3.5" />
-      </Button>
-    </ButtonGroup>
+    <TooltipProvider>
+      <ButtonGroup orientation="vertical">
+        {onTurn && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="outline"
+                className="bg-card"
+                onClick={onTurn}
+                aria-label={`Turn${all || " a quarter turn"}`}
+                onPointerEnter={() => onTurnPreview?.(true)}
+                onPointerLeave={() => onTurnPreview?.(false)}
+                onFocus={() => onTurnPreview?.(true)}
+                onBlur={() => onTurnPreview?.(false)}
+              >
+                <RotateCw className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-64">
+              <p className="font-medium">Turn{all}</p>
+              <p className="opacity-80">
+                {count === undefined
+                  ? "A quarter turn. A unit faces one of four ways and nothing in between."
+                  : "Everything selected that turns, a quarter turn. A group and a zone do not."}
+              </p>
+              {turnNote && <p className="opacity-80">{turnNote}</p>}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              className="bg-card text-destructive hover:text-destructive"
+              onClick={onDelete}
+              aria-label={`${deleteLabel}${all}`}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-64">
+            <p className="font-medium">
+              {deleteLabel}
+              {all}
+            </p>
+            {count !== undefined && (
+              <p className="opacity-80">
+                Everything selected goes, not just the one the bar names.
+              </p>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </ButtonGroup>
+    </TooltipProvider>
   );
 }
 
@@ -281,12 +319,30 @@ export function SelectionBar({
 }
 
 /**
- * What the outlined square beside a selected building means (issue #1541).
+ * What the outlined square beside a selected building means (issue #1541), in
+ * words. Null when nobody is considering a turn, and then there is nothing to
+ * say.
  *
  * The squares are the answer and this is what ties them to the button the
  * pointer is on. Both cases are said, because most buildings are square and a
  * turn leaves those exactly where they are: a control that draws something for
  * some buildings and nothing for others otherwise reads as broken.
+ *
+ * The sentence lives here rather than in either of the two things that show it,
+ * a rail tooltip and {@link TurnNote}'s bar, so a surface that moved its turn
+ * into the rail and one that did not say the same thing about the same squares.
+ */
+export function turnNoteText(moves: boolean | null): string | null {
+  if (moves === null) return null;
+  return moves
+    ? "Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square."
+    : "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move.";
+}
+
+/**
+ * {@link turnNoteText} as a bar over the surface, for an editor whose Turn is
+ * still a button in the selection bar rather than a tool in a rail. A rail
+ * says the same thing in the turn's own tooltip.
  */
 export function TurnNote({
   moves,
@@ -295,12 +351,11 @@ export function TurnNote({
    *  considering a turn, and then nothing is said. */
   moves: boolean | null;
 }) {
-  if (moves === null) return null;
+  const said = turnNoteText(moves);
+  if (!said) return null;
   return (
     <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-      {moves
-        ? "Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square."
-        : "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."}
+      {said}
     </p>
   );
 }

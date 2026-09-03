@@ -72,7 +72,7 @@ import {
   PlaybackBar,
   SelectionBar,
   SelectionTools,
-  TurnNote,
+  turnNoteText,
 } from "@/placement/SurfaceBars";
 import {
   focusCamera,
@@ -1089,19 +1089,30 @@ export const ScenarioMapScene = forwardRef<
    */
   const tools = picked
     ? {
-        // A selection of several always has a Turn to offer, because "turn what
-        // turns" is a thing to do even when this one is a group. On its own the
-        // button says why it cannot.
-        turnable: actingOn !== undefined || canTurn(picked.key),
-        turnHint: "A group's units all face south",
         count: actingOn,
-        onTurnPreview: setTurning,
-        onTurn: () =>
-          onChange((doc) =>
-            selection.length > 1
-              ? turnSelection(doc, selection, 1, layoutEdit)
-              : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
-          ),
+        // A selection of several always has a Turn to offer, because "turn what
+        // turns" is a thing to do even when this one is a group. On its own,
+        // one that cannot turn is offered no turn at all: a group's units all
+        // face south, and a tool that cannot be used is one more thing to read
+        // past.
+        ...(actingOn !== undefined || canTurn(picked.key)
+          ? {
+              onTurnPreview: setTurning,
+              // What the outlined squares beside the building mean, said in the
+              // turn's own tooltip. It is only ever true while the pointer is on
+              // that button, which is where the tooltip already is.
+              turnNote:
+                picked.kind === "base"
+                  ? turnNoteText(turning ? turned.length > 0 : null)
+                  : null,
+              onTurn: () =>
+                onChange((doc) =>
+                  selection.length > 1
+                    ? turnSelection(doc, selection, 1, layoutEdit)
+                    : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
+                ),
+            }
+          : {}),
         onDelete: () => {
           onChange((doc) =>
             selection.length > 1
@@ -1113,7 +1124,6 @@ export const ScenarioMapScene = forwardRef<
       }
     : pickedZone
       ? {
-          turnable: false,
           onDelete: () => {
             onChange((doc) => removeZone(doc, pickedZone.id));
             setSelected(null);
@@ -1121,7 +1131,6 @@ export const ScenarioMapScene = forwardRef<
         }
       : pathRef && selected
         ? {
-            turnable: false,
             deleteLabel: "Delete point",
             onDelete: () => {
               onChange((doc) => removePathWaypoint(doc, selected));
@@ -1485,19 +1494,11 @@ export const ScenarioMapScene = forwardRef<
               )}
             </ScenarioSelectionBar>
           )}
-          {/* What the outlined square beside the selected building is, while a
-              turn is being considered (issue #1541). Nothing for an actor,
-              which stands on no build squares at all.
-
-              Below the bar rather than above it (issue #1716): the note appears
-              while the pointer is on the Turn button, and a note above the bar
-              pushes that button out from under the pointer, which takes the
-              note away, which puts the button back. */}
-          <TurnNote
-            moves={
-              turning && picked?.kind === "base" ? turned.length > 0 : null
-            }
-          />
+          {/* What the outlined square beside the selected building means while
+              a turn is being considered (issue #1541) is `turnNote` on the
+              rail's Turn now. It is only ever said while the pointer is on that
+              button, which is where its tooltip already is, so it does not need
+              a bar of its own across the view. */}
           {drawingPath && pickedGroup && (
             <ClickMapBar
               message={
