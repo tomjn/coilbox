@@ -1,0 +1,235 @@
+id generated-1
+title TG Conquest
+description A procedurally generated conquest of 80 systems.
+game TG
+playerFaction player
+playable player,enemy-1,enemy-2
+faction player name="Iron Vanguard" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Obsidian Accord" color=#ff3524 aggression=0.4335768576245755 side=
+faction enemy-2 name="Gilded Enclave" color=#ffb300 aggression=0.4134130441583693 side=
+node node-0 name="Bellatrix" pos=-22.4,72.5 owner=enemy-2 kind=normal difficulty=5 map="Map 10" star=""
+node node-1 name="Atria" pos=-14,-85.6 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-2 name="Alnair" pos=-44.3,-6.4 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-3 name="Betelgeuse" pos=25,16.9 owner=neutral kind=normal difficulty=5 map="Map 11" star=""
+node node-4 name="Castor" pos=23.7,46.2 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-5 name="Alnitak" pos=-13.5,87.5 owner=enemy-2 kind=capital difficulty=5 map="Map 10" star=""
+node node-6 name="Menkar" pos=83.9,-21.5 owner=neutral kind=normal difficulty=3 map="Map 6" star=""
+node node-7 name="Mintaka" pos=90.8,32.8 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-8 name="Saiph" pos=35.8,-21.6 owner=neutral kind=normal difficulty=3 map="Map 4" star=""
+node node-9 name="Hamal" pos=70.6,-24.9 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+node node-10 name="Suhail" pos=65.6,72.4 owner=neutral kind=normal difficulty=4 map="Map 7" star=""
+node node-11 name="Canopus" pos=-39.2,-65.3 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-12 name="Sargas" pos=0.1,47.7 owner=neutral kind=normal difficulty=5 map="Map 11" star=""
+node node-13 name="Phecda" pos=-65.8,74.8 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-14 name="Acrux" pos=-37.3,50.2 owner=neutral kind=normal difficulty=5 map="Map 10" star=""
+node node-15 name="Rasalhague" pos=-45.7,-31.4 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-16 name="Wezen" pos=-50,64.9 owner=neutral kind=normal difficulty=5 map="Map 11" star=""
+node node-17 name="Capella" pos=-61.4,-71.4 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-18 name="Sirius" pos=-19.7,10.4 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-19 name="Altair" pos=44.6,-37.5 owner=neutral kind=normal difficulty=3 map="Map 6" star=""
+node node-20 name="Dubhe" pos=15.4,65.3 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-21 name="Vega" pos=2.4,-26.2 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+node node-22 name="Adhara" pos=-84.5,-28.1 owner=player kind=capital difficulty=1 map="Map 1" star=""
+node node-23 name="Gacrux" pos=-38.5,70.2 owner=neutral kind=normal difficulty=5 map="Map 10" star=""
+node node-24 name="Regulus" pos=5.1,-57.7 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-25 name="Alcor" pos=53.4,-14.5 owner=neutral kind=normal difficulty=3 map="Map 4" star=""
+node node-26 name="Avior" pos=62.2,-41.3 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+node node-27 name="Rigel" pos=81.7,-0.8 owner=neutral kind=normal difficulty=3 map="Map 6" star=""
+node node-28 name="Alnilam" pos=82.1,15.8 owner=enemy-1 kind=normal difficulty=3 map="Map 4" star=""
+node node-29 name="Polaris" pos=-56.8,-55.4 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-30 name="Kochab" pos=-68.2,-29.3 owner=player kind=normal difficulty=1 map="Map 1" star=""
+node node-31 name="Sadr" pos=75.1,31.8 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-32 name="Fomalhaut" pos=-27.7,-87.6 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+node node-33 name="Antares" pos=7.6,84.9 owner=enemy-2 kind=normal difficulty=4 map="Map 7" star=""
+node node-34 name="Achernar" pos=28.1,-52.5 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-35 name="Alkaid" pos=17.3,-35.6 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+node node-36 name="Merak" pos=-68.3,48.8 owner=neutral kind=normal difficulty=5 map="Map 11" star=""
+node node-37 name="Deneb" pos=-50.6,-15.9 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-38 name="Alphard" pos=-49.5,78.2 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-39 name="Naos" pos=-30.6,90.9 owner=enemy-2 kind=normal difficulty=5 map="Map 10" star=""
+node node-40 name="Pollux" pos=-10.6,67.1 owner=neutral kind=normal difficulty=5 map="Map 11" star=""
+node node-41 name="Spica" pos=-59.4,-3.2 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-42 name="Arcturus" pos=37.7,91.4 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-43 name="Algol" pos=13.4,25.3 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-44 name="Nunki" pos=-21.7,-60.9 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-45 name="Denebola" pos=-39.9,-83 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-46 name="Shaula" pos=86.8,26.6 owner=enemy-1 kind=normal difficulty=4 map="Map 7" star=""
+node node-47 name="Aldebaran" pos=-1.8,-92.4 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-48 name="Procyon" pos=38.6,30.9 owner=neutral kind=normal difficulty=5 map="Map 10" star=""
+node node-49 name="Mizar" pos=99,12.5 owner=enemy-1 kind=capital difficulty=5 map="Map 11" star=""
+node node-50 name="Bellatrix II" pos=18.9,55.4 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-51 name="Atria II" pos=81.4,53 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-52 name="Alnair II" pos=-36.7,-75 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-53 name="Betelgeuse II" pos=66.1,8.8 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+node node-54 name="Castor II" pos=46.2,-56.7 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+node node-55 name="Alnitak II" pos=-68.5,-42.1 owner=player kind=normal difficulty=1 map="Map 1" star=""
+node node-56 name="Menkar II" pos=-78.4,62.1 owner=neutral kind=normal difficulty=5 map="Map 10" star=""
+node node-57 name="Mintaka II" pos=-67.7,62.9 owner=neutral kind=normal difficulty=5 map="Map 11" star=""
+node node-58 name="Saiph II" pos=-68.9,-54.9 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-59 name="Hamal II" pos=-45.9,-43.5 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-60 name="Suhail II" pos=-57.3,-18.4 owner=player kind=normal difficulty=1 map="Map 0" star=""
+node node-61 name="Canopus II" pos=-49.4,-74.4 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-62 name="Sargas II" pos=-31,-38.8 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-63 name="Phecda II" pos=-13.7,76 owner=enemy-2 kind=normal difficulty=5 map="Map 9" star=""
+node node-64 name="Acrux II" pos=-18.6,57.7 owner=neutral kind=normal difficulty=5 map="Map 10" star=""
+node node-65 name="Rasalhague II" pos=25.1,-41.2 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-66 name="Wezen II" pos=70.4,-4.9 owner=neutral kind=normal difficulty=3 map="Map 6" star=""
+node node-67 name="Capella II" pos=-35.4,15.7 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-68 name="Sirius II" pos=-47.3,8.7 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-69 name="Altair II" pos=44.1,-25.1 owner=neutral kind=normal difficulty=3 map="Map 4" star=""
+node node-70 name="Dubhe II" pos=-30.8,-66.3 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+node node-71 name="Vega II" pos=-43.5,20.3 owner=neutral kind=normal difficulty=1 map="Map 1" star=""
+node node-72 name="Adhara II" pos=71,55.5 owner=neutral kind=normal difficulty=4 map="Map 7" star=""
+node node-73 name="Gacrux II" pos=67.3,-57.8 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+node node-74 name="Regulus II" pos=20,70.4 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-75 name="Alcor II" pos=93.8,-4.9 owner=enemy-1 kind=normal difficulty=3 map="Map 6" star=""
+node node-76 name="Avior II" pos=28.2,-31.8 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-77 name="Rigel II" pos=85.5,-42 owner=neutral kind=normal difficulty=3 map="Map 4" star=""
+node node-78 name="Alnilam II" pos=-70.6,11.5 owner=neutral kind=normal difficulty=1 map="Map 0" star=""
+node node-79 name="Polaris II" pos=58.3,-26.1 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+link node-20 node-74
+link node-37 node-60
+link node-7 node-46
+link node-11 node-70
+link node-45 node-52
+link node-8 node-69
+link node-0 node-63
+link node-67 node-71
+link node-40 node-63
+link node-35 node-65
+link node-65 node-76
+link node-11 node-52
+link node-4 node-50
+link node-20 node-50
+link node-52 node-70
+link node-44 node-70
+link node-51 node-72
+link node-56 node-57
+link node-2 node-37
+link node-5 node-63
+link node-35 node-76
+link node-34 node-65
+link node-28 node-46
+link node-27 node-66
+link node-15 node-59
+link node-13 node-57
+link node-68 node-71
+link node-29 node-58
+link node-9 node-79
+link node-17 node-61
+link node-19 node-69
+link node-40 node-64
+link node-25 node-79
+link node-16 node-23
+link node-27 node-75
+link node-8 node-76
+link node-52 node-61
+link node-55 node-58
+link node-31 node-46
+link node-45 node-61
+link node-30 node-55
+link node-0 node-40
+link node-32 node-45
+link node-16 node-38
+link node-23 node-38
+link node-11 node-61
+link node-6 node-9
+link node-67 node-68
+link node-1 node-32
+link node-1 node-47
+link node-25 node-69
+link node-36 node-57
+link node-69 node-79
+link node-3 node-43
+link node-53 node-66
+link node-50 node-74
+link node-0 node-64
+link node-41 node-60
+link node-30 node-60
+link node-2 node-68
+link node-2 node-41
+link node-37 node-41
+link node-32 node-52
+link node-59 node-62
+link node-26 node-79
+link node-7 node-31
+link node-29 node-59
+link node-22 node-30
+link node-0 node-23
+link node-15 node-37
+link node-15 node-62
+link node-27 node-28
+link node-18 node-67
+link node-13 node-38
+link node-36 node-56
+link node-17 node-29
+link node-28 node-49
+link node-26 node-73
+link node-19 node-76
+link node-5 node-39
+link node-0 node-5
+link node-28 node-31
+link node-28 node-53
+link node-21 node-35
+link node-29 node-55
+link node-16 node-57
+link node-10 node-72
+link node-19 node-79
+link node-13 node-56
+link node-11 node-44
+link node-19 node-26
+link node-17 node-58
+link node-49 node-75
+link node-8 node-19
+link node-9 node-26
+link node-27 node-53
+link node-41 node-78
+link node-34 node-54
+link node-46 node-49
+link node-8 node-25
+link node-33 node-74
+link node-19 node-54
+link node-6 node-75
+link node-14 node-16
+link node-3 node-48
+link node-25 node-66
+link node-14 node-23
+link node-0 node-39
+link node-34 node-35
+link node-14 node-64
+link node-12 node-50
+link node-44 node-52
+link node-6 node-77
+link node-20 node-33
+link node-54 node-73
+link node-12 node-64
+link node-22 node-55
+link node-5 node-33
+link node-4 node-48
+link node-23 node-39
+link node-31 node-51
+link node-12 node-40
+link node-7 node-51
+link node-9 node-77
+link node-4 node-43
+link node-26 node-77
+link node-68 node-78
+link node-24 node-34
+link node-44 node-62
+link node-31 node-72
+link node-73 node-77
+link node-16 node-36
+link node-10 node-51
+link node-1 node-52
+link node-24 node-35
+link node-43 node-48
+link node-18 node-71
+link node-32 node-47
+link node-21 node-76
+link node-42 node-74
+link node-18 node-68
+link node-71 node-78
+link node-22 node-60
+link node-33 node-42
+link node-10 node-42
+link node-24 node-47

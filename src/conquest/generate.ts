@@ -10,7 +10,11 @@ import { hashString, mulberry32, pick, type Rng } from "./rng";
  * Procedural galaxy generation — the fallback when a game ships no authored
  * galaxy. Produces the exact same {@link GalaxyDoc} shape, so everything
  * downstream is agnostic to how a galaxy was made. Fully deterministic from
- * the seed; the wizard offers a reroll by changing it.
+ * the seed, and the wizard offers a reroll by changing it.
+ *
+ * That determinism has to hold across engines, since a shared challenge sends
+ * the seed rather than the galaxy. `galaxyGolden.test.ts` keeps a checked-in
+ * galaxy per layout to hold the claim to it.
  */
 
 /** Minimal structural shapes of installed content (keeps this module pure). */

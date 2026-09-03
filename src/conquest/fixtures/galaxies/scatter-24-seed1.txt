@@ -1,0 +1,76 @@
+id generated-1
+title TG Conquest
+description A procedurally generated conquest of 24 systems.
+game TG
+playerFaction player
+playable player,enemy-1,enemy-2
+faction player name="Fractured Assembly" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Frozen Coalition" color=#ff3524 aggression=0.4171708470210433 side=
+faction enemy-2 name="Azure Concord" color=#ffb300 aggression=0.3157144950237125 side=
+node node-0 name="Alcor" pos=79.2,1.4 owner=enemy-1 kind=normal difficulty=5 map="Map 10" star=""
+node node-1 name="Bellatrix" pos=-14.3,-77 owner=neutral kind=normal difficulty=4 map="Map 7" star=""
+node node-2 name="Suhail" pos=-95.8,27.7 owner=player kind=capital difficulty=1 map="Map 1" star=""
+node node-3 name="Castor" pos=-30.7,21.2 owner=player kind=normal difficulty=1 map="Map 0" star=""
+node node-4 name="Antares" pos=42.1,11.6 owner=enemy-1 kind=normal difficulty=4 map="Map 8" star=""
+node node-5 name="Spica" pos=23.1,-73.3 owner=neutral kind=normal difficulty=5 map="Map 11" star=""
+node node-6 name="Arcturus" pos=-24.7,-38 owner=neutral kind=normal difficulty=3 map="Map 5" star=""
+node node-7 name="Regulus" pos=30.6,81.5 owner=enemy-2 kind=capital difficulty=5 map="Map 9" star=""
+node node-8 name="Naos" pos=2.2,-48.9 owner=neutral kind=normal difficulty=4 map="Map 7" star=""
+node node-9 name="Algol" pos=-3.3,35.5 owner=enemy-2 kind=normal difficulty=2 map="Map 2" star=""
+node node-10 name="Dubhe" pos=52.5,-58.9 owner=enemy-1 kind=normal difficulty=5 map="Map 10" star=""
+node node-11 name="Alnilam" pos=83.6,-36.9 owner=enemy-1 kind=capital difficulty=5 map="Map 11" star=""
+node node-12 name="Alphard" pos=13.5,-14.6 owner=neutral kind=normal difficulty=4 map="Map 8" star=""
+node node-13 name="Aldebaran" pos=-70,-14 owner=player kind=normal difficulty=1 map="Map 1" star=""
+node node-14 name="Deneb" pos=-33.5,66.1 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+node node-15 name="Rasalhague" pos=-47.7,-66.9 owner=neutral kind=normal difficulty=3 map="Map 6" star=""
+node node-16 name="Canopus" pos=-19.2,35.1 owner=neutral kind=normal difficulty=2 map="Map 2" star=""
+node node-17 name="Mintaka" pos=84.7,27.8 owner=neutral kind=normal difficulty=4 map="Map 7" star=""
+node node-18 name="Shaula" pos=12.6,5.7 owner=neutral kind=normal difficulty=3 map="Map 4" star=""
+node node-19 name="Atria" pos=18,-91.8 owner=neutral kind=normal difficulty=5 map="Map 9" star=""
+node node-20 name="Vega" pos=42.6,64 owner=enemy-2 kind=normal difficulty=3 map="Map 5" star=""
+node node-21 name="Hamal" pos=-14,96.7 owner=enemy-2 kind=normal difficulty=3 map="Map 6" star=""
+node node-22 name="Wezen" pos=-78.8,10.1 owner=player kind=normal difficulty=1 map="Map 0" star=""
+node node-23 name="Nunki" pos=-79.8,-49.9 owner=neutral kind=normal difficulty=2 map="Map 3" star=""
+link node-9 node-16
+link node-3 node-16
+link node-5 node-19
+link node-12 node-18
+link node-7 node-20
+link node-2 node-22
+link node-13 node-22
+link node-0 node-17
+link node-6 node-8
+link node-4 node-18
+link node-3 node-9
+link node-5 node-8
+link node-1 node-8
+link node-5 node-10
+link node-9 node-18
+link node-14 node-16
+link node-1 node-15
+link node-1 node-19
+link node-8 node-12
+link node-14 node-21
+link node-15 node-23
+link node-6 node-15
+link node-13 node-23
+link node-10 node-11
+link node-0 node-4
+link node-0 node-11
+link node-4 node-12
+link node-1 node-6
+link node-9 node-14
+link node-3 node-14
+link node-4 node-17
+link node-8 node-19
+link node-7 node-21
+link node-10 node-19
+link node-2 node-13
+link node-3 node-22
+link node-4 node-20
+link node-9 node-20
+link node-17 node-20
+link node-6 node-23
+link node-7 node-9
+link node-4 node-11
+link node-2 node-3
