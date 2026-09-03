@@ -91,8 +91,99 @@ export function HistoryControls({
 }
 
 /**
- * What is selected, and the two things that can be done to it that a drag
- * cannot: turn it a quarter turn, and delete it.
+ * The two things that can be done to a selection that a drag cannot: turn it a
+ * quarter turn, and delete it. Drawn as a group at the foot of the surface's
+ * rail rather than as words in the bar that names the selection.
+ *
+ * They moved out of that bar because they are tools rather than facts. The bar
+ * says what is selected, which changes as the selection does and is read. These
+ * two are pressed, and a control that is pressed belongs where the other
+ * pressable things are, at a place on screen that does not move when the
+ * selection changes shape. The bar keeps the naming and the per-kind controls.
+ *
+ * Only drawn when something is selected, so the rail is the modes alone while
+ * nothing is.
+ *
+ * A group's units are spawned facing south together, so there is nothing to
+ * turn on one. That button is disabled with the reason on it rather than left
+ * out, so the pair does not change size as the selection moves between kinds.
+ */
+export function SelectionTools({
+  turnable,
+  turnHint,
+  count,
+  deleteLabel = "Delete",
+  onTurn,
+  onTurnPreview,
+  onDelete,
+}: {
+  /** Whether there is anything here that turns. A zone and a path point do
+   *  not, and neither offers `onTurn` at all. */
+  turnable: boolean;
+  /** Why it cannot be turned, when it cannot. */
+  turnHint?: string;
+  /** How many things the buttons will act on, when it is more than one, so a
+   *  Delete that removes six says six (issue #2279). */
+  count?: number;
+  /** What the delete is of, for its tooltip: a point on a path rather than the
+   *  thing itself. */
+  deleteLabel?: string;
+  /** Left out by a selection with nothing to turn, and then only the delete is
+   *  drawn. */
+  onTurn?: () => void;
+  onTurnPreview?: (on: boolean) => void;
+  onDelete: () => void;
+}) {
+  const all = count === undefined ? "" : ` all ${count}`;
+
+  return (
+    <ButtonGroup orientation="vertical">
+      {onTurn && (
+        <Button
+          size="icon"
+          variant="outline"
+          className="bg-card"
+          onClick={onTurn}
+          disabled={!turnable}
+          aria-label={`Turn${all || " a quarter turn"}`}
+          title={
+            !turnable
+              ? turnHint
+              : count === undefined
+                ? "Turn a quarter turn"
+                : "Turn everything selected that turns a quarter turn. A group and a zone do not."
+          }
+          onPointerEnter={() => onTurnPreview?.(true)}
+          onPointerLeave={() => onTurnPreview?.(false)}
+          onFocus={() => onTurnPreview?.(true)}
+          onBlur={() => onTurnPreview?.(false)}
+        >
+          <RotateCw className="size-3.5" />
+        </Button>
+      )}
+      <Button
+        size="icon"
+        variant="outline"
+        className="bg-card text-destructive hover:text-destructive"
+        onClick={onDelete}
+        aria-label={`${deleteLabel}${all}`}
+        title={
+          count === undefined ? deleteLabel : `Delete all ${count} of them`
+        }
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+    </ButtonGroup>
+  );
+}
+
+/**
+ * What is selected: what it is, and the controls for whatever kind of thing it
+ * is.
+ *
+ * Turning and deleting are {@link SelectionTools} on a surface that has a rail
+ * to put them in. A surface without one passes `onTurn` and `onDelete` here and
+ * gets them in the bar, which is where both used to be for everybody.
  *
  * A group's units are spawned facing south together, so there is nothing to turn
  * on one, and the button says so rather than disappearing.
@@ -121,10 +212,11 @@ export function SelectionBar({
    * says "Delete" and removes six things is a button that lied about itself.
    */
   count?: number;
-  turnable: boolean;
+  turnable?: boolean;
   /** Why it cannot be turned, when it cannot. */
   turnHint?: string;
-  onTurn: () => void;
+  /** Left out by a surface whose rail carries the turn instead. */
+  onTurn?: () => void;
   /**
    * Whether the turn is being considered, which is what draws where it would
    * put the building (issue #1541).
@@ -134,49 +226,56 @@ export function SelectionBar({
    * keyboard deserves the same warning as one taken with the mouse.
    */
   onTurnPreview?: (on: boolean) => void;
-  onDelete: () => void;
+  /** Left out by a surface whose rail carries the delete instead. */
+  onDelete?: () => void;
   /** Controls for what kind of thing this is: an actor's team and its
    *  overrides, a base's queue, a layout's build order. */
   children?: ReactNode;
 }) {
   return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card p-1 pl-2">
       <span className="font-mono text-[11px]">
         {def}
         <span className="ml-1.5 text-muted-foreground">{what}</span>
       </span>
       {children}
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs"
-        onClick={onTurn}
-        disabled={!turnable}
-        title={
-          !turnable
-            ? turnHint
-            : count === undefined
-              ? "Turn a quarter turn"
-              : "Turn everything selected that turns a quarter turn. A group and a zone do not."
-        }
-        onPointerEnter={() => onTurnPreview?.(true)}
-        onPointerLeave={() => onTurnPreview?.(false)}
-        onFocus={() => onTurnPreview?.(true)}
-        onBlur={() => onTurnPreview?.(false)}
-      >
-        <RotateCw className="size-3.5" /> Turn
-        {count === undefined ? "" : " all"}
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-        onClick={onDelete}
-        title={count === undefined ? undefined : `Delete all ${count} of them`}
-      >
-        <Trash2 className="size-3.5" /> Delete
-        {count === undefined ? "" : ` ${count}`}
-      </Button>
+      {onTurn && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1.5 px-2 text-xs"
+          onClick={onTurn}
+          disabled={!turnable}
+          title={
+            !turnable
+              ? turnHint
+              : count === undefined
+                ? "Turn a quarter turn"
+                : "Turn everything selected that turns a quarter turn. A group and a zone do not."
+          }
+          onPointerEnter={() => onTurnPreview?.(true)}
+          onPointerLeave={() => onTurnPreview?.(false)}
+          onFocus={() => onTurnPreview?.(true)}
+          onBlur={() => onTurnPreview?.(false)}
+        >
+          <RotateCw className="size-3.5" /> Turn
+          {count === undefined ? "" : " all"}
+        </Button>
+      )}
+      {onDelete && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+          onClick={onDelete}
+          title={
+            count === undefined ? undefined : `Delete all ${count} of them`
+          }
+        >
+          <Trash2 className="size-3.5" /> Delete
+          {count === undefined ? "" : ` ${count}`}
+        </Button>
+      )}
     </div>
   );
 }

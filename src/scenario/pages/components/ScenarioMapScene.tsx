@@ -5,7 +5,6 @@ import {
   Loader2,
   MapPin,
   MountainSnow,
-  Trash2,
   Unplug,
 } from "lucide-react";
 import {
@@ -72,6 +71,7 @@ import {
   HistoryControls,
   PlaybackBar,
   SelectionBar,
+  SelectionTools,
   TurnNote,
 } from "@/placement/SurfaceBars";
 import {
@@ -1068,6 +1068,75 @@ export const ScenarioMapScene = forwardRef<
     if (entry) pickEntryRef.current(entry);
   }, [focus?.id, focus?.token]);
 
+  /**
+   * How many things Turn and Delete will act on, when it is more than one.
+   * Undefined for a selection of one, and then both read as they always did.
+   */
+  const actingOn =
+    selection.length > 1 ? countSelection(selection).total : undefined;
+
+  /**
+   * What the rail's bottom group acts on, or null when nothing is selected.
+   *
+   * One set of tools for three kinds of selection, because "delete what is
+   * selected" is one thought however many kinds of thing can be selected. Only
+   * a placement turns: a zone is a footprint with no facing, and a point on a
+   * path is a point.
+   *
+   * Read in the order the surface reads a selection: a placement first, then a
+   * zone, then a point on a path. Exactly one of the three can be true at once,
+   * because all three are read off the same selected key.
+   */
+  const tools = picked
+    ? {
+        // A selection of several always has a Turn to offer, because "turn what
+        // turns" is a thing to do even when this one is a group. On its own the
+        // button says why it cannot.
+        turnable: actingOn !== undefined || canTurn(picked.key),
+        turnHint: "A group's units all face south",
+        count: actingOn,
+        onTurnPreview: setTurning,
+        onTurn: () =>
+          onChange((doc) =>
+            selection.length > 1
+              ? turnSelection(doc, selection, 1, layoutEdit)
+              : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
+          ),
+        onDelete: () => {
+          onChange((doc) =>
+            selection.length > 1
+              ? removeSelection(doc, selection, layoutEdit)
+              : removePlacement(doc, picked.key, layoutEdit(picked.id)),
+          );
+          setSelected(null);
+        },
+      }
+    : pickedZone
+      ? {
+          turnable: false,
+          onDelete: () => {
+            onChange((doc) => removeZone(doc, pickedZone.id));
+            setSelected(null);
+          },
+        }
+      : pathRef && selected
+        ? {
+            turnable: false,
+            deleteLabel: "Delete point",
+            onDelete: () => {
+              onChange((doc) => removePathWaypoint(doc, selected));
+              // Back to the path the point belonged to rather than to nothing,
+              // so its other points keep their knobs and a path being drawn is
+              // still being drawn.
+              setSelected(
+                pickedGroup
+                  ? placementKey("group", pathRef.groupId, 0)
+                  : pathLineKey(pathRef.groupId),
+              );
+            },
+          }
+        : null;
+
   /** What is shown instead of the map when there is no map to show. */
   const stand =
     status === "no-map" ? (
@@ -1152,7 +1221,10 @@ export const ScenarioMapScene = forwardRef<
 
            Undo and redo ride at the top of the same rail, one gap clear of the
            modes: both act on the document, and a pair in the far corner was the
-           only thing over the map that did. */
+           only thing over the map that did. Turn and delete ride at the bottom
+           the same way, and only while there is something to act on. Three
+           groups: what you did, what you are doing, and what you are doing it
+           to, which is how the unit builder's viewport stacks its own. */
         <TooltipProvider>
           <div className="flex flex-col gap-2">
             {history && <HistoryControls {...history} vertical />}
@@ -1187,6 +1259,7 @@ export const ScenarioMapScene = forwardRef<
                 </Tooltip>
               ))}
             </ButtonGroup>
+            {tools && <SelectionTools {...tools} />}
           </div>
         </TooltipProvider>
       }
@@ -1238,34 +1311,10 @@ export const ScenarioMapScene = forwardRef<
             />
           )}
           {picked && (
-            <ScenarioSelectionBar
-              placement={picked}
-              // Everything selected, so the buttons say what they will do rather
-              // than naming one thing and doing six (issue #2279). Counted as
-              // an author counts, which is the number the bar above says: a
-              // group is one thing however many of its units the box caught.
-              count={
-                selection.length > 1
-                  ? countSelection(selection).total
-                  : undefined
-              }
-              onTurnPreview={setTurning}
-              onTurn={() =>
-                onChange((doc) =>
-                  selection.length > 1
-                    ? turnSelection(doc, selection, 1, layoutEdit)
-                    : turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
-                )
-              }
-              onDelete={() => {
-                onChange((doc) =>
-                  selection.length > 1
-                    ? removeSelection(doc, selection, layoutEdit)
-                    : removePlacement(doc, picked.key, layoutEdit(picked.id)),
-                );
-                setSelected(null);
-              }}
-            >
+            // Turning and deleting are the rail's now. What is left here is
+            // what the bar was always for: naming what is selected, and the
+            // controls for whatever kind of thing it turned out to be.
+            <ScenarioSelectionBar placement={picked}>
               {pickedActor && (
                 <ActorControls
                   key={pickedActor.id}
@@ -1514,17 +1563,6 @@ export const ScenarioMapScene = forwardRef<
                 pathRef.waypoint + 1
               }`}
               hint="drag it to move it"
-              // Back to the path the point belonged to rather than to nothing, so
-              // its other points keep their knobs and a path being drawn is still
-              // being drawn.
-              onDelete={() => {
-                onChange((doc) => removePathWaypoint(doc, selected));
-                setSelected(
-                  pickedGroup
-                    ? placementKey("group", pathRef.groupId, 0)
-                    : pathLineKey(pathRef.groupId),
-                );
-              }}
             >
               {groupControls}
             </PathBar>
@@ -1542,10 +1580,6 @@ export const ScenarioMapScene = forwardRef<
               onRename={(name) =>
                 onChange((doc) => renameZone(doc, pickedZone.id, name))
               }
-              onDelete={() => {
-                onChange((doc) => removeZone(doc, pickedZone.id));
-                setSelected(null);
-              }}
             />
           )}
         </>
@@ -1637,20 +1671,9 @@ export const ScenarioMapScene = forwardRef<
  */
 function ScenarioSelectionBar({
   placement,
-  count,
-  onTurn,
-  onTurnPreview,
-  onDelete,
   children,
 }: {
   placement: Placement;
-  /** How many things the buttons will act on, when it is more than the one this
-   *  bar names (issue #2279). Left out for a selection of one. */
-  count?: number;
-  onTurn: () => void;
-  /** Whether a turn is being considered, which draws where it would go. */
-  onTurnPreview: (on: boolean) => void;
-  onDelete: () => void;
   /** Controls for what kind of thing this is: an actor's team and its
    *  overrides, and whatever a group or a base grows later. */
   children?: ReactNode;
@@ -1665,15 +1688,6 @@ function ScenarioSelectionBar({
             ? `group unit ${placement.index + 1}`
             : `base building ${placement.index + 1}`
       }
-      count={count}
-      // A selection of several always has a Turn to offer, because "turn what
-      // turns" is a thing to do even when this one is a group. On its own the
-      // button says why it cannot.
-      turnable={count !== undefined || canTurn(placement.key)}
-      turnHint="A group's units all face south"
-      onTurn={onTurn}
-      onTurnPreview={onTurnPreview}
-      onDelete={onDelete}
     >
       {children}
     </SelectionBar>
@@ -1747,11 +1761,9 @@ function SelectionCountBar({
 export function ZoneBar({
   zone,
   onRename,
-  onDelete,
 }: {
   zone: ScenarioZone;
   onRename: (name: string) => void;
-  onDelete: () => void;
 }) {
   const [name, setName] = useFieldText(zone.name);
   const { halfX, halfZ } = zoneExtent(zone);
@@ -1784,14 +1796,6 @@ export function ZoneBar({
       <span className="text-[11px] text-muted-foreground">
         drag the orange handle to move it, a white one to resize it
       </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-        onClick={onDelete}
-      >
-        <Trash2 className="size-3.5" /> Delete
-      </Button>
     </div>
   );
 }
@@ -1921,32 +1925,18 @@ function PointFields({
 function PathBar({
   what,
   hint,
-  onDelete,
   children,
 }: {
   what: string;
   hint: string;
-  /** Left out when a whole path is what is selected rather than one of its
-   *  points, because a path is deleted by deleting the order that holds it. */
-  onDelete?: () => void;
   /** The group's controls: its team, its units and its orders. */
   children?: ReactNode;
 }) {
   return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card p-1 pl-2">
       <span className="font-mono text-[11px]">{what}</span>
       {children}
       <span className="text-[11px] text-muted-foreground">{hint}</span>
-      {onDelete && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="size-3.5" /> Delete point
-        </Button>
-      )}
     </div>
   );
 }

@@ -57,6 +57,8 @@ The map is drawn as a 3D scene from the same terrain data the content browser pr
 
 The column of buttons down the left of the scene decides what a click on the ground does. Hover one for its name, what it makes, and the number key that reaches it. The mode's own controls, a unit picker or a count, appear in a bar along the top while that mode is on.
 
+Undo and redo sit at the top of the same column. Turn and delete appear at the bottom of it whenever something is selected, and act on the whole selection. The bar along the top says what is selected and carries that thing's own controls.
+
 | Mode | What it does |
 | --- | --- |
 | **Pan** | Where the editor opens. Drag to move the view. Nothing is placed, and a click still selects. |
@@ -75,9 +77,9 @@ In Select and Zones the left button is taken by the drag that draws, so middle-d
 
 Click a thing to select it, then **drag it to move it**. Dragging one of a group's units moves the whole group, and dragging a base's building moves it within the base. Dragging a zone moves it, and dragging its handles resizes it.
 
-Rotation is the **Turn** button in the selection bar, which turns a quarter turn at a time. A unit faces one of four ways and nothing in between, which is what the engine gives a placed unit. A group's units all face south and cannot be turned individually.
+Rotation is the **Turn** button at the foot of the mode rail, which turns a quarter turn at a time. A unit faces one of four ways and nothing in between, which is what the engine gives a placed unit. A group's units all face south and cannot be turned individually, so the button says so rather than disappearing. **Delete** is beside it, and a zone has only that one: a zone is a footprint with no facing.
 
-The selection bar also has **Delete**, and says what is selected.
+Both act on everything selected, and the bar along the top says what that is.
 
 There is no Save button and no undo. Every change is written to disk as you make it. Text fields commit when you leave them or press Enter, sliders when you let go, and a drag when you release it.
 
