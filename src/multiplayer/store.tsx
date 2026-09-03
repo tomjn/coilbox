@@ -90,6 +90,7 @@ import {
   newZerokInstallId,
   ZEROK_INSTALL_ID_KEY,
 } from "./clientId";
+import { DebriefingDrawer } from "./DebriefingDrawer";
 import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
@@ -542,6 +543,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // queued (never dropped) rather than overwriting each other; the dialog shows the
   // front and dismissing pops it.
   const [serverMsgBoxes, setServerMsgBoxes] = useState<string[]>([]);
+
+  // The game whose result the debriefing drawer is open on, or null when it is
+  // shut. The result itself lives in the snapshot, so this only decides whether
+  // to show it: holding the id rather than a flag means the next game's
+  // debriefing opens the drawer again after this one was dismissed.
+  const [debriefingShown, setDebriefingShown] = useState<number | null>(null);
 
   // Transient "just launched the game" set, populated off `playerWentIngame`
   // deltas and drained per-name after a short delay, so battle rows can flash as a
@@ -1283,6 +1290,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             else void notify({ title: "Server message", body: d.text });
           }
         }
+        // A game we played has finished and the server has said what it did to
+        // everybody's rating. Only the id is recorded: the result itself is in
+        // the snapshot that follows, and the drawer waits for it. Zero-K only
+        // (issue #2003).
+        else if (d.kind === "debriefingReceived") {
+          setDebriefingShown(d.battleId);
+        }
         queueSnapshot(d);
       }
       // The server can pause a new account's first login on the agreement/
@@ -1860,6 +1874,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       <ServerMessageBoxDialog
         text={serverMsgBoxes[0] ?? null}
         onDismiss={() => setServerMsgBoxes((q) => q.slice(1))}
+      />
+      <DebriefingDrawer
+        open={
+          debriefingShown != null &&
+          mirror.state?.debriefing?.battleId === debriefingShown
+        }
+        report={mirror.state?.debriefing ?? null}
+        myUsername={mirror.state?.myUsername ?? null}
+        onClose={() => setDebriefingShown(null)}
       />
     </MultiplayerContext.Provider>
   );

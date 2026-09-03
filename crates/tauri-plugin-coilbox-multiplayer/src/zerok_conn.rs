@@ -44,7 +44,9 @@ use crate::conn::{
 use crate::dmlog::DmLog;
 use crate::tls::ConnectError;
 use crate::turn::TurnAnswer;
-use crate::{lock_or_recover, zerok_battles, zerok_chat, zerok_room, zerok_users};
+use crate::{
+    lock_or_recover, zerok_battles, zerok_chat, zerok_debriefing, zerok_room, zerok_users,
+};
 
 /// How long the socket may be idle before the kernel starts probing, and how far
 /// apart the probes go.
@@ -324,6 +326,7 @@ async fn run_loop(
                         let mut held = lock_or_recover(&state);
                         let mut deltas = zerok_users::reduce(&mut held, &message);
                         deltas.extend(zerok_battles::reduce(&mut held, &message));
+                        deltas.extend(zerok_debriefing::reduce(&mut held, &message));
                         let (room, room_replies) = zerok_room::reduce(&mut held, &message);
                         deltas.extend(room);
                         let (chat, chat_replies) = zerok_chat::reduce(&mut held, &message, now);

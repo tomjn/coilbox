@@ -59,6 +59,92 @@ impl Rating {
     }
 }
 
+/// What the server said about a game that has just finished (issue #2003).
+///
+/// Zero-K only. It is the one protocol coilbox speaks that reports a result at
+/// all: a Zero-K server sends `BattleDebriefing` to everybody who played, and
+/// neither TASServer nor Tachyon has anything of the kind, so this stays `None`
+/// on both.
+///
+/// The rating numbers are whole points, rounded on the way in, for the same
+/// reason [`Rating`] holds whole points. Upstream clips a ladder change to
+/// between 1 and 50 points either way (`GlobalConst.LadderEloMinChange` and
+/// `LadderEloMaxChange`), so the fraction it sends is below what anybody reads.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Debriefing {
+    /// The server's own number for the game, which is what its page on the
+    /// website is keyed by. A different number from the lobby battle id: that
+    /// one names a room, this one names a game that was played in it.
+    pub battle_id: i32,
+    /// The page with the result and the replay on it, where the server gave one.
+    pub url: Option<String>,
+    /// Whatever the server had to say, which is normally why a game did not
+    /// count: cheats were on, or it never started.
+    pub message: Option<String>,
+    /// Which rating this game counted toward, by the server's own name for it:
+    /// `Casual`, `MatchMaking` or `Planetwars`. `None` where it counted toward
+    /// none, which the server says by leaving the category at `Unrated`.
+    pub rating_category: Option<String>,
+    /// The chat channel the server put everybody who played into, so the game
+    /// can be talked over after it. Matchmaker games only: an ordinary custom
+    /// battle gets a debriefing with no channel on it.
+    pub chat_channel: Option<String>,
+    /// One row per player, by side and then by name. The server sends a map
+    /// keyed by name and a map has no order, so the order is put on here rather
+    /// than read off the wire. Spectators are not in it, because the server
+    /// leaves them out.
+    pub players: Vec<DebriefingPlayer>,
+}
+
+/// How one player came out of the game.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebriefingPlayer {
+    /// The name the rest of the app knows them by, which is the key the server
+    /// filed them under.
+    pub name: String,
+    /// Which side they were on, so the rows can be grouped the way the game was.
+    pub ally: i32,
+    pub won: bool,
+    /// What the game did to their rating, in whole points. `None` where the
+    /// game counted toward no rating, which the server says by sending a
+    /// category of `Unrated` and no rating at all.
+    pub rating_change: Option<i32>,
+    /// Their rating now, in whole points. `None` on an unrated game, where the
+    /// server sends -1 rather than a rating.
+    pub rating: Option<i32>,
+    /// Their rank now, 0 to 7.
+    pub rank: i32,
+    /// Whether this game moved them up a rank or down one.
+    pub ranked_up: bool,
+    pub ranked_down: bool,
+    /// The rating that would take them up a rank, and the one that would take
+    /// them down. `None` on an unrated game, for the same reason as `rating`.
+    pub next_rank_rating: Option<i32>,
+    pub prev_rank_rating: Option<i32>,
+    /// Experience, which goes up for playing rather than for winning, so it
+    /// moves on a game that counted toward no rating at all.
+    pub xp_change: i32,
+    pub xp: i32,
+    /// What the game handed them, such as most damage dealt.
+    pub awards: Vec<DebriefingAward>,
+}
+
+/// One award a player earned in the game.
+///
+/// No number on it. The server stores an award with a key and a description and
+/// nothing else (`BattleResultHandler.StoreAwards`), and the description is the
+/// game's own wording, which already carries the figure where there is one.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebriefingAward {
+    /// The server's identifier for the award, such as `mostDamage`.
+    pub key: String,
+    /// What to show, in the game's own words.
+    pub description: String,
+}
+
 /// The kind of a chat message, so the frontend can render it appropriately.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -414,6 +500,10 @@ pub struct LobbyState {
     /// A live SPADS autohost vote in the current battle, or `None` when none is
     /// open. Parsed from the bot's battle chat; drives the vote panel.
     pub current_vote: Option<Vote>,
+    /// The result of the last game this connection played, or `None` before one
+    /// has finished. Always `None` on a TASServer or a Tachyon connection,
+    /// neither of which reports a result. See [`Debriefing`].
+    pub debriefing: Option<Debriefing>,
     /// Our intended per-battle status + team colour, authoritative for answering
     /// `REQUESTBATTLESTATUS`. Set when we open a battle (host defaults to player)
     /// and updated on every status push (spectate/ready/sync/colour), so a server

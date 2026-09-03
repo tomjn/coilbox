@@ -65,8 +65,9 @@ vi.mock("./ringEffect", () => ({ triggerRing: () => {} }));
 vi.mock("./ingameCue", () => ({ triggerIngameCue: () => {} }));
 vi.mock("./chat/mentionCue", () => ({ triggerMentionCue: () => {} }));
 
-// The provider renders three of its own dialogs. They read the context this is
+// The provider renders four of its own dialogs. They read the context this is
 // testing and drag in the whole component library with them.
+vi.mock("./DebriefingDrawer", () => ({ DebriefingDrawer: () => null }));
 vi.mock("./MatchFoundPanel", () => ({ MatchFoundPanel: () => null }));
 vi.mock("./ServerMessageBoxDialog", () => ({
   ServerMessageBoxDialog: () => null,

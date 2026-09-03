@@ -277,6 +277,15 @@ pub enum Delta {
     /// SPADS vote arrives as a chat line, so the `ChatMessage` for that line is
     /// already the signal, and Tachyon holds its votes on the lobby.
     VoteChanged,
+    /// A game we played has finished and the server has said what it did to
+    /// everybody's rating. [`crate::LobbyState::debriefing`] carries the result.
+    ///
+    /// Only ever produced on a Zero-K connection, which is the only protocol
+    /// that reports one. Carries the server's number for the game so a repeat of
+    /// the same debriefing can be told from the next game's.
+    DebriefingReceived {
+        battle_id: i32,
+    },
 }
 
 /// Apply a server message to the lobby state, returning the deltas produced.

@@ -36,8 +36,9 @@ pub use reduce::{
     begin_channel_list, push_chat, push_dm, record_outgoing_private, reduce, reduce_at, Delta,
 };
 pub use state::{
-    Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MatchFound, MatchQueue,
-    Matchmaking, MemberStatus, Party, Rating, StartRect, TurnCredentials, User, Vote,
+    Battle, Bot, ChannelState, ChatKind, ChatMsg, Debriefing, DebriefingAward, DebriefingPlayer,
+    DirChannel, LobbyState, MatchFound, MatchQueue, Matchmaking, MemberStatus, Party, Rating,
+    StartRect, TurnCredentials, User, Vote,
 };
 pub use status::{
     default_battle_status, team_color_from_rgb, team_color_rgb, BattleStatus, ClientStatus,
