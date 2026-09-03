@@ -115,6 +115,20 @@ body,
   margin: 0;
 }
 
+/* Themed scrollbars (#2376). picoframe's `color-scheme` (theme.css) only picks
+   between the browser's two built-in scrollbar palettes, so a themed scrollbar
+   still needs `scrollbar-color` set explicitly. `--border` already tracks
+   light/dark and the active base/accent, so the thumb re-themes with everything
+   else instead of being hard-coded. `thin` narrows the permanent strip Windows
+   and Linux draw down every scrolling region. macOS's overlay scrollbar hides
+   the same strip at rest, which is why this went unnoticed there. Inherited, so
+   one declaration at the root covers every `overflow-auto`/`overflow-scroll`
+   region in the app, including the ones added after this. */
+:root {
+  scrollbar-color: hsl(var(--border)) transparent;
+  scrollbar-width: thin;
+}
+
 /* Fade-in used by the game header art layer (referenced via animate-[fadein_...]). */
 @keyframes fadein {
   from {
