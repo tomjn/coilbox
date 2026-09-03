@@ -168,8 +168,8 @@ export function StepRow({
   onPick: (target: PointTarget | null) => void;
   /** Set one parameter, or take it out when the value is undefined. */
   onParam: (name: string, value: ScenarioParam | undefined) => void;
-  /** Read this condition the other way round, or null on an
-   *  action, which has no truth to turn over. */
+  /** Read this condition the other way round, or null on an action, which has
+   *  no truth to turn over. */
   onNegate: ((negate: boolean) => void) | null;
   /** Move the step within its list, or null where order carries no meaning. */
   onMove: ((delta: number) => void) | null;

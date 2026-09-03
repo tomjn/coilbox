@@ -275,11 +275,11 @@ end
 -- never an error out of the callin that led here.
 --
 -- `condition.negate` turns a real answer over, which is how a mission asks
--- whether something has *not* happened. Only a real answer: a
--- condition nothing implements and one that raised are false whichever way
--- round they are read, because both are the runtime saying it does not know
--- rather than saying no. Negating either would turn a broken trigger into one
--- that fires on the first frame.
+-- whether something has *not* happened. Only a real answer: a condition nothing
+-- implements and one that raised are false whichever way round they are read,
+-- because both are the runtime saying it does not know rather than saying no.
+-- Negating either would turn a broken trigger into one that fires on the first
+-- frame.
 function Engine:test(condition)
 	local kind = tostring(condition.type)
 	local spec = self.conditions[condition.type]

@@ -419,9 +419,9 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   /** Issue #812. A runtime behind 3 ignores it and goes on ordering a squad the
    *  mission handed the player. */
   release_group: 3,
-  /** Five actions and one format feature, all landing in 7. A
-   *  runtime behind it has no implementation for any of them, so each is a
-   *  trigger that reports itself once and does nothing. */
+  /** Five actions and one format feature, all landing in 7. A runtime behind
+   *  it has no implementation for any of them, so each is a trigger that
+   *  reports itself once and does nothing. */
   call_lua: 7,
   build_unit: 7,
   give_resources: 7,

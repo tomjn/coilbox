@@ -126,10 +126,10 @@ function asksForAnUncontestedHold(scenario: Scenario): boolean {
 const DIFFICULTY_VERSION = 6;
 
 /**
- * The runtime that first read a negated condition. A runtime
- * behind this reads past the flag and answers the question the right way up, so
- * "the player has not built a factory" holds the moment they build one, which is
- * the exact opposite of the mission that was written.
+ * The runtime that first read a negated condition. A runtime behind this reads
+ * past the flag and answers the question the right way up, so "the player has
+ * not built a factory" holds the moment they build one, which is the exact
+ * opposite of the mission that was written.
  */
 const NEGATED_CONDITION_VERSION = 7;
 

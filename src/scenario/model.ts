@@ -322,8 +322,8 @@ export type TriggerStep = {
   type: string;
   params: Record<string, ScenarioParam>;
   /**
-   * Hold when this condition does not. Only read on a condition,
-   * because an action has no truth to turn over.
+   * Hold when this condition does not. Only read on a condition, because an
+   * action has no truth to turn over.
    *
    * A flag on the step rather than a `not_built` type per condition: "the
    * player has not built X" is the same question `unit_built` already asks,
