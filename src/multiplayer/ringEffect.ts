@@ -1,4 +1,4 @@
-import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
+import { announce, flashTaskbar, getAudioContext } from "./soundCue";
 
 /**
  * Reaction to an autohost `!ring` (a `Delta::Ring` from the lobby). Autohosts ring
@@ -14,35 +14,6 @@ import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 
 const REVERB_CLASS = "ring-reverb";
 const GONG_DURATION_S = 1.8;
-
-// A single AudioContext is reused across rings. WKWebView/WebView2 can hand it back
-// "suspended" until a user gesture, so we resume on first interaction (below) and
-// again defensively before each gong.
-let audioCtx: AudioContext | null = null;
-
-type WebkitWindow = { webkitAudioContext?: typeof AudioContext };
-
-function getAudioContext(): AudioContext | null {
-  if (audioCtx) return audioCtx;
-  const Ctor =
-    window.AudioContext ??
-    (window as unknown as WebkitWindow).webkitAudioContext;
-  if (!Ctor) return null;
-  audioCtx = new Ctor();
-  return audioCtx;
-}
-
-// Unlock audio on the first user gesture so a later network-triggered ring can play
-// without a gesture of its own. Lobby users will have clicked/typed long before any
-// ring arrives, so this normally resolves well ahead of time.
-function unlockAudioOnce() {
-  const ctx = getAudioContext();
-  if (ctx && ctx.state === "suspended") void ctx.resume();
-  window.removeEventListener("pointerdown", unlockAudioOnce);
-  window.removeEventListener("keydown", unlockAudioOnce);
-}
-window.addEventListener("pointerdown", unlockAudioOnce, { once: true });
-window.addEventListener("keydown", unlockAudioOnce, { once: true });
 
 /**
  * A gong is inharmonic: partials sit at non-integer ratios of the fundamental and each
@@ -122,29 +93,6 @@ function playReverb() {
   window.setTimeout(clear, 2000);
 }
 
-// The gong + shake are non-verbal, so announce the ring to assistive tech via a
-// single reused visually-hidden live region.
-let liveRegion: HTMLElement | null = null;
-function announce(text: string) {
-  if (!liveRegion) {
-    liveRegion = document.createElement("div");
-    liveRegion.setAttribute("aria-live", "assertive");
-    liveRegion.setAttribute("role", "alert");
-    liveRegion.style.cssText =
-      "position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;";
-    document.body.appendChild(liveRegion);
-  }
-  liveRegion.textContent = text;
-}
-
-function flashTaskbar() {
-  // No focus check: the OS treats this as a no-op / auto-clears it when the window is
-  // already focused, which is exactly the AFK semantics we want.
-  getCurrentWindow()
-    .requestUserAttention(UserAttentionType.Critical)
-    .catch((e) => console.warn("ring: requestUserAttention failed", e));
-}
-
 /**
  * Fire every ring affordance, saying what for. Anything that has to reach a
  * player who may have wandered off uses this: an autohost ring, and a
@@ -153,8 +101,8 @@ function flashTaskbar() {
 export function triggerAttention(announcement: string) {
   playGong();
   playReverb();
-  flashTaskbar();
-  announce(announcement);
+  flashTaskbar("ring", true);
+  announce(announcement, true);
 }
 
 /**
