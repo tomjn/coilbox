@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { toast } from "sonner";
 
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -37,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { notify } from "@/notify/notify";
 import { aimPoint } from "../aimPoint";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES, restAngleWarnings } from "../animPresets";
@@ -458,8 +458,10 @@ function Builder({ id }: { id: string | undefined }) {
     try {
       await navigator.clipboard.writeText(serializeClipboardPiece(lifted));
     } catch (e) {
-      toast.error("Couldn't copy to the clipboard", {
-        description: e instanceof Error ? e.message : String(e),
+      void notify({
+        title: "Couldn't copy to the clipboard",
+        body: e instanceof Error ? e.message : String(e),
+        level: "error",
       });
     }
   }
@@ -471,8 +473,10 @@ function Builder({ id }: { id: string | undefined }) {
     try {
       text = await navigator.clipboard.readText();
     } catch (e) {
-      toast.error("Couldn't read the clipboard", {
-        description: e instanceof Error ? e.message : String(e),
+      void notify({
+        title: "Couldn't read the clipboard",
+        body: e instanceof Error ? e.message : String(e),
+        level: "error",
       });
       return;
     }
@@ -480,14 +484,19 @@ function Builder({ id }: { id: string | undefined }) {
     const knownPartIds = new Set(pack.parts.map((part) => part.id));
     const result = parseClipboardPiece(text, knownPartIds);
     if (!result.ok) {
-      toast.error("Couldn't paste", { description: result.reason });
+      void notify({
+        title: "Couldn't paste",
+        body: result.reason,
+        level: "error",
+      });
       return;
     }
     if (result.piece.missingParts.length > 0) {
       const count = result.piece.missingParts.length;
-      toast.warning(
-        `Pasted, but ${count} ${count === 1 ? "piece isn't" : "pieces aren't"} in this pack and won't show geometry until reassigned.`,
-      );
+      void notify({
+        title: `Pasted, but ${count} ${count === 1 ? "piece isn't" : "pieces aren't"} in this pack and won't show geometry until reassigned.`,
+        level: "warning",
+      });
     }
 
     const inserted = doc.insert(
