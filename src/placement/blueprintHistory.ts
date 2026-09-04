@@ -43,7 +43,7 @@ import { blueprintDocument, documentLayout } from "./blueprintDocument";
 export type LayoutEdit = (current: Scenario) => Scenario;
 
 /** The layout an edit makes of the one it is applied to. */
-export function editedLayout(
+function editedLayout(
   current: BaseBlueprint,
   gameName: string,
   edit: LayoutEdit,

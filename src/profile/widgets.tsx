@@ -44,9 +44,6 @@ export const WIDGET_REGISTRY: Record<string, (arg?: string) => ReactNode> = {
   "faction-button": (arg) => <BuildTreeEmbed arg={arg} mode="buttons" />,
 };
 
-/** The names a distribution can embed — used by docs/validation. */
-export const WIDGET_NAMES = Object.keys(WIDGET_REGISTRY);
-
 /**
  * Render one `@widget/<name>` token. An unknown name renders a visible placeholder (not
  * a crash or a silent blank) so a typo in a distribution's markdown is obvious.

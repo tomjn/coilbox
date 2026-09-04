@@ -964,11 +964,6 @@ export const mpJoinBattle = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_join_battle");
 
-export const mpJoinBattleDeny = defineCommand<
-  { serverKey: string; username: string; reason?: string | null },
-  { sent: boolean }
->("coilbox-multiplayer", "mp_join_battle_deny");
-
 export const mpLeaveBattle = defineCommand<
   { serverKey: string },
   { sent: boolean }

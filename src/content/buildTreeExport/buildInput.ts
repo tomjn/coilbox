@@ -44,7 +44,7 @@ function kindOf(
 }
 
 /** Build one faction's exported scene from its commander's reachable graph. */
-export function buildFaction(
+function buildFaction(
   side: Side,
   edges: Map<string, string[]>,
   fullByName: Map<string, string>,
