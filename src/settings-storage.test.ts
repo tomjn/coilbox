@@ -36,13 +36,13 @@ const backend = vi.hoisted(() => {
   };
 });
 
-vi.mock("./uberstress/bindings", () => ({
-  usSettingsLoad: async () => ({ entries: {} }),
-  usSettingsSave: ({ entries }: { entries: Record<string, string> }) => {
-    backend.saved.push({ ...entries });
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (command: string, args?: { entries: Record<string, string> }) => {
+    if (command === "app_settings_load") return Promise.resolve({});
+    backend.saved.push({ ...args?.entries });
     return new Promise((resolve, reject) => {
       backend.waiting.push({
-        release: () => resolve({}),
+        release: () => resolve(undefined),
         fail: () => reject(new Error("disk full")),
       });
     });

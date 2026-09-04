@@ -1,9 +1,9 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
   type FlushableSettingsStorage,
   installSettingsStorage,
 } from "./lib/storedSetting";
 import { notify } from "./notify/notify";
-import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
 
 /**
  * A Tauri-app-data-backed `SettingsStorage` for the frame's `useSetting`. The
@@ -11,8 +11,9 @@ import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
  * IO is async, so we hydrate an in-memory cache once at boot and treat it as the
  * source of truth: `get` reads the cache; `set` updates it and fires an async
  * write-through that persists the whole map (serialized so rapid edits can't
- * interleave). The persistence command lives in the uberstress plugin crate —
- * the only settings consumer today; it would move app-level if others appear.
+ * interleave). The persistence commands (`app_settings_load` / `app_settings_save`)
+ * are app-level, in `src-tauri/src/settings.rs`, not a plugin. Twenty-nine settings
+ * sections across a dozen plugins go through them, so no one plugin should own them.
  *
  * `flush` is how anything that cares about the file rather than the cache waits
  * for that write to land. See `settingsWritten` in `./lib/storedSetting`.
@@ -28,10 +29,10 @@ import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
 export async function createTauriSettingsStorage(): Promise<FlushableSettingsStorage> {
   const cache = new Map<string, string>();
   try {
-    const { entries } = await usSettingsLoad(undefined);
+    const entries = await invoke<Record<string, string>>("app_settings_load");
     for (const [k, v] of Object.entries(entries)) cache.set(k, v);
   } catch (e) {
-    console.error("uberstress: failed to load settings; starting empty", e);
+    console.error("settings: failed to load settings; starting empty", e);
   }
 
   // Whether the save before this one failed, so a disk that has stopped taking
@@ -42,12 +43,12 @@ export async function createTauriSettingsStorage(): Promise<FlushableSettingsSto
   const persist = () => {
     const entries = Object.fromEntries(cache);
     queue = queue.then(() =>
-      usSettingsSave({ entries }).then(
+      invoke("app_settings_save", { entries }).then(
         () => {
           failing = false;
         },
         (e) => {
-          console.error("uberstress: settings save failed", e);
+          console.error("settings: save failed", e);
           if (failing) return;
           failing = true;
           void notify({

@@ -168,17 +168,6 @@ export const usImportReport = defineCommand<{ src: string }, { file: string }>(
   "us_import_report",
 );
 
-/** Whole settings map (opaque JSON-encoded string values), for the frame's SettingsStorage. */
-export const usSettingsLoad = defineCommand<
-  undefined,
-  { entries: Record<string, string> }
->("coilbox-uberstress", "us_settings_load");
-
-export const usSettingsSave = defineCommand<
-  { entries: Record<string, string> },
-  Record<string, never>
->("coilbox-uberstress", "us_settings_save");
-
 export const usSeedSql = defineCommand<
   { count: number; prefix?: string; password?: string },
   { sql: string }

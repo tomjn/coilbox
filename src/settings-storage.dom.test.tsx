@@ -44,15 +44,16 @@ const backend = vi.hoisted(() => {
   };
 });
 
-vi.mock("./uberstress/bindings", () => ({
-  usSettingsLoad: async () => ({ entries: {} }),
-  usSettingsSave: () =>
-    new Promise((resolve, reject) => {
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (command: string) => {
+    if (command === "app_settings_load") return Promise.resolve({});
+    return new Promise((resolve, reject) => {
       backend.waiting.push({
-        release: () => resolve({}),
+        release: () => resolve(undefined),
         fail: () => reject(new Error("No space left on device")),
       });
-    }),
+    });
+  },
 }));
 
 import { installSettingsStorage } from "./lib/storedSetting";
