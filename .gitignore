@@ -35,8 +35,9 @@ docs/mockups/
 docs/reports/
 
 # Working notes from the orchestrate-milestone skill, one file per milestone.
-# The two that were worth keeping (22 and 27) are already committed; the rest are
-# scratch. Root-anchored so a real doc named this elsewhere still shows up.
+# None of them belong in the repo: they are a running log for one orchestration
+# run, not documentation. Root-anchored so a real doc named this elsewhere still
+# shows up.
 /ORCHESTRATION-*.md
 
 # VitePress docs-site build artifacts (the site itself lives in docs/, its output
