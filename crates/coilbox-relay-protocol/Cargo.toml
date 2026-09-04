@@ -10,7 +10,7 @@ license = "MIT"
 # needs. Deliberately no tokio: how the lines are carried is the caller's
 # business, and keeping it out means the coilbox side can depend on this without
 # dragging in the sidecar's TURN stack.
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1"
 
 [dev-dependencies]

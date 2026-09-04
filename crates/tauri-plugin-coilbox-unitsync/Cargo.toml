@@ -14,7 +14,7 @@ tauri-plugin = { version = "2", features = ["build"] }
 [dependencies]
 tauri = { version = "2" }
 base64 = "0.22"
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1"
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }

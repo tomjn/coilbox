@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1"
 # The digest of the embedded document, so a client whose copy has drifted from
 # the hub's finds out rather than looking like it is reporting different facts

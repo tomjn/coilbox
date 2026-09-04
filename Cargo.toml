@@ -69,3 +69,7 @@ debug = "line-tables-only"
 # `cfg(all(target_arch = "aarch64", not(target_env = "msvc")))` and windows-arm64
 # was left on the portable code. None of that is needed here (issue #1757).
 sha2 = "0.11"
+
+# One derive implementation shared by the 25 manifests that serialise config,
+# catalog and protocol types, instead of 25 declarations that can drift apart.
+serde = { version = "1", features = ["derive"] }
