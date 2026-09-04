@@ -13,10 +13,10 @@
  */
 
 import { useEffect, useRef } from "react";
-import { toast } from "sonner";
 
 import { useUnitsyncEngineConfig } from "@/content/config";
 import { engineConfigDir } from "@/content/enginePaths";
+import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import { appFileIO } from "./fileIO";
@@ -66,22 +66,26 @@ export function useWidgetFiles() {
     })
       .then(({ collected, skipped }) => {
         if (collected > 0) {
-          toast.success(
-            collected === 1
-              ? "A blueprint saved in game is in your library."
-              : `${collected} blueprints saved in game are in your library.`,
-          );
+          void notify({
+            title:
+              collected === 1
+                ? "A blueprint saved in game is in your library."
+                : `${collected} blueprints saved in game are in your library.`,
+            level: "success",
+          });
         }
         if (skipped > 0) {
-          toast.warning(
-            `${skipped} ${skipped === 1 ? "entry" : "entries"} in the widget's spool could not be read and ${skipped === 1 ? "was" : "were"} dropped.`,
-          );
+          void notify({
+            title: `${skipped} ${skipped === 1 ? "entry" : "entries"} in the widget's spool could not be read and ${skipped === 1 ? "was" : "were"} dropped.`,
+            level: "warning",
+          });
         }
       })
       .catch((e) => {
-        toast.error(
-          `Could not collect what the widget saved: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        void notify({
+          title: `Could not collect what the widget saved: ${e instanceof Error ? e.message : String(e)}`,
+          level: "error",
+        });
       });
   }, [loading, running, engineDir, engineName]);
 }

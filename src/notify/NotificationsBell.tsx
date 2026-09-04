@@ -17,6 +17,7 @@ import type { NotifyLevel } from "./notify";
 const DOT_CLASS: Record<NotifyLevel, string> = {
   info: "bg-muted-foreground",
   success: "bg-green-500",
+  warning: "bg-amber-500",
   error: "bg-destructive",
 };
 

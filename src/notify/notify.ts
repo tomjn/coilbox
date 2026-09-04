@@ -6,7 +6,7 @@ import { getOsEnabled, getPermGranted } from "./prefs";
 import { route } from "./route";
 
 /** Severity of a notification, mapped to a sonner toast style. */
-export type NotifyLevel = "info" | "success" | "error";
+export type NotifyLevel = "info" | "success" | "warning" | "error";
 
 export interface NotifyInput {
   title: string;
@@ -19,6 +19,7 @@ export interface NotifyInput {
 function showToast({ title, body, level = "info" }: NotifyInput): void {
   const opts = body ? { description: body } : undefined;
   if (level === "success") toast.success(title, opts);
+  else if (level === "warning") toast.warning(title, opts);
   else if (level === "error") toast.error(title, opts);
   else toast(title, opts);
 }

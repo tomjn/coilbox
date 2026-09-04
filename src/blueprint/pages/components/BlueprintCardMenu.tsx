@@ -20,7 +20,6 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Copy, Loader2, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import {
   DropdownMenu,
@@ -29,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { notify } from "@/notify/notify";
 import { duplicatedBlueprint, type StoredBlueprint } from "../../library";
 import { saveBlueprint } from "../../store";
 
@@ -60,7 +60,10 @@ export function BlueprintCardMenu({
           record={record}
           onDone={(saved) => {
             drawer.close();
-            toast.success(`That blueprint is now "${saved.layout.name}".`);
+            void notify({
+              title: `That blueprint is now "${saved.layout.name}".`,
+              level: "success",
+            });
           }}
         />
       ),
@@ -72,9 +75,15 @@ export function BlueprintCardMenu({
     try {
       const copy = duplicatedBlueprint(record, taken);
       await saveBlueprint(copy);
-      toast.success(`"${copy.layout.name}" is yours to change.`);
+      void notify({
+        title: `"${copy.layout.name}" is yours to change.`,
+        level: "success",
+      });
     } catch (e) {
-      toast.error(`That blueprint could not be copied: ${message(e)}`);
+      void notify({
+        title: `That blueprint could not be copied: ${message(e)}`,
+        level: "error",
+      });
     } finally {
       setBusy(false);
     }
