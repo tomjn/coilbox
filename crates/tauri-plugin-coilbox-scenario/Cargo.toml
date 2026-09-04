@@ -23,7 +23,7 @@ uuid = { version = "1", features = ["v4"] }
 # Reading a game's own missions out of the archive it ships them in. `.sdz` is a
 # zip and `.sd7` is 7-zip, the same two readers content and mapconv already use.
 zip = { workspace = true }
-sevenz-rust2 = "0.21.1"
+sevenz-rust2 = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -89,3 +89,7 @@ base64 = "0.22"
 # The .sdz/.zip reader content, mapconv and scenario all use, pinned once
 # instead of three times.
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+
+# The .sd7/7z reader downloads, mapconv and scenario all use, pinned once
+# instead of three times.
+sevenz-rust2 = "0.21.1"

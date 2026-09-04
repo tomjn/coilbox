@@ -24,7 +24,7 @@ coilbox-springlua = { path = "../coilbox-springlua" }
 # Shared dependency-free on-disk byte cache for thumbnails (read-or-compute+write).
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
 zip = { workspace = true }
-sevenz-rust2 = "0.21.1"
+sevenz-rust2 = { workspace = true }
 # Decode source images (texture/heightmap/...) to read true dimensions and build
 # small preview thumbnails. default-features off; only the formats mapconv accepts.
 image = { version = "0.25", default-features = false, features = ["png", "bmp", "tga", "jpeg", "tiff"] }
