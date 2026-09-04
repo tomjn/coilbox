@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use coilbox_unitpose::{unitvalue, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
 
 use crate::cob;
-use crate::opcodes::{mnemonic, opcode};
+use crate::opcodes::opcode;
 
 /// COB's fixed-point scale: 65536ths of an elmo for a distance, and 65536ths
 /// of a full circle for an angle.
@@ -1064,12 +1064,6 @@ impl Run {
         self.rng ^= self.rng << 17;
         self.rng
     }
-}
-
-/// The name of an instruction word, for a message about one that is not.
-#[allow(dead_code)]
-fn name_of(word: u32) -> &'static str {
-    mnemonic(word).unwrap_or("unknown")
 }
 
 #[cfg(test)]
