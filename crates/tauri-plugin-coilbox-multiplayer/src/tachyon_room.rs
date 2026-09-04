@@ -116,6 +116,7 @@ use coilbox_tachyon_protocol::types::{self, LobbyCreateResponse, LobbyDetails, L
 use coilbox_tachyon_protocol::TachyonMessage;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tauri_plugin_coilbox_play::script::BattleConfig;
 use tokio::sync::mpsc;
 
 use crate::tachyon_lobbies::handle_for;
@@ -481,21 +482,26 @@ pub(crate) fn battle_start(
 /// lobby's own engine version. `map.springName` and `game.springName` do, and
 /// are carried, though a client script leaves both out.
 pub(crate) fn battle_config(private: &types::PrivateBattle) -> Value {
-    json!({
-        "mapName": private.map.spring_name,
-        "gameType": private.game.spring_name,
-        "myPlayerName": private.username,
+    let cfg = BattleConfig {
+        map_name: private.map.spring_name.clone(),
+        game_type: private.game.spring_name.clone(),
+        my_player_name: private.username.clone(),
         // Where players start is the game server's business on a client script,
         // so this is the field's default rather than a claim about the match.
-        "startPosType": 0,
-        "players": [],
-        "teams": [],
-        "allyTeams": [],
-        "isHost": false,
-        "hostIp": private.ip,
-        "hostPort": port(private.port),
-        "myPasswd": private.password,
-    })
+        start_pos_type: 0,
+        players: Vec::new(),
+        teams: Vec::new(),
+        ally_teams: Vec::new(),
+        is_host: false,
+        host_ip: Some(private.ip.clone()),
+        host_port: port(private.port),
+        my_passwd: Some(private.password.clone()),
+        ..Default::default()
+    };
+    // `BattleConfig` only carries data serde_json can always represent (strings,
+    // numbers, maps keyed by `String`). A plain `Value` is what every reader of
+    // this function already expects.
+    serde_json::to_value(cfg).expect("BattleConfig always serializes")
 }
 
 /// The port to connect on. It is a JSON number on the wire and a port is a
