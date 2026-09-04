@@ -14,7 +14,7 @@ mlua = { version = "0.11", features = ["lua51", "vendored", "serde"] }
 # runtime so a preview cannot mean one thing for Lua and another for a `.cob`.
 coilbox-unitpose = { path = "../coilbox-unitpose" }
 serde = { workspace = true }
-serde_json = "1"
+serde_json = { workspace = true }
 
 [dev-dependencies]
 # A throwaway tree for the VFS listing tests, so the two spellings of one folder

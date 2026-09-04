@@ -73,3 +73,7 @@ sha2 = "0.11"
 # One derive implementation shared by the 25 manifests that serialise config,
 # catalog and protocol types, instead of 25 declarations that can drift apart.
 serde = { version = "1", features = ["derive"] }
+
+# The JSON encoder/decoder every crate above uses alongside serde, and two more
+# besides (a build-dependency and one with no serde derive of its own).
+serde_json = "1"

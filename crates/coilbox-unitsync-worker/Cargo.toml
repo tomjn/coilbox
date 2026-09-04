@@ -14,7 +14,7 @@ path = "src/main.rs"
 # library lives in the user's engine install, not in our build).
 libloading = "0.8"
 serde = { workspace = true }
-serde_json = "1"
+serde_json = { workspace = true }
 # Minimap mode encodes the RGB565 buffer to PNG; archive preview also decodes
 # TGA (which browsers can't render) and re-encodes it to PNG. Game-header art is
 # decoded from any loadpicture format and re-encoded as a downscaled JPEG, so the
