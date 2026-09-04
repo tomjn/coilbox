@@ -13,3 +13,9 @@ export function clamp(v: number, lo: number, hi: number): number {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/** The last path segment, from a path using `/` or `\` as the separator. */
+export function basename(path: string): string {
+  const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return i >= 0 ? path.slice(i + 1) : path;
+}

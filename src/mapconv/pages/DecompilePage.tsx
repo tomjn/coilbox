@@ -16,6 +16,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { basename } from "@/lib/helpers";
 import { versionLabel } from "@/lib/utils";
 import {
   type LogLine,
@@ -54,12 +55,6 @@ function dirname(p: string): string {
 function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") ? "\\" : "/";
   return `${dir}${sep}${name}`;
-}
-
-/** The last path segment (handles both / and \ separators). */
-function basename(p: string): string {
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(i + 1) : p;
 }
 
 /** The decompile result panel's data (shared with the persisted draft). */

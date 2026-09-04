@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { clamp, sleep } from "./helpers";
+import { basename, clamp, sleep } from "./helpers";
 
 describe("clamp", () => {
   it("passes a value already inside the range through unchanged", () => {
@@ -45,5 +45,31 @@ describe("sleep", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("basename", () => {
+  it("returns the last segment of a forward-slash path", () => {
+    expect(basename("/a/b/c.txt")).toBe("c.txt");
+  });
+
+  it("returns the last segment of a backslash path", () => {
+    expect(basename("C:\\a\\b\\c.txt")).toBe("c.txt");
+  });
+
+  it("returns the last segment when separators are mixed", () => {
+    expect(basename("C:\\a/b\\c.txt")).toBe("c.txt");
+  });
+
+  it("returns the whole string when there is no separator", () => {
+    expect(basename("c.txt")).toBe("c.txt");
+  });
+
+  it("returns an empty string for a trailing separator", () => {
+    expect(basename("/a/b/")).toBe("");
+  });
+
+  it("returns an empty string for an empty input", () => {
+    expect(basename("")).toBe("");
   });
 });

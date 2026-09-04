@@ -18,6 +18,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { basename } from "@/lib/helpers";
 import {
   type CompileOpts,
   type CompressionType,
@@ -66,12 +67,6 @@ const CT_OPTIONS = [
 function dirname(p: string): string {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
   return i >= 0 ? p.slice(0, i) : "";
-}
-
-/** The last path segment (handles both / and \ separators). */
-function basename(p: string): string {
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(i + 1) : p;
 }
 
 /** Parse a numeric form string, falling back when empty/invalid. */
