@@ -1,18 +1,13 @@
 /**
- * Session store for saved units and compounds.
- *
- * Same shape as `src/campaign/campaigns.ts`: a module-level cache so navigating
- * back to the overview does not re-read every document, and a listener set so a
- * save in the builder updates the overview without a round trip through the
- * router.
+ * Session store for saved units and compounds, built on the shared
+ * `documentStore` (issue #2440).
  *
  * Units and compounds are the same document in different folders, so one read
  * covers both and the builder never has to ask twice.
  */
 
-import { useEffect, useState } from "react";
-
 import { legoThumbUrl } from "../lib/assetUrl";
+import { createDocumentStore } from "../lib/documentStore";
 import { legoDelete, legoList, legoSave, legoThumbSave } from "./bindings";
 import { type LegoProject, orderedPieces, parseLegoProjectJson } from "./model";
 
@@ -20,9 +15,6 @@ interface LegoStore {
   projects: LegoProject[];
   compounds: LegoProject[];
 }
-
-let cache: LegoStore | null = null;
-const listeners = new Set<(store: LegoStore) => void>();
 
 /** Read and parse every stored document, skipping any that will not load. */
 async function fetchStore(): Promise<LegoStore> {
@@ -43,13 +35,13 @@ async function fetchStore(): Promise<LegoStore> {
   return { projects: parse(projects), compounds: parse(compounds) };
 }
 
+const store = createDocumentStore<LegoStore>(fetchStore, {
+  projects: [],
+  compounds: [],
+});
+
 /** Re-read from disk and push the result to every mounted hook. */
-export async function refreshProjects(): Promise<LegoStore> {
-  const loaded = await fetchStore();
-  cache = loaded;
-  for (const listener of listeners) listener(loaded);
-  return loaded;
-}
+export const refreshProjects = store.refresh;
 
 /**
  * Save a project and refresh the shared list.
@@ -158,60 +150,14 @@ export async function hasThumbnail(id: string): Promise<boolean> {
   }
 }
 
-const EMPTY: LegoStore = { projects: [], compounds: [] };
-
-/** Everything on disk, newest first. Stays in step with saves made elsewhere. */
-function useLegoStore() {
-  const [store, setStore] = useState<LegoStore>(cache ?? EMPTY);
-  const [loading, setLoading] = useState(cache === null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const listener = (loaded: LegoStore) => setStore(loaded);
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (cache) {
-      setStore(cache);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    fetchStore()
-      .then((loaded) => {
-        cache = loaded;
-        if (!cancelled) {
-          setStore(loaded);
-          setError(null);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { store, loading, error };
-}
-
 /** Every saved unit, newest first. */
 export function useLegoProjects() {
-  const { store, loading, error } = useLegoStore();
-  return { projects: store.projects, loading, error };
+  const { data, loading, error } = store.useStore();
+  return { projects: data.projects, loading, error };
 }
 
 /** Every saved sub-assembly, newest first. */
 export function useLegoCompounds() {
-  const { store, loading, error } = useLegoStore();
-  return { compounds: store.compounds, loading, error };
+  const { data, loading, error } = store.useStore();
+  return { compounds: data.compounds, loading, error };
 }
