@@ -1560,6 +1560,86 @@ export function invalidateMapPreview(
 }
 
 /**
+ * Shared shape behind {@link useUnitsyncHeightmap}, {@link useUnitsyncHeightField}
+ * and {@link useUnitsyncMetalmap}: fetch one map asset from unitsync, keyed by
+ * `dataDir::enginePath::mapName`, live-checked against the thumb cache the same
+ * way every render in this file is (issue #1551). An empty render is a state,
+ * not an answer, so only a result with a URL is remembered, and a retry re-runs
+ * it.
+ *
+ * `fetchAsset` is the unitsync binding to call, and `cache` is that binding's
+ * own module-level Map. The URL always comes from {@link renderedUrl} against
+ * `unitsyncThumbUrl`, which fits all three results: a cache file when the
+ * render reached disk, or the inlined `dataUrl` when it did not.
+ *
+ * `useUnitsyncMapSkybox` is not built on this. It caches "no skybox" as a
+ * valid, permanent answer rather than an unanswered one, which this hook's
+ * caching rule would refetch on every mount. `useUnitsyncMinimap` is not built
+ * on this either, for its own mip-keyed cache and start-position/appearance
+ * side effects.
+ */
+function useUnitsyncMapAsset<
+  T extends { file?: string; dataUrl?: string; errors?: string[] },
+>(
+  cache: Map<string, T>,
+  fetchAsset: (args: {
+    enginePath: string;
+    dataDir: string;
+    mapName: string;
+  }) => Promise<T>,
+  enginePath?: string,
+  dataDir?: string,
+  mapName?: string,
+) {
+  const [data, setData] = useState<T | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !mapName) {
+      setData(null);
+      setUrl(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const apply = (res: T) => {
+      setData(res);
+      const url = renderedUrl(res, unitsyncThumbUrl);
+      setUrl(url);
+      if (!url && res.errors?.length) setError(res.errors.join("; "));
+    };
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    (async () => {
+      const cached = await liveCacheHit(cache, key, (r) => r.file);
+      if (cancelled) return;
+      if (cached) {
+        apply(cached);
+        return;
+      }
+      const res = await fetchAsset({ enginePath, dataDir, mapName });
+      if (cancelled) return;
+      // Same rule as the minimap: an empty render is a state, not an answer.
+      if (renderedUrl(res, unitsyncThumbUrl)) cache.set(key, res);
+      apply(res);
+    })()
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cache, fetchAsset, enginePath, dataDir, mapName]);
+
+  return { data, url, loading, error };
+}
+
+/**
  * Lazily render and cache a map's height picture (WebP URL plus the world
  * heights its black and white stand for).
  *
@@ -1573,54 +1653,13 @@ export function useUnitsyncHeightmap(
   dataDir?: string,
   mapName?: string,
 ) {
-  const [data, setData] = useState<HeightmapResult | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!enginePath || !dataDir || !mapName) {
-      setData(null);
-      setUrl(null);
-      return;
-    }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
-    const apply = (res: HeightmapResult) => {
-      setData(res);
-      const url = renderedUrl(res, unitsyncThumbUrl);
-      setUrl(url);
-      if (!url && res.errors?.length) setError(res.errors.join("; "));
-    };
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    (async () => {
-      const cached = await liveCacheHit(heightmapCache, key, (r) => r.file);
-      if (cancelled) return;
-      if (cached) {
-        apply(cached);
-        return;
-      }
-      const res = await unitsyncHeightmap({
-        enginePath,
-        dataDir,
-        mapName,
-      });
-      if (cancelled) return;
-      // Same rule as the minimap: an empty render is a state, not an answer.
-      if (renderedUrl(res, unitsyncThumbUrl)) heightmapCache.set(key, res);
-      apply(res);
-    })()
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enginePath, dataDir, mapName]);
+  const { data, url, loading, error } = useUnitsyncMapAsset(
+    heightmapCache,
+    unitsyncHeightmap,
+    enginePath,
+    dataDir,
+    mapName,
+  );
 
   // What the picture's black and white stand for, which is not the map's own
   // pair: it is rescaled into the window its samples occupy (issue #1730).
@@ -1644,53 +1683,13 @@ export function useUnitsyncHeightField(
   dataDir?: string,
   mapName?: string,
 ) {
-  const [data, setData] = useState<HeightFieldResult | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!enginePath || !dataDir || !mapName) {
-      setData(null);
-      setUrl(null);
-      return;
-    }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
-    const apply = (res: HeightFieldResult) => {
-      setData(res);
-      const url = res.file ? unitsyncThumbUrl(res.file) : null;
-      setUrl(url);
-      if (!url && res.errors?.length) setError(res.errors.join("; "));
-    };
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    (async () => {
-      const cached = await liveCacheHit(heightFieldCache, key, (r) => r.file);
-      if (cancelled) return;
-      if (cached) {
-        apply(cached);
-        return;
-      }
-      const res = await unitsyncHeightField({ enginePath, dataDir, mapName });
-      if (cancelled) return;
-      // Same rule as the minimap: a write that produced nothing is a state,
-      // not an answer, so a retry re-runs it.
-      if (res.file) heightFieldCache.set(key, res);
-      apply(res);
-    })()
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enginePath, dataDir, mapName]);
-
-  return { data, url, loading, error };
+  return useUnitsyncMapAsset(
+    heightFieldCache,
+    unitsyncHeightField,
+    enginePath,
+    dataDir,
+    mapName,
+  );
 }
 
 /** Lazily render and cache a map's metal infomap (green-on-transparent PNG overlay). */
@@ -1699,52 +1698,13 @@ export function useUnitsyncMetalmap(
   dataDir?: string,
   mapName?: string,
 ) {
-  const [data, setData] = useState<MetalmapResult | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!enginePath || !dataDir || !mapName) {
-      setData(null);
-      setUrl(null);
-      return;
-    }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
-    const apply = (res: MetalmapResult) => {
-      setData(res);
-      const url = renderedUrl(res, unitsyncThumbUrl);
-      setUrl(url);
-      if (!url && res.errors?.length) setError(res.errors.join("; "));
-    };
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    (async () => {
-      const cached = await liveCacheHit(metalmapCache, key, (r) => r.file);
-      if (cancelled) return;
-      if (cached) {
-        apply(cached);
-        return;
-      }
-      const res = await unitsyncMetalmap({ enginePath, dataDir, mapName });
-      if (cancelled) return;
-      // Same rule as the minimap: an empty render is a state, not an answer.
-      if (renderedUrl(res, unitsyncThumbUrl)) metalmapCache.set(key, res);
-      apply(res);
-    })()
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enginePath, dataDir, mapName]);
-
-  return { data, url, loading, error };
+  return useUnitsyncMapAsset(
+    metalmapCache,
+    unitsyncMetalmap,
+    enginePath,
+    dataDir,
+    mapName,
+  );
 }
 
 /** Session cache of skybox results, keyed by `dataDir::enginePath::mapName`. */
