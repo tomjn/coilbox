@@ -12,10 +12,10 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdvancedMode } from "@/general/advanced";
+import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import {
@@ -207,10 +207,16 @@ export default function MapDetailPage() {
           state: { inputPath: tree.archivePath },
         });
       } else {
-        toast.error("Couldn't locate this map's archive on disk.");
+        void notify({
+          title: "Couldn't locate this map's archive on disk.",
+          level: "error",
+        });
       }
     } catch {
-      toast.error("Couldn't open this map in mapconv.");
+      void notify({
+        title: "Couldn't open this map in mapconv.",
+        level: "error",
+      });
     } finally {
       setDecompiling(false);
     }

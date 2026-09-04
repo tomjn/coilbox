@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
 
 import {
   Popover,
@@ -44,6 +43,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useBlueprintBackfill } from "@/hub/assets/useBlueprintBackfill";
 import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
+import { notify } from "@/notify/notify";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { BlueprintOnMap } from "@/placement/BlueprintOnMap";
 import { scenarioRoute } from "@/scenario/scenarios";
@@ -415,10 +415,16 @@ function DuplicateBlueprintButton({
     try {
       const copy = duplicatedBlueprint(record, taken);
       await saveBlueprint(copy);
-      toast.success(`"${copy.layout.name}" is yours to change.`);
+      void notify({
+        title: `"${copy.layout.name}" is yours to change.`,
+        level: "success",
+      });
       navigate(blueprintRoute(copy.id));
     } catch (e) {
-      toast.error(`That blueprint could not be copied: ${message(e)}`);
+      void notify({
+        title: `That blueprint could not be copied: ${message(e)}`,
+        level: "error",
+      });
     } finally {
       setBusy(false);
     }

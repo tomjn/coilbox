@@ -2,13 +2,13 @@ import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatBytes } from "@/lib/format";
+import { notify } from "@/notify/notify";
 import { contentDeleteEngine, type EngineUsage } from "../../bindings";
 
 const msg = (e: unknown): string =>
@@ -48,11 +48,12 @@ export function DeleteEngineButton({
     try {
       const { bytes } = await contentDeleteEngine({ path: engine.path });
       const freed = formatBytes(bytes);
-      toast.success(
-        freed
+      void notify({
+        title: freed
           ? `Deleted engine ${engine.version}, freeing ${freed}.`
           : `Deleted engine ${engine.version}.`,
-      );
+        level: "success",
+      });
       setOpen(false);
       onDeleted();
     } catch (e) {

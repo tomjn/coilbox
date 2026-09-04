@@ -1,13 +1,13 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatBytes } from "@/lib/format";
+import { notify } from "@/notify/notify";
 import { contentDeleteArchive, contentRescan } from "../../bindings";
 import {
   invalidateScans,
@@ -48,9 +48,12 @@ export function DeleteArchiveButton({
     try {
       const { bytes } = await contentDeleteArchive({ path });
       const freed = formatBytes(bytes);
-      toast.success(
-        freed ? `Deleted ${name}, freeing ${freed}.` : `Deleted ${name}.`,
-      );
+      void notify({
+        title: freed
+          ? `Deleted ${name}, freeing ${freed}.`
+          : `Deleted ${name}.`,
+        level: "success",
+      });
       // The scan caches still list it, and the root's counts are now stale. The
       // forced unitsync rescan is what takes it out of the grids. It is not
       // awaited because a rescan can run for minutes, and the page the user

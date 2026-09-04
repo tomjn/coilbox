@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { toast } from "sonner";
 
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -46,6 +45,7 @@ import {
 import { gameForIdentity } from "@/content/useGameUnits";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useRecordHubImport } from "@/hub/imports";
+import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
@@ -111,19 +111,27 @@ export default function BlueprintsPage() {
           <>
             <BlueprintPackButton
               onImported={(kept) => {
-                toast.success(
-                  kept.length === 1
-                    ? `"${kept[0].layout.name}" is in your library.`
-                    : `${kept.length} blueprints are in your library.`,
-                );
+                void notify({
+                  title:
+                    kept.length === 1
+                      ? `"${kept[0].layout.name}" is in your library.`
+                      : `${kept.length} blueprints are in your library.`,
+                  level: "success",
+                });
               }}
             />
             {records.length > 0 && (
               <BlueprintPackWriteButton
-                onWritten={(said) => toast.success(said)}
+                onWritten={(said) =>
+                  void notify({ title: said, level: "success" })
+                }
               />
             )}
-            <BlueprintWidgetButton onChanged={(said) => toast.success(said)} />
+            <BlueprintWidgetButton
+              onChanged={(said) =>
+                void notify({ title: said, level: "success" })
+              }
+            />
             <BlueprintImportButton
               initialCode={importCode}
               hubItemId={hubItemId}
@@ -133,7 +141,10 @@ export default function BlueprintsPage() {
                   [record.id],
                   blueprintRoute(record.id),
                 );
-                toast.success(`"${record.layout.name}" is in your library.`);
+                void notify({
+                  title: `"${record.layout.name}" is in your library.`,
+                  level: "success",
+                });
               }}
             />
             <NewBlueprintButton

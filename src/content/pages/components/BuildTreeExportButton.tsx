@@ -2,13 +2,13 @@ import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { notify } from "@/notify/notify";
 import type { Side, UnitDatasetEntry } from "../../bindings";
 import type { BrandingEntry } from "../../branding";
 import { resolveBrandingDataUrl } from "../../branding";
@@ -72,7 +72,10 @@ export function BuildTreeExportButton({
     const scopeSides =
       scope === "all" ? sides : sides.filter((s) => s.name === activeSide);
     if (scopeSides.length === 0) {
-      toast.error("Nothing to export for this faction.");
+      void notify({
+        title: "Nothing to export for this faction.",
+        level: "error",
+      });
       return;
     }
 
@@ -139,10 +142,13 @@ export function BuildTreeExportButton({
       } else {
         await contentExportBuildTreeZip({ dest, files: artifact.files });
       }
-      toast.success("Build tree exported.");
+      void notify({ title: "Build tree exported.", level: "success" });
       setOpen(false);
     } catch (e) {
-      toast.error(`Export failed: ${e instanceof Error ? e.message : e}`);
+      void notify({
+        title: `Export failed: ${e instanceof Error ? e.message : e}`,
+        level: "error",
+      });
     } finally {
       setBusy(false);
     }

@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -21,6 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatBytes, formatDuration } from "@/lib/format";
+import { notify } from "@/notify/notify";
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
@@ -818,14 +818,16 @@ export default function ReplayDetailPage() {
     if (!newName) return;
     navigate(`/play/replays/${encodeURIComponent(newName)}`);
     // Flag the navigation so the jump to a different file isn't a surprise.
-    toast.success("Remix created", {
-      description: "Opened the remixed replay — use Watch to run it.",
+    void notify({
+      title: "Remix created",
+      body: "Opened the remixed replay — use Watch to run it.",
+      level: "success",
     });
   };
 
   const onDeleted = () => {
     navigate("/play/replays");
-    toast.success("Replay deleted");
+    void notify({ title: "Replay deleted", level: "success" });
   };
 
   if (listLoading && !replay) return <DetailLoading backTo="/play/replays" />;
