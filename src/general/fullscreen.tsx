@@ -38,7 +38,7 @@ export function isFullscreenLocked(): boolean {
  * on (that's {@link isFullscreenLocked}). Independent of the lock, so a windowed
  * build can simply drop the button.
  */
-export function isFullscreenButtonHidden(): boolean {
+function isFullscreenButtonHidden(): boolean {
   return getProfile().layout?.fullscreenButton === false;
 }
 

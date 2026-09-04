@@ -32,18 +32,6 @@ export const conquestDelete = defineCommand<
   Record<string, never>
 >("coilbox-conquest", "conquest_delete");
 
-/** Write a caller-serialized galaxy export document to a chosen path. */
-export const conquestExport = defineCommand<
-  { json: string; dest: string },
-  Record<string, never>
->("coilbox-conquest", "conquest_export");
-
-/** Read a galaxy export file the user picked; the caller parses/validates it. */
-export const conquestImport = defineCommand<{ src: string }, { json: string }>(
-  "coilbox-conquest",
-  "conquest_import",
-);
-
 /** Load the opaque run-state document (an empty default when none exists yet). */
 export const conquestStateLoad = defineCommand<
   Record<string, never>,

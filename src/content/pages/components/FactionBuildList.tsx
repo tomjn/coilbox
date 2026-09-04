@@ -40,7 +40,7 @@ interface BuildContext {
 }
 
 /** One faction: a button that opens the build-tree drawer starting on that side. */
-export function FactionBuildButton({
+function FactionBuildButton({
   ctx,
   side,
   icon,

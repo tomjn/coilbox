@@ -121,7 +121,7 @@ export function SurfaceMessage({
 /** Frame the whole of the ground, looking down at its centre. What the surface
  *  opens on, and what the Frame button does unless the caller has a better
  *  answer, such as framing the layout rather than the field it sits in. */
-export function frameGround(handle: MapScene3D): void {
+function frameGround(handle: MapScene3D): void {
   const { camera, controls, planeWidth, planeDepth, render } = handle;
   const at = authoringCamera(
     planeWidth,

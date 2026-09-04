@@ -316,7 +316,7 @@ function refusedByGround(standing: Standing): boolean {
  * most candidate spots are refused by the first thing tried and the ground is
  * the expensive question.
  */
-export function fitsAt(
+function fitsAt(
   buildings: readonly PreviewBuilding[],
   delta: Point,
   footprintOf: (def: string) => Footprint,

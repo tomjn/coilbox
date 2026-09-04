@@ -23,9 +23,5 @@ interface MapCatalogDocument {
 
 const catalog = raw as MapCatalogDocument;
 
-/** Which extraction produced an entry. Read rather than restated, so the number
- *  a client reports and the number the hub compares cannot drift. */
-export const CATALOG_VERSION = catalog.catalogVersion;
-
 /** How many names one `POST /api/v1/maps/lookup` may carry. */
 export const MAX_LOOKUP_NAMES = catalog.caps.lookupNames;

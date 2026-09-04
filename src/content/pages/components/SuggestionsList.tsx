@@ -49,7 +49,7 @@ interface SuggestionsListProps {
  * Async because a `github` suggestion names a repo, not a file: the release
  * archive has to be looked up before there is a URL to queue.
  */
-export async function suggestionRequest(
+async function suggestionRequest(
   dl: SuggestedDownload,
   kind: "game" | "map",
   label: string,

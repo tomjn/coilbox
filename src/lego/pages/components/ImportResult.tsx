@@ -74,7 +74,7 @@ export type ImportStage =
     };
 
 /** The file's own name, which is what an opened unit is called by default. */
-export function baseName(path: string): string {
+function baseName(path: string): string {
   const file = path.split(/[\\/]/).at(-1) ?? path;
   return file.replace(/\.s3o$/i, "");
 }
@@ -213,7 +213,7 @@ async function readThreeDo(options: {
  * decide. The two that are worth saying are both about faces that came out
  * plain, and both would otherwise look like a bug in the model.
  */
-export function conversionNotes(result: ThreeDoImport): string[] {
+function conversionNotes(result: ThreeDoImport): string[] {
   const notes: string[] = [];
   const found = result.tiles - result.missingTextures.length;
   notes.push(

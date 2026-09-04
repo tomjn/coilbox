@@ -62,12 +62,6 @@ export type HaveStatus = "have" | "changed" | "missing";
 /** One answer, carrying the key it is about in the shape it was sent. */
 export type HaveResult = AssetIdentity & { status: HaveStatus };
 
-/** Whether this key is worth spending a render and an encode on. The point of
- *  asking first is that most of a real batch answers false here. */
-export function wantsUpload(status: HaveStatus): boolean {
-  return status !== "have";
-}
-
 const hubAssetsHave = defineCommand<
   { hubUrl: string; keys: AssetKey[] },
   { results: HaveResult[] }

@@ -16,7 +16,7 @@ const ASSET_URL = /^https?:[/][/]coilbox[.]localhost[/]/i;
  * `coilbox://…` (see {@link ./assetUrl}), so it has to be excluded by hand or the
  * `http:` rule lets a bundled file through on Windows only.
  */
-export function isExternalLink(href: string): boolean {
+function isExternalLink(href: string): boolean {
   const h = href.trim();
   return EXTERNAL.test(h) && !ASSET_URL.test(h);
 }

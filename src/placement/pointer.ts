@@ -13,7 +13,7 @@ import type { Point } from "@/scenario/model";
 /** How far a pointer may travel between press and release and still count as a
  *  click, in CSS pixels. Wide enough to survive a shaky hand, narrow enough that
  *  a deliberate nudge of a unit is not read as a click. */
-export const CLICK_SLOP_PX = 4;
+const CLICK_SLOP_PX = 4;
 
 /** A point in the surface's own pixels. */
 export interface PointerPos {

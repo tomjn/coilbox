@@ -84,11 +84,6 @@ export function modGetIp(nick: string): string {
   return `GETIP ${nick}`;
 }
 
-/** Ring (alert) a user. */
-export function modRing(nick: string): string {
-  return `RING ${nick}`;
-}
-
 /** Kick a user off the server. */
 export function modKick(nick: string, reason: string): string {
   return reason ? `KICK ${nick} ${reason}` : `KICK ${nick}`;
@@ -97,10 +92,6 @@ export function modKick(nick: string, reason: string): string {
 /** Ban a user from the server. `duration` is a server span (e.g. `7d`). */
 export function modBan(nick: string, duration: string, reason: string): string {
   return `BAN ${nick} ${duration} ${reason}`.trimEnd();
-}
-
-export function modUnban(nick: string): string {
-  return `UNBAN ${nick}`;
 }
 
 /**
