@@ -32,6 +32,14 @@ jobs:
         run: bunx biome ci .
       - name: Typecheck
         run: bun run typecheck
+      # src/lego/luaScript.test.ts and pieceCollisionScript.test.ts shell out
+      # to luajit via spawnSync to check the Lua they generate actually
+      # compiles. Without the binary, spawnSync returns a null status and the
+      # tests fail on a missing dependency rather than a real Lua error.
+      - name: Install LuaJIT
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit
       - name: Vitest
         run: bun run test
 
