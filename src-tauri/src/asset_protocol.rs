@@ -49,8 +49,9 @@
 //! URL rather than by bytes, so it stays `no-cache` along with the editable media.
 //!
 //! Every segment is percent-decoded and rejected if it contains path syntax, so a
-//! request can never escape its root. Any miss (no root, unsafe path, absent file)
-//! returns 404 rather than leaking why.
+//! request can never escape its root. Path syntax includes a colon, because a
+//! Windows drive prefix is a path root the same way a leading slash is. Any miss
+//! (no root, unsafe path, absent file) returns 404 rather than leaking why.
 //!
 //! Note: CSP is `null` today, so the scheme loads unrestricted. If CSP is ever
 //! enabled it must allowlist `coilbox:` (and the Windows `http://coilbox.localhost`
@@ -89,6 +90,18 @@ fn percent_decode(seg: &str) -> Option<String> {
 /// Empty pieces are skipped; a segment that decodes to `.`/`..` or still contains a
 /// separator is rejected outright (returns `None`), so the result can never escape a
 /// root when joined.
+///
+/// A colon counts as a separator here. On Windows `PathBuf::push` clears the buffer
+/// and starts over whenever the pushed component carries a drive prefix, so a
+/// segment of `C:` would drop the root entirely and `portable/C:/Windows/x` would
+/// resolve to `C:Windows\x`. A colon later in the name (`file.txt:stream`) opens an
+/// NTFS alternate data stream, a second fork of the file rather than the file.
+///
+/// Rejecting the character outright rather than asking `Path::components()` for a
+/// single `Normal` keeps the rule the same on every platform. `Path` parses by host
+/// rules, so a components check would accept `C:` on Unix and only bite on Windows,
+/// which CI never builds. No root this scheme serves can hold a colon in a name:
+/// Windows forbids it in a filename, so a cross-platform asset cannot carry one.
 fn safe_segments(path: &str) -> Option<Vec<String>> {
     let mut out = Vec::new();
     for raw in path.split('/') {
@@ -96,7 +109,13 @@ fn safe_segments(path: &str) -> Option<Vec<String>> {
             continue;
         }
         let dec = percent_decode(raw)?;
-        if dec == "." || dec == ".." || dec.contains('/') || dec.contains('\\') || dec.is_empty() {
+        if dec == "."
+            || dec == ".."
+            || dec.contains('/')
+            || dec.contains('\\')
+            || dec.contains(':')
+            || dec.is_empty()
+        {
             return None;
         }
         out.push(dec);
@@ -381,6 +400,31 @@ mod tests {
         assert_eq!(safe_segments("/portable/../etc"), None);
         assert_eq!(safe_segments("/"), None);
         assert_eq!(safe_segments(""), None);
+    }
+
+    /// A colon is path syntax on Windows and must never reach `resolve_path`.
+    /// `PathBuf::push` replaces the whole path when the pushed component carries
+    /// a drive prefix, so `portable/C:/Windows/x` would resolve to `C:Windows\x`
+    /// and leave the portable root. `file.txt:stream` names an NTFS alternate
+    /// data stream, a second fork of a real file rather than the file itself.
+    ///
+    /// The guard is unconditional, not `cfg(windows)`: the same URL has to mean
+    /// the same thing on every platform, and CI only runs Linux, so a
+    /// Windows-only guard would go untested.
+    #[test]
+    fn safe_segments_rejects_colons() {
+        assert_eq!(safe_segments("/portable/C:/Windows/x"), None);
+        assert_eq!(safe_segments("/portable/C%3A/Windows/x"), None);
+        assert_eq!(safe_segments("/portable/file.txt:stream"), None);
+        // The roots that never guarded their own segments are covered too: the
+        // pack name in `legopacks/<name>/<file>` is used verbatim.
+        assert_eq!(safe_segments("/legopacks/C:/x"), None);
+        assert_eq!(safe_segments("/unitsyncthumb/file.png:stream"), None);
+        // A colon-free name is untouched.
+        assert_eq!(
+            safe_segments("/portable/file.txt"),
+            Some(vec!["portable".into(), "file.txt".into()])
+        );
     }
 
     /// The app-data roots under one `data_dir`, which is how the real handler
