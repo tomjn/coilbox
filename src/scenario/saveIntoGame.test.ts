@@ -46,7 +46,11 @@ import {
 import { isEditable, type LoadedScenario } from "./storage";
 
 function build(id: string, name: string): Scenario {
-  const scenario = parseScenario({ id, name, setup: {} });
+  const scenario = parseScenario({
+    id,
+    name,
+    setup: { gameName: "BAR", mapName: "Map" },
+  });
   if (!scenario) throw new Error("fixture is not a valid scenario");
   return scenario;
 }
