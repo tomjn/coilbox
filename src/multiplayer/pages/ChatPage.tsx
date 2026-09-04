@@ -9,13 +9,13 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router";
-import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { notify } from "@/notify/notify";
 import { leaveBattle } from "../battle/leaveBattle";
 import { type ChatMsg, mpLeaveChannel, mpSend } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
@@ -258,7 +258,7 @@ function ChatPage() {
     requestAppliedRef.current = requestedConversation;
     setRequestSettled(true);
     if (result.ok) setActive(result.descriptor);
-    else toast.error(result.reason);
+    else void notify({ title: result.reason, level: "error" });
   }, [requestedConversation, state]);
 
   // Open on the first joined channel when nothing is selected (initial entry, and
