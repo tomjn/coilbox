@@ -20,6 +20,7 @@ import {
   ThemeProvider,
 } from "@picoframe/frame";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
 import { clearHistory, readHistory } from "@/notify/history";
@@ -68,6 +69,10 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // sonner keeps its toasts in module state and replays the live ones to each
+  // new host that subscribes, so a toast raised here would show up in the next
+  // test's freshly mounted Toaster.
+  toast.dismiss();
   vi.restoreAllMocks();
 });
 
