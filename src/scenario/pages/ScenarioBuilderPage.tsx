@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -23,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { relativeTime } from "@/lib/relativeTime";
+import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
 import {
@@ -149,7 +149,10 @@ export default function ScenarioBuilderPage() {
     setRescanning(true);
     try {
       await refresh();
-      toast.success("Rescanned. The scenario list is up to date.");
+      void notify({
+        title: "Rescanned. The scenario list is up to date.",
+        level: "success",
+      });
     } finally {
       setRescanning(false);
     }
@@ -217,9 +220,10 @@ export default function ScenarioBuilderPage() {
       await refreshScenarios();
       navigate(`/scenario-builder/${copy.id}`);
     } catch (e) {
-      toast.error(
-        `Could not duplicate ${scenario.name}: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      void notify({
+        title: `Could not duplicate ${scenario.name}: ${e instanceof Error ? e.message : String(e)}`,
+        level: "error",
+      });
     }
   };
 

@@ -1,8 +1,8 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { formatBytes } from "@/lib/format";
+import { notify } from "@/notify/notify";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import {
   namedScenarioClips,
@@ -86,7 +86,7 @@ export function ReclaimClipsForm({ onDone }: { onDone: () => void }) {
         ),
         true,
       );
-      toast.success(summarize(summary));
+      void notify({ title: summarize(summary), level: "success" });
       onDone();
     } catch (e) {
       setError(msg(e));

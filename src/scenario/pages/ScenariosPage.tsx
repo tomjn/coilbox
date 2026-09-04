@@ -1,13 +1,13 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { useUnitsyncScan } from "@/content/config";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useOneShotParam } from "@/deeplink/useOneShotParam";
 import { useRecordHubImport } from "@/hub/imports";
+import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import {
@@ -66,11 +66,17 @@ export default function ScenariosPage() {
   // player looking for a row that never arrives.
   const imported = (scenario: Scenario) => {
     recordHubImport(hubItemId, [scenario.id], scenarioRoute(scenario.id));
-    return isSetUp(scenario)
-      ? toast.success(`${scenario.name} is ready to play.`)
-      : toast.warning(
-          `${scenario.name} was imported, but it names no game and map, so there is nothing to play yet.`,
-        );
+    if (isSetUp(scenario)) {
+      void notify({
+        title: `${scenario.name} is ready to play.`,
+        level: "success",
+      });
+    } else {
+      void notify({
+        title: `${scenario.name} was imported, but it names no game and map, so there is nothing to play yet.`,
+        level: "warning",
+      });
+    }
   };
 
   // The same refusal the drawer's button carries, shown a step earlier so the
@@ -113,11 +119,12 @@ export default function ScenariosPage() {
     opened.current = openScenarioId;
     const found = playable.find((l) => l.scenario.id === openScenarioId);
     if (found) return void openPlay(found);
-    toast.warning(
-      scenarios.some((l) => l.scenario.id === openScenarioId)
+    void notify({
+      title: scenarios.some((l) => l.scenario.id === openScenarioId)
         ? "That scenario names no game and map, so there is nothing to play yet."
         : "That scenario isn't here any more. It may have been deleted.",
-    );
+      level: "warning",
+    });
   }, [openScenarioId, loading, playable, scenarios]);
 
   return (
