@@ -52,6 +52,7 @@ import {
 } from "./battleOptions";
 import {
   battleStartable,
+  clampBonus,
   deriveSync,
   hexToColorInt,
   type MemberRow,
@@ -289,6 +290,15 @@ export interface BattleRoomView {
   startGame: () => Promise<void>;
   /** Ask the autohost to switch to a map (`!map <name>`). */
   suggestMap: (name: string) => Promise<void>;
+  /**
+   * Ask the autohost to set a player's resource bonus/handicap, 0-100 (issue
+   * #346): `!force <name> bonus <n>`, SPADS's real command. There is no
+   * team-scoped `!teambonus` in SPADS, only this per-player one, so a "team"
+   * bonus is set one player at a time from their row. SPADS's own command
+   * level (typically boss/host) gates who may call it. A denied attempt comes
+   * back as a chat line, the same as every other `!`-command in this room.
+   */
+  setBonus: (name: string, value: number) => Promise<void>;
   /**
    * Host: change the battle's map directly (UPDATEBATTLEINFO), preserving the
    * current lock/spectator fields. `maphash` is the map's signed 32-bit CRC.
@@ -829,6 +839,15 @@ export function useBattleRoom(): BattleRoomView {
     [activeKey, clearErr, setErr],
   );
 
+  // Ask the autohost to set a player's resource bonus/handicap (issue #346).
+  // SPADS's real command is per-player (`!force <name> bonus <n>`, `HANDICAP`
+  // on the wire). There is no team-scoped `!teambonus` to send instead.
+  const setBonus = useCallback(
+    (name: string, value: number) =>
+      autohostSend(`!force ${name} bonus ${clampBonus(value)}`),
+    [autohostSend],
+  );
+
   // Ask for the match to begin. The fork is the Rust side's: on Tachyon this is
   // `lobby/startBattle`, after which the server allocates a machine to run the
   // match and sends every player its address, and on the line protocol it stays
@@ -1177,6 +1196,7 @@ export function useBattleRoom(): BattleRoomView {
     autohostSend,
     startGame,
     suggestMap: (name) => autohostSend(`!map ${name}`),
+    setBonus,
     setMap,
     setLocked,
     rescan,

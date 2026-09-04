@@ -118,6 +118,13 @@ export interface MemberRow {
   ally: number;
   side: number;
   colorHex: string;
+  /**
+   * SPADS resource bonus/handicap, 0-100 (issue #346). Decoded off the same
+   * `battleStatus` bitfield as `teamId`/`ally`/`side`, so this is always the
+   * server's last-confirmed value, carried on `CLIENTBATTLESTATUS`, never a
+   * locally guessed echo of a command that was merely sent.
+   */
+  handicap: number;
   /** Humans only: ISO 3166-1 alpha-2 country (from ADDUSER), when known. */
   country?: string;
   /** Humans only: server rank 0-7 (from ClientStatus), when known. */
@@ -154,7 +161,19 @@ function rowFromStatus(
     ally: s.ally,
     side: s.side,
     colorHex: colorIntToHex(teamColor),
+    handicap: s.handicap,
   };
+}
+
+/**
+ * Clamp a requested bonus/handicap to what SPADS's `!force <player> bonus
+ * <n>` actually accepts (issue #346): a non-negative integer no greater than
+ * 100. SPADS rejects anything outside that range outright, so this mirrors
+ * its own check client-side rather than letting an out-of-range drag reach
+ * the wire.
+ */
+export function clampBonus(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 /**

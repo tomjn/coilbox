@@ -14,6 +14,7 @@ const row = (p: Partial<MemberRow> & { name: string }): MemberRow => ({
   ally: 0,
   side: 0,
   colorHex: "#000000",
+  handicap: 0,
   ...p,
 });
 
