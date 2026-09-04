@@ -8,8 +8,6 @@ permissions = [
   "allow-us-cancel",
   "allow-us-history",
   "allow-us-report",
-  "allow-us-settings-load",
-  "allow-us-settings-save",
   "allow-us-seed-sql",
   "allow-us-results-dir",
   "allow-us-export-report",

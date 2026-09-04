@@ -111,16 +111,16 @@ pub fn data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 }
 
 /// Where the app's user settings are stored: the `string -> string` map behind the
-/// frame's `useSetting`, written by `us_settings_save` in the uberstress plugin and
-/// read back at boot by `src/settings-storage.ts`.
+/// frame's `useSetting`, written by `app_settings_save` in `src-tauri/src/settings.rs`
+/// and read back at boot by `src/settings-storage.ts`.
 ///
-/// Named here rather than in the plugin that writes it because it is no longer only
-/// that plugin's file. The hub reads it to find out whether the user has agreed to
-/// asset uploads (`crates/tauri-plugin-coilbox-hub/src/consent.rs`), and a reader
-/// and a writer disagreeing about the path would be a setting that silently never
-/// takes effect. The `uberstress` segment is history: the store was that plugin's
-/// before it became the app's, and moving it would strip every existing install of
-/// its settings.
+/// Named here rather than in the crate that writes it because it is nobody's plugin
+/// file. The hub reads it to find out whether the user has agreed to asset uploads
+/// (`crates/tauri-plugin-coilbox-hub/src/consent.rs`), and a reader and a writer
+/// disagreeing about the path would be a setting that silently never takes effect.
+/// The `uberstress` segment is history: the store used to belong to that plugin
+/// (issue #2436 moved the commands to the app), and renaming it would strip every
+/// existing install of its settings.
 pub fn settings_file<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(data_dir(app)?.join("uberstress").join("settings.json"))
 }

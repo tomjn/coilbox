@@ -8,8 +8,6 @@ const COMMANDS: &[&str] = &[
     "us_cancel",
     "us_history",
     "us_report",
-    "us_settings_load",
-    "us_settings_save",
     "us_seed_sql",
     "us_results_dir",
     "us_export_report",

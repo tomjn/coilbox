@@ -5,13 +5,11 @@
 //! a [`CliResult`] envelope, matching every other picoframe plugin.
 
 mod report;
-mod settings;
 mod sidecar;
 
 use picoframe_core::CliResult;
 use report::{list_report_files, parse_scenarios, Report, ReportSummary};
 use serde_json::json;
-use settings::{load_settings, save_settings, Settings};
 use sidecar::{build_args, resolve_sidecar, LogLine, RunOpts};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -31,16 +29,11 @@ const SIDECAR_MISSING: &str =
 /// run in flight. A run removes its own entry when it finishes reaping.
 type SharedRegistry = Arc<Mutex<HashMap<String, Child>>>;
 
-/// Resolve the settings-file path and this plugin's results directory under app-data.
-///
-/// The settings path comes from `coilbox_portable::settings_file`, because the map
-/// this plugin persists is the whole app's settings rather than its own and the hub
-/// reads it too.
-fn data_dirs<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, PathBuf), String> {
-    let results = coilbox_portable::data_dir(app)?
+/// This plugin's results directory under app-data.
+fn results_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?
         .join("uberstress")
-        .join("results");
-    Ok((coilbox_portable::settings_file(app)?, results))
+        .join("results"))
 }
 
 /// Run the sidecar to completion and capture its output (for short commands like
@@ -158,7 +151,7 @@ async fn us_run<R: Runtime>(
         Some(b) => b,
         None => return Ok(CliResult::err(SIDECAR_MISSING)),
     };
-    let (_, results_dir) = match data_dirs(&app) {
+    let results_dir = match results_dir(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -197,7 +190,7 @@ async fn us_cancel(reg: State<'_, SharedRegistry>, run_id: String) -> Result<Cli
 /// `us_history` — summaries of every saved report, newest first.
 #[tauri::command]
 async fn us_history<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
-    let (_, results_dir) = match data_dirs(&app) {
+    let results_dir = match results_dir(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -221,7 +214,7 @@ async fn us_history<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
 /// `us_report` — full parsed report for one filename (basename only, no traversal).
 #[tauri::command]
 async fn us_report<R: Runtime>(app: AppHandle<R>, file: String) -> Result<CliResult, ()> {
-    let (_, results_dir) = match data_dirs(&app) {
+    let results_dir = match results_dir(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -235,37 +228,6 @@ async fn us_report<R: Runtime>(app: AppHandle<R>, file: String) -> Result<CliRes
             Err(e) => CliResult::err(format!("could not parse report: {e}")),
         },
         Err(e) => CliResult::err(format!("could not read report: {e}")),
-    })
-}
-
-/// `us_settings_load` — read the whole settings map, backing the frame's
-/// `SettingsStorage` adapter at app boot.
-#[tauri::command]
-async fn us_settings_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
-    let (settings_path, _) = match data_dirs(&app) {
-        Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    Ok(match load_settings(&settings_path) {
-        Ok(entries) => CliResult::ok(json!({ "entries": entries })),
-        Err(e) => CliResult::err(e),
-    })
-}
-
-/// `us_settings_save` — persist the whole settings map. The adapter sends the
-/// full map on every change, so this is an atomic overwrite (no merge races).
-#[tauri::command]
-async fn us_settings_save<R: Runtime>(
-    app: AppHandle<R>,
-    entries: Settings,
-) -> Result<CliResult, ()> {
-    let (settings_path, _) = match data_dirs(&app) {
-        Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    Ok(match save_settings(&settings_path, &entries) {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e),
     })
 }
 
@@ -295,7 +257,7 @@ async fn us_seed_sql(count: i64, prefix: Option<String>, password: Option<String
 /// so the UI can open it in the OS file manager.
 #[tauri::command]
 async fn us_results_dir<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
-    let (_, results_dir) = match data_dirs(&app) {
+    let results_dir = match results_dir(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -315,7 +277,7 @@ async fn us_export_report<R: Runtime>(
     file: String,
     dest: String,
 ) -> Result<CliResult, ()> {
-    let (_, results_dir) = match data_dirs(&app) {
+    let results_dir = match results_dir(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -333,7 +295,7 @@ async fn us_export_report<R: Runtime>(
 /// validating it parses as a report. Returns the imported filename.
 #[tauri::command]
 async fn us_import_report<R: Runtime>(app: AppHandle<R>, src: String) -> Result<CliResult, ()> {
-    let (_, results_dir) = match data_dirs(&app) {
+    let results_dir = match results_dir(&app) {
         Ok(d) => d,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -373,8 +335,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             us_cancel,
             us_history,
             us_report,
-            us_settings_load,
-            us_settings_save,
             us_seed_sql,
             us_results_dir,
             us_export_report,
