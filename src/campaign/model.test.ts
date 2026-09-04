@@ -171,7 +171,13 @@ describe("parseCampaignJson — media playback", () => {
         id: "c1",
         title: "T",
         backgroundPlayback: { autoplay: false, loop: true },
-        missions: [{ id: "m1", title: "M", snapshot: {} }],
+        missions: [
+          {
+            id: "m1",
+            title: "M",
+            snapshot: { mapName: "Comet Catcher", gameName: "BAR" },
+          },
+        ],
       }),
     );
     expect(c!.backgroundPlayback).toEqual({ autoplay: false, loop: true });
@@ -211,5 +217,66 @@ describe("parseCampaignJson - attached scenario", () => {
     expect(
       parseCampaignJson(campaignJson({ scenario: "nonsense" })),
     ).toBeNull();
+  });
+});
+
+describe("parseCampaignJson - snapshot validation", () => {
+  // run.ts reads snapshot.mapName and snapshot.gameName as plain strings to
+  // look up the map and game before launch, so a document missing either is
+  // refused rather than reaching the launcher (issue #2473).
+  it("rejects a mission whose snapshot has no mapName", () => {
+    expect(
+      parseCampaignJson(
+        JSON.stringify({
+          type: "ta",
+          id: "c1",
+          title: "T",
+          missions: [{ id: "m1", title: "M", snapshot: { gameName: "BAR" } }],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects a mission whose snapshot has a non-string mapName", () => {
+    expect(
+      parseCampaignJson(
+        JSON.stringify({
+          type: "ta",
+          id: "c1",
+          title: "T",
+          missions: [
+            {
+              id: "m1",
+              title: "M",
+              snapshot: { mapName: 123, gameName: "BAR" },
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("passes a valid snapshot through unchanged", () => {
+    const snapshot = {
+      participants: [],
+      mapName: "Comet Catcher",
+      gameName: "BAR",
+      startPosType: 1,
+      modOptionValues: { fixedallies: "1" },
+      restrictions: {
+        disabledUnits: ["armcom"],
+        advantage: 0.1,
+        incomeMultiplier: 1.2,
+      },
+    };
+    const c = parseCampaignJson(
+      JSON.stringify({
+        type: "ta",
+        id: "c1",
+        title: "T",
+        missions: [{ id: "m1", title: "M", snapshot }],
+      }),
+    );
+    expect(c!.missions[0].snapshot).toEqual(snapshot);
   });
 });

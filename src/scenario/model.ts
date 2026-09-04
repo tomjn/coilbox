@@ -1152,8 +1152,14 @@ function parseBattleRestrictions(
  * (`defaultSkirmishDraft`), and every committed scenario fixture carries them
  * well-formed, so a wrong-typed extra there is dropped in favour of that
  * default instead of failing a document that would otherwise load fine.
+ *
+ * Exported because `parseCampaignJson` validates a mission's `snapshot` the
+ * same way, against the same type, for the same reason (issue #2473): both
+ * are a `SkirmishDraft` an untrusted document hands straight to a launcher.
  */
-function parseSetup(value: Record<string, unknown>): SkirmishDraft | null {
+export function parseSetup(
+  value: Record<string, unknown>,
+): SkirmishDraft | null {
   const mapName = str(value.mapName);
   const gameName = str(value.gameName);
   if (mapName === undefined || gameName === undefined) return null;

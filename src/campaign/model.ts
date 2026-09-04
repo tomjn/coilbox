@@ -3,6 +3,7 @@ import type { SkirmishDraft } from "../play/drafts";
 import {
   type Difficulty,
   parseScenario,
+  parseSetup,
   type Scenario,
 } from "../scenario/model";
 
@@ -317,8 +318,10 @@ function stringArray(value: unknown): string[] {
  * {@link Campaign}, or `null` if the shape doesn't match. This is the single
  * untrusted-input validator (a bundled or imported campaign is untrusted) and the
  * future schema-migration point. Missing optional fields are normalized to
- * defaults (objectives → [], disabledUnits → [], skippable → false); a document is
- * rejected outright if a mission lacks a snapshot or the ids aren't unique.
+ * defaults (objectives → [], disabledUnits → [], skippable → false). A document
+ * is rejected outright if a mission lacks a snapshot, its snapshot has no
+ * `mapName` or `gameName` string (see `parseSetup`, issue #2473), or the ids
+ * aren't unique.
  */
 export function parseCampaignJson(json: string): Campaign | null {
   let data: unknown;
@@ -373,8 +376,20 @@ export function parseCampaignJson(json: string): Campaign | null {
     const m = raw as Record<string, unknown>;
     if (typeof m.id !== "string" || m.id === "" || seen.has(m.id)) return null;
     if (typeof m.title !== "string") return null;
-    // The snapshot is the launch payload; a mission without one is unplayable.
-    if (typeof m.snapshot !== "object" || m.snapshot === null) return null;
+    // The snapshot is the launch payload. A mission without one is unplayable.
+    // run.ts reads snapshot.mapName and snapshot.gameName as plain strings to
+    // look up the map and game before launch, so parseSetup rejects the whole
+    // campaign when either is missing or the wrong type, the same failure
+    // parseScenario reports for its own setup block (issue #2473).
+    if (
+      typeof m.snapshot !== "object" ||
+      m.snapshot === null ||
+      Array.isArray(m.snapshot)
+    ) {
+      return null;
+    }
+    const snapshot = parseSetup(m.snapshot as Record<string, unknown>);
+    if (!snapshot) return null;
     // An attached scenario is optional, but a *present* one that will not parse
     // rejects the campaign rather than being dropped. Dropping it would leave a
     // mission that still launches and quietly plays as a plain skirmish, with
@@ -412,7 +427,7 @@ export function parseCampaignJson(json: string): Campaign | null {
         ? undefined
         : parseUnitPreview(m.sideGraphicUnit),
       mapDownload: parseMapDownload(m.mapDownload),
-      snapshot: m.snapshot as SkirmishDraft,
+      snapshot,
       scenario,
       disabledUnits: stringArray(m.disabledUnits),
       skippable: m.skippable === true,
