@@ -2,6 +2,7 @@ import type { MapDownloadHint } from "../campaign/model";
 import { parseMapDownload } from "../campaign/model";
 import type { GameRef } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
+import { clamp } from "../lib/helpers";
 
 /**
  * Roguelite-run schema — the single source of truth for the shape of an active
@@ -281,9 +282,6 @@ export const emptyMeta: RogueliteMeta = {
 // Parsing / validation. A saved run is untrusted on load (it may predate a
 // schema change), so parse defensively and repair rather than trust the blob.
 // ---------------------------------------------------------------------------
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, v));
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;

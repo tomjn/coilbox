@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
+import { clamp } from "@/lib/helpers";
 import { toRoman } from "../../../conquest/names";
 import {
   BracketFrame,
@@ -22,9 +23,6 @@ import {
   StatCard,
 } from "../../../conquest/pages/components/hudChrome";
 import type { RogueliteRun } from "../../model";
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, v));
 
 /** Difficulty tier -> flavour word for the trailing badge. */
 const DIFFICULTY_WORD = [

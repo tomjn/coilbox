@@ -8,6 +8,7 @@ import {
   nodeMapsFrom,
   parseNodeMaps,
 } from "../challenge/nodeMaps";
+import { clamp } from "../lib/helpers";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
 import { applyChallengeMaps, generateGalaxy } from "./generate";
 import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
@@ -49,9 +50,6 @@ const LAYOUTS: readonly (GalaxyLayout | "random" | "realstars")[] = [
   "random",
   "realstars",
 ];
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, v));
 
 /**
  * Build a challenge's settings from a saved galaxy doc. Only procedurally

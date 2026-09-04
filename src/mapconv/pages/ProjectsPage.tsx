@@ -12,15 +12,10 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
+import { basename } from "@/lib/helpers";
 import { mcOpenPath } from "../bindings";
 import { getImageInfo } from "../imageCache";
 import { type MapProject, useMapProjects } from "../projects";
-
-/** The last path segment (handles both / and \ separators). */
-function basename(p: string): string {
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(i + 1) : p;
-}
 
 /**
  * Mapping projects hub: a gallery of map folders the user has decompiled or

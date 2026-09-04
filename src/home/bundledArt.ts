@@ -41,6 +41,7 @@
  */
 
 import { mulberry32 } from "../conquest/rng";
+import { clamp } from "../lib/helpers";
 import type { CardArtSource, CardScheme } from "./art";
 import {
   FALLBACK_THEME_COLOR,
@@ -1730,10 +1731,6 @@ function diamond(x: number, y: number, r: number): string {
 /** Two decimal places, so the markup stays short. */
 function round(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n));
 }
 
 /** An `hsl()` colour, with every component rounded and wrapped into range. */

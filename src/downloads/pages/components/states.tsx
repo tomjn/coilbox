@@ -1,10 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { errorText } from "@/lib/helpers";
 
-/** Normalise a thrown value to a display string. */
-export function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
+/**
+ * Normalise a thrown value to a display string. Re-exported under its
+ * original name (see `@/lib/errorText`, issue #2434) so its 15+ existing
+ * importers are unaffected.
+ */
+export const errMessage = errorText;
 
 /** Centered icon + message for "nothing here yet" / "select something" states. */
 export function EmptyState({

@@ -18,6 +18,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { basename, errorText } from "@/lib/helpers";
 import {
   type CompileOpts,
   type CompressionType,
@@ -44,10 +45,6 @@ import { MapPreview3D } from "./components/MapPreview3D";
 import { OptionSelect } from "./components/OptionSelect";
 import { PathField } from "./components/PathField";
 
-function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
 const TEXTURE_FILTERS = [
   {
     name: "Images",
@@ -66,12 +63,6 @@ const CT_OPTIONS = [
 function dirname(p: string): string {
   const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
   return i >= 0 ? p.slice(0, i) : "";
-}
-
-/** The last path segment (handles both / and \ separators). */
-function basename(p: string): string {
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(i + 1) : p;
 }
 
 /** Parse a numeric form string, falling back when empty/invalid. */
@@ -227,7 +218,7 @@ export default function CompilePage() {
           lastOutDir: outDir,
         });
     } catch (e) {
-      setRunError(errMessage(e));
+      setRunError(errorText(e));
     } finally {
       setRunning(false);
       runIdRef.current = null;

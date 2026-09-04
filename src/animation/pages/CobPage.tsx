@@ -15,11 +15,8 @@ import {
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
+import { errorText } from "@/lib/helpers";
 import { animBos2cob, animCobDisasm } from "../bindings";
-
-function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
 
 const COB = /\.cob$/i;
 const BOS = /\.bos$/i;
@@ -85,7 +82,7 @@ export default function CobPage() {
       });
       await disassemble(res.output);
     } catch (e) {
-      setBanner({ kind: "error", text: errMessage(e) });
+      setBanner({ kind: "error", text: errorText(e) });
     } finally {
       setBusy(false);
     }
@@ -101,7 +98,7 @@ export default function CobPage() {
     try {
       await disassemble(p);
     } catch (e) {
-      setBanner({ kind: "error", text: errMessage(e) });
+      setBanner({ kind: "error", text: errorText(e) });
     } finally {
       setBusy(false);
     }
@@ -121,7 +118,7 @@ export default function CobPage() {
     try {
       await revealItemInDir(revealTarget);
     } catch (e) {
-      setBanner({ kind: "error", text: errMessage(e) });
+      setBanner({ kind: "error", text: errorText(e) });
     }
   }
 

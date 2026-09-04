@@ -1,5 +1,6 @@
 import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
 import { parseImageRef, parseMapDownload } from "../campaign/model";
+import { clamp } from "../lib/helpers";
 import { expandRevealed } from "./fog";
 
 /**
@@ -266,9 +267,6 @@ function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === "string");
 }
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, v));
 
 function parseFaction(value: unknown): Faction | null {
   if (typeof value !== "object" || value === null) return null;

@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { basename } from "@/lib/helpers";
 import type { LegoAtlas } from "../../atlas";
 import {
   legoImport3do,
@@ -73,10 +74,13 @@ export type ImportStage =
       notes?: string[];
     };
 
-/** The file's own name, which is what an opened unit is called by default. */
+/**
+ * The file's own name, which is what an opened unit is called by default.
+ * The last path segment (see `@/lib/basename`) with a trailing `.s3o`
+ * stripped, since that's redundant on a name shown next to "Imported".
+ */
 function baseName(path: string): string {
-  const file = path.split(/[\\/]/).at(-1) ?? path;
-  return file.replace(/\.s3o$/i, "");
+  return basename(path).replace(/\.s3o$/i, "");
 }
 
 /**

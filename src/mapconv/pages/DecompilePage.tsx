@@ -16,6 +16,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { basename, errorText } from "@/lib/helpers";
 import { versionLabel } from "@/lib/utils";
 import {
   type LogLine,
@@ -32,10 +33,6 @@ import { type DecompileResult, useDecompileDraft } from "../drafts";
 import { useMapProjects } from "../projects";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
-
-function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
 
 const INPUT_FILTERS = [
   { name: "Spring map or archive", extensions: ["smf", "sdz", "sd7"] },
@@ -54,12 +51,6 @@ function dirname(p: string): string {
 function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") ? "\\" : "/";
   return `${dir}${sep}${name}`;
-}
-
-/** The last path segment (handles both / and \ separators). */
-function basename(p: string): string {
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(i + 1) : p;
 }
 
 /** The decompile result panel's data (shared with the persisted draft). */
@@ -190,7 +181,7 @@ export default function DecompilePage() {
       });
       if (cfg.rememberDirs) setCfg({ ...cfg, lastSmfDir: dirname(inputPath) });
     } catch (e) {
-      setRunError(errMessage(e));
+      setRunError(errorText(e));
     } finally {
       setRunning(false);
       runIdRef.current = null;
