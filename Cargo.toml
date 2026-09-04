@@ -37,6 +37,25 @@ members = [
   "crates/tauri-plugin-coilbox-direct",
 ]
 
+# Line tables rather than full debug info. A backtrace or a panic still names
+# the file and the line, which is what anyone reads here. What goes is the
+# variable-level information only a debugger uses. Across 33 crates, and with
+# `--all-targets` building every test binary as well, that information was the
+# bulk of a target directory that reached 42 GiB and filled the disk.
+#
+# Incremental compilation stays on. It costs disk but keeps the edit-and-check
+# loop short, which matters more day to day. Note that sccache cannot cache an
+# incremental build, so the two do not combine.
+#
+# `split-debuginfo` is deliberately not set. It moves debug info between the
+# binary, .o files and a .dSYM bundle, and changes link times, but it does not
+# reduce how much debug info exists. The level does that.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
+
 [workspace.dependencies]
 # SHA-256 is where a render key spends its time, and every `source_hash` coilbox
 # uploads goes through it too, so the five members that hash share one
