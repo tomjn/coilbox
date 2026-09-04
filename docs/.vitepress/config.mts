@@ -65,6 +65,7 @@ export default defineConfig({
           { text: "The unit builder", link: "/lego-builder" },
           { text: "Lego parts pack", link: "/lego-parts-pack" },
           { text: "The mission runtime", link: "/mission-runtime" },
+          { text: "Lobby moderation", link: "/lobby-moderation" },
         ],
       },
       {
