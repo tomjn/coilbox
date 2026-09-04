@@ -77,3 +77,7 @@ serde = { version = "1", features = ["derive"] }
 # The JSON encoder/decoder every crate above uses alongside serde, and two more
 # besides (a build-dependency and one with no serde derive of its own).
 serde_json = "1"
+
+# One throwaway-directory implementation for the 12 crates whose tests (and, in
+# two cases, runtime code) need a real filesystem location that isn't anyone's.
+tempfile = "3"

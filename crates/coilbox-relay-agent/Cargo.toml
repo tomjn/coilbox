@@ -68,4 +68,4 @@ tokio = { version = "1", features = [
 tokio = { version = "1", features = ["time", "test-util"] }
 
 # A directory to put a run file in that is not somebody's real one.
-tempfile = "3"
+tempfile = { workspace = true }

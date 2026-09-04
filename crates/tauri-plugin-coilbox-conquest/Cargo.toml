@@ -19,4 +19,4 @@ picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }

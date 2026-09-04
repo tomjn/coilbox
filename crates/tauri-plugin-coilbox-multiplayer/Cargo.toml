@@ -20,7 +20,7 @@ tokio = { version = "1", features = ["test-util"] }
 tauri-plugin-coilbox-direct = { path = "../tauri-plugin-coilbox-direct" }
 # A directory to write a relay agent's run file into that is not somebody's
 # real one.
-tempfile = "3"
+tempfile = { workspace = true }
 # Minting the time limited credential that `tests/relayed_battle.rs` hands a
 # real coturn: the TURN REST API password is the base64 of an HMAC-SHA1 over
 # the username, and the username carries the expiry. Both of these are already

@@ -16,4 +16,4 @@ serde_json = { workspace = true }
 [dev-dependencies]
 # The run file lock is the one thing here that is not pure, so proving it needs
 # a real file on a real filesystem rather than a description of one.
-tempfile = "3"
+tempfile = { workspace = true }

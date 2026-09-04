@@ -19,4 +19,4 @@ serde_json = { workspace = true }
 [dev-dependencies]
 # A throwaway tree for the VFS listing tests, so the two spellings of one folder
 # a case-sensitive filesystem allows can be built and torn down.
-tempfile = "3"
+tempfile = { workspace = true }
