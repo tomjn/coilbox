@@ -1,7 +1,8 @@
 import { Boxes } from "lucide-react";
 import { Link } from "react-router";
+import { formatBytes } from "@/lib/format";
 import { useArchives, useScanTargetSelection } from "../config";
-import { formatBytes, isSdd } from "../format";
+import { isSdd } from "../format";
 import { ArchiveTypeBadge, PrimaryBadge } from "./components/ArchiveTypeBadge";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { SddBadge } from "./components/SddBadge";

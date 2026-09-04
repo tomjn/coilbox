@@ -164,7 +164,7 @@ describe("a relayed battle", () => {
     carrying(41984);
     await drawBadge(true);
 
-    expect(pillSays()).toContain("Relaying 41.0 KB/s");
+    expect(pillSays()).toContain("Relaying 41 KB/s");
   });
 
   /**
@@ -183,7 +183,7 @@ describe("a relayed battle", () => {
   it("follows the relay rather than showing the first figure it heard", async () => {
     carrying(41984);
     await drawBadge(true);
-    expect(pillSays()).toContain("Relaying 41.0 KB/s");
+    expect(pillSays()).toContain("Relaying 41 KB/s");
 
     carrying(0);
     await act(async () => {
@@ -269,7 +269,7 @@ describe("a relay coilbox can see but cannot get a figure out of", () => {
   it("keeps the warning when a poll fails outright", async () => {
     carrying(41984);
     await drawBadge(true);
-    expect(relaySays()).toBe("Relaying 41.0 KB/s");
+    expect(relaySays()).toBe("Relaying 41 KB/s");
 
     relayTraffic.mockRejectedValue(new Error("the call never landed"));
     await act(async () => {

@@ -7,9 +7,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { formatBytes } from "@/lib/format";
 import { type CacheReclaimSummary, contentReclaimCaches } from "../../bindings";
 import { isEmpty, nonEmptyCaches, summarizeCaches } from "../../caches";
-import { formatBytes } from "../../rapidPool";
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);

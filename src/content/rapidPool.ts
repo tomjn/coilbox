@@ -5,6 +5,7 @@
  * module stays free of binding imports (and thus unit-testable).
  */
 
+import { formatBytes } from "@/lib/format";
 import type { PruneSummary } from "./bindings";
 
 /**
@@ -14,19 +15,6 @@ import type { PruneSummary } from "./bindings";
  */
 export function canPrune(active: unknown, queuedCount: number): boolean {
   return active == null && queuedCount === 0;
-}
-
-/** Human-readable byte size (base-1024), e.g. `1.5 MB`. */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  let n = bytes / 1024;
-  let i = 0;
-  while (n >= 1024 && i < units.length - 1) {
-    n /= 1024;
-    i++;
-  }
-  return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${units[i]}`;
 }
 
 /** Total reclaimable bytes a prune summary represents. */

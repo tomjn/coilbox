@@ -14,13 +14,13 @@ import { Blocks } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { builderOpenUrl } from "@/lego/archiveOpen";
+import { formatBytes } from "@/lib/format";
 import {
   MODEL_PREVIEW_CAP,
   type ModelFormat,
   modelTooLargeToPreview,
 } from "../../archiveModel";
 import { useUnitsyncUnitModel } from "../../config";
-import { formatBytes } from "../../format";
 import { countPieces, countTriangles } from "../../unitModel";
 import { ModelNotes, ModelViewport } from "./ModelViewport";
 import { Centered } from "./states";

@@ -1,8 +1,8 @@
 import { cn } from "@picoframe/frame";
 import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
+import { formatBytes } from "@/lib/format";
 import type { ArchiveFileEntry } from "../../bindings";
-import { formatBytes } from "../../format";
 
 interface DirNode {
   dirs: Map<string, DirNode>;

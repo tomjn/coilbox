@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { formatBytes } from "@/lib/format";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
@@ -97,7 +98,7 @@ const PAGE = 200;
 
 function archiveSubtitle(a: ReleaseArchive): string {
   const parts: string[] = [];
-  if (a.size) parts.push(`${(a.size / 1_048_576).toFixed(1)} MB`);
+  if (a.size) parts.push(formatBytes(a.size));
   if (a.tag) parts.push(a.tag);
   return parts.join(" · ");
 }
@@ -107,7 +108,7 @@ function springSubtitle(f: SpringFile): string {
   if (f.metadata.author) parts.push(`by ${f.metadata.author}`);
   if (f.metadata.width && f.metadata.height)
     parts.push(`${f.metadata.width}×${f.metadata.height}`);
-  if (f.size) parts.push(`${(f.size / 1_048_576).toFixed(1)} MB`);
+  if (f.size) parts.push(formatBytes(f.size));
   return parts.join(" · ");
 }
 

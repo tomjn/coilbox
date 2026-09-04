@@ -2,9 +2,9 @@ import { Button } from "@picoframe/frame";
 import { Check, Copy, Download, FileQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatBytes } from "@/lib/format";
 import { modelFormatFor } from "../../archiveModel";
 import type { ArchiveFileResult } from "../../bindings";
-import { formatBytes } from "../../format";
 import { ArchiveModelPreview } from "./ArchiveModelPreview";
 import { Centered } from "./states";
 

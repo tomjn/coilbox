@@ -8,8 +8,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { formatBytes } from "@/lib/format";
 import { contentDeleteEngine, type EngineUsage } from "../../bindings";
-import { formatBytes } from "../../format";
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);

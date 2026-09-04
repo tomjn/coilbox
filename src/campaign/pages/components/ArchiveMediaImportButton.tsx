@@ -15,7 +15,7 @@ import {
   useUnitsyncArchiveTree,
   useUnitsyncScan,
 } from "@/content/config";
-import { formatBytes } from "@/content/format";
+import { formatBytes } from "@/lib/format";
 import { usePreferredTarget } from "@/play/config";
 import {
   type CampaignImageKind,

@@ -20,11 +20,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { formatBytes, formatDuration } from "@/lib/format";
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
-import {
-  formatBytes,
-  QueueProgress,
-} from "../../downloads/pages/components/ProgressBar";
+import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { useReplayTarget } from "../../play/config";
@@ -50,7 +48,6 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
-import { formatDuration } from "../matchStats";
 import { provenanceLink } from "../replayProvenanceLink";
 import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";

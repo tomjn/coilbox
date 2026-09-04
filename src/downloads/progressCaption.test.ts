@@ -28,7 +28,7 @@ describe("progressCaption", () => {
       rate({ bytesPerSec: 3.5 * MB, secondsLeft: 10 }),
       4,
     );
-    expect(caption).toBe("12.0 MB of 48.0 MB · 3.5 MB/s · 10s left");
+    expect(caption).toBe("12 MB of 48 MB · 3.5 MB/s · 10s left");
   });
 
   it("leaves the percentage out when the byte total says the same thing", () => {
@@ -74,7 +74,7 @@ describe("progressCaption", () => {
       rate({ bytesPerSec: 3.5 * MB }),
       30,
     );
-    expect(caption).toBe("12.0 MB · 3.5 MB/s · 30s elapsed");
+    expect(caption).toBe("12 MB · 3.5 MB/s · 30s elapsed");
   });
 
   it("says a stalled download is stalled rather than quoting zero", () => {
@@ -83,7 +83,7 @@ describe("progressCaption", () => {
       rate({ stalled: true }),
       130,
     );
-    expect(caption).toBe("12.0 MB of 48.0 MB · stalled · 2m 10s elapsed");
+    expect(caption).toBe("12 MB of 48 MB · stalled · 2m 10s elapsed");
   });
 
   it("names the extraction phase when there is nothing else to name", () => {

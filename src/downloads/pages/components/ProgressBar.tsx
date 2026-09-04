@@ -1,21 +1,9 @@
 import { cn } from "@picoframe/frame";
 import { useEffect, useId, useState } from "react";
 import { Progress } from "@/components/ui/progress";
+import { formatBytes } from "@/lib/format";
 import type { DownloadProgress } from "../../bindings";
 import { type DownloadRate, formatDuration } from "../../downloadRate";
-
-/** Human-readable bytes, e.g. `6.9 MB`. */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  let v = bytes;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
 
 /** Human-readable transfer rate, e.g. `3.4 MB/s`. */
 export function formatSpeed(bytesPerSec: number): string {

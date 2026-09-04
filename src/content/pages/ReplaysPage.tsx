@@ -22,8 +22,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatBytes } from "@/lib/format";
 import { mostRecentOpen } from "@/lib/recency";
-import { formatBytes } from "../../downloads/pages/components/ProgressBar";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
   useReplays,

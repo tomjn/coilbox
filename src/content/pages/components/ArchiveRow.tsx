@@ -1,9 +1,9 @@
 import { Button } from "@picoframe/frame";
 import { Boxes } from "lucide-react";
 import { Link, useNavigate } from "react-router";
+import { formatBytes } from "@/lib/format";
 import type { Archive } from "../../bindings";
 import type { ArchiveClassification } from "../../config";
-import { formatBytes } from "../../format";
 import { ArchiveTypeBadge } from "./ArchiveTypeBadge";
 
 /**

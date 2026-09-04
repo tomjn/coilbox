@@ -4,6 +4,7 @@ import { ArrowLeft, FolderOpen, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatBytes } from "@/lib/format";
 import { modelFormatFor } from "../archiveModel";
 import {
   type Archive,
@@ -16,7 +17,7 @@ import {
   useUnitsyncArchiveFile,
   useUnitsyncArchiveTree,
 } from "../config";
-import { formatBytes, isDeletableArchive, isSdd } from "../format";
+import { isDeletableArchive, isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { ArchiveTree } from "./components/ArchiveTree";
 import { ArchiveTypeBadge, PrimaryBadge } from "./components/ArchiveTypeBadge";

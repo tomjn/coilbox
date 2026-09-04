@@ -27,7 +27,7 @@ import {
   gameIdentityForName,
   type InstalledGameInfo,
 } from "../container/gameIdentity";
-import { formatBytes } from "../content/rapidPool";
+import { formatBytes } from "../lib/format";
 import type { Footprint } from "./footprint";
 import type { BaseBlueprint } from "./model";
 import {

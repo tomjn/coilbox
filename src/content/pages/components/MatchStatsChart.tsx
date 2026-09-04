@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatDuration } from "@/lib/format";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
 import {
   allySeries,
@@ -38,7 +39,6 @@ import {
   type EndPoint,
   endPoints,
   formatChartValue,
-  formatDuration,
   formatRate,
   metricGroups,
   modeRows,

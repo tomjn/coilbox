@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatBytes } from "@/lib/format";
 import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
 import {
   type ContentRoot,
@@ -23,7 +24,6 @@ import {
   type StorageOverview,
 } from "../bindings";
 import { useContentState, usePreferredEngine } from "../config";
-import { formatBytes } from "../format";
 import { canPrune } from "../rapidPool";
 import { BulkDeleteReplaysPanel } from "./components/BulkDeleteReplaysPanel";
 import { DeleteEngineButton } from "./components/DeleteEngineButton";
