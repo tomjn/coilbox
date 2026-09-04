@@ -93,3 +93,9 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 # The .sd7/7z reader downloads, mapconv and scenario all use, pinned once
 # instead of three times.
 sevenz-rust2 = "0.21.1"
+
+# The decoder/encoder backend shared by six crates. Each enables a different
+# subset of formats for its own reason (see the comment at each call site), so
+# only the version and default-features toggle are shared here. Features stay
+# declared per crate.
+image = { version = "0.25", default-features = false }

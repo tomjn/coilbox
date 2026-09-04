@@ -18,7 +18,7 @@ serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 uuid = { version = "1", features = ["v4"] }
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
     "png",
     "jpeg",
     "gif",

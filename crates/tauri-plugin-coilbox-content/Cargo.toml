@@ -23,7 +23,7 @@ notify = "8"
 zip = { workspace = true }
 base64 = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
     "png",
     "jpeg",
     "gif",

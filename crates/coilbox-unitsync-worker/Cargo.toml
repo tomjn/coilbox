@@ -21,7 +21,7 @@ serde_json = { workspace = true }
 # jpeg/bmp/gif decoders (and jpeg encoder) are enabled too. `tiff` is decoded
 # through `coilbox-texture` (issue #1915) and named here so the tests can write
 # one, which costs nothing: the same feature is already on in the graph.
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
     "png",
     "tga",
     "jpeg",

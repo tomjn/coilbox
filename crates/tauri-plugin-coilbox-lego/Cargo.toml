@@ -33,7 +33,7 @@ sha2 = { workspace = true }
 # the legacy games ship, so all three are re-encoded to PNG on the way into the
 # store. `coilbox-texture` does the decoding. These are the encoders the tests
 # write their fixtures with.
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
   "png",
   "bmp",
   "tga",

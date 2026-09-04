@@ -15,7 +15,7 @@ texpresso = "2"
 # TGA has no magic bytes. `tiff` is here because Basically OTA paints four of its
 # core units with one (issue #1915), and it costs no new crate: the `tiff` decoder
 # is already in the lock file.
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
     "png",
     "tga",
     "jpeg",
