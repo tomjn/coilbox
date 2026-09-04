@@ -18,11 +18,11 @@ None of the three blocks the work. Each shapes it.
 
 ### How to read the citations
 
-Upstream protocol claims cite paths in `beyond-all-reason/tachyon` at tag `v1.23.0` or `beyond-all-reason/teiserver` at master, and are prefixed `tachyon:` or `teiserver:`. Coilbox claims cite repository paths with line numbers.
+Upstream protocol claims cite paths in `beyond-all-reason/tachyon` at tag `v1.23.0` or `beyond-all-reason/teiserver` at master, and are prefixed `tachyon:` or `teiserver:`. Coilbox claims cite a file plus a function or type name rather than a line number, since coilbox is under active development and line numbers go stale (issue #2430).
 
 ## What Tachyon is, and how it differs from TASServer
 
-TASServer is a line protocol. A client writes `JOINBATTLE 42 pass 0`, the server writes back lines beginning with verbs, and the client parses each line positionally. Coilbox handles this in `crates/coilbox-lobby-protocol/src/message.rs:338`, where `parse_line` is a single match with 70 verb arms.
+TASServer is a line protocol. A client writes `JOINBATTLE 42 pass 0`, the server writes back lines beginning with verbs, and the client parses each line positionally. Coilbox handles this in `parse_line`, in `crates/coilbox-lobby-protocol/src/message.rs`, a single match with 76 verb arms.
 
 Tachyon is a different kind of protocol in five ways.
 
@@ -30,7 +30,7 @@ Tachyon is a different kind of protocol in five ways.
 
 The connection is a WebSocket at `wss://<server>/tachyon`, with `ws://` allowed for localhost only (`tachyon:docs/connection.md`). Messages are UTF-8 JSON text frames. Binary frames are a protocol error, and Teiserver closes the connection with code `1003` when it sees one (`teiserver:lib/teiserver/tachyon/transport.ex`).
 
-Authorisation happens on the HTTP upgrade request, as an `Authorization: Bearer <token>` header. There is no in-band login exchange and no equivalent of our STLS upgrade dance at `crates/tauri-plugin-coilbox-multiplayer/src/tls.rs:50-74`. TLS is negotiated by the HTTP client before the WebSocket exists.
+Authorisation happens on the HTTP upgrade request, as an `Authorization: Bearer <token>` header. There is no in-band login exchange and no equivalent of our STLS upgrade dance, `connect_stream` and `stls_upgrade` in `crates/tauri-plugin-coilbox-multiplayer/src/tls.rs`. TLS is negotiated by the HTTP client before the WebSocket exists.
 
 Protocol version is negotiated through the WebSocket subprotocol. The client lists the versions it supports in `Sec-WebSocket-Protocol`, formatted as `{version}.tachyon`, where version is `v{major}[.{minor}]`. The server picks the highest it also supports and echoes it in the response header. A server must accept a higher minor than it knows if the major matches, because minor versions only add optional extensions. The only version that exists today is `v0`, and Teiserver hardcodes the string `v0.tachyon` at `teiserver:lib/teiserver_web/controllers/tachyon.ex` line 54.
 
@@ -284,7 +284,7 @@ One wrinkle: under Tachyon there is no login exchange at all. The token is prese
 
 The browser handoff has no phase of its own because it is a separate command with no connection and no event channel behind it. It resolves when the user finishes in the browser. Reusing `ready` as the end state is what keeps every frontend gate working unchanged.
 
-Our `password_hash` helper at `crates/coilbox-lobby-protocol/src/hash.rs:12` computes `base64(md5(pw))` and is TASServer-only. It stays, unused by the Tachyon path.
+Our `password_hash` helper in `crates/coilbox-lobby-protocol/src/hash.rs` computes `base64(md5(pw))` and is TASServer-only. It stays, unused by the Tachyon path.
 
 ## What it costs us
 
@@ -292,12 +292,12 @@ Going surface by surface through coilbox as it stands.
 
 ### Survives untouched
 
-- `LobbyState` at `crates/coilbox-lobby-protocol/src/state.rs:176`. It stays the single authoritative struct and the frontend contract.
+- The `LobbyState` struct in `crates/coilbox-lobby-protocol/src/state.rs`. It stays the single authoritative struct and the frontend contract.
 - The `Delta` type and its 38 variants. Deltas carry locations rather than payloads, so they are already protocol-agnostic.
-- `src/multiplayer/bindings.ts` state types, the `mp_snapshot` call, and the replace-whole-state pattern at `src/multiplayer/store.tsx:920`.
+- `src/multiplayer/bindings.ts` state types, the `mpSnapshot` calls, and the replace-whole-state `snapshot` action in `src/multiplayer/store.tsx`.
 - The four nav gating hooks, `useMpRevealed`, `useMpDisconnected`, `useMpInBattle`, and `useBattleRoomLabel`.
 - The seven consumers outside `src/multiplayer`, including `home/continue.ts`, `ResumeRail`, `Greeting`, and `AutojoinChannels`. The last of these degrades to a no-op on a Tachyon connection because there are no channels to auto-join.
-- `battle_to_host_config` at `crates/tauri-plugin-coilbox-multiplayer/src/lib.rs:1131-1259` and everything downstream of `BattleConfig`. It reads `LobbyState`, not the wire, so it works for a Tachyon battle as long as the state is populated. Its wire-id renumbering and its 0..200 to 0..1 start-rect conversion are TASServer-shaped, so a Tachyon path needs its own mapping into the same `BattleConfig`.
+- `battle_to_host_config` in `crates/tauri-plugin-coilbox-multiplayer/src/lib.rs` and everything downstream of `BattleConfig`. It reads `LobbyState`, not the wire, so it works for a Tachyon battle as long as the state is populated. Its wire-id renumbering and its 0..200 to 0..1 start-rect conversion are TASServer-shaped, so a Tachyon path needs its own mapping into the same `BattleConfig`.
 - The 34 vitest files and 461 pure-function cases.
 - `tests/login_transcript.rs` and the transcript testing pattern. Tachyon gets its own transcript test in the same shape, feeding recorded JSON frames through parse and reduce and asserting the resulting `LobbyState`.
 
@@ -307,7 +307,7 @@ Going surface by surface through coilbox as it stands.
 - The `LobbyEvent` channel and its five kinds. `console` currently carries raw wire lines in both directions for the debug drawer. It keeps doing that, carrying pretty-printed JSON frames instead of newline-delimited text.
 - The login phase machine, as described above.
 - `LobbyServer` in `src/lobby-servers/config.ts`, which gains a `protocol` field.
-- Two host obligations hardcoded in the read loop, `REQUESTBATTLESTATUS` to `MYBATTLESTATUS` at `conn.rs:235` and `JOINBATTLEREQUEST` to `JOINBATTLEACCEPT` at `conn.rs:244`. Neither has a Tachyon equivalent, because the server owns lobby admission. They stay on the TASServer path only.
+- Two host obligations hardcoded in the read loop, the `ServerMessage::RequestBattleStatus` and `ServerMessage::JoinBattleRequest` arms in `conn.rs`, which reply with `MYBATTLESTATUS` and `JOINBATTLEACCEPT` respectively. Neither has a Tachyon equivalent, because the server owns lobby admission. They stay on the TASServer path only.
 
 ### Has no Tachyon equivalent
 
@@ -370,7 +370,7 @@ The practical consequence is that the two backends share `state.rs`, `status.rs`
 
 We add `protocol: "tasserver" | "tachyon"`, defaulting to `"tasserver"`. Existing stored configuration and existing keychain entries keep working with no migration, because an absent field reads as the default. `migration.ts` already establishes the pattern for changing stored server shapes, with a pure `planMigration` that returns described keychain moves rather than performing IO, so if we later need to move keys we have the mechanism.
 
-`serverKey` is derived as `${username}@${host}:${port}` at `src/multiplayer/store.tsx:84`. A Tachyon server's identity is a URL origin rather than a host and port, so a Tachyon entry stores a port of 443 and the key shape survives. That is slightly artificial but it avoids touching every consumer of `serverKey`.
+`serverKey` is derived as `${username}@${host}:${port}` by `serverKeyFor` in `src/multiplayer/store.tsx`. A Tachyon server's identity is a URL origin rather than a host and port, so a Tachyon entry stores a port of 443 and the key shape survives. That is slightly artificial but it avoids touching every consumer of `serverKey`.
 
 The frontend uses the discriminator to hide surfaces the connected protocol cannot serve: the channel list, the channel directory, moderation menus, and the Host button on Tachyon, and parties and matchmaking on TASServer.
 
