@@ -127,27 +127,6 @@ async fn conquest_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult
     CliResult::ok(json!({}))
 }
 
-/// `conquest_export` — write a caller-serialized galaxy export document to a
-/// caller-chosen path (opaque; the frontend builds the export shape and picks
-/// the destination via the save dialog).
-#[tauri::command]
-async fn conquest_export(json: String, dest: String) -> CliResult {
-    match std::fs::write(&dest, json) {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(format!("could not write galaxy export: {e}")),
-    }
-}
-
-/// `conquest_import` — read a galaxy export file the user picked and hand its
-/// raw contents back for the frontend to parse and validate.
-#[tauri::command]
-async fn conquest_import(src: String) -> CliResult {
-    match std::fs::read_to_string(&src) {
-        Ok(json) => CliResult::ok(json!({ "json": json })),
-        Err(e) => CliResult::err(format!("could not read galaxy import: {e}")),
-    }
-}
-
 /// `conquest_state_load` — the opaque `state.json`, or an empty default when
 /// it doesn't exist yet.
 #[tauri::command]
@@ -185,8 +164,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             conquest_list,
             conquest_save,
             conquest_delete,
-            conquest_export,
-            conquest_import,
             conquest_state_load,
             conquest_state_save
         ])

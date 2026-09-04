@@ -1,13 +1,11 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the conquest plugin's galaxy storage, import/export and run-state commands."
+description = "Allows the conquest plugin's galaxy storage and run-state commands."
 permissions = [
   "allow-conquest-list",
   "allow-conquest-save",
   "allow-conquest-delete",
-  "allow-conquest-export",
-  "allow-conquest-import",
   "allow-conquest-state-load",
   "allow-conquest-state-save",
 ]

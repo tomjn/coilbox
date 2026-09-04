@@ -6,8 +6,6 @@ const COMMANDS: &[&str] = &[
     "conquest_list",
     "conquest_save",
     "conquest_delete",
-    "conquest_export",
-    "conquest_import",
     "conquest_state_load",
     "conquest_state_save",
 ];
