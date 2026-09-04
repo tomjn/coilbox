@@ -38,6 +38,7 @@
  */
 
 import { hashString, mulberry32, pick, type Rng } from "../conquest/rng";
+import { clamp } from "../lib/helpers";
 import type { CardScheme } from "./art";
 
 /** Canvas the pattern is authored against. Cards crop it with `object-fit`. */
@@ -232,10 +233,6 @@ function jitter(rand: Rng, spread: number): number {
 /** Two decimal places, so the markup stays short and comparisons stay exact. */
 function round(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n));
 }
 
 /** An `hsl()` colour, with every component rounded and wrapped into range. */
