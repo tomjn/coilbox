@@ -3,7 +3,6 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, History, Play, Swords } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Popover,
@@ -694,13 +693,17 @@ export default function SkirmishPage() {
     openedPreset.current = openPresetId;
     const preset = presets.find((p) => p.id === openPresetId);
     if (!preset) {
-      toast.warning(
-        "That preset isn't here any more. It may have been deleted.",
-      );
+      void notify({
+        title: "That preset isn't here any more. It may have been deleted.",
+        level: "warning",
+      });
       return;
     }
     loadPreset(preset);
-    toast.success(`Loaded the preset "${preset.name}".`);
+    void notify({
+      title: `Loaded the preset "${preset.name}".`,
+      level: "success",
+    });
   }, [openPresetId, scan.loading, presets]);
 
   return (
