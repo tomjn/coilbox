@@ -389,9 +389,8 @@ function restrictions(scenario: Scenario): LuaTable {
 }
 
 /** A `setup` string field, when the captured skirmish actually carries one. */
-function setupString(scenario: Scenario, field: string): string | undefined {
-  const value = (scenario.setup as unknown as Record<string, unknown>)[field];
-  return typeof value === "string" && value !== "" ? value : undefined;
+function setupString(value: string): string | undefined {
+  return value !== "" ? value : undefined;
 }
 
 function mission(scenario: Scenario): LuaTable {
@@ -401,8 +400,8 @@ function mission(scenario: Scenario): LuaTable {
     ["id", scenario.id],
     ["name", scenario.name],
     ["description", scenario.description],
-    ["game", setupString(scenario, "gameName")],
-    ["map", setupString(scenario, "mapName")],
+    ["game", setupString(scenario.setup.gameName)],
+    ["map", setupString(scenario.setup.mapName)],
     ["teams", teams(scenario)],
     ["zones", scenario.zones.map(zone)],
     [
