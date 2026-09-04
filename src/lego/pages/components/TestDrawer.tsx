@@ -13,7 +13,7 @@ import { Button, useSetting } from "@picoframe/frame";
 import { FolderOpen, Rocket, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
-
+import { OptionSelect } from "@/components/OptionSelect";
 import { primeScan, useUnitsyncScan } from "../../../content/config";
 import {
   isScratchArchive,
@@ -28,7 +28,6 @@ import {
   usePreferredTarget,
 } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
-import { OptionSelect } from "@/components/OptionSelect";
 import { exportTextureName, unitAtlas } from "../../atlas";
 import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
 import { unitScript } from "../../luaScript";

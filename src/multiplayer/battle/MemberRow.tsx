@@ -9,6 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -24,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { OptionSelect } from "@/components/OptionSelect";
 import { NoteButton } from "../NoteButton";
 import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
 import { BonusButton } from "./BonusButton";

@@ -39,6 +39,7 @@ import { buildGridSnap } from "@/blueprint/footprint";
 import { useBlueprintLibrary } from "@/blueprint/store";
 import { blueprintFromPayload } from "@/blueprint/transfer";
 import { knownUnits } from "@/blueprint/units";
+import { OptionSelect } from "@/components/OptionSelect";
 import { useUnitsyncScan } from "@/content/config";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
@@ -50,7 +51,6 @@ import {
 import type { PreviewBuilding } from "@/placement/preview";
 import type { GestureKeys, GroundDragPhase } from "@/placement/useMapEditing";
 import { usePreferredTarget } from "@/play/config";
-import { OptionSelect } from "@/components/OptionSelect";
 import {
   baseBuildings,
   type Point,

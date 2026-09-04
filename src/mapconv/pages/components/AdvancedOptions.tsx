@@ -76,9 +76,7 @@ export default function AdvancedOptions({
             <HelpTip>
               <span>
                 Defines the terrain elevation. A grayscale image where{" "}
-                <strong>
-                  white is the highest point and black the lowest
-                </strong>
+                <strong>white is the highest point and black the lowest</strong>
                 . Greys are heights in between. It should be{" "}
                 <code>(texture ÷ 8) + 1</code> pixels on each side (e.g. an
                 8192px texture needs a 1025px heightmap).
@@ -100,9 +98,8 @@ export default function AdvancedOptions({
             <HelpTip>
               <span>
                 Marks where reclaimable/extractable metal is. The{" "}
-                <strong>red channel</strong> sets metal density (brighter red
-                = more); paint small red spots where you want metal spots in
-                game.
+                <strong>red channel</strong> sets metal density (brighter red =
+                more); paint small red spots where you want metal spots in game.
               </span>
             </HelpTip>
           }
@@ -140,9 +137,9 @@ export default function AdvancedOptions({
           help={
             <HelpTip>
               <span>
-                The low-resolution overview image players see in the lobby
-                and the in-game minimap. If omitted, the engine can derive one
-                from the texture.
+                The low-resolution overview image players see in the lobby and
+                the in-game minimap. If omitted, the engine can derive one from
+                the texture.
               </span>
             </HelpTip>
           }
@@ -160,8 +157,8 @@ export default function AdvancedOptions({
           help={
             <HelpTip>
               <span>
-                Controls where engine grass/vegetation grows. A grayscale
-                image where brighter = denser grass.
+                Controls where engine grass/vegetation grows. A grayscale image
+                where brighter = denser grass.
               </span>
             </HelpTip>
           }
@@ -179,10 +176,10 @@ export default function AdvancedOptions({
           help={
             <HelpTip>
               <span>
-                Places map features (trees, rocks, wreckage). A text file
-                with one feature per line:{" "}
-                <code>[tdfname] [x] [y] [z] [rotation]</code>, where tdfname
-                is the feature's definition name.
+                Places map features (trees, rocks, wreckage). A text file with
+                one feature per line:{" "}
+                <code>[tdfname] [x] [y] [z] [rotation]</code>, where tdfname is
+                the feature's definition name.
               </span>
             </HelpTip>
           }
@@ -226,9 +223,9 @@ export default function AdvancedOptions({
             help={
               <HelpTip>
                 <span>
-                  The in-world height (in map units) that pure white maps to
-                  — the map's highest point. The gap between min and max sets
-                  how steep the terrain is.
+                  The in-world height (in map units) that pure white maps to —
+                  the map's highest point. The gap between min and max sets how
+                  steep the terrain is.
                 </span>
               </HelpTip>
             }

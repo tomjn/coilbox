@@ -7,8 +7,8 @@
  * belongs to, and the selection bar, which changes what an existing one does.
  */
 
-import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/components/OptionSelect";
+import type { Participant } from "@/play/config";
 
 export function TeamSelect({
   participants,

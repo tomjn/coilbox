@@ -21,9 +21,9 @@
 import { Button, Input } from "@picoframe/frame";
 import { Ban, Lock, Plus, X } from "lucide-react";
 import { useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
-import { OptionSelect } from "@/components/OptionSelect";
 import type { Scenario } from "../../model";
 import { notifyDeleted } from "./deleteNotice";
 import { EditorPanel } from "./panels";

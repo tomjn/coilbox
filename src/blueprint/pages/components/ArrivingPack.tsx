@@ -30,10 +30,9 @@
 
 import { Button } from "@picoframe/frame";
 import { Blocks, Download, Loader2, Repeat } from "lucide-react";
-
+import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { OptionSelect } from "@/components/OptionSelect";
 import type { ArrivalNote } from "../../arrival";
 import {
   orderPack,

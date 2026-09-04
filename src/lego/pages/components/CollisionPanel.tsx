@@ -16,10 +16,9 @@
 
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
-
+import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { OptionSelect } from "@/components/OptionSelect";
 import {
   COLLISION_VOLUME_LABELS,
   effectiveCollisionVolume,

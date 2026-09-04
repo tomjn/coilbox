@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Code2, FilePlus2, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,7 +9,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { OptionSelect } from "@/components/OptionSelect";
 import { compareGameVersions } from "../../../conquest/model";
 import { useReplayTarget } from "../../../play/config";
 import { contentRewriteDemo } from "../../bindings";

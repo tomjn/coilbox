@@ -387,9 +387,9 @@ export default function CompilePage() {
                   The diffuse colour image painted across the whole map. Its
                   width and height set the map's size and{" "}
                   <strong>must each be a multiple of 1024</strong> (e.g. 1024,
-                  2048, 8192). Name companion images{" "}
-                  <code>heightmap.png</code>, <code>metalmap.png</code>, etc.
-                  in the same folder and they auto-fill below.
+                  2048, 8192). Name companion images <code>heightmap.png</code>,{" "}
+                  <code>metalmap.png</code>, etc. in the same folder and they
+                  auto-fill below.
                 </span>
               </HelpTip>
             }
@@ -442,8 +442,7 @@ export default function CompilePage() {
                   trade-off of file size, speed and quality:
                   <br />1 — none (largest file, fastest build)
                   <br />2 — fast (compares the last N tiles)
-                  <br />3 — insane (compares the whole map; smallest, very
-                  slow)
+                  <br />3 — insane (compares the whole map; smallest, very slow)
                   <br />4 — high quality fast (recommended)
                 </span>
               </HelpTip>

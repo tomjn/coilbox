@@ -22,9 +22,9 @@
 import { Button } from "@picoframe/frame";
 import { Copy, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { OptionSelect } from "@/components/OptionSelect";
 import type { Scenario, ScenarioObjective } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { notifyDeleted } from "./deleteNotice";

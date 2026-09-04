@@ -1,8 +1,8 @@
 import { useEffect } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
 import { useUnitsyncGameInfo } from "../../../content/config";
-import { OptionSelect } from "@/components/OptionSelect";
 import { shapeClipPath } from "../../galaxy3d/factionShape";
 import { HUD_ACCENT_INK } from "./hudChrome";
 

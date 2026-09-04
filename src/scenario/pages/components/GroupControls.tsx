@@ -30,6 +30,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { Boxes, Pencil, Plus, Route, Trash2, X } from "lucide-react";
 import { useId, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -41,7 +42,6 @@ import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
-import { OptionSelect } from "@/components/OptionSelect";
 import type { GroupUnit, ScenarioGroup, ScenarioOrder } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
