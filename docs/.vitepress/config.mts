@@ -66,6 +66,7 @@ export default defineConfig({
           { text: "Lego parts pack", link: "/lego-parts-pack" },
           { text: "The mission runtime", link: "/mission-runtime" },
           { text: "Lobby moderation", link: "/lobby-moderation" },
+          { text: "Tachyon protocol", link: "/tachyon-protocol" },
         ],
       },
       {
