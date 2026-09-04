@@ -72,7 +72,7 @@ pub fn store(dir: &Path, source: &Path) -> Result<Stored, String> {
     let ext = extension(source);
     let (ext, payload) = match to_webview_format(&ext, &bytes) {
         Some(png) => ("png".to_string(), png),
-        None => (if ext.is_empty() { "bin".into() } else { ext }, bytes),
+        None => (ext, bytes),
     };
 
     let key = format!("{}.{ext}", hex(&Sha256::digest(&payload)));
@@ -227,11 +227,27 @@ fn find_in(dir: &Path, name: &str) -> Option<PathBuf> {
     None
 }
 
+/// `Path::extension`, lower cased and sanitised the way a stem already is
+/// elsewhere in this crate.
+///
+/// `Path::extension` cannot hold a slash, since that would split it into
+/// another path component, but on macOS and Linux it can hold a colon. The
+/// store keys a file `<sha256>.<ext>`, so a colon written there would fail
+/// outright on Windows and is now unservable everywhere else too: the
+/// `coilbox://` asset protocol rejects a path segment containing one
+/// (issue #2425). A non-alphanumeric extension falls back to `bin` rather
+/// than being written into that key unchanged.
 fn extension(path: &Path) -> String {
-    path.extension()
+    let ext = path
+        .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
-        .to_lowercase()
+        .to_lowercase();
+    if !ext.is_empty() && ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+        ext
+    } else {
+        "bin".to_string()
+    }
 }
 
 /// Re-encode a texture the webview cannot decode, or `None` to store the bytes
@@ -732,5 +748,40 @@ mod tests {
         assert!(!dir.path().join("a.dds").exists());
         // A store that was never written is nothing to prune, not an error.
         assert_eq!(prune(&dir.path().join("gone"), &[]), 0);
+    }
+
+    #[test]
+    fn extension_passes_a_normal_one_through_lower_cased() {
+        assert_eq!(extension(Path::new("skin.PNG")), "png");
+    }
+
+    /// On macOS and Linux `Path::extension` can hold a colon: a source named
+    /// `skin.d:ds` would otherwise be stored as `<sha256>.d:ds`, which fails
+    /// outright on Windows and on NTFS selects an alternate data stream rather
+    /// than naming a file. The `coilbox://` asset protocol also now rejects a
+    /// path segment containing a colon (issue #2425), so a key spelled that way
+    /// could not be served even where the write itself would succeed.
+    #[test]
+    fn extension_falls_back_to_bin_for_one_with_a_colon() {
+        assert_eq!(extension(Path::new("skin.d:ds")), "bin");
+    }
+
+    #[test]
+    fn extension_falls_back_to_bin_when_there_is_none() {
+        assert_eq!(extension(Path::new("skin")), "bin");
+    }
+
+    /// The sanitised extension reaches the store key `store` writes, not just
+    /// the helper in isolation.
+    #[test]
+    fn a_colon_in_the_source_extension_does_not_reach_the_store_key() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("skin.d:ds");
+        std::fs::write(&source, b"not really a texture").expect("write");
+
+        let stored = store(&dir.path().join("textures"), &source).expect("store");
+
+        assert!(stored.key.ends_with(".bin"), "got: {}", stored.key);
+        assert!(!stored.key.contains(':'), "got: {}", stored.key);
     }
 }

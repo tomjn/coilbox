@@ -802,10 +802,19 @@ pub(crate) fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String
 /// open and no hash to recompute.
 pub(crate) fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
     let lower = member.to_lowercase();
-    let ext = match source_ext.to_lowercase().as_str() {
-        "bmp" | "tga" | "tif" | "tiff" | "pcx" => "png".to_string(),
-        "" => "bin".to_string(),
-        other => other.to_string(),
+    let source_ext = source_ext.to_lowercase();
+    // `source_ext` comes from `rsplit_once('.')` on the archive member's own
+    // path, which can never hold a dot but can hold a `/`, `\` or `:`: a slash
+    // sends the write to a directory that does not exist, and a colon fails
+    // outright on Windows and picks an NTFS alternate data stream elsewhere.
+    // Sanitised the same way `safe` below sanitises the stem.
+    let ext = if !source_ext.is_empty() && source_ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+        match source_ext.as_str() {
+            "bmp" | "tga" | "tif" | "tiff" | "pcx" => "png".to_string(),
+            other => other.to_string(),
+        }
+    } else {
+        "bin".to_string()
     };
     let safe: String = lower
         .chars()
@@ -1168,5 +1177,32 @@ mod tests {
         // written as they arrived rather than the texture going missing.
         assert!(to_webview_format("tiff", &tiff, true).is_some());
         assert!(to_webview_format("tif", b"II not really a tiff", true).is_none());
+    }
+
+    #[test]
+    fn cache_file_name_passes_a_normal_extension_through_lower_cased() {
+        let name = cache_file_name("abc123", "unittextures/skin.PNG", "PNG");
+        assert!(name.ends_with(".png"), "got: {name}");
+    }
+
+    /// A zip entry named `unittextures/logo.png/x` gives `rsplit_once('.')` an
+    /// extension of `png/x`. Written unchanged it would send the cache write to
+    /// a directory that does not exist, so the file is never written and the
+    /// texture never appears.
+    #[test]
+    fn cache_file_name_falls_back_to_bin_for_an_extension_with_a_slash() {
+        let name = cache_file_name("abc123", "unittextures/logo.png/x", "png/x");
+        assert!(name.ends_with(".bin"), "got: {name}");
+        assert!(!name.contains('/'), "got: {name}");
+    }
+
+    /// A zip entry named `unittextures/skin.d:ds` gives an extension of `d:ds`.
+    /// A colon fails outright on Windows, and on NTFS a colon in the middle of a
+    /// name selects an alternate data stream rather than the file.
+    #[test]
+    fn cache_file_name_falls_back_to_bin_for_an_extension_with_a_colon() {
+        let name = cache_file_name("abc123", "unittextures/skin.d:ds", "d:ds");
+        assert!(name.ends_with(".bin"), "got: {name}");
+        assert!(!name.contains(':'), "got: {name}");
     }
 }
