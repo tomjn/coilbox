@@ -7,7 +7,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -20,6 +19,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { isGeneratedGame } from "@/lib/generatedGames";
+import { notify } from "@/notify/notify";
 import {
   type GameMissionEntry,
   type RuntimeMarker,
@@ -357,9 +357,12 @@ function WrittenMissions({ root }: { root: string }) {
     try {
       await scenarioDeleteMission({ root, scenarioId: mission.id });
       setFolders((current) => current.filter((id) => id !== mission.id));
-      toast.success(`Removed ${mission.name ?? mission.id} from the game.`);
+      void notify({
+        title: `Removed ${mission.name ?? mission.id} from the game.`,
+        level: "success",
+      });
     } catch (e) {
-      toast.error(msg(e));
+      void notify({ title: msg(e), level: "error" });
     } finally {
       setRemoving(null);
     }
@@ -444,9 +447,10 @@ function DuplicateFolders({
     setError(null);
     try {
       const result = await scenarioRuntimeConsolidate({ root, apply: true });
-      toast.success(
-        `Merged the runtime folders, ${result.files.length} duplicate files removed.`,
-      );
+      void notify({
+        title: `Merged the runtime folders, ${result.files.length} duplicate files removed.`,
+        level: "success",
+      });
       setOpen(false);
       onDone();
     } catch (e) {
@@ -646,9 +650,10 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
       const result = await scenarioRuntimeInstall({ root });
       setInstalled(result.installed);
       setInstalledError(null);
-      toast.success(
-        `Mission runtime version ${result.installed.version} installed, ${result.files.length} files.`,
-      );
+      void notify({
+        title: `Mission runtime version ${result.installed.version} installed, ${result.files.length} files.`,
+        level: "success",
+      });
       // An install can leave the game with a second spelling of a tree it did
       // not write to, so what is duplicated is asked again rather than assumed.
       refresh();

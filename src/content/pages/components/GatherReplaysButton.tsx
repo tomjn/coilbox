@@ -1,13 +1,13 @@
 import { Button } from "@picoframe/frame";
 import { FolderInput, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatBytes } from "@/lib/format";
+import { notify } from "@/notify/notify";
 import { contentGatherReplays, type GatherSummary } from "../../bindings";
 
 const msg = (e: unknown): string =>
@@ -77,7 +77,7 @@ export function GatherReplaysButton({
         root: rootPath,
         apply: true,
       });
-      toast.success(summarize(summary));
+      void notify({ title: summarize(summary), level: "success" });
       setOpen(false);
       onGathered();
     } catch (e) {

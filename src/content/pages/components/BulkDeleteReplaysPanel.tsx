@@ -1,7 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
@@ -16,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatBytes } from "@/lib/format";
+import { notify } from "@/notify/notify";
 import {
   contentDeleteReplays,
   contentListReplays,
@@ -124,13 +124,15 @@ export function BulkDeleteReplaysPanel({
         paths: selection.paths,
         apply: true,
       });
-      toast.success(
-        `Deleted ${summary.deleted} ${summary.deleted === 1 ? "replay" : "replays"}, freeing ${formatBytes(summary.bytes) ?? "0 B"}.`,
-      );
+      void notify({
+        title: `Deleted ${summary.deleted} ${summary.deleted === 1 ? "replay" : "replays"}, freeing ${formatBytes(summary.bytes) ?? "0 B"}.`,
+        level: "success",
+      });
       if (summary.skipped.length > 0) {
-        toast.warning(
-          `${summary.skipped.length} could not be deleted: ${summary.skipped[0]}`,
-        );
+        void notify({
+          title: `${summary.skipped.length} could not be deleted: ${summary.skipped[0]}`,
+          level: "warning",
+        });
       }
       setConfirming(false);
       const { replays } = await contentListReplays({ root: rootPath });

@@ -1,12 +1,12 @@
 import { Button } from "@picoframe/frame";
 import { HardDrive, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { notify } from "@/notify/notify";
 import { contentPruneRapidPool, type PruneSummary } from "../../bindings";
 import { isClean, summarize } from "../../rapidPool";
 
@@ -65,7 +65,7 @@ export function ReclaimSpaceButton({
         root: rootPath,
         apply: true,
       });
-      toast.success(summarize(summary));
+      void notify({ title: summarize(summary), level: "success" });
       setOpen(false);
     } catch (e) {
       setError(msg(e));

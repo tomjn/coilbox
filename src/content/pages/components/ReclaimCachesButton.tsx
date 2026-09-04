@@ -1,13 +1,13 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatBytes } from "@/lib/format";
+import { notify } from "@/notify/notify";
 import { type CacheReclaimSummary, contentReclaimCaches } from "../../bindings";
 import { isEmpty, nonEmptyCaches, summarizeCaches } from "../../caches";
 
@@ -50,7 +50,7 @@ export function ReclaimCachesButton() {
     setError(null);
     try {
       const { summary } = await contentReclaimCaches({ apply: true });
-      toast.success(summarizeCaches(summary));
+      void notify({ title: summarizeCaches(summary), level: "success" });
       setOpen(false);
     } catch (e) {
       setError(msg(e));
