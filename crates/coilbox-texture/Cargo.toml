@@ -23,4 +23,4 @@ image = { version = "0.25", default-features = false, features = [
     "gif",
     "tiff",
 ] }
-base64 = "0.22"
+base64 = { workspace = true }

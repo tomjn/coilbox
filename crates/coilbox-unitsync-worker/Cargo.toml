@@ -33,7 +33,7 @@ image = { version = "0.25", default-features = false, features = [
 # DXT/BCn-compressed, and the PNG encode every cache here writes. Shared with the
 # unit builder's Blender exports, which decode the same files (issue #715).
 coilbox-texture = { path = "../coilbox-texture" }
-base64 = "0.22"
+base64 = { workspace = true }
 # The one WebP encoder, lossy and lossless (issue #1623). It wraps libwebp-sys,
 # which vendors libwebp's C and builds it with `cc`, so there is no system
 # library and no pkg-config, and all three release targets build it natively with

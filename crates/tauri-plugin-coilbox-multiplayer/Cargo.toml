@@ -27,7 +27,7 @@ tempfile = { workspace = true }
 # in `Cargo.lock` at these versions, `ring` under `stun` and `rustls` and
 # `base64` under `stun`, so neither adds a package to the tree.
 ring = "0.17"
-base64 = "0.22"
+base64 = { workspace = true }
 # `tauri::test::mock_builder`, so the quit renewal can be driven through a real
 # `RunEvent::Exit` instead of being called by hand. `test` is an empty feature
 # list in tauri's manifest, so it adds no package to `Cargo.lock`, and asking

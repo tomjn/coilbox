@@ -81,3 +81,7 @@ serde_json = "1"
 # One throwaway-directory implementation for the 12 crates whose tests (and, in
 # two cases, runtime code) need a real filesystem location that isn't anyone's.
 tempfile = "3"
+
+# One codec for the tokens, hashes and other binary-to-text values that cross a
+# protocol or config boundary, shared by 9 crates instead of copied into each.
+base64 = "0.22"

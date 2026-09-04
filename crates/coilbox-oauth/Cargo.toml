@@ -15,7 +15,7 @@ serde_json = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 url = "2"
 sha2 = { workspace = true }
-base64 = "0.22"
+base64 = { workspace = true }
 getrandom = "0.3"
 # "sync" is for the per-account refresh lock in account.rs, which is held across
 # awaits and so cannot be a std one.
