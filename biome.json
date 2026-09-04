@@ -25,7 +25,20 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "sonner": {
+                "importNames": ["toast"],
+                "message": "Import notify() from @/notify/notify instead, so the message reaches the notifications bell (issue #2429). A deliberately raw toast (an instant confirmation, or one using a sonner feature notify() can't express) needs a per-file override in biome.json."
+              }
+            }
+          }
+        }
+      }
     }
   },
   "javascript": {
@@ -48,6 +61,21 @@
         "rules": {
           "correctness": {
             "useHookAtTopLevel": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/notify/notify.ts",
+        "src/deeplink/copyLink.ts",
+        "src/scenario/pages/components/deleteNotice.ts",
+        "src/settings-storage.dom.test.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
           }
         }
       }
