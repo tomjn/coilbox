@@ -4,6 +4,7 @@ import {
   type DemoInfo,
   type ReplayFile,
 } from "../content/bindings";
+import { sleep } from "../lib/helpers";
 import type { PlayTarget } from "./config";
 
 /**
@@ -20,8 +21,6 @@ export type DetectedResult = "victory" | "defeat" | "ambiguous";
 
 const RETRY_COUNT = 3;
 const RETRY_DELAY_MS = 1000;
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The replays present in `after` that weren't in `before` (by path). */
 export function diffNewReplays(

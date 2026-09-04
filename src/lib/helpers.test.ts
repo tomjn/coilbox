@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { clamp } from "./helpers";
+import { describe, expect, it, vi } from "vitest";
+import { clamp, sleep } from "./helpers";
 
 describe("clamp", () => {
   it("passes a value already inside the range through unchanged", () => {
@@ -25,5 +25,25 @@ describe("clamp", () => {
 
   it("propagates NaN rather than clamping it to a boundary", () => {
     expect(clamp(Number.NaN, 0, 10)).toBeNaN();
+  });
+});
+
+describe("sleep", () => {
+  it("resolves once the given delay has elapsed", async () => {
+    vi.useFakeTimers();
+    try {
+      let resolved = false;
+      sleep(1000).then(() => {
+        resolved = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(resolved).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
