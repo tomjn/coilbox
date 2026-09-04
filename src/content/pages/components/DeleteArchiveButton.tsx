@@ -7,13 +7,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { formatBytes } from "@/lib/format";
 import { contentDeleteArchive, contentRescan } from "../../bindings";
 import {
   invalidateScans,
   primeScan,
   useScanTargetSelection,
 } from "../../config";
-import { formatBytes } from "../../format";
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);

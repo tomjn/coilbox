@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bumpAiHandicap, describeOutcome, formatDuration } from "./debrief";
+import { bumpAiHandicap, describeOutcome } from "./debrief";
 import type { Participant } from "./participants";
 
 describe("describeOutcome", () => {
@@ -28,20 +28,6 @@ describe("describeOutcome", () => {
     expect(describeOutcome("decode-failed").headline).toMatch(
       /couldn't be read/i,
     );
-  });
-});
-
-describe("formatDuration", () => {
-  it("formats under an hour as mm:ss", () => {
-    expect(formatDuration(65)).toBe("1:05");
-  });
-
-  it("formats an hour or more as h:mm:ss", () => {
-    expect(formatDuration(3725)).toBe("1:02:05");
-  });
-
-  it("formats zero", () => {
-    expect(formatDuration(0)).toBe("0:00");
   });
 });
 

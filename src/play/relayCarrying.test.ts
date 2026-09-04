@@ -3,7 +3,7 @@ import { relayCarryingLabel } from "./relayCarrying";
 
 describe("what the pill says a relay is carrying", () => {
   it("names the rate in units somebody can read at a glance", () => {
-    expect(relayCarryingLabel(41984)).toBe("Relaying 41.0 KB/s");
+    expect(relayCarryingLabel(41984)).toBe("Relaying 41 KB/s");
     expect(relayCarryingLabel(600)).toBe("Relaying 600 B/s");
     expect(relayCarryingLabel(3_500_000)).toBe("Relaying 3.3 MB/s");
   });

@@ -11,12 +11,12 @@ import {
   gameIdentityForName,
   type InstalledGameInfo,
 } from "../container/gameIdentity";
-import { formatBytes } from "../content/rapidPool";
 import {
   type ContentRequirement,
   exactGameRequirement,
   exactMapRequirement,
 } from "../content/resolveContent";
+import { formatBytes } from "../lib/format";
 import { parseScenario, type Scenario } from "./model";
 
 /**

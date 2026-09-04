@@ -4,8 +4,8 @@
  * (free of binding imports) makes them unit-testable.
  */
 
+import { formatBytes } from "@/lib/format";
 import type { CacheReclaimSummary } from "./bindings";
-import { formatBytes } from "./rapidPool";
 
 /** True when a summary found nothing to reclaim. */
 export function isEmpty(s: CacheReclaimSummary): boolean {

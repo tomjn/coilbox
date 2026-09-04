@@ -2,13 +2,13 @@ import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { formatBytes } from "@/lib/format";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import {
   namedScenarioClips,
   previewOrphanedScenarioMedia,
   sweptCount,
 } from "../../../campaign/scenarioMedia";
-import { formatBytes } from "../../../content/rapidPool";
 import type { MediaSweepSummary } from "../../bindings";
 import { listScenarios, sweepScenarioMedia } from "../../storage";
 

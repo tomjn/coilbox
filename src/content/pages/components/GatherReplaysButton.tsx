@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { formatBytes } from "../../../downloads/pages/components/ProgressBar";
+import { formatBytes } from "@/lib/format";
 import { contentGatherReplays, type GatherSummary } from "../../bindings";
 
 const msg = (e: unknown): string =>

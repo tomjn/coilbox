@@ -15,13 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatBytes } from "@/lib/format";
 import {
   contentDeleteReplays,
   contentListReplays,
   type ReplayDeleteSummary,
   type ReplayFile,
 } from "../../bindings";
-import { formatBytes } from "../../format";
 import { SHORT_REPLAY_SECONDS } from "../../replayFilterVisibility";
 import { useReplayUserState } from "../../replayUserState";
 import {

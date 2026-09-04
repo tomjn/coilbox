@@ -8,6 +8,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { formatDuration } from "@/lib/format";
 import type {
   DemoInfo,
   DemoTrailer,
@@ -15,12 +16,7 @@ import type {
   MetricGroup,
 } from "../../bindings";
 import { contentMetricRegistry, contentReplayTrailer } from "../../bindings";
-import {
-  formatDuration,
-  hasStatistics,
-  headlineTotals,
-  seatCount,
-} from "../../matchStats";
+import { hasStatistics, headlineTotals, seatCount } from "../../matchStats";
 import { teamResultLabel } from "../../replaySideLabel";
 import { MatchStatsChart } from "./MatchStatsChart";
 import { StatCard } from "./StatWidgets";

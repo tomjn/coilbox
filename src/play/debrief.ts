@@ -42,17 +42,6 @@ export function describeOutcome(reason: DebriefReason): {
   }
 }
 
-/** Seconds -> `mm:ss` (or `h:mm:ss`), mirroring the replay pages' formatter
- * (`ReplaysPage`/`ReplayDetailPage`). */
-export function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
 /** The handicap nudges offered by "Rematch with a tweak" — a single quick
  * adjustment applied to every AI opponent. Deliberately simple: #354 is the
  * separate, richer per-AI difficulty control. */

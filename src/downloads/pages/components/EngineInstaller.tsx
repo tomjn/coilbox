@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatBytes } from "@/lib/format";
 import { dlRecoilEngines, dlSpringfilesEngines } from "../../bindings";
 import { useWriteRoot } from "../../config";
 import {
@@ -17,13 +18,6 @@ import {
 import { OptionSelect } from "./OptionSelect";
 import { QueueProgress } from "./ProgressBar";
 import { errMessage } from "./states";
-
-/** Human-readable byte size for engine archives. */
-function fmtSize(bytes: number): string {
-  if (!bytes) return "";
-  const mb = bytes / 1_048_576;
-  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
-}
 
 type Source = EngineSource;
 
@@ -76,7 +70,7 @@ export function EngineInstaller() {
           res.releases.map((r) => ({
             key: r.version,
             title: r.version,
-            subtitle: fmtSize(r.size),
+            subtitle: formatBytes(r.size),
             prerelease: r.prerelease,
             assetUrl: r.assetUrl,
           })),
@@ -89,7 +83,7 @@ export function EngineInstaller() {
           res.engines.map((e) => ({
             key: e.version,
             title: `${e.name} ${e.version}`.trim(),
-            subtitle: fmtSize(e.size),
+            subtitle: formatBytes(e.size),
             detail: e.filename,
           })),
         );

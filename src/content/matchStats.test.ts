@@ -22,7 +22,6 @@ import {
   END_LABEL_MAX_SERIES,
   endPoints,
   formatChartValue,
-  formatDuration,
   formatRate,
   formatTableValue,
   formatTotal,
@@ -137,17 +136,8 @@ function info(over: Partial<DemoInfo> = {}): DemoInfo {
   };
 }
 
-describe("formatDuration", () => {
-  it("counts minutes and seconds", () => {
-    expect(formatDuration(0)).toBe("0:00");
-    expect(formatDuration(65)).toBe("1:05");
-    expect(formatDuration(600)).toBe("10:00");
-  });
-
-  it("grows an hours field rather than counting to 90 minutes", () => {
-    expect(formatDuration(3725)).toBe("1:02:05");
-  });
-});
+/* `formatDuration` used to live here. It is now `@/lib/format`'s, shared with
+ * the skirmish debrief (issue #2426), and covered by `lib/format.test.ts`. */
 
 /* `resultLabel` used to live here, naming the same sides "Ally 0, Ally 2 won"
  * while every other surface said "Team 1, Team 3 won". Its three cases are now

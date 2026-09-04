@@ -71,7 +71,7 @@ it("says how much a relay left running is carrying", async () => {
   found(true, 41984);
   await drawPill();
 
-  expect(pillSays()).toBe("Relaying 41.0 KB/s");
+  expect(pillSays()).toBe("Relaying 41 KB/s");
 });
 
 /**
@@ -101,7 +101,7 @@ it("says a relay is there without a figure it has not been given", async () => {
 it("follows the relay rather than showing the first figure it heard", async () => {
   found(true, 41984);
   await drawPill();
-  expect(pillSays()).toBe("Relaying 41.0 KB/s");
+  expect(pillSays()).toBe("Relaying 41 KB/s");
 
   found(true, 0);
   await act(async () => {
@@ -115,7 +115,7 @@ it("follows the relay rather than showing the first figure it heard", async () =
 it("goes away when the relay stops", async () => {
   found(true, 41984);
   await drawPill();
-  expect(pillSays()).toBe("Relaying 41.0 KB/s");
+  expect(pillSays()).toBe("Relaying 41 KB/s");
 
   found(false);
   await act(async () => {

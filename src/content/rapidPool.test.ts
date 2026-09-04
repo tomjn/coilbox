@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PruneSummary } from "./bindings";
-import {
-  canPrune,
-  formatBytes,
-  isClean,
-  reclaimedBytes,
-  summarize,
-} from "./rapidPool";
+import { canPrune, isClean, reclaimedBytes, summarize } from "./rapidPool";
 
 const summary = (over: Partial<PruneSummary> = {}): PruneSummary => ({
   applied: false,
@@ -27,15 +21,6 @@ describe("canPrune", () => {
   });
   it("blocks while items are queued", () => {
     expect(canPrune(null, 2)).toBe(false);
-  });
-});
-
-describe("formatBytes", () => {
-  it("formats across units", () => {
-    expect(formatBytes(512)).toBe("512 B");
-    expect(formatBytes(1024)).toBe("1.0 KB");
-    expect(formatBytes(1024 * 1024 * 5)).toBe("5.0 MB");
-    expect(formatBytes(1024 * 1024 * 1024 * 20)).toBe("20 GB");
   });
 });
 

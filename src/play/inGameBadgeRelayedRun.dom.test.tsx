@@ -203,7 +203,7 @@ it("warns about the relay on the game that is going through it", async () => {
   await startRun("host");
 
   await waitFor(async () =>
-    expect(await pillSays()).toContain("Relaying 41.0 KB/s"),
+    expect(await pillSays()).toContain("Relaying 41 KB/s"),
   );
   screen.getByRole("button", { name: "End game" }).click();
   expect(playCancel).not.toHaveBeenCalled();
@@ -213,7 +213,7 @@ it("warns about the relay on the game that is going through it", async () => {
 it("says nothing about a relay left running behind a later skirmish", async () => {
   const relayed = await startRun("host");
   await waitFor(async () =>
-    expect(await pillSays()).toContain("Relaying 41.0 KB/s"),
+    expect(await pillSays()).toContain("Relaying 41 KB/s"),
   );
   relayed.finish();
   await waitFor(() =>

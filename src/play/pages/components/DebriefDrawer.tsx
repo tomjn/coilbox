@@ -11,7 +11,8 @@ import {
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 import { Link } from "react-router";
-import { formatDuration, HANDICAP_TWEAKS } from "@/play/debrief";
+import { formatDuration } from "@/lib/format";
+import { HANDICAP_TWEAKS } from "@/play/debrief";
 import type { SkirmishDebrief } from "@/play/useSkirmishDebrief";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { SkirmishDraft } from "../../drafts";

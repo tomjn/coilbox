@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { isBlackHex } from "@/lib/teamColor";
 import { PALETTE, rgbToHex } from "@/play/participants";
 import type {
@@ -22,16 +23,6 @@ import { teamLabel } from "./replaySideLabel";
  * - Every sample field is a running total for the match so far, so a match total
  *   is the last sample of each team's series added up, never a sum over samples.
  */
-
-/** Seconds to `mm:ss` (or `h:mm:ss`). */
-export function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
 
 /** How many seats played: humans who weren't spectating, plus every bot. */
 export function seatCount(info: DemoInfo): number {
