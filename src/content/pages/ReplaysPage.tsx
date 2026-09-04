@@ -30,6 +30,7 @@ import {
   useScanTargetSelection,
   useUnitsyncThumbnails,
 } from "../config";
+import { formatDuration } from "../matchStats";
 import {
   computeReplayFilterVisibility,
   isShortReplay,
@@ -112,17 +113,6 @@ const dateOf = (r: { startTimeMs?: number; modifiedMs: number }) =>
 
 /** A skill value for a column, rounded to one decimal (or `—`). */
 const fmtSkill = (v?: number) => (v == null ? "—" : v.toFixed(1));
-
-/** Seconds → `mm:ss` (or `h:mm:ss`). */
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
-  return h > 0
-    ? `${h}:${mm}:${String(s).padStart(2, "0")}`
-    : `${mm}:${String(s).padStart(2, "0")}`;
-}
 
 /** The mode badge for a replay's row/detail header, when its origin is known. */
 export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
