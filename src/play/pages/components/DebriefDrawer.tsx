@@ -14,7 +14,7 @@ import { Link } from "react-router";
 import { formatDuration } from "@/lib/format";
 import { HANDICAP_TWEAKS } from "@/play/debrief";
 import type { SkirmishDebrief } from "@/play/useSkirmishDebrief";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { SkirmishDraft } from "../../drafts";
 import { SaveAsPresetButton } from "./SaveAsPresetButton";
 

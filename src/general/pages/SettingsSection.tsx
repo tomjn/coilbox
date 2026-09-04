@@ -2,7 +2,7 @@ import { Maximize2, Sparkles, Wrench } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
-import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { useAdvancedModeSetting } from "../advanced";
 import {
   type ReduceMotionSetting,

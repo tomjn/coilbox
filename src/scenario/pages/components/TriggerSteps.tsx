@@ -31,7 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useFieldText } from "@/lib/useFieldText";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import {
   amountVar,

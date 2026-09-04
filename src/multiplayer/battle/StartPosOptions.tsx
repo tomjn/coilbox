@@ -1,5 +1,5 @@
 import { START_POS_OPTIONS } from "@/play/pages/components/GameOptionsPanel";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { Battle } from "../bindings";
 import { STARTPOSTYPE_KEY } from "./battleOptions";
 import { useBattleOptions } from "./useBattleOptions";

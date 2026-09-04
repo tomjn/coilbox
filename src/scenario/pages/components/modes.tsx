@@ -50,7 +50,7 @@ import {
 import type { PreviewBuilding } from "@/placement/preview";
 import type { GestureKeys, GroundDragPhase } from "@/placement/useMapEditing";
 import { usePreferredTarget } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   baseBuildings,
   type Point,

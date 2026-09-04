@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
 import { useUnitsyncGameInfo } from "../../../content/config";
-import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { shapeClipPath } from "../../galaxy3d/factionShape";
 import { HUD_ACCENT_INK } from "./hudChrome";
 

@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/popover";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { mpZerokOpenBattle, ZerokBattleMode } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
 import {

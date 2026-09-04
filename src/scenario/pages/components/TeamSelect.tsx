@@ -8,7 +8,7 @@
  */
 
 import type { Participant } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 
 export function TeamSelect({
   participants,

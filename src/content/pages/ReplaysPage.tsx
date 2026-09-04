@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { mostRecentOpen } from "@/lib/recency";
-import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   useReplays,
   useScanTargetSelection,

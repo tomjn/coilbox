@@ -70,7 +70,7 @@ import { MapCard } from "@/play/pages/components/MapCard";
 import { ParticipantsTable } from "@/play/pages/components/ParticipantsTable";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { Scenario } from "../../model";
 import type { LoadedScenario } from "../../storage";
 import { defsMissingFrom, type MissionIssue, unitDefsIn } from "../../validate";

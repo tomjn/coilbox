@@ -28,7 +28,7 @@ import {
   minigamePips,
   orderedAis,
 } from "@/play/gameAi";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   aiByline,
   effectiveTeams,

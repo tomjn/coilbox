@@ -17,7 +17,7 @@
  */
 
 import { useId } from "react";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   DIFFICULTIES,
   type Difficulty,

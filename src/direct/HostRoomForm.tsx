@@ -17,7 +17,7 @@ import { Button, Input, useDrawer } from "@picoframe/frame";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Checkbox } from "@/components/ui/checkbox";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   DEFAULT_HOST_PORT,
   type OpenBattleArgs,

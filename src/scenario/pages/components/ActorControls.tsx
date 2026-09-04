@@ -52,7 +52,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { ActorState, Facing, ScenarioActor } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";

@@ -1,10 +1,10 @@
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CheckField, Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 import { usScenarios } from "../bindings";
 import { useUberstressConfig } from "../config";
-import { CheckField, Field } from "./components/Field";
-import { OptionSelect } from "./components/OptionSelect";
 
 /**
  * The plugin's settings section, hosted in the frame settings page at

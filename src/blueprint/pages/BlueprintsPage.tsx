@@ -47,7 +47,7 @@ import { useImportParam } from "@/deeplink/useImportParam";
 import { useRecordHubImport } from "@/hub/imports";
 import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   type BlueprintSource,
   libraryGames,

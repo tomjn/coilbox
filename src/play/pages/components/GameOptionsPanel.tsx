@@ -15,7 +15,7 @@ import {
   isChanged,
   type OptionGroup,
 } from "@/play/modOptions";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 
 /** Start-position modes we expose (a subset of the engine's `StartPosType`). */
 export const START_POS_OPTIONS = [

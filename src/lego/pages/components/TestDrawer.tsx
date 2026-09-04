@@ -28,7 +28,7 @@ import {
   usePreferredTarget,
 } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
-import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { exportTextureName, unitAtlas } from "../../atlas";
 import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
 import { unitScript } from "../../luaScript";

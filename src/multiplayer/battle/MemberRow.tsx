@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { NoteButton } from "../NoteButton";
 import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
 import { BonusButton } from "./BonusButton";

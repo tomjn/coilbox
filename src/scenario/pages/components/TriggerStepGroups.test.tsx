@@ -17,7 +17,7 @@ import type { ExtensionTypes } from "../../extensions";
 import { ACTION_TYPES, CONDITION_TYPES } from "../../triggerTypes";
 import { AddStep } from "./TriggerSteps";
 
-vi.mock("@/uberstress/pages/components/OptionSelect", () => ({
+vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({
     options,
   }: {

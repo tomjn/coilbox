@@ -9,7 +9,7 @@ import {
 import { useDemoInfo, useReplays } from "@/content/config";
 import { demoInfoToSkirmishDraft } from "@/content/demoToSkirmish";
 import { useRefightSetup } from "@/content/refight";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { aiByline, type Participant, usePreferredTarget } from "../../config";
 import type { SkirmishDraft } from "../../drafts";
 

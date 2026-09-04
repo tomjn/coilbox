@@ -19,7 +19,7 @@ import { useMemo } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   COLLISION_VOLUME_LABELS,
   effectiveCollisionVolume,

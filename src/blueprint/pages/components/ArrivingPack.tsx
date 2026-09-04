@@ -33,7 +33,7 @@ import { Blocks, Download, Loader2, Repeat } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { ArrivalNote } from "../../arrival";
 import {
   orderPack,

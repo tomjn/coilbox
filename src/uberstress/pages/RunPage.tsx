@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { CheckField, Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -35,8 +37,6 @@ import {
   parseProgressLine,
   type RunProgress as RunProgressData,
 } from "../reportMetrics";
-import { CheckField, Field } from "./components/Field";
-import { OptionSelect } from "./components/OptionSelect";
 import { EarlyTerminationNotice } from "./components/ReportDetail";
 import SeedSqlForm from "./components/SeedSqlForm";
 

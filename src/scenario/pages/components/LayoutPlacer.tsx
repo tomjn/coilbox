@@ -25,7 +25,7 @@ import type { KnownUnits } from "@/blueprint/units";
 import { unknownBuildings, unknownUnitsWarning } from "@/blueprint/units";
 import type { InstalledGameInfo } from "@/container/gameIdentity";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { Scenario } from "../../model";
 import {
   type LayoutChoice,

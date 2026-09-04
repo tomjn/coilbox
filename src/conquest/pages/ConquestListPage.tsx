@@ -49,7 +49,7 @@ import {
   useSkirmishAis,
 } from "../../play/config";
 import { getGameMatcher, getProfile } from "../../profile/profile";
-import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
 import {
   type ConquestChallengeSettings,
