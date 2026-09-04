@@ -6,8 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { type ContentRoot, contentStateLoad } from "../../content/bindings";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY } from "../../multiplayer/battle/autoDownload";
 import { useDownloadsConfig } from "../config";
-import { Field } from "./components/Field";
-import { OptionSelect } from "./components/OptionSelect";
+import { Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 
 /**
  * The downloads plugin's settings section (frame settings page at

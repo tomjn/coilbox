@@ -33,7 +33,7 @@ import {
 } from "../DownloadQueueProvider";
 import { CachedThumb } from "./components/CachedThumb";
 import { MapPacksBanner } from "./components/MapPacksBanner";
-import { OptionSelect } from "./components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { QueueProgress } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";

@@ -1,5 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
+import { Field } from "@/components/Field";
 import { getProfile, isHubAssetUploadOffered } from "../../profile/profile";
 import { useAssetUploadConsent } from "../assetUploads";
 import {
@@ -10,7 +11,6 @@ import {
 } from "../config";
 import { AccountControl } from "./components/AccountControl";
 import { AssetUploadControl } from "./components/AssetUploadControl";
-import { Field } from "./components/Field";
 import { GameFactsControl } from "./components/GameFactsControl";
 import { GamePicturesControl } from "./components/GamePicturesControl";
 import { MapCatalogControl } from "./components/MapCatalogControl";

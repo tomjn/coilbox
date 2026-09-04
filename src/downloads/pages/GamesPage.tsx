@@ -24,7 +24,7 @@ import {
   useDownloadQueue,
 } from "../DownloadQueueProvider";
 import { GAME_REPOS, mergeGameRepos, repoForKey } from "../gameRepos";
-import { OptionSelect } from "./components/OptionSelect";
+import { OptionSelect } from "@/components/OptionSelect";
 import { QueueProgress } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";

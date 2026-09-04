@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { Check, Copy, ExternalLink, Globe } from "lucide-react";
 import { useCallback, useState } from "react";
+import { Field } from "@/components/Field";
 import { Textarea } from "@/components/ui/textarea";
 import { openExternal } from "@/home/navItem";
 import { isHubEnabled } from "@/profile/profile";
@@ -12,7 +13,6 @@ import {
   SignInButton,
   TryAgainButton,
 } from "./pages/components/AccountControl";
-import { Field } from "./pages/components/Field";
 import {
   hubItemPageUrl,
   type Publication,
