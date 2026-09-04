@@ -26,6 +26,12 @@ So: import `Button`/`Input` from `@picoframe/frame`; add anything else from the 
 
 The release version comes from the git tag, not from source. CI (`.github/workflows/release.yml`) writes the pushed tag (e.g. `0.2.0`) into `tauri.conf.json` at build time via `jq`; in source the version stays a `0.0.0` placeholder. To cut a release, push a `N.N` or `N.N.N` tag at the release commit — no manual version bump is needed. (`package.json` / Cargo versions are not used for the artifact version.)
 
+## Reports
+
+Write reports to `docs/reports/`, never the repo root. That covers anything you produce to be read once and then thrown away: investigation write-ups, audit results, HTML summaries of a run. The folder is gitignored and excluded from the docs site, so nothing there ships or needs reviewing.
+
+Working notes from the orchestrate-milestone skill stay in the root as `ORCHESTRATION-<n>.md` and are gitignored there.
+
 ## Disk Space
 
 Be mindful that work trees can contain large amounts of data that can fill up the disk with build artefacts. Make sure that when work is done and a PR is created that you offer to clean up the build artefacts, and that the build folder does not inflate out of control to multiple tens of GB.

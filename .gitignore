@@ -29,6 +29,16 @@ src-tauri/binaries/coilbox-relay-agent-*
 # honours this ignore file via useIgnoreFile).
 docs/mockups/
 
+# Reports agents write while investigating something. They are a snapshot of one
+# run, so they go stale the moment the code moves and there is nothing to review
+# in them. Kept out of the repo root so `git status` stays readable.
+docs/reports/
+
+# Working notes from the orchestrate-milestone skill, one file per milestone.
+# The two that were worth keeping (22 and 27) are already committed; the rest are
+# scratch. Root-anchored so a real doc named this elsewhere still shows up.
+/ORCHESTRATION-*.md
+
 # VitePress docs-site build artifacts (the site itself lives in docs/, its output
 # and dev cache do not). `dist` above already covers docs/.vitepress/dist.
 docs/.vitepress/cache/

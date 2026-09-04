@@ -23,7 +23,13 @@ export default defineConfig({
   ignoreDeadLinks: true,
   head: [["link", { rel: "icon", href: "/coilbox/favicon.ico" }]],
   // Keep internal/design docs off the public site.
-  srcExclude: ["**/superpowers/**", "mockups/**", "ideas-*.md", "README.md"],
+  srcExclude: [
+    "**/superpowers/**",
+    "mockups/**",
+    "reports/**",
+    "ideas-*.md",
+    "README.md",
+  ],
   themeConfig: {
     logo: "/app-icon.png",
     // Long guides are hard to scan; surface a per-page table of contents in the
