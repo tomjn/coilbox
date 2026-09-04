@@ -10,7 +10,7 @@
 mod focus;
 mod infolog;
 mod launch;
-mod script;
+pub mod script;
 
 use launch::build_engine_args;
 use picoframe_core::CliResult;

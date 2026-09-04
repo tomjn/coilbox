@@ -8,11 +8,11 @@
 //!
 //! Format reference: `RecoilEngine/doc/StartScriptFormat.txt`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BattleConfig {
     /// `[GAME].MapName` — map name without extension.
@@ -23,9 +23,9 @@ pub struct BattleConfig {
     pub my_player_name: String,
     /// 0 fixed, 1 random, 2 choose-in-game, 3 choose-before.
     pub start_pos_type: u8,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game_start_delay: Option<u32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_rng_seed: Option<u32>,
     pub players: Vec<Player>,
     #[serde(default)]
@@ -49,7 +49,7 @@ pub struct BattleConfig {
     pub is_host: bool,
     /// Host address for a networked game. When hosting, `[GAME].HostIP` (defaults
     /// to `0.0.0.0`); when joining, the host we connect to.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host_ip: Option<String>,
     /// Why this host binds an address the engine is about to complain about,
     /// written into the script as a comment above `HostIP`.
@@ -65,14 +65,14 @@ pub struct BattleConfig {
     ///
     /// A `//` line comment, which the engine's TDF reader has always skipped
     /// (`cont/base/springcontent/gamedata/parse_tdf.lua`, `EatWhite`).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host_loopback_reason: Option<String>,
     /// Host port. Present for a networked host (the port the engine listens on) or
     /// a client (the port to connect to). Absent for pure singleplayer.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host_port: Option<u16>,
     /// Script password the client presents to the host (client scripts only).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub my_passwd: Option<String>,
 }
 
@@ -108,57 +108,57 @@ impl Default for BattleConfig {
     }
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Player {
     pub name: String,
     pub spectator: bool,
     /// Team index this player controls; omitted from the script when spectating.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub team: Option<u32>,
 }
 
 /// A native skirmish AI — rendered as an `[AI]` block.
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Ai {
     pub name: String,
     pub short_name: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     pub team: u32,
     /// Player index whose machine runs the AI (usually 0, the host).
     pub host: u32,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub options: BTreeMap<String, String>,
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Team {
     pub team_leader: u32,
     pub ally_team: u32,
     /// RGB in 0..1, rendered space-separated (`RgbColor=r g b`).
     pub rgb_color: [f32; 3],
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advantage: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub income_multiplier: Option<f32>,
     /// Pre-placed start position (with `StartPosType=3`), in unitsync map coords.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_pos_x: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_pos_z: Option<f32>,
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AllyTeam {
     pub num_allies: u32,
     /// Start box `[top, left, bottom, right]` in 0..1 (with `StartPosType=2`).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_rect: Option<[f32; 4]>,
 }
 
