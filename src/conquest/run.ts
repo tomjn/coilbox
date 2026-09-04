@@ -1,58 +1,20 @@
-import { useCallback, useState } from "react";
-import { contentListReplays } from "../content/bindings";
-import { useBrandingEntry } from "../content/branding";
-import { useUnitsyncScan } from "../content/config";
-import { useReplayUserState } from "../content/replayUserState";
-import type { BattleConfig } from "../play/bindings";
-import {
-  gameOptionSchema,
-  mapOptionSchema,
-  toBattleConfig,
-  usePreferredTarget,
-  useSkirmishAis,
-} from "../play/config";
-import {
-  type DetectedResult,
-  detectBattleResult,
-  engineFailureMessage,
-} from "../play/detect";
+import { useCallback } from "react";
+import type { SkirmishAi } from "../content/bindings";
+import type { ReplayProvenance } from "../content/replayUserState";
 import type { SkirmishDraft } from "../play/drafts";
-import { mergeGameAi } from "../play/gameAi";
-import { usePlay } from "../play/PlayProvider";
-import { getProfile } from "../profile/profile";
+import type { GameAiConfig } from "../play/gameAi";
+import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { useConquestState } from "./conquests";
-import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
-import { resolveGameByShortname } from "./model";
+import type {
+  ConquestState,
+  GalaxyDoc,
+  GalaxyNode,
+  InstalledGame,
+} from "./model";
 import { advanceAfterBattle } from "./rules";
 import { synthesizeBattle } from "./synthesize";
 
-/* -------------------------------------------------------------------------- *
- * The conquest battle hook — mirrors `campaign/run.ts` (`useMissionRun`):
- * install check, launch, automatic result detection from the replay, and the
- * manual result flow as its fallback. On a resolved outcome the full strategic
- * pipeline runs in one tested call (`advanceAfterBattle`: ownership → expiry →
- * enemy phase → status) and the state file is saved.
- * -------------------------------------------------------------------------- */
-
-/** Phases of the battle screen, matching the campaign flow:
- *   briefing → (launch) → checking → result → victory | defeat
- * A cancelled launch returns to `briefing` — the turn is not consumed. */
-export type BattleRunPhase =
-  | "briefing"
-  | "checking"
-  | "result"
-  | "victory"
-  | "defeat";
-
-/** What the battle needs installed before it can launch. The game resolves by
- * shortname (newest installed version); the map is an exact-name match. */
-export interface BattleRequirement {
-  kind: "game" | "map";
-  name: string;
-}
-
-/** The player participant's display name in synthesized battles. */
-const PLAYER_NAME = "You";
+export type { BattleRequirement, BattleRunPhase } from "../play/useBattleRun";
 
 /**
  * Drive one strategic battle: resolve the launch target and the galaxy's game
@@ -60,6 +22,11 @@ const PLAYER_NAME = "You";
  * the contested node, launch, detect the outcome from the replay (manual
  * prompt on ambiguity), then advance the conquest state through the full
  * post-battle pipeline and persist it.
+ *
+ * The launch/detect/manual-prompt state machine itself is
+ * `play/useBattleRun`, shared with warpath's `useRunEncounter`. Only the
+ * conquest-specific pieces (the disabled-unit-only snapshot, and advancing
+ * through `advanceAfterBattle`) live here.
  */
 export function useConquestBattleRun(
   galaxy: GalaxyDoc,
@@ -67,230 +34,66 @@ export function useConquestBattleRun(
   node: GalaxyNode | undefined,
   mode: "attack" | "defend",
 ) {
-  const { target, loading: targetLoading } = usePreferredTarget();
-  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const { running, launch } = usePlay();
   const { saveFor } = useConquestState();
-  const { setProvenance } = useReplayUserState();
 
-  const [phase, setPhase] = useState<BattleRunPhase>("briefing");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [autoDetected, setAutoDetected] = useState(false);
-  // The state as it was AFTER the battle resolved (for the result screens —
-  // the hook's `state` prop refreshes underneath once saved).
-  const [resolved, setResolved] = useState<ConquestState | null>(null);
-  // The exact draft last launched, so saving a preset from the *outcome* screen
-  // captures the fight as fought — the conquest advances ownership on resolve, so a
-  // fresh `snapshot()` would describe the node's next (possibly neutral) matchup.
-  const [lastSnapshot, setLastSnapshot] = useState<SkirmishDraft | null>(null);
-
-  const games = scan.data?.games ?? [];
-  const maps = scan.data?.maps ?? [];
-  const scanReady = !!scan.data;
-
-  const installedGame = resolveGameByShortname(galaxy.game, games);
-  const mapName = node?.battle.mapName ?? "";
-  const missing: BattleRequirement | null = !scanReady
-    ? null
-    : !installedGame
-      ? { kind: "game", name: galaxy.game.pinnedName ?? galaxy.game.shortname }
-      : !maps.some((m) => m.name === mapName)
-        ? { kind: "map", name: mapName }
-        : null;
-
-  const { ais } = useSkirmishAis(
-    target?.enginePath,
-    target?.dataDir,
-    installedGame?.primaryArchive.name,
-  );
-  // The game's AI catalogue: the branding entry's, with any profile override on
-  // top. Called unconditionally, since useBrandingEntry accepts undefined.
-  const brandingAi = useBrandingEntry(installedGame)?.ai;
-  const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
-
-  const noEngine = !targetLoading && !target;
-  const scanLoading = !!target && !scanReady && scan.loading;
-  const canStart =
-    !!target &&
-    scanReady &&
-    !missing &&
-    !running &&
-    !scan.loading &&
-    !!state &&
-    !!node &&
-    state.status === "active" &&
-    ais.length > 0;
-
-  /** Advance the conquest through the resolved battle and persist. Shared by
-   * the manual buttons and automatic detection. */
-  const applyResult = useCallback(
-    async (outcome: "victory" | "defeat", auto: boolean) => {
-      if (!state || !node) return;
-      setSaving(true);
-      setError(null);
-      try {
-        const next = advanceAfterBattle(galaxy, state, node.id, mode, outcome);
-        await saveFor(galaxy.id, next);
-        setResolved(next);
-        setAutoDetected(auto);
-        setPhase(outcome);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-        // Never strand the player on "checking": fall back to the manual
-        // prompt, which shows this error and offers the buttons again.
-        setPhase("result");
-      } finally {
-        setSaving(false);
-      }
-    },
-    [galaxy, state, node, mode, saveFor],
-  );
-
-  // The node battle as a launchable skirmish snapshot: the synthesized roster plus
-  // the node's disabled-unit restrictions, so "Save as preset" and the live launch
-  // below capture exactly the same fight. Conquest has no per-team perks.
-  const snapshot = useCallback((): SkirmishDraft | null => {
-    if (!state || !node || !installedGame) return null;
-    const draft = synthesizeBattle(galaxy, state, node.id, mode, {
-      playerName: PLAYER_NAME,
-      gameName: installedGame.name,
-      ais,
-      aiConfig,
-    });
-    if (!draft) return null;
-    const disabledUnits = node.battle.disabledUnits;
-    return disabledUnits && disabledUnits.length > 0
-      ? { ...draft, restrictions: { disabledUnits } }
-      : draft;
-  }, [galaxy, state, node, mode, installedGame, ais, aiConfig]);
-
-  const start = useCallback(async () => {
-    if (!target || !state || !node || !installedGame) return;
-    const draft = snapshot();
-    if (!draft) return;
-    setLastSnapshot(draft);
-    const config: BattleConfig = toBattleConfig({
-      participants: draft.participants,
-      mapName: draft.mapName,
-      gameType: draft.gameName,
-      startPosType: draft.startPosType,
-      modOptions: draft.modOptionValues,
-      optionSchema: await gameOptionSchema(
-        target,
-        installedGame.primaryArchive.name,
-      ),
-      mapOptionSchema: await mapOptionSchema(target, draft.mapName),
-      disabledUnits: draft.restrictions?.disabledUnits,
-    });
-    setError(null);
-    // Snapshot the replays that exist before the engine runs; a failure here
-    // only disables detection, never the launch.
-    let beforePaths: Set<string> | null = null;
-    try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
-      beforePaths = new Set(replays.map((r) => r.path));
-    } catch {
-      beforePaths = null;
-    }
-    try {
-      const res = await launch("conquest", {
-        config,
-        executable: target.executable,
-        dataDir: target.dataDir,
-      });
-      // Cancelled before the game started: no turn consumed, no detection.
-      if (res.exitCode === null) return;
-      const exitCode = res.exitCode;
-      if (beforePaths === null) {
-        // No baseline to detect a replay against, so a nonzero exit is read
-        // the same way as "no replay found" below.
-        const failure = engineFailureMessage(exitCode, false);
-        if (failure) {
-          setError(failure);
-          return;
-        }
-        setPhase("result");
-        return;
-      }
-      setPhase("checking");
-      const { outcome, replay } = await detectBattleResult({
-        target,
-        beforePaths,
+  // The node battle as a launchable skirmish snapshot: the synthesized roster
+  // plus the node's disabled-unit restrictions, so "Save as preset" and the
+  // live launch capture exactly the same fight. Conquest has no per-team perks.
+  const snapshot = useCallback(
+    (
+      installedGame: InstalledGame,
+      ais: SkirmishAi[],
+      aiConfig: GameAiConfig | undefined,
+    ): SkirmishDraft | null => {
+      if (!state || !node) return null;
+      const draft = synthesizeBattle(galaxy, state, node.id, mode, {
         playerName: PLAYER_NAME,
-      }).catch((): { outcome: DetectedResult; replay: null } => ({
-        outcome: "ambiguous",
-        replay: null,
-      }));
-      // Tag the replay with where it came from the moment its filename is
-      // known — regardless of whether the outcome itself was readable.
-      if (replay) {
-        setProvenance(replay.filename, {
-          mode: "conquest",
-          galaxyId: galaxy.id,
-          nodeId: node.id,
-        });
-      }
-      // A nonzero exit with no new replay is stronger than either signal
-      // alone: the engine died before anything was recorded, so this says so
-      // directly rather than asking the player to guess how the battle ended.
-      // A nonzero exit alongside a replay is left to detection below, since
-      // the engine can exit nonzero after a completed battle, and that
-      // replay is real evidence not to discard.
-      const failure = engineFailureMessage(exitCode, replay !== null);
-      if (failure) {
-        setError(failure);
-        setPhase("briefing");
-        return;
-      }
-      if (outcome === "ambiguous") {
-        setPhase("result");
-      } else {
-        await applyResult(outcome, true);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }, [
-    target,
-    state,
-    node,
-    installedGame,
-    snapshot,
-    launch,
-    applyResult,
-    galaxy.id,
-    setProvenance,
-  ]);
-
-  const recordVictory = useCallback(
-    () => applyResult("victory", false),
-    [applyResult],
-  );
-  const recordDefeat = useCallback(
-    () => applyResult("defeat", false),
-    [applyResult],
+        gameName: installedGame.name,
+        ais,
+        aiConfig,
+      });
+      if (!draft) return null;
+      const disabledUnits = node.battle.disabledUnits;
+      return disabledUnits && disabledUnits.length > 0
+        ? { ...draft, restrictions: { disabledUnits } }
+        : draft;
+    },
+    [galaxy, state, node, mode],
   );
 
-  return {
-    phase,
-    error,
-    canStart,
-    missing,
-    noEngine,
-    scanLoading,
-    running,
-    saving,
-    autoDetected,
-    resolved,
-    installedGame,
-    ais,
-    start,
-    snapshot,
-    lastSnapshot,
-    recordVictory,
-    recordDefeat,
-    /** Force a rescan so a just-installed game/map clears `missing`. */
-    recheck: () => scan.run(true),
+  // Only ever invoked once `hasDomainState` (below) has gated on `state` and
+  // `node` both being present, so the guard here is defensive rather than a
+  // reachable path. It also lets TypeScript narrow past the two `| undefined`s.
+  const resolveOutcome = useCallback(
+    (outcome: "victory" | "defeat"): ConquestState => {
+      if (!state || !node) {
+        throw new Error("resolveOutcome called before state/node were ready");
+      }
+      return advanceAfterBattle(galaxy, state, node.id, mode, outcome);
+    },
+    [galaxy, state, node, mode],
+  );
+
+  const persist = useCallback(
+    (next: ConquestState) => saveFor(galaxy.id, next),
+    [saveFor, galaxy.id],
+  );
+
+  const provenance: ReplayProvenance = {
+    mode: "conquest",
+    galaxyId: galaxy.id,
+    nodeId: node?.id,
   };
+
+  return useBattleRun<ConquestState>({
+    launchMode: "conquest",
+    gameRef: galaxy.game,
+    mapName: node?.battle.mapName ?? "",
+    canStartExtra: !!state && !!node && state.status === "active",
+    hasDomainState: !!state && !!node,
+    snapshot,
+    resolveOutcome,
+    persist,
+    provenance,
+  });
 }
