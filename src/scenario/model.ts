@@ -1,5 +1,5 @@
 import type { BaseBlueprint, BlueprintBuilding } from "../blueprint/model";
-import type { SkirmishDraft } from "../play/drafts";
+import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -1112,6 +1112,64 @@ function parseIdCounters(value: unknown): Record<string, number> | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** A `setup.modOptionValues` entry, dropping anything not string-keyed and string-valued. */
+function parseModOptionValues(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [option, raw] of Object.entries(value)) {
+    const v = str(raw);
+    if (option !== "" && v !== undefined) out[option] = v;
+  }
+  return out;
+}
+
+/** The faithful-replay levers `setup.restrictions` may carry. All optional, so a malformed one is dropped rather than failing the document. */
+function parseBattleRestrictions(
+  value: unknown,
+): BattleRestrictions | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: BattleRestrictions = {};
+  if (Array.isArray(value.disabledUnits)) {
+    out.disabledUnits = stringArray(value.disabledUnits);
+  }
+  const advantage = num(value.advantage);
+  if (advantage !== undefined) out.advantage = advantage;
+  const incomeMultiplier = num(value.incomeMultiplier);
+  if (incomeMultiplier !== undefined) out.incomeMultiplier = incomeMultiplier;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * The skirmish setup `parseScenario` hands to the launcher, or `null` when it
+ * cannot be launched. `mapName` and `gameName` are read as plain strings by
+ * `launch.ts` and `compile.ts` (`scenario.setup.mapName`/`.gameName`), so those
+ * are the two fields that reject the whole document when missing or the wrong
+ * type, the same failure the rest of `parseScenario` reports for a missing id
+ * or name.
+ *
+ * Everything else in {@link SkirmishDraft} already has a safe default the
+ * skirmish launcher itself falls back to for a fresh draft
+ * (`defaultSkirmishDraft`), and every committed scenario fixture carries them
+ * well-formed, so a wrong-typed extra there is dropped in favour of that
+ * default instead of failing a document that would otherwise load fine.
+ */
+function parseSetup(value: Record<string, unknown>): SkirmishDraft | null {
+  const mapName = str(value.mapName);
+  const gameName = str(value.gameName);
+  if (mapName === undefined || gameName === undefined) return null;
+
+  const setup: SkirmishDraft = {
+    participants: Array.isArray(value.participants) ? value.participants : [],
+    gameName,
+    mapName,
+    startPosType: num(value.startPosType) ?? 0,
+    modOptionValues: parseModOptionValues(value.modOptionValues),
+  };
+  const restrictions = parseBattleRestrictions(value.restrictions);
+  if (restrictions) setup.restrictions = restrictions;
+  return setup;
+}
+
 /**
  * Narrow an already-parsed value to a validated {@link Scenario}, or `null` when
  * the shape does not match. Takes an unknown rather than text so the container
@@ -1125,6 +1183,7 @@ export function parseScenario(value: unknown): Scenario | null {
   if (sid === undefined || name === undefined) return null;
   // The setup is the launch payload, as a campaign mission's snapshot is.
   if (!isRecord(value.setup)) return null;
+  const setup = parseSetup(value.setup);
 
   const teams = parseTeams(value.teams);
   const zones = parseRegistry(value.zones, parseZone);
@@ -1135,6 +1194,7 @@ export function parseScenario(value: unknown): Scenario | null {
   const objectives = parseRegistry(value.objectives, parseObjective);
   const dialogue = parseRegistry(value.dialogue, parseDialogue);
   if (
+    !setup ||
     !teams ||
     !zones ||
     !actors ||
@@ -1153,7 +1213,7 @@ export function parseScenario(value: unknown): Scenario | null {
     name,
     description: str(value.description) ?? "",
     runtimeVersion: num(value.runtimeVersion) ?? SCENARIO_RUNTIME_VERSION,
-    setup: value.setup as unknown as SkirmishDraft,
+    setup,
     teams,
     zones,
     actors,

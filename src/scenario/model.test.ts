@@ -76,6 +76,56 @@ describe("parseScenario — document identity", () => {
     expect(parseScenario(doc({ setup: [] }))).toBeNull();
   });
 
+  it("rejects a setup with a missing mapName, the launcher's own read", () => {
+    expect(parseScenario(doc({ setup: { gameName: "BAR" } }))).toBeNull();
+  });
+
+  it("rejects a setup with a non-string mapName", () => {
+    expect(
+      parseScenario(doc({ setup: { gameName: "BAR", mapName: 7 } })),
+    ).toBeNull();
+  });
+
+  it("rejects a setup with a non-string gameName", () => {
+    expect(
+      parseScenario(doc({ setup: { gameName: 7, mapName: "Comet Catcher" } })),
+    ).toBeNull();
+  });
+
+  it("passes a valid setup through, defaulting the fields it omits", () => {
+    const s = parseScenario(doc());
+    expect(s?.setup).toEqual({
+      gameName: "BAR",
+      mapName: "Comet Catcher",
+      participants: [],
+      startPosType: 0,
+      modOptionValues: {},
+    });
+  });
+
+  it("keeps a fully populated setup unchanged", () => {
+    const setup = {
+      gameName: "BAR",
+      mapName: "Comet Catcher",
+      participants: [
+        {
+          id: "player",
+          kind: "you",
+          name: "Commander",
+          side: "arm",
+          color: [0, 0.6, 1],
+          allyTeam: 0,
+          spectator: false,
+        },
+      ],
+      startPosType: 2,
+      modOptionValues: { fixedallies: "0" },
+      restrictions: { disabledUnits: ["armcom"], advantage: 0.1 },
+    };
+    const s = parseScenario(doc({ setup }));
+    expect(s?.setup).toEqual(setup);
+  });
+
   it("keeps script only when it is exactly true", () => {
     expect(parseScenario(doc({ script: true }))?.script).toBe(true);
     expect(parseScenario(doc({ script: "yes" }))?.script).toBeUndefined();

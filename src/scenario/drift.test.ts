@@ -7,11 +7,16 @@ import { parseScenario, type Scenario } from "./model";
 
 /** A valid scenario carrying only the fields a test cares about. */
 function build(overrides: Record<string, unknown> = {}): Scenario {
+  const { setup, ...rest } = overrides;
   const scenario = parseScenario({
     id: "s1",
     name: "Scenario",
-    setup: {},
-    ...overrides,
+    setup: {
+      gameName: "BAR",
+      mapName: "Map",
+      ...(setup as Record<string, unknown> | undefined),
+    },
+    ...rest,
   });
   if (!scenario) throw new Error("fixture is not a valid scenario");
   return scenario;

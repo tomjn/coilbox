@@ -19,7 +19,11 @@ import {
 import { deleteScenario, type LoadedScenario, saveScenario } from "./storage";
 
 function build(name: string): Scenario {
-  const scenario = parseScenario({ id: "s1", name, setup: {} });
+  const scenario = parseScenario({
+    id: "s1",
+    name,
+    setup: { gameName: "BAR", mapName: "Map" },
+  });
   if (!scenario) throw new Error("fixture is not a valid scenario");
   return scenario;
 }
