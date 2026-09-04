@@ -32,6 +32,8 @@ jobs:
         run: bunx biome ci .
       - name: Typecheck
         run: bun run typecheck
+      - name: Vitest
+        run: bun run test
 
   # The mission runtime and the blueprint widget are Lua the engine runs, so
   # neither the frontend nor the Rust job compiles them and a break would
