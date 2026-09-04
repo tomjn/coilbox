@@ -1,13 +1,8 @@
 import { useCallback, useState } from "react";
-import {
-  contentDemoInfo,
-  contentListReplays,
-  type ReplayFile,
-} from "../content/bindings";
+import { contentListReplays } from "../content/bindings";
 import { primeScan, useUnitsyncScan } from "../content/config";
 import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
-import type { PlayTarget } from "../play/config";
 import {
   gameOptionSchema,
   mapOptionSchema,
@@ -16,10 +11,8 @@ import {
 } from "../play/config";
 import {
   type DetectedResult,
-  diffNewReplays,
+  detectBattleResult,
   engineFailureMessage,
-  pickNewestReplay,
-  resultFromDemoInfo,
 } from "../play/detect";
 import { usePlay } from "../play/PlayProvider";
 import { launchScenario } from "../scenario/launch";
@@ -42,56 +35,6 @@ import { ensureCampaignScenarioMedia } from "./scenarioMedia";
  * newest-pick, verdict) live in `detect.ts` so they're unit-testable without
  * mocking the Tauri commands used below.
  * -------------------------------------------------------------------------- */
-
-const RETRY_COUNT = 3;
-const RETRY_DELAY_MS = 1000;
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Poll the content root for a replay that appeared after `beforePaths` was
- * snapshotted. A filesystem flush can lag briefly behind the engine exiting, so
- * an empty diff is retried a few times before giving up.
- */
-async function findNewReplay(
-  dataDir: string,
-  beforePaths: ReadonlySet<string>,
-): Promise<ReplayFile | null> {
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
-    const { replays } = await contentListReplays({ root: dataDir });
-    const newest = pickNewestReplay(diffNewReplays(beforePaths, replays));
-    if (newest) return newest;
-    if (attempt < RETRY_COUNT) await sleep(RETRY_DELAY_MS);
-  }
-  return null;
-}
-
-/**
- * Detect the outcome of a just-finished mission launch: find the replay that
- * appeared since `beforePaths` was snapshotted (pre-launch), decode it, and read
- * off `playerName`'s result. Any failure along the way — no new replay, a decode
- * error, an unknown winner, or the player not being in the demo — resolves to
- * `"ambiguous"` rather than throwing, so the caller always falls back to the
- * manual prompt.
- */
-async function detectMissionResult(opts: {
-  target: PlayTarget;
-  beforePaths: ReadonlySet<string>;
-  playerName: string;
-}): Promise<{ outcome: DetectedResult; replay: ReplayFile | null }> {
-  const { target, beforePaths, playerName } = opts;
-  try {
-    const replay = await findNewReplay(target.dataDir, beforePaths);
-    if (!replay) return { outcome: "ambiguous", replay: null };
-    const { info } = await contentDemoInfo({
-      enginePath: target.enginePath,
-      replayPath: replay.path,
-    });
-    return { outcome: resultFromDemoInfo(info, playerName), replay };
-  } catch {
-    return { outcome: "ambiguous", replay: null };
-  }
-}
 
 /**
  * The phases the briefing page moves through. Kept here (not a separate route) so
@@ -346,11 +289,11 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         return;
       }
       setPhase("checking");
-      // detectMissionResult already resolves internal failures to "ambiguous"
-      // rather than throwing; this catch is a last-resort safety net so an
+      // detectBattleResult already resolves internal failures to "ambiguous"
+      // rather than throwing. This catch is a last-resort safety net so an
       // unexpected throw still falls through to the manual prompt instead of
       // stranding the player on the "checking" screen.
-      const { outcome, replay } = await detectMissionResult({
+      const { outcome, replay } = await detectBattleResult({
         target,
         beforePaths,
         playerName: launched.myPlayerName,

@@ -1,16 +1,11 @@
 import { useCallback, useState } from "react";
 import { resolveGameByShortname } from "../conquest/model";
-import {
-  contentDemoInfo,
-  contentListReplays,
-  type ReplayFile,
-} from "../content/bindings";
+import { contentListReplays } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
 import { buildEdgeMap } from "../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
 import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
-import type { PlayTarget } from "../play/config";
 import {
   applyRestrictions,
   gameOptionSchema,
@@ -21,10 +16,8 @@ import {
 } from "../play/config";
 import {
   type DetectedResult,
-  diffNewReplays,
+  detectBattleResult,
   engineFailureMessage,
-  pickNewestReplay,
-  resultFromDemoInfo,
 } from "../play/detect";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import { mergeGameAi } from "../play/gameAi";
@@ -41,45 +34,6 @@ import { synthesizeEncounter } from "./synthesize";
  * result flow as its fallback. On a resolved outcome the pure `resolveBattle`
  * transition runs (salvage/hull/status) and the caller persists via `onResolved`.
  * -------------------------------------------------------------------------- */
-
-const RETRY_COUNT = 3;
-const RETRY_DELAY_MS = 1000;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function findNewReplay(
-  dataDir: string,
-  beforePaths: ReadonlySet<string>,
-): Promise<ReplayFile | null> {
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
-    const { replays } = await contentListReplays({ root: dataDir });
-    const newest = pickNewestReplay(diffNewReplays(beforePaths, replays));
-    if (newest) return newest;
-    if (attempt < RETRY_COUNT) await sleep(RETRY_DELAY_MS);
-  }
-  return null;
-}
-
-/** Mirrors conquest's `detectBattleResult`: the replay (when found) comes back
- * alongside the outcome so the caller can tag it with provenance the moment
- * its filename is known. */
-async function detectBattleResult(opts: {
-  target: PlayTarget;
-  beforePaths: ReadonlySet<string>;
-  playerName: string;
-}): Promise<{ outcome: DetectedResult; replay: ReplayFile | null }> {
-  const { target, beforePaths, playerName } = opts;
-  try {
-    const replay = await findNewReplay(target.dataDir, beforePaths);
-    if (!replay) return { outcome: "ambiguous", replay: null };
-    const { info } = await contentDemoInfo({
-      enginePath: target.enginePath,
-      replayPath: replay.path,
-    });
-    return { outcome: resultFromDemoInfo(info, playerName), replay };
-  } catch {
-    return { outcome: "ambiguous", replay: null };
-  }
-}
 
 export type BattleRunPhase =
   | "briefing"
