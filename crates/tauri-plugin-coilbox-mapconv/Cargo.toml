@@ -23,7 +23,7 @@ coilbox-proc = { path = "../coilbox-proc" }
 coilbox-springlua = { path = "../coilbox-springlua" }
 # Shared dependency-free on-disk byte cache for thumbnails (read-or-compute+write).
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { workspace = true }
 sevenz-rust2 = "0.21.1"
 # Decode source images (texture/heightmap/...) to read true dimensions and build
 # small preview thumbnails. default-features off; only the formats mapconv accepts.

@@ -85,3 +85,7 @@ tempfile = "3"
 # One codec for the tokens, hashes and other binary-to-text values that cross a
 # protocol or config boundary, shared by 9 crates instead of copied into each.
 base64 = "0.22"
+
+# The .sdz/.zip reader content, mapconv and scenario all use, pinned once
+# instead of three times.
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
