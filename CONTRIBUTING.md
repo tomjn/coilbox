@@ -119,6 +119,8 @@ Prefer this over asserting a hook is correct by reading it. The wiring inside a 
 
 The release version comes from the git tag, not from source — CI writes the pushed tag into `tauri.conf.json` at build time, and the in-source version stays a `0.0.0` placeholder. To cut a release, push an `N.N` or `N.N.N` tag at the release commit; no manual version bump is needed.
 
+`scripts/build-windows-icon.sh` and `scripts/build-windows-nsis-images.sh` regenerate committed Windows icon assets (`icon-windows.ico`, `nsis-header.bmp`, `nsis-sidebar.bmp`) from `src-tauri/icons/icon.png`. Run one by hand, with ImageMagick installed, whenever that source artwork changes. Each script's own header explains the details. Release builds don't call either script.
+
 ## Licensing
 
 Coilbox's own code is MIT (see [LICENSE](LICENSE)). It bundles `pr-downloader`, which is GPL-2.0-or-later; that source is at <https://github.com/beyond-all-reason/pr-downloader>. By contributing you agree your contribution is licensed under the repository's MIT license.
