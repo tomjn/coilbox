@@ -6,8 +6,8 @@
       "name": "coilbox",
       "dependencies": {
         "@fontsource-variable/oxanium": "^5.3.0",
-        "@picoframe/frame": "^0.8.0",
-        "@picoframe/plugin-sdk": "^0.8.0",
+        "@picoframe/frame": "^0.9.0",
+        "@picoframe/plugin-sdk": "^0.9.0",
         "@shadcn/react": "^0.2.1",
         "@tauri-apps/api": "^2.11.1",
         "@tauri-apps/plugin-deep-link": "2.4.9",
@@ -203,9 +203,9 @@
 
     "@oxc-project/types": ["@oxc-project/types@0.148.0", "", {}, "sha512-Nm4s/jB+4FpFsPhWGEC4h7rzksesmtnMXomo6rCMcg/b8zLQuOziRgkCS1fxDCXOlJB/6Q8oABOZ/OP6RIPj9A=="],
 
-    "@picoframe/frame": ["@picoframe/frame@0.8.0", "", { "dependencies": { "@tauri-apps/plugin-opener": "^2.5.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.7", "sonner": "^2.0.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.6.0" } }, "sha512-yblA0nlNeKFPi4BXsZw9gHwuUlm59/tS6GncVk/doo+OfvMBvXl/DODibbrGg5GPljo+Rl3Vum6AaPF9iyfZsA=="],
+    "@picoframe/frame": ["@picoframe/frame@0.9.0", "", { "dependencies": { "@tauri-apps/plugin-opener": "^2.5.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.16.0", "radix-ui": "^1.6.7", "sonner": "^2.0.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@picoframe/plugin-sdk": "*", "@tauri-apps/api": "^2.11.0", "react": "^19.0.0", "react-dom": "^19.0.0", "react-router": "^7.18.2" } }, "sha512-9pq6QrSJhZuy06/6zaN2GqDTqO+vIZGKdc2okBFz7iqGcEDw0ON+Bvleauxc7v4dIxrqBYfI3g2M9UJksDrNfA=="],
 
-    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.8.0", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-TbXHyqBggL44LpZh0X5bQvc5wKTxe8SOgcd7E3yKboLT2Sl+4Xd1KVxQPUSC8Zl9lCoon7Kt3UBKYoQXlbbmPQ=="],
+    "@picoframe/plugin-sdk": ["@picoframe/plugin-sdk@0.9.0", "", { "peerDependencies": { "@tauri-apps/api": "^2.11.0", "react": "^19.0.0" } }, "sha512-IqifZHUmxCwd8+EZcWPVYwki9iq48p7YQWZmPeK6jMdCVfojIYW3kkg933VOcL9ZAWkMtL21LDC/6sJor1M0vw=="],
 
     "@radix-ui/number": ["@radix-ui/number@1.1.3", "", {}, "sha512-Road2bidD0uu/1BGDOWNdPI06g0lIRy6IF9GZcIrDK2KGItfor8IQwQa+yM2ERgHM1MmHxaxpTzk0/Jp42lNfA=="],
 
@@ -1116,12 +1116,6 @@
     "zustand": ["zustand@4.5.7", "", { "dependencies": { "use-sync-external-store": "^1.2.2" }, "peerDependencies": { "@types/react": ">=16.8", "immer": ">=9.0.6", "react": ">=16.8" }, "optionalPeers": ["@types/react", "immer", "react"] }, "sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw=="],
 
     "zwitch": ["zwitch@2.0.4", "", {}, "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A=="],
-
-    "@picoframe/frame/@tauri-apps/plugin-opener": ["@tauri-apps/plugin-opener@2.5.4", "", { "dependencies": { "@tauri-apps/api": "^2.11.0" } }, "sha512-1HnPkb+AmgO29HBazm4uPLKB+r7zzcTBW1d0fyYp1uP+jwtpoiNDGKMMzz58SFp49nOIrxdE3aUJtT57lfO9CQ=="],
-
-    "@picoframe/frame/lucide-react": ["lucide-react@1.21.0", "", { "peerDependencies": { "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-reEZMXq8Qdd5jg5XYkQ5TR1fB/GiQ7ih4vcrthYDtgjSDwh0i6/YLiGjsWsIwgN49gpAnd4J2elSNzncMEEUUQ=="],
-
-    "@picoframe/frame/sonner": ["sonner@2.0.7", "", { "peerDependencies": { "react": "^18.0.0 || ^19.0.0 || ^19.0.0-rc", "react-dom": "^18.0.0 || ^19.0.0 || ^19.0.0-rc" } }, "sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w=="],
 
     "@shikijs/core/@shikijs/engine-javascript": ["@shikijs/engine-javascript@2.5.0", "", { "dependencies": { "@shikijs/types": "2.5.0", "@shikijs/vscode-textmate": "^10.0.2", "oniguruma-to-es": "^3.1.0" } }, "sha512-VjnOpnQf8WuCEZtNUdjjwGUbtAVKuZkVQ/5cHy/tojVVRIRtlWMYVjyWhxOmIq05AlSOv72z7hRNRGVBgQOl0w=="],
 
