@@ -124,15 +124,17 @@ pub fn spawn_connection(
     // phase is woken when the connection ends, exactly as on a line connection.
     let (phase_tx, phase) = watch::channel(LoginPhase::Ready);
     let task = run_loop(
-        registry.clone(),
-        server_key.clone(),
         socket,
-        sink.clone(),
-        rx,
-        state.clone(),
-        tachyon.clone(),
-        started.clone(),
-        markers,
+        TachyonConnContext {
+            registry: registry.clone(),
+            server_key: server_key.clone(),
+            sink: sink.clone(),
+            rx,
+            state: state.clone(),
+            tachyon: tachyon.clone(),
+            started: started.clone(),
+            markers,
+        },
     );
     tokio::spawn(async move {
         let _phase = phase_tx;
@@ -164,21 +166,35 @@ pub fn spawn_connection(
     );
 }
 
-/// The connection event loop. Interleaves the frames the correlator hands up, the
-/// actions commands queue, and the correlator's own ending. On exit it reports the
-/// reason and evicts itself from the registry.
-#[allow(clippy::too_many_arguments)]
-async fn run_loop(
+/// Everything [`run_loop`] needs beyond the socket: the registry it registers
+/// into, the channels it drives, and the per-connection state slots the rest of
+/// the plugin shares with it.
+struct TachyonConnContext {
     registry: Registry,
     server_key: String,
-    mut socket: TachyonSocket,
     sink: EventSink,
-    mut rx: mpsc::UnboundedReceiver<Outbound>,
+    rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     tachyon: TachyonHandle,
     started: StartedBattle,
     markers: TachyonMarkers,
-) {
+}
+
+/// The connection event loop. Interleaves the frames the correlator hands up, the
+/// actions commands queue, and the correlator's own ending. On exit it reports the
+/// reason and evicts itself from the registry.
+async fn run_loop(mut socket: TachyonSocket, ctx: TachyonConnContext) {
+    let TachyonConnContext {
+        registry,
+        server_key,
+        sink,
+        mut rx,
+        state,
+        tachyon,
+        started,
+        markers,
+    } = ctx;
+
     // The console is fed from the socket rather than from here, because the socket
     // is the one place every frame passes through in both directions. Watching from
     // above would miss the responses and requests the correlator answers itself.

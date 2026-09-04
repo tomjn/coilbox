@@ -148,15 +148,17 @@ pub fn spawn_connection(
     let (phase_tx, phase) = watch::channel(LoginPhase::AwaitGreeting);
 
     tokio::spawn(run_loop(
-        registry.clone(),
-        server_key.clone(),
         stream,
         login,
-        sink.clone(),
-        phase_tx,
-        state.clone(),
-        rx,
-        dm_log,
+        ZerokConnContext {
+            registry: registry.clone(),
+            server_key: server_key.clone(),
+            sink: sink.clone(),
+            rx,
+            state: state.clone(),
+            phase_slot: phase_tx,
+            dm_log,
+        },
     ));
 
     // Registered after spawning. The task's first act is a network read, so it
@@ -188,24 +190,36 @@ pub fn spawn_connection(
     );
 }
 
+/// Everything [`run_loop`] needs beyond the socket and the login: the registry
+/// it registers into, the channels it drives, and the per-connection state
+/// slots the rest of the plugin shares with it.
+struct ZerokConnContext {
+    registry: Registry,
+    server_key: String,
+    sink: EventSink,
+    rx: mpsc::UnboundedReceiver<Outbound>,
+    state: Arc<Mutex<LobbyState>>,
+    phase_slot: watch::Sender<LoginPhase>,
+    dm_log: DmLog,
+}
+
 /// The connection event loop. Interleaves inbound lines with the ones commands
 /// queue, over one socket. On exit it reports the reason and evicts itself from
 /// the registry.
 ///
 /// No keepalive timer, unlike [`crate::conn::run_loop`]. Zero-K's protocol has
 /// no `Ping`, and the socket carries TCP keepalive instead.
-#[allow(clippy::too_many_arguments)]
-async fn run_loop(
-    registry: Registry,
-    server_key: String,
-    stream: TcpStream,
-    login: ZerokLogin,
-    sink: EventSink,
-    phase_slot: watch::Sender<LoginPhase>,
-    state: Arc<Mutex<LobbyState>>,
-    mut rx: mpsc::UnboundedReceiver<Outbound>,
-    dm_log: DmLog,
-) {
+async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
+    let ZerokConnContext {
+        registry,
+        server_key,
+        sink,
+        mut rx,
+        state,
+        phase_slot,
+        dm_log,
+    } = ctx;
+
     emit(&sink, LobbyEvent::Connected);
     let mut phase = Phase {
         sink: sink.clone(),

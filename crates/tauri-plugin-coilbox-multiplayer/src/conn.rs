@@ -350,21 +350,23 @@ pub fn spawn_connection(
     let relay_refused = crate::relay_host::RefusedRelayAddress::default();
 
     tokio::spawn(run_loop(
-        registry.clone(),
-        server_key.clone(),
         stream,
         login_cfg,
-        sink.clone(),
-        phase_tx,
-        agreement.clone(),
-        turn_tx,
-        opened_tx,
-        relay_refused.clone(),
-        relay.clone(),
-        rx,
-        state.clone(),
-        dm_log,
-        chan_log,
+        ConnContext {
+            registry: registry.clone(),
+            server_key: server_key.clone(),
+            sink: sink.clone(),
+            rx,
+            state: state.clone(),
+            phase_slot: phase_tx,
+            agreement_slot: agreement.clone(),
+            turn_slot: turn_tx,
+            opened_slot: opened_tx,
+            relay_refused: relay_refused.clone(),
+            relay: relay.clone(),
+            dm_log,
+            chan_log,
+        },
     ));
 
     // Register after spawning. The task's first action is a network read (the
@@ -393,27 +395,45 @@ pub fn spawn_connection(
     );
 }
 
-/// The connection event loop. Interleaves inbound lines, queued outbound lines
-/// (from commands), and the keepalive timer over one socket; on exit it reports the
-/// reason and evicts itself from the registry.
-#[allow(clippy::too_many_arguments)]
-async fn run_loop(
+/// Everything [`run_loop`] needs beyond the socket and the login config: the
+/// registry it registers into, the channels it drives, and the per-connection
+/// state slots the rest of the plugin shares with it.
+struct ConnContext {
     registry: Registry,
     server_key: String,
-    stream: Box<dyn AsyncReadWrite>,
-    login_cfg: LoginConfig,
     sink: EventSink,
+    rx: mpsc::UnboundedReceiver<Outbound>,
+    state: Arc<Mutex<LobbyState>>,
     phase_slot: watch::Sender<LoginPhase>,
     agreement_slot: Arc<Mutex<Option<String>>>,
     turn_slot: watch::Sender<TurnAnswer>,
     opened_slot: watch::Sender<OpenAnswer>,
     relay_refused: crate::relay_host::RefusedRelayAddress,
     relay: HostedRelay,
-    mut rx: mpsc::UnboundedReceiver<Outbound>,
-    state: Arc<Mutex<LobbyState>>,
     dm_log: DmLog,
     chan_log: DmLog,
-) {
+}
+
+/// The connection event loop. Interleaves inbound lines, queued outbound lines
+/// (from commands), and the keepalive timer over one socket; on exit it reports the
+/// reason and evicts itself from the registry.
+async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: ConnContext) {
+    let ConnContext {
+        registry,
+        server_key,
+        sink,
+        mut rx,
+        state,
+        phase_slot,
+        agreement_slot,
+        turn_slot,
+        opened_slot,
+        relay_refused,
+        relay,
+        dm_log,
+        chan_log,
+    } = ctx;
+
     emit(&sink, LobbyEvent::Connected);
 
     let mut framed = Framed::new(stream, LinesCodec::new());
