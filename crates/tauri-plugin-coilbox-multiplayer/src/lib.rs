@@ -119,6 +119,7 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Manager, RunEvent, Runtime, State,
 };
+use tauri_plugin_coilbox_play::script::{Ai, AllyTeam, BattleConfig, Player, Team};
 use tls::{ConnectError, TlsMode};
 use tokio_util::sync::CancellationToken;
 
@@ -3072,15 +3073,19 @@ fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
     members.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut players = Vec::new();
-    let mut teams: BTreeMap<u8, Value> = BTreeMap::new();
+    let mut teams: BTreeMap<u8, Team> = BTreeMap::new();
     let mut allies: BTreeSet<u8> = BTreeSet::new();
 
     for (name, ms) in members {
         let bs = ms.battle_status;
         let is_player = bs.mode; // mode == true -> playing, false -> spectating
-        let mut player = json!({ "name": name, "spectator": !is_player });
+        let mut player = Player {
+            name: name.clone(),
+            spectator: !is_player,
+            team: None,
+        };
         if is_player {
-            player["team"] = json!(bs.team_id);
+            player.team = Some(u32::from(bs.team_id));
             teams
                 .entry(bs.team_id)
                 .or_insert_with(|| team_value(bs.ally, ms.team_color));
@@ -3094,12 +3099,13 @@ fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
     let mut ais = Vec::new();
     for (name, bot) in bots {
         let bs = bot.battle_status;
-        ais.push(json!({
-            "name": name,
-            "shortName": bot.ai_dll,
-            "team": bs.team_id,
-            "host": 0,
-        }));
+        ais.push(Ai {
+            name: name.clone(),
+            short_name: bot.ai_dll.clone(),
+            team: u32::from(bs.team_id),
+            host: 0,
+            ..Default::default()
+        });
         teams
             .entry(bs.team_id)
             .or_insert_with(|| team_value(bs.ally, bot.team_color));
@@ -3111,38 +3117,53 @@ fn battle_to_config(state: &LobbyState) -> Result<Value, String> {
     let (start_pos_type, mod_options, map_options, _restricted_units) =
         split_script_tags(&battle.script_tags);
 
-    let ally_teams: Vec<Value> = allies.iter().map(|_| json!({ "numAllies": 0 })).collect();
+    let ally_teams: Vec<AllyTeam> = allies
+        .iter()
+        .map(|_| AllyTeam {
+            num_allies: 0,
+            start_rect: None,
+        })
+        .collect();
     let my_passwd = battle
         .members
         .get(&me)
         .and_then(|m| m.script_password.clone());
 
-    Ok(json!({
-        "mapName": battle.map,
-        "gameType": battle.modname,
-        "myPlayerName": me,
-        "startPosType": start_pos_type,
-        "modOptions": mod_options,
-        "mapOptions": map_options,
-        "players": players,
-        "ais": ais,
-        "teams": teams.into_values().collect::<Vec<_>>(),
-        "allyTeams": ally_teams,
-        "isHost": false,
-        "hostIp": battle.ip,
-        "hostPort": battle.port.parse::<u16>().ok(),
-        "myPasswd": my_passwd,
-    }))
+    to_config_value(BattleConfig {
+        map_name: battle.map.clone(),
+        game_type: battle.modname.clone(),
+        my_player_name: me,
+        start_pos_type,
+        mod_options,
+        map_options,
+        players,
+        ais,
+        teams: teams.into_values().collect(),
+        ally_teams,
+        is_host: false,
+        host_ip: Some(battle.ip.clone()),
+        host_port: battle.port.parse::<u16>().ok(),
+        my_passwd,
+        ..Default::default()
+    })
+}
+
+/// Serialize a typed `BattleConfig` to the `Value` these builders hand back, the
+/// one boundary where a `BattleConfig` becomes JSON instead of being built as
+/// JSON by hand field by field.
+fn to_config_value(cfg: BattleConfig) -> Result<Value, String> {
+    serde_json::to_value(cfg).map_err(|e| format!("failed to serialize battle config: {e}"))
 }
 
 /// One `teams[]` entry: RGB normalized to the engine's 0..1 floats.
-fn team_value(ally: u8, color: u32) -> Value {
+fn team_value(ally: u8, color: u32) -> Team {
     let (r, g, b) = team_color_rgb(color);
-    json!({
-        "teamLeader": 0,
-        "allyTeam": ally,
-        "rgbColor": [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0],
-    })
+    Team {
+        team_leader: 0,
+        ally_team: u32::from(ally),
+        rgb_color: [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0],
+        ..Default::default()
+    }
 }
 
 /// Map the current battle into a HOST-mode `BattleConfig` (`isHost:true`), binding
@@ -3207,14 +3228,18 @@ fn battle_to_host_config(
         .collect();
     let my_index = player_index.get(me.as_str()).copied().unwrap_or(0);
 
-    let mut teams: BTreeMap<usize, Value> = BTreeMap::new();
+    let mut teams: BTreeMap<usize, Team> = BTreeMap::new();
     let mut players = Vec::new();
     for (i, (name, ms)) in members.iter().enumerate() {
         let bs = ms.battle_status;
-        let mut player = json!({ "name": name, "spectator": !bs.mode });
+        let mut player = Player {
+            name: (*name).clone(),
+            spectator: !bs.mode,
+            team: None,
+        };
         if bs.mode {
             let pos = team_index[&bs.team_id];
-            player["team"] = json!(pos);
+            player.team = Some(pos as u32);
             teams
                 .entry(pos)
                 .or_insert_with(|| host_team_value(ally_index[&bs.ally], ms.team_color, i));
@@ -3234,12 +3259,13 @@ fn battle_to_host_config(
             .get(bot.owner.as_str())
             .copied()
             .unwrap_or(my_index);
-        ais.push(json!({
-            "name": name,
-            "shortName": bot.ai_dll,
-            "team": pos,
-            "host": owner,
-        }));
+        ais.push(Ai {
+            name: (*name).clone(),
+            short_name: bot.ai_dll.clone(),
+            team: pos as u32,
+            host: owner as u32,
+            ..Default::default()
+        });
         // Members are walked first, so this only fires for an AI-only team, whose
         // leader is by convention the player hosting the AI.
         teams
@@ -3253,19 +3279,18 @@ fn battle_to_host_config(
     // One [ALLYTEAM] per distinct ally, in contiguous order, carrying its start box
     // (converted from the 0..200 wire grid to the engine's 0..1
     // `[top, left, bottom, right]`).
-    let ally_teams: Vec<Value> = ally_ids
+    let ally_teams: Vec<AllyTeam> = ally_ids
         .iter()
-        .map(|raw| {
-            let mut v = json!({ "numAllies": 0 });
-            if let Some(r) = battle.start_rects.get(raw) {
-                v["startRect"] = json!([
+        .map(|raw| AllyTeam {
+            num_allies: 0,
+            start_rect: battle.start_rects.get(raw).map(|r| {
+                [
                     r.top as f32 / 200.0,
                     r.left as f32 / 200.0,
                     r.bottom as f32 / 200.0,
                     r.right as f32 / 200.0,
-                ]);
-            }
-            v
+                ]
+            }),
         })
         .collect();
 
@@ -3307,42 +3332,45 @@ fn battle_to_host_config(
         ),
     };
 
-    let mut config = json!({
-        "mapName": battle.map,
-        "gameType": battle.modname,
-        "myPlayerName": me,
-        "startPosType": start_pos_type,
-        "modOptions": mod_options,
-        "mapOptions": map_options,
-        "restrictedUnits": restricted_units,
-        "players": players,
-        "ais": ais,
-        "teams": teams.into_values().collect::<Vec<_>>(),
-        "allyTeams": ally_teams,
-        "isHost": true,
-        "hostIp": host_ip,
-        "hostPort": host_port,
-    });
-    if let Some(relay) = relay {
-        config["hostLoopbackReason"] = json!(format!(
+    let host_loopback_reason = relay.map(|relay| {
+        format!(
             "This battle is relayed through {}, so the engine listens on loopback and the relay \
              agent carries every player to it. The engine's warning about a loopback socket does \
              not apply.",
             relay.relayed
-        ));
-    }
-    Ok(config)
+        )
+    });
+
+    to_config_value(BattleConfig {
+        map_name: battle.map.clone(),
+        game_type: battle.modname.clone(),
+        my_player_name: me,
+        start_pos_type,
+        mod_options,
+        map_options,
+        restricted_units,
+        players,
+        ais,
+        teams: teams.into_values().collect(),
+        ally_teams,
+        is_host: true,
+        host_ip: Some(host_ip.to_string()),
+        host_port,
+        host_loopback_reason,
+        ..Default::default()
+    })
 }
 
 /// One host-mode `teams[]` entry, with an already-renumbered ally index and the
 /// player number leading the team.
-fn host_team_value(ally: usize, color: u32, leader: usize) -> Value {
+fn host_team_value(ally: usize, color: u32, leader: usize) -> Team {
     let (r, g, b) = team_color_rgb(color);
-    json!({
-        "teamLeader": leader,
-        "allyTeam": ally,
-        "rgbColor": [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0],
-    })
+    Team {
+        team_leader: leader as u32,
+        ally_team: ally as u32,
+        rgb_color: [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0],
+        ..Default::default()
+    }
 }
 
 /// `mp_build_host_config` — return the current (hosted) battle as a host-mode
