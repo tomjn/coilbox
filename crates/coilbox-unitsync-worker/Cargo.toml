@@ -13,15 +13,15 @@ path = "src/main.rs"
 # Runtime dlopen of the engine's libunitsync.* (NOT a link-time dependency — the
 # library lives in the user's engine install, not in our build).
 libloading = "0.8"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 # Minimap mode encodes the RGB565 buffer to PNG; archive preview also decodes
 # TGA (which browsers can't render) and re-encodes it to PNG. Game-header art is
 # decoded from any loadpicture format and re-encoded as a downscaled JPEG, so the
 # jpeg/bmp/gif decoders (and jpeg encoder) are enabled too. `tiff` is decoded
 # through `coilbox-texture` (issue #1915) and named here so the tests can write
 # one, which costs nothing: the same feature is already on in the graph.
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
     "png",
     "tga",
     "jpeg",
@@ -33,7 +33,7 @@ image = { version = "0.25", default-features = false, features = [
 # DXT/BCn-compressed, and the PNG encode every cache here writes. Shared with the
 # unit builder's Blender exports, which decode the same files (issue #715).
 coilbox-texture = { path = "../coilbox-texture" }
-base64 = "0.22"
+base64 = { workspace = true }
 # The one WebP encoder, lossy and lossless (issue #1623). It wraps libwebp-sys,
 # which vendors libwebp's C and builds it with `cc`, so there is no system
 # library and no pkg-config, and all three release targets build it natively with

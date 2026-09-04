@@ -13,8 +13,8 @@ tauri-plugin = { version = "2", features = ["build"] }
 
 [dependencies]
 tauri = { version = "2" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-proc = { path = "../coilbox-proc" }
@@ -23,8 +23,8 @@ coilbox-proc = { path = "../coilbox-proc" }
 coilbox-springlua = { path = "../coilbox-springlua" }
 # Shared dependency-free on-disk byte cache for thumbnails (read-or-compute+write).
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
-sevenz-rust2 = "0.21.1"
+zip = { workspace = true }
+sevenz-rust2 = { workspace = true }
 # Decode source images (texture/heightmap/...) to read true dimensions and build
 # small preview thumbnails. default-features off; only the formats mapconv accepts.
-image = { version = "0.25", default-features = false, features = ["png", "bmp", "tga", "jpeg", "tiff"] }
+image = { workspace = true, features = ["png", "bmp", "tga", "jpeg", "tiff"] }

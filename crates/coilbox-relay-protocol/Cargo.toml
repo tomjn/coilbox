@@ -10,10 +10,10 @@ license = "MIT"
 # needs. Deliberately no tokio: how the lines are carried is the caller's
 # business, and keeping it out means the coilbox side can depend on this without
 # dragging in the sidecar's TURN stack.
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 # The run file lock is the one thing here that is not pure, so proving it needs
 # a real file on a real filesystem rather than a description of one.
-tempfile = "3"
+tempfile = { workspace = true }

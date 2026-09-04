@@ -13,8 +13,8 @@ tauri-plugin = { version = "2", features = ["build"] }
 
 [dependencies]
 tauri = { version = "2" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-s3o = { path = "../coilbox-s3o" }
@@ -33,7 +33,7 @@ sha2 = { workspace = true }
 # the legacy games ship, so all three are re-encoded to PNG on the way into the
 # store. `coilbox-texture` does the decoding. These are the encoders the tests
 # write their fixtures with.
-image = { version = "0.25", default-features = false, features = [
+image = { workspace = true, features = [
   "png",
   "bmp",
   "tga",
@@ -45,4 +45,4 @@ image = { version = "0.25", default-features = false, features = [
 coilbox-texture = { path = "../coilbox-texture" }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }

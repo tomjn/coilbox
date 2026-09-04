@@ -13,8 +13,8 @@ tauri-plugin = { version = "2", features = ["build"] }
 
 [dependencies]
 tauri = { version = "2" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 # Where the pieces are and how they move, shared with the Lua unit script
 # runtime so a preview means the same thing for a `.cob` as for a `.lua`.

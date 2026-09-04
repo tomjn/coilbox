@@ -13,13 +13,13 @@ tauri-plugin = { version = "2", features = ["build"] }
 
 [dependencies]
 tauri = { version = "2" }
-base64 = "0.22"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+base64 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-proc = { path = "../coilbox-proc" }
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }

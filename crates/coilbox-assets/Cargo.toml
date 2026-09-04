@@ -6,8 +6,8 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 # The digest of the embedded document, so a client can be told it is behind the
 # hub instead of finding out one refusal at a time (issue #1708). Already the
 # version four other crates here build.

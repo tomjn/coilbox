@@ -69,3 +69,33 @@ debug = "line-tables-only"
 # `cfg(all(target_arch = "aarch64", not(target_env = "msvc")))` and windows-arm64
 # was left on the portable code. None of that is needed here (issue #1757).
 sha2 = "0.11"
+
+# One derive implementation shared by the 25 manifests that serialise config,
+# catalog and protocol types, instead of 25 declarations that can drift apart.
+serde = { version = "1", features = ["derive"] }
+
+# The JSON encoder/decoder every crate above uses alongside serde, and two more
+# besides (a build-dependency and one with no serde derive of its own).
+serde_json = "1"
+
+# One throwaway-directory implementation for the 12 crates whose tests (and, in
+# two cases, runtime code) need a real filesystem location that isn't anyone's.
+tempfile = "3"
+
+# One codec for the tokens, hashes and other binary-to-text values that cross a
+# protocol or config boundary, shared by 9 crates instead of copied into each.
+base64 = "0.22"
+
+# The .sdz/.zip reader content, mapconv and scenario all use, pinned once
+# instead of three times.
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+
+# The .sd7/7z reader downloads, mapconv and scenario all use, pinned once
+# instead of three times.
+sevenz-rust2 = "0.21.1"
+
+# The decoder/encoder backend shared by six crates. Each enables a different
+# subset of formats for its own reason (see the comment at each call site), so
+# only the version and default-features toggle are shared here. Features stay
+# declared per crate.
+image = { version = "0.25", default-features = false }

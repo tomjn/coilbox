@@ -15,7 +15,7 @@ tauri-plugin = { version = "2", features = ["build"] }
 tauri = { version = "2" }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
-serde_json = "1"
+serde_json = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }

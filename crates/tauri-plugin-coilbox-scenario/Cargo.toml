@@ -12,18 +12,18 @@ links = "tauri-plugin-coilbox-scenario"
 tauri-plugin = { version = "2", features = ["build"] }
 
 [dependencies]
-base64 = "0.22"
+base64 = { workspace = true }
 tauri = { version = "2" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-springlua = { path = "../coilbox-springlua" }
 uuid = { version = "1", features = ["v4"] }
 # Reading a game's own missions out of the archive it ships them in. `.sdz` is a
 # zip and `.sd7` is 7-zip, the same two readers content and mapconv already use.
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
-sevenz-rust2 = "0.21.1"
+zip = { workspace = true }
+sevenz-rust2 = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }
