@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -31,7 +32,6 @@ import {
   usReport,
   usResultsDir,
 } from "../bindings";
-import { OptionSelect } from "./components/OptionSelect";
 import {
   CompareBars,
   LatencyBars,

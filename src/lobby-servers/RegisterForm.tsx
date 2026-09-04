@@ -1,10 +1,10 @@
 import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useState } from "react";
+import { Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 import { useMultiplayer } from "../multiplayer/store";
 import { lsStoreCredential } from "./bindings";
 import { type LobbyServer, serverProtocol, useLobbyAccounts } from "./config";
-import { Field } from "./pages/components/Field";
-import { OptionSelect } from "./pages/components/OptionSelect";
 
 /**
  * Create a new account on a lobby server. Drives the backend `register` handshake,

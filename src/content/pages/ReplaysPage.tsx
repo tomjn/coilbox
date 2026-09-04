@@ -15,6 +15,7 @@ import {
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ContinueBadge } from "@/components/ContinueBadge";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -24,7 +25,6 @@ import {
 } from "@/components/ui/tooltip";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { mostRecentOpen } from "@/lib/recency";
-import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
   useReplays,
   useScanTargetSelection,

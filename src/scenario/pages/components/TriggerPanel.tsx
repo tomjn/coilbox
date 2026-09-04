@@ -28,6 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -39,7 +40,6 @@ import {
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { useFieldProblem } from "@/lib/useFieldProblem";
 import { useFieldText } from "@/lib/useFieldText";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import type { PaletteGate } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";

@@ -2,8 +2,8 @@ import { Button, cn, Input } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { Field } from "@/components/Field";
 import { AssetPreview } from "./AssetPreview";
-import { Field } from "./Field";
 
 /**
  * A path field: a read-only text input showing the selected path plus a Browse
@@ -31,7 +31,7 @@ export function PathField({
   label: string;
   hint?: string;
   help?: ReactNode;
-  learnMore?: string;
+  learnMore?: ReactNode;
   value: string;
   onChange: (path: string) => void;
   disabled?: boolean;

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   dlRepos,
@@ -20,7 +21,6 @@ import {
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
 import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
-import { OptionSelect } from "./OptionSelect";
 import { QueueProgress } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";
 

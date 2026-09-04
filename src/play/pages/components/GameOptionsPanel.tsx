@@ -1,6 +1,7 @@
 import { Input } from "@picoframe/frame";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
@@ -15,7 +16,6 @@ import {
   isChanged,
   type OptionGroup,
 } from "@/play/modOptions";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 
 /** Start-position modes we expose (a subset of the engine's `StartPosType`). */
 export const START_POS_OPTIONS = [

@@ -23,7 +23,7 @@
 import { Button } from "@picoframe/frame";
 import { SwatchBook } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
+import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -45,7 +45,6 @@ import { unitLabel } from "../../../content/unitChoices";
 import { countTriangles } from "../../../content/unitModel";
 import { withoutGeneratedGames } from "../../../lib/generatedGames";
 import { usePreferredTarget } from "../../../play/config";
-import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
 
 /** What the viewport needs to stand a unit in the scene, and what to call it. */
 export interface GameReferenceChoice {

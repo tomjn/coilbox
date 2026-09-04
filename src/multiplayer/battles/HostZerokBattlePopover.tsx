@@ -1,5 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { memo, useMemo, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   Popover,
   PopoverContent,
@@ -7,7 +8,6 @@ import {
 } from "@/components/ui/popover";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { mpZerokOpenBattle, ZerokBattleMode } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
 import {

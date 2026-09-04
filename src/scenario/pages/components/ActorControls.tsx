@@ -41,7 +41,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { SlidersHorizontal } from "lucide-react";
 import { useId } from "react";
-
+import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -52,7 +52,6 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ActorState, Facing, ScenarioActor } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";

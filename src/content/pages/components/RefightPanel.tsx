@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, Play, Swords } from "lucide-react";
 import { useMemo, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   Popover,
   PopoverContent,
@@ -17,7 +18,6 @@ import {
 import type { SkirmishDraft } from "@/play/drafts";
 import { usePlay } from "@/play/PlayProvider";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { tagFreshReplay } from "../../../play/tagReplayProvenance";
 import type { DemoInfo } from "../../bindings";
 import { contentListReplays } from "../../bindings";

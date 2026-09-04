@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatBytes } from "@/lib/format";
 import { dlRecoilEngines, dlSpringfilesEngines } from "../../bindings";
@@ -15,7 +16,6 @@ import {
   type EngineSource,
   emptyEngineListMessage,
 } from "../../emptyEngineList";
-import { OptionSelect } from "./OptionSelect";
 import { QueueProgress } from "./ProgressBar";
 import { errMessage } from "./states";
 

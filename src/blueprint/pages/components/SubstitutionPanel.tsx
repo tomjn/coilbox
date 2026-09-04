@@ -41,11 +41,10 @@
 import { Button } from "@picoframe/frame";
 import { ArrowRight, BookOpen, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
-
+import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ArrivalNote } from "../../arrival";
 import {
   coveredDefsBySource,

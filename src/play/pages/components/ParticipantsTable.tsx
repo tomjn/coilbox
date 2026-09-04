@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, Dices, X } from "lucide-react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -28,7 +29,6 @@ import {
   minigamePips,
   orderedAis,
 } from "@/play/gameAi";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   aiByline,
   effectiveTeams,

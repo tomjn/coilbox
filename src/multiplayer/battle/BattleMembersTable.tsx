@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   Table,
   TableBody,
@@ -20,7 +21,6 @@ import {
   orderedAis,
 } from "@/play/gameAi";
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
 import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
 import { type MemberControls, MemberRow } from "./MemberRow";

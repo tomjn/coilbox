@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { CheckField, Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   AUTO_AWAY_ENABLED_KEY,
   AUTO_AWAY_MINUTES_KEY,
@@ -42,8 +44,6 @@ import {
 } from "../config";
 import { RegisterForm } from "../RegisterForm";
 import { AutojoinChannels } from "./components/AutojoinChannels";
-import { CheckField, Field } from "./components/Field";
-import { OptionSelect } from "./components/OptionSelect";
 
 const H2_CLASS =
   "flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground";

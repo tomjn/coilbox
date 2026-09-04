@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
@@ -9,7 +10,6 @@ import {
 } from "@/components/ui/popover";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { mpCreateLobby } from "../bindings";
 import {
   ALLY_TEAM_RANGE,

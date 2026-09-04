@@ -1,9 +1,9 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { useSkirmishDraft } from "../../play/drafts";
-import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
   useKeybinds,
   useScanTargetSelection,

@@ -1,13 +1,13 @@
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { useState } from "react";
 import { Link } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   advertisedGamePort,
   HOST_THROUGH_RELAY_KEY,

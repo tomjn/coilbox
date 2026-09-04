@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { FilePlus2, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   Popover,
   PopoverContent,
@@ -9,7 +10,6 @@ import {
 import { useDemoInfo, useReplays } from "@/content/config";
 import { demoInfoToSkirmishDraft } from "@/content/demoToSkirmish";
 import { useRefightSetup } from "@/content/refight";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { aiByline, type Participant, usePreferredTarget } from "../../config";
 import type { SkirmishDraft } from "../../drafts";
 

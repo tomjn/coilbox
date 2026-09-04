@@ -23,9 +23,9 @@ import { LayoutThumb } from "@/blueprint/pages/components/LayoutThumb";
 import { blueprintPayload } from "@/blueprint/transfer";
 import type { KnownUnits } from "@/blueprint/units";
 import { unknownBuildings, unknownUnitsWarning } from "@/blueprint/units";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { InstalledGameInfo } from "@/container/gameIdentity";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
 import {
   type LayoutChoice,

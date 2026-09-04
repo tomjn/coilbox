@@ -3,12 +3,12 @@ import { Settings2, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useMemo, useState } from "react";
 import { UnitRestrictions } from "@/campaign/pages/components/UnitRestrictions";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { ConfigOption } from "@/content/bindings";
 import {
   ModOptionField,
   START_POS_OPTIONS,
 } from "@/play/pages/components/GameOptionsPanel";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Battle } from "../bindings";
 import {
   changedCount,

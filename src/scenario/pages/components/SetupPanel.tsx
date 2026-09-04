@@ -36,6 +36,7 @@ import {
   useState,
 } from "react";
 import { PresetPickerDrawer } from "@/campaign/pages/components/PresetPickerDrawer";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBrandingEntry } from "@/content/branding";
 import {
@@ -70,7 +71,6 @@ import { MapCard } from "@/play/pages/components/MapCard";
 import { ParticipantsTable } from "@/play/pages/components/ParticipantsTable";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
-import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
 import type { LoadedScenario } from "../../storage";
 import { defsMissingFrom, type MissionIssue, unitDefsIn } from "../../validate";

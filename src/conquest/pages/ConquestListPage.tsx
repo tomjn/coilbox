@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ContinueBadge } from "@/components/ContinueBadge";
+import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -49,7 +50,6 @@ import {
   useSkirmishAis,
 } from "../../play/config";
 import { getGameMatcher, getProfile } from "../../profile/profile";
-import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
 import {
   type ConquestChallengeSettings,

@@ -33,7 +33,7 @@ vi.mock("@/components/ui/popover", () => ({
   ),
 }));
 
-vi.mock("@/uberstress/pages/components/OptionSelect", () => ({
+vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({ value }: { value: string }) => <span>{value}</span>,
 }));
 

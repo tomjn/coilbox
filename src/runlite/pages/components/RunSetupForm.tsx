@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
@@ -30,7 +31,6 @@ import {
 import { loadoutById, unlockedLoadouts } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
 import { useRunMeta, useRuns } from "../../runs";
-import { OptionSelect } from "./OptionSelect";
 
 /**
  * The run-setup form, shown in a drawer (see RunListPage). Assembles a
