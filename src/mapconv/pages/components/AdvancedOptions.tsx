@@ -1,6 +1,6 @@
 import { Input } from "@picoframe/frame";
-import { CheckField, Field } from "./Field";
-import { WIKI } from "./Help";
+import { CheckField, Field } from "@/components/Field";
+import { HelpTip, LearnMore, WIKI } from "./Help";
 import { PathField } from "./PathField";
 
 /** Image file filters shared by the optional map pickers. */
@@ -73,15 +73,19 @@ export default function AdvancedOptions({
           label="Heightmap (-h)"
           hint="grayscale; white = high, black = low"
           help={
-            <span>
-              Defines the terrain elevation. A grayscale image where{" "}
-              <strong>white is the highest point and black the lowest</strong>.
-              Greys are heights in between. It should be{" "}
-              <code>(texture ÷ 8) + 1</code> pixels on each side (e.g. an 8192px
-              texture needs a 1025px heightmap).
-            </span>
+            <HelpTip>
+              <span>
+                Defines the terrain elevation. A grayscale image where{" "}
+                <strong>
+                  white is the highest point and black the lowest
+                </strong>
+                . Greys are heights in between. It should be{" "}
+                <code>(texture ÷ 8) + 1</code> pixels on each side (e.g. an
+                8192px texture needs a 1025px heightmap).
+              </span>
+            </HelpTip>
           }
-          learnMore={WIKI.height}
+          learnMore={<LearnMore href={WIKI.height} />}
           value={value.heightmap}
           onChange={(v) => set({ heightmap: v })}
           disabled={disabled}
@@ -93,13 +97,16 @@ export default function AdvancedOptions({
           label="Metal map (-m)"
           hint="red channel marks metal deposits"
           help={
-            <span>
-              Marks where reclaimable/extractable metal is. The{" "}
-              <strong>red channel</strong> sets metal density (brighter red =
-              more); paint small red spots where you want metal spots in game.
-            </span>
+            <HelpTip>
+              <span>
+                Marks where reclaimable/extractable metal is. The{" "}
+                <strong>red channel</strong> sets metal density (brighter red
+                = more); paint small red spots where you want metal spots in
+                game.
+              </span>
+            </HelpTip>
           }
-          learnMore={WIKI.metal}
+          learnMore={<LearnMore href={WIKI.metal} />}
           value={value.metalmap}
           onChange={(v) => set({ metalmap: v })}
           disabled={disabled}
@@ -111,12 +118,15 @@ export default function AdvancedOptions({
           label="Type map (-z)"
           hint="terrain-type index per pixel"
           help={
-            <span>
-              Assigns a terrain type per pixel (each pixel value is an index
-              into the map's terrain types, which set speed/hardness for units).
-            </span>
+            <HelpTip>
+              <span>
+                Assigns a terrain type per pixel (each pixel value is an index
+                into the map's terrain types, which set speed/hardness for
+                units).
+              </span>
+            </HelpTip>
           }
-          learnMore={WIKI.terraintype}
+          learnMore={<LearnMore href={WIKI.terraintype} />}
           value={value.typemap}
           onChange={(v) => set({ typemap: v })}
           disabled={disabled}
@@ -128,13 +138,15 @@ export default function AdvancedOptions({
           label="Minimap (-minimap)"
           hint="the small overview image shown in-lobby and in-game"
           help={
-            <span>
-              The low-resolution overview image players see in the lobby and the
-              in-game minimap. If omitted, the engine can derive one from the
-              texture.
-            </span>
+            <HelpTip>
+              <span>
+                The low-resolution overview image players see in the lobby
+                and the in-game minimap. If omitted, the engine can derive one
+                from the texture.
+              </span>
+            </HelpTip>
           }
-          learnMore={WIKI.minimap}
+          learnMore={<LearnMore href={WIKI.minimap} />}
           value={value.minimap}
           onChange={(v) => set({ minimap: v })}
           disabled={disabled}
@@ -146,12 +158,14 @@ export default function AdvancedOptions({
           label="Vegetation map (-v)"
           hint="grayscale; brightness = grass density"
           help={
-            <span>
-              Controls where engine grass/vegetation grows. A grayscale image
-              where brighter = denser grass.
-            </span>
+            <HelpTip>
+              <span>
+                Controls where engine grass/vegetation grows. A grayscale
+                image where brighter = denser grass.
+              </span>
+            </HelpTip>
           }
-          learnMore={WIKI.grass}
+          learnMore={<LearnMore href={WIKI.grass} />}
           value={value.vegmap}
           onChange={(v) => set({ vegmap: v })}
           disabled={disabled}
@@ -163,13 +177,16 @@ export default function AdvancedOptions({
           label="Features file (-features)"
           hint="text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
           help={
-            <span>
-              Places map features (trees, rocks, wreckage). A text file with one
-              feature per line: <code>[tdfname] [x] [y] [z] [rotation]</code>,
-              where tdfname is the feature's definition name.
-            </span>
+            <HelpTip>
+              <span>
+                Places map features (trees, rocks, wreckage). A text file
+                with one feature per line:{" "}
+                <code>[tdfname] [x] [y] [z] [rotation]</code>, where tdfname
+                is the feature's definition name.
+              </span>
+            </HelpTip>
           }
-          learnMore={WIKI.features}
+          learnMore={<LearnMore href={WIKI.features} />}
           value={value.features}
           onChange={(v) => set({ features: v })}
           disabled={disabled}
@@ -186,11 +203,13 @@ export default function AdvancedOptions({
             label="Min height (-minh)"
             hint="world height at black; default 0"
             help={
-              <span>
-                The in-world height (in map units) that pure black in the
-                heightmap maps to — the map's lowest point. Below 0 is
-                underwater.
-              </span>
+              <HelpTip>
+                <span>
+                  The in-world height (in map units) that pure black in the
+                  heightmap maps to — the map's lowest point. Below 0 is
+                  underwater.
+                </span>
+              </HelpTip>
             }
           >
             <Input
@@ -205,11 +224,13 @@ export default function AdvancedOptions({
             label="Max height (-maxh)"
             hint="world height at white; default 1"
             help={
-              <span>
-                The in-world height (in map units) that pure white maps to — the
-                map's highest point. The gap between min and max sets how steep
-                the terrain is.
-              </span>
+              <HelpTip>
+                <span>
+                  The in-world height (in map units) that pure white maps to
+                  — the map's highest point. The gap between min and max sets
+                  how steep the terrain is.
+                </span>
+              </HelpTip>
             }
           >
             <Input

@@ -1,9 +1,9 @@
 import { CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CheckField, Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 import { type CompressionType, mcProbe } from "../bindings";
 import { useMapconvConfig } from "../config";
-import { CheckField, Field } from "./components/Field";
-import { OptionSelect } from "./components/OptionSelect";
 
 const CT_OPTIONS = [
   { value: "1", label: "1 — No compression" },

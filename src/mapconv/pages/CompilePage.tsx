@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
+import { Field } from "@/components/Field";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Collapsible,
@@ -39,10 +41,8 @@ import AdvancedOptions, {
   type AdvancedCompileOpts,
   defaultAdvanced,
 } from "./components/AdvancedOptions";
-import { Field } from "./components/Field";
-import { LearnMore, WIKI } from "./components/Help";
+import { HelpTip, LearnMore, WIKI } from "./components/Help";
 import { MapPreview3D } from "./components/MapPreview3D";
-import { OptionSelect } from "./components/OptionSelect";
 import { PathField } from "./components/PathField";
 
 const TEXTURE_FILTERS = [
@@ -382,16 +382,18 @@ export default function CompilePage() {
             label="Main texture (-t)"
             hint="required · the map's diffuse colour image · sets the map size · siblings auto-fill below"
             help={
-              <span>
-                The diffuse colour image painted across the whole map. Its width
-                and height set the map's size and{" "}
-                <strong>must each be a multiple of 1024</strong> (e.g. 1024,
-                2048, 8192). Name companion images <code>heightmap.png</code>,{" "}
-                <code>metalmap.png</code>, etc. in the same folder and they
-                auto-fill below.
-              </span>
+              <HelpTip>
+                <span>
+                  The diffuse colour image painted across the whole map. Its
+                  width and height set the map's size and{" "}
+                  <strong>must each be a multiple of 1024</strong> (e.g. 1024,
+                  2048, 8192). Name companion images{" "}
+                  <code>heightmap.png</code>, <code>metalmap.png</code>, etc.
+                  in the same folder and they auto-fill below.
+                </span>
+              </HelpTip>
             }
-            learnMore={WIKI.diffuse}
+            learnMore={<LearnMore href={WIKI.diffuse} />}
             value={maintexture}
             onChange={pickTexture}
             disabled={running}
@@ -434,14 +436,17 @@ export default function CompilePage() {
             label="Compression type (-ct)"
             hint="4 (high quality fast) is a good default"
             help={
-              <span>
-                How the <code>.smt</code> tile texture is compressed — a
-                trade-off of file size, speed and quality:
-                <br />1 — none (largest file, fastest build)
-                <br />2 — fast (compares the last N tiles)
-                <br />3 — insane (compares the whole map; smallest, very slow)
-                <br />4 — high quality fast (recommended)
-              </span>
+              <HelpTip>
+                <span>
+                  How the <code>.smt</code> tile texture is compressed — a
+                  trade-off of file size, speed and quality:
+                  <br />1 — none (largest file, fastest build)
+                  <br />2 — fast (compares the last N tiles)
+                  <br />3 — insane (compares the whole map; smallest, very
+                  slow)
+                  <br />4 — high quality fast (recommended)
+                </span>
+              </HelpTip>
             }
           >
             <OptionSelect
