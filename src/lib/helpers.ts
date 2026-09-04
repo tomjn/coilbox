@@ -19,3 +19,8 @@ export function basename(path: string): string {
   const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   return i >= 0 ? path.slice(i + 1) : path;
 }
+
+/** Normalise a thrown value to a display string. */
+export function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}

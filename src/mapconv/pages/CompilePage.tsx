@@ -18,7 +18,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { basename } from "@/lib/helpers";
+import { basename, errorText } from "@/lib/helpers";
 import {
   type CompileOpts,
   type CompressionType,
@@ -44,10 +44,6 @@ import { LearnMore, WIKI } from "./components/Help";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { OptionSelect } from "./components/OptionSelect";
 import { PathField } from "./components/PathField";
-
-function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
 
 const TEXTURE_FILTERS = [
   {
@@ -222,7 +218,7 @@ export default function CompilePage() {
           lastOutDir: outDir,
         });
     } catch (e) {
-      setRunError(errMessage(e));
+      setRunError(errorText(e));
     } finally {
       setRunning(false);
       runIdRef.current = null;

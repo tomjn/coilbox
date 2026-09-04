@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { basename, clamp, sleep } from "./helpers";
+import { basename, clamp, errorText, sleep } from "./helpers";
 
 describe("clamp", () => {
   it("passes a value already inside the range through unchanged", () => {
@@ -71,5 +71,29 @@ describe("basename", () => {
 
   it("returns an empty string for an empty input", () => {
     expect(basename("")).toBe("");
+  });
+});
+
+describe("errorText", () => {
+  it("reads the message off an Error", () => {
+    expect(errorText(new Error("boom"))).toBe("boom");
+  });
+
+  it("reads the message off an Error subclass", () => {
+    class CustomError extends Error {}
+    expect(errorText(new CustomError("custom boom"))).toBe("custom boom");
+  });
+
+  it("stringifies a plain string", () => {
+    expect(errorText("boom")).toBe("boom");
+  });
+
+  it("stringifies a non-Error object even when it has a message property", () => {
+    expect(errorText({ message: "boom" })).toBe("[object Object]");
+  });
+
+  it("stringifies null and undefined", () => {
+    expect(errorText(null)).toBe("null");
+    expect(errorText(undefined)).toBe("undefined");
   });
 });
