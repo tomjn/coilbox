@@ -249,8 +249,8 @@ pub(crate) async fn content_widget_status<R: Runtime>(
         Ok(d) => d,
         Err(e) => return CliResult::err(e),
     };
-    let res = tauri::async_runtime::spawn_blocking(move || status(&src, Path::new(&root_path)))
-        .await;
+    let res =
+        tauri::async_runtime::spawn_blocking(move || status(&src, Path::new(&root_path))).await;
     match res {
         Ok(status) => CliResult::ok(json!(status)),
         Err(e) => CliResult::err(format!("widget status task failed: {e}")),

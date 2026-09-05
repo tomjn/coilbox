@@ -216,10 +216,9 @@ pub(crate) async fn content_keymap_save<R: Runtime>(
         Ok(d) => d,
         Err(e) => return CliResult::err(e),
     };
-    let res = tauri::async_runtime::spawn_blocking(move || {
-        keymaps_save(&dir, &root_path, &name, &json)
-    })
-    .await;
+    let res =
+        tauri::async_runtime::spawn_blocking(move || keymaps_save(&dir, &root_path, &name, &json))
+            .await;
     match res {
         Ok(Ok(keymap)) => CliResult::ok(json!({ "keymap": keymap })),
         Ok(Err(e)) => CliResult::err(e),

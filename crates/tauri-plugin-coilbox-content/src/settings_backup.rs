@@ -356,10 +356,9 @@ pub(crate) async fn content_config_restore<R: Runtime>(
         Err(e) => return CliResult::err(e),
     };
     let overwrite = overwrite.unwrap_or(false);
-    let res = tauri::async_runtime::spawn_blocking(move || {
-        restore(&dir, &root_path, &slug, overwrite)
-    })
-    .await;
+    let res =
+        tauri::async_runtime::spawn_blocking(move || restore(&dir, &root_path, &slug, overwrite))
+            .await;
     match res {
         Ok(Ok(outcome)) => CliResult::ok(json!(outcome)),
         Ok(Err(e)) => CliResult::err(e),
