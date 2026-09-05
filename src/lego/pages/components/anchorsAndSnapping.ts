@@ -18,9 +18,9 @@ import {
   pieceIdOf,
   points,
   ROTATION_STEP,
-  type SceneState,
   SEAT_COLOUR,
 } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 /** A target anchor nothing is near. Warms towards `SEAT_COLOUR` on approach. */
 const TARGET_COLD = 0x64748b;

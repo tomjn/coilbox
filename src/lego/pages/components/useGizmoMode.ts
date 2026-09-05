@@ -1,11 +1,7 @@
 import { type RefObject, useEffect } from "react";
 import { showCollisionHandles } from "./collisionHandles";
-import {
-  attachGizmo,
-  type GizmoMode,
-  gizmoMode,
-  type SceneState,
-} from "./ModelViewport";
+import { attachGizmo, type GizmoMode, gizmoMode } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 /**
  * Put the gizmo in the chosen mode, and keep the uniform scale lock read

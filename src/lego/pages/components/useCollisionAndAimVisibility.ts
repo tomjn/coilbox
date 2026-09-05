@@ -10,11 +10,11 @@ import {
   COLLISION_DIM_OPACITY,
   COLLISION_OPACITY,
   COLLISION_OVERLAY_OPACITY,
-  type SceneState,
   SELECT_OVERLAY_OPACITY,
   showCollisionVolume,
   showPieceCollisionVolumes,
 } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 export interface CollisionAndAimVisibilityDeps {
   project: LegoProject;

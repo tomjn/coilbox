@@ -12,7 +12,7 @@ import {
   type ScriptTimeline,
 } from "../../scriptPlayback";
 import type { Vec3 } from "../../snapping";
-import type { SceneState } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 /**
  * Pose every animated piece for one moment in time.
