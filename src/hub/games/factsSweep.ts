@@ -8,6 +8,11 @@ import { loadBrandingCatalog, resolveBranding } from "@/content/branding";
 import { isSddName, isSdpName } from "@/content/format";
 import { buildTechForest } from "@/content/techForest";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
+import type {
+  HubSweepProgress,
+  HubSweepReport,
+  HubSweepTarget,
+} from "../sweepFrame";
 import {
   type GameFaction,
   type GameFacts,
@@ -95,31 +100,23 @@ export interface FailedGame {
   said: string;
 }
 
-/** How far along a sweep is, for a progress line. */
-export interface GameSweepProgress {
-  /** What the sweep is doing now. */
-  phase: "scanning" | "reading" | "sending";
-  /** Games finished, and how many there are to do. */
-  done: number;
-  total: number;
-  /** The game being read or sent, when there is one. */
-  game?: string;
-}
+/** How far along a sweep is, for a progress line. `done` and `total` count
+ *  games, and `game` is the one being read or sent. */
+export type GameSweepProgress = HubSweepProgress<
+  "scanning" | "reading" | "sending"
+>;
 
-/** What a sweep did, in counts rather than in words. */
-export interface GameSweepReport {
+/** What a sweep did, in counts rather than in words. `skipped` is the games
+ *  that were never sent, and why. */
+export interface GameSweepReport extends HubSweepReport<SkippedGame> {
   /** Games the machine has installed, before anything was ruled out. */
   found: number;
   /** Games whose units the hub now holds. */
   sent: number;
-  /** Games that were never sent, and why. */
-  skipped: SkippedGame[];
   /** Games the hub would not take, and what it said about each. */
   failed: FailedGame[];
   /** Units the hub refused inside an otherwise fine submission. */
   refused: GameFactsResult[];
-  /** Anything the worker reported while reading. */
-  errors: string[];
 }
 
 /** Everything this reaches outside itself, so a test can count the calls. */
@@ -143,11 +140,7 @@ export const liveGameSweepTools: GameSweepTools = {
   branding: loadBrandingCatalog,
 };
 
-export interface GameSweepTarget {
-  hubUrl: string;
-  enginePath: string;
-  dataDir: string;
-}
+export type GameSweepTarget = HubSweepTarget;
 
 /** A game that will be sent, with the two modinfo fields already read off it. */
 interface Sendable {
