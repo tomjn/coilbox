@@ -15,10 +15,10 @@
 //! typed fields, applying whatever cross field rules the mode has, for
 //! `parse_args` to call. `--unit-render`, `--unit-models`,
 //! `--unit-render-keys`, `--config`, `--config-set`, `--map-meta`,
-//! `--map-info`, `--map-skybox`, `--map-catalog` and `--map-minimaps` have
-//! migrated so far. The other 16 modes still have their flags written by hand
-//! in the three old places, and move here one family at a time, matching how
-//! this crate
+//! `--map-info`, `--map-skybox`, `--map-catalog`, `--map-minimaps`,
+//! `--heightmap`, `--height-field` and `--metalmap` have migrated so far.
+//! The other 13 modes still have their flags written by hand in the three
+//! old places, and move here one family at a time, matching how this crate
 //! already ships (135 commits since May 2026 says a sweeping rewrite is not
 //! this crate's style).
 
@@ -41,6 +41,9 @@ pub enum Mode {
     MapSkybox(MapSkyboxArgs),
     MapCatalog(MapCatalogArgs),
     MapMinimaps(MapMinimapsArgs),
+    Heightmap(HeightmapArgs),
+    HeightField(HeightFieldArgs),
+    Metalmap(MetalmapArgs),
 }
 
 impl Mode {
@@ -59,6 +62,9 @@ impl Mode {
             Mode::MapSkybox(args) => args.to_args(),
             Mode::MapCatalog(args) => args.to_args(),
             Mode::MapMinimaps(args) => args.to_args(),
+            Mode::Heightmap(args) => args.to_args(),
+            Mode::HeightField(args) => args.to_args(),
+            Mode::Metalmap(args) => args.to_args(),
         }
     }
 }
@@ -760,6 +766,204 @@ impl MapMinimapsArgs {
     }
 }
 
+/// `--heightmap`: render one map's height infomap as a downscaled grey WebP
+/// preview, with the world heights that turn it back into terrain. With
+/// `asset_dir` also stores the same picture as the hub's `overlay:height`
+/// asset, capped at the shared vocabulary's edge so the preview and the
+/// asset are the same bytes (issue #1730). `map` is required: there is
+/// nothing to render without one, the rule that used to live in `run()`
+/// alone (issue #2448).
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeightmapArgs {
+    pub map: String,
+    pub cache_dir: Option<String>,
+    /// No builder sends this today (the plugin never asks for the asset,
+    /// only the preview), but `run()` still honours it, so it stays part of
+    /// the contract rather than being narrowed out from under a caller
+    /// nobody has audited.
+    pub asset_dir: Option<String>,
+}
+
+impl HeightmapArgs {
+    /// Build the flags for `--heightmap` mode: the flag itself, the map to
+    /// render, and the optional on-disk picture cache and asset directories.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--heightmap".to_string(),
+            "--map".to_string(),
+            self.map.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        if let Some(dir) = &self.asset_dir {
+            args.push("--asset-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--heightmap` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`HeightmapArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// `--map` is required: there is nothing to render without one.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut map = None;
+        let mut cache_dir = None;
+        let mut asset_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--map" => map = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                "--asset-dir" => asset_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        let Some(map) = map else {
+            return Err("--heightmap needs --map <name>".into());
+        };
+        Ok(HeightmapArgs {
+            map,
+            cache_dir,
+            asset_dir,
+        })
+    }
+}
+
+/// `--height-field`: write one map's raw 16 bit heights to the cache, for
+/// the terrain check to read without a PNG in the way (issue #1490). `map`
+/// is required: there is nothing to read without one, the rule that used to
+/// live in `run()` alone (issue #2448). No `asset_dir`: this mode has never
+/// encoded a hub asset, only the cache file the terrain check reads.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeightFieldArgs {
+    pub map: String,
+    pub cache_dir: Option<String>,
+}
+
+impl HeightFieldArgs {
+    /// Build the flags for `--height-field` mode: the flag itself, the map
+    /// to read, and the optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--height-field".to_string(),
+            "--map".to_string(),
+            self.map.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--height-field` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`HeightFieldArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// `--map` is required: there is nothing to read without one.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut map = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--map" => map = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        let Some(map) = map else {
+            return Err("--height-field needs --map <name>".into());
+        };
+        Ok(HeightFieldArgs { map, cache_dir })
+    }
+}
+
+/// `--metalmap`: render one map's metal infomap as a downscaled green-on-
+/// transparent RGBA PNG, capped at `max_side`'s longest side. With
+/// `asset_dir` also stores the raw density as the hub's `overlay:metal`
+/// asset. `map` is required: there is nothing to render without one, the
+/// rule that used to live in `run()` alone (issue #2448). `max_side`
+/// defaults to 512 when absent, the same default `run()` applied before
+/// this moved here, since the plugin always fills one in itself and no
+/// caller has ever relied on the bare default.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetalmapArgs {
+    pub map: String,
+    pub max_side: u32,
+    pub cache_dir: Option<String>,
+    pub asset_dir: Option<String>,
+}
+
+impl MetalmapArgs {
+    /// Build the flags for `--metalmap` mode: the flag itself, the map to
+    /// render, the longest-side pixel cap, and the optional on-disk cache
+    /// and asset directories.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--metalmap".to_string(),
+            "--map".to_string(),
+            self.map.clone(),
+            "--max-side".to_string(),
+            self.max_side.to_string(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        if let Some(dir) = &self.asset_dir {
+            args.push("--asset-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--metalmap` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`MetalmapArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// `--map` is required: there is nothing to render without one. A
+    /// missing `--max-side` recovers as 512, the same default `run()` read
+    /// from an absent flag before this moved here.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut map = None;
+        let mut max_side = 512u32;
+        let mut cache_dir = None;
+        let mut asset_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--map" => map = it.next().cloned(),
+                "--max-side" => {
+                    max_side = it
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                        .ok_or("--max-side needs an integer")?
+                }
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                "--asset-dir" => asset_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        let Some(map) = map else {
+            return Err("--metalmap needs --map <name>".into());
+        };
+        Ok(MetalmapArgs {
+            map,
+            max_side,
+            cache_dir,
+            asset_dir,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1277,5 +1481,153 @@ mod tests {
     fn map_minimaps_dispatches_to_args_to_its_variant() {
         let a = map_minimaps_args();
         assert_eq!(Mode::MapMinimaps(a.clone()).to_args(), a.to_args());
+    }
+
+    fn heightmap_args() -> HeightmapArgs {
+        HeightmapArgs {
+            map: "Map v1".into(),
+            cache_dir: Some("/cache/heightmap".into()),
+            asset_dir: Some("/assets".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn heightmap_round_trips_through_to_args_and_from_args() {
+        let original = heightmap_args();
+        let recovered = HeightmapArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// No builder sends `--asset-dir` for this mode today, but `run()` still
+    /// honours it (issue #1730), so a caller with neither optional directory
+    /// has to round trip to `None` for both rather than error.
+    #[test]
+    fn heightmap_with_nothing_optional_round_trips_to_none() {
+        let original = HeightmapArgs {
+            cache_dir: None,
+            asset_dir: None,
+            ..heightmap_args()
+        };
+        let a = original.to_args();
+        assert!(!a.contains(&"--cache-dir".to_string()));
+        assert!(!a.contains(&"--asset-dir".to_string()));
+        let recovered = HeightmapArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// There is nothing to render without a map, so a missing one is
+    /// refused rather than treated as a quiet no-op.
+    #[test]
+    fn heightmap_missing_map_is_refused() {
+        let mut a = heightmap_args().to_args();
+        let at = a.iter().position(|x| x == "--map").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(HeightmapArgs::from_args(&a).is_err());
+    }
+
+    #[test]
+    fn heightmap_dispatches_to_args_to_its_variant() {
+        let a = heightmap_args();
+        assert_eq!(Mode::Heightmap(a.clone()).to_args(), a.to_args());
+    }
+
+    fn height_field_args() -> HeightFieldArgs {
+        HeightFieldArgs {
+            map: "Map v1".into(),
+            cache_dir: Some("/cache/heightfield".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn height_field_round_trips_through_to_args_and_from_args() {
+        let original = height_field_args();
+        let recovered = HeightFieldArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A caller with no cache directory omits `--cache-dir` entirely, and
+    /// that has to round trip as `None` rather than as an empty string.
+    #[test]
+    fn height_field_with_no_cache_dir_round_trips_none() {
+        let original = HeightFieldArgs {
+            cache_dir: None,
+            ..height_field_args()
+        };
+        let a = original.to_args();
+        assert!(!a.contains(&"--cache-dir".to_string()));
+        let recovered = HeightFieldArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// There is nothing to read without a map, so a missing one is refused
+    /// rather than treated as a quiet no-op.
+    #[test]
+    fn height_field_missing_map_is_refused() {
+        let mut a = height_field_args().to_args();
+        let at = a.iter().position(|x| x == "--map").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(HeightFieldArgs::from_args(&a).is_err());
+    }
+
+    #[test]
+    fn height_field_dispatches_to_args_to_its_variant() {
+        let a = height_field_args();
+        assert_eq!(Mode::HeightField(a.clone()).to_args(), a.to_args());
+    }
+
+    fn metalmap_args() -> MetalmapArgs {
+        MetalmapArgs {
+            map: "Map v1".into(),
+            max_side: 512,
+            cache_dir: Some("/cache/metalmap".into()),
+            asset_dir: Some("/assets".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn metalmap_round_trips_through_to_args_and_from_args() {
+        let original = metalmap_args();
+        let recovered = MetalmapArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A missing `--max-side` recovers as 512, the same default `run()` read
+    /// from an absent flag before this moved here.
+    #[test]
+    fn metalmap_missing_max_side_defaults_to_512() {
+        let mut a = metalmap_args().to_args();
+        let at = a.iter().position(|x| x == "--max-side").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        let recovered = MetalmapArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered.max_side, 512);
+    }
+
+    /// There is nothing to render without a map, so a missing one is
+    /// refused rather than treated as a quiet no-op.
+    #[test]
+    fn metalmap_missing_map_is_refused() {
+        let mut a = metalmap_args().to_args();
+        let at = a.iter().position(|x| x == "--map").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(MetalmapArgs::from_args(&a).is_err());
+    }
+
+    #[test]
+    fn metalmap_dispatches_to_args_to_its_variant() {
+        let a = metalmap_args();
+        assert_eq!(Mode::Metalmap(a.clone()).to_args(), a.to_args());
     }
 }
