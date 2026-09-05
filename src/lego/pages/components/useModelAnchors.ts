@@ -2,7 +2,7 @@ import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { showAnchors } from "./anchorsAndSnapping";
-import type { SceneState } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 /**
  * Draw the origin, seat and snap anchors for the one selected piece.

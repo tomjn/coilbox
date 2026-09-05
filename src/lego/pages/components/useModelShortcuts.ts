@@ -5,11 +5,9 @@ import {
   useEffect,
 } from "react";
 import { isShortcut } from "../../shortcuts";
-import {
-  focusSelection,
-  type GizmoMode,
-  type SceneState,
-} from "./ModelViewport";
+import { focusSelection } from "./cameraFraming";
+import type { GizmoMode } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 export interface ModelShortcutsDeps {
   selectedIdsRef: RefObject<string[]>;

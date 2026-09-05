@@ -6,13 +6,9 @@ import {
   buildReferenceUnit,
   disposeReferenceUnit,
 } from "../../referenceObject";
-import {
-  applyBackdrop,
-  applyGround,
-  applySceneScale,
-  type SceneState,
-} from "./ModelViewport";
+import { applySceneScale } from "./cameraFraming";
 import type { GameReferenceChoice } from "./ReferencePicker";
+import { applyBackdrop, applyGround, type SceneState } from "./sceneState";
 
 export interface ModelEnvironmentDeps {
   showGrid: boolean;

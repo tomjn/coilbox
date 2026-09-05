@@ -10,7 +10,7 @@ import {
 } from "../../collisionVolume";
 import type { LegoCollisionVolume } from "../../model";
 import { bakedPieces, unitBounds } from "../../s3oBuild";
-import type { SceneState } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 /** Which face of the volume a grab plate is, carried on the plate itself so a
  *  raycast hit says what it dragged. */

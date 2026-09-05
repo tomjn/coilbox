@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
-import { type SceneGraph, syncScene } from "./ModelViewport";
+import { type SceneGraph, syncScene } from "./sceneState";
 
 /** A pack holding one part: a triangle a metre out along x and z. */
 function pack(): LoadedPack {

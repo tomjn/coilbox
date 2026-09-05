@@ -2,13 +2,9 @@ import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
-import {
-  applySceneScale,
-  frameObject,
-  type SceneState,
-  showBaked,
-  syncScene,
-} from "./ModelViewport";
+import { showBaked } from "./bakedPlayback";
+import { applySceneScale, frameObject } from "./cameraFraming";
+import { type SceneState, syncScene } from "./sceneState";
 
 /**
  * Keep the scene's pieces and transforms in step with the document, and frame

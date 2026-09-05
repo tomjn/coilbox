@@ -6,15 +6,17 @@ import type { RawGeometry } from "../../rawGeometry";
 import { unitBounds } from "../../s3oBuild";
 import { showCollisionHandles } from "./collisionHandles";
 import {
-  attachGizmo,
+  showCollisionVolume,
+  showPieceCollisionVolumes,
+} from "./collisionVolumes";
+import { attachGizmo } from "./gizmoCommit";
+import {
   COLLISION_DIM_OPACITY,
   COLLISION_OPACITY,
   COLLISION_OVERLAY_OPACITY,
-  type SceneState,
   SELECT_OVERLAY_OPACITY,
-  showCollisionVolume,
-  showPieceCollisionVolumes,
 } from "./ModelViewport";
+import type { SceneState } from "./sceneState";
 
 export interface CollisionAndAimVisibilityDeps {
   project: LegoProject;
