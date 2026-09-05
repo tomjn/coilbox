@@ -396,17 +396,17 @@ async fn play_infolog<R: Runtime>(
     app: AppHandle<R>,
     data_dir: String,
     max_lines: usize,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let documents = app.path().document_dir().ok();
     let base = infolog::LogBaseDirs::from_env(documents);
     let dirs = infolog::candidate_dirs(infolog::current_os(), &base, &data_dir);
     let Some(path) = infolog::newest_log(&dirs) else {
-        return Ok(CliResult::err("no engine log was found"));
+        return CliResult::err("no engine log was found");
     };
-    Ok(match infolog::read_tail(&path, max_lines) {
+    match infolog::read_tail(&path, max_lines) {
         Ok(tail) => CliResult::ok(json!({ "log": tail })),
         Err(e) => CliResult::err(e),
-    })
+    }
 }
 
 /// Build the plugin. Registered as `"coilbox-play"` (crate name minus the
