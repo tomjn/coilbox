@@ -1094,20 +1094,6 @@ async fn content_delete_replays(paths: Vec<String>, apply: bool) -> CliResult {
     }
 }
 
-/// `content_delete_archive`: delete one downloaded game or map archive and
-/// report the bytes it freed. `path` is an on-disk archive path from a scan.
-/// Guarded by [`archives::classify`], which refuses anything outside a content
-/// root's `games`/`maps`/`packages` so the engine's base archives cannot go.
-#[tauri::command]
-async fn content_delete_archive(path: String) -> CliResult {
-    let p = PathBuf::from(&path);
-    match tauri::async_runtime::spawn_blocking(move || archives::delete(&p)).await {
-        Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("delete archive task failed: {e}")),
-    }
-}
-
 /// `content_gather_replays`: move the replays sitting inside each installed
 /// engine's own folder into the root's `demos/`, so deleting an old engine
 /// folder does not take them (issue #971). `apply` false previews without moving
@@ -1124,33 +1110,6 @@ async fn content_gather_replays(root: String, apply: bool) -> CliResult {
     {
         Ok(summary) => CliResult::ok(json!({ "summary": summary })),
         Err(e) => CliResult::err(format!("gather replays task failed: {e}")),
-    }
-}
-
-/// `content_export_build_tree_html` — write a single self-contained build-tree
-/// export HTML file (built entirely by the frontend) to a caller-chosen path.
-/// Opaque: the frontend owns the markup and picks the destination via the save
-/// dialog (mirrors `campaign_export`).
-#[tauri::command]
-async fn content_export_build_tree_html(dest: String, html: String) -> CliResult {
-    match build_tree_export::write_html(&dest, &html) {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e),
-    }
-}
-
-/// `content_export_build_tree_zip` — assemble the build-tree export zip
-/// (`index.html` + `images/` + `assets/`) at a caller-chosen path from the file
-/// set the frontend serialized. Image bytes arrive base64-encoded and are decoded
-/// here; text files (html/css/js) are written UTF-8.
-#[tauri::command]
-async fn content_export_build_tree_zip(
-    dest: String,
-    files: Vec<build_tree_export::ExportFile>,
-) -> CliResult {
-    match build_tree_export::write_zip(&dest, &files) {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e),
     }
 }
 
@@ -1661,7 +1620,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_rewrite_demo,
             content_delete_replay,
             content_delete_replays,
-            content_delete_archive,
+            archives::content_delete_archive,
             content_gather_replays,
             content_list_saves,
             content_delete_save,
@@ -1685,8 +1644,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_reclaim_caches,
             content_storage_overview,
             content_delete_engine,
-            content_export_build_tree_html,
-            content_export_build_tree_zip,
+            build_tree_export::content_export_build_tree_html,
+            build_tree_export::content_export_build_tree_zip,
             content_export_challenge,
             content_write_file,
             content_import_challenge,
