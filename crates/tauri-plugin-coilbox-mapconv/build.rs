@@ -14,8 +14,6 @@ const COMMANDS: &[&str] = &[
     "mc_cancel",
     "mc_open_path",
     "mc_open_url",
-    "mc_settings_load",
-    "mc_settings_save",
 ];
 
 fn main() {

@@ -207,14 +207,3 @@ export const mcOpenUrl = defineCommand<{ url: string }, { opened: boolean }>(
   "coilbox-mapconv",
   "mc_open_url",
 );
-
-/** Whole settings map (opaque JSON-encoded string values), for the frame's SettingsStorage. */
-export const mcSettingsLoad = defineCommand<
-  undefined,
-  { entries: Record<string, string> }
->("coilbox-mapconv", "mc_settings_load");
-
-export const mcSettingsSave = defineCommand<
-  { entries: Record<string, string> },
-  Record<string, never>
->("coilbox-mapconv", "mc_settings_save");
