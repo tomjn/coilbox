@@ -1,5 +1,10 @@
 import type { MapCatalogEntry, MapCatalogResult } from "../../content/bindings";
 import { unitsyncMapCatalog } from "../../content/bindings";
+import type {
+  HubSweepProgress,
+  HubSweepReport,
+  HubSweepTarget,
+} from "../sweepFrame";
 import {
   type MapSubmitOutcome,
   type MapSubmitResult,
@@ -41,18 +46,15 @@ import {
  * shows as out of sync in a lobby and desyncs in a game.
  */
 
-/** How far along a sweep is, for a progress line. */
-export interface SweepProgress {
-  /** What the sweep is doing now. */
-  phase: "reading" | "asking" | "sending";
-  /** Maps finished in this phase, and how many there are to do. Counted in maps
-   *  rather than in bytes, because facts are small and what moves is the count. */
-  done: number;
-  total: number;
-}
+/** How far along a sweep is, for a progress line. `done` and `total` count
+ *  maps rather than bytes, because facts are small and what moves is the
+ *  count. */
+export type SweepProgress = HubSweepProgress<"reading" | "asking" | "sending">;
 
-/** What a sweep did, in counts rather than in words. */
-export interface SweepReport {
+/** What a sweep did, in counts rather than in words. `skipped` is the maps
+ *  the library could not produce facts for, and why. */
+export interface SweepReport
+  extends HubSweepReport<MapCatalogResult["skipped"][number]> {
   /** Maps the library offered, after duplicates and unreadable archives. */
   read: number;
   /** Maps the hub was asked about, which is the same number. */
@@ -65,10 +67,6 @@ export interface SweepReport {
   refused: number;
   /** The refusals themselves, so a caller can say which maps and why. */
   problems: MapSubmitResult[];
-  /** Maps the library could not produce facts for, and why. */
-  skipped: MapCatalogResult["skipped"];
-  /** Anything the worker reported while reading. */
-  errors: string[];
 }
 
 /** Everything this reaches outside itself, so a test can count the calls. */
@@ -84,11 +82,7 @@ export const liveSweepTools: SweepTools = {
   send: publishMapFacts,
 };
 
-export interface SweepTarget {
-  hubUrl: string;
-  enginePath: string;
-  dataDir: string;
-}
+export type SweepTarget = HubSweepTarget;
 
 /** An outcome that means the hub now holds these facts, or already did. */
 function isHeld(outcome: MapSubmitOutcome): boolean {
