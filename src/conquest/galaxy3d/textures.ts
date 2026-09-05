@@ -569,6 +569,34 @@ export function cometTailTexture(size: number): THREE.Texture {
 }
 
 /**
+ * A soft check-mark glyph on a transparent field, drawn white with a glow so it
+ * reads as a completed marker over a node under normal blending. Tinted per use.
+ */
+export function checkTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.shadowColor = "#000000";
+    ctx.shadowBlur = size * 0.1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.15;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(size * 0.26, size * 0.52);
+    ctx.lineTo(size * 0.44, size * 0.7);
+    ctx.lineTo(size * 0.76, size * 0.32);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
  * A soft glowing annulus, the expanding shockwave ring of a win burst.
  */
 export function ringBurstTexture(size: number): THREE.Texture {
