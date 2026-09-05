@@ -13,6 +13,7 @@ import type { GalaxyDoc, GalaxyNode, Incursion, NodeStar } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
 import { bodyLabel, isVoidNode, type VoidBody, voidBodiesFor } from "./bodies";
+import { createWinBurst } from "./burst";
 import { factionSides } from "./factionShape";
 import {
   hashString,
@@ -31,6 +32,7 @@ import {
   gasGiantTexture,
   greebleTexture,
   radialTexture,
+  ringBurstTexture,
   spaceEnvTexture,
   spikesTexture,
 } from "./textures";
@@ -538,29 +540,6 @@ function chevronTexture(size: number): THREE.Texture {
     ctx.moveTo(m - s * 0.5, m - s);
     ctx.lineTo(m + s * 0.7, m); // tip toward +x
     ctx.lineTo(m - s * 0.5, m + s);
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/**
- * A soft glowing annulus — the expanding shockwave ring of a win burst.
- */
-function ringBurstTexture(size: number): THREE.Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.clearRect(0, 0, size, size);
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = size * 0.05;
-    ctx.shadowColor = "#ffe9b0";
-    ctx.shadowBlur = size * 0.1;
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size * 0.4, 0, Math.PI * 2);
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(canvas);
@@ -2899,53 +2878,15 @@ export function GalaxyView({
     };
 
     // Win burst: a one-shot shockwave ring + flare on a node (the star just
-    // won). Two reused sprites, repositioned per burst; driven by the loop.
-    const burstFlareTex = radialTexture(128, [
-      [0, "#ffffffff"],
-      [0.3, "#fff3c8dd"],
-      [0.7, "#ffcf6633"],
-      [1, "#ffcf6600"],
-    ]);
-    const burstRingTex = ringBurstTexture(128);
-    disposables.push(burstFlareTex, burstRingTex);
-    const burstFlareMat = new THREE.SpriteMaterial({
-      map: burstFlareTex,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      depthTest: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const burstRingMat = new THREE.SpriteMaterial({
-      map: burstRingTex,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      depthTest: false,
-      blending: THREE.AdditiveBlending,
-    });
-    disposables.push(burstFlareMat, burstRingMat);
-    const burstFlare = new THREE.Sprite(burstFlareMat);
-    const burstRing = new THREE.Sprite(burstRingMat);
-    for (const s of [burstFlare, burstRing]) {
-      s.visible = false;
-      s.raycast = () => {};
-      s.renderOrder = 6;
-      scene.add(s);
-    }
-    const BURST_MS = 1300;
-    let burstAnim: { t0: number } | null = null;
-    const applyBurst = () => {
-      const id = burstRef.current;
-      if (!id || reduceMotion) return; // no animated burst under reduce-motion
-      const p = positions.get(id);
-      if (!p) return;
-      const at: [number, number, number] = [p[0], p[1] + 0.3, p[2]];
-      burstFlare.position.set(...at);
-      burstRing.position.set(...at);
-      burstAnim = { t0: performance.now() };
-    };
-    applyBurstRef.current = applyBurst;
+    // won). See burst.ts, ticked in the animation loop below.
+    const winBurst = createWinBurst(
+      scene,
+      disposables,
+      positions,
+      burstRef,
+      reduceMotion,
+    );
+    applyBurstRef.current = winBurst.apply;
 
     // Fade the lanes up during the intro (their target opacities are captured
     // now, then restored as the intro clock advances).
@@ -3787,23 +3728,7 @@ export function GalaxyView({
             }
           }
         }
-        // Win burst: shockwave ring expands and fades, flare spikes then dies.
-        if (burstAnim) {
-          const e = (now - burstAnim.t0) / BURST_MS;
-          if (e >= 1) {
-            burstAnim = null;
-            burstFlare.visible = false;
-            burstRing.visible = false;
-          } else {
-            burstFlare.visible = true;
-            burstRing.visible = true;
-            const flareIn = e < 0.12 ? e / 0.12 : 1;
-            burstFlareMat.opacity = flareIn * (1 - e) ** 1.5;
-            burstFlare.scale.setScalar(6 + 26 * easeOut(e));
-            burstRingMat.opacity = (1 - e) * 0.85;
-            burstRing.scale.setScalar(3 + 52 * easeOut(e));
-          }
-        }
+        winBurst.tick(now);
 
         // Controls own the camera only in the free overview — not during the
         // intro, a focus ease, or while a node is focused (controls locked).
