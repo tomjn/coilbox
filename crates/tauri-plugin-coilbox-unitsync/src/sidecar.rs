@@ -316,12 +316,18 @@ pub fn build_unit_render_keys_args(
     args
 }
 
-/// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
-/// flag, and the optional on-disk picture cache directory.
+/// Build args for heightmap mode: the map name and the optional on-disk
+/// picture cache directory.
 ///
 /// No size cap. The height picture is capped at the shared vocabulary's edge so
 /// the preview and the hub's `overlay:height` asset are the same bytes, which a
 /// caller asking for its own size would break (issue #1730).
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::HeightmapArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode
+/// takes and `Mode::to_args` does not include (issue #2448). No caller here
+/// sends `--asset-dir`: that shape exists only because `run()` still honours
+/// it.
 pub fn build_heightmap_args(
     lib: &str,
     datadir: &str,
@@ -329,17 +335,25 @@ pub fn build_heightmap_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map".into());
-    args.push(map.into());
-    args.push("--heightmap".into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Heightmap(coilbox_unitsync_worker::HeightmapArgs {
+            map: map.into(),
+            cache_dir: cache_dir.map(String::from),
+            asset_dir: None,
+        })
+        .to_args(),
+    );
     args
 }
 
-/// Build args for height-field mode: scan args plus the map name, the
-/// `--height-field` flag, and the cache directory the grid is written to. No
-/// size cap: the whole point is the map's own corner grid at full depth (issue
-/// #1490).
+/// Build args for height-field mode: the map name and the cache directory
+/// the grid is written to. No size cap: the whole point is the map's own
+/// corner grid at full depth (issue #1490).
+///
+/// The mode's fields live once in
+/// `coilbox_unitsync_worker::HeightFieldArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448).
 pub fn build_height_field_args(
     lib: &str,
     datadir: &str,
@@ -347,15 +361,24 @@ pub fn build_height_field_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map".into());
-    args.push(map.into());
-    args.push("--height-field".into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::HeightField(coilbox_unitsync_worker::HeightFieldArgs {
+            map: map.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
-/// Build args for metalmap mode: scan args plus the map name, the `--metalmap`
-/// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
+/// Build args for metalmap mode: the map name, the longest-side pixel cap,
+/// and the optional on-disk PNG cache directory.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::MetalmapArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode
+/// takes and `Mode::to_args` does not include (issue #2448). No caller here
+/// sends `--asset-dir`: that shape exists only because `run()` still honours
+/// it.
 pub fn build_metalmap_args(
     lib: &str,
     datadir: &str,
@@ -364,12 +387,20 @@ pub fn build_metalmap_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map".into());
-    args.push(map.into());
-    args.push("--metalmap".into());
-    args.push("--max-side".into());
-    args.push(max_side.to_string());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Metalmap(coilbox_unitsync_worker::MetalmapArgs {
+            map: map.into(),
+            // `max_side` stays `i32` on this function's own signature since
+            // that is what the Tauri command's `Option<i32>` parameter
+            // carries. The worker has only ever taken a non-negative side,
+            // and no caller sends a negative one, so this clamps rather than
+            // widening the type the mode's contract exposes.
+            max_side: max_side.max(0) as u32,
+            cache_dir: cache_dir.map(String::from),
+            asset_dir: None,
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -693,28 +724,64 @@ mod tests {
         assert!(!without.iter().any(|a| a == "--cache-dir"));
     }
 
+    /// What `build_heightmap_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
     #[test]
-    fn heightmap_args_carry_the_map_flag_and_no_size_of_their_own() {
+    fn build_heightmap_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::HeightmapArgs;
+
         let a = build_heightmap_args(
             "/eng/libunitsync.dylib",
             "/data",
             "Map v1",
             Some("/cache/thumbs"),
         );
-        assert!(a.contains(&"--heightmap".to_string()));
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = HeightmapArgs::from_args(&a).expect("valid argv");
         assert_eq!(
-            &a[a.len() - 2..],
-            &["--cache-dir".to_string(), "/cache/thumbs".to_string()]
+            recovered,
+            HeightmapArgs {
+                map: "Map v1".into(),
+                cache_dir: Some("/cache/thumbs".into()),
+                asset_dir: None,
+            }
         );
-        let i = a.iter().position(|x| x == "--map").unwrap();
-        assert_eq!(a[i + 1], "Map v1");
         // The vocabulary caps the height picture, so asking for a size here
         // would produce a preview that is not the asset (issue #1730).
         assert!(!a.contains(&"--max-side".to_string()));
     }
 
+    /// What `build_height_field_args` writes, the worker's own `from_args`
+    /// reads back whole.
     #[test]
-    fn metalmap_args_carry_map_flag_and_max_side() {
+    fn build_height_field_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::HeightFieldArgs;
+
+        let a = build_height_field_args(
+            "/eng/libunitsync.dylib",
+            "/data",
+            "Map v1",
+            Some("/cache/thumbs"),
+        );
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = HeightFieldArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            HeightFieldArgs {
+                map: "Map v1".into(),
+                cache_dir: Some("/cache/thumbs".into()),
+            }
+        );
+    }
+
+    /// What `build_metalmap_args` writes, the worker's own `from_args` reads
+    /// back whole.
+    #[test]
+    fn build_metalmap_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MetalmapArgs;
+
         let a = build_metalmap_args(
             "/eng/libunitsync.dylib",
             "/data",
@@ -722,15 +789,29 @@ mod tests {
             512,
             Some("/cache/thumbs"),
         );
-        assert!(a.contains(&"--metalmap".to_string()));
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = MetalmapArgs::from_args(&a).expect("valid argv");
         assert_eq!(
-            &a[a.len() - 2..],
-            &["--cache-dir".to_string(), "/cache/thumbs".to_string()]
+            recovered,
+            MetalmapArgs {
+                map: "Map v1".into(),
+                max_side: 512,
+                cache_dir: Some("/cache/thumbs".into()),
+                asset_dir: None,
+            }
         );
-        let i = a.iter().position(|x| x == "--map").unwrap();
-        assert_eq!(a[i + 1], "Map v1");
-        let j = a.iter().position(|x| x == "--max-side").unwrap();
-        assert_eq!(a[j + 1], "512");
+    }
+
+    /// A negative `max_side` (never sent by the real caller) clamps to 0
+    /// rather than wrapping into a huge cap, since the mode's contract has
+    /// only ever taken a non-negative side.
+    #[test]
+    fn build_metalmap_args_clamps_a_negative_max_side_to_zero() {
+        use coilbox_unitsync_worker::MetalmapArgs;
+
+        let a = build_metalmap_args("/eng/libunitsync.dylib", "/data", "Map v1", -5, None);
+        let recovered = MetalmapArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered.max_side, 0);
     }
 
     /// What `build_map_skybox_args` writes, the worker's own `from_args`

@@ -63,15 +63,22 @@ struct Args {
     extract: Option<String>,
     thumbnails: bool,
     /// `--heightmap`: render one map's height infomap as a downscaled preview
-    /// PNG, and with `--asset-dir` also store the full resolution 16 bit samples
-    /// as the hub's asset.
-    heightmap: bool,
+    /// PNG, and with `--asset-dir` also store the full resolution 16 bit
+    /// samples as the hub's asset. Its fields live once in
+    /// `coilbox_unitsync_worker::HeightmapArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    heightmap: Option<Mode>,
     /// `--height-field`: write one map's raw 16 bit heights to the cache, for
-    /// the terrain check to read without a PNG in the way (issue #1490).
-    height_field: bool,
-    /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG, and
-    /// with `--asset-dir` also store the raw density as the hub's asset.
-    metalmap: bool,
+    /// the terrain check to read without a PNG in the way (issue #1490). Its
+    /// field lives once in `coilbox_unitsync_worker::HeightFieldArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    height_field: Option<Mode>,
+    /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG,
+    /// and with `--asset-dir` also store the raw density as the hub's asset.
+    /// Its fields live once in `coilbox_unitsync_worker::MetalmapArgs`,
+    /// shared with the sidecar plugin that builds this flag's argv (issue
+    /// #2448).
+    metalmap: Option<Mode>,
     /// `--typemap`: store one map's terrain-type infomap as the hub's asset.
     /// Needs `--asset-dir`: nothing in coilbox draws a type map, so there is no
     /// other output for this mode to produce.
@@ -170,9 +177,6 @@ struct Args {
     /// (combined with `--lua`), an alternative to a single `--source-file`.
     chunks_file: Option<String>,
     mip: i32,
-    /// Longest-side pixel cap for the metal map PNG downscale (metalmap mode).
-    /// The height picture takes its cap from the shared vocabulary instead.
-    max_side: u32,
     /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
     cache_dir: Option<String>,
     /// `--asset-dir`: where to write encoded hub assets. Set only when something
@@ -710,65 +714,56 @@ fn run() -> i32 {
     }
 
     // Heightmap: render one map's height infomap to a grayscale PNG data URL.
-    if args.heightmap {
-        if let Some(map) = args.map.clone() {
-            let asset_dir = args.asset_dir.as_deref().map(Path::new);
-            return match std::panic::catch_unwind(|| {
-                heightmap::render(&args.lib, &map, cache_dir, asset_dir)
-            }) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    heightmap::emit_error("worker panicked while rendering heightmap".into());
-                    1
-                }
-            };
-        }
-        emit_error("missing --map <name> for --heightmap".into());
-        return 1;
+    if let Some(Mode::Heightmap(mode)) = &args.heightmap {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        let asset_dir = mode.asset_dir.as_deref().map(Path::new);
+        return match std::panic::catch_unwind(|| {
+            heightmap::render(&args.lib, &mode.map, cache_dir, asset_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                heightmap::emit_error("worker panicked while rendering heightmap".into());
+                1
+            }
+        };
     }
 
     // Height field: write one map's raw heights out for the terrain check.
-    if args.height_field {
-        if let Some(map) = args.map.clone() {
-            return match std::panic::catch_unwind(|| {
-                heightfield::render(&args.lib, &map, cache_dir)
-            }) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    heightfield::emit_error("worker panicked while reading heights".into());
-                    1
-                }
-            };
-        }
-        emit_error("missing --map <name> for --height-field".into());
-        return 1;
+    if let Some(Mode::HeightField(mode)) = &args.height_field {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return match std::panic::catch_unwind(|| {
+            heightfield::render(&args.lib, &mode.map, cache_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                heightfield::emit_error("worker panicked while reading heights".into());
+                1
+            }
+        };
     }
 
     // Metalmap: render one map's metal infomap to a green-on-transparent RGBA PNG.
-    if args.metalmap {
-        if let Some(map) = args.map.clone() {
-            let asset_dir = args.asset_dir.as_deref().map(Path::new);
-            return match std::panic::catch_unwind(|| {
-                metalmap::render(&args.lib, &map, args.max_side, cache_dir, asset_dir)
-            }) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    metalmap::emit_error("worker panicked while rendering metalmap".into());
-                    1
-                }
-            };
-        }
-        emit_error("missing --map <name> for --metalmap".into());
-        return 1;
+    if let Some(Mode::Metalmap(mode)) = &args.metalmap {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        let asset_dir = mode.asset_dir.as_deref().map(Path::new);
+        return match std::panic::catch_unwind(|| {
+            metalmap::render(&args.lib, &mode.map, mode.max_side, cache_dir, asset_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                metalmap::emit_error("worker panicked while rendering metalmap".into());
+                1
+            }
+        };
     }
 
     // Typemap: store one map's terrain-type infomap as the hub's overlay asset.
@@ -921,9 +916,22 @@ fn parse_args() -> Result<Args, String> {
     let mut file = None;
     let mut extract = None;
     let mut thumbnails = false;
-    let mut heightmap = false;
-    let mut height_field = false;
-    let mut metalmap = false;
+    // `--heightmap`'s own fields (map, cache directory, asset directory) are
+    // not collected into locals here for its own use: `Mode::Heightmap`'s
+    // `from_args` below re-scans `raw` for those, the same treatment
+    // `--map-info` and its siblings got above (issue #2448).
+    let mut heightmap_flag = false;
+    // `--height-field`'s own fields (map, cache directory) are not collected
+    // into locals here for its own use, the same treatment as above:
+    // `Mode::HeightField`'s `from_args` below re-scans `raw` for those
+    // (issue #2448).
+    let mut height_field_flag = false;
+    // `--metalmap`'s own fields (map, max side, cache directory, asset
+    // directory) are not collected into locals here for its own use, the
+    // same treatment as above: `Mode::Metalmap`'s `from_args` below re-scans
+    // `raw` for those (issue #2448). `--max-side` match arm below stays a
+    // shared consuming placeholder rather than a local.
+    let mut metalmap_flag = false;
     let mut typemap = false;
     // `--map-catalog`'s own fields (single map, maps file, keys-only,
     // cache directory) are not collected into locals here for its own use:
@@ -997,7 +1005,6 @@ fn parse_args() -> Result<Args, String> {
     let mut source_file = None;
     let mut chunks_file = None;
     let mut mip = 1; // 512x512 by default
-    let mut max_side = 512u32;
     let mut cache_dir = None;
     let mut asset_dir = None;
     let mut seed = false;
@@ -1014,9 +1021,9 @@ fn parse_args() -> Result<Args, String> {
             "--file" => file = it.next(),
             "--extract" => extract = it.next(),
             "--thumbnails" => thumbnails = true,
-            "--heightmap" => heightmap = true,
-            "--height-field" => height_field = true,
-            "--metalmap" => metalmap = true,
+            "--heightmap" => heightmap_flag = true,
+            "--height-field" => height_field_flag = true,
+            "--metalmap" => metalmap_flag = true,
             "--typemap" => typemap = true,
             "--map-catalog" => map_catalog_flag = true,
             // Consumed by `Mode::MapCatalog`'s `from_args` below, not stored
@@ -1031,11 +1038,10 @@ fn parse_args() -> Result<Args, String> {
             "--map-info" => map_info_flag = true,
             "--map-meta" => map_meta_flag = true,
             "--map-skybox" => map_skybox_flag = true,
+            // Consumed by `Mode::Metalmap`'s `from_args` below, not stored
+            // here.
             "--max-side" => {
-                max_side = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or("--max-side needs an integer")?
+                it.next();
             }
             "--cache-dir" => cache_dir = it.next(),
             "--asset-dir" => asset_dir = it.next(),
@@ -1124,9 +1130,27 @@ fn parse_args() -> Result<Args, String> {
         file,
         extract,
         thumbnails,
-        heightmap,
-        height_field,
-        metalmap,
+        heightmap: if heightmap_flag {
+            Some(Mode::Heightmap(
+                coilbox_unitsync_worker::HeightmapArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        height_field: if height_field_flag {
+            Some(Mode::HeightField(
+                coilbox_unitsync_worker::HeightFieldArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        metalmap: if metalmap_flag {
+            Some(Mode::Metalmap(
+                coilbox_unitsync_worker::MetalmapArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         typemap,
         map_catalog: if map_catalog_flag {
             Some(Mode::MapCatalog(
@@ -1211,7 +1235,6 @@ fn parse_args() -> Result<Args, String> {
         source_file,
         chunks_file,
         mip,
-        max_side,
         cache_dir,
         asset_dir,
         seed,
@@ -1326,6 +1349,45 @@ fn absolutize(args: &mut Args) {
     }
     // `Mode::MapSkybox` has no path field of its own: `--map` is a unitsync
     // name, not a path, so there is nothing here for it to do.
+    // `Mode::Heightmap` holds its own copy of `--cache-dir`/`--asset-dir`,
+    // read separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--map` is a unitsync name, not a path, so it is left
+    // alone.
+    if let Some(Mode::Heightmap(mode)) = args.heightmap.as_mut() {
+        for path in [mode.cache_dir.as_mut(), mode.asset_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
+            }
+        }
+    }
+    // `Mode::HeightField` holds its own copy of `--cache-dir`, read
+    // separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--map` is a unitsync name, not a path, so it is left
+    // alone.
+    if let Some(Mode::HeightField(mode)) = args.height_field.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::Metalmap` holds its own copy of `--cache-dir`/`--asset-dir`,
+    // read separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--map` is a unitsync name, not a path, so it is left
+    // alone.
+    if let Some(Mode::Metalmap(mode)) = args.metalmap.as_mut() {
+        for path in [mode.cache_dir.as_mut(), mode.asset_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
+            }
+        }
+    }
 }
 
 /// `path` joined onto the current directory when it is relative, and `None`
@@ -1673,9 +1735,9 @@ mod tests {
             file: None,
             extract: None,
             thumbnails: false,
-            heightmap: false,
-            height_field: false,
-            metalmap: false,
+            heightmap: None,
+            height_field: None,
+            metalmap: None,
             typemap: false,
             map_catalog: None,
             map_minimaps: None,
@@ -1702,7 +1764,6 @@ mod tests {
             source_file: None,
             chunks_file: None,
             mip: 1,
-            max_side: 512,
             cache_dir: cache_dir.map(str::to_string),
             asset_dir: asset_dir.map(str::to_string),
             seed: false,
