@@ -6,13 +6,15 @@ import type { RawGeometry } from "../../rawGeometry";
 import { unitBounds } from "../../s3oBuild";
 import { showCollisionHandles } from "./collisionHandles";
 import {
+  showCollisionVolume,
+  showPieceCollisionVolumes,
+} from "./collisionVolumes";
+import {
   attachGizmo,
   COLLISION_DIM_OPACITY,
   COLLISION_OPACITY,
   COLLISION_OVERLAY_OPACITY,
   SELECT_OVERLAY_OPACITY,
-  showCollisionVolume,
-  showPieceCollisionVolumes,
 } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
 
