@@ -372,14 +372,10 @@ async fn run_worker(
 /// returning its maps, games, archives and metadata. `engine_path` is the engine
 /// dir holding `libunitsync.*`; `data_dir` is the content root to enumerate.
 #[tauri::command]
-async fn unitsync_scan(
-    engine_path: String,
-    data_dir: String,
-    op_id: Option<String>,
-) -> Result<CliResult, ()> {
+async fn unitsync_scan(engine_path: String, data_dir: String, op_id: Option<String>) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
@@ -388,7 +384,7 @@ async fn unitsync_scan(
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
-    Ok(res)
+    res
 }
 
 /// `unitsync_minimap` — render one map's minimap as a PNG data URL. `mip` selects
@@ -400,10 +396,10 @@ async fn unitsync_minimap<R: Runtime>(
     data_dir: String,
     map_name: String,
     mip: Option<i32>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_minimap_args(
@@ -414,7 +410,7 @@ async fn unitsync_minimap<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "minimap", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "minimap", None).await
 }
 
 /// `unitsync_heightmap` — render one map's height infomap as a downscaled
@@ -428,10 +424,10 @@ async fn unitsync_heightmap<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map_name: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_heightmap_args(
@@ -441,7 +437,7 @@ async fn unitsync_heightmap<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "heightmap", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "heightmap", None).await
 }
 
 /// `unitsync_height_field` — write one map's raw 16 bit heights to the thumb
@@ -453,10 +449,10 @@ async fn unitsync_height_field<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map_name: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_height_field_args(
@@ -466,7 +462,7 @@ async fn unitsync_height_field<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "height-field", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "height-field", None).await
 }
 
 /// `unitsync_metalmap` — render one map's metal infomap as a downscaled green-on-
@@ -479,10 +475,10 @@ async fn unitsync_metalmap<R: Runtime>(
     data_dir: String,
     map_name: String,
     max_side: Option<i32>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_metalmap_args(
@@ -493,7 +489,7 @@ async fn unitsync_metalmap<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "metalmap", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "metalmap", None).await
 }
 
 /// `unitsync_thumbnails` — render a small minimap for every map in one session,
@@ -505,10 +501,10 @@ async fn unitsync_thumbnails<R: Runtime>(
     data_dir: String,
     mip: Option<i32>,
     op_id: Option<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_thumbnails_args(
@@ -523,7 +519,7 @@ async fn unitsync_thumbnails<R: Runtime>(
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
-    Ok(res)
+    res
 }
 
 /// `unitsync_game_info` — load one game's archives to read its sides (with start
@@ -537,10 +533,10 @@ async fn unitsync_map_meta<R: Runtime>(
     engine_path: String,
     data_dir: String,
     op_id: Option<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_map_meta_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
@@ -550,7 +546,7 @@ async fn unitsync_map_meta<R: Runtime>(
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
-    Ok(res)
+    res
 }
 
 #[tauri::command]
@@ -559,10 +555,10 @@ async fn unitsync_game_info<R: Runtime>(
     engine_path: String,
     data_dir: String,
     game_archive: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_game_args(
@@ -572,7 +568,7 @@ async fn unitsync_game_info<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game info", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "game info", None).await
 }
 
 /// `unitsync_unit_buildpics` — resolve build icons for a game's start units in one
@@ -592,19 +588,19 @@ async fn unitsync_unit_buildpics<R: Runtime>(
     game_archive: String,
     units: Vec<String>,
     assets: Option<bool>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = buildpic_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let asset_dir = match assets {
         Some(true) => match hub_asset_dir(&app) {
             Some(dir) => Some(dir.to_string_lossy().into_owned()),
-            None => return Ok(CliResult::err(
+            None => return CliResult::err(
                 "no cache directory on this platform, so there is nowhere to write the build pics"
                     .to_string(),
-            )),
+            ),
         },
         _ => None,
     };
@@ -617,7 +613,7 @@ async fn unitsync_unit_buildpics<R: Runtime>(
         asset_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit buildpics", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit buildpics", None).await
 }
 
 /// `unitsync_faction_logos` — resolve each side's `Sidepics/<side>` faction emblem
@@ -631,10 +627,10 @@ async fn unitsync_faction_logos<R: Runtime>(
     data_dir: String,
     game_archive: String,
     sides: Vec<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = faction_logo_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_faction_logos_args(
@@ -645,7 +641,7 @@ async fn unitsync_faction_logos<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "faction logos", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "faction logos", None).await
 }
 
 /// `unitsync_unit_dataset` — load one game's archives to read its reusable unit
@@ -658,10 +654,10 @@ async fn unitsync_unit_dataset<R: Runtime>(
     engine_path: String,
     data_dir: String,
     game_archive: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_unit_dataset_args(
@@ -671,7 +667,7 @@ async fn unitsync_unit_dataset<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await
 }
 
 /// `unitsync_map_info` — load one map's archive set to read its options + any
@@ -688,10 +684,10 @@ async fn unitsync_unit_model<R: Runtime>(
     data_dir: String,
     game_archive: String,
     object: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = model_texture_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_unit_model_args(
@@ -702,7 +698,7 @@ async fn unitsync_unit_model<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit model", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit model", None).await
 }
 
 /// `unitsync_unit_script`: find and read one unit's animation script inside a
@@ -721,14 +717,14 @@ async fn unitsync_unit_script(
     data_dir: String,
     game_archive: String,
     unit: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_unit_script_args(&libpath.to_string_lossy(), &data_dir, &game_archive, &unit);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit script", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit script", None).await
 }
 
 /// `unitsync_unit_models` reads a batch of units' models in one archive mount
@@ -749,24 +745,24 @@ async fn unitsync_unit_models<R: Runtime>(
     data_dir: String,
     game_archive: String,
     objects: Vec<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let Some(cache_dir) = model_texture_dir(&app) else {
-        return Ok(CliResult::err(
+        return CliResult::err(
             "no cache directory on this platform, so there is nowhere to write the models"
                 .to_string(),
-        ));
+        );
     };
     let list = match serde_json::to_string(&objects) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(format!("could not send the unit list: {e}"))),
+        Err(e) => return CliResult::err(format!("could not send the unit list: {e}")),
     };
     let units_file = match write_temp_list("render-keys", &list) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
 
     let args = build_unit_models_args(
@@ -779,7 +775,7 @@ async fn unitsync_unit_models<R: Runtime>(
     let envs = loader_envs(&engine_dir, &data_dir);
     let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit models", None).await;
     let _ = std::fs::remove_file(&units_file);
-    Ok(out)
+    out
 }
 
 /// `unitsync_unit_render` encodes a top down render the webview drew as the
@@ -820,16 +816,16 @@ async fn unitsync_unit_render<R: Runtime>(
     model_digest: Option<String>,
     source_member: Option<String>,
     source_archive: Option<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let Some(asset_dir) = hub_asset_dir(&app) else {
-        return Ok(CliResult::err(
+        return CliResult::err(
             "no cache directory on this platform, so there is nowhere to write the render"
                 .to_string(),
-        ));
+        );
     };
     // All three or none, checked before the quarter of a megabyte of pixels is
     // written anywhere. Two of them is a caller that meant to hand the key down
@@ -847,20 +843,20 @@ async fn unitsync_unit_render<R: Runtime>(
             source_archive,
         }),
         _ => {
-            return Ok(CliResult::err(
+            return CliResult::err(
                 "a render's model digest, source member and source archive travel together or \
                  not at all"
                     .to_string(),
-            ))
+            )
         }
     };
     let rgba = match base64::engine::general_purpose::STANDARD.decode(&pixels) {
         Ok(bytes) => bytes,
-        Err(e) => return Ok(CliResult::err(format!("render pixels are not base64: {e}"))),
+        Err(e) => return CliResult::err(format!("render pixels are not base64: {e}")),
     };
     let pixel_file = match write_temp_pixels(&rgba) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
 
     let args = build_unit_render_args(
@@ -881,7 +877,7 @@ async fn unitsync_unit_render<R: Runtime>(
     let envs = loader_envs(&engine_dir, &data_dir);
     let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit render", None).await;
     let _ = std::fs::remove_file(&pixel_file);
-    Ok(out)
+    out
 }
 
 /// One unit of a render-key batch, as the frontend sends it. Passed through to
@@ -918,18 +914,18 @@ async fn unitsync_unit_render_keys<R: Runtime>(
     angles: Option<Vec<String>>,
     renderer_version: u32,
     units: Vec<UnitRenderKeyRequest>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let list = match serde_json::to_string(&units) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(format!("could not send the unit list: {e}"))),
+        Err(e) => return CliResult::err(format!("could not send the unit list: {e}")),
     };
     let units_file = match write_temp_list("render-keys", &list) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
 
     let args = build_unit_render_keys_args(
@@ -943,7 +939,7 @@ async fn unitsync_unit_render_keys<R: Runtime>(
     let envs = loader_envs(&engine_dir, &data_dir);
     let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit render keys", None).await;
     let _ = std::fs::remove_file(&units_file);
-    Ok(out)
+    out
 }
 
 /// `unitsync_remember_render` writes down which unit a drawn render is of, so it
@@ -977,23 +973,23 @@ async fn unitsync_remember_render<R: Runtime>(
     renderer_version: u32,
     width: u32,
     height: u32,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let Some(dir) = hub_asset_dir(&app) else {
-        return Ok(CliResult::err(
+        return CliResult::err(
             "no cache directory on this platform, so there is nowhere to keep the render"
                 .to_string(),
-        ));
+        );
     };
     let Some(file) = Path::new(&path)
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
     else {
-        return Ok(CliResult::err(format!("{path} does not name a file")));
+        return CliResult::err(format!("{path} does not name a file"));
     };
     if !dir.join(&file).is_file() {
-        return Ok(CliResult::err(format!(
+        return CliResult::err(format!(
             "{file} is not in the render folder, so there is nothing to point at"
-        )));
+        ));
     }
     let record = renderindex::RenderRecord {
         game,
@@ -1010,11 +1006,9 @@ async fn unitsync_remember_render<R: Runtime>(
         height,
     };
     if !renderindex::remember(&dir, &record) {
-        return Ok(CliResult::err(
-            "could not write the render's index record".to_string(),
-        ));
+        return CliResult::err("could not write the render's index record".to_string());
     }
-    Ok(CliResult::ok(serde_json::json!({ "remembered": true })))
+    CliResult::ok(serde_json::json!({ "remembered": true }))
 }
 
 /// `unitsync_local_renders` finds the renders this machine has already drawn for a
@@ -1037,11 +1031,9 @@ async fn unitsync_local_renders<R: Runtime>(
     renderer_version: u32,
     source_archive: Option<String>,
     units: Vec<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let Some(dir) = hub_asset_dir(&app) else {
-        return Ok(CliResult::ok(
-            serde_json::json!({ "renders": serde_json::Map::new() }),
-        ));
+        return CliResult::ok(serde_json::json!({ "renders": serde_json::Map::new() }));
     };
     let found = renderindex::look_up(
         &dir,
@@ -1052,10 +1044,8 @@ async fn unitsync_local_renders<R: Runtime>(
         &units,
     );
     match serde_json::to_value(found) {
-        Ok(renders) => Ok(CliResult::ok(serde_json::json!({ "renders": renders }))),
-        Err(e) => Ok(CliResult::err(format!(
-            "could not read back the local renders: {e}"
-        ))),
+        Ok(renders) => CliResult::ok(serde_json::json!({ "renders": renders })),
+        Err(e) => CliResult::err(format!("could not read back the local renders: {e}")),
     }
 }
 
@@ -1079,21 +1069,21 @@ async fn unitsync_map_catalog<R: Runtime>(
     data_dir: String,
     maps: Option<Vec<String>>,
     keys_only: bool,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let maps_file = match maps {
         None => None,
         Some(names) => {
             let list = match serde_json::to_string(&names) {
                 Ok(s) => s,
-                Err(e) => return Ok(CliResult::err(format!("could not send the map list: {e}"))),
+                Err(e) => return CliResult::err(format!("could not send the map list: {e}")),
             };
             match write_temp_list("map-catalog", &list) {
                 Ok(p) => Some(p),
-                Err(e) => return Ok(CliResult::err(e)),
+                Err(e) => return CliResult::err(e),
             }
         }
     };
@@ -1110,7 +1100,7 @@ async fn unitsync_map_catalog<R: Runtime>(
     if let Some(path) = maps_file {
         let _ = std::fs::remove_file(&path);
     }
-    Ok(out)
+    out
 }
 
 /// `unitsync_map_minimaps` names what every installed map's minimap would be
@@ -1132,31 +1122,31 @@ async fn unitsync_map_minimaps<R: Runtime>(
     data_dir: String,
     maps: Option<Vec<String>>,
     assets: Option<bool>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let maps_file = match maps {
         None => None,
         Some(names) => {
             let list = match serde_json::to_string(&names) {
                 Ok(s) => s,
-                Err(e) => return Ok(CliResult::err(format!("could not send the map list: {e}"))),
+                Err(e) => return CliResult::err(format!("could not send the map list: {e}")),
             };
             match write_temp_list("map-minimaps", &list) {
                 Ok(p) => Some(p),
-                Err(e) => return Ok(CliResult::err(e)),
+                Err(e) => return CliResult::err(e),
             }
         }
     };
     let asset_dir = match assets {
         Some(true) => match hub_asset_dir(&app) {
             Some(dir) => Some(dir.to_string_lossy().into_owned()),
-            None => return Ok(CliResult::err(
+            None => return CliResult::err(
                 "no cache directory on this platform, so there is nowhere to write the minimaps"
                     .to_string(),
-            )),
+            ),
         },
         _ => None,
     };
@@ -1173,7 +1163,7 @@ async fn unitsync_map_minimaps<R: Runtime>(
     if let Some(path) = maps_file {
         let _ = std::fs::remove_file(&path);
     }
-    Ok(out)
+    out
 }
 
 #[tauri::command]
@@ -1182,10 +1172,10 @@ async fn unitsync_map_info<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map_name: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_map_info_args(
@@ -1195,7 +1185,7 @@ async fn unitsync_map_info<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map info", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map info", None).await
 }
 
 /// `unitsync_map_skybox` — read one map's `atmosphere.skyBox` DDS cube map as raw
@@ -1203,18 +1193,14 @@ async fn unitsync_map_info<R: Runtime>(
 /// sky. Returns `{ dataUrl?, errors }`; `dataUrl` is absent for the common case of
 /// a map with no skybox.
 #[tauri::command]
-async fn unitsync_map_skybox(
-    engine_path: String,
-    data_dir: String,
-    map_name: String,
-) -> Result<CliResult, ()> {
+async fn unitsync_map_skybox(engine_path: String, data_dir: String, map_name: String) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_map_skybox_args(&libpath.to_string_lossy(), &data_dir, &map_name);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map skybox", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map skybox", None).await
 }
 
 /// `unitsync_skirmish_ais` — list the skirmish AIs available to play against:
@@ -1226,10 +1212,10 @@ async fn unitsync_skirmish_ais(
     engine_path: String,
     data_dir: String,
     game_archive: Option<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_skirmish_ai_args(
         &libpath.to_string_lossy(),
@@ -1237,21 +1223,21 @@ async fn unitsync_skirmish_ais(
         game_archive.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "skirmish ais", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "skirmish ais", None).await
 }
 
 /// `unitsync_engine_config` — read a curated set of engine settings from the
 /// user's `springsettings.cfg` via `GetSpringConfig*`. A light unitsync session
 /// (no archive scan); `data_dir` selects which data root's config is read.
 #[tauri::command]
-async fn unitsync_engine_config(engine_path: String, data_dir: String) -> Result<CliResult, ()> {
+async fn unitsync_engine_config(engine_path: String, data_dir: String) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_config_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config", None).await
 }
 
 /// `unitsync_engine_config_set` — write one curated engine setting back to the
@@ -1264,14 +1250,14 @@ async fn unitsync_engine_config_set(
     data_dir: String,
     key: String,
     value: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_config_set_args(&libpath.to_string_lossy(), &data_dir, &key, &value);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config write", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config write", None).await
 }
 
 /// `unitsync_archive_tree` — list the member tree of one archive (and resolve its
@@ -1281,14 +1267,14 @@ async fn unitsync_archive_tree(
     engine_path: String,
     data_dir: String,
     archive: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_archive_tree_args(&libpath.to_string_lossy(), &data_dir, &archive);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "archive tree", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "archive tree", None).await
 }
 
 /// `unitsync_archive_file` — read one member of an archive for preview. `file` is
@@ -1299,14 +1285,14 @@ async fn unitsync_archive_file(
     data_dir: String,
     archive: String,
     file: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_archive_file_args(&libpath.to_string_lossy(), &data_dir, &archive, &file);
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file", None).await
 }
 
 /// `unitsync_game_headers` — batch-resolve loading-screen art for every game in
@@ -1317,15 +1303,15 @@ async fn unitsync_game_headers<R: Runtime>(
     app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let cache_dir = header_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_game_headers_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "game headers", None).await)
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "game headers", None).await
 }
 
 /// `unitsync_lua_exec` — run a Lua snippet through the engine's Lua parser with
@@ -1338,14 +1324,14 @@ async fn unitsync_lua_exec(
     data_dir: String,
     archive: String,
     source: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let script = match write_temp_script(&source) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_lua_args(
         &libpath.to_string_lossy(),
@@ -1356,7 +1342,7 @@ async fn unitsync_lua_exec(
     let envs = loader_envs(&engine_dir, &data_dir);
     let result = run_worker(bin, args, envs, MINIMAP_TIMEOUT, "lua exec", None).await;
     let _ = std::fs::remove_file(&script);
-    Ok(result)
+    result
 }
 
 /// `unitsync_lua_repl_exec` — REPL replay: run `chunks` (the session's
@@ -1370,18 +1356,18 @@ async fn unitsync_lua_repl_exec(
     data_dir: String,
     archive: String,
     chunks: Vec<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let json = match serde_json::to_string(&chunks) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(format!("could not serialize chunks: {e}"))),
+        Err(e) => return CliResult::err(format!("could not serialize chunks: {e}")),
     };
     let script = match write_temp_script(&json) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_lua_repl_args(
         &libpath.to_string_lossy(),
@@ -1392,7 +1378,7 @@ async fn unitsync_lua_repl_exec(
     let envs = loader_envs(&engine_dir, &data_dir);
     let result = run_worker(bin, args, envs, LUA_TIMEOUT, "lua repl", None).await;
     let _ = std::fs::remove_file(&script);
-    Ok(result)
+    result
 }
 
 /// `unitsync_archive_extract` — write one member's full bytes to `dest` (the
@@ -1405,10 +1391,10 @@ async fn unitsync_archive_extract(
     archive: String,
     file: String,
     dest: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let args = build_archive_extract_args(
         &libpath.to_string_lossy(),
@@ -1418,17 +1404,17 @@ async fn unitsync_archive_extract(
         &dest,
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    Ok(run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive extract", None).await)
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive extract", None).await
 }
 
 /// `unitsync_cancel` — signal the scan/thumbnail worker registered under `op_id`
 /// to stop. No-op if the id is unknown (already finished).
 #[tauri::command]
-async fn unitsync_cancel(op_id: String) -> Result<CliResult, ()> {
+async fn unitsync_cancel(op_id: String) -> CliResult {
     if let Some(flag) = cancel_registry().lock().unwrap().get(&op_id) {
         flag.store(true, Ordering::Relaxed);
     }
-    Ok(CliResult::ok(serde_json::json!({ "cancelled": true })))
+    CliResult::ok(serde_json::json!({ "cancelled": true }))
 }
 
 /// Build the plugin. Registered as `"coilbox-unitsync"` (crate name minus the
