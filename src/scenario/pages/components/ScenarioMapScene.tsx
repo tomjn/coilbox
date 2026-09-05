@@ -1,5 +1,4 @@
-import { Button } from "@picoframe/frame";
-import { Layers, List, Loader2, MountainSnow, Unplug } from "lucide-react";
+import { Layers, Loader2, MountainSnow, Unplug } from "lucide-react";
 import {
   forwardRef,
   type ReactNode,
@@ -14,25 +13,9 @@ import { Link } from "react-router";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { useGameSides } from "@/blueprint/useGameSides";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
-import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
-import {
-  type LayoutEdit,
-  removeBlueprint,
-  setOrigin,
-} from "@/lib/scenarioEditing/bases";
+import { type LayoutEdit, setOrigin } from "@/lib/scenarioEditing/bases";
 import {
   canTurn,
   duplicatePlacement,
@@ -41,19 +24,14 @@ import {
 } from "@/lib/scenarioEditing/editing";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import type { LayoutChoice } from "@/lib/scenarioEditing/layoutPlacing";
-import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
-import { dragKeys, placementKey, sceneUnchecked } from "@/placement/placements";
+import { dragKeys, placementKey } from "@/placement/placements";
 import {
   previewArmed,
   previewNote,
   withoutBuilding,
 } from "@/placement/preview";
-import {
-  HistoryControls,
-  SelectionTools,
-  turnNoteText,
-} from "@/placement/SurfaceBars";
+import { turnNoteText } from "@/placement/SurfaceBars";
 import { mapSceneStatus } from "@/placement/scene";
 import { useLayoutPreview } from "@/placement/useLayoutPreview";
 import { useMapEditing } from "@/placement/useMapEditing";
@@ -63,7 +41,6 @@ import { usePreferredTarget } from "@/play/config";
 import type { ExtensionTypes } from "../../extensions";
 import type { Point, Scenario } from "../../model";
 import type { MissionIssue } from "../../validate";
-import { ContentsList } from "./ContentsList";
 import {
   type ContentEntry,
   contentsSelection,
@@ -80,11 +57,11 @@ import {
   targetOptions,
 } from "./groups";
 import { type MapStep, type MapThings, moveOnMap } from "./mapKeyboard";
-import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
+import { EDITOR_MODES, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
 import { turnSelectionAround } from "./rigidTurn";
-import { PathBar, UnitsNote, ZoneBar } from "./ScenarioMapBars";
+import { PathBar, ZoneBar } from "./ScenarioMapBars";
 import {
   ClickAnswerBars,
   ModeStatusBar,
@@ -92,6 +69,11 @@ import {
   ScenarioPlaybackBar,
   TallyBar,
 } from "./ScenarioMapSceneBars";
+import {
+  MapFootnotes,
+  ScenarioContentsPopover,
+  ScenarioModeRail,
+} from "./ScenarioMapSceneChrome";
 import {
   addedWords,
   addKeys,
@@ -105,17 +87,13 @@ import {
   removeSelection,
 } from "./selection";
 import { modeDigit } from "./shortcuts";
+import { useBasePlayback } from "./useBasePlayback";
 import { useCameraMovement, useMapCamera } from "./useMapCamera";
 import { useMapKeyboard } from "./useMapKeyboard";
 import { useMapOverlays } from "./useMapOverlays";
 import { useMapPlacementPreview } from "./useMapPlacementPreview";
 import { useMapSelection, useSelectionCleanup } from "./useMapSelection";
 import { removeZone, renameZone } from "./zones";
-
-/** How long one building of a build order stands on screen before the next one
- *  arrives. Slow enough to read the base going up, brisk enough that a
- *  twenty-building opening is not a coffee break. */
-const PLAYBACK_STEP_MS = 700;
 
 /**
  * The scenario's map as the surface it is authored on.
@@ -210,61 +188,14 @@ export const ScenarioMapScene = forwardRef<
   const { loading: enginesLoading } = usePreferredTarget();
   const { sceneRef, handle, onScene } = useMapCamera();
 
-  /**
-   * The base being watched go up, and how much of it is standing (issue #1418).
-   *
-   * `step` is how many of the layout's buildings have been built, so 0 is bare
-   * ground and the last step is the base as the document holds it. Held as
-   * loosely as a base waiting to be moved: a base that has been deleted, or a
-   * layout that is no longer a build order, stops the playback rather than
-   * stranding it.
-   */
-  const [playback, setPlayback] = useState<{
-    base: string;
-    step: number;
-    playing: boolean;
-  } | null>(null);
-  const watched = playback
-    ? scenario.bases.find((b) => b.id === playback.base)
-    : undefined;
-  const watchedLayout = watched
-    ? scenario.blueprints.find((b) => b.id === watched.blueprint)
-    : undefined;
-  const steps = watchedLayout?.ordered ? watchedLayout.buildings : [];
-  const playing = playback && steps.length > 0 ? playback : null;
-
-  // What is not standing yet, which is everything the playback has not reached.
-  // Only the drawing is held back: the document is untouched, so the footprints
-  // still show the whole plan the base is being built into.
-  const undrawn = useMemo(() => {
-    if (!playing) return null;
-    const out = new Set<string>();
-    for (let at = playing.step; at < steps.length; at++) {
-      out.add(placementKey("base", playing.base, at));
-    }
-    return out;
-  }, [playing, steps.length]);
+  // The base being watched go up, and what is not standing yet: held apart in
+  // `useBasePlayback.ts`, the same way `useMapSelection` holds the selection
+  // (issue #2515).
+  const { playing, setPlayback, total, steps, undrawn } =
+    useBasePlayback(scenario);
 
   const units = useScenarioUnits(handle, scenario, assets, undrawn);
 
-  // Playing it means one step at a time on its own until the base is up. It
-  // stops there rather than looping, because the end of a build order is the
-  // base, and a base that keeps vanishing and rebuilding itself is a thing to
-  // watch rather than a thing to read.
-  const total = steps.length;
-  const advancing = playing?.playing === true;
-  useEffect(() => {
-    if (!advancing) return;
-    const timer = setInterval(() => {
-      setPlayback((at) => {
-        if (!at) return at;
-        return at.step >= total
-          ? { ...at, playing: false }
-          : { ...at, step: at.step + 1 };
-      });
-    }, PLAYBACK_STEP_MS);
-    return () => clearInterval(timer);
-  }, [advancing, total]);
   // An author who has asked for less motion gets the steps and not the film.
   const reduceMotion = useReduceMotion();
   const [modeId, setModeId] = useState(EDITOR_MODES[0].id);
@@ -894,61 +825,17 @@ export const ScenarioMapScene = forwardRef<
         onFocus: keys.onFocus,
       }}
       rail={
-        /* The modes as a rail down the left rather than a row across the top.
-           A row of six labelled buttons ran most of the way across the map and
-           pushed the mode's own controls onto a second line, so the toolbar took
-           two bands of the view before an author had placed anything.
-
-           One segmented group, the way the unit builder's viewport draws its
-           handles, and opaque: a translucent button on terrain takes whatever is
-           under it, so the same control reads differently over grass and over
-           snow. The tooltip is where each mode says its name, what it makes and
-           the key that reaches it. The strip had no room for the first two and
-           never showed the third anywhere else.
-
-           Undo and redo ride at the top of the same rail, one gap clear of the
-           modes: both act on the document, and a pair in the far corner was the
-           only thing over the map that did. Turn and delete ride at the bottom
-           the same way, and only while there is something to act on. Three
-           groups: what you did, what you are doing, and what you are doing it
-           to, which is how the unit builder's viewport stacks its own. */
-        <TooltipProvider>
-          <div className="flex flex-col gap-2">
-            {history && <HistoryControls {...history} vertical />}
-            <ButtonGroup orientation="vertical">
-              {EDITOR_MODES.map((m, i) => (
-                <Tooltip key={m.id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      // The pair the unit builder's viewport uses for the
-                      // handle it is on. `bg-card` only on the ones that are
-                      // off: an outline button has no fill of its own, and a
-                      // see-through control on terrain takes whatever is under
-                      // it.
-                      variant={mode.id === m.id ? "default" : "outline"}
-                      className={mode.id === m.id ? undefined : "bg-card"}
-                      onClick={() => setModeId(m.id)}
-                      // The name is in the tooltip, which a pointer reaches and
-                      // a screen reader does not, so the button carries it as
-                      // its accessible name as well.
-                      aria-label={m.label}
-                      aria-pressed={mode.id === m.id}
-                    >
-                      <m.icon className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-56">
-                    <p className="font-medium">{m.label}</p>
-                    <p className="opacity-80">{m.what}</p>
-                    <p className="opacity-60">Key {i + 1}</p>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </ButtonGroup>
-            {tools && <SelectionTools {...tools} />}
-          </div>
-        </TooltipProvider>
+        // The modes as a rail down the left rather than a row across the top,
+        // with undo and redo above them and Turn and delete below, while
+        // there is something to act on: in `ScenarioModeRail`, taken out
+        // whole (issue #2515's third boundary), since it reads nothing here
+        // beyond the mode, the tools already built and the history passed in.
+        <ScenarioModeRail
+          history={history}
+          modeId={mode.id}
+          onModeChange={setModeId}
+          tools={tools}
+        />
       }
       bars={
         <>
@@ -1049,67 +936,27 @@ export const ScenarioMapScene = forwardRef<
         </>
       }
       chrome={
-        <Popover open={contentsOpen} onOpenChange={setContentsOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5 bg-card"
-              title="Everything this scenario holds, placed or not"
-            >
-              <List className="size-3.5" /> Contents
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 p-1">
-            <ContentsList
-              entries={entries}
-              layouts={layouts}
-              selected={listed}
-              participants={scenario.setup.participants}
-              onPick={pickEntry}
-              onToggle={toggleEntry}
-              // Armed rather than placed. Where a base stands is the reason
-              // the author deleted it, so the next click on the map is the
-              // placement and this only gets them ready to make it (#1450).
-              onPlaceLayout={(layout) => {
-                setLayoutChoice({ from: "scenario", id: layout.id });
-                setModeId(LAYOUTS_MODE_ID);
-                setContentsOpen(false);
-              }}
-              onDeleteLayout={(layout) =>
-                onChange((doc) => removeBlueprint(doc, layout.id))
-              }
-            />
-          </PopoverContent>
-        </Popover>
+        <ScenarioContentsPopover
+          open={contentsOpen}
+          onOpenChange={setContentsOpen}
+          entries={entries}
+          layouts={layouts}
+          selected={listed}
+          participants={scenario.setup.participants}
+          onPick={pickEntry}
+          onToggle={toggleEntry}
+          onChange={onChange}
+          setLayoutChoice={setLayoutChoice}
+          setModeId={setModeId}
+        />
       }
       note={
-        <>
-          {/* What is true of the whole map at once, said once rather than per
-              base in a popover two clicks away (issue #1496). Held back until
-              the reads have settled, so an editor opening does not greet
-              anybody with a warning that clears itself.
-
-              Down here with the count of what was drawn rather than over the
-              ground the author is working on (issue #2285): all three are
-              statements about how far the whole scene can be trusted, none of
-              them changes while anybody works, and none is answered by doing
-              anything to the spot under the pointer. Left-aligned inside a
-              corner that otherwise right-aligns, because these are sentences
-              rather than the tally under them. */}
-          <div className="flex max-w-full flex-col items-end gap-1 text-left">
-            <UncheckedNote
-              unchecked={units.settled ? sceneUnchecked(footprints) : null}
-              flattened={units.heightsUnread}
-            />
-            <WaterlessNote floor={waterless} />
-          </div>
-          <UnitsNote
-            units={units}
-            gameName={scenario.setup.gameName}
-            drawing={units.drawing}
-          />
-        </>
+        <MapFootnotes
+          scenario={scenario}
+          units={units}
+          footprints={footprints}
+          waterless={waterless}
+        />
       }
       // What the hands do here, which is the mode's own line as much as it is
       // the camera's (issue #2285). What the left button does on bare ground is
