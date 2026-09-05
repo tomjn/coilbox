@@ -301,19 +301,37 @@ describe("the chrome on the warpath map that is not in a frame", () => {
  *
  * `SaveAsPresetButton` lives in `src/play`, because the same control saves a
  * fight from the multiplayer room and the debrief drawer as well. Its `gutter`
- * look is only ever rendered by the two overlays below, stacked under the back
- * arrow over the starfield, and it was the last box still painting `bg-card/70`
- * with `text-muted-foreground` on it. 1.97:1 over a white node on the worst base.
+ * look is only ever rendered by `BattleGutter` in `BattleOverlayParts.tsx`
+ * (issue #2441 pulled the render site the two overlays used to duplicate into
+ * one place), stacked under the back arrow over the starfield, and it was the
+ * last box still painting `bg-card/70` with `text-muted-foreground` on it.
+ * 1.97:1 over a white node on the worst base.
  *
  * It could not take {@link HUD_CARD_CLASS} itself. The HUD accent inks are
  * dark-ramp values with no light half, so `no importer outside the two dark
  * routes` at the foot of this file keeps this chrome off any page that can go
  * light, and that component renders on several. So the gutter look names no
- * surface at all now, and the two callers hand it one. That is what these check:
- * a caller that stops passing the card gets a transparent box rather than a
- * quietly wrong one, which nothing else here would catch.
+ * surface at all now, and `BattleGutter` hands it one. That is what the first
+ * check below is for: it stopping passing the card gets a transparent box
+ * rather than a quietly wrong one, which nothing else here would catch. The
+ * other two check that both overlays still reach it.
  */
 describe("the save-as-preset box in the gutter of either overlay", () => {
+  it("hands the measured card to the gutter button", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("./BattleOverlayParts.tsx", import.meta.url)),
+      "utf8",
+    );
+    const at = source.indexOf("<SaveAsPresetButton");
+    expect(
+      at,
+      "no SaveAsPresetButton in BattleOverlayParts.tsx",
+    ).toBeGreaterThan(-1);
+    const tag = source.slice(at, source.indexOf("/>", at));
+    expect(tag).toContain('appearance="gutter"');
+    expect(tag).toContain("HUD_CARD_CLASS");
+  });
+
   const OVERLAYS = {
     "the conquest battle overlay": "./BattleOverlay.tsx",
     "the warpath encounter overlay":
@@ -321,16 +339,12 @@ describe("the save-as-preset box in the gutter of either overlay", () => {
   };
 
   for (const [name, file] of Object.entries(OVERLAYS)) {
-    it(`hands the measured card to the gutter button on ${name}`, () => {
+    it(`renders the shared gutter on ${name}`, () => {
       const source = readFileSync(
         fileURLToPath(new URL(file, import.meta.url)),
         "utf8",
       );
-      const at = source.indexOf("<SaveAsPresetButton");
-      expect(at, `no SaveAsPresetButton in ${file}`).toBeGreaterThan(-1);
-      const tag = source.slice(at, source.indexOf("/>", at));
-      expect(tag).toContain('appearance="gutter"');
-      expect(tag).toContain("HUD_CARD_CLASS");
+      expect(source).toContain("<BattleGutter");
     });
   }
 });
@@ -916,6 +930,7 @@ describe("no importer outside the two dark routes", () => {
   const INSIDE_A_ROOT = [
     "conquest/pages/components/BackToMapButton.tsx",
     "conquest/pages/components/BattleOverlay.tsx",
+    "conquest/pages/components/BattleOverlayParts.tsx",
     "conquest/pages/components/RunSetup.tsx",
     "runlite/pages/components/EncounterOverlay.tsx",
     "runlite/pages/components/NodeOverlays.tsx",

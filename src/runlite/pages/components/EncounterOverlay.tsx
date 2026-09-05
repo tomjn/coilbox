@@ -1,19 +1,16 @@
 import { Button } from "@picoframe/frame";
-import { Download, Loader2, Swords } from "lucide-react";
-import { Link } from "react-router";
+import { Swords } from "lucide-react";
 import { SubstitutedMapNote } from "../../../challenge/SubstitutedMapNote";
-import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
+import {
+  BattleCheckingNotice,
+  BattleGutter,
+  BattleLaunchGate,
+  BattleResultPrompt,
+} from "../../../conquest/pages/components/BattleOverlayParts";
 import {
   BracketFrame,
   HUD_ACCENT_INK,
-  HUD_CARD_CLASS,
 } from "../../../conquest/pages/components/hudChrome";
-import { invalidateMapPreview, invalidateScans } from "../../../content/config";
-import { ErrorBanner } from "../../../content/pages/components/states";
-import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
-import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
-import { usePreferredTarget } from "../../../play/config";
-import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import type { RogueliteRun, RunNode } from "../../model";
 import { useRunEncounter } from "../../runlite-run";
 
@@ -61,26 +58,15 @@ export function EncounterOverlay({
         className="absolute inset-0 cursor-default"
       />
       <BracketFrame className="flex w-[40rem] max-w-full flex-col gap-4 p-7 backdrop-blur-md">
-        {/* Its own box in the gutter to the card's left (not a header link), so
-            stepping back to the map is a separate, obvious target. */}
-        <BackToMapButton
-          onClick={onClose}
-          className="absolute right-full top-0 mr-4"
+        {/* Prefers the exact draft last launched (so an outcome save captures
+            the fight as fought, with its restrictions and perks), else the
+            live briefing snapshot. */}
+        <BattleGutter
+          onClose={onClose}
+          installedGame={!!enc.installedGame}
+          getDraft={() => enc.lastSnapshot ?? enc.snapshot()}
+          defaultName={`${kindLabel} — ${spec?.mapName ?? "battle"}`}
         />
-        {/* Its own gutter box beneath the back arrow — save this fight as a
-            skirmish preset to replay later. Prefers the exact draft last launched
-            (so an outcome save captures the fight as fought, with its restrictions
-            and perks), else the live briefing snapshot.
-            The button is shared with pages that can go light, so it paints no
-            box of its own and takes the measured card from here (#1818). */}
-        {enc.installedGame && (
-          <SaveAsPresetButton
-            appearance="gutter"
-            getDraft={() => enc.lastSnapshot ?? enc.snapshot()}
-            defaultName={`${kindLabel} — ${spec?.mapName ?? "battle"}`}
-            className={`absolute right-full top-16 mr-4 ${HUD_CARD_CLASS}`}
-          />
-        )}
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
             <Swords className="size-5 text-primary" aria-hidden />
@@ -106,66 +92,31 @@ export function EncounterOverlay({
             <p className="text-xs text-muted-foreground">
               Defeat costs health, not the warpath — you retreat and press on.
             </p>
-            {enc.error && <ErrorBanner message={enc.error} />}
-            {enc.noEngine ? (
-              <p className="text-sm text-muted-foreground">
-                Install an engine first (
-                <Link
-                  className="underline underline-offset-4"
-                  to="/settings/engines"
-                >
-                  Settings → Engines
-                </Link>
-                ).
-              </p>
-            ) : enc.missing ? (
-              <RequirementGate node={node} enc={enc} />
-            ) : enc.canStart ? (
-              <Button onClick={enc.start} className="w-full">
-                <Swords className="mr-1.5 size-4" aria-hidden /> Launch battle
-              </Button>
-            ) : (
-              <Button disabled className="w-full">
-                <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
-                {enc.running
-                  ? "A game is already running"
-                  : enc.scanLoading
-                    ? "Scanning content…"
-                    : enc.ais.length === 0
-                      ? "No skirmish AI available"
-                      : "Preparing…"}
-              </Button>
-            )}
+            <BattleLaunchGate
+              error={enc.error}
+              noEngine={enc.noEngine}
+              missing={enc.missing}
+              canStart={enc.canStart}
+              running={enc.running}
+              scanLoading={enc.scanLoading}
+              aisAvailable={enc.ais.length > 0}
+              onStart={enc.start}
+              mapName={spec.mapName}
+              mapDownload={spec.mapDownload}
+              onRecheck={enc.recheck}
+            />
           </div>
         )}
 
-        {enc.phase === "checking" && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Reading the battle report…
-          </div>
-        )}
+        {enc.phase === "checking" && <BattleCheckingNotice />}
 
         {enc.phase === "result" && (
-          <div className="flex flex-col gap-3">
-            {enc.error && <ErrorBanner message={enc.error} />}
-            <p className="text-sm text-muted-foreground">
-              The outcome could not be read from the replay. How did the battle
-              end?
-            </p>
-            <div className="flex gap-2">
-              <Button disabled={enc.saving} onClick={enc.recordVictory}>
-                Victory
-              </Button>
-              <Button
-                variant="outline"
-                disabled={enc.saving}
-                onClick={enc.recordDefeat}
-              >
-                Defeat
-              </Button>
-            </div>
-          </div>
+          <BattleResultPrompt
+            error={enc.error}
+            saving={enc.saving}
+            onVictory={enc.recordVictory}
+            onDefeat={enc.recordDefeat}
+          />
         )}
 
         {(enc.phase === "victory" || enc.phase === "defeat") && (
@@ -225,74 +176,6 @@ function Row({
           <SubstitutedMapNote original={note} onRestore={onRestoreNote} />
         )}
       </dd>
-    </div>
-  );
-}
-
-/** Install gate: a missing map downloads inline; a missing game links out. */
-function RequirementGate({
-  node,
-  enc,
-}: {
-  node: RunNode;
-  enc: ReturnType<typeof useRunEncounter>;
-}) {
-  const { target } = usePreferredTarget();
-  const missing = enc.missing;
-  const mapDl = useQueuedDownload({
-    kind: "map",
-    label: `Map: ${node.battle?.mapName ?? ""}`,
-    args: {
-      springName:
-        node.battle?.mapDownload?.springName ?? node.battle?.mapName ?? "",
-      searchUrl: node.battle?.mapDownload?.searchUrl,
-    },
-  });
-  if (!missing) return null;
-
-  const downloading = mapDl.busy;
-
-  const download = async () => {
-    const settled = await mapDl.start();
-    if (settled?.status !== "done") return;
-    invalidateScans();
-    if (target?.enginePath && target?.dataDir && node.battle) {
-      invalidateMapPreview(
-        target.enginePath,
-        target.dataDir,
-        node.battle.mapName,
-      );
-    }
-    await enc.recheck();
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">
-        {missing.kind === "map" ? "Map" : "Game"} not installed:{" "}
-        <span className="text-foreground">{missing.name}</span>
-      </p>
-      {mapDl.error && <ErrorBanner message={mapDl.error} />}
-      {missing.kind === "map" ? (
-        <>
-          <Button onClick={download} disabled={downloading} className="w-full">
-            <Download className="mr-1.5 size-4" aria-hidden />
-            {mapDl.status === "queued"
-              ? "Waiting for a slot…"
-              : downloading
-                ? "Downloading…"
-                : "Download map"}
-          </Button>
-          <QueueProgress item={mapDl} />
-        </>
-      ) : (
-        <Link to="/downloads/games">
-          <Button variant="outline" className="w-full">
-            <Download className="mr-1.5 size-4" aria-hidden /> Open game
-            downloads
-          </Button>
-        </Link>
-      )}
     </div>
   );
 }
