@@ -22,8 +22,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { BUILD_SQUARE } from "@/blueprint/footprint";
+import type { MapScene3D } from "@/lib/mapScene";
 import { useCanvas3D } from "@/lib/useCanvas3D";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 
 /** Scene units the longer side is normalised to, the same figure the map
  *  preview uses, so the camera's limits mean the same thing on both. */

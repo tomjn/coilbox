@@ -38,11 +38,11 @@ import {
   ViewToggle,
 } from "@/components/ViewControls";
 import { useReduceMotion } from "@/general/display";
+import type { MapScene3D } from "@/lib/mapScene";
 import type { MapAppearance } from "@/mapconv/bindings";
 import {
   type HeightWords,
   MapPreview3D,
-  type MapScene3D,
 } from "@/mapconv/pages/components/MapPreview3D";
 import { GridScene } from "./GridScene";
 import { authoringCamera, clampToPlane } from "./scene";

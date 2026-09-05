@@ -21,7 +21,7 @@
 
 import * as THREE from "three";
 
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import { worldToScene } from "@/placement/scene";
 import type { Point } from "../../model";
 import {

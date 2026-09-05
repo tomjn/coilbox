@@ -38,7 +38,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 import type { Rect } from "@/blueprint/footprint";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import type { Point } from "@/scenario/model";
 import { dragKeys, type Placement } from "./placements";
 import {

@@ -39,7 +39,7 @@ import {
   type FootprintMark,
   unjudged,
 } from "@/blueprint/footprint";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import type { Point } from "@/scenario/model";
 import { animates, arrivals, eased, fadeAt, pulseAt } from "./arrivals";
 import { worldToScene } from "./scene";

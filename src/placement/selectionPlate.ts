@@ -21,7 +21,7 @@
 
 import * as THREE from "three";
 
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 
 /** What the plate is drawn in: the colour the ring was, which is the colour a
  *  held building's squares take. One colour for "this is the one you have",

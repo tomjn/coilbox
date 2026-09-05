@@ -28,7 +28,7 @@ import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
 import { readThemeColor } from "@/home/art";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import { worldToScene } from "@/placement/scene";
 import type { Point, ScenarioZone } from "../../model";
 import {
