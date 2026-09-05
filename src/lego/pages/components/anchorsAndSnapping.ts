@@ -11,12 +11,12 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
+import { points } from "./dotsAndPoints";
 import { pieceIdOf } from "./gizmoCommit";
 import {
   CORNER_COLOUR,
   CUSTOM_COLOUR,
   FACE_COLOUR,
-  points,
   ROTATION_STEP,
   SEAT_COLOUR,
 } from "./ModelViewport";
