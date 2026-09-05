@@ -1,5 +1,5 @@
 import { Button, buttonVariants, cn, Input, useDrawer } from "@picoframe/frame";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import {
   ChevronRight,
   Dices,
@@ -20,18 +20,14 @@ import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { mostRecentOpen } from "@/lib/recency";
-import { challengeExport, challengeImport } from "../../challenge/bindings";
-import { ChallengeCodeInput } from "../../challenge/ChallengeCodeInput";
+import { challengeExport } from "../../challenge/bindings";
 import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
-import { challengeDecodeErrorMessage } from "../../challenge/code";
-import { identify } from "../../container/container";
-import { rememberCarriedShortname } from "../../container/shortnames";
+import { ImportChallengeForm as SharedImportChallengeForm } from "../../challenge/ImportChallengeForm";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import { useMapEligibility } from "../../content/mapEligibility";
 import { BrandingLinks } from "../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../content/pages/components/BrandingScreenshots";
-import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
   Diagnostics,
   EmptyState,
@@ -43,7 +39,6 @@ import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
-import { notify } from "../../notify/notify";
 import {
   usePlayReadiness,
   usePreferredTarget,
@@ -890,12 +885,14 @@ function GenerateGalaxyForm({
 /**
  * Paste a challenge code, resolve it against the recipient's own install, and
  * generate the identical galaxy locally (issue #376). `installedGame` is
- * resolved from the decoded settings, not from the wizard's own game picker —
- * a challenge names its own game.
+ * resolved from the decoded settings, not from the wizard's own game picker,
+ * because a challenge names its own game. Wraps the shared
+ * `ImportChallengeForm` (issue #2441) with conquest's own decode and finish.
+ * Warpath's counterpart is `ImportChallengeForm.tsx`.
  *
  * SEAM FOR #387 (resolve missing content on import): the "game not installed"
  * branch below is exactly where a content-resolution/download flow belongs. It
- * currently just reports the gap; `optionsFromChallenge` (see `../challenge.ts`)
+ * currently just reports the gap. `optionsFromChallenge` (see `../challenge.ts`)
  * is the pure settings -> generator-options step #387's resolution result would
  * feed into unchanged.
  */
@@ -907,21 +904,17 @@ function ImportChallengeForm({
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
 }) {
-  const { target, loading: targetLoading } = usePreferredTarget();
+  const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
   const { eligible } = useMapEligibility();
-  const [pending, setPending] = useState<ConquestChallengeSettings | null>(
-    null,
-  );
 
   const { run: runScan, data: scanData, loading: scanLoading } = scan;
   useEffect(() => {
     if (!scanData && !scanLoading) runScan();
   }, [scanData, scanLoading, runScan]);
 
-  const finishImport = async (settings: ConquestChallengeSettings) => {
-    if (!target) throw new Error("Install an engine first.");
+  const finish = async (settings: ConquestChallengeSettings) => {
     const matcher = getGameMatcher();
     const games = (scanData?.games ?? []).filter(
       (g) => !matcher || matcher(g.name),
@@ -946,71 +939,24 @@ function ImportChallengeForm({
 
     const id = `generated-${crypto.randomUUID()}`;
     const doc = galaxyFromChallenge(settings, { maps, names }, id);
-    // Say so when this install could not supply every map the challenge names
-    // (issue #1393). The systems themselves carry the detail. This is the one
-    // moment somebody is watching, and a stand-in they never heard about is
-    // exactly the surprise the naming exists to stop.
-    const substituted = substitutedMapCount(doc);
-    if (substituted > 0) {
-      void notify({
-        title: `Imported with ${substituted} substituted ${substituted === 1 ? "map" : "maps"}`,
-        body: "You do not have every map this challenge names. Those systems say which map they should have used.",
-      });
-    }
     await conquestSave({
       id,
       json: JSON.stringify({ ...doc, importedChallenge: true }),
     });
     await refreshGalaxies();
-    onImported(id);
-  };
-
-  // Decode the code, then either finish straight away (game already
-  // installed — no pointless prompt) or hand off to the resolve gate, which
-  // offers the download and calls `finishImport` once it clears (#387).
-  const importChallenge = async (code: string) => {
-    const result = decodeConquestChallenge(code);
-    if (!result.ok) {
-      throw new Error(challengeDecodeErrorMessage(result.error));
-    }
-    // A challenge that pins a build names it both ways, so take its word for
-    // the shortname (issue #1383). One that pins none teaches nothing.
-    rememberCarriedShortname(identify(code).game);
-    setPending(result.settings);
-  };
-
-  // Open a challenge file exported via exportChallengeFile above (#476), the
-  // rest of the import (decode, resolve, generate) is identical to a pasted
-  // code.
-  const pickChallengeFile = async (): Promise<string | null> => {
-    const src = await open({
-      title: "Import challenge",
-      multiple: false,
-      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
-    });
-    if (typeof src !== "string") return null;
-    const { text } = await challengeImport({ src });
-    return text;
+    return { id, doc };
   };
 
   return (
-    <>
-      <ChallengeCodeInput
-        helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
-        initialCode={initialCode}
-        onImport={importChallenge}
-        onPickFile={pickChallengeFile}
-      />
-      {pending && (
-        <ResolveContentGate
-          title="Set up this challenge"
-          requirements={[shortnameGameRequirement(pending.game)]}
-          target={target ?? undefined}
-          targetLoading={targetLoading}
-          onContinue={() => finishImport(pending).then(() => setPending(null))}
-          onCancel={() => setPending(null)}
-        />
-      )}
-    </>
+    <SharedImportChallengeForm
+      helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
+      substitutedNoun="systems"
+      initialCode={initialCode}
+      decode={decodeConquestChallenge}
+      buildRequirement={(settings) => shortnameGameRequirement(settings.game)}
+      finish={finish}
+      countSubstitutedMaps={substitutedMapCount}
+      onImported={onImported}
+    />
   );
 }
