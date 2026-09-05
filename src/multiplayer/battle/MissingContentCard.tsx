@@ -30,7 +30,8 @@ export function MissingContentCard({
   onRescan: () => Promise<void>;
 }) {
   const writePath = useWriteRootPath();
-  const { active, queued, items, enqueue, onComplete } = useDownloadQueue();
+  const { active, queued, items, enqueue, onComplete, failureFor } =
+    useDownloadQueue();
   const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
   const [rescanning, setRescanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +49,9 @@ export function MissingContentCard({
   const item = items.find((i) => i.identity === identity) ?? null;
   const downloading = item?.status === "queued" || item?.status === "active";
   const progress = item?.progress ?? null;
+  // The row wins while it is still there, then the queue's longer-lived record
+  // of the failure takes over once it has been pruned (issue #2504).
+  const downloadError = item?.error ?? failureFor(identity);
 
   async function downloadGame() {
     setError(null);
@@ -125,7 +129,11 @@ export function MissingContentCard({
           </Button>
         </div>
       )}
-      {error && <span className="text-sm text-destructive">{error}</span>}
+      {(error ?? downloadError) && (
+        <span className="text-sm text-destructive">
+          {error ?? downloadError}
+        </span>
+      )}
     </div>
   );
 }
