@@ -207,9 +207,29 @@ async fn a_refused_login_is_told_why_before_it_is_dropped() {
 /// log back in under it. A seat is remembered by name and not by socket, so the
 /// sweep taking the socket away cannot take the seat with it. This is that claim,
 /// with the ninety seconds actually elapsing.
+///
+/// The room runs on [`Room::start_on_a_manual_clock`] rather than a paused
+/// runtime clock. A paused clock auto-advances the moment the runtime believes
+/// it has nothing else to do, and a test waiting on a real socket hands it that
+/// chance constantly. Under load, the host's keepalive line could still be in
+/// flight over the loopback socket, not yet visible to the reactor, when the
+/// clock jumped straight past the moment it was meant to land, so the sweep
+/// took the host as well as bob and the keepalive's next write landed on a
+/// socket the room had already closed (issue #2496, seen as a Broken Pipe
+/// panic from `RawPeer::send`). A manual clock only moves when this test
+/// tells it to, so there is nothing left for real I/O timing to race.
 #[tokio::test]
 async fn the_sweep_frees_a_name_and_leaves_the_seat_alone() {
-    let room = room().await;
+    let (room, clock) = Room::start_on_a_manual_clock(RoomOptions {
+        host: "alice".to_string(),
+        ip: Some("192.168.0.5".to_string()),
+        public_address: None,
+        port: 0,
+        approve_joins: false,
+        advertise: false,
+    })
+    .await
+    .expect("a free port");
     let mut host = RawPeer::connect(&room).await;
     host.log_in("alice").await;
     host.send(&command::open_battle(
@@ -244,21 +264,23 @@ async fn the_sweep_frees_a_name_and_leaves_the_seat_alone() {
     bob.send(&command::my_battle_status(seat, 16_711_680)).await;
     assert_eq!(bob.read_to("CLIENTBATTLESTATUS").await.last(), Some(&taken));
 
-    // Bob's machine goes to sleep. The host keeps talking on its own timer, as
-    // the real client's thirty second keepalive does, or the sweep would take the
-    // host too and close the battle out from under the test.
-    //
-    // The clock is paused from here, so the ninety seconds pass in no time. Time
-    // auto-advances to the next timer whenever the runtime is idle, which is why
-    // the host's keepalive has to be a timer and not a line this test sends: a
-    // socket read is not a timer, and the clock would jump straight past it.
-    tokio::time::pause();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(30)).await;
-            host.send("PING keepalive").await;
-        }
-    });
+    // Bob's machine goes to sleep. The host keeps talking, once per clock
+    // advance, the way the real client's thirty second keepalive does, and
+    // waits for the PONG that proves the room counted it as heard before the
+    // clock moves again, so refreshing the host can never race the sweep.
+    // Broadcasts about bob queued on the host's socket meanwhile, so the wait
+    // reads past those rather than expecting the PONG to be the very next line.
+    for _ in 0..2 {
+        clock.advance(Duration::from_secs(30));
+        host.send("PING keepalive").await;
+        assert_eq!(
+            host.read_to("PONG").await.last(),
+            Some(&"PONG keepalive".to_string())
+        );
+    }
+    // The third thirty seconds: bob has now said nothing for the full ninety,
+    // and the sweep takes him on this tick.
+    clock.advance(Duration::from_secs(30));
     assert_eq!(bob.next().await, None, "bob's socket is swept");
     assert_eq!(room.status().await.map(|s| s.peers), Some(1));
 
