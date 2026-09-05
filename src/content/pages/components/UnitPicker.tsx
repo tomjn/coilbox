@@ -13,7 +13,6 @@ import type {
   UnitDatasetEntry,
   UnitDisplay,
 } from "../../bindings";
-import { buildPicMissing } from "../../buildPicMissing";
 import {
   useUnitsyncGameInfo,
   useUnitsyncScan,
@@ -28,7 +27,7 @@ import {
   unknownSelected,
 } from "../../techForest";
 import { unitLabel } from "../../unitChoices";
-import { unitIconSrc } from "../../unitIcon";
+import { UnitIcon } from "./UnitIcon";
 
 /** Cap on how many rows the list shows at once, so a huge game stays responsive
  * (a 4000-unit game would otherwise render every row). */
@@ -704,52 +703,6 @@ function UnitRow({
         {body}
       </div>
     </li>
-  );
-}
-
-/** A unit's build pic, or a stand-in saying why there isn't one. */
-function UnitIcon({
-  display,
-  pending = false,
-  size = "default",
-}: {
-  display?: UnitDisplay;
-  /** The pics are still being read, so this one is not missing, just not here. */
-  pending?: boolean;
-  size?: "sm" | "default";
-}) {
-  const src = unitIconSrc(display);
-  const box = size === "sm" ? "size-5" : "size-7";
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        className={cn(box, "shrink-0 rounded object-contain")}
-      />
-    );
-  }
-  if (pending) {
-    return (
-      <span
-        aria-hidden
-        className={cn(box, "shrink-0 animate-pulse rounded bg-muted")}
-      />
-    );
-  }
-  const missing = buildPicMissing(display);
-  return (
-    <span
-      title={missing.title}
-      className={cn(
-        box,
-        "flex shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[0.55rem] leading-tight text-muted-foreground",
-      )}
-    >
-      {/* The small box is 20px, which fits a swatch and not two words, so the
-          trigger says it with the tooltip the box already carries. */}
-      {size === "sm" ? null : missing.label}
-    </span>
   );
 }
 
