@@ -11,9 +11,12 @@
 //! A snapshot therefore covers the root and every engine directory under it, and
 //! mirrors that layout so a restore puts each copy back where it came from.
 
+use picoframe_core::CliResult;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Runtime};
 
 /// The three config artifacts, each a path relative to a config location.
 /// `is_dir` selects a recursive copy (`LuaUI/Config`) vs a single-file copy.
@@ -292,6 +295,95 @@ pub fn delete(profiles_root: &Path, root_path: &str, slug: &str) -> Result<(), S
         std::fs::remove_dir_all(&dir).map_err(|e| format!("delete snapshot: {e}"))?;
     }
     Ok(())
+}
+
+/// Directory holding engine-config profile snapshots, under the app data dir.
+fn profiles_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?.join("engine-config-profiles"))
+}
+
+/// `content_config_profiles`, list saved engine-config snapshots for a content
+/// root (its `springsettings.cfg` / `LuaUI/Config` / `uikeys.txt`). `rootPath` is a
+/// `ContentRoot.path`.
+#[tauri::command]
+pub(crate) async fn content_config_profiles<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+) -> CliResult {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let profiles = tauri::async_runtime::spawn_blocking(move || list(&dir, &root_path)).await;
+    match profiles {
+        Ok(profiles) => CliResult::ok(json!({ "profiles": profiles })),
+        Err(e) => CliResult::err(format!("list profiles task failed: {e}")),
+    }
+}
+
+/// `content_config_backup`, snapshot a root's present engine-config artifacts into
+/// a named profile (re-saving the name replaces it).
+#[tauri::command]
+pub(crate) async fn content_config_backup<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    name: String,
+) -> CliResult {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || backup(&dir, &root_path, &name)).await;
+    match res {
+        Ok(Ok(profile)) => CliResult::ok(json!({ "profile": profile })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("backup task failed: {e}")),
+    }
+}
+
+/// `content_config_restore`, restore a named profile's artifacts into the root.
+/// With `overwrite` unset, refuses (returning `needsOverwrite`) when live files
+/// would be clobbered, so the UI can confirm first. `slug` is `ProfileInfo.slug`.
+#[tauri::command]
+pub(crate) async fn content_config_restore<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    slug: String,
+    overwrite: Option<bool>,
+) -> CliResult {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let overwrite = overwrite.unwrap_or(false);
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        restore(&dir, &root_path, &slug, overwrite)
+    })
+    .await;
+    match res {
+        Ok(Ok(outcome)) => CliResult::ok(json!(outcome)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("restore task failed: {e}")),
+    }
+}
+
+/// `content_config_delete_profile`, delete a named engine-config snapshot.
+#[tauri::command]
+pub(crate) async fn content_config_delete_profile<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    slug: String,
+) -> CliResult {
+    let dir = match profiles_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || delete(&dir, &root_path, &slug)).await;
+    match res {
+        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete profile task failed: {e}")),
+    }
 }
 
 #[cfg(test)]
