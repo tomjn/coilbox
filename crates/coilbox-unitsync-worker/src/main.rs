@@ -43,6 +43,7 @@ mod unitmodels;
 mod unitrender;
 mod unitscriptfile;
 
+use coilbox_unitsync_worker::Mode;
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
 use std::path::Path;
@@ -126,17 +127,11 @@ struct Args {
     /// `--game`, following the unit script framework's own resolution order.
     unit_script: bool,
     /// `--unit-render`: encode a top down render the webview drew as the hub's
-    /// `render:<angle>` asset. Takes the pixels in `--pixels`, the frame in
-    /// `--width`/`--height`/`--footprint-x`/`--footprint-z`, and the unit in
-    /// `--game`/`--object`. Needs `--asset-dir`, since the file is the output.
-    unit_render: bool,
-    /// What a `--unit-render` was drawn from, for a caller that already holds it
-    /// from `--unit-render-keys` (issue #1720). All three or none: given, the
-    /// game's archive set is not mounted at all, and a caller that gives two of
-    /// them has a wiring bug rather than a fast path.
-    model_digest: Option<String>,
-    source_member: Option<String>,
-    source_archive: Option<String>,
+    /// `render:<angle>` asset. Its fields and cross field rules (needs
+    /// `--asset-dir`, needs `--pixels`, the render source is all three fields
+    /// or none) live once in `coilbox_unitsync_worker::UnitRenderArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    unit_render: Option<Mode>,
     /// `--unit-render-keys`: what a batch of units' renders would be called,
     /// without drawing any of them. Takes the units in `--units-file`, the angles
     /// in `--angles` and the renderer in `--renderer-version`.
@@ -146,22 +141,12 @@ struct Args {
     /// file rather than an argument because a whole game's roster is past what
     /// Windows takes on a command line.
     units_file: Option<String>,
-    /// The render angle for `--unit-render`, without the `render:` prefix.
-    /// Defaults to the plan, which is the vocabulary's first.
-    angle: Option<String>,
     /// The render angles for `--unit-render-keys`, comma separated and without
     /// the `render:` prefix. Defaults to every angle the vocabulary lists, since
     /// the mount they share is the cost.
     angles: Option<Vec<String>>,
-    /// A file of raw RGBA pixels for `--unit-render`, top row first.
-    pixels: Option<String>,
-    /// The render's pixel dimensions, which have to be what the footprint frames
-    /// to.
-    width: u32,
-    height: u32,
-    footprint_x: u32,
-    footprint_z: u32,
-    /// Which renderer drew the pixels, for the render's `source_hash`.
+    /// Which renderer drew the pixels, for the render's `source_hash`. Shared
+    /// by `--unit-render` (via `Mode::UnitRender`) and `--unit-render-keys`.
     renderer_version: u32,
     object: Option<String>,
     /// `--unit`: one unit definition's own key, for `--unit-script`. Not the
@@ -502,39 +487,23 @@ fn run() -> i32 {
     // Unit render: encode pixels the webview drew as the hub's render asset.
     // Keys off --game like the modes above, so it is checked before them. The
     // asset directory is the whole output, so there is nothing to do without one.
-    if args.unit_render {
-        let Some(asset_dir) = args.asset_dir.clone() else {
-            unitrender::emit_error("--unit-render needs --asset-dir <directory>".into());
-            return 1;
-        };
-        let Some(pixels) = args.pixels.clone() else {
-            unitrender::emit_error("--unit-render needs --pixels <file of RGBA>".into());
-            return 1;
-        };
-        let game_archive = args.game.clone().unwrap_or_default();
-        let object = args.object.clone().unwrap_or_default();
-        let angle = args
-            .angle
-            .clone()
-            .unwrap_or_else(|| coilbox_assets::vocabulary().unit.render_angles[0].clone());
-        let source = match render_source(&args) {
-            Ok(source) => source,
-            Err(why) => {
-                unitrender::emit_error(why);
-                return 1;
-            }
-        };
+    if let Some(Mode::UnitRender(mode)) = &args.unit_render {
+        let source = mode.source.as_ref().map(|s| unitrender::RenderSource {
+            model_digest: &s.model_digest,
+            source_member: &s.source_member,
+            source_archive: &s.source_archive,
+        });
         let req = unitrender::RenderRequest {
-            game_archive: &game_archive,
-            object_name: &object,
-            angle: &angle,
-            footprint_x: args.footprint_x,
-            footprint_z: args.footprint_z,
-            renderer_version: args.renderer_version,
-            pixels: Path::new(&pixels),
-            width: args.width,
-            height: args.height,
-            asset_dir: Path::new(&asset_dir),
+            game_archive: &mode.game,
+            object_name: &mode.object,
+            angle: &mode.angle,
+            footprint_x: mode.footprint_x,
+            footprint_z: mode.footprint_z,
+            renderer_version: mode.renderer_version,
+            pixels: Path::new(&mode.pixels),
+            width: mode.width,
+            height: mode.height,
+            asset_dir: Path::new(&mode.asset_dir),
             source,
         };
         return match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -961,45 +930,6 @@ fn run() -> i32 {
     }
 }
 
-/// What `--unit-render` was drawn from, when the caller said (issue #1720).
-///
-/// All three or none. Two of them is a caller that meant to hand the key down and
-/// got it wrong, and quietly mounting the archive instead would hide that behind
-/// a slow render nobody would look twice at.
-fn render_source(args: &Args) -> Result<Option<unitrender::RenderSource<'_>>, String> {
-    match (
-        args.model_digest.as_deref(),
-        args.source_member.as_deref(),
-        args.source_archive.as_deref(),
-    ) {
-        (None, None, None) => Ok(None),
-        (Some(model_digest), Some(source_member), Some(source_archive)) => {
-            if [model_digest, source_member, source_archive]
-                .iter()
-                .any(|v| v.is_empty())
-            {
-                // An empty digest still hashes, into a `source_hash` naming a
-                // picture of nothing that the have check would then key on.
-                return Err(
-                    "--unit-render was given an empty model digest, source member or \
-                            source archive"
-                        .into(),
-                );
-            }
-            Ok(Some(unitrender::RenderSource {
-                model_digest,
-                source_member,
-                source_archive,
-            }))
-        }
-        _ => Err(
-            "--unit-render takes --model-digest, --source-member and --source-archive together \
-             or not at all"
-                .into(),
-        ),
-    }
-}
-
 fn parse_args() -> Result<Args, String> {
     let mut lib = None;
     let mut datadir = None;
@@ -1031,19 +961,17 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_model = false;
     let mut unit_script = false;
     let mut unit_models = false;
-    let mut unit_render = false;
-    let mut model_digest = None;
-    let mut source_member = None;
-    let mut source_archive = None;
+    // `--unit-render`'s own flags (angle, footprint, pixels, dimensions, render
+    // source) are not collected into locals here: `Mode::UnitRender`'s
+    // `from_args` below re-scans `raw` for those, which is the single place
+    // that mode's fields and cross field rules are defined (issue #2448). The
+    // match arms for those flags below still recognise them, so the shared
+    // loop does not reject them as unknown, but their values are otherwise
+    // unused here.
+    let mut unit_render_flag = false;
     let mut unit_render_keys = false;
     let mut units_file = None;
-    let mut angle = None;
     let mut angles = None;
-    let mut pixels = None;
-    let mut width = 0u32;
-    let mut height = 0u32;
-    let mut footprint_x = 0u32;
-    let mut footprint_z = 0u32;
     let mut renderer_version = 0u32;
     let mut object = None;
     let mut unit = None;
@@ -1059,7 +987,8 @@ fn parse_args() -> Result<Args, String> {
     let mut asset_dir = None;
     let mut seed = false;
     let mut dry_run = false;
-    let mut it = std::env::args().skip(1);
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    let mut it = raw.iter().cloned();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--lib" => lib = it.next(),
@@ -1102,13 +1031,13 @@ fn parse_args() -> Result<Args, String> {
             "--unit-model" => unit_model = true,
             "--unit-script" => unit_script = true,
             "--unit-models" => unit_models = true,
-            "--unit-render" => unit_render = true,
-            "--model-digest" => model_digest = it.next(),
-            "--source-member" => source_member = it.next(),
-            "--source-archive" => source_archive = it.next(),
+            "--unit-render" => unit_render_flag = true,
+            // Consumed by `Mode::UnitRender`'s `from_args` below, not stored here.
+            "--model-digest" | "--source-member" | "--source-archive" | "--angle" => {
+                it.next();
+            }
             "--unit-render-keys" => unit_render_keys = true,
             "--units-file" => units_file = it.next(),
-            "--angle" => angle = it.next(),
             "--angles" => {
                 angles = it.next().map(|list| {
                     list.split(',')
@@ -1118,30 +1047,9 @@ fn parse_args() -> Result<Args, String> {
                         .collect()
                 })
             }
-            "--pixels" => pixels = it.next(),
-            "--width" => {
-                width = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or("--width needs an integer")?
-            }
-            "--height" => {
-                height = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or("--height needs an integer")?
-            }
-            "--footprint-x" => {
-                footprint_x = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or("--footprint-x needs an integer")?
-            }
-            "--footprint-z" => {
-                footprint_z = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or("--footprint-z needs an integer")?
+            // Consumed by `Mode::UnitRender`'s `from_args` below, not stored here.
+            "--pixels" | "--width" | "--height" | "--footprint-x" | "--footprint-z" => {
+                it.next();
             }
             "--renderer-version" => {
                 renderer_version = it
@@ -1219,19 +1127,16 @@ fn parse_args() -> Result<Args, String> {
         unit_model,
         unit_script,
         unit_models,
-        unit_render,
-        model_digest,
-        source_member,
-        source_archive,
+        unit_render: if unit_render_flag {
+            Some(Mode::UnitRender(
+                coilbox_unitsync_worker::UnitRenderArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         unit_render_keys,
         units_file,
-        angle,
         angles,
-        pixels,
-        width,
-        height,
-        footprint_x,
-        footprint_z,
         renderer_version,
         object,
         unit,
@@ -1270,7 +1175,6 @@ fn absolutize(args: &mut Args) {
         args.extract.as_mut(),
         args.source_file.as_mut(),
         args.chunks_file.as_mut(),
-        args.pixels.as_mut(),
         args.units_file.as_mut(),
     ]
     .into_iter()
@@ -1278,6 +1182,16 @@ fn absolutize(args: &mut Args) {
     {
         if let Some(abs) = absolute_path(path) {
             *path = abs;
+        }
+    }
+    // `Mode::UnitRender` holds its own copy of `--pixels`/`--asset-dir`, read
+    // separately from `raw` in `parse_args`, so it needs the same treatment.
+    if let Some(Mode::UnitRender(mode)) = args.unit_render.as_mut() {
+        if let Some(abs) = absolute_path(&mode.pixels) {
+            mode.pixels = abs;
+        }
+        if let Some(abs) = absolute_path(&mode.asset_dir) {
+            mode.asset_dir = abs;
         }
     }
 }
@@ -1648,19 +1562,10 @@ mod tests {
             unit_dataset: false,
             unit_model: false,
             unit_models: false,
-            unit_render: false,
-            model_digest: None,
-            source_member: None,
-            source_archive: None,
+            unit_render: None,
             unit_render_keys: false,
             units_file: None,
-            angle: None,
             angles: None,
-            pixels: None,
-            width: 0,
-            height: 0,
-            footprint_x: 0,
-            footprint_z: 0,
             renderer_version: 0,
             object: None,
             unit: None,
@@ -1721,44 +1626,8 @@ mod tests {
         assert_eq!(args.cache_dir, None);
     }
 
-    /// The three fields of a render's identity travel together or not at all
-    /// (issue #1720). Two of them is a caller that meant to hand the key down and
-    /// mis-wired it, and mounting the archive instead would hide that.
-    #[test]
-    fn the_handed_down_render_key_is_all_three_fields_or_none() {
-        let with = |digest: Option<&str>, member: Option<&str>, archive: Option<&str>| {
-            let mut args = args_with(None, None);
-            args.model_digest = digest.map(str::to_string);
-            args.source_member = member.map(str::to_string);
-            args.source_archive = archive.map(str::to_string);
-            args
-        };
-
-        let none = with(None, None, None);
-        assert!(render_source(&none)
-            .expect("no key is the mounting path")
-            .is_none());
-
-        let all = with(Some("digest"), Some("objects3d/armsolar.s3o"), Some("BAR"));
-        let source = render_source(&all)
-            .expect("all three is the fast path")
-            .expect("a source");
-        assert_eq!(source.model_digest, "digest");
-        assert_eq!(source.source_member, "objects3d/armsolar.s3o");
-        assert_eq!(source.source_archive, "BAR");
-
-        for partial in [
-            with(Some("digest"), None, None),
-            with(Some("digest"), Some("member"), None),
-            with(None, Some("member"), Some("BAR")),
-        ] {
-            assert!(render_source(&partial).is_err());
-        }
-
-        // An empty digest hashes as happily as a real one, into a `source_hash`
-        // naming a picture of nothing.
-        assert!(render_source(&with(Some(""), Some("member"), Some("BAR"))).is_err());
-        assert!(render_source(&with(Some("digest"), Some(""), Some("BAR"))).is_err());
-        assert!(render_source(&with(Some("digest"), Some("member"), Some(""))).is_err());
-    }
+    // `--unit-render`'s cross field rule (the render source is all three
+    // fields or none) moved with the mode to
+    // `coilbox_unitsync_worker::UnitRenderArgs::from_args`, and its test moved
+    // there too (issue #2448).
 }
