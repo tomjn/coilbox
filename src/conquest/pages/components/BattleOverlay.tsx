@@ -1,31 +1,29 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { Download, ListTree, Loader2, ShieldAlert, Swords } from "lucide-react";
+import { ListTree, ShieldAlert, Swords } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
 import { SubstitutedMapNote } from "../../../challenge/SubstitutedMapNote";
 import { buildEdgeMap, reachableFrom } from "../../../content/buildTree";
 import {
-  invalidateMapPreview,
-  invalidateScans,
   useUnitsyncGameInfo,
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "../../../content/config";
-import { ErrorBanner } from "../../../content/pages/components/states";
 import { UnitPicker } from "../../../content/pages/components/UnitPicker";
-import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
-import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { usePreferredTarget } from "../../../play/config";
 import { resolveGameByShortname } from "../../../play/installedGames";
-import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import { factionSides } from "../../galaxy3d/factionShape";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
-import { BackToMapButton } from "./BackToMapButton";
+import {
+  BattleCheckingNotice,
+  BattleGutter,
+  BattleLaunchGate,
+  BattleResultPrompt,
+} from "./BattleOverlayParts";
 import { BracketFrame, HUD_ACCENT_INK, HUD_CARD_CLASS } from "./hudChrome";
 import { FactionDot } from "./RunSetup";
 
@@ -161,39 +159,30 @@ export function BattleOverlay({
         className="absolute inset-0 cursor-default"
       />
       <BracketFrame className="flex w-[30rem] max-w-full flex-col gap-4 p-5 backdrop-blur-sm">
-        {/* Its own box in the gutter to the card's left, matching the map's
-            top-left exit control. */}
-        <BackToMapButton
-          onClick={onClose}
-          className="absolute right-full top-0 mr-4"
+        {/* Prefers the exact draft last launched (so an outcome save captures
+            the fight as fought, not the node's now-advanced next matchup),
+            else the live briefing snapshot. The tech tree button is
+            conquest-only: a read-only lit tree of units still usable in this
+            fight (issue #489). */}
+        <BattleGutter
+          onClose={onClose}
+          installedGame={!!run.installedGame}
+          getDraft={() => run.lastSnapshot ?? run.snapshot()}
+          defaultName={`${node.name} vs ${enemyFaction?.name ?? "garrison"}`}
+          extra={
+            openTechTree && (
+              <button
+                type="button"
+                onClick={openTechTree}
+                aria-label="View available units"
+                title="View tech tree"
+                className={`pointer-events-auto absolute right-full top-32 mr-4 flex items-center justify-center p-3.5 text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground ${HUD_CARD_CLASS}`}
+              >
+                <ListTree className="size-5" aria-hidden />
+              </button>
+            )
+          }
         />
-        {/* Its own gutter box beneath the back arrow — save this fight as a
-            skirmish preset to replay later. Prefers the exact draft last launched
-            (so an outcome save captures the fight as fought, not the node's
-            now-advanced next matchup), else the live briefing snapshot.
-            The button is shared with pages that can go light, so it paints no
-            box of its own and takes the measured card from here (#1818). */}
-        {run.installedGame && (
-          <SaveAsPresetButton
-            appearance="gutter"
-            getDraft={() => run.lastSnapshot ?? run.snapshot()}
-            defaultName={`${node.name} vs ${enemyFaction?.name ?? "garrison"}`}
-            className={`absolute right-full top-16 mr-4 ${HUD_CARD_CLASS}`}
-          />
-        )}
-        {/* Another gutter box beneath the preset save button. Read-only lit
-            tree of units still usable in this fight (issue #489). */}
-        {openTechTree && (
-          <button
-            type="button"
-            onClick={openTechTree}
-            aria-label="View available units"
-            title="View tech tree"
-            className={`pointer-events-auto absolute right-full top-32 mr-4 flex items-center justify-center p-3.5 text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground ${HUD_CARD_CLASS}`}
-          >
-            <ListTree className="size-5" aria-hidden />
-          </button>
-        )}
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
             {mode === "defend" ? (
@@ -227,32 +216,14 @@ export function BattleOverlay({
             onRestoreMap={onRestoreMap}
           />
         )}
-        {run.phase === "checking" && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Reading the battle report…
-          </div>
-        )}
+        {run.phase === "checking" && <BattleCheckingNotice />}
         {run.phase === "result" && (
-          <div className="flex flex-col gap-3">
-            {run.error && <ErrorBanner message={run.error} />}
-            <p className="text-sm text-muted-foreground">
-              The outcome could not be read from the replay. How did the battle
-              end?
-            </p>
-            <div className="flex gap-2">
-              <Button disabled={run.saving} onClick={run.recordVictory}>
-                Victory
-              </Button>
-              <Button
-                variant="outline"
-                disabled={run.saving}
-                onClick={run.recordDefeat}
-              >
-                Defeat
-              </Button>
-            </div>
-          </div>
+          <BattleResultPrompt
+            error={run.error}
+            saving={run.saving}
+            onVictory={run.recordVictory}
+            onDefeat={run.recordDefeat}
+          />
         )}
         {(run.phase === "victory" || run.phase === "defeat") && (
           <Outcome
@@ -370,102 +341,19 @@ function Briefing({
         )}
       </dl>
 
-      {run.error && <ErrorBanner message={run.error} />}
-
-      {run.noEngine ? (
-        <p className="text-sm text-muted-foreground">
-          Install an engine first (
-          <Link className="underline underline-offset-4" to="/settings/engines">
-            Settings → Engines
-          </Link>
-          ).
-        </p>
-      ) : run.missing ? (
-        <RequirementGate node={node} run={run} />
-      ) : run.canStart ? (
-        <Button onClick={run.start} className="w-full">
-          <Swords className="mr-1.5 size-4" aria-hidden /> Launch battle
-        </Button>
-      ) : (
-        <Button disabled className="w-full">
-          <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
-          {run.running
-            ? "A game is already running"
-            : run.scanLoading
-              ? "Scanning content…"
-              : run.ais.length === 0
-                ? "No skirmish AI available"
-                : "Preparing…"}
-        </Button>
-      )}
-    </div>
-  );
-}
-
-/** Install gate: a missing map downloads inline; a missing game links to the
- * Downloads page (games are bigger decisions than a map fetch). */
-function RequirementGate({
-  node,
-  run,
-}: {
-  node: GalaxyNode;
-  run: ReturnType<typeof useConquestBattleRun>;
-}) {
-  const { target } = usePreferredTarget();
-  const missing = run.missing;
-  const mapDl = useQueuedDownload({
-    kind: "map",
-    label: `Map: ${node.battle.mapName}`,
-    args: {
-      springName: node.battle.mapDownload?.springName ?? node.battle.mapName,
-      searchUrl: node.battle.mapDownload?.searchUrl,
-    },
-  });
-  if (!missing) return null;
-
-  const downloading = mapDl.busy;
-
-  const download = async () => {
-    const settled = await mapDl.start();
-    if (settled?.status !== "done") return;
-    invalidateScans();
-    if (target?.enginePath && target?.dataDir) {
-      invalidateMapPreview(
-        target.enginePath,
-        target.dataDir,
-        node.battle.mapName,
-      );
-    }
-    await run.recheck();
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">
-        {missing.kind === "map" ? "Map" : "Game"} not installed:{" "}
-        <span className="text-foreground">{missing.name}</span>
-      </p>
-      {mapDl.error && <ErrorBanner message={mapDl.error} />}
-      {missing.kind === "map" ? (
-        <>
-          <Button onClick={download} disabled={downloading} className="w-full">
-            <Download className="mr-1.5 size-4" aria-hidden />
-            {mapDl.status === "queued"
-              ? "Waiting for a slot…"
-              : downloading
-                ? "Downloading…"
-                : "Download map"}
-          </Button>
-          <QueueProgress item={mapDl} />
-        </>
-      ) : (
-        <Link to="/downloads/games">
-          <Button variant="outline" className="w-full">
-            <Download className="mr-1.5 size-4" aria-hidden /> Open game
-            downloads
-          </Button>
-        </Link>
-      )}
+      <BattleLaunchGate
+        error={run.error}
+        noEngine={run.noEngine}
+        missing={run.missing}
+        canStart={run.canStart}
+        running={run.running}
+        scanLoading={run.scanLoading}
+        aisAvailable={run.ais.length > 0}
+        onStart={run.start}
+        mapName={node.battle.mapName}
+        mapDownload={node.battle.mapDownload}
+        onRecheck={run.recheck}
+      />
     </div>
   );
 }
