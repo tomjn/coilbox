@@ -19,9 +19,9 @@ import {
 } from "@/content/config";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
+import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario } from "@/scenario/model";
-import { scenarioPlacements } from "@/scenario/pages/components/placements";
 import { type Placement, teamColor } from "./placements";
 import {
   cornerGround,

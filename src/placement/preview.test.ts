@@ -7,10 +7,10 @@ import {
   footprintRect,
   snapToBuildGrid,
 } from "@/blueprint/footprint";
+import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { newScenario } from "@/scenario/create";
 import type { Scenario } from "@/scenario/model";
 import { turnPlacement } from "@/scenario/pages/components/editing";
-import { scenarioPlacements } from "@/scenario/pages/components/placements";
 import { baseFootprints, type Placement } from "./placements";
 import {
   draggedBuilding,

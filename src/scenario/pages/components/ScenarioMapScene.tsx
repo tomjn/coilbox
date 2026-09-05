@@ -55,6 +55,7 @@ import {
   sharingLayout,
   substituteQueues,
 } from "@/lib/scenarioEditing/bases";
+import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { useFieldText } from "@/lib/useFieldText";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
@@ -152,7 +153,6 @@ import {
 } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
-import { scenarioPlacements } from "./placements";
 import type { RowFocus } from "./problemTargets";
 import { turnSelectionAround } from "./rigidTurn";
 import {

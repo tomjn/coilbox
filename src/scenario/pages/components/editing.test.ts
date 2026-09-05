@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BUILD_SQUARE, buildGridSnap } from "@/blueprint/footprint";
+import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { dragKeys } from "@/placement/placements";
 import { draggedBuilding } from "@/placement/preview";
 import { newScenario } from "../../create";
@@ -17,7 +18,6 @@ import {
   turnFacing,
   turnPlacement,
 } from "./editing";
-import { scenarioPlacements } from "./placements";
 
 /** A document with one of each shape, so the three move and delete rules can be
  *  told apart. */
