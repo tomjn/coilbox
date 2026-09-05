@@ -12,6 +12,12 @@ import {
   type SkippedGame,
 } from "../games/factsSweep";
 import {
+  createSweptAtTracker,
+  type HubSweepProgress,
+  type HubSweepReport,
+  type HubSweepTarget,
+} from "../sweepFrame";
+import {
   type BackfillTools,
   type BackfillUnit,
   backfillBlueprintUnits,
@@ -121,20 +127,15 @@ import { type AssetUpload, uploadAssetsToHub } from "./upload";
  *  sweep's, because the rule about which games are ours to publish is one rule. */
 export type PictureSkipReason = GameSkipReason;
 
-/** How far along a sweep is, for a progress line. */
-export interface PictureSweepProgress {
-  /**
-   * What the sweep is doing now. `reading` covers the survey, which is the
-   * models and the question to the hub. `filling` is the drawing and the
-   * sending, which is the part that takes minutes.
-   */
-  phase: "scanning" | "reading" | "filling";
-  /** Games finished, and how many there are to do. */
-  done: number;
-  total: number;
-  /** The game being read or filled, when there is one. */
-  game?: string;
-}
+/**
+ * How far along a sweep is, for a progress line. `reading` covers the
+ * survey, which is the models and the question to the hub. `filling` is the
+ * drawing and the sending, which is the part that takes minutes. `done` and
+ * `total` count games, and `game` is the one being read or filled.
+ */
+export type PictureSweepProgress = HubSweepProgress<
+  "scanning" | "reading" | "filling"
+>;
 
 /** What one game's sweep came to. */
 export interface GamePictures {
@@ -162,18 +163,15 @@ export interface GamePictures {
   stopped?: string;
 }
 
-/** What a sweep did. */
-export interface PictureSweepReport {
+/** What a sweep did. `skipped` is the games that were never looked at, and
+ *  `errors` is anything the worker reported while reading. */
+export interface PictureSweepReport extends HubSweepReport<SkippedGame> {
   /** Games the machine has, before anything was ruled out. */
   found: number;
   /** One entry per game the sweep looked at. */
   games: GamePictures[];
-  /** Games that were never looked at, and why. */
-  skipped: SkippedGame[];
   /** Games that fell over, and what they said. */
   failed: { game: string; said: string }[];
-  /** Anything the worker reported while reading. */
-  errors: string[];
 }
 
 /** Everything this reaches outside itself, so a test can count the calls. */
@@ -216,11 +214,7 @@ export const livePictureSweepTools: PictureSweepTools = {
   record: recordBackfillWrites,
 };
 
-export interface PictureSweepTarget {
-  hubUrl: string;
-  enginePath: string;
-  dataDir: string;
-}
+export type PictureSweepTarget = HubSweepTarget;
 
 /**
  * Every unit in a game's roster that a picture can be made of.
@@ -575,36 +569,15 @@ function pictureId(asset: AssetUpload): string {
 /** Where the last sweep's finishing time is kept. */
 export const LAST_SWEPT_KEY = "coilbox.hub.pictureSweptAt";
 
-/**
- * When a sweep last finished, or null for a machine that has never run one.
- *
- * Recorded here rather than read off the rate limit ledger, which was the
- * obvious place and is the wrong one: that ledger prunes itself to a rolling
- * hour, so anything it could answer about is by definition less than an hour
- * old, and the question somebody is asking is whether this has ever happened.
- *
- * Guarded the way the ledger's reader is, and for the same reason: a webview
- * with storage off reads as never, which is a line that does not appear rather
- * than a run that cannot start.
- */
-export function lastSweptAt(): number | null {
-  try {
-    const raw = localStorage.getItem(LAST_SWEPT_KEY);
-    const at = raw ? Number(raw) : Number.NaN;
-    return Number.isFinite(at) && at > 0 ? at : null;
-  } catch {
-    return null;
-  }
-}
+const sweptAt = createSweptAtTracker(LAST_SWEPT_KEY);
+
+/** When a sweep last finished, or null for a machine that has never run one.
+ *  See `createSweptAtTracker` in `../sweepFrame` for what this guards
+ *  against. */
+export const lastSweptAt = sweptAt.lastSweptAt;
 
 /** Write down that a sweep has just finished. */
-export function rememberSweptAt(now = Date.now()): void {
-  try {
-    localStorage.setItem(LAST_SWEPT_KEY, String(now));
-  } catch {
-    // No storage. The sweep still happened, it simply cannot say so next launch.
-  }
-}
+export const rememberSweptAt = sweptAt.rememberSweptAt;
 
 /**
  * What to tell somebody a sweep did, in one sentence.
