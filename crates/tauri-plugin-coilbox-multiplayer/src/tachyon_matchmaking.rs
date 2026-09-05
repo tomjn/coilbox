@@ -51,7 +51,11 @@ use coilbox_tachyon_protocol::types::{
     PrivateUserMatchmaking,
 };
 use coilbox_tachyon_protocol::TachyonMessage;
+use picoframe_core::CliResult;
 use serde_json::{json, Value};
+use tauri::State;
+
+use crate::conn::{Registry, TachyonAction};
 
 /// The queues this server offers and where we are in them, as the connection
 /// holds it before projecting it onto the state.
@@ -364,6 +368,55 @@ fn millis_from(timeout_ms: i64) -> u64 {
 /// A count off the wire. A negative one is not a count of anything.
 fn count(value: i64) -> u32 {
     u32::try_from(value).unwrap_or(0)
+}
+
+/// Queue one matchmaking action, refusing on a connection with no matchmaking.
+///
+/// The four commands differ only in the action they name, so the refusal and the
+/// Tachyon test are written once. TASServer has no matchmaking at all, which is
+/// why there is no line to fall back to.
+fn matchmaking_action(
+    registry: &Registry,
+    server_key: &str,
+    action: MatchmakingAction,
+) -> CliResult {
+    crate::tachyon_action(registry, server_key, TachyonAction::Matchmaking(action))
+        .unwrap_or_else(|| CliResult::err("this server does not have matchmaking"))
+}
+
+/// `mp_matchmaking_list`, Tachyon only: fetch the queues on offer. The
+/// connection asks once as it comes up, so this is the screen asking again.
+#[tauri::command]
+pub(crate) fn mp_matchmaking_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::List)
+}
+
+/// `mp_matchmaking_queue`, Tachyon only: start searching in one queue. A party
+/// searches as one, so this puts every member of yours in it.
+#[tauri::command]
+pub(crate) fn mp_matchmaking_queue(
+    registry: State<'_, Registry>,
+    server_key: String,
+    queue_id: String,
+) -> CliResult {
+    matchmaking_action(
+        registry.inner(),
+        &server_key,
+        MatchmakingAction::Search(queue_id),
+    )
+}
+
+/// `mp_matchmaking_ready`, Tachyon only: accept the match the server has found.
+#[tauri::command]
+pub(crate) fn mp_matchmaking_ready(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::Accept)
+}
+
+/// `mp_matchmaking_cancel`, Tachyon only: stop searching, or turn down a match
+/// that has been found.
+#[tauri::command]
+pub(crate) fn mp_matchmaking_cancel(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::Cancel)
 }
 
 #[cfg(test)]

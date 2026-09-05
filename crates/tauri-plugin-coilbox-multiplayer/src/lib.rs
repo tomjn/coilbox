@@ -110,7 +110,6 @@ use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tachyon_conn::TachyonMarkers;
 use tachyon_friends::FriendAction;
-use tachyon_matchmaking::MatchmakingAction;
 use tachyon_messaging::Conversation;
 use tachyon_room::{NewLobby, RoomAction, VoteChoice};
 use tauri::{
@@ -1327,55 +1326,6 @@ fn mp_friend_request_list(registry: State<'_, Registry>, server_key: String) -> 
         &server_key,
         command::friend_request_list(),
     )
-}
-
-/// Queue one matchmaking action, refusing on a connection with no matchmaking.
-///
-/// The four commands differ only in the action they name, so the refusal and the
-/// Tachyon test are written once. TASServer has no matchmaking at all, which is
-/// why there is no line to fall back to.
-fn matchmaking_action(
-    registry: &Registry,
-    server_key: &str,
-    action: MatchmakingAction,
-) -> CliResult {
-    tachyon_action(registry, server_key, TachyonAction::Matchmaking(action))
-        .unwrap_or_else(|| CliResult::err("this server does not have matchmaking"))
-}
-
-/// `mp_matchmaking_list`, Tachyon only: fetch the queues on offer. The
-/// connection asks once as it comes up, so this is the screen asking again.
-#[tauri::command]
-fn mp_matchmaking_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::List)
-}
-
-/// `mp_matchmaking_queue`, Tachyon only: start searching in one queue. A party
-/// searches as one, so this puts every member of yours in it.
-#[tauri::command]
-fn mp_matchmaking_queue(
-    registry: State<'_, Registry>,
-    server_key: String,
-    queue_id: String,
-) -> CliResult {
-    matchmaking_action(
-        registry.inner(),
-        &server_key,
-        MatchmakingAction::Search(queue_id),
-    )
-}
-
-/// `mp_matchmaking_ready`, Tachyon only: accept the match the server has found.
-#[tauri::command]
-fn mp_matchmaking_ready(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::Accept)
-}
-
-/// `mp_matchmaking_cancel`, Tachyon only: stop searching, or turn down a match
-/// that has been found.
-#[tauri::command]
-fn mp_matchmaking_cancel(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::Cancel)
 }
 
 /// `mp_join_battle` — join an open battle (optional battle key and script password).
@@ -3628,10 +3578,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             tachyon_parties::mp_party_kick_member,
             tachyon_parties::mp_party_accept_invite,
             tachyon_parties::mp_party_decline_invite,
-            mp_matchmaking_list,
-            mp_matchmaking_queue,
-            mp_matchmaking_ready,
-            mp_matchmaking_cancel,
+            tachyon_matchmaking::mp_matchmaking_list,
+            tachyon_matchmaking::mp_matchmaking_queue,
+            tachyon_matchmaking::mp_matchmaking_ready,
+            tachyon_matchmaking::mp_matchmaking_cancel,
             mp_join_battle,
             mp_join_battle_deny,
             mp_leave_battle,
