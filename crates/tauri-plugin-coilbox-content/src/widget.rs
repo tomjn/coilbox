@@ -10,7 +10,10 @@
 //! "Matches" is byte equality with the bundled files. There is no version
 //! number to get out of step with the files it is meant to describe.
 
+use picoframe_core::CliResult;
+use serde_json::json;
 use std::path::{Component, Path, PathBuf};
+use tauri::{AppHandle, Manager, Runtime};
 
 /// The tree under the widget's source directory that is installed. `tests/`
 /// and the README sit beside it and never are.
@@ -220,6 +223,71 @@ pub fn remove(root: &Path) -> Result<Vec<String>, String> {
         let _ = std::fs::remove_dir(&own_dir);
     }
     Ok(removed)
+}
+
+/// Where the bundled blueprint widget lives, or a message when this build has
+/// none to offer.
+fn widget_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    let bundled = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|dir| bundled_widget_dir(&dir, |path| path.is_dir()));
+    bundled
+        .or_else(source_tree_widget_dir)
+        .ok_or_else(|| "this build of coilbox does not carry the blueprint widget".to_string())
+}
+
+/// `content_widget_status`, what is installed under a content root against
+/// what coilbox ships. `rootPath` is a `ContentRoot.path`.
+#[tauri::command]
+pub(crate) async fn content_widget_status<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+) -> CliResult {
+    let src = match widget_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || status(&src, Path::new(&root_path)))
+        .await;
+    match res {
+        Ok(status) => CliResult::ok(json!(status)),
+        Err(e) => CliResult::err(format!("widget status task failed: {e}")),
+    }
+}
+
+/// `content_widget_install`, copy the blueprint widget into a content root's
+/// `LuaUI/`. The same command updates one already there. Only ever run from the
+/// button: coilbox never installs a widget on its own.
+#[tauri::command]
+pub(crate) async fn content_widget_install<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+) -> CliResult {
+    let src = match widget_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let res =
+        tauri::async_runtime::spawn_blocking(move || install(&src, Path::new(&root_path))).await;
+    match res {
+        Ok(Ok(written)) => CliResult::ok(json!({ "written": written })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("widget install task failed: {e}")),
+    }
+}
+
+/// `content_widget_remove`, take the blueprint widget out of a content root.
+/// The library file and the spool are data rather than the widget, and stay.
+#[tauri::command]
+pub(crate) async fn content_widget_remove(root_path: String) -> CliResult {
+    let res = tauri::async_runtime::spawn_blocking(move || remove(Path::new(&root_path))).await;
+    match res {
+        Ok(Ok(removed)) => CliResult::ok(json!({ "removed": removed })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("widget remove task failed: {e}")),
+    }
 }
 
 #[cfg(test)]

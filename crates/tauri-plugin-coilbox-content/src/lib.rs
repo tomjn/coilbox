@@ -1198,11 +1198,6 @@ fn keymaps_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(coilbox_portable::data_dir(app)?.join("keymaps"))
 }
 
-/// Directory holding the blueprint library, under the app data dir.
-fn blueprints_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    Ok(coilbox_portable::data_dir(app)?.join("blueprints"))
-}
-
 /// `content_config_profiles` — list saved engine-config snapshots for a content
 /// root (its `springsettings.cfg` / `LuaUI/Config` / `uikeys.txt`). `rootPath` is a
 /// `ContentRoot.path`.
@@ -1379,118 +1374,6 @@ async fn content_keymap_delete<R: Runtime>(
     }
 }
 
-/// `content_blueprints`, every layout in the blueprint library. The documents
-/// are opaque here: the frontend owns their shape.
-#[tauri::command]
-async fn content_blueprints<R: Runtime>(app: AppHandle<R>) -> CliResult {
-    let dir = match blueprints_dir(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    match tauri::async_runtime::spawn_blocking(move || blueprints::list(&dir)).await {
-        Ok(items) => CliResult::ok(json!({ "items": items })),
-        Err(e) => CliResult::err(format!("list blueprints task failed: {e}")),
-    }
-}
-
-/// `content_blueprint_save`, write one layout under its id, replacing what was
-/// there. Ids are `[A-Za-z0-9-_]+`, which is what a UUID is.
-#[tauri::command]
-async fn content_blueprint_save<R: Runtime>(
-    app: AppHandle<R>,
-    id: String,
-    json: String,
-) -> CliResult {
-    let dir = match blueprints_dir(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    let res =
-        tauri::async_runtime::spawn_blocking(move || blueprints::save(&dir, &id, &json)).await;
-    match res {
-        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("save blueprint task failed: {e}")),
-    }
-}
-
-/// `content_blueprint_delete`, drop one layout from the library.
-#[tauri::command]
-async fn content_blueprint_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult {
-    let dir = match blueprints_dir(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    let res = tauri::async_runtime::spawn_blocking(move || blueprints::delete(&dir, &id)).await;
-    match res {
-        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("delete blueprint task failed: {e}")),
-    }
-}
-
-/// Where the bundled blueprint widget lives, or a message when this build has
-/// none to offer.
-fn widget_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let bundled = app
-        .path()
-        .resource_dir()
-        .ok()
-        .and_then(|dir| widget::bundled_widget_dir(&dir, |path| path.is_dir()));
-    bundled
-        .or_else(widget::source_tree_widget_dir)
-        .ok_or_else(|| "this build of coilbox does not carry the blueprint widget".to_string())
-}
-
-/// `content_widget_status`, what is installed under a content root against
-/// what coilbox ships. `rootPath` is a `ContentRoot.path`.
-#[tauri::command]
-async fn content_widget_status<R: Runtime>(app: AppHandle<R>, root_path: String) -> CliResult {
-    let src = match widget_dir(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    let res =
-        tauri::async_runtime::spawn_blocking(move || widget::status(&src, Path::new(&root_path)))
-            .await;
-    match res {
-        Ok(status) => CliResult::ok(json!(status)),
-        Err(e) => CliResult::err(format!("widget status task failed: {e}")),
-    }
-}
-
-/// `content_widget_install`, copy the blueprint widget into a content root's
-/// `LuaUI/`. The same command updates one already there. Only ever run from the
-/// button: coilbox never installs a widget on its own.
-#[tauri::command]
-async fn content_widget_install<R: Runtime>(app: AppHandle<R>, root_path: String) -> CliResult {
-    let src = match widget_dir(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    let res =
-        tauri::async_runtime::spawn_blocking(move || widget::install(&src, Path::new(&root_path)))
-            .await;
-    match res {
-        Ok(Ok(written)) => CliResult::ok(json!({ "written": written })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("widget install task failed: {e}")),
-    }
-}
-
-/// `content_widget_remove`, take the blueprint widget out of a content root.
-/// The library file and the spool are data rather than the widget, and stay.
-#[tauri::command]
-async fn content_widget_remove(root_path: String) -> CliResult {
-    let res =
-        tauri::async_runtime::spawn_blocking(move || widget::remove(Path::new(&root_path))).await;
-    match res {
-        Ok(Ok(removed)) => CliResult::ok(json!({ "removed": removed })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("widget remove task failed: {e}")),
-    }
-}
-
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -1532,12 +1415,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_keymaps,
             content_keymap_save,
             content_keymap_delete,
-            content_blueprints,
-            content_blueprint_save,
-            content_blueprint_delete,
-            content_widget_status,
-            content_widget_install,
-            content_widget_remove,
+            blueprints::content_blueprints,
+            blueprints::content_blueprint_save,
+            blueprints::content_blueprint_delete,
+            widget::content_widget_status,
+            widget::content_widget_install,
+            widget::content_widget_remove,
             rapid_pool::content_warm_rapid_pool,
             rapid_pool::content_prune_rapid_pool,
             caches::content_reclaim_caches,
