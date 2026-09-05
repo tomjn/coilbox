@@ -15,16 +15,16 @@ import { HostedRoomProvider } from "../direct/HostedRoomProvider";
 import { isProfileHidden } from "../profile/hidden";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
-import HighlightsSettings from "./pages/HighlightsSettings";
-import IgnoreSettings from "./pages/IgnoreSettings";
 import {
-  MultiplayerProvider,
   useBattleRoomLabel,
   useMpDisconnected,
   useMpInBattle,
   useMpMatchmaking,
   useMpRevealed,
-} from "./store";
+} from "./navPredicates";
+import HighlightsSettings from "./pages/HighlightsSettings";
+import IgnoreSettings from "./pages/IgnoreSettings";
+import { MultiplayerProvider } from "./store";
 
 /**
  * The multiplayer plugin's frontend half: a "Lobby" nav group and its routes,

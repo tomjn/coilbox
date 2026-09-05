@@ -1,6 +1,6 @@
 import { NavGate } from "@picoframe/frame";
 import { LoginPanel } from "../LobbyStatusButton";
-import { useMpDisconnected } from "../store";
+import { useMpDisconnected } from "../navPredicates";
 
 /**
  * The multiplayer login screen (route `/lobby`, labelled "Login"). Shown only
