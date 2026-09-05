@@ -391,10 +391,19 @@ pub fn build_thumbnails_args(
 
 /// Build args for batch map-metadata mode: scan args plus the info-blob cache
 /// directory the per-map results are stored in.
+///
+/// The mode's own field lives once in
+/// `coilbox_unitsync_worker::MapMetaArgs`, so this function only has to add
+/// `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does not
+/// include (issue #2448).
 pub fn build_map_meta_args(lib: &str, datadir: &str, cache_dir: Option<&str>) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map-meta".into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::MapMeta(coilbox_unitsync_worker::MapMetaArgs {
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -415,6 +424,12 @@ pub fn build_game_args(
 
 /// Build args for map-info mode: scan args plus the map name, the `--map-info`
 /// flag, and the optional on-disk info-blob cache directory.
+///
+/// The mode's field and cross field rule (`map_name` is required, checked by
+/// the worker's `from_args`) live once in
+/// `coilbox_unitsync_worker::MapInfoArgs`, so this function only has to add
+/// `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does not
+/// include (issue #2448).
 pub fn build_map_info_args(
     lib: &str,
     datadir: &str,
@@ -422,10 +437,13 @@ pub fn build_map_info_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map".into());
-    args.push(map_name.into());
-    args.push("--map-info".into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::MapInfo(coilbox_unitsync_worker::MapInfoArgs {
+            map: map_name.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -440,6 +458,12 @@ pub fn build_map_info_args(
 /// `maps_file` is a JSON array of map names, which is how the second pass is
 /// told which those were. A file rather than an argument because three thousand
 /// map names is past what Windows takes on a command line.
+///
+/// The mode's fields live once in
+/// `coilbox_unitsync_worker::MapCatalogArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448). No caller here sends a single map: that shape
+/// exists only because `run()` still honours it.
 pub fn build_map_catalog_args(
     lib: &str,
     datadir: &str,
@@ -448,15 +472,15 @@ pub fn build_map_catalog_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map-catalog".into());
-    if keys_only {
-        args.push("--keys-only".into());
-    }
-    if let Some(path) = maps_file {
-        args.push("--maps-file".into());
-        args.push(path.into());
-    }
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::MapCatalog(coilbox_unitsync_worker::MapCatalogArgs {
+            map: None,
+            maps_file: maps_file.map(String::from),
+            keys_only,
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -471,6 +495,11 @@ pub fn build_map_catalog_args(
 /// `maps_file` is a JSON array of map names, for the same reason the map catalog
 /// takes one: a library's worth of names is past what Windows takes on a command
 /// line.
+///
+/// The mode's fields live once in
+/// `coilbox_unitsync_worker::MapMinimapsArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448).
 pub fn build_map_minimaps_args(
     lib: &str,
     datadir: &str,
@@ -479,26 +508,33 @@ pub fn build_map_minimaps_args(
     asset_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map-minimaps".into());
-    if let Some(path) = maps_file {
-        args.push("--maps-file".into());
-        args.push(path.into());
-    }
-    push_cache_dir(&mut args, cache_dir);
-    if let Some(dir) = asset_dir {
-        args.push("--asset-dir".into());
-        args.push(dir.into());
-    }
+    args.extend(
+        coilbox_unitsync_worker::Mode::MapMinimaps(coilbox_unitsync_worker::MapMinimapsArgs {
+            maps_file: maps_file.map(String::from),
+            cache_dir: cache_dir.map(String::from),
+            asset_dir: asset_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
 /// Build args for map-skybox mode: scan args plus the map name and the
 /// `--map-skybox` flag (read the map's `atmosphere.skyBox` DDS).
+///
+/// The mode's field and cross field rule (`map_name` is required, checked by
+/// the worker's `from_args`) live once in
+/// `coilbox_unitsync_worker::MapSkyboxArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448).
 pub fn build_map_skybox_args(lib: &str, datadir: &str, map_name: &str) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map".into());
-    args.push(map_name.into());
-    args.push("--map-skybox".into());
+    args.extend(
+        coilbox_unitsync_worker::Mode::MapSkybox(coilbox_unitsync_worker::MapSkyboxArgs {
+            map: map_name.into(),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -697,13 +733,23 @@ mod tests {
         assert_eq!(a[j + 1], "512");
     }
 
+    /// What `build_map_skybox_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's field, and this one can (issue #2448).
     #[test]
-    fn build_map_skybox_args_carry_map_and_flag() {
+    fn build_map_skybox_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MapSkyboxArgs;
+
         let a = build_map_skybox_args("/eng/libunitsync.so", "/data", "Map v1");
-        assert_eq!(a.last(), Some(&"--map-skybox".to_string()));
-        let i = a.iter().position(|x| x == "--map").unwrap();
-        assert_eq!(a[i + 1], "Map v1");
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = MapSkyboxArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            MapSkyboxArgs {
+                map: "Map v1".into()
+            }
+        );
     }
 
     #[test]
@@ -764,17 +810,33 @@ mod tests {
         assert_eq!(recovered, expected);
     }
 
+    /// What `build_map_info_args` writes, the worker's own `from_args` reads
+    /// back whole. A test that only checks a flag landed somewhere in the
+    /// argv cannot catch the sidecar and the worker disagreeing about the
+    /// mode's fields, and this one can (issue #2448).
     #[test]
-    fn build_map_info_args_carry_map_and_flag() {
-        let a = build_map_info_args("/eng/libunitsync.dylib", "/home/u/.spring", "Map v1", None);
-        assert_eq!(a.last(), Some(&"--map-info".to_string()));
-        let i = a.iter().position(|x| x == "--map").unwrap();
-        assert_eq!(a[i + 1], "Map v1");
+    fn build_map_info_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MapInfoArgs;
+
+        let a = build_map_info_args(
+            "/eng/libunitsync.dylib",
+            "/home/u/.spring",
+            "Map v1",
+            Some("/cache/info"),
+        );
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = MapInfoArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            MapInfoArgs {
+                map: "Map v1".into(),
+                cache_dir: Some("/cache/info".into()),
+            }
+        );
     }
 
     #[test]
-    fn build_game_and_map_info_args_append_cache_dir() {
+    fn build_game_args_appends_cache_dir() {
         let g = build_game_args(
             "/eng/libunitsync.so",
             "/data",
@@ -782,13 +844,106 @@ mod tests {
             Some("/cache/info"),
         );
         assert_eq!(&g[g.len() - 2..], &["--cache-dir", "/cache/info"]);
-        let m = build_map_info_args(
+    }
+
+    /// What `build_map_meta_args` writes, the worker's own `from_args` reads
+    /// back whole. A test that only checks a flag landed somewhere in the
+    /// argv cannot catch the sidecar and the worker disagreeing about the
+    /// mode's field, and this one can (issue #2448).
+    #[test]
+    fn build_map_meta_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MapMetaArgs;
+
+        let a = build_map_meta_args("/eng/libunitsync.so", "/data", Some("/cache/meta"));
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = MapMetaArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            MapMetaArgs {
+                cache_dir: Some("/cache/meta".into()),
+            }
+        );
+
+        let without = build_map_meta_args("/eng/libunitsync.so", "/data", None);
+        assert!(!without.iter().any(|a| a == "--cache-dir"));
+    }
+
+    /// What `build_map_catalog_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
+    #[test]
+    fn build_map_catalog_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MapCatalogArgs;
+
+        let a = build_map_catalog_args(
             "/eng/libunitsync.so",
             "/data",
-            "Map v1",
-            Some("/cache/info"),
+            Some("/tmp/maps.json"),
+            true,
+            Some("/cache/catalog"),
         );
-        assert_eq!(&m[m.len() - 2..], &["--cache-dir", "/cache/info"]);
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = MapCatalogArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            MapCatalogArgs {
+                map: None,
+                maps_file: Some("/tmp/maps.json".into()),
+                keys_only: true,
+                cache_dir: Some("/cache/catalog".into()),
+            }
+        );
+    }
+
+    /// The have-check pass takes none of the optional fields, so that shape
+    /// has to round trip too.
+    #[test]
+    fn build_map_catalog_args_with_nothing_narrowed_round_trips_to_defaults() {
+        use coilbox_unitsync_worker::MapCatalogArgs;
+
+        let a = build_map_catalog_args("/eng/libunitsync.so", "/data", None, false, None);
+        let recovered = MapCatalogArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, MapCatalogArgs::default());
+    }
+
+    /// What `build_map_minimaps_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
+    #[test]
+    fn build_map_minimaps_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MapMinimapsArgs;
+
+        let a = build_map_minimaps_args(
+            "/eng/libunitsync.so",
+            "/data",
+            Some("/tmp/maps.json"),
+            Some("/cache/minimaps"),
+            Some("/assets"),
+        );
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = MapMinimapsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            MapMinimapsArgs {
+                maps_file: Some("/tmp/maps.json".into()),
+                cache_dir: Some("/cache/minimaps".into()),
+                asset_dir: Some("/assets".into()),
+            }
+        );
+    }
+
+    /// The first pass of the sweep (issue #2379) gives no asset directory,
+    /// which has to round trip to `None` rather than an empty string.
+    #[test]
+    fn build_map_minimaps_args_with_no_asset_dir_round_trips_none() {
+        use coilbox_unitsync_worker::MapMinimapsArgs;
+
+        let a = build_map_minimaps_args("/eng/libunitsync.so", "/data", None, None, None);
+        assert!(!a.iter().any(|a| a == "--asset-dir"));
+        let recovered = MapMinimapsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, MapMinimapsArgs::default());
     }
 
     #[test]

@@ -77,28 +77,32 @@ struct Args {
     /// other output for this mode to produce.
     typemap: bool,
     /// `--map-catalog`: assemble a map's facts into the entry the hub takes.
-    /// With `--map`, one map. Without it, the whole installed library.
-    map_catalog: bool,
-    /// `--keys-only`: on a `--map-catalog` library walk, read each map's archive
-    /// and hash it and stop there, which is what a have check compares on. The
-    /// rest costs a whole height grid a map, and most of a library is maps the
-    /// hub already holds (issue #1737).
-    keys_only: bool,
-    /// A JSON file of map names for a `--map-catalog` library walk, which is how
-    /// the second pass is told which maps the hub asked for. A file rather than
-    /// an argument because three thousand map names is past what Windows takes
-    /// on a command line.
-    maps_file: Option<String>,
+    /// With `--map`, one map. Without it, the whole installed library,
+    /// narrowed by `--maps-file` and stopped at the archive hash alone with
+    /// `--keys-only`. Its fields live once in
+    /// `coilbox_unitsync_worker::MapCatalogArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    map_catalog: Option<Mode>,
     /// `--map-minimaps`: name every installed map's minimap, and with
     /// `--asset-dir` encode it as the hub's `minimap` asset too (issue #2379).
-    /// `--maps-file` narrows it to the maps the hub said it wanted.
-    map_minimaps: bool,
+    /// `--maps-file` narrows it to the maps the hub said it wanted. Its
+    /// fields live once in `coilbox_unitsync_worker::MapMinimapsArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    map_minimaps: Option<Mode>,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
-    map_info: bool,
-    /// `--map-meta`: batch-read every map's mapinfo metadata in one Init.
-    map_meta: bool,
-    /// `--map-skybox`: read one map's `atmosphere.skyBox` DDS (combined with `--map`).
-    map_skybox: bool,
+    /// Its field and cross field rule (`--map` is required) live once in
+    /// `coilbox_unitsync_worker::MapInfoArgs`, shared with the sidecar plugin
+    /// that builds this flag's argv (issue #2448).
+    map_info: Option<Mode>,
+    /// `--map-meta`: batch-read every map's mapinfo metadata in one Init. Its
+    /// field lives once in `coilbox_unitsync_worker::MapMetaArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    map_meta: Option<Mode>,
+    /// `--map-skybox`: read one map's `atmosphere.skyBox` DDS (combined with
+    /// `--map`). Its field and cross field rule (`--map` is required) live
+    /// once in `coilbox_unitsync_worker::MapSkyboxArgs`, shared with the
+    /// sidecar plugin that builds this flag's argv (issue #2448).
+    map_skybox: Option<Mode>,
     /// `--config`: read the curated set of engine settings. Carries no
     /// fields of its own, so `Some` is always `Mode::Config`, shared with the
     /// sidecar plugin only in that the flag itself now comes from
@@ -309,7 +313,8 @@ fn run() -> i32 {
 
     // Batch map metadata: every map's mapinfo in one Init, disk-cached per map.
     // Checked before the --map modes because it takes no --map of its own.
-    if args.map_meta {
+    if let Some(Mode::MapMeta(mode)) = &args.map_meta {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| mapmeta::read_all(&args.lib, cache_dir)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -670,43 +675,38 @@ fn run() -> i32 {
     }
 
     // Lazy map info: one map's options + attributed warnings (mounts the map).
-    if args.map_info {
-        if let Some(map) = args.map.clone() {
-            return match std::panic::catch_unwind(|| map_info(&args.lib, &map, cache_dir)) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    let out = model::MapInfoOutput {
-                        errors: vec!["worker panicked while reading map info".into()],
-                        ..Default::default()
-                    };
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    1
-                }
-            };
-        }
-        emit_error("missing --map <name> for --map-info".into());
-        return 1;
+    // `--map` being required now lives in `MapInfoArgs::from_args`, not here.
+    if let Some(Mode::MapInfo(mode)) = &args.map_info {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return match std::panic::catch_unwind(|| map_info(&args.lib, &mode.map, cache_dir)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                let out = model::MapInfoOutput {
+                    errors: vec!["worker panicked while reading map info".into()],
+                    ..Default::default()
+                };
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                1
+            }
+        };
     }
 
     // Map skybox: read one map's `atmosphere.skyBox` DDS cube map as raw bytes.
-    if args.map_skybox {
-        if let Some(map) = args.map.clone() {
-            return match std::panic::catch_unwind(|| archive::map_skybox(&args.lib, &map)) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    archive::emit_skybox_error("worker panicked while reading map skybox".into());
-                    1
-                }
-            };
-        }
-        emit_error("missing --map <name> for --map-skybox".into());
-        return 1;
+    // `--map` being required now lives in `MapSkyboxArgs::from_args`, not here.
+    if let Some(Mode::MapSkybox(mode)) = &args.map_skybox {
+        return match std::panic::catch_unwind(|| archive::map_skybox(&args.lib, &mode.map)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                archive::emit_skybox_error("worker panicked while reading map skybox".into());
+                1
+            }
+        };
     }
 
     // Heightmap: render one map's height infomap to a grayscale PNG data URL.
@@ -799,9 +799,10 @@ fn run() -> i32 {
     // Map catalog: a map's facts in the shape the hub takes. Reads archives
     // rather than drawing anything, so it takes no --asset-dir. With --map it is
     // one map, and without it the whole library in one Init.
-    if args.map_catalog {
-        if let Some(map) = args.map.clone() {
-            return match std::panic::catch_unwind(|| mapcatalog::read(&args.lib, &map, cache_dir)) {
+    if let Some(Mode::MapCatalog(mode)) = &args.map_catalog {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        if let Some(map) = &mode.map {
+            return match std::panic::catch_unwind(|| mapcatalog::read(&args.lib, map, cache_dir)) {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());
                     0
@@ -812,7 +813,7 @@ fn run() -> i32 {
                 }
             };
         }
-        let only = match args.maps_file.as_deref() {
+        let only = match mode.maps_file.as_deref() {
             None => None,
             Some(path) => match std::fs::read_to_string(path)
                 .map_err(|e| e.to_string())
@@ -826,7 +827,7 @@ fn run() -> i32 {
                 }
             },
         };
-        let keys_only = args.keys_only;
+        let keys_only = mode.keys_only;
         return match std::panic::catch_unwind(|| {
             mapcatalog::walk(&args.lib, only.as_deref(), keys_only, cache_dir)
         }) {
@@ -845,8 +846,8 @@ fn run() -> i32 {
     // the hub's asset too (issue #2379). Both passes of one sweep run through
     // here. The first takes no asset dir and stops at the identity, and the
     // second is given the maps the hub asked for.
-    if args.map_minimaps {
-        let only = match args.maps_file.as_deref() {
+    if let Some(Mode::MapMinimaps(mode)) = &args.map_minimaps {
+        let only = match mode.maps_file.as_deref() {
             None => None,
             Some(path) => match std::fs::read_to_string(path)
                 .map_err(|e| e.to_string())
@@ -860,14 +861,10 @@ fn run() -> i32 {
                 }
             },
         };
-        let asset_dir = args.asset_dir.clone();
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        let asset_dir = mode.asset_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            minimap::assets(
-                &args.lib,
-                only.as_deref(),
-                cache_dir,
-                asset_dir.as_deref().map(Path::new),
-            )
+            minimap::assets(&args.lib, only.as_deref(), cache_dir, asset_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -928,13 +925,30 @@ fn parse_args() -> Result<Args, String> {
     let mut height_field = false;
     let mut metalmap = false;
     let mut typemap = false;
-    let mut map_catalog = false;
-    let mut keys_only = false;
-    let mut maps_file = None;
-    let mut map_minimaps = false;
-    let mut map_info = false;
-    let mut map_meta = false;
-    let mut map_skybox = false;
+    // `--map-catalog`'s own fields (single map, maps file, keys-only,
+    // cache directory) are not collected into locals here for its own use:
+    // `Mode::MapCatalog`'s `from_args` below re-scans `raw` for those, the
+    // same treatment `--unit-models` and its siblings got above (issue
+    // #2448). `--keys-only` and `--maps-file` are not shared with any
+    // unmigrated mode, so their match arms below only consume the tokens.
+    let mut map_catalog_flag = false;
+    // `--map-minimaps`' own fields (maps file, cache directory, asset
+    // directory) are not collected into locals here for its own use, the
+    // same treatment `--map-catalog` got above: `Mode::MapMinimaps`'s
+    // `from_args` below re-scans `raw` for those (issue #2448).
+    let mut map_minimaps_flag = false;
+    // `--map-info`'s own fields (map, cache directory) are not collected
+    // into locals here for its own use: `Mode::MapInfo`'s `from_args` below
+    // re-scans `raw` for those (issue #2448).
+    let mut map_info_flag = false;
+    // `--map-meta`'s own field (cache directory) is not collected into a
+    // local here for its own use: `Mode::MapMeta`'s `from_args` below
+    // re-scans `raw` for it (issue #2448).
+    let mut map_meta_flag = false;
+    // `--map-skybox`'s own field (map) is not collected into a local here
+    // for its own use: `Mode::MapSkybox`'s `from_args` below re-scans `raw`
+    // for it (issue #2448).
+    let mut map_skybox_flag = false;
     // `--config` has no fields of its own beyond the flag, so there is no
     // local to collect: the match arm below sets this straight to `true`.
     let mut config_flag = false;
@@ -1004,13 +1018,19 @@ fn parse_args() -> Result<Args, String> {
             "--height-field" => height_field = true,
             "--metalmap" => metalmap = true,
             "--typemap" => typemap = true,
-            "--map-catalog" => map_catalog = true,
-            "--keys-only" => keys_only = true,
-            "--maps-file" => maps_file = it.next(),
-            "--map-minimaps" => map_minimaps = true,
-            "--map-info" => map_info = true,
-            "--map-meta" => map_meta = true,
-            "--map-skybox" => map_skybox = true,
+            "--map-catalog" => map_catalog_flag = true,
+            // Consumed by `Mode::MapCatalog`'s `from_args` below, not stored
+            // here.
+            "--keys-only" => {}
+            // Consumed by `Mode::MapCatalog`'s and `Mode::MapMinimaps`'s
+            // `from_args` below, not stored here.
+            "--maps-file" => {
+                it.next();
+            }
+            "--map-minimaps" => map_minimaps_flag = true,
+            "--map-info" => map_info_flag = true,
+            "--map-meta" => map_meta_flag = true,
+            "--map-skybox" => map_skybox_flag = true,
             "--max-side" => {
                 max_side = it
                     .next()
@@ -1108,13 +1128,41 @@ fn parse_args() -> Result<Args, String> {
         height_field,
         metalmap,
         typemap,
-        map_catalog,
-        keys_only,
-        maps_file,
-        map_minimaps,
-        map_info,
-        map_meta,
-        map_skybox,
+        map_catalog: if map_catalog_flag {
+            Some(Mode::MapCatalog(
+                coilbox_unitsync_worker::MapCatalogArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        map_minimaps: if map_minimaps_flag {
+            Some(Mode::MapMinimaps(
+                coilbox_unitsync_worker::MapMinimapsArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        map_info: if map_info_flag {
+            Some(Mode::MapInfo(
+                coilbox_unitsync_worker::MapInfoArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        map_meta: if map_meta_flag {
+            Some(Mode::MapMeta(
+                coilbox_unitsync_worker::MapMetaArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        map_skybox: if map_skybox_flag {
+            Some(Mode::MapSkybox(
+                coilbox_unitsync_worker::MapSkyboxArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         config: if config_flag {
             Some(Mode::Config)
         } else {
@@ -1227,6 +1275,57 @@ fn absolutize(args: &mut Args) {
             mode.units_file = abs;
         }
     }
+    // `Mode::MapMeta` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment.
+    if let Some(Mode::MapMeta(mode)) = args.map_meta.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::MapInfo` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment. `--map` is
+    // a unitsync name, not a path, so it is left alone.
+    if let Some(Mode::MapInfo(mode)) = args.map_info.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::MapCatalog` holds its own copy of `--maps-file`/`--cache-dir`,
+    // read separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--map` is a unitsync name, not a path, so it is left alone.
+    if let Some(Mode::MapCatalog(mode)) = args.map_catalog.as_mut() {
+        for path in [mode.maps_file.as_mut(), mode.cache_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
+            }
+        }
+    }
+    // `Mode::MapMinimaps` holds its own copy of
+    // `--maps-file`/`--cache-dir`/`--asset-dir`, read separately from `raw`
+    // in `parse_args`, so it needs the same treatment.
+    if let Some(Mode::MapMinimaps(mode)) = args.map_minimaps.as_mut() {
+        for path in [
+            mode.maps_file.as_mut(),
+            mode.cache_dir.as_mut(),
+            mode.asset_dir.as_mut(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
+            }
+        }
+    }
+    // `Mode::MapSkybox` has no path field of its own: `--map` is a unitsync
+    // name, not a path, so there is nothing here for it to do.
 }
 
 /// `path` joined onto the current directory when it is relative, and `None`
@@ -1578,13 +1677,11 @@ mod tests {
             height_field: false,
             metalmap: false,
             typemap: false,
-            map_catalog: false,
-            keys_only: false,
-            maps_file: None,
-            map_minimaps: false,
-            map_info: false,
-            map_meta: false,
-            map_skybox: false,
+            map_catalog: None,
+            map_minimaps: None,
+            map_info: None,
+            map_meta: None,
+            map_skybox: None,
             config: None,
             config_set: None,
             skirmish_ais: false,
