@@ -515,21 +515,31 @@ pub fn build_skirmish_ai_args(lib: &str, datadir: &str, game: Option<&str>) -> V
 }
 
 /// Build args for engine-config mode: scan args plus the `--config` flag.
+///
+/// `--config` has no fields of its own, so `Mode::Config` carries none
+/// either (issue #2448). This function only has to add `--lib`/`--datadir`,
+/// which every mode takes and `Mode::to_args` does not include.
 pub fn build_config_args(lib: &str, datadir: &str) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--config".into());
+    args.extend(coilbox_unitsync_worker::Mode::Config.to_args());
     args
 }
 
 /// Build args for engine-config write mode: scan args plus `--config-set` and the
 /// `--config-key`/`--config-value` pair to set.
+///
+/// The mode's own field and its rule (`key` is required, checked by the
+/// worker's `from_args`) live once in
+/// `coilbox_unitsync_worker::ConfigSetArgs`, so this function only has to add
+/// `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does not
+/// include (issue #2448).
 pub fn build_config_set_args(lib: &str, datadir: &str, key: &str, value: &str) -> Vec<String> {
+    let mode = coilbox_unitsync_worker::Mode::ConfigSet(coilbox_unitsync_worker::ConfigSetArgs {
+        key: key.into(),
+        value: value.into(),
+    });
     let mut args = build_args(lib, datadir);
-    args.push("--config-set".into());
-    args.push("--config-key".into());
-    args.push(key.into());
-    args.push("--config-value".into());
-    args.push(value.into());
+    args.extend(mode.to_args());
     args
 }
 
@@ -713,11 +723,45 @@ mod tests {
         assert!(!empty_game.contains(&"--game".to_string()));
     }
 
+    /// `--config` has no fields of its own, so there is no `from_args` to
+    /// round trip through. What this can still show is that the flag comes
+    /// from `Mode::Config` itself rather than a hand written literal that
+    /// could drift from it (issue #2448).
     #[test]
-    fn build_config_args_appends_flag() {
+    fn build_config_args_appends_the_shared_mode_s_flag() {
         let a = build_config_args("/eng/libunitsync.dylib", "/home/u/.spring");
-        assert_eq!(a.last(), Some(&"--config".to_string()));
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        assert_eq!(
+            a[a.len() - 1..],
+            coilbox_unitsync_worker::Mode::Config.to_args()
+        );
+    }
+
+    /// The whole point of sharing `ConfigSetArgs` with the worker: what
+    /// `build_config_set_args` writes, the worker's own `from_args` reads
+    /// back whole. A test that only checks a flag landed somewhere in the
+    /// argv cannot catch the sidecar and the worker disagreeing about the
+    /// mode's fields, and this one can (issue #2448).
+    #[test]
+    fn build_config_set_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::ConfigSetArgs;
+
+        let expected = ConfigSetArgs {
+            key: "Fullscreen".into(),
+            value: "1".into(),
+        };
+        let a = build_config_set_args(
+            "/eng/libunitsync.dylib",
+            "/home/u/.spring",
+            &expected.key,
+            &expected.value,
+        );
+        assert!(
+            a.contains(&"--lib".to_string()),
+            "the shared lib/datadir args are still prepended"
+        );
+        let recovered = ConfigSetArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, expected);
     }
 
     #[test]

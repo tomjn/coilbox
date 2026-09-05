@@ -99,12 +99,17 @@ struct Args {
     map_meta: bool,
     /// `--map-skybox`: read one map's `atmosphere.skyBox` DDS (combined with `--map`).
     map_skybox: bool,
-    config: bool,
-    /// `--config-set`: write one curated engine setting (with `--config-key` and
-    /// `--config-value`) back to `springsettings.cfg` via `SetSpringConfig*`.
-    config_set: bool,
-    config_key: Option<String>,
-    config_value: Option<String>,
+    /// `--config`: read the curated set of engine settings. Carries no
+    /// fields of its own, so `Some` is always `Mode::Config`, shared with the
+    /// sidecar plugin only in that the flag itself now comes from
+    /// `Mode::to_args` rather than a literal string (issue #2448).
+    config: Option<Mode>,
+    /// `--config-set`: write one curated engine setting back to
+    /// `springsettings.cfg` via `SetSpringConfig*`. Its field (`--config-key`
+    /// is required, `--config-value` defaults to empty) lives once in
+    /// `coilbox_unitsync_worker::ConfigSetArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    config_set: Option<Mode>,
     /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
     /// combined with `--game`).
     skirmish_ais: bool,
@@ -630,7 +635,7 @@ fn run() -> i32 {
 
     // Engine settings: read a curated set of config values (a separate, light
     // unitsync session — no archive scan).
-    if args.config {
+    if args.config.is_some() {
         return match std::panic::catch_unwind(|| config::render(&args.lib)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -644,13 +649,10 @@ fn run() -> i32 {
     }
 
     // Engine settings write: set one curated config key via SetSpringConfig*.
-    if args.config_set {
-        let Some(key) = args.config_key.clone() else {
-            config::emit_write_error("--config-set needs --config-key".into());
-            return 1;
-        };
-        let value = args.config_value.clone().unwrap_or_default();
-        return match std::panic::catch_unwind(|| config::apply(&args.lib, &key, &value)) {
+    // `--config-key` being required now lives in `ConfigSetArgs::from_args`,
+    // not here.
+    if let Some(Mode::ConfigSet(mode)) = &args.config_set {
+        return match std::panic::catch_unwind(|| config::apply(&args.lib, &mode.key, &mode.value)) {
             Ok(out) => {
                 let ok = out.ok;
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -933,10 +935,16 @@ fn parse_args() -> Result<Args, String> {
     let mut map_info = false;
     let mut map_meta = false;
     let mut map_skybox = false;
-    let mut config = false;
-    let mut config_set = false;
-    let mut config_key = None;
-    let mut config_value = None;
+    // `--config` has no fields of its own beyond the flag, so there is no
+    // local to collect: the match arm below sets this straight to `true`.
+    let mut config_flag = false;
+    // `--config-set`'s own fields (`--config-key`, `--config-value`) are not
+    // collected into locals here for its own use: `Mode::ConfigSet`'s
+    // `from_args` below re-scans `raw` for those, the same treatment
+    // `--unit-models`, `--unit-render` and `--unit-render-keys` got above
+    // (issue #2448). The match arms for those flags below still recognise
+    // them, so the shared loop does not reject them as unknown.
+    let mut config_set_flag = false;
     let mut skirmish_ais = false;
     let mut game_headers = false;
     let mut unit_buildpics = false;
@@ -1013,10 +1021,13 @@ fn parse_args() -> Result<Args, String> {
             "--asset-dir" => asset_dir = it.next(),
             "--seed" => seed = true,
             "--dry-run" => dry_run = true,
-            "--config" => config = true,
-            "--config-set" => config_set = true,
-            "--config-key" => config_key = it.next(),
-            "--config-value" => config_value = it.next(),
+            "--config" => config_flag = true,
+            "--config-set" => config_set_flag = true,
+            // Consumed by `Mode::ConfigSet`'s `from_args` below, not stored
+            // here.
+            "--config-key" | "--config-value" => {
+                it.next();
+            }
             "--skirmish-ais" => skirmish_ais = true,
             "--game-headers" => game_headers = true,
             "--unit-buildpics" => unit_buildpics = true,
@@ -1104,10 +1115,18 @@ fn parse_args() -> Result<Args, String> {
         map_info,
         map_meta,
         map_skybox,
-        config,
-        config_set,
-        config_key,
-        config_value,
+        config: if config_flag {
+            Some(Mode::Config)
+        } else {
+            None
+        },
+        config_set: if config_set_flag {
+            Some(Mode::ConfigSet(
+                coilbox_unitsync_worker::ConfigSetArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         skirmish_ais,
         game_headers,
         unit_buildpics,
@@ -1566,10 +1585,8 @@ mod tests {
             map_info: false,
             map_meta: false,
             map_skybox: false,
-            config: false,
-            config_set: false,
-            config_key: None,
-            config_value: None,
+            config: None,
+            config_set: None,
             skirmish_ais: false,
             game_headers: false,
             unit_buildpics: false,

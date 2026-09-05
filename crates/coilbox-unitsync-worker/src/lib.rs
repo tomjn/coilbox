@@ -13,11 +13,12 @@
 //! turns a mode's fields into the flags `main.rs` reads, for the sidecar to
 //! build a process argv from. `from_args` reads those same flags back into the
 //! typed fields, applying whatever cross field rules the mode has, for
-//! `parse_args` to call. `--unit-render`, `--unit-models` and
-//! `--unit-render-keys` have migrated so far. The other 23 modes still have
-//! their flags written by hand in the three old places, and move here one
-//! family at a time, matching how this crate already ships (135 commits since
-//! May 2026 says a sweeping rewrite is not this crate's style).
+//! `parse_args` to call. `--unit-render`, `--unit-models`,
+//! `--unit-render-keys`, `--config` and `--config-set` have migrated so far.
+//! The other 21 modes still have their flags written by hand in the three old
+//! places, and move here one family at a time, matching how this crate
+//! already ships (135 commits since May 2026 says a sweeping rewrite is not
+//! this crate's style).
 
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new
@@ -28,6 +29,11 @@ pub enum Mode {
     UnitRender(UnitRenderArgs),
     UnitModels(UnitModelsArgs),
     UnitRenderKeys(UnitRenderKeysArgs),
+    /// `--config`: read the curated set of engine settings. No fields of its
+    /// own beyond the flag, so this is a unit variant rather than an empty
+    /// payload struct.
+    Config,
+    ConfigSet(ConfigSetArgs),
 }
 
 impl Mode {
@@ -39,6 +45,8 @@ impl Mode {
             Mode::UnitRender(args) => args.to_args(),
             Mode::UnitModels(args) => args.to_args(),
             Mode::UnitRenderKeys(args) => args.to_args(),
+            Mode::Config => vec!["--config".to_string()],
+            Mode::ConfigSet(args) => args.to_args(),
         }
     }
 }
@@ -432,6 +440,60 @@ impl UnitRenderKeysArgs {
     }
 }
 
+/// `--config-set`: write one curated engine setting back to
+/// `springsettings.cfg` via unitsync's `SetSpringConfig*`. `key` is required:
+/// there is nothing in the curated catalog to look up without it, the rule
+/// that used to live in `main.rs`'s `run()` alone. `value` defaults to an
+/// empty string when `--config-value` is absent, the same default `run()`
+/// applied before this moved here, since clearing a string or boolean key is
+/// a legitimate write, not a missing argument.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConfigSetArgs {
+    pub key: String,
+    pub value: String,
+}
+
+impl ConfigSetArgs {
+    /// Build the flags for `--config-set` mode: the key to write and the
+    /// value to write it as.
+    pub fn to_args(&self) -> Vec<String> {
+        vec![
+            "--config-set".to_string(),
+            "--config-key".to_string(),
+            self.key.clone(),
+            "--config-value".to_string(),
+            self.value.clone(),
+        ]
+    }
+
+    /// Recover a `--config-set` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`ConfigSetArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut key = None;
+        let mut value = None;
+
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--config-key" => key = it.next().cloned(),
+                "--config-value" => value = it.next().cloned(),
+                _ => {}
+            }
+        }
+
+        let Some(key) = key else {
+            return Err("--config-set needs --config-key".into());
+        };
+
+        Ok(ConfigSetArgs {
+            key,
+            value: value.unwrap_or_default(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -695,5 +757,72 @@ mod tests {
     fn unit_render_keys_dispatches_to_args_to_its_variant() {
         let a = unit_render_keys_args();
         assert_eq!(Mode::UnitRenderKeys(a.clone()).to_args(), a.to_args());
+    }
+
+    #[test]
+    fn config_dispatches_to_args_to_its_flag() {
+        assert_eq!(Mode::Config.to_args(), vec!["--config".to_string()]);
+    }
+
+    fn config_set_args() -> ConfigSetArgs {
+        ConfigSetArgs {
+            key: "Fullscreen".into(),
+            value: "1".into(),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn config_set_round_trips_through_to_args_and_from_args() {
+        let original = config_set_args();
+        let recovered = ConfigSetArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// `from_args` is also handed a full process argv, carrying `--lib` and
+    /// `--datadir`, neither of which this mode owns.
+    #[test]
+    fn config_set_ignores_unrecognised_tokens_around_its_own_flags() {
+        let mut argv = vec![
+            "--lib".to_string(),
+            "/engines/one/libunitsync.so".to_string(),
+            "--datadir".to_string(),
+            "/data".to_string(),
+        ];
+        argv.extend(config_set_args().to_args());
+        let recovered = ConfigSetArgs::from_args(&argv).expect("valid argv");
+        assert_eq!(recovered, config_set_args());
+    }
+
+    /// There is nothing in the curated catalog to look up without a key, so a
+    /// missing one is refused rather than treated as a quiet no-op.
+    #[test]
+    fn config_set_missing_key_is_refused() {
+        let mut a = config_set_args().to_args();
+        let at = a.iter().position(|x| x == "--config-key").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(ConfigSetArgs::from_args(&a).is_err());
+    }
+
+    /// A caller that omits `--config-value` entirely (rather than sending an
+    /// explicit empty string) still gets a value to write, since clearing a
+    /// string or boolean key is a legitimate write, not a missing argument.
+    #[test]
+    fn config_set_missing_value_defaults_to_empty_string() {
+        let mut a = config_set_args().to_args();
+        let at = a.iter().position(|x| x == "--config-value").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        let recovered = ConfigSetArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered.value, "");
+    }
+
+    #[test]
+    fn config_set_dispatches_to_args_to_its_variant() {
+        let a = config_set_args();
+        assert_eq!(Mode::ConfigSet(a.clone()).to_args(), a.to_args());
     }
 }
