@@ -9,6 +9,8 @@
 //!
 //! So it makes the directory, but only so far. See [`MAKEABLE_DEPTH`].
 
+use picoframe_core::CliResult;
+use serde_json::json;
 use std::path::{Path, PathBuf};
 
 /// How many missing directories coilbox will make to reach a destination.
@@ -55,6 +57,23 @@ pub fn write(dest: &str, text: &str) -> Result<(), String> {
         }
     }
     std::fs::write(path, text).map_err(|e| format!("could not write {dest}: {e}"))
+}
+
+/// `content_write_file`, write caller-serialized text to a caller-chosen path.
+/// Opaque like the challenge export beside it: the frontend owns what is in the
+/// file and picks the destination. Reading goes through
+/// `content_import_container`, the other half of the pair.
+///
+/// Callers are the keymap export it was first written for, and the send of a
+/// base layout into a game's own `LuaUI/Config/blueprints.json`, which is why it
+/// makes the directory when it has to (issue #1480). How far it will go is
+/// [`write`].
+#[tauri::command]
+pub(crate) async fn content_write_file(dest: String, text: String) -> CliResult {
+    match write(&dest, &text) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    }
 }
 
 #[cfg(test)]

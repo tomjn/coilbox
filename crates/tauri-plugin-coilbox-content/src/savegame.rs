@@ -14,9 +14,11 @@
 //! lives in the play plugin, not here.
 
 use flate2::read::GzDecoder;
+use picoframe_core::CliResult;
 use serde::Serialize;
+use serde_json::json;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 /// The engine's savegame folder, relative to a content root's write dir.
@@ -150,6 +152,36 @@ fn read_up_to<R: Read>(rdr: &mut R, buf: &mut [u8]) -> Option<usize> {
         }
     }
     (filled > 0).then_some(filled)
+}
+
+/// `content_list_saves`, list singleplayer savegames under `<root>/Saves` (fast
+/// fs metadata + a best-effort map/game read). `root` is a `ContentRoot.path`.
+#[tauri::command]
+pub(crate) async fn content_list_saves(root: String) -> CliResult {
+    let p = PathBuf::from(&root);
+    match tauri::async_runtime::spawn_blocking(move || list_saves(&p)).await {
+        Ok(saves) => CliResult::ok(json!({ "saves": saves })),
+        Err(e) => CliResult::err(format!("list saves task failed: {e}")),
+    }
+}
+
+/// `content_delete_save`, delete one savegame file. `path` must be a `.ssf`/`.slsf`
+/// path from `content_list_saves` (guarded against deleting anything else).
+#[tauri::command]
+pub(crate) async fn content_delete_save(path: String) -> CliResult {
+    let p = PathBuf::from(&path);
+    let ok_ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("ssf") || e.eq_ignore_ascii_case("slsf"))
+        .unwrap_or(false);
+    if !ok_ext {
+        return CliResult::err("not a savegame file".to_string());
+    }
+    match std::fs::remove_file(&p) {
+        Ok(()) => CliResult::ok(json!({ "ok": true })),
+        Err(e) => CliResult::err(format!("delete failed: {e}")),
+    }
 }
 
 #[cfg(test)]

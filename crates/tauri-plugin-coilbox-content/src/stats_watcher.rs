@@ -43,6 +43,8 @@ use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use picoframe_core::CliResult;
+use serde_json::json;
 use tauri::{AppHandle, Emitter, Runtime};
 
 use crate::demo::{self, DEMO_DIRS};
@@ -385,6 +387,39 @@ fn run_ingest<R: Runtime>(app: &AppHandle<R>, target: &IngestTarget) {
         return;
     }
     let _ = app.emit(STATS_UPDATED_EVENT, &summary);
+}
+
+/// `content_stats_watch_start` (#462): start (or restart) the live filesystem
+/// watcher over `roots`' demos/replays folders, so a newly-arrived replay is
+/// ingested as it lands rather than only on the next scan-on-open. Idempotent,
+/// replaces any watcher already running. `enginePath` is used the same way as
+/// [`crate::stats::content_stats_ingest`]'s. A watcher that fails to start (e.g.
+/// the OS watch couldn't be constructed) reports an error but never crashes the
+/// app, scan-on-open keeps working regardless.
+#[tauri::command]
+pub(crate) async fn content_stats_watch_start<R: Runtime>(
+    app: AppHandle<R>,
+    roots: Vec<String>,
+    engine_path: String,
+) -> CliResult {
+    let sp = match stats::stats_path(&app) {
+        Ok(p) => p,
+        Err(e) => return CliResult::err(e),
+    };
+    let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
+    let engine_dir = PathBuf::from(&engine_path);
+    match start(app, root_paths, engine_dir, sp) {
+        Ok(()) => CliResult::ok(json!({ "watching": true })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `content_stats_watch_stop` (#462): stop the live filesystem watcher, if one
+/// is running. Idempotent.
+#[tauri::command]
+pub(crate) fn content_stats_watch_stop() -> CliResult {
+    stop();
+    CliResult::ok(json!({ "watching": false }))
 }
 
 #[cfg(test)]

@@ -8,7 +8,9 @@
 //! unitsync, no branding — opaque data in, files out.
 
 use base64::Engine;
+use picoframe_core::CliResult;
 use serde::Deserialize;
+use serde_json::json;
 use std::io::Write;
 use std::path::Path;
 
@@ -66,6 +68,33 @@ pub fn write_zip(dest: &str, files: &[ExportFile]) -> Result<(), String> {
     zip.finish()
         .map_err(|e| format!("could not finish zip: {e}"))?;
     Ok(())
+}
+
+/// `content_export_build_tree_html`, write a single self-contained build-tree
+/// export HTML file (built entirely by the frontend) to a caller-chosen path.
+/// Opaque: the frontend owns the markup and picks the destination via the save
+/// dialog (mirrors `campaign_export`).
+#[tauri::command]
+pub(crate) async fn content_export_build_tree_html(dest: String, html: String) -> CliResult {
+    match write_html(&dest, &html) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `content_export_build_tree_zip`, assemble the build-tree export zip
+/// (`index.html` + `images/` + `assets/`) at a caller-chosen path from the file
+/// set the frontend serialized. Image bytes arrive base64-encoded and are decoded
+/// here, and text files (html/css/js) are written UTF-8.
+#[tauri::command]
+pub(crate) async fn content_export_build_tree_zip(
+    dest: String,
+    files: Vec<ExportFile>,
+) -> CliResult {
+    match write_zip(&dest, &files) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    }
 }
 
 #[cfg(test)]

@@ -17,7 +17,9 @@
 
 use std::collections::BTreeMap;
 
+use picoframe_core::CliResult;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::model::{DemoTrailer, TeamStatSample};
 
@@ -203,6 +205,17 @@ pub fn match_totals(trailer: &DemoTrailer) -> Vec<TeamTotals> {
             })
         })
         .collect()
+}
+
+/// `content_metric_registry`: what every `TeamStatistics` field decoded by
+/// `content_replay_trailer` is called, which group it belongs to, what it
+/// counts, and whether it belongs on the roster or in a headline tile. Static
+/// data, no file access. Every match-statistics surface builds itself from this
+/// rather than from a list of its own, so adding a metric is one line in
+/// `metrics.rs`. See [`METRICS`].
+#[tauri::command]
+pub(crate) async fn content_metric_registry() -> CliResult {
+    CliResult::ok(json!({ "metrics": METRICS }))
 }
 
 #[cfg(test)]

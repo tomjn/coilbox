@@ -10,8 +10,11 @@
 //! constants with no path separators, so the join can't escape the cache root, and
 //! the walk never follows symlinks out of a cache dir.
 
+use picoframe_core::CliResult;
 use serde::Serialize;
+use serde_json::json;
 use std::path::Path;
+use tauri::{AppHandle, Runtime};
 
 /// The cache subdirectories under the app cache dir, as `(dir name, label)`.
 ///
@@ -127,6 +130,26 @@ pub(crate) fn reclaim(cache_root: &Path, apply: bool) -> ReclaimSummary {
         }
     }
     out
+}
+
+/// `content_reclaim_caches`, size (and, when `apply`, clear) the app's grow-only
+/// generated-image / info caches under the app cache dir. `apply=false` is a dry
+/// run that reports per-cache sizes without deleting. Every cache regenerates on
+/// demand, so clearing is always safe.
+#[tauri::command]
+pub(crate) async fn content_reclaim_caches<R: Runtime>(
+    app: AppHandle<R>,
+    apply: Option<bool>,
+) -> CliResult {
+    let cache_root = match coilbox_portable::cache_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let apply = apply.unwrap_or(false);
+    match tauri::async_runtime::spawn_blocking(move || reclaim(&cache_root, apply)).await {
+        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
+        Err(e) => CliResult::err(format!("reclaim task failed: {e}")),
+    }
 }
 
 #[cfg(test)]

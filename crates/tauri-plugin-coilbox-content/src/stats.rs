@@ -26,9 +26,12 @@
 //! day something genuinely needs every match's series at once is the day to argue
 //! about a database, and it is not this day.
 
+use picoframe_core::CliResult;
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Runtime};
 
 use serde::{Deserialize, Serialize};
 
@@ -306,6 +309,68 @@ pub fn ingest(roots: &[PathBuf], engine_dir: &Path, store: &mut StatsStore) -> I
     }
     summary.total = store.records.len() as u32;
     summary
+}
+
+/// The replay-stats store, alongside the content `state.json` under app-data.
+pub(crate) fn stats_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?
+        .join("content")
+        .join("stats.json"))
+}
+
+/// `content_stats_ingest`, incrementally parse every replay under `roots` into the
+/// local stats database, decoding only files new or changed since the last pass
+/// (idempotent, keyed by filename). The winner comes from each replay's own
+/// trailer. `enginePath` locates `demotool` only as a fallback for a trailer
+/// format the decoder refuses, and the native decode still records map/players/
+/// game either way. With `dryRun`, the pass runs but the store isn't written
+/// (returns the would-be summary). `roots` are `ContentRoot.path`s. Runs off the
+/// UI thread.
+#[tauri::command]
+pub(crate) async fn content_stats_ingest<R: Runtime>(
+    app: AppHandle<R>,
+    roots: Vec<String>,
+    engine_path: String,
+    dry_run: Option<bool>,
+) -> CliResult {
+    let sp = match stats_path(&app) {
+        Ok(p) => p,
+        Err(e) => return CliResult::err(e),
+    };
+    let dry_run = dry_run.unwrap_or(false);
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let mut store = load(&sp)?;
+        let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
+        let engine_dir = PathBuf::from(&engine_path);
+        let summary = ingest(&root_paths, &engine_dir, &mut store);
+        if !dry_run {
+            save(&sp, &store)?;
+        }
+        Ok::<_, String>((summary, store))
+    })
+    .await;
+    match res {
+        Ok(Ok((summary, store))) => {
+            CliResult::ok(json!({ "summary": summary, "records": store.records }))
+        }
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("stats ingest task failed: {e}")),
+    }
+}
+
+/// `content_stats_query`, return the whole local stats record set (the flat table
+/// every stats view aggregates over). Read-only, never triggers an ingest.
+#[tauri::command]
+pub(crate) async fn content_stats_query<R: Runtime>(app: AppHandle<R>) -> CliResult {
+    let sp = match stats_path(&app) {
+        Ok(p) => p,
+        Err(e) => return CliResult::err(e),
+    };
+    match tauri::async_runtime::spawn_blocking(move || load(&sp)).await {
+        Ok(Ok(store)) => CliResult::ok(json!({ "records": store.records })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("stats query task failed: {e}")),
+    }
 }
 
 #[cfg(test)]
