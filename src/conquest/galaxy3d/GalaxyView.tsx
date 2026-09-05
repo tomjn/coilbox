@@ -23,6 +23,7 @@ import {
   type WorldPos,
 } from "./layout";
 import { createOwners } from "./owners";
+import { createSelection } from "./selection";
 import { buildStarfield } from "./starfield";
 import {
   accretionTexture,
@@ -2981,39 +2982,26 @@ export function GalaxyView({
       ownerRings,
       discMats,
       ringGeoFor,
-      () => sel.idx,
+      () => selection.getIndex(),
     );
     applyOwnersRef.current = owners.apply;
 
-    // Selection enlarges the node's own ownership ring and pulses its colour
-    // (see the animation loop) — no second ring.
-    const sel = { idx: -1 };
-    const applySelection = () => {
-      const selId = selectedRef.current;
-      const idx = selId ? nodeIds.indexOf(selId) : -1;
-      if (sel.idx >= 0 && sel.idx !== idx) {
-        ownerRings[sel.idx]?.scale.setScalar(1);
-        owners.styleRing(sel.idx);
-      }
-      sel.idx = idx;
-      if (idx >= 0) {
-        ownerRings[idx]?.scale.setScalar(1.3);
-        // Static brighten covers the no-animation paths; the loop overrides
-        // it with a colour pulse while motion is on.
-        const mat = ownerRingMats[idx];
-        if (mat) {
-          mat.color.lerp(new THREE.Color(0xffffff), 0.3);
-          mat.opacity = 1;
-        }
-      }
-      const inc = incursionRef.current;
-      const incPos = inc ? positions.get(inc.nodeId) : undefined;
-      incursionMarker.visible = !!incPos;
-      if (incPos) {
-        incursionMarker.position.set(incPos[0], incPos[1] + 4.2, incPos[2]);
-      }
-    };
-    applySelectionRef.current = applySelection;
+    // Selection enlarges the node's own ownership ring and pulses its
+    // colour, in the animation loop below, no second ring. See selection.ts.
+    const selection = createSelection(
+      galaxy,
+      nodeIds,
+      selectedRef,
+      incursionRef,
+      positions,
+      incursionMarker,
+      ownerRings,
+      ownerRingMats,
+      ownerColor,
+      ownersRef,
+      owners.styleRing,
+    );
+    applySelectionRef.current = selection.apply;
 
     // Fog of war + graded emphasis: dim/hide styling for every node, plus the
     // lazily-built "done" check marker and ambient combat flash. See
@@ -3039,7 +3027,7 @@ export function GalaxyView({
     applyVisibilityRef.current = visibility.apply;
 
     owners.apply();
-    applySelection();
+    selection.apply();
     visibility.apply();
 
     /* ------------------------------ picking -------------------------------- */
@@ -3068,7 +3056,7 @@ export function GalaxyView({
      * pulse owns the selected node's ring, so leave that one alone). */
     const setHoverStyle = (i: number, on: boolean) => {
       coronaSprites[i]?.scale.setScalar(coronaScale(i, on));
-      if (i === sel.idx) return;
+      if (i === selection.getIndex()) return;
       const ring = ownerRings[i];
       const mat = ownerRingMats[i];
       if (!ring || !mat) return;
@@ -3394,23 +3382,7 @@ export function GalaxyView({
               (0.55 + 0.45 * Math.sin(now / 1100)) *
               dimOf(galaxy.nodes[vp.i].id);
           }
-          if (sel.idx >= 0) {
-            const ring = ownerRings[sel.idx];
-            const mat = ownerRingMats[sel.idx];
-            if (ring && mat) {
-              ring.scale.setScalar(1.3 + 0.06 * Math.sin(now / 280));
-              const owner =
-                ownersRef.current[galaxy.nodes[sel.idx].id] ??
-                galaxy.nodes[sel.idx].owner;
-              mat.color
-                .copy(ownerColor(owner))
-                .lerp(
-                  new THREE.Color(0xffffff),
-                  0.3 + 0.25 * Math.sin(now / 280),
-                );
-              mat.opacity = 1;
-            }
-          }
+          selection.tick(now);
         }
         winBurst.tick(now);
 
