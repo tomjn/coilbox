@@ -40,7 +40,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
-import type { MapScene3D } from "@/lib/mapScene";
 import {
   editBase,
   editBaseLayout,
@@ -83,7 +82,6 @@ import {
   tooShallowIn,
   unstableIn,
 } from "@/placement/placements";
-import { clampToMap } from "@/placement/pointer";
 import {
   placeKind,
   previewArmed,
@@ -99,13 +97,7 @@ import {
   SelectionTools,
   turnNoteText,
 } from "@/placement/SurfaceBars";
-import {
-  focusCamera,
-  focusDistance,
-  mapSceneStatus,
-  sceneToWorld,
-  worldToScene,
-} from "@/placement/scene";
+import { mapSceneStatus } from "@/placement/scene";
 import { useLayoutPreview } from "@/placement/useLayoutPreview";
 import { useMapEditing } from "@/placement/useMapEditing";
 import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
@@ -175,7 +167,8 @@ import {
 } from "./selection";
 import { modeDigit } from "./shortcuts";
 import { startMarkers } from "./startPositions";
-import { type MapCursor, useMapKeyboard } from "./useMapKeyboard";
+import { useCameraMovement, useMapCamera } from "./useMapCamera";
+import { useMapKeyboard } from "./useMapKeyboard";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
 import { useScenarioZones } from "./useScenarioZones";
@@ -281,10 +274,7 @@ export const ScenarioMapScene = forwardRef<
   // engine's rule is arithmetic over those exact numbers (issue #1490).
   const assets = useMissionMapAssets(mapName, true);
   const { loading: enginesLoading } = usePreferredTarget();
-  const sceneRef = useRef<MapScene3D | null>(null);
-  // Also held in state, because the units layer is built from it and a ref
-  // does not re-render the hook that owns that layer.
-  const [handle, setHandle] = useState<MapScene3D | null>(null);
+  const { sceneRef, handle, onScene } = useMapCamera();
 
   /**
    * The base being watched go up, and how much of it is standing (issue #1418).
@@ -892,38 +882,14 @@ export const ScenarioMapScene = forwardRef<
   );
   thingsRef.current = things;
 
-  /**
-   * Look closely at a point on the map.
-   *
-   * The camera is put where it would be if the author had zoomed in on the
-   * place themselves, rather than moved along a path: what matters is arriving,
-   * and a scene this heavy is not one to animate a flight across.
-   */
-  const focusOn = useCallback(
-    (pos: Point, span: number) => {
-      const handle = sceneRef.current;
-      if (!handle) return;
-      const { camera, controls, render, scale } = handle;
-      const at = worldToScene(
-        pos,
-        assets.worldWidth,
-        assets.worldHeight,
-        scale,
-      );
-      const distance = Math.min(
-        controls.maxDistance,
-        Math.max(controls.minDistance, focusDistance(span) * scale),
-      );
-      // Looked at where it stands rather than at sea level, or a thing on a
-      // ridge would arrive at the top of the view and one in a valley below it.
-      const height = units.groundAt(pos) * scale;
-      const stand = focusCamera(at, distance);
-      controls.target.set(at.x, height, at.z);
-      camera.position.set(stand.x, height + stand.y, stand.z);
-      controls.update();
-      render();
-    },
-    [assets.worldWidth, assets.worldHeight, units.groundAt],
+  // Looking closely at a point on the map, the point the view is looking at,
+  // and panning it: the three ways of moving the camera that are not a drag,
+  // in `useMapCamera.ts` alongside the scene handle above, which they read
+  // through the same `sceneRef`.
+  const { focusOn, cursorAt, panBy } = useCameraMovement(
+    sceneRef,
+    { worldWidth: assets.worldWidth, worldHeight: assets.worldHeight },
+    units.groundAt,
   );
 
   /** Picking something out of the list is the same two things a click that
@@ -971,53 +937,6 @@ export const ScenarioMapScene = forwardRef<
     },
     [scenario, setSelection],
   );
-
-  const onScene = useCallback((handle: MapScene3D | null) => {
-    sceneRef.current = handle;
-    setHandle(handle);
-  }, []);
-
-  /**
-   * The point the view is looking at, which is what the keyboard aims with
-   * (issue #2269).
-   *
-   * The camera's own target rather than a cursor of its own: it is already on
-   * screen, already held over the map by the surface, and already the thing the
-   * Frame button and the contents list move. One cursor, moved by everything
-   * that moves the view.
-   */
-  const cursorAt = useCallback((): MapCursor | null => {
-    const handle = sceneRef.current;
-    if (!handle) return null;
-    const { target } = handle.controls;
-    const pos = clampToMap(
-      sceneToWorld(
-        { x: target.x, z: target.z },
-        assets.worldWidth,
-        assets.worldHeight,
-        handle.scale,
-      ),
-      assets.worldWidth,
-      assets.worldHeight,
-    );
-    return { pos, height: units.groundAt(pos) };
-  }, [assets.worldWidth, assets.worldHeight, units.groundAt]);
-
-  /** Move that point, camera and all, and draw the one frame it needs. The
-   *  surface's own clamp catches the edges of the map, off the change the
-   *  controls fire. */
-  const panBy = useCallback((delta: Point) => {
-    const handle = sceneRef.current;
-    if (!handle) return;
-    const { camera, controls, render, scale } = handle;
-    const step = { x: delta.x * scale, z: delta.z * scale };
-    controls.target.x += step.x;
-    controls.target.z += step.z;
-    camera.position.x += step.x;
-    camera.position.z += step.z;
-    controls.update();
-    render();
-  }, []);
 
   const keys = useMapKeyboard({
     things,
