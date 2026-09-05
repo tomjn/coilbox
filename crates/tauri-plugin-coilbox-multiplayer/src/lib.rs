@@ -112,7 +112,6 @@ use tachyon_conn::TachyonMarkers;
 use tachyon_friends::FriendAction;
 use tachyon_matchmaking::MatchmakingAction;
 use tachyon_messaging::Conversation;
-use tachyon_parties::PartyAction;
 use tachyon_room::{NewLobby, RoomAction, VoteChoice};
 use tauri::{
     ipc::Channel,
@@ -206,7 +205,7 @@ fn enqueue_all(registry: &Registry, server_key: &str, lines: Vec<String>) -> Cli
 ///
 /// Having a request client is what makes a connection a Tachyon one, which is
 /// the same test `mp_tachyon_request` makes.
-fn tachyon_action(
+pub(crate) fn tachyon_action(
     registry: &Registry,
     server_key: &str,
     action: TachyonAction,
@@ -1327,87 +1326,6 @@ fn mp_friend_request_list(registry: State<'_, Registry>, server_key: String) -> 
         registry.inner(),
         &server_key,
         command::friend_request_list(),
-    )
-}
-
-/// Queue one party action, refusing on a connection with no parties.
-///
-/// The seven commands differ only in the action they name, so the refusal and
-/// the Tachyon test are written once. TASServer has no parties at all, which is
-/// why there is no line to fall back to.
-fn party_action(registry: &Registry, server_key: &str, action: PartyAction) -> CliResult {
-    tachyon_action(registry, server_key, TachyonAction::Party(action))
-        .unwrap_or_else(|| CliResult::err("this server does not have parties"))
-}
-
-/// `mp_party_create`, Tachyon only: start a party of your own.
-#[tauri::command]
-fn mp_party_create(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Create)
-}
-
-/// `mp_party_leave`, Tachyon only: leave the party you are in.
-#[tauri::command]
-fn mp_party_leave(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Leave)
-}
-
-/// `mp_party_invite`, Tachyon only: ask somebody into your party.
-#[tauri::command]
-fn mp_party_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Invite(username))
-}
-
-/// `mp_party_cancel_invite`, Tachyon only: withdraw an invitation you sent.
-#[tauri::command]
-fn mp_party_cancel_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    party_action(
-        registry.inner(),
-        &server_key,
-        PartyAction::CancelInvite(username),
-    )
-}
-
-/// `mp_party_kick_member`, Tachyon only: put a member out of your party.
-#[tauri::command]
-fn mp_party_kick_member(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Kick(username))
-}
-
-/// `mp_party_accept_invite`, Tachyon only: take up an invitation. A party has no
-/// name, so it is named by the id the state carries.
-#[tauri::command]
-fn mp_party_accept_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    party_id: String,
-) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Accept(party_id))
-}
-
-/// `mp_party_decline_invite`, Tachyon only: turn an invitation down.
-#[tauri::command]
-fn mp_party_decline_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    party_id: String,
-) -> CliResult {
-    party_action(
-        registry.inner(),
-        &server_key,
-        PartyAction::Decline(party_id),
     )
 }
 
@@ -3703,13 +3621,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_unfriend,
             mp_friend_list,
             mp_friend_request_list,
-            mp_party_create,
-            mp_party_leave,
-            mp_party_invite,
-            mp_party_cancel_invite,
-            mp_party_kick_member,
-            mp_party_accept_invite,
-            mp_party_decline_invite,
+            tachyon_parties::mp_party_create,
+            tachyon_parties::mp_party_leave,
+            tachyon_parties::mp_party_invite,
+            tachyon_parties::mp_party_cancel_invite,
+            tachyon_parties::mp_party_kick_member,
+            tachyon_parties::mp_party_accept_invite,
+            tachyon_parties::mp_party_decline_invite,
             mp_matchmaking_list,
             mp_matchmaking_queue,
             mp_matchmaking_ready,

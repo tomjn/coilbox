@@ -39,8 +39,11 @@ use std::collections::HashMap;
 use coilbox_lobby_protocol::{Delta, LobbyState, Party};
 use coilbox_tachyon_protocol::types::{PartyCreateResponse, PartyState};
 use coilbox_tachyon_protocol::TachyonMessage;
+use picoframe_core::CliResult;
 use serde_json::{json, Value};
+use tauri::State;
 
+use crate::conn::{Registry, TachyonAction};
 use crate::tachyon_users::{names_in, SUBSCRIBE_LIMIT};
 
 /// The party we are in and the ones we have been asked into, by the user ids
@@ -413,6 +416,87 @@ fn project(parties: &Parties, state: &mut LobbyState) -> Vec<Delta> {
     state.party = current;
     state.party_invites = invites;
     vec![Delta::PartyChanged]
+}
+
+/// Queue one party action, refusing on a connection with no parties.
+///
+/// The seven commands differ only in the action they name, so the refusal and
+/// the Tachyon test are written once. TASServer has no parties at all, which is
+/// why there is no line to fall back to.
+fn party_action(registry: &Registry, server_key: &str, action: PartyAction) -> CliResult {
+    crate::tachyon_action(registry, server_key, TachyonAction::Party(action))
+        .unwrap_or_else(|| CliResult::err("this server does not have parties"))
+}
+
+/// `mp_party_create`, Tachyon only: start a party of your own.
+#[tauri::command]
+pub(crate) fn mp_party_create(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    party_action(registry.inner(), &server_key, PartyAction::Create)
+}
+
+/// `mp_party_leave`, Tachyon only: leave the party you are in.
+#[tauri::command]
+pub(crate) fn mp_party_leave(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    party_action(registry.inner(), &server_key, PartyAction::Leave)
+}
+
+/// `mp_party_invite`, Tachyon only: ask somebody into your party.
+#[tauri::command]
+pub(crate) fn mp_party_invite(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    party_action(registry.inner(), &server_key, PartyAction::Invite(username))
+}
+
+/// `mp_party_cancel_invite`, Tachyon only: withdraw an invitation you sent.
+#[tauri::command]
+pub(crate) fn mp_party_cancel_invite(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    party_action(
+        registry.inner(),
+        &server_key,
+        PartyAction::CancelInvite(username),
+    )
+}
+
+/// `mp_party_kick_member`, Tachyon only: put a member out of your party.
+#[tauri::command]
+pub(crate) fn mp_party_kick_member(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    party_action(registry.inner(), &server_key, PartyAction::Kick(username))
+}
+
+/// `mp_party_accept_invite`, Tachyon only: take up an invitation. A party has no
+/// name, so it is named by the id the state carries.
+#[tauri::command]
+pub(crate) fn mp_party_accept_invite(
+    registry: State<'_, Registry>,
+    server_key: String,
+    party_id: String,
+) -> CliResult {
+    party_action(registry.inner(), &server_key, PartyAction::Accept(party_id))
+}
+
+/// `mp_party_decline_invite`, Tachyon only: turn an invitation down.
+#[tauri::command]
+pub(crate) fn mp_party_decline_invite(
+    registry: State<'_, Registry>,
+    server_key: String,
+    party_id: String,
+) -> CliResult {
+    party_action(
+        registry.inner(),
+        &server_key,
+        PartyAction::Decline(party_id),
+    )
 }
 
 #[cfg(test)]
