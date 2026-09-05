@@ -228,24 +228,18 @@ pub fn build_unit_models_args(
     args
 }
 
-/// What a render was drawn from, for a caller that already holds it from
-/// `--unit-render-keys` (issue #1720).
-///
-/// Given, the worker does not mount the game's archive set at all, which is a
-/// second or more per unit on a game like Beyond All Reason. All three travel
-/// together and the worker refuses two of them.
-pub struct RenderSourceArgs<'a> {
-    pub model_digest: &'a str,
-    pub source_member: &'a str,
-    pub source_archive: &'a str,
-}
-
 /// Build args for `--unit-render` mode: the unit whose render this is, the frame
 /// it was taken in, the file the pixels are in, and where the encoded asset goes.
 ///
 /// The pixels travel by path rather than as an argument because a 256 square
 /// render is a quarter of a megabyte of RGBA, which is past what a command line
 /// takes on any platform.
+///
+/// The mode's own fields and cross field rules (the render source in
+/// `source` is all three fields or none, checked by the worker's
+/// `from_args`) live once in `coilbox_unitsync_worker::UnitRenderArgs`, so
+/// this function only has to add `--lib`/`--datadir`, which every mode takes
+/// and `Mode::to_args` does not include (issue #2448).
 #[allow(clippy::too_many_arguments)]
 pub fn build_unit_render_args(
     lib: &str,
@@ -260,38 +254,23 @@ pub fn build_unit_render_args(
     width: u32,
     height: u32,
     asset_dir: &str,
-    source: Option<RenderSourceArgs<'_>>,
+    source: Option<coilbox_unitsync_worker::RenderSource>,
 ) -> Vec<String> {
+    let mode = coilbox_unitsync_worker::Mode::UnitRender(coilbox_unitsync_worker::UnitRenderArgs {
+        game: game.into(),
+        object: object.into(),
+        angle: angle.into(),
+        footprint_x,
+        footprint_z,
+        renderer_version,
+        pixels: pixels.into(),
+        width,
+        height,
+        asset_dir: asset_dir.into(),
+        source,
+    });
     let mut args = build_args(lib, datadir);
-    args.push("--unit-render".into());
-    args.push("--game".into());
-    args.push(game.into());
-    args.push("--object".into());
-    args.push(object.into());
-    args.push("--angle".into());
-    args.push(angle.into());
-    args.push("--footprint-x".into());
-    args.push(footprint_x.to_string());
-    args.push("--footprint-z".into());
-    args.push(footprint_z.to_string());
-    args.push("--renderer-version".into());
-    args.push(renderer_version.to_string());
-    args.push("--pixels".into());
-    args.push(pixels.into());
-    args.push("--width".into());
-    args.push(width.to_string());
-    args.push("--height".into());
-    args.push(height.to_string());
-    args.push("--asset-dir".into());
-    args.push(asset_dir.into());
-    if let Some(source) = source {
-        args.push("--model-digest".into());
-        args.push(source.model_digest.into());
-        args.push("--source-member".into());
-        args.push(source.source_member.into());
-        args.push("--source-archive".into());
-        args.push(source.source_archive.into());
-    }
+    args.extend(mode.to_args());
     args
 }
 
@@ -898,82 +877,92 @@ mod tests {
         assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
     }
 
-    /// The frame has to reach the worker intact, because the worker refusing a
-    /// mis-framed render is the only check on the rule. A footprint dropped or
-    /// transposed on the way would either fail every render or pass a wrong one.
+    /// The whole point of sharing `UnitRenderArgs` with the worker: what
+    /// `build_unit_render_args` writes, the worker's own `from_args` reads
+    /// back whole. A test that only checks a flag appears at some position
+    /// cannot catch the sidecar and the worker disagreeing about the mode's
+    /// fields, and this one can (issue #2448).
     #[test]
-    fn build_unit_render_args_carry_the_unit_the_frame_and_the_pixels() {
+    fn build_unit_render_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UnitRenderArgs;
+
+        let expected = UnitRenderArgs {
+            game: "BAR.sdd".into(),
+            object: "armcom.s3o".into(),
+            angle: "top".into(),
+            footprint_x: 3,
+            footprint_z: 2,
+            renderer_version: 1,
+            pixels: "/tmp/pixels.bin".into(),
+            width: 255,
+            height: 204,
+            asset_dir: "/assets".into(),
+            source: None,
+        };
         let a = build_unit_render_args(
             "/eng/libunitsync.so",
             "/data",
-            "BAR.sdd",
-            "armcom.s3o",
-            "top",
-            3,
-            2,
-            1,
-            "/tmp/pixels.bin",
-            255,
-            204,
-            "/assets",
-            None,
+            &expected.game,
+            &expected.object,
+            &expected.angle,
+            expected.footprint_x,
+            expected.footprint_z,
+            expected.renderer_version,
+            &expected.pixels,
+            expected.width,
+            expected.height,
+            &expected.asset_dir,
+            expected.source.clone(),
         );
-        let after = |flag: &str| {
-            let at = a.iter().position(|x| x == flag).expect(flag);
-            a[at + 1].clone()
-        };
-        assert!(a.contains(&"--unit-render".to_string()));
-        assert_eq!(after("--game"), "BAR.sdd");
-        assert_eq!(after("--object"), "armcom.s3o");
-        assert_eq!(after("--angle"), "top");
-        assert_eq!(after("--footprint-x"), "3");
-        assert_eq!(after("--footprint-z"), "2");
-        assert_eq!(after("--renderer-version"), "1");
-        assert_eq!(after("--pixels"), "/tmp/pixels.bin");
-        assert_eq!(after("--width"), "255");
-        assert_eq!(after("--height"), "204");
-        assert_eq!(after("--asset-dir"), "/assets");
-        // A caller with no key still gets the mounting path, so nothing that
-        // exists today changes (issue #1720).
-        assert!(!a.contains(&"--model-digest".to_string()));
-        assert!(!a.contains(&"--source-member".to_string()));
-        assert!(!a.contains(&"--source-archive".to_string()));
+        assert!(
+            a.contains(&"--lib".to_string()),
+            "the shared lib/datadir args are still prepended"
+        );
+        let recovered = UnitRenderArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, expected);
     }
 
-    /// A caller that already has the key from `--unit-render-keys` hands it down,
-    /// and all three fields have to arrive: two of them is refused by the worker
-    /// rather than quietly mounting (issue #1720).
+    /// A caller that already has the key from `--unit-render-keys` hands it
+    /// down, and it has to round trip whole alongside the frame, not just
+    /// arrive somewhere in the argv (issue #1720).
     #[test]
-    fn build_unit_render_args_carry_a_handed_down_key_whole() {
+    fn build_unit_render_args_round_trips_a_handed_down_key_whole() {
+        use coilbox_unitsync_worker::{RenderSource, UnitRenderArgs};
+
+        let expected = UnitRenderArgs {
+            game: "BAR.sdd".into(),
+            object: "armcom.s3o".into(),
+            angle: "top".into(),
+            footprint_x: 3,
+            footprint_z: 2,
+            renderer_version: 1,
+            pixels: "/tmp/pixels.bin".into(),
+            width: 255,
+            height: 204,
+            asset_dir: "/assets".into(),
+            source: Some(RenderSource {
+                model_digest: "d5f0".into(),
+                source_member: "objects3d/units/armcom.s3o".into(),
+                source_archive: "Beyond All Reason test-30922".into(),
+            }),
+        };
         let a = build_unit_render_args(
             "/eng/libunitsync.so",
             "/data",
-            "BAR.sdd",
-            "armcom.s3o",
-            "top",
-            3,
-            2,
-            1,
-            "/tmp/pixels.bin",
-            255,
-            204,
-            "/assets",
-            Some(RenderSourceArgs {
-                model_digest: "d5f0",
-                source_member: "objects3d/units/armcom.s3o",
-                source_archive: "Beyond All Reason test-30922",
-            }),
+            &expected.game,
+            &expected.object,
+            &expected.angle,
+            expected.footprint_x,
+            expected.footprint_z,
+            expected.renderer_version,
+            &expected.pixels,
+            expected.width,
+            expected.height,
+            &expected.asset_dir,
+            expected.source.clone(),
         );
-        let after = |flag: &str| {
-            let at = a.iter().position(|x| x == flag).expect(flag);
-            a[at + 1].clone()
-        };
-        assert_eq!(after("--model-digest"), "d5f0");
-        assert_eq!(after("--source-member"), "objects3d/units/armcom.s3o");
-        assert_eq!(after("--source-archive"), "Beyond All Reason test-30922");
-        // And the frame is still the frame, since the key does not replace it.
-        assert_eq!(after("--footprint-x"), "3");
-        assert_eq!(after("--width"), "255");
+        let recovered = UnitRenderArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, expected);
     }
 
     /// The key mode's whole point is one call for many units, so the units go by
