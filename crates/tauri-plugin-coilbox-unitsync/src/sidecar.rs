@@ -289,6 +289,12 @@ pub fn build_unit_render_args(
 ///
 /// An empty list leaves `--angles` off, which is how the worker is told to key
 /// every angle the vocabulary lists (issue #1951).
+///
+/// The mode's own fields and this rule (the units file is required, an empty
+/// `angles` means every angle) live once in
+/// `coilbox_unitsync_worker::UnitRenderKeysArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448).
 pub fn build_unit_render_keys_args(
     lib: &str,
     datadir: &str,
@@ -297,18 +303,16 @@ pub fn build_unit_render_keys_args(
     angles: &[String],
     renderer_version: u32,
 ) -> Vec<String> {
+    let mode = coilbox_unitsync_worker::Mode::UnitRenderKeys(
+        coilbox_unitsync_worker::UnitRenderKeysArgs {
+            game: game.into(),
+            units_file: units_file.into(),
+            angles: angles.to_vec(),
+            renderer_version,
+        },
+    );
     let mut args = build_args(lib, datadir);
-    args.push("--unit-render-keys".into());
-    args.push("--game".into());
-    args.push(game.into());
-    args.push("--units-file".into());
-    args.push(units_file.into());
-    if !angles.is_empty() {
-        args.push("--angles".into());
-        args.push(angles.join(","));
-    }
-    args.push("--renderer-version".into());
-    args.push(renderer_version.to_string());
+    args.extend(mode.to_args());
     args
 }
 
@@ -981,39 +985,60 @@ mod tests {
         assert_eq!(recovered, expected);
     }
 
-    /// The key mode's whole point is one call for many units, so the units go by
-    /// file and the angles and renderer travel with them: a key made for the
-    /// wrong renderer would report the hub's corpus as changed.
+    /// The whole point of sharing `UnitRenderKeysArgs` with the worker: what
+    /// `build_unit_render_keys_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag appears at some
+    /// position cannot catch the sidecar and the worker disagreeing about the
+    /// mode's fields, and this one can (issue #2448).
     #[test]
-    fn build_unit_render_keys_args_carry_the_game_the_units_and_the_renderer() {
-        let keys = |angles: &[&str]| {
-            build_unit_render_keys_args(
-                "/eng/libunitsync.so",
-                "/data",
-                "BAR.sdd",
-                "/tmp/units.json",
-                &angles.iter().map(|a| (*a).to_string()).collect::<Vec<_>>(),
-                1,
-            )
+    fn build_unit_render_keys_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UnitRenderKeysArgs;
+
+        let expected = UnitRenderKeysArgs {
+            game: "BAR.sdd".into(),
+            units_file: "/tmp/units.json".into(),
+            angles: vec!["top".into(), "angled".into()],
+            renderer_version: 1,
         };
-        let a = keys(&["top", "angled"]);
-        let after = |flag: &str| {
-            let at = a.iter().position(|x| x == flag).expect(flag);
-            a[at + 1].clone()
-        };
-        assert!(a.contains(&"--unit-render-keys".to_string()));
-        assert_eq!(after("--game"), "BAR.sdd");
-        assert_eq!(after("--units-file"), "/tmp/units.json");
-        assert_eq!(after("--angles"), "top,angled");
-        assert_eq!(after("--renderer-version"), "1");
+        let a = build_unit_render_keys_args(
+            "/eng/libunitsync.so",
+            "/data",
+            &expected.game,
+            &expected.units_file,
+            &expected.angles,
+            expected.renderer_version,
+        );
+        assert!(
+            a.contains(&"--lib".to_string()),
+            "the shared lib/datadir args are still prepended"
+        );
         // Nothing is drawn or written, so neither belongs on this call.
         assert!(!a.contains(&"--pixels".to_string()));
         assert!(!a.contains(&"--asset-dir".to_string()));
+        let recovered = UnitRenderKeysArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, expected);
 
-        // No angles named is how a caller says every angle, so the flag has to be
-        // absent rather than empty: an empty `--angles` would key nothing at all
-        // and read to the caller as the hub already holding every picture.
-        assert!(!keys(&[]).contains(&"--angles".to_string()));
+        // No angles named is how a caller says every angle, so the flag has to
+        // be absent rather than empty, and that has to round trip too (issue
+        // #1951): an empty `--angles` would key nothing at all and read to the
+        // caller as the hub already holding every picture.
+        let none_named = UnitRenderKeysArgs {
+            angles: Vec::new(),
+            ..expected.clone()
+        };
+        let b = build_unit_render_keys_args(
+            "/eng/libunitsync.so",
+            "/data",
+            &none_named.game,
+            &none_named.units_file,
+            &none_named.angles,
+            none_named.renderer_version,
+        );
+        assert!(!b.contains(&"--angles".to_string()));
+        assert_eq!(
+            UnitRenderKeysArgs::from_args(&b).expect("valid argv"),
+            none_named
+        );
     }
 
     #[test]

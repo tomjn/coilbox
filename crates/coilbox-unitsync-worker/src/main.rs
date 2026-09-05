@@ -137,21 +137,12 @@ struct Args {
     /// with the sidecar plugin that builds this flag's argv (issue #2448).
     unit_render: Option<Mode>,
     /// `--unit-render-keys`: what a batch of units' renders would be called,
-    /// without drawing any of them. Takes the units in `--units-file`, the angles
-    /// in `--angles` and the renderer in `--renderer-version`.
-    unit_render_keys: bool,
-    /// A JSON file of `{ unit, object, footprintX, footprintZ }` for
-    /// `--unit-render-keys`, or of `objectname` strings for `--unit-models`. A
-    /// file rather than an argument because a whole game's roster is past what
-    /// Windows takes on a command line.
-    units_file: Option<String>,
-    /// The render angles for `--unit-render-keys`, comma separated and without
-    /// the `render:` prefix. Defaults to every angle the vocabulary lists, since
-    /// the mount they share is the cost.
-    angles: Option<Vec<String>>,
-    /// Which renderer drew the pixels, for the render's `source_hash`. Shared
-    /// by `--unit-render` (via `Mode::UnitRender`) and `--unit-render-keys`.
-    renderer_version: u32,
+    /// without drawing any of them. Its fields and cross field rule (needs
+    /// `--units-file`, an absent `--angles` means every angle the vocabulary
+    /// lists) live once in `coilbox_unitsync_worker::UnitRenderKeysArgs`,
+    /// shared with the sidecar plugin that builds this flag's argv (issue
+    /// #2448).
+    unit_render_keys: Option<Mode>,
     object: Option<String>,
     /// `--unit`: one unit definition's own key, for `--unit-script`. Not the
     /// `objectname` the model reads: a script is named by the definition and a
@@ -517,40 +508,37 @@ fn run() -> i32 {
 
     // Unit render keys: what a batch of units' renders would be called, without
     // drawing any of them. Keys off --game like the render mode, so it is
-    // checked alongside them.
-    if args.unit_render_keys {
-        let Some(units_file) = args.units_file.clone() else {
-            renderkey::emit_error("--unit-render-keys needs --units-file <json>".into());
-            return 1;
-        };
-        let requests: Vec<model::UnitRenderKeyRequest> = match std::fs::read_to_string(&units_file)
-            .map_err(|e| format!("could not read units file {units_file}: {e}"))
-            .and_then(|raw| {
-                serde_json::from_str(&raw)
-                    .map_err(|e| format!("could not parse units file {units_file}: {e}"))
-            }) {
-            Ok(v) => v,
-            Err(e) => {
-                renderkey::emit_error(e);
-                return 1;
-            }
-        };
-        let game_archive = args.game.clone().unwrap_or_default();
+    // checked alongside them. Both the units file requirement and the empty
+    // `angles` shape now live in `UnitRenderKeysArgs::from_args`, not here.
+    if let Some(Mode::UnitRenderKeys(mode)) = &args.unit_render_keys {
+        let requests: Vec<model::UnitRenderKeyRequest> =
+            match std::fs::read_to_string(&mode.units_file)
+                .map_err(|e| format!("could not read units file {}: {e}", mode.units_file))
+                .and_then(|raw| {
+                    serde_json::from_str(&raw)
+                        .map_err(|e| format!("could not parse units file {}: {e}", mode.units_file))
+                }) {
+                Ok(v) => v,
+                Err(e) => {
+                    renderkey::emit_error(e);
+                    return 1;
+                }
+            };
         // Every angle the vocabulary lists unless the caller narrows it, since a
         // batch costs one mount whether it answers for one angle or four
         // (issue #1951).
-        let angles = match args.angles.clone() {
-            Some(named) => named,
-            None => coilbox_assets::vocabulary().unit.render_angles.clone(),
+        let angles = if mode.angles.is_empty() {
+            coilbox_assets::vocabulary().unit.render_angles.clone()
+        } else {
+            mode.angles.clone()
         };
-        let renderer_version = args.renderer_version;
         return match std::panic::catch_unwind(|| {
             renderkey::render(
                 &args.lib,
-                &game_archive,
+                &mode.game,
                 &requests,
                 &angles,
-                renderer_version,
+                mode.renderer_version,
             )
         }) {
             Ok(out) => {
@@ -971,10 +959,13 @@ fn parse_args() -> Result<Args, String> {
     // loop does not reject them as unknown, but their values are otherwise
     // unused here.
     let mut unit_render_flag = false;
-    let mut unit_render_keys = false;
-    let mut units_file = None;
-    let mut angles = None;
-    let mut renderer_version = 0u32;
+    // `--unit-render-keys`' own flags (units file, angles, renderer version)
+    // are not collected into locals here for its own use, the same treatment
+    // `--unit-models` and `--unit-render` got above: `Mode::UnitRenderKeys`'s
+    // `from_args` below re-scans `raw` for those (issue #2448). `--renderer-version`
+    // is also `--unit-render`'s own flag, so its match arm below stays a
+    // shared consuming placeholder rather than belonging to either mode alone.
+    let mut unit_render_keys_flag = false;
     let mut object = None;
     let mut unit = None;
     let mut units: Vec<String> = Vec::new();
@@ -1038,26 +1029,21 @@ fn parse_args() -> Result<Args, String> {
             "--model-digest" | "--source-member" | "--source-archive" | "--angle" => {
                 it.next();
             }
-            "--unit-render-keys" => unit_render_keys = true,
-            "--units-file" => units_file = it.next(),
-            "--angles" => {
-                angles = it.next().map(|list| {
-                    list.split(',')
-                        .map(str::trim)
-                        .filter(|a| !a.is_empty())
-                        .map(str::to_owned)
-                        .collect()
-                })
+            "--unit-render-keys" => unit_render_keys_flag = true,
+            // Consumed by `Mode::UnitRenderKeys`'s `from_args` below, not
+            // stored here.
+            "--units-file" | "--angles" => {
+                it.next();
             }
             // Consumed by `Mode::UnitRender`'s `from_args` below, not stored here.
             "--pixels" | "--width" | "--height" | "--footprint-x" | "--footprint-z" => {
                 it.next();
             }
+            // `--renderer-version` is `Mode::UnitRender`'s and
+            // `Mode::UnitRenderKeys`'s own flag: each re-scans `raw` for it in
+            // its own `from_args`, so this arm only has to consume the token.
             "--renderer-version" => {
-                renderer_version = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or("--renderer-version needs an integer")?
+                it.next();
             }
             "--object" => object = it.next(),
             "--unit" => unit = it.next(),
@@ -1142,10 +1128,13 @@ fn parse_args() -> Result<Args, String> {
         } else {
             None
         },
-        unit_render_keys,
-        units_file,
-        angles,
-        renderer_version,
+        unit_render_keys: if unit_render_keys_flag {
+            Some(Mode::UnitRenderKeys(
+                coilbox_unitsync_worker::UnitRenderKeysArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         object,
         unit,
         units,
@@ -1183,7 +1172,6 @@ fn absolutize(args: &mut Args) {
         args.extract.as_mut(),
         args.source_file.as_mut(),
         args.chunks_file.as_mut(),
-        args.units_file.as_mut(),
     ]
     .into_iter()
     .flatten()
@@ -1211,6 +1199,13 @@ fn absolutize(args: &mut Args) {
         }
         if let Some(abs) = absolute_path(&mode.cache_dir) {
             mode.cache_dir = abs;
+        }
+    }
+    // `Mode::UnitRenderKeys` holds its own copy of `--units-file`, read
+    // separately from `raw` in `parse_args`, so it needs the same treatment.
+    if let Some(Mode::UnitRenderKeys(mode)) = args.unit_render_keys.as_mut() {
+        if let Some(abs) = absolute_path(&mode.units_file) {
+            mode.units_file = abs;
         }
     }
 }
@@ -1582,10 +1577,7 @@ mod tests {
             unit_model: false,
             unit_models: None,
             unit_render: None,
-            unit_render_keys: false,
-            units_file: None,
-            angles: None,
-            renderer_version: 0,
+            unit_render_keys: None,
             object: None,
             unit: None,
             unit_script: false,

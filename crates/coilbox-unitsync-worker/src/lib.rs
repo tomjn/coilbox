@@ -13,11 +13,11 @@
 //! turns a mode's fields into the flags `main.rs` reads, for the sidecar to
 //! build a process argv from. `from_args` reads those same flags back into the
 //! typed fields, applying whatever cross field rules the mode has, for
-//! `parse_args` to call. Only `--unit-render` has migrated so far. The other
-//! 25 modes still have their flags written by hand in the three old places,
-//! and move here one family at a time, matching how this crate already ships
-//! (135 commits since May 2026 says a sweeping rewrite is not this crate's
-//! style).
+//! `parse_args` to call. `--unit-render`, `--unit-models` and
+//! `--unit-render-keys` have migrated so far. The other 23 modes still have
+//! their flags written by hand in the three old places, and move here one
+//! family at a time, matching how this crate already ships (135 commits since
+//! May 2026 says a sweeping rewrite is not this crate's style).
 
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new
@@ -27,6 +27,7 @@
 pub enum Mode {
     UnitRender(UnitRenderArgs),
     UnitModels(UnitModelsArgs),
+    UnitRenderKeys(UnitRenderKeysArgs),
 }
 
 impl Mode {
@@ -37,6 +38,7 @@ impl Mode {
         match self {
             Mode::UnitRender(args) => args.to_args(),
             Mode::UnitModels(args) => args.to_args(),
+            Mode::UnitRenderKeys(args) => args.to_args(),
         }
     }
 }
@@ -329,6 +331,107 @@ impl UnitModelsArgs {
     }
 }
 
+/// `--unit-render-keys`: what a batch of units' renders would be called,
+/// without drawing any of them (issues #1666, #1672, #1951). Keys the units by
+/// the digest of their models, which the render itself would also need, but
+/// does none of the drawing or encoding, so a have check can ask before
+/// paying for either.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnitRenderKeysArgs {
+    pub game: String,
+    /// A JSON file of `{ unit, object, footprintX, footprintZ }`, one per unit
+    /// to key. A file rather than an argument for the same reason
+    /// `--unit-models` takes one: a blueprint's roster is past what Windows
+    /// takes on a command line. Required: there is nothing to key without it.
+    pub units_file: String,
+    /// Render angles without the `render:` prefix. Empty means every angle
+    /// the vocabulary lists, since the mount is a cost every angle shares
+    /// (issue #1951). An empty list is also what an absent `--angles`
+    /// recovers as, so the flag is left off the argv entirely rather than
+    /// sent empty.
+    pub angles: Vec<String>,
+    /// Which renderer would draw the pixels, for the render's `source_hash`.
+    pub renderer_version: u32,
+}
+
+impl UnitRenderKeysArgs {
+    /// Build the flags for `--unit-render-keys` mode: the game the units come
+    /// out of, the file naming them, the angles to key (when narrowed), and
+    /// the renderer they would be drawn by.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--unit-render-keys".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--units-file".to_string(),
+            self.units_file.clone(),
+            "--renderer-version".to_string(),
+            self.renderer_version.to_string(),
+        ];
+        if !self.angles.is_empty() {
+            args.push("--angles".to_string());
+            args.push(self.angles.join(","));
+        }
+        args
+    }
+
+    /// Recover a `--unit-render-keys` invocation from a worker argv. As with
+    /// [`UnitModelsArgs::from_args`], `args` may be exactly what
+    /// [`UnitRenderKeysArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// `--units-file` is required: there is nothing to key without it. A
+    /// missing `--angles` recovers as an empty list, which `main.rs` reads as
+    /// every angle the vocabulary lists (issue #1951). That defaulting stays
+    /// in `main.rs` rather than here, since it needs the shared vocabulary
+    /// this crate's `from_args` functions otherwise have no reason to reach
+    /// for.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut units_file = None;
+        let mut angles: Vec<String> = Vec::new();
+        let mut renderer_version = 0u32;
+
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--units-file" => units_file = it.next().cloned(),
+                "--angles" => {
+                    angles = it
+                        .next()
+                        .map(|list| {
+                            list.split(',')
+                                .map(str::trim)
+                                .filter(|a| !a.is_empty())
+                                .map(str::to_owned)
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                }
+                "--renderer-version" => {
+                    renderer_version = it
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                        .ok_or("--renderer-version needs an integer")?
+                }
+                _ => {}
+            }
+        }
+
+        let Some(units_file) = units_file else {
+            return Err("--unit-render-keys needs --units-file <json>".into());
+        };
+
+        Ok(UnitRenderKeysArgs {
+            game: game.unwrap_or_default(),
+            units_file,
+            angles,
+            renderer_version,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,5 +629,71 @@ mod tests {
     fn unit_models_dispatches_to_args_to_its_variant() {
         let a = unit_models_args();
         assert_eq!(Mode::UnitModels(a.clone()).to_args(), a.to_args());
+    }
+
+    fn unit_render_keys_args() -> UnitRenderKeysArgs {
+        UnitRenderKeysArgs {
+            game: "BAR.sdd".into(),
+            units_file: "/tmp/units.json".into(),
+            angles: vec!["top".into(), "angled".into()],
+            renderer_version: 1,
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn unit_render_keys_round_trips_through_to_args_and_from_args() {
+        let original = unit_render_keys_args();
+        let recovered = UnitRenderKeysArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// No angles named is how a caller says every angle, so the flag has to
+    /// be absent rather than empty, and that has to round trip as an empty
+    /// list rather than as a missing value (issue #1951).
+    #[test]
+    fn unit_render_keys_with_no_angles_named_omits_the_flag_and_round_trips_empty() {
+        let original = UnitRenderKeysArgs {
+            angles: Vec::new(),
+            ..unit_render_keys_args()
+        };
+        let a = original.to_args();
+        assert!(!a.contains(&"--angles".to_string()));
+        let recovered = UnitRenderKeysArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// `from_args` is also handed a full process argv, carrying `--lib` and
+    /// `--datadir`, neither of which this mode owns.
+    #[test]
+    fn unit_render_keys_ignores_unrecognised_tokens_around_its_own_flags() {
+        let mut argv = vec![
+            "--lib".to_string(),
+            "/engines/one/libunitsync.so".to_string(),
+            "--datadir".to_string(),
+            "/data".to_string(),
+        ];
+        argv.extend(unit_render_keys_args().to_args());
+        let recovered = UnitRenderKeysArgs::from_args(&argv).expect("valid argv");
+        assert_eq!(recovered, unit_render_keys_args());
+    }
+
+    /// There is nothing to key without a units file, so a missing one is
+    /// refused rather than treated as a quiet no-op.
+    #[test]
+    fn unit_render_keys_missing_units_file_is_refused() {
+        let mut a = unit_render_keys_args().to_args();
+        let at = a.iter().position(|x| x == "--units-file").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(UnitRenderKeysArgs::from_args(&a).is_err());
+    }
+
+    #[test]
+    fn unit_render_keys_dispatches_to_args_to_its_variant() {
+        let a = unit_render_keys_args();
+        assert_eq!(Mode::UnitRenderKeys(a.clone()).to_args(), a.to_args());
     }
 }
