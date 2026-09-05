@@ -100,10 +100,19 @@ pub fn build_minimap_args(
 
 /// Build args for batch `--game-headers` mode: resolve every game's loadpicture
 /// art in one session, with the optional on-disk cache directory.
+///
+/// The mode's own field lives once in
+/// `coilbox_unitsync_worker::GameHeadersArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448).
 pub fn build_game_headers_args(lib: &str, datadir: &str, cache_dir: Option<&str>) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--game-headers".into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::GameHeaders(coilbox_unitsync_worker::GameHeadersArgs {
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -114,6 +123,11 @@ pub fn build_game_headers_args(lib: &str, datadir: &str, cache_dir: Option<&str>
 /// and writes it there. Only the blueprint backfill asks for that (issue #1636).
 /// Every other caller wants the `data:` icon and nothing on disk, and encoding a
 /// WebP for a picture nobody is going to send is work for nothing.
+///
+/// The mode's fields live once in
+/// `coilbox_unitsync_worker::UnitBuildpicsArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448).
 pub fn build_unit_buildpics_args(
     lib: &str,
     datadir: &str,
@@ -123,21 +137,24 @@ pub fn build_unit_buildpics_args(
     asset_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--unit-buildpics".into());
-    args.push("--game".into());
-    args.push(game.into());
-    args.push("--units".into());
-    args.push(units.join(","));
-    push_cache_dir(&mut args, cache_dir);
-    if let Some(dir) = asset_dir {
-        args.push("--asset-dir".into());
-        args.push(dir.into());
-    }
+    args.extend(
+        coilbox_unitsync_worker::Mode::UnitBuildpics(coilbox_unitsync_worker::UnitBuildpicsArgs {
+            game: game.into(),
+            units: units.to_vec(),
+            cache_dir: cache_dir.map(String::from),
+            asset_dir: asset_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
 /// Build args for `--faction-logos` mode: the game whose `Sidepics/<side>` emblems
 /// to resolve, the comma-joined side names, and the optional on-disk cache dir.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::FactionLogosArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode
+/// takes and `Mode::to_args` does not include (issue #2448).
 pub fn build_faction_logos_args(
     lib: &str,
     datadir: &str,
@@ -146,17 +163,23 @@ pub fn build_faction_logos_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--faction-logos".into());
-    args.push("--game".into());
-    args.push(game.into());
-    args.push("--sides".into());
-    args.push(sides.join(","));
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::FactionLogos(coilbox_unitsync_worker::FactionLogosArgs {
+            game: game.into(),
+            sides: sides.to_vec(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
 /// Build args for `--unit-dataset` mode: the game whose unit graph (units +
 /// `buildoptions` edges) to read, plus the optional on-disk info-blob cache dir.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::UnitDatasetArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode
+/// takes and `Mode::to_args` does not include (issue #2448).
 pub fn build_unit_dataset_args(
     lib: &str,
     datadir: &str,
@@ -164,16 +187,23 @@ pub fn build_unit_dataset_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--unit-dataset".into());
-    args.push("--game".into());
-    args.push(game.into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::UnitDataset(coilbox_unitsync_worker::UnitDatasetArgs {
+            game: game.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
 /// Build args for `--unit-model` mode: the game whose archive holds the model,
 /// the unitdef `objectname` naming it, plus the directory extracted textures are
 /// cached in (and served from).
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::UnitModelArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode
+/// takes and `Mode::to_args` does not include (issue #2448).
 pub fn build_unit_model_args(
     lib: &str,
     datadir: &str,
@@ -182,12 +212,14 @@ pub fn build_unit_model_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--unit-model".into());
-    args.push("--game".into());
-    args.push(game.into());
-    args.push("--object".into());
-    args.push(object.into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::UnitModel(coilbox_unitsync_worker::UnitModelArgs {
+            game: game.into(),
+            object: object.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -196,13 +228,19 @@ pub fn build_unit_model_args(
 /// The unit's own key rather than its `objectname`, because a script is named by
 /// the definition and a model by a field inside it, and games regularly use
 /// different words for the two.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::UnitScriptArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode
+/// takes and `Mode::to_args` does not include (issue #2448).
 pub fn build_unit_script_args(lib: &str, datadir: &str, game: &str, unit: &str) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--unit-script".into());
-    args.push("--game".into());
-    args.push(game.into());
-    args.push("--unit".into());
-    args.push(unit.into());
+    args.extend(
+        coilbox_unitsync_worker::Mode::UnitScript(coilbox_unitsync_worker::UnitScriptArgs {
+            game: game.into(),
+            unit: unit.into(),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -406,6 +444,10 @@ pub fn build_metalmap_args(
 
 /// Build args for batch-thumbnail mode: scan args plus the thumbnail mip level and
 /// the optional on-disk PNG cache directory.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::ThumbnailsArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode
+/// takes and `Mode::to_args` does not include (issue #2448).
 pub fn build_thumbnails_args(
     lib: &str,
     datadir: &str,
@@ -413,10 +455,13 @@ pub fn build_thumbnails_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--thumbnails".into());
-    args.push("--mip".into());
-    args.push(mip.to_string());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Thumbnails(coilbox_unitsync_worker::ThumbnailsArgs {
+            mip,
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -571,13 +616,19 @@ pub fn build_map_skybox_args(lib: &str, datadir: &str, map_name: &str) -> Vec<St
 
 /// Build args for skirmish-AI mode: scan args plus the `--skirmish-ais` flag and,
 /// when a game is given, `--game <archive>` so its Lua AIs are enumerated too.
+///
+/// The mode's field and its empty-string filter live once in
+/// `coilbox_unitsync_worker::SkirmishAisArgs`, so this function only has to
+/// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
+/// not include (issue #2448).
 pub fn build_skirmish_ai_args(lib: &str, datadir: &str, game: Option<&str>) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--skirmish-ais".into());
-    if let Some(game) = game.filter(|g| !g.is_empty()) {
-        args.push("--game".into());
-        args.push(game.into());
-    }
+    args.extend(
+        coilbox_unitsync_worker::Mode::SkirmishAis(coilbox_unitsync_worker::SkirmishAisArgs {
+            game: game.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -690,24 +741,56 @@ mod tests {
         );
     }
 
+    /// What `build_thumbnails_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
     #[test]
-    fn thumbnails_args_append_cache_dir_when_present() {
+    fn build_thumbnails_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::ThumbnailsArgs;
+
         let with =
             build_thumbnails_args("/eng/libunitsync.dylib", "/data", 3, Some("/cache/thumbs"));
-        assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/thumbs"]);
+        assert!(with.contains(&"--lib".to_string()) && with.contains(&"--datadir".to_string()));
+        let recovered = ThumbnailsArgs::from_args(&with).expect("valid argv");
+        assert_eq!(
+            recovered,
+            ThumbnailsArgs {
+                mip: 3,
+                cache_dir: Some("/cache/thumbs".into()),
+            }
+        );
+
         let without = build_thumbnails_args("/eng/libunitsync.dylib", "/data", 3, None);
         assert!(!without.iter().any(|a| a == "--cache-dir"));
+        let recovered = ThumbnailsArgs::from_args(&without).expect("valid argv");
+        assert_eq!(recovered.cache_dir, None);
     }
 
+    /// What `build_game_headers_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's field, and this one can (issue #2448).
     #[test]
-    fn game_headers_args_append_flag_and_cache_dir() {
+    fn build_game_headers_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::GameHeadersArgs;
+
         let with =
             build_game_headers_args("/eng/libunitsync.dylib", "/data", Some("/cache/headers"));
         assert!(with.contains(&"--game-headers".to_string()));
-        assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/headers"]);
+        let recovered = GameHeadersArgs::from_args(&with).expect("valid argv");
+        assert_eq!(
+            recovered,
+            GameHeadersArgs {
+                cache_dir: Some("/cache/headers".into()),
+            }
+        );
+
         let without = build_game_headers_args("/eng/libunitsync.dylib", "/data", None);
         assert!(without.contains(&"--game-headers".to_string()));
         assert!(!without.iter().any(|a| a == "--cache-dir"));
+        let recovered = GameHeadersArgs::from_args(&without).expect("valid argv");
+        assert_eq!(recovered.cache_dir, None);
     }
 
     #[test]
@@ -835,15 +918,23 @@ mod tests {
 
     #[test]
     fn build_skirmish_ai_args_flag_and_optional_game() {
+        use coilbox_unitsync_worker::SkirmishAisArgs;
+
         let no_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", None);
         assert!(no_game.contains(&"--skirmish-ais".to_string()));
         assert!(!no_game.contains(&"--game".to_string()));
+        assert_eq!(
+            SkirmishAisArgs::from_args(&no_game).expect("valid argv"),
+            SkirmishAisArgs { game: None }
+        );
 
         let with_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", Some("BAR.sdd"));
         assert!(with_game.contains(&"--skirmish-ais".to_string()));
         assert_eq!(
-            &with_game[with_game.len() - 2..],
-            &["--game".to_string(), "BAR.sdd".to_string()],
+            SkirmishAisArgs::from_args(&with_game).expect("valid argv"),
+            SkirmishAisArgs {
+                game: Some("BAR.sdd".into())
+            }
         );
 
         let empty_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", Some(""));
@@ -1062,6 +1153,8 @@ mod tests {
 
     #[test]
     fn build_unit_buildpics_args_carry_game_units_and_cache_dir() {
+        use coilbox_unitsync_worker::UnitBuildpicsArgs;
+
         let a = build_unit_buildpics_args(
             "/eng/libunitsync.so",
             "/data",
@@ -1071,22 +1164,33 @@ mod tests {
             None,
         );
         assert!(a.contains(&"--unit-buildpics".to_string()));
-        let g = a.iter().position(|x| x == "--game").unwrap();
-        assert_eq!(a[g + 1], "BAR.sdd");
-        let u = a.iter().position(|x| x == "--units").unwrap();
-        assert_eq!(a[u + 1], "armcom,corcom");
-        assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/buildpics"]);
+        let recovered = UnitBuildpicsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            UnitBuildpicsArgs {
+                game: "BAR.sdd".into(),
+                units: vec!["armcom".into(), "corcom".into()],
+                cache_dir: Some("/cache/buildpics".into()),
+                asset_dir: None,
+            }
+        );
 
         let without =
             build_unit_buildpics_args("/eng/libunitsync.so", "/data", "BAR.sdd", &[], None, None);
         assert!(without.contains(&"--unit-buildpics".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
+        let recovered = UnitBuildpicsArgs::from_args(&without).expect("valid argv");
+        assert_eq!(recovered.cache_dir, None);
+        assert_eq!(recovered.units, Vec::<String>::new());
     }
 
     /// The hub's build pic asset is opt-in, so the callers that only want the
-    /// icon never pay for an encode (issue #1636).
+    /// icon never pay for an encode (issue #1636). What `to_args` writes,
+    /// `from_args` reads back whole either way.
     #[test]
     fn build_unit_buildpics_args_only_write_assets_when_asked() {
+        use coilbox_unitsync_worker::UnitBuildpicsArgs;
+
         let icons_only = build_unit_buildpics_args(
             "/eng/libunitsync.so",
             "/data",
@@ -1096,6 +1200,12 @@ mod tests {
             None,
         );
         assert!(!icons_only.iter().any(|x| x == "--asset-dir"));
+        assert_eq!(
+            UnitBuildpicsArgs::from_args(&icons_only)
+                .expect("valid argv")
+                .asset_dir,
+            None
+        );
 
         let with_assets = build_unit_buildpics_args(
             "/eng/libunitsync.so",
@@ -1105,15 +1215,55 @@ mod tests {
             Some("/cache/buildpics"),
             Some("/cache/hub-assets"),
         );
-        let at = with_assets
-            .iter()
-            .position(|x| x == "--asset-dir")
-            .expect("asset dir");
-        assert_eq!(with_assets[at + 1], "/cache/hub-assets");
+        assert_eq!(
+            UnitBuildpicsArgs::from_args(&with_assets)
+                .expect("valid argv")
+                .asset_dir,
+            Some("/cache/hub-assets".into())
+        );
     }
 
+    /// What `build_faction_logos_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
     #[test]
-    fn build_unit_dataset_args_carry_game_and_cache_dir() {
+    fn build_faction_logos_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::FactionLogosArgs;
+
+        let a = build_faction_logos_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            &["Armada".into(), "Cortex".into()],
+            Some("/cache/logos"),
+        );
+        assert!(a.contains(&"--faction-logos".to_string()));
+        let recovered = FactionLogosArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            FactionLogosArgs {
+                game: "BAR.sdd".into(),
+                sides: vec!["Armada".into(), "Cortex".into()],
+                cache_dir: Some("/cache/logos".into()),
+            }
+        );
+
+        let without =
+            build_faction_logos_args("/eng/libunitsync.so", "/data", "BAR.sdd", &[], None);
+        assert!(!without.iter().any(|x| x == "--cache-dir"));
+        let recovered = FactionLogosArgs::from_args(&without).expect("valid argv");
+        assert_eq!(recovered.cache_dir, None);
+    }
+
+    /// What `build_unit_dataset_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
+    #[test]
+    fn build_unit_dataset_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UnitDatasetArgs;
+
         let a = build_unit_dataset_args(
             "/eng/libunitsync.so",
             "/data",
@@ -1121,17 +1271,30 @@ mod tests {
             Some("/cache/info"),
         );
         assert!(a.contains(&"--unit-dataset".to_string()));
-        let g = a.iter().position(|x| x == "--game").unwrap();
-        assert_eq!(a[g + 1], "BAR.sdd");
-        assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/info"]);
+        let recovered = UnitDatasetArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            UnitDatasetArgs {
+                game: "BAR.sdd".into(),
+                cache_dir: Some("/cache/info".into()),
+            }
+        );
 
         let without = build_unit_dataset_args("/eng/libunitsync.so", "/data", "BAR.sdd", None);
         assert!(without.contains(&"--unit-dataset".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
+        let recovered = UnitDatasetArgs::from_args(&without).expect("valid argv");
+        assert_eq!(recovered.cache_dir, None);
     }
 
+    /// What `build_unit_model_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
     #[test]
-    fn build_unit_model_args_carry_game_object_and_cache_dir() {
+    fn build_unit_model_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UnitModelArgs;
+
         let a = build_unit_model_args(
             "/eng/libunitsync.so",
             "/data",
@@ -1140,11 +1303,35 @@ mod tests {
             Some("/cache/models"),
         );
         assert!(a.contains(&"--unit-model".to_string()));
-        let g = a.iter().position(|x| x == "--game").unwrap();
-        assert_eq!(a[g + 1], "BA.sdz");
-        let o = a.iter().position(|x| x == "--object").unwrap();
-        assert_eq!(a[o + 1], "ARMCOM");
-        assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
+        let recovered = UnitModelArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            UnitModelArgs {
+                game: "BA.sdz".into(),
+                object: "ARMCOM".into(),
+                cache_dir: Some("/cache/models".into()),
+            }
+        );
+    }
+
+    /// What `build_unit_script_args` writes, the worker's own `from_args`
+    /// reads back whole. A test that only checks a flag landed somewhere in
+    /// the argv cannot catch the sidecar and the worker disagreeing about
+    /// the mode's fields, and this one can (issue #2448).
+    #[test]
+    fn build_unit_script_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UnitScriptArgs;
+
+        let a = build_unit_script_args("/eng/libunitsync.so", "/data", "BAR.sdd", "armcom");
+        assert!(a.contains(&"--unit-script".to_string()));
+        let recovered = UnitScriptArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            UnitScriptArgs {
+                game: "BAR.sdd".into(),
+                unit: "armcom".into(),
+            }
+        );
     }
 
     /// The whole point of sharing `UnitModelsArgs` with the worker: what
