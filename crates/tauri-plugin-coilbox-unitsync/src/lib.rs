@@ -13,6 +13,7 @@ mod renderindex;
 mod sidecar;
 
 use base64::Engine;
+use coilbox_unitsync_worker::RenderSource;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
@@ -22,7 +23,7 @@ use sidecar::{
     build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
     build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args,
     build_unit_models_args, build_unit_render_args, build_unit_render_keys_args,
-    build_unit_script_args, find_unitsync, resolve_sidecar, RenderSourceArgs,
+    build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -837,10 +838,10 @@ async fn unitsync_unit_render<R: Runtime>(
         source_archive.as_deref(),
     ) {
         (None, None, None) => None,
-        (Some(model_digest), Some(source_member), Some(source_archive)) => Some(RenderSourceArgs {
-            model_digest,
-            source_member,
-            source_archive,
+        (Some(model_digest), Some(source_member), Some(source_archive)) => Some(RenderSource {
+            model_digest: model_digest.to_string(),
+            source_member: source_member.to_string(),
+            source_archive: source_archive.to_string(),
         }),
         _ => {
             return CliResult::err(

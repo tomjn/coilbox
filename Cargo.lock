@@ -5812,6 +5812,7 @@ dependencies = [
  "coilbox-portable",
  "coilbox-proc",
  "coilbox-thumb-cache",
+ "coilbox-unitsync-worker",
  "picoframe-core",
  "serde",
  "serde_json",

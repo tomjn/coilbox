@@ -20,6 +20,10 @@ picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-proc = { path = "../coilbox-proc" }
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
+# The `Mode`/`UnitRenderArgs` contract the worker's `parse_args` also builds
+# from, so a migrated mode's flags are defined once rather than written by
+# hand here and in the worker's `main.rs` (issue #2448).
+coilbox-unitsync-worker = { path = "../coilbox-unitsync-worker" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
