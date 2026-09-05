@@ -4,10 +4,13 @@
 //! fetching remote branding images and caching them once as `data:` URLs (which
 //! sidestep CSP host-allowlisting — the catalog can reference any host).
 
+use picoframe_core::CliResult;
+use serde_json::json;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use tauri::{AppHandle, Manager, Runtime};
 
 /// How long a negative image marker (`.none`) is trusted before we retry the host.
 /// Without this a transiently-down image host would be cached as permanently
@@ -498,6 +501,56 @@ async fn fetch_image(url: &str, reencode: bool) -> Fetched {
         }
     }
     Fetched::Image(content_type, bytes.to_vec())
+}
+
+/// `branding_catalog`, answer with the branding catalog JSON already on disk (the
+/// cache, else the bundled seed), refetching in the background when that copy is
+/// past its TTL. Returns the raw JSON text. The frontend parses and matches it, so
+/// Rust stays schema-agnostic.
+#[tauri::command]
+pub(crate) async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> CliResult {
+    let cache_file = coilbox_portable::cache_dir(&app)
+        .ok()
+        .map(|d| d.join("coilbox-branding").join("catalog.json"));
+    let seed_file = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|d| seed_file(&d, |p| p.exists()));
+    let res = resolve_catalog(&url, cache_file, seed_file).await;
+    CliResult::ok(json!(res))
+}
+
+/// `branding_image` fetches the first working image URL (https only), caches the
+/// bytes as a file keyed by URL hash, and names it. Neither field set means the
+/// UI falls back to the game's own art or gradient. When `reencode` is set, for
+/// opaque photographic art like banners and screenshots, decodable rasters are
+/// downsampled and JPEG-encoded to bound what is kept, and logos pass through
+/// untouched.
+///
+/// The picture comes back as `file`, a name under `coilbox://contentbranding/`,
+/// with `dataUrl` holding the bytes only where there was nowhere to cache them.
+#[tauri::command]
+pub(crate) async fn branding_image<R: Runtime>(
+    app: AppHandle<R>,
+    urls: Vec<String>,
+    reencode: bool,
+) -> CliResult {
+    let resolved = resolve_image(&urls, branding_image_dir(&app), reencode).await;
+    CliResult::ok(json!(resolved.unwrap_or_default()))
+}
+
+/// Subdirectory of the app cache dir holding catalog art fetched over the
+/// network. `None` when the platform can't resolve a cache dir, and the pictures
+/// are then not cached at all.
+const BRANDING_IMAGE_SUBDIR: &str = "coilbox-branding-images";
+
+/// Where catalog art is cached. Public because the asset protocol serves this
+/// folder as its `contentbranding` root.
+pub fn branding_image_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    coilbox_portable::cache_dir(app)
+        .ok()
+        .map(|d| d.join(BRANDING_IMAGE_SUBDIR))
 }
 
 #[cfg(test)]
