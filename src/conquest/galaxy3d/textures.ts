@@ -567,3 +567,26 @@ export function cometTailTexture(size: number): THREE.Texture {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
+
+/**
+ * A soft glowing annulus, the expanding shockwave ring of a win burst.
+ */
+export function ringBurstTexture(size: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.clearRect(0, 0, size, size);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = size * 0.05;
+    ctx.shadowColor = "#ffe9b0";
+    ctx.shadowBlur = size * 0.1;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
