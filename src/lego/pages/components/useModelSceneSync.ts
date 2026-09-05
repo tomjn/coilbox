@@ -3,7 +3,7 @@ import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { showBaked } from "./bakedPlayback";
-import { applySceneScale, frameObject } from "./ModelViewport";
+import { applySceneScale, frameObject } from "./cameraFraming";
 import { type SceneState, syncScene } from "./sceneState";
 
 /**
