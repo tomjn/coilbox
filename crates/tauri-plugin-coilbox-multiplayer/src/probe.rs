@@ -16,6 +16,9 @@ use std::io;
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::time::Duration;
 
+use picoframe_core::CliResult;
+use serde_json::json;
+
 /// How long to wait for a reply before giving up on the probe. An ICMP
 /// port-unreachable comes back within one round trip, so this only has to cover
 /// a slow link rather than any engine-side work. Every launch into a healthy
@@ -89,6 +92,22 @@ pub fn probe(host: &str, port: u16, timeout: Duration) -> Outcome {
     }
     let mut buf = [0u8; 64];
     classify(sock.recv(&mut buf))
+}
+
+/// `mp_probe_host`: ask whether a battle host's game port refuses us outright.
+///
+/// Read the module docs above before acting on the result. Only `refused` and
+/// `unresolved` mean anything. `silent` is the normal answer from a perfectly
+/// healthy host, so it must never be surfaced as a problem.
+#[tauri::command]
+pub(crate) async fn mp_probe_host(host: String, port: u16) -> CliResult {
+    let outcome =
+        tauri::async_runtime::spawn_blocking(move || probe(&host, port, PROBE_TIMEOUT).as_str())
+            .await;
+    match outcome {
+        Ok(o) => CliResult::ok(json!({ "outcome": o })),
+        Err(e) => CliResult::err(format!("probe failed to run: {e}")),
+    }
 }
 
 #[cfg(test)]

@@ -3266,23 +3266,6 @@ fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> 
     }
 }
 
-/// `mp_probe_host`: ask whether a battle host's game port refuses us outright.
-///
-/// Read the [`probe`] module docs before acting on the result. Only `refused`
-/// and `unresolved` mean anything. `silent` is the normal answer from a
-/// perfectly healthy host, so it must never be surfaced as a problem.
-#[tauri::command]
-async fn mp_probe_host(host: String, port: u16) -> CliResult {
-    let outcome = tauri::async_runtime::spawn_blocking(move || {
-        probe::probe(&host, port, probe::PROBE_TIMEOUT).as_str()
-    })
-    .await;
-    match outcome {
-        Ok(o) => CliResult::ok(json!({ "outcome": o })),
-        Err(e) => CliResult::err(format!("probe failed to run: {e}")),
-    }
-}
-
 /// `mp_chat_logs` — enumerate saved chat logs (DM + channel threads) across every
 /// account, for the log viewer. Reads the log dirs directly, so it works with no
 /// active connection. Each account's threads are newest-activity first.
@@ -3468,7 +3451,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_remove_script_tags,
             mp_build_battle_config,
             mp_build_host_config,
-            mp_probe_host,
+            probe::mp_probe_host,
             turn::mp_turn_credentials,
             mp_relay_traffic,
             mp_leftover_relay_agent,
