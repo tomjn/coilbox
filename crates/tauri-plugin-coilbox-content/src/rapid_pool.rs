@@ -13,7 +13,9 @@
 //! - Pools are **per-root** (blobs aren't shared across roots), so GC runs per root.
 
 use flate2::read::GzDecoder;
+use picoframe_core::CliResult;
 use serde::Serialize;
+use serde_json::json;
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -243,6 +245,31 @@ pub fn prune(root: &Path, apply: bool) -> Result<PruneSummary, String> {
     }
 
     Ok(out)
+}
+
+/// `content_warm_rapid_pool`, background-read every `packages/*.sdp` manifest
+/// across the given roots into the OS page cache so the engine's first rapid-tag
+/// resolution is warm. Manifests only, returns a cache-warm summary.
+#[tauri::command]
+pub(crate) async fn content_warm_rapid_pool(roots: Vec<String>) -> CliResult {
+    let paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
+    match tauri::async_runtime::spawn_blocking(move || warm(&paths)).await {
+        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
+        Err(e) => CliResult::err(format!("warm task failed: {e}")),
+    }
+}
+
+/// `content_prune_rapid_pool`, reclaim orphaned rapid pool data under `root`
+/// (pool blobs referenced by no on-disk `.sdp`, plus `*.incomplete` leftovers).
+/// `apply=false` is a dry run that computes the summary without deleting.
+#[tauri::command]
+pub(crate) async fn content_prune_rapid_pool(root: String, apply: bool) -> CliResult {
+    let res = tauri::async_runtime::spawn_blocking(move || prune(Path::new(&root), apply)).await;
+    match res {
+        Ok(Ok(summary)) => CliResult::ok(json!({ "summary": summary })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("prune task failed: {e}")),
+    }
 }
 
 #[cfg(test)]

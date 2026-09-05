@@ -1036,36 +1036,6 @@ async fn content_rewrite_demo(
     }
 }
 
-/// `content_list_saves` — list singleplayer savegames under `<root>/Saves` (fast
-/// fs metadata + a best-effort map/game read). `root` is a `ContentRoot.path`.
-#[tauri::command]
-async fn content_list_saves(root: String) -> CliResult {
-    let p = PathBuf::from(&root);
-    match tauri::async_runtime::spawn_blocking(move || savegame::list_saves(&p)).await {
-        Ok(saves) => CliResult::ok(json!({ "saves": saves })),
-        Err(e) => CliResult::err(format!("list saves task failed: {e}")),
-    }
-}
-
-/// `content_delete_save` — delete one savegame file. `path` must be a `.ssf`/`.slsf`
-/// path from `content_list_saves` (guarded against deleting anything else).
-#[tauri::command]
-async fn content_delete_save(path: String) -> CliResult {
-    let p = PathBuf::from(&path);
-    let ok_ext = p
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("ssf") || e.eq_ignore_ascii_case("slsf"))
-        .unwrap_or(false);
-    if !ok_ext {
-        return CliResult::err("not a savegame file".to_string());
-    }
-    match std::fs::remove_file(&p) {
-        Ok(()) => CliResult::ok(json!({ "ok": true })),
-        Err(e) => CliResult::err(format!("delete failed: {e}")),
-    }
-}
-
 /// `content_delete_replay` — delete one replay file. `path` must be a `.sdfz`/`.sdf`
 /// path from `content_list_replays` (guarded against deleting anything else).
 #[tauri::command]
@@ -1521,33 +1491,6 @@ async fn content_widget_remove(root_path: String) -> CliResult {
     }
 }
 
-/// `content_warm_rapid_pool` — background-read every `packages/*.sdp` manifest
-/// across the given roots into the OS page cache so the engine's first rapid-tag
-/// resolution is warm. Manifests only; returns a cache-warm summary.
-#[tauri::command]
-async fn content_warm_rapid_pool(roots: Vec<String>) -> CliResult {
-    let paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
-    match tauri::async_runtime::spawn_blocking(move || rapid_pool::warm(&paths)).await {
-        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
-        Err(e) => CliResult::err(format!("warm task failed: {e}")),
-    }
-}
-
-/// `content_prune_rapid_pool` — reclaim orphaned rapid pool data under `root`
-/// (pool blobs referenced by no on-disk `.sdp`, plus `*.incomplete` leftovers).
-/// `apply=false` is a dry run that computes the summary without deleting.
-#[tauri::command]
-async fn content_prune_rapid_pool(root: String, apply: bool) -> CliResult {
-    let res =
-        tauri::async_runtime::spawn_blocking(move || rapid_pool::prune(Path::new(&root), apply))
-            .await;
-    match res {
-        Ok(Ok(summary)) => CliResult::ok(json!({ "summary": summary })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("prune task failed: {e}")),
-    }
-}
-
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -1578,8 +1521,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_delete_replays,
             archives::content_delete_archive,
             content_gather_replays,
-            content_list_saves,
-            content_delete_save,
+            savegame::content_list_saves,
+            savegame::content_delete_save,
             content_config_profiles,
             content_config_backup,
             content_config_restore,
@@ -1595,8 +1538,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_widget_status,
             content_widget_install,
             content_widget_remove,
-            content_warm_rapid_pool,
-            content_prune_rapid_pool,
+            rapid_pool::content_warm_rapid_pool,
+            rapid_pool::content_prune_rapid_pool,
             caches::content_reclaim_caches,
             storage::content_storage_overview,
             storage::content_delete_engine,
