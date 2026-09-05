@@ -61,7 +61,11 @@ struct Args {
     file: Option<String>,
     /// Destination path for `--extract` (download one member to disk).
     extract: Option<String>,
-    thumbnails: bool,
+    /// `--thumbnails`: render a small minimap for every installed map in one
+    /// Init. Its fields live once in
+    /// `coilbox_unitsync_worker::ThumbnailsArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    thumbnails: Option<Mode>,
     /// `--heightmap`: render one map's height infomap as a downscaled preview
     /// PNG, and with `--asset-dir` also store the full resolution 16 bit
     /// samples as the hub's asset. Its fields live once in
@@ -122,19 +126,30 @@ struct Args {
     /// plugin that builds this flag's argv (issue #2448).
     config_set: Option<Mode>,
     /// `--skirmish-ais`: list native skirmish AIs (+ a game's Lua AIs when
-    /// combined with `--game`).
-    skirmish_ais: bool,
+    /// combined with `--game`). Its field lives once in
+    /// `coilbox_unitsync_worker::SkirmishAisArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    skirmish_ais: Option<Mode>,
     /// `--game-headers`: batch-resolve every game's header art in one Init.
-    game_headers: bool,
-    /// `--unit-buildpics`: resolve start-unit build icons for `--game`, for the
-    /// units listed in `--units` (comma-separated).
-    unit_buildpics: bool,
-    /// `--unit-dataset`: read `--game`'s reusable unit graph (units + their
-    /// `buildoptions` edges), for the build-tree viewer and unit filters.
-    unit_dataset: bool,
-    /// `--unit-model`: read one unit's model out of `--game`, named by the
-    /// unitdef `objectname` given in `--object`.
-    unit_model: bool,
+    /// Its field lives once in `coilbox_unitsync_worker::GameHeadersArgs`,
+    /// shared with the sidecar plugin that builds this flag's argv (issue
+    /// #2448).
+    game_headers: Option<Mode>,
+    /// `--unit-buildpics`: resolve start-unit build icons for a game, for the
+    /// units listed by name. Its fields live once in
+    /// `coilbox_unitsync_worker::UnitBuildpicsArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    unit_buildpics: Option<Mode>,
+    /// `--unit-dataset`: read a game's reusable unit graph (units + their
+    /// `buildoptions` edges), for the build-tree viewer and unit filters. Its
+    /// fields live once in `coilbox_unitsync_worker::UnitDatasetArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    unit_dataset: Option<Mode>,
+    /// `--unit-model`: read one unit's model out of a game, named by the
+    /// unitdef `objectname`. Its fields live once in
+    /// `coilbox_unitsync_worker::UnitModelArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    unit_model: Option<Mode>,
     /// `--unit-models`: read a batch of units' models out of a game in one
     /// mount, named by the `objectname`s in a units file, and write each into
     /// a cache directory. Its fields and cross field rule (both the units
@@ -143,9 +158,11 @@ struct Args {
     /// once in `coilbox_unitsync_worker::UnitModelsArgs`, shared with the
     /// sidecar plugin that builds this flag's argv (issue #2448).
     unit_models: Option<Mode>,
-    /// `--unit-script`: find and read `--unit`'s animation script inside
-    /// `--game`, following the unit script framework's own resolution order.
-    unit_script: bool,
+    /// `--unit-script`: find and read a unit's animation script inside a
+    /// game, following the unit script framework's own resolution order. Its
+    /// fields live once in `coilbox_unitsync_worker::UnitScriptArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    unit_script: Option<Mode>,
     /// `--unit-render`: encode a top down render the webview drew as the hub's
     /// `render:<angle>` asset. Its fields and cross field rules (needs
     /// `--asset-dir`, needs `--pixels`, the render source is all three fields
@@ -159,16 +176,11 @@ struct Args {
     /// shared with the sidecar plugin that builds this flag's argv (issue
     /// #2448).
     unit_render_keys: Option<Mode>,
-    object: Option<String>,
-    /// `--unit`: one unit definition's own key, for `--unit-script`. Not the
-    /// `objectname` the model reads: a script is named by the definition and a
-    /// model by the field inside it, and the two are often different words.
-    unit: Option<String>,
-    units: Vec<String>,
-    /// `--faction-logos`: resolve `Sidepics/<side>` emblems for `--game`, for the
-    /// side names listed in `--sides` (comma-separated).
-    faction_logos: bool,
-    sides: Vec<String>,
+    /// `--faction-logos`: resolve `Sidepics/<side>` emblems for a game, for
+    /// the side names listed by name. Its fields live once in
+    /// `coilbox_unitsync_worker::FactionLogosArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    faction_logos: Option<Mode>,
     /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
     /// the script from `--source-file`.
     lua: bool,
@@ -296,9 +308,10 @@ fn run() -> i32 {
     }
 
     // Batch thumbnails: a small minimap for every map in one Init.
-    if args.thumbnails {
+    if let Some(Mode::Thumbnails(mode)) = &args.thumbnails {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            minimap::render_all(&args.lib, args.mip, cache_dir)
+            minimap::render_all(&args.lib, mode.mip, cache_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -337,7 +350,8 @@ fn run() -> i32 {
 
     // Batch game headers: resolve every game's loadpicture art in one Init, for
     // the Games grid. Keyed on cheap file identity (not sync-checksum).
-    if args.game_headers {
+    if let Some(Mode::GameHeaders(mode)) = &args.game_headers {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| archive::game_headers(&args.lib, cache_dir)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -357,12 +371,11 @@ fn run() -> i32 {
     // Unit build icons: resolve start-unit build pics for one game in one Init,
     // disk-cached like game headers. Checked before the --game modes because it
     // also keys off --game.
-    if args.unit_buildpics {
-        let game_archive = args.game.clone().unwrap_or_default();
-        let units = args.units.clone();
-        let asset_dir = args.asset_dir.as_deref().map(Path::new);
+    if let Some(Mode::UnitBuildpics(mode)) = &args.unit_buildpics {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        let asset_dir = mode.asset_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            buildpic::render(&args.lib, &game_archive, &units, cache_dir, asset_dir)
+            buildpic::render(&args.lib, &mode.game, &mode.units, cache_dir, asset_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -378,11 +391,10 @@ fn run() -> i32 {
     // Faction logos: resolve each side's `Sidepics/<side>` emblem for one game in
     // one Init, disk-cached like build pics. Keys off --game, so checked before the
     // --game modes.
-    if args.faction_logos {
-        let game_archive = args.game.clone().unwrap_or_default();
-        let sides = args.sides.clone();
+    if let Some(Mode::FactionLogos(mode)) = &args.faction_logos {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            factionlogo::render(&args.lib, &game_archive, &sides, cache_dir)
+            factionlogo::render(&args.lib, &mode.game, &mode.sides, cache_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -398,11 +410,10 @@ fn run() -> i32 {
     // Unit dataset: read one game's reusable unit graph (units + buildoptions
     // edges) in one Init, disk-cached like game info. Checked before the --game
     // game-detail mode because it also keys off --game.
-    if args.unit_dataset {
-        let game_archive = args.game.clone().unwrap_or_default();
-        return match std::panic::catch_unwind(|| {
-            dataset::render(&args.lib, &game_archive, cache_dir)
-        }) {
+    if let Some(Mode::UnitDataset(mode)) = &args.unit_dataset {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return match std::panic::catch_unwind(|| dataset::render(&args.lib, &mode.game, cache_dir))
+        {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
@@ -416,11 +427,10 @@ fn run() -> i32 {
 
     // Unit model: read one unit's model out of a game's archive and flatten it
     // for the viewer. Keys off --game, so checked before the --game modes.
-    if args.unit_model {
-        let game_archive = args.game.clone().unwrap_or_default();
-        let object = args.object.clone().unwrap_or_default();
+    if let Some(Mode::UnitModel(mode)) = &args.unit_model {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            unitmodel::render(&args.lib, &game_archive, &object, cache_dir)
+            unitmodel::render(&args.lib, &mode.game, &mode.object, cache_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -437,11 +447,9 @@ fn run() -> i32 {
     // Keys off --game like the model read above, and names the unit by its
     // definition key rather than by a path, because the script name is a
     // definition field the game may compute.
-    if args.unit_script {
-        let game_archive = args.game.clone().unwrap_or_default();
-        let unit = args.unit.clone().unwrap_or_default();
+    if let Some(Mode::UnitScript(mode)) = &args.unit_script {
         return match std::panic::catch_unwind(|| {
-            unitscriptfile::render(&args.lib, &game_archive, &unit)
+            unitscriptfile::render(&args.lib, &mode.game, &mode.unit)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -613,8 +621,8 @@ fn run() -> i32 {
 
     // Skirmish AIs: native engine AIs, plus a game's Lua AIs when --game is
     // given. Checked before game detail because that mode also keys off --game.
-    if args.skirmish_ais {
-        let game = args.game.clone();
+    if let Some(Mode::SkirmishAis(mode)) = &args.skirmish_ais {
+        let game = mode.game.clone();
         return match std::panic::catch_unwind(|| skirmishai::render(&args.lib, game.as_deref())) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -915,7 +923,13 @@ fn parse_args() -> Result<Args, String> {
     let mut archive = None;
     let mut file = None;
     let mut extract = None;
-    let mut thumbnails = false;
+    // `--thumbnails`' own fields (mip, cache directory) are not collected
+    // into locals here for its own use: `Mode::Thumbnails`'s `from_args`
+    // below re-scans `raw` for those, the same treatment `--heightmap` and
+    // its siblings got above (issue #2448). The shared `mip`/`cache_dir`
+    // locals below still exist and are still read from `raw` too, since the
+    // unmigrated single-minimap mode still uses them.
+    let mut thumbnails_flag = false;
     // `--heightmap`'s own fields (map, cache directory, asset directory) are
     // not collected into locals here for its own use: `Mode::Heightmap`'s
     // `from_args` below re-scans `raw` for those, the same treatment
@@ -967,12 +981,33 @@ fn parse_args() -> Result<Args, String> {
     // (issue #2448). The match arms for those flags below still recognise
     // them, so the shared loop does not reject them as unknown.
     let mut config_set_flag = false;
-    let mut skirmish_ais = false;
-    let mut game_headers = false;
-    let mut unit_buildpics = false;
-    let mut unit_dataset = false;
-    let mut unit_model = false;
-    let mut unit_script = false;
+    // `--skirmish-ais`' own field (game) is not collected into a local here
+    // for its own use: `Mode::SkirmishAis`'s `from_args` below re-scans
+    // `raw` for it (issue #2448). The shared `game` local below still exists
+    // and is still read from `raw` too, since the unmigrated game-detail
+    // mode still uses it.
+    let mut skirmish_ais_flag = false;
+    // `--game-headers`' own field (cache directory) is not collected into a
+    // local here for its own use: `Mode::GameHeaders`'s `from_args` below
+    // re-scans `raw` for it (issue #2448).
+    let mut game_headers_flag = false;
+    // `--unit-buildpics`' own fields (game, units, cache directory, asset
+    // directory) are not collected into locals here for its own use:
+    // `Mode::UnitBuildpics`'s `from_args` below re-scans `raw` for those
+    // (issue #2448).
+    let mut unit_buildpics_flag = false;
+    // `--unit-dataset`'s own fields (game, cache directory) are not
+    // collected into locals here for its own use: `Mode::UnitDataset`'s
+    // `from_args` below re-scans `raw` for those (issue #2448).
+    let mut unit_dataset_flag = false;
+    // `--unit-model`'s own fields (game, object, cache directory) are not
+    // collected into locals here for its own use: `Mode::UnitModel`'s
+    // `from_args` below re-scans `raw` for those (issue #2448).
+    let mut unit_model_flag = false;
+    // `--unit-script`'s own fields (game, unit) are not collected into
+    // locals here for its own use: `Mode::UnitScript`'s `from_args` below
+    // re-scans `raw` for those (issue #2448).
+    let mut unit_script_flag = false;
     // `--unit-models`' own fields (units file, cache directory) are not
     // collected into locals here for its own use: `Mode::UnitModels`'s
     // `from_args` below re-scans `raw` for those, the single place that
@@ -996,11 +1031,10 @@ fn parse_args() -> Result<Args, String> {
     // is also `--unit-render`'s own flag, so its match arm below stays a
     // shared consuming placeholder rather than belonging to either mode alone.
     let mut unit_render_keys_flag = false;
-    let mut object = None;
-    let mut unit = None;
-    let mut units: Vec<String> = Vec::new();
-    let mut faction_logos = false;
-    let mut sides: Vec<String> = Vec::new();
+    // `--faction-logos`' own fields (game, sides, cache directory) are not
+    // collected into locals here for its own use: `Mode::FactionLogos`'s
+    // `from_args` below re-scans `raw` for those (issue #2448).
+    let mut faction_logos_flag = false;
     let mut lua = false;
     let mut source_file = None;
     let mut chunks_file = None;
@@ -1020,7 +1054,7 @@ fn parse_args() -> Result<Args, String> {
             "--archive" => archive = it.next(),
             "--file" => file = it.next(),
             "--extract" => extract = it.next(),
-            "--thumbnails" => thumbnails = true,
+            "--thumbnails" => thumbnails_flag = true,
             "--heightmap" => heightmap_flag = true,
             "--height-field" => height_field_flag = true,
             "--metalmap" => metalmap_flag = true,
@@ -1054,12 +1088,12 @@ fn parse_args() -> Result<Args, String> {
             "--config-key" | "--config-value" => {
                 it.next();
             }
-            "--skirmish-ais" => skirmish_ais = true,
-            "--game-headers" => game_headers = true,
-            "--unit-buildpics" => unit_buildpics = true,
-            "--unit-dataset" => unit_dataset = true,
-            "--unit-model" => unit_model = true,
-            "--unit-script" => unit_script = true,
+            "--skirmish-ais" => skirmish_ais_flag = true,
+            "--game-headers" => game_headers_flag = true,
+            "--unit-buildpics" => unit_buildpics_flag = true,
+            "--unit-dataset" => unit_dataset_flag = true,
+            "--unit-model" => unit_model_flag = true,
+            "--unit-script" => unit_script_flag = true,
             "--unit-models" => unit_models_flag = true,
             "--unit-render" => unit_render_flag = true,
             // Consumed by `Mode::UnitRender`'s `from_args` below, not stored here.
@@ -1082,32 +1116,26 @@ fn parse_args() -> Result<Args, String> {
             "--renderer-version" => {
                 it.next();
             }
-            "--object" => object = it.next(),
-            "--unit" => unit = it.next(),
-            "--units" => {
-                units = it
-                    .next()
-                    .map(|s| {
-                        s.split(',')
-                            .map(str::trim)
-                            .filter(|s| !s.is_empty())
-                            .map(str::to_string)
-                            .collect()
-                    })
-                    .unwrap_or_default()
+            // Consumed by `Mode::UnitModel`'s and `Mode::UnitRender`'s
+            // `from_args` below, not stored here.
+            "--object" => {
+                it.next();
             }
-            "--faction-logos" => faction_logos = true,
+            // Consumed by `Mode::UnitScript`'s `from_args` below, not stored
+            // here.
+            "--unit" => {
+                it.next();
+            }
+            // Consumed by `Mode::UnitBuildpics`'s `from_args` below, not
+            // stored here.
+            "--units" => {
+                it.next();
+            }
+            "--faction-logos" => faction_logos_flag = true,
+            // Consumed by `Mode::FactionLogos`'s `from_args` below, not
+            // stored here.
             "--sides" => {
-                sides = it
-                    .next()
-                    .map(|s| {
-                        s.split(',')
-                            .map(str::trim)
-                            .filter(|s| !s.is_empty())
-                            .map(str::to_string)
-                            .collect()
-                    })
-                    .unwrap_or_default()
+                it.next();
             }
             "--lua" => lua = true,
             "--source-file" => source_file = it.next(),
@@ -1129,7 +1157,13 @@ fn parse_args() -> Result<Args, String> {
         archive,
         file,
         extract,
-        thumbnails,
+        thumbnails: if thumbnails_flag {
+            Some(Mode::Thumbnails(
+                coilbox_unitsync_worker::ThumbnailsArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         heightmap: if heightmap_flag {
             Some(Mode::Heightmap(
                 coilbox_unitsync_worker::HeightmapArgs::from_args(&raw)?,
@@ -1199,12 +1233,48 @@ fn parse_args() -> Result<Args, String> {
         } else {
             None
         },
-        skirmish_ais,
-        game_headers,
-        unit_buildpics,
-        unit_dataset,
-        unit_model,
-        unit_script,
+        skirmish_ais: if skirmish_ais_flag {
+            Some(Mode::SkirmishAis(
+                coilbox_unitsync_worker::SkirmishAisArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        game_headers: if game_headers_flag {
+            Some(Mode::GameHeaders(
+                coilbox_unitsync_worker::GameHeadersArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        unit_buildpics: if unit_buildpics_flag {
+            Some(Mode::UnitBuildpics(
+                coilbox_unitsync_worker::UnitBuildpicsArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        unit_dataset: if unit_dataset_flag {
+            Some(Mode::UnitDataset(
+                coilbox_unitsync_worker::UnitDatasetArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        unit_model: if unit_model_flag {
+            Some(Mode::UnitModel(
+                coilbox_unitsync_worker::UnitModelArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        unit_script: if unit_script_flag {
+            Some(Mode::UnitScript(
+                coilbox_unitsync_worker::UnitScriptArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         unit_models: if unit_models_flag {
             Some(Mode::UnitModels(
                 coilbox_unitsync_worker::UnitModelsArgs::from_args(&raw)?,
@@ -1226,11 +1296,13 @@ fn parse_args() -> Result<Args, String> {
         } else {
             None
         },
-        object,
-        unit,
-        units,
-        faction_logos,
-        sides,
+        faction_logos: if faction_logos_flag {
+            Some(Mode::FactionLogos(
+                coilbox_unitsync_worker::FactionLogosArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         lua,
         source_file,
         chunks_file,
@@ -1385,6 +1457,74 @@ fn absolutize(args: &mut Args) {
         {
             if let Some(abs) = absolute_path(path) {
                 *path = abs;
+            }
+        }
+    }
+    // `Mode::UnitBuildpics` holds its own copy of
+    // `--cache-dir`/`--asset-dir`, read separately from `raw` in
+    // `parse_args`, so it needs the same treatment. `--game` and `--units`
+    // are unitsync names, not paths, so they are left alone.
+    if let Some(Mode::UnitBuildpics(mode)) = args.unit_buildpics.as_mut() {
+        for path in [mode.cache_dir.as_mut(), mode.asset_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
+            }
+        }
+    }
+    // `Mode::FactionLogos` holds its own copy of `--cache-dir`, read
+    // separately from `raw` in `parse_args`, so it needs the same treatment.
+    // `--game` and `--sides` are unitsync names, not paths, so they are left
+    // alone.
+    if let Some(Mode::FactionLogos(mode)) = args.faction_logos.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::UnitDataset` holds its own copy of `--cache-dir`, read
+    // separately from `raw` in `parse_args`, so it needs the same treatment.
+    // `--game` is a unitsync name, not a path, so it is left alone.
+    if let Some(Mode::UnitDataset(mode)) = args.unit_dataset.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::UnitModel` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment. `--game`
+    // and `--object` are unitsync names, not paths, so they are left alone.
+    if let Some(Mode::UnitModel(mode)) = args.unit_model.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::UnitScript` has no path field of its own: `--game` and `--unit`
+    // are unitsync names, not paths, so there is nothing here for it to do.
+    // `Mode::SkirmishAis` has no path field of its own for the same reason:
+    // `--game` is a unitsync name, not a path.
+    // `Mode::GameHeaders` holds its own copy of `--cache-dir`, read
+    // separately from `raw` in `parse_args`, so it needs the same treatment.
+    if let Some(Mode::GameHeaders(mode)) = args.game_headers.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::Thumbnails` holds its own copy of `--cache-dir`, read
+    // separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--mip` is a number, not a path, so it is left alone.
+    if let Some(Mode::Thumbnails(mode)) = args.thumbnails.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
             }
         }
     }
@@ -1734,7 +1874,7 @@ mod tests {
             archive: None,
             file: None,
             extract: None,
-            thumbnails: false,
+            thumbnails: None,
             heightmap: None,
             height_field: None,
             metalmap: None,
@@ -1746,20 +1886,16 @@ mod tests {
             map_skybox: None,
             config: None,
             config_set: None,
-            skirmish_ais: false,
-            game_headers: false,
-            unit_buildpics: false,
-            unit_dataset: false,
-            unit_model: false,
+            skirmish_ais: None,
+            game_headers: None,
+            unit_buildpics: None,
+            unit_dataset: None,
+            unit_model: None,
             unit_models: None,
             unit_render: None,
             unit_render_keys: None,
-            object: None,
-            unit: None,
-            unit_script: false,
-            units: Vec::new(),
-            faction_logos: false,
-            sides: Vec::new(),
+            unit_script: None,
+            faction_logos: None,
             lua: false,
             source_file: None,
             chunks_file: None,

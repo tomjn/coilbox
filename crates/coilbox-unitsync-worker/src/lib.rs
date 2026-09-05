@@ -16,11 +16,15 @@
 //! `parse_args` to call. `--unit-render`, `--unit-models`,
 //! `--unit-render-keys`, `--config`, `--config-set`, `--map-meta`,
 //! `--map-info`, `--map-skybox`, `--map-catalog`, `--map-minimaps`,
-//! `--heightmap`, `--height-field` and `--metalmap` have migrated so far.
-//! The other 13 modes still have their flags written by hand in the three
-//! old places, and move here one family at a time, matching how this crate
-//! already ships (135 commits since May 2026 says a sweeping rewrite is not
-//! this crate's style).
+//! `--heightmap`, `--height-field`, `--metalmap`, `--unit-buildpics`,
+//! `--faction-logos`, `--unit-dataset`, `--unit-model`, `--unit-script`,
+//! `--skirmish-ais`, `--game-headers` and `--thumbnails` have migrated so
+//! far. The other 5 modes still have their flags written by hand in the
+//! three old places: the Lua REPL, the archive/file/extract group and the
+//! default minimap render. `--typemap` stays a hand written CLI flag with no
+//! builder, per issue #2517. These move here one family at a time, matching
+//! how this crate already ships (135 commits since May 2026 says a sweeping
+//! rewrite is not this crate's style).
 
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new
@@ -44,6 +48,14 @@ pub enum Mode {
     Heightmap(HeightmapArgs),
     HeightField(HeightFieldArgs),
     Metalmap(MetalmapArgs),
+    UnitBuildpics(UnitBuildpicsArgs),
+    FactionLogos(FactionLogosArgs),
+    UnitDataset(UnitDatasetArgs),
+    UnitModel(UnitModelArgs),
+    UnitScript(UnitScriptArgs),
+    SkirmishAis(SkirmishAisArgs),
+    GameHeaders(GameHeadersArgs),
+    Thumbnails(ThumbnailsArgs),
 }
 
 impl Mode {
@@ -65,6 +77,14 @@ impl Mode {
             Mode::Heightmap(args) => args.to_args(),
             Mode::HeightField(args) => args.to_args(),
             Mode::Metalmap(args) => args.to_args(),
+            Mode::UnitBuildpics(args) => args.to_args(),
+            Mode::FactionLogos(args) => args.to_args(),
+            Mode::UnitDataset(args) => args.to_args(),
+            Mode::UnitModel(args) => args.to_args(),
+            Mode::UnitScript(args) => args.to_args(),
+            Mode::SkirmishAis(args) => args.to_args(),
+            Mode::GameHeaders(args) => args.to_args(),
+            Mode::Thumbnails(args) => args.to_args(),
         }
     }
 }
@@ -964,6 +984,436 @@ impl MetalmapArgs {
     }
 }
 
+/// `--unit-buildpics`: resolve start-unit build icons for `game`'s roster,
+/// named by `units`, disk-cached under `cache_dir` like the rest of the game
+/// info family. With `asset_dir` also encodes each icon as the hub's
+/// `buildpic` asset (issue #1636). Every caller that only wants the `data:`
+/// icon leaves it unset, since encoding a WebP nobody will look at is work
+/// for nothing.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct UnitBuildpicsArgs {
+    pub game: String,
+    pub units: Vec<String>,
+    pub cache_dir: Option<String>,
+    pub asset_dir: Option<String>,
+}
+
+impl UnitBuildpicsArgs {
+    /// Build the flags for `--unit-buildpics` mode: the flag itself, the game
+    /// whose roster this is, the comma-joined unit names, and the optional
+    /// on-disk cache and asset directories.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--unit-buildpics".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--units".to_string(),
+            self.units.join(","),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        if let Some(dir) = &self.asset_dir {
+            args.push("--asset-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--unit-buildpics` invocation from a worker argv. As with
+    /// the other modes' `from_args` functions, `args` may be exactly what
+    /// [`UnitBuildpicsArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// Neither `game` nor `units` was ever required by `run()`, so a missing
+    /// one recovers as empty rather than an error, the same treatment the
+    /// old code gave them.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut units: Vec<String> = Vec::new();
+        let mut cache_dir = None;
+        let mut asset_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--units" => {
+                    units = it
+                        .next()
+                        .map(|list| {
+                            list.split(',')
+                                .map(str::trim)
+                                .filter(|u| !u.is_empty())
+                                .map(str::to_owned)
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                }
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                "--asset-dir" => asset_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(UnitBuildpicsArgs {
+            game: game.unwrap_or_default(),
+            units,
+            cache_dir,
+            asset_dir,
+        })
+    }
+}
+
+/// `--faction-logos`: resolve `Sidepics/<side>` emblems for `game`, named by
+/// `sides`, disk-cached under `cache_dir` like `--unit-buildpics`. Unlike
+/// that mode, `run()` has never given this one an `--asset-dir`, since
+/// `factionlogo::render` has no asset-encoding path, so there is no such
+/// field here.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FactionLogosArgs {
+    pub game: String,
+    pub sides: Vec<String>,
+    pub cache_dir: Option<String>,
+}
+
+impl FactionLogosArgs {
+    /// Build the flags for `--faction-logos` mode: the flag itself, the game
+    /// whose sides these are, the comma-joined side names, and the optional
+    /// on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--faction-logos".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--sides".to_string(),
+            self.sides.join(","),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--faction-logos` invocation from a worker argv. As with
+    /// the other modes' `from_args` functions, `args` may be exactly what
+    /// [`FactionLogosArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut sides: Vec<String> = Vec::new();
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--sides" => {
+                    sides = it
+                        .next()
+                        .map(|list| {
+                            list.split(',')
+                                .map(str::trim)
+                                .filter(|s| !s.is_empty())
+                                .map(str::to_owned)
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                }
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(FactionLogosArgs {
+            game: game.unwrap_or_default(),
+            sides,
+            cache_dir,
+        })
+    }
+}
+
+/// `--unit-dataset`: read `game`'s reusable unit graph (units + their
+/// `buildoptions` edges), disk-cached under `cache_dir` like the rest of the
+/// game info family.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct UnitDatasetArgs {
+    pub game: String,
+    pub cache_dir: Option<String>,
+}
+
+impl UnitDatasetArgs {
+    /// Build the flags for `--unit-dataset` mode: the flag itself, the game
+    /// whose unit graph this is, and the optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--unit-dataset".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--unit-dataset` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`UnitDatasetArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(UnitDatasetArgs {
+            game: game.unwrap_or_default(),
+            cache_dir,
+        })
+    }
+}
+
+/// `--unit-model`: read one unit's model out of `game`, named by the
+/// unitdef's `objectname` in `object`, disk-cached under `cache_dir`.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct UnitModelArgs {
+    pub game: String,
+    pub object: String,
+    pub cache_dir: Option<String>,
+}
+
+impl UnitModelArgs {
+    /// Build the flags for `--unit-model` mode: the flag itself, the game
+    /// whose archive holds the model, the `objectname` naming it, and the
+    /// optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--unit-model".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--object".to_string(),
+            self.object.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--unit-model` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`UnitModelArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut object = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--object" => object = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(UnitModelArgs {
+            game: game.unwrap_or_default(),
+            object: object.unwrap_or_default(),
+            cache_dir,
+        })
+    }
+}
+
+/// `--unit-script`: find and read `unit`'s animation script inside `game`.
+/// `unit` is the unit definition's own key, not the `objectname`
+/// `--unit-model` takes. A script is named by the definition and a model by
+/// a field inside it, and games regularly use different words for the two.
+/// Takes no `cache_dir`, since `unitscriptfile::render` has never cached.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct UnitScriptArgs {
+    pub game: String,
+    pub unit: String,
+}
+
+impl UnitScriptArgs {
+    /// Build the flags for `--unit-script` mode: the flag itself, the game,
+    /// and the unit definition's key.
+    pub fn to_args(&self) -> Vec<String> {
+        vec![
+            "--unit-script".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--unit".to_string(),
+            self.unit.clone(),
+        ]
+    }
+
+    /// Recover a `--unit-script` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`UnitScriptArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut unit = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--unit" => unit = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(UnitScriptArgs {
+            game: game.unwrap_or_default(),
+            unit: unit.unwrap_or_default(),
+        })
+    }
+}
+
+/// `--skirmish-ais`: list native skirmish AIs, plus `game`'s Lua AIs when a
+/// game is given. `game` is optional, the bare flag lists native AIs alone.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SkirmishAisArgs {
+    pub game: Option<String>,
+}
+
+impl SkirmishAisArgs {
+    /// Build the flags for `--skirmish-ais` mode: the flag itself, and the
+    /// game when one is given and not empty. No caller sends an empty game
+    /// today, but the old `build_skirmish_ai_args` filtered one out rather
+    /// than emit a meaningless `--game`, so this keeps that filter rather
+    /// than changing what argv a caller gets.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec!["--skirmish-ais".to_string()];
+        if let Some(game) = self.game.as_deref().filter(|g| !g.is_empty()) {
+            args.push("--game".to_string());
+            args.push(game.to_string());
+        }
+        args
+    }
+
+    /// Recover a `--skirmish-ais` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`SkirmishAisArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            if a == "--game" {
+                game = it.next().cloned();
+            }
+        }
+        Ok(SkirmishAisArgs { game })
+    }
+}
+
+/// `--game-headers`: batch-resolve every game's loadpicture art in one Init,
+/// disk-cached under `cache_dir`. Takes no `--game` of its own, since it is
+/// always a whole-library pass, the same shape `--map-meta` takes.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct GameHeadersArgs {
+    pub cache_dir: Option<String>,
+}
+
+impl GameHeadersArgs {
+    /// Build the flags for `--game-headers` mode: the flag itself and the
+    /// optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec!["--game-headers".to_string()];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--game-headers` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`GameHeadersArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            if a == "--cache-dir" {
+                cache_dir = it.next().cloned();
+            }
+        }
+        Ok(GameHeadersArgs { cache_dir })
+    }
+}
+
+/// `--thumbnails`: render a small minimap for every installed map in one
+/// Init, disk-cached under `cache_dir`. `mip` defaults to 1 (512 square)
+/// when absent, the same default `parse_args`'s shared `mip` local applied
+/// before this moved here, since the default is shared with the unmigrated
+/// single-minimap mode.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThumbnailsArgs {
+    pub mip: i32,
+    pub cache_dir: Option<String>,
+}
+
+impl Default for ThumbnailsArgs {
+    fn default() -> Self {
+        ThumbnailsArgs {
+            mip: 1,
+            cache_dir: None,
+        }
+    }
+}
+
+impl ThumbnailsArgs {
+    /// Build the flags for `--thumbnails` mode: the flag itself, the mip
+    /// level, and the optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--thumbnails".to_string(),
+            "--mip".to_string(),
+            self.mip.to_string(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--thumbnails` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`ThumbnailsArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// A missing `--mip` recovers as 1, the same default the shared `mip`
+    /// local in `parse_args` used before this moved here.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut mip = 1;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--mip" => {
+                    mip = it
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                        .ok_or("--mip needs an integer")?
+                }
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(ThumbnailsArgs { mip, cache_dir })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1629,5 +2079,247 @@ mod tests {
     fn metalmap_dispatches_to_args_to_its_variant() {
         let a = metalmap_args();
         assert_eq!(Mode::Metalmap(a.clone()).to_args(), a.to_args());
+    }
+
+    fn unit_buildpics_args() -> UnitBuildpicsArgs {
+        UnitBuildpicsArgs {
+            game: "BAR.sdd".into(),
+            units: vec!["armcom".into(), "corcom".into()],
+            cache_dir: Some("/cache/buildpics".into()),
+            asset_dir: Some("/assets".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn unit_buildpics_round_trips_through_to_args_and_from_args() {
+        let original = unit_buildpics_args();
+        let recovered = UnitBuildpicsArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// The blueprint backfill is the only caller that asks for the hub asset
+    /// (issue #1636), so no asset dir has to round trip to `None` too.
+    #[test]
+    fn unit_buildpics_with_no_asset_dir_round_trips_none() {
+        let original = UnitBuildpicsArgs {
+            asset_dir: None,
+            ..unit_buildpics_args()
+        };
+        let a = original.to_args();
+        assert!(!a.contains(&"--asset-dir".to_string()));
+        let recovered = UnitBuildpicsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn unit_buildpics_dispatches_to_args_to_its_variant() {
+        let a = unit_buildpics_args();
+        assert_eq!(Mode::UnitBuildpics(a.clone()).to_args(), a.to_args());
+    }
+
+    fn faction_logos_args() -> FactionLogosArgs {
+        FactionLogosArgs {
+            game: "BAR.sdd".into(),
+            sides: vec!["Armada".into(), "Cortex".into()],
+            cache_dir: Some("/cache/logos".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn faction_logos_round_trips_through_to_args_and_from_args() {
+        let original = faction_logos_args();
+        let recovered = FactionLogosArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn faction_logos_dispatches_to_args_to_its_variant() {
+        let a = faction_logos_args();
+        assert_eq!(Mode::FactionLogos(a.clone()).to_args(), a.to_args());
+    }
+
+    fn unit_dataset_args() -> UnitDatasetArgs {
+        UnitDatasetArgs {
+            game: "BAR.sdd".into(),
+            cache_dir: Some("/cache/dataset".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn unit_dataset_round_trips_through_to_args_and_from_args() {
+        let original = unit_dataset_args();
+        let recovered = UnitDatasetArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn unit_dataset_dispatches_to_args_to_its_variant() {
+        let a = unit_dataset_args();
+        assert_eq!(Mode::UnitDataset(a.clone()).to_args(), a.to_args());
+    }
+
+    fn unit_model_args() -> UnitModelArgs {
+        UnitModelArgs {
+            game: "BA.sdz".into(),
+            object: "ARMCOM".into(),
+            cache_dir: Some("/cache/models".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn unit_model_round_trips_through_to_args_and_from_args() {
+        let original = unit_model_args();
+        let recovered = UnitModelArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn unit_model_dispatches_to_args_to_its_variant() {
+        let a = unit_model_args();
+        assert_eq!(Mode::UnitModel(a.clone()).to_args(), a.to_args());
+    }
+
+    fn unit_script_args() -> UnitScriptArgs {
+        UnitScriptArgs {
+            game: "BAR.sdd".into(),
+            unit: "armcom".into(),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn unit_script_round_trips_through_to_args_and_from_args() {
+        let original = unit_script_args();
+        let recovered = UnitScriptArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn unit_script_dispatches_to_args_to_its_variant() {
+        let a = unit_script_args();
+        assert_eq!(Mode::UnitScript(a.clone()).to_args(), a.to_args());
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole, for the common
+    /// case of a game given.
+    #[test]
+    fn skirmish_ais_with_a_game_round_trips_through_to_args_and_from_args() {
+        let original = SkirmishAisArgs {
+            game: Some("BAR.sdd".into()),
+        };
+        let recovered = SkirmishAisArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// No game named is how a caller asks for native AIs alone, and that has
+    /// to round trip as `None` rather than as an empty string.
+    #[test]
+    fn skirmish_ais_with_no_game_omits_the_flag_and_round_trips_none() {
+        let original = SkirmishAisArgs { game: None };
+        let a = original.to_args();
+        assert!(!a.contains(&"--game".to_string()));
+        let recovered = SkirmishAisArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// An empty game string is never sent by the real caller (the old
+    /// `build_skirmish_ai_args` filtered it out before this moved here), so
+    /// `to_args` still filters it rather than emitting a meaningless
+    /// `--game`.
+    #[test]
+    fn skirmish_ais_with_an_empty_game_omits_the_flag() {
+        let a = SkirmishAisArgs {
+            game: Some(String::new()),
+        }
+        .to_args();
+        assert!(!a.contains(&"--game".to_string()));
+    }
+
+    #[test]
+    fn skirmish_ais_dispatches_to_args_to_its_variant() {
+        let a = SkirmishAisArgs {
+            game: Some("BAR.sdd".into()),
+        };
+        assert_eq!(Mode::SkirmishAis(a.clone()).to_args(), a.to_args());
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's field.
+    #[test]
+    fn game_headers_round_trips_through_to_args_and_from_args() {
+        let original = GameHeadersArgs {
+            cache_dir: Some("/cache/headers".into()),
+        };
+        let recovered = GameHeadersArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A caller with no cache directory omits `--cache-dir` entirely, and
+    /// that has to round trip as `None` rather than as an empty string.
+    #[test]
+    fn game_headers_with_no_cache_dir_round_trips_none() {
+        let original = GameHeadersArgs { cache_dir: None };
+        let a = original.to_args();
+        assert!(!a.contains(&"--cache-dir".to_string()));
+        let recovered = GameHeadersArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn game_headers_dispatches_to_args_to_its_variant() {
+        let a = GameHeadersArgs {
+            cache_dir: Some("/cache/headers".into()),
+        };
+        assert_eq!(Mode::GameHeaders(a.clone()).to_args(), a.to_args());
+    }
+
+    fn thumbnails_args() -> ThumbnailsArgs {
+        ThumbnailsArgs {
+            mip: 2,
+            cache_dir: Some("/cache/thumbs".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn thumbnails_round_trips_through_to_args_and_from_args() {
+        let original = thumbnails_args();
+        let recovered = ThumbnailsArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A missing `--mip` recovers as 1, the same default `parse_args`'s
+    /// shared local read from an absent flag before this moved here.
+    #[test]
+    fn thumbnails_missing_mip_defaults_to_1() {
+        let mut a = thumbnails_args().to_args();
+        let at = a.iter().position(|x| x == "--mip").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        let recovered = ThumbnailsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered.mip, 1);
+    }
+
+    #[test]
+    fn thumbnails_dispatches_to_args_to_its_variant() {
+        let a = thumbnails_args();
+        assert_eq!(Mode::Thumbnails(a.clone()).to_args(), a.to_args());
     }
 }
