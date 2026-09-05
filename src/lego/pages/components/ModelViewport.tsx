@@ -31,7 +31,7 @@ import {
   Scaling,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
@@ -63,7 +63,6 @@ import {
   disposeGround,
   groundSteps,
   REFERENCE_PARK_X,
-  referenceParkX,
 } from "../../buildPlate";
 import {
   effectiveCollisionVolume,
@@ -101,7 +100,6 @@ import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import { getMeshGeometry, type RawGeometry } from "../../rawGeometry";
 import {
-  buildGameReferenceUnit,
   buildReferenceUnit,
   disposeReferenceUnit,
 } from "../../referenceObject";
@@ -111,8 +109,7 @@ import {
   type UnitBounds,
   unitBounds,
 } from "../../s3oBuild";
-import { clampFrame, frameAt, type ScriptTimeline } from "../../scriptPlayback";
-import { isShortcut } from "../../shortcuts";
+import type { ScriptTimeline } from "../../scriptPlayback";
 import { snapRotation, type Vec3 } from "../../snapping";
 import { captureThumbnail, readyToCapture } from "../../thumbnail";
 import {
@@ -120,16 +117,9 @@ import {
   clearAnchors,
   forceUniformScale,
   placeAnchor,
-  showAnchors,
   showSeat,
   showTargetAnchors,
 } from "./anchorsAndSnapping";
-import {
-  applyAnimation,
-  applyTimeline,
-  applyTimelineFrame,
-  restoreFromPlayback,
-} from "./animationPlayback";
 import {
   beginFaceDrag,
   buildCollisionHandles,
@@ -140,11 +130,19 @@ import {
   handleBox,
   highlightHandle,
   moveFaceDrag,
-  showCollisionHandles,
 } from "./collisionHandles";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import { type GameReferenceChoice, ReferencePicker } from "./ReferencePicker";
 import { ShortcutSheet } from "./ShortcutSheet";
+import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
+import { useGizmoMode } from "./useGizmoMode";
+import { useModelAnchors } from "./useModelAnchors";
+import { useModelEnvironment } from "./useModelEnvironment";
+import { useModelHover } from "./useModelHover";
+import { useModelSceneSync } from "./useModelSceneSync";
+import { useModelSelection } from "./useModelSelection";
+import { useModelShortcuts } from "./useModelShortcuts";
+import { useScriptFrameStepping } from "./useScriptFrameStepping";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
 
@@ -184,7 +182,7 @@ const HOVER_COLOUR = FACE_COLOUR;
  * low: a wash that hides the part's texture is too strong to be "subtle".
  */
 const HOVER_OVERLAY_OPACITY = 0.12;
-const SELECT_OVERLAY_OPACITY = 0.22;
+export const SELECT_OVERLAY_OPACITY = 0.22;
 /**
  * The same wash while a collision panel is open, where it is in the way.
  *
@@ -193,7 +191,7 @@ const SELECT_OVERLAY_OPACITY = 0.22;
  * across a washed face is harder to follow than one crossing the texture. The
  * selection outline still marks the piece, so the wash can give way.
  */
-const COLLISION_OVERLAY_OPACITY = 0.1;
+export const COLLISION_OVERLAY_OPACITY = 0.1;
 /**
  * Dot sizes in CSS pixels, constant however far the camera is.
  *
@@ -214,7 +212,7 @@ const SEAT_DOT = 11;
  */
 const COLLISION_COLOUR = 0xf97316;
 /** How strongly that wireframe draws when it is the shape being read. */
-const COLLISION_OPACITY = 0.9;
+export const COLLISION_OPACITY = 0.9;
 /**
  * The same wireframe while a piece's own box is being edited.
  *
@@ -223,7 +221,7 @@ const COLLISION_OPACITY = 0.9;
  * it is no longer the answer being changed, and at full strength a large orange
  * box drawn over everything wins the eye against the small yellow one inside it.
  */
-const COLLISION_DIM_OPACITY = 0.3;
+export const COLLISION_DIM_OPACITY = 0.3;
 
 /**
  * The per-piece boxes. Yellow rather than the unit volume's orange, because the
@@ -1096,360 +1094,62 @@ export function ModelViewport({
     [reduceMotion],
   );
 
-  // Structure and transforms both land here, because a piece added and a piece
-  // moved are the same operation on the same map. While playing, the bake goes
-  // back over the top: changing an animation's parameters must not drop the
-  // scene back to its unbaked form mid-cycle.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    syncScene(state, pack, raw, project);
-    if (playing && !reduceMotion) showBaked(state, pack, raw, project);
-    // Before the frame below, not after it. Framing sets the camera's distance
-    // and then hands it to the orbit controls, which pull it back in to
-    // whatever `maxDistance` is at the time. Left until afterwards, that was
-    // the builder's own starting limit of 120, so a unit read out of a game
-    // opened clipped even once nothing capped the framing distance itself.
-    applySceneScale(state);
-    // Framed once per scene, the moment the whole unit's geometry first has
-    // something in it. A brand new unit's root piece is empty, so this keeps
-    // retrying on every sync (each one is cheap: an empty box, nothing more)
-    // until a piece with geometry exists, rather than giving up after the
-    // first, geometry-less attempt. Once it succeeds, `framed` stops it ever
-    // running again for this scene, so it never fights a camera the user has
-    // since moved.
-    if (!state.framed && frameObject(state, state.root)) state.framed = true;
-    state.render();
-  }, [pack, raw, project, playing, reduceMotion]);
+  useModelSceneSync(sceneRef, pack, raw, project, playing, reduceMotion);
 
-  // Before the gizmo below, which may have to point at what this builds.
-  // Follows the document as well as the toggle: the derived volume is the
-  // unit's own bounding box, so it changes every time a piece does.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    state.editCollision = editCollision;
-    state.editPieceId = editPieceCollisionId;
-    const shown = showCollision || editCollision;
-    // Both boxes are wireframes read through the model, so the model's own
-    // washes step back while either panel is open.
-    state.selectOverlayMaterial.opacity =
-      editingVolume || showAimPoint
-        ? COLLISION_OVERLAY_OPACITY
-        : SELECT_OVERLAY_OPACITY;
-    showCollisionVolume(state, shown ? project : null, pack, raw);
-    // One set of boxes for both switches: the engine builds them once and
-    // hit-tests and click-tests against the same tree, so either switch alone
-    // is reason to draw them.
-    //
-    // Picking a piece to edit draws them whichever way the switches are set,
-    // the same way opening the collision panel draws the unit's own volume. A
-    // piece can be given a box before the unit is told to use them, and handles
-    // for a shape nobody can see would be handles on nothing.
-    showPieceCollisionVolumes(
-      state,
-      (shown && (project.pieceCollision || project.pieceSelection)) ||
-        editPieceCollisionId !== null
-        ? project
-        : null,
-      pack,
-      raw,
-    );
-    // The unit's volume steps back once a piece's box is the shape being
-    // changed, so the large orange box drawn over everything stops winning the
-    // eye against the small yellow one inside it. After the boxes, since a
-    // piece nothing hits draws none and keeps the volume the shape being read.
-    state.collisionMaterial.opacity =
-      editPieceCollisionId !== null &&
-      state.pieceCollisionBoxes.has(editPieceCollisionId)
-        ? COLLISION_DIM_OPACITY
-        : COLLISION_OPACITY;
-    // The handles move between the volume and the selected piece with this, so
-    // they are re-pointed here rather than left until the selection changes.
-    attachGizmo(
-      state,
-      project,
-      selectedIdsRef.current,
-      placingAnchorRef.current,
-    );
-    showCollisionHandles(state);
-    state.render();
-  }, [
+  useCollisionAndAimVisibility(sceneRef, {
+    project,
+    pack,
+    raw,
     showCollision,
     editCollision,
     editingVolume,
     editPieceCollisionId,
+    showAim,
     showAimPoint,
-    project,
-    pack,
-    raw,
-  ]);
+    selectedIdsRef,
+    placingAnchorRef,
+  });
 
-  // Follows the document as well as the toggle, for the same reason the volume
-  // does: a unit that has not been given an aim point is aimed at the middle of
-  // its own bounding box, which moves every time a piece does.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    const shown = showAim || showAimPoint;
-    state.aimMark.visible = shown;
-    // Handles only while the panel that explains them is open, which is the
-    // same rule the collision volume follows. The viewport's own toggle draws
-    // the point without offering to move it.
-    state.editAim = showAimPoint;
-    if (shown) {
-      state.aimMark.position.set(
-        ...aimPoint(project, unitBounds(project, pack, raw)),
-      );
-    }
-    // After the position, so the gizmo attaches to a marker already sitting
-    // where the point is rather than snapping to it on the next frame.
-    attachGizmo(
-      state,
-      project,
-      selectedIdsRef.current,
-      placingAnchorRef.current,
-    );
-    state.render();
-  }, [showAim, showAimPoint, project, pack, raw]);
+  useModelSelection(sceneRef, selectedIds, project, placingAnchor);
 
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    showSelection(state, project, selectedIds);
-    attachGizmo(state, project, selectedIds, placingAnchor);
-    // The new selection may be a piece already showing a hover treatment,
-    // which now has to stand down in favour of the (stronger) selected look.
-    applyHoverVisual(state);
-    state.render();
-  }, [selectedIds, project, placingAnchor]);
+  useModelHover(sceneRef, hoveredId, project);
 
-  // Independent of the pointer: the hovered piece can arrive from the sidebar
-  // tree instead of a raycast, and does not report back up when it does, so
-  // this never fights with what the pointer itself is over. Unlike the
-  // pointer-driven path this always redraws rather than bailing out when the
-  // id has not changed, so an edit to the hovered piece itself (a transform
-  // typed into a field, an undo) still keeps its outline and wash in step.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    state.hoveredId = resolveHovered(project, hoveredId ?? null);
-    applyHoverVisual(state);
-    state.render();
-  }, [hoveredId, project]);
+  useModelAnchors(sceneRef, pack, project, soleSelectedId, playing);
 
-  // Declared after the scene sync, so the group a new piece needs already
-  // exists by the time this looks for it. Playback clears them: the baked scene
-  // has no pivot left to point at. So does a set: a group drag seats against
-  // nothing, so fifteen dots per piece would be pointing at nothing.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    showAnchors(state, pack, project, playing ? null : soleSelectedId);
-    state.render();
-  }, [pack, project, soleSelectedId, playing]);
+  useGizmoMode(sceneRef, mode, editingVolume, showAimPoint, uniformScale);
 
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    state.gizmo.setMode(gizmoMode(mode, editingVolume, showAimPoint));
-    // Scale on a volume is the face plates rather than the gizmo, so the mode
-    // decides which of the two is on screen.
-    attachGizmo(
-      state,
-      state.projectRef.current,
-      state.selectedIdsRef.current,
-      state.placingAnchorRef.current,
-    );
-    showCollisionHandles(state);
-    state.render();
-  }, [mode, editingVolume, showAimPoint]);
+  useModelEnvironment(sceneRef, {
+    showGrid,
+    showReference,
+    gameReference,
+    backdrop,
+    ground,
+  });
 
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (state) state.uniformScale = uniformScale;
-  }, [uniformScale]);
+  useScriptFrameStepping(sceneRef, {
+    playing,
+    reduceMotion,
+    selectedIds,
+    scriptPaused,
+    scriptTimeline,
+    scriptFrame,
+    packRef,
+    rawRef,
+    projectRef,
+    scriptTimelineRef,
+    scriptPausedRef,
+    scriptFrameRef,
+    onScriptFrameRef,
+    placingAnchorRef,
+  });
 
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    state.grid.visible = showGrid;
-    state.axes.visible = showGrid;
-    state.render();
-  }, [showGrid]);
-
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    state.reference.visible = showReference;
-    applySceneScale(state);
-    state.render();
-  }, [showReference]);
-
-  // Read by the swap below, which must not itself rerun on a toggle: rebuilding
-  // a game's model every time the figure is hidden and shown again would throw
-  // its geometry away and read it back.
-  const showReferenceRef = useRef(showReference);
-  showReferenceRef.current = showReference;
-
-  // Swapping the figure for a game's unit, and back. The old one is freed
-  // rather than kept: a real unit can be tens of thousands of triangles and
-  // several textures, and the built-in one is cheap to rebuild.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    state.scene.remove(state.reference);
-    state.disposeReference();
-
-    if (gameReference) {
-      const built = buildGameReferenceUnit(gameReference.model);
-      built.group.position.set(referenceParkX(built.widthElmos), 0, 0);
-      state.reference = built.group;
-      state.disposeReference = built.dispose;
-    } else {
-      const group = buildReferenceUnit();
-      group.position.set(REFERENCE_PARK_X, 0, 0);
-      state.reference = group;
-      state.disposeReference = () => disposeReferenceUnit(group);
-    }
-
-    state.reference.visible = showReferenceRef.current;
-    state.scene.add(state.reference);
-    applySceneScale(state);
-    state.render();
-  }, [gameReference]);
-
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    applyBackdrop(state, backdrop);
-    state.render();
-  }, [backdrop]);
-
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    applyGround(state, ground);
-    state.render();
-  }, [ground]);
-
-  // Playback. The gizmo comes off first: it would be dragging a transform that
-  // is overwritten on the next frame. Stopping puts the scene back from the
-  // document, which is the rest pose by definition.
-  //
-  // Pausing a script run does not stop this effect: it keeps ticking so it can
-  // notice a resume, it just skips posing and rendering while paused, holding
-  // whatever the last unpaused tick drew. Read through refs rather than a
-  // dependency, so pausing, scrubbing and stepping never tear the bake down.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state || !playing || reduceMotion) return;
-
-    state.gizmo.detach();
-    showBaked(state, packRef.current, rawRef.current, projectRef.current);
-    let raf = 0;
-    let elapsed = 0;
-    let last = performance.now();
-    let wasPaused = false;
-
-    const tick = (now: number) => {
-      const dt = (now - last) / 1000;
-      last = now;
-      if (scriptPausedRef.current) {
-        wasPaused = true;
-      } else {
-        const timeline = scriptTimelineRef.current;
-        if (timeline) {
-          // Resuming picks the clock back up from wherever a pause or a scrub
-          // while paused left the frame, rather than from where it froze.
-          if (wasPaused) {
-            elapsed =
-              clampFrame(timeline, scriptFrameRef.current) / timeline.fps;
-            wasPaused = false;
-          }
-          elapsed += dt;
-          applyTimeline(state, projectRef.current, timeline, elapsed);
-          onScriptFrameRef.current?.(frameAt(timeline, elapsed));
-        } else {
-          elapsed += dt;
-          applyAnimation(state, projectRef.current, elapsed);
-        }
-        state.render();
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      const current = sceneRef.current;
-      if (!current) return;
-      restoreFromPlayback(current);
-      disposeBaked(current);
-      syncScene(current, packRef.current, rawRef.current, projectRef.current);
-      attachGizmo(
-        current,
-        projectRef.current,
-        selectedIds,
-        placingAnchorRef.current,
-      );
-      current.render();
-    };
-  }, [playing, reduceMotion, selectedIds]);
-
-  // Scrubbing or stepping a paused script run. The tick above paints every
-  // frame while it is not paused, and leaves the frozen frame alone otherwise,
-  // so this is what paints the frame it froze on.
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state || !playing || !scriptPaused || !scriptTimeline) return;
-    applyTimelineFrame(
-      state,
-      projectRef.current,
-      scriptTimeline,
-      clampFrame(scriptTimeline, scriptFrame),
-    );
-    state.render();
-  }, [playing, scriptPaused, scriptTimeline, scriptFrame]);
-
-  useEffect(() => {
-    const state = sceneRef.current;
-    if (!state) return;
-    state.onSnapChange = (on, anchorName) => {
-      setSnapped(on);
-      setSnappedTo(anchorName ?? null);
-    };
-  }, []);
-
-  // Held rather than toggled: snapping is on, and letting go of it is a
-  // deliberate act for the one piece that has to sit off the grid.
-  useEffect(() => {
-    const setSnapping = (on: boolean) => {
-      const state = sceneRef.current;
-      if (state) state.snapping = on;
-    };
-    const down = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement) return;
-      if (isShortcut("snap-hold", event)) setSnapping(false);
-      if (isShortcut("translate", event)) setMode("translate");
-      if (isShortcut("rotate", event)) setMode("rotate");
-      if (isShortcut("scale", event)) setMode("scale");
-      if (isShortcut("frame", event)) {
-        const state = sceneRef.current;
-        if (state) focusSelection(state, selectedIdsRef.current);
-      }
-      if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
-    };
-    const up = (event: KeyboardEvent) => {
-      if (!isShortcut("snap-hold", event)) setSnapping(true);
-    };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-    };
-  }, []);
+  useModelShortcuts(sceneRef, {
+    selectedIdsRef,
+    setSnapped,
+    setSnappedTo,
+    setMode,
+    setShortcutsOpen,
+  });
 
   // Whether the selected piece carries anchors of its own, which decides what
   // the key at the bottom of the view has to name.
@@ -2008,7 +1708,7 @@ export interface SceneState {
  * stays transparent and the panel's own tint shows through, which is what the
  * builder has always looked like.
  */
-function applyBackdrop(state: SceneState, id: BackdropId) {
+export function applyBackdrop(state: SceneState, id: BackdropId) {
   if (state.sky?.id === id) return;
   state.sky?.texture.dispose();
   state.sky = null;
@@ -2033,7 +1733,7 @@ function applyBackdrop(state: SceneState, id: BackdropId) {
  * volume's own numbers are the object's transform and a drag needs no
  * conversion to read back.
  */
-function showCollisionVolume(
+export function showCollisionVolume(
   state: SceneState,
   project: LegoProject | null,
   pack: LoadedPack,
@@ -2088,7 +1788,7 @@ function showCollisionVolume(
  * the thirty behind it, so a unit with any real number of pieces read as a mesh
  * of lines rather than as a box you were changing.
  */
-function showPieceCollisionVolumes(
+export function showPieceCollisionVolumes(
   state: SceneState,
   project: LegoProject | null,
   pack: LoadedPack,
@@ -2160,7 +1860,7 @@ function disposePieceCollision(state: SceneState) {
  * drag and rotate falls back to move. The aim point is one point, so it has no
  * size either and every mode falls back to move.
  */
-function gizmoMode(
+export function gizmoMode(
   mode: GizmoMode,
   editingVolume: boolean,
   editingAim: boolean,
@@ -2212,7 +1912,7 @@ function collisionSolid(volume: LegoCollisionVolume): THREE.BufferGeometry {
 }
 
 /** Put the solid ground under the markings, or take it away again. */
-function applyGround(state: SceneState, id: GroundId) {
+export function applyGround(state: SceneState, id: GroundId) {
   if (id !== "terrain") {
     state.terrain?.removeFromParent();
     return;
@@ -2282,7 +1982,7 @@ function hideOverlay(overlay: THREE.Mesh) {
  * grown, so selecting eight pieces and then one leaves seven idle helpers
  * rather than seven disposed and rebuilt on the next click.
  */
-function showSelection(
+export function showSelection(
   state: SceneState,
   project: LegoProject,
   selectedIds: string[],
@@ -2339,7 +2039,7 @@ function refreshSelectionOutlines(state: SceneState) {
  * them for a selection with nothing movable in it: the root is the unit, and a
  * hidden piece is not on screen to drag.
  */
-function attachGizmo(
+export function attachGizmo(
   state: SceneState,
   project: LegoProject,
   selectedIds: string[],
@@ -2500,7 +2200,7 @@ function applyHoveredId(
 
 /** Never a hidden piece, or one behind a hidden ancestor: there is nothing on
  *  screen for either of those to point at. */
-function resolveHovered(
+export function resolveHovered(
   project: LegoProject,
   pieceId: string | null,
 ): string | null {
@@ -2513,7 +2213,7 @@ function resolveHovered(
  * outline, wash and gizmo already say enough, and a second wash in a different
  * colour on the same faces would only look muddy.
  */
-function applyHoverVisual(state: SceneState) {
+export function applyHoverVisual(state: SceneState) {
   const id = state.hoveredId;
   const group =
     id && !state.selectedIdsRef.current.includes(id)
@@ -2541,7 +2241,7 @@ function applyHoverVisual(state: SceneState) {
  * Only used for playback. Editing keeps the document's own transforms on the
  * groups, because that is what the gizmo writes back to.
  */
-function showBaked(
+export function showBaked(
   state: SceneState,
   pack: LoadedPack,
   raw: RawGeometry | null,
@@ -2717,7 +2417,7 @@ export function points(
 }
 
 /** Free the geometry playback built. The shared part cache is untouched. */
-function disposeBaked(state: SceneState) {
+export function disposeBaked(state: SceneState) {
   for (const geometry of state.baked) geometry.dispose();
   state.baked = [];
   state.rest = new Map();
@@ -2739,7 +2439,7 @@ function disposeBaked(state: SceneState) {
  * document's own box has no dots in it, and no reference figure either: the
  * figure stands beside the unit for scale and is not the work being framed.
  */
-function focusSelection(state: SceneState, pieceIds: string[]) {
+export function focusSelection(state: SceneState, pieceIds: string[]) {
   const unit = boundsBox(
     unitBounds(
       state.projectRef.current,
@@ -2775,7 +2475,10 @@ function focusSelection(state: SceneState, pieceIds: string[]) {
  * Used by the opening frame, which frames the whole unit once as soon as its
  * geometry exists.
  */
-function frameObject(state: SceneState, object: THREE.Object3D): boolean {
+export function frameObject(
+  state: SceneState,
+  object: THREE.Object3D,
+): boolean {
   return frameBounds(state, new THREE.Box3().setFromObject(object));
 }
 
@@ -2844,7 +2547,7 @@ function frameBounds(state: SceneState, box: THREE.Box3, from?: Vec3): boolean {
  * two bounding boxes and only lays the ground again when the answer crosses a
  * whole footprint step.
  */
-function applySceneScale(state: SceneState) {
+export function applySceneScale(state: SceneState) {
   const box = new THREE.Box3().setFromObject(state.root);
   // Only when it is standing. A figure that has been picked but switched off
   // is not in the scene, and should not stretch the ground out under nothing.
