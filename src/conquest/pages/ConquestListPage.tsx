@@ -49,6 +49,10 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../../play/config";
+import {
+  compareGameVersions,
+  resolveGameByShortname,
+} from "../../play/installedGames";
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { conquestDelete, conquestSave } from "../bindings";
 import {
@@ -62,7 +66,6 @@ import {
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
-import { compareGameVersions, resolveGameByShortname } from "../model";
 import { mergeConquestNames } from "../names";
 import {
   DEFAULT_RADIUS_LY,

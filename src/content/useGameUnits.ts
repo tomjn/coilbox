@@ -12,8 +12,8 @@
  * read rather than one each.
  */
 
-import { compareGameVersions } from "@/conquest/model";
 import { usePreferredTarget } from "@/play/config";
+import { compareGameVersions } from "@/play/installedGames";
 import type { UnitDatasetEntry } from "./bindings";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "./config";
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { compareGameVersions } from "@/conquest/model";
 import { usePreferredTarget, useSkirmishAis } from "@/play/config";
+import { compareGameVersions } from "@/play/installedGames";
 import type { DemoInfo } from "./bindings";
 import { useUnitsyncGameInfo, useUnitsyncScan } from "./config";
 import {

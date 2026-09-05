@@ -3,14 +3,10 @@ import type { SkirmishAi } from "../content/bindings";
 import type { ReplayProvenance } from "../content/replayUserState";
 import type { SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
+import type { InstalledGame } from "../play/installedGames";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { useConquestState } from "./conquests";
-import type {
-  ConquestState,
-  GalaxyDoc,
-  GalaxyNode,
-  InstalledGame,
-} from "./model";
+import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
 import { advanceAfterBattle } from "./rules";
 import { synthesizeBattle } from "./synthesize";
 

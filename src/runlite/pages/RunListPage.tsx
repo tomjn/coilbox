@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
-import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
 import { Diagnostics, EmptyState } from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
@@ -18,6 +17,7 @@ import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { usePlayReadiness, usePreferredTarget } from "../../play/config";
+import { resolveGameByShortname } from "../../play/installedGames";
 import {
   encodeWarpathChallenge,
   encodeWarpathChallengeFile,

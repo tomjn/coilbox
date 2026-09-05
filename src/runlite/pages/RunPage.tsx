@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { SubstitutedMapNote } from "../../challenge/SubstitutedMapNote";
-import { resolveGameByShortname } from "../../conquest/model";
 import {
   BracketFrame,
   HUD_ACCENT_INK,
@@ -22,6 +21,7 @@ import {
 } from "../../content/pages/components/states";
 import { UnitPicker } from "../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../play/config";
+import { resolveGameByShortname } from "../../play/installedGames";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
 import { awardMeta } from "../meta";
 import {

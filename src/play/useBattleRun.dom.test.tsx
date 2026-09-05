@@ -28,9 +28,9 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { InstalledGame } from "../conquest/model";
 import type { DemoInfo, ReplayFile } from "../content/bindings";
 import type { BattleRestrictions, SkirmishDraft } from "./drafts";
+import type { InstalledGame } from "./installedGames";
 import {
   PLAYER_NAME,
   type UseBattleRunOptions,
