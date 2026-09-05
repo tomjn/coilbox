@@ -111,7 +111,7 @@ use serde_json::{json, Value};
 use tachyon_conn::TachyonMarkers;
 use tachyon_friends::FriendAction;
 use tachyon_messaging::Conversation;
-use tachyon_room::{NewLobby, RoomAction, VoteChoice};
+use tachyon_room::{RoomAction, VoteChoice};
 use tauri::{
     ipc::Channel,
     plugin::{Builder, TauriPlugin},
@@ -2322,36 +2322,6 @@ fn mp_zerok_open_battle(
     .unwrap_or_else(|| CliResult::err("this server does not open battles for its players"))
 }
 
-/// `mp_create_lobby`, Tachyon only: make a lobby of our own.
-///
-/// A lobby is not a battle this machine hosts. It is a room the server owns,
-/// which we are put in as its first player, and the match only gets a machine to
-/// run on when a member asks for it to start. So there is no port, no NAT mode
-/// and no content hash to send, and nothing here seats us as a host.
-#[tauri::command]
-fn mp_create_lobby(
-    registry: State<'_, Registry>,
-    server_key: String,
-    name: String,
-    map_name: String,
-    ally_teams: u8,
-    players_per_team: u8,
-    bosses_enabled: bool,
-) -> CliResult {
-    tachyon_action(
-        registry.inner(),
-        &server_key,
-        TachyonAction::CreateLobby(NewLobby {
-            name,
-            map_name,
-            ally_teams,
-            players_per_team,
-            bosses_enabled,
-        }),
-    )
-    .unwrap_or_else(|| CliResult::err("this server hosts battles rather than lobbies"))
-}
-
 /// `mp_start_battle`: ask for the match to begin.
 #[tauri::command]
 fn mp_start_battle(registry: State<'_, Registry>, server_key: String) -> CliResult {
@@ -2713,33 +2683,6 @@ fn mp_cast_vote(
         &server_key,
         command::say_battle(&format!("!vote {letter}")),
     )
-}
-
-/// `mp_appoint_boss`, Tachyon only: make a member a boss, so they may change the
-/// lobby. Tachyon has no founder, and a boss is the nearest thing it has.
-#[tauri::command]
-fn mp_appoint_boss(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    tachyon_action(
-        registry.inner(),
-        &server_key,
-        TachyonAction::Room(RoomAction::AppointBoss { username }),
-    )
-    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
-}
-
-/// `mp_unboss`, Tachyon only: stand a boss down.
-#[tauri::command]
-fn mp_unboss(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
-    tachyon_action(
-        registry.inner(),
-        &server_key,
-        TachyonAction::Room(RoomAction::Unboss { username }),
-    )
-    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
 }
 
 /// `mp_set_start_rect` — host: set an ally team's start rectangle.
@@ -3589,7 +3532,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_set_battle_status,
             mp_open_battle,
             mp_zerok_open_battle,
-            mp_create_lobby,
+            tachyon_room::mp_create_lobby,
             mp_start_battle,
             mp_update_battle_info,
             mp_add_bot,
@@ -3601,8 +3544,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_force_spectator,
             mp_kick,
             mp_cast_vote,
-            mp_appoint_boss,
-            mp_unboss,
+            tachyon_room::mp_appoint_boss,
+            tachyon_room::mp_unboss,
             mp_set_start_rect,
             mp_remove_start_rect,
             mp_set_script_tags,
