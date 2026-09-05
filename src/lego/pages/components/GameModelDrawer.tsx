@@ -14,13 +14,12 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Blocks, ChevronLeft, ImageOff, Search, X } from "lucide-react";
+import { Blocks, ChevronLeft, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import type { GameItem } from "@/content/bindings";
-import { buildPicMissing } from "@/content/buildPicMissing";
+import type { GameItem, UnitDisplay } from "@/content/bindings";
 import {
   useUnitsyncArchiveTree,
   useUnitsyncScan,
@@ -29,7 +28,7 @@ import {
 } from "@/content/config";
 import { isSdd } from "@/content/format";
 import { SddBadge } from "@/content/pages/components/SddBadge";
-import { unitIconSrc } from "@/content/unitIcon";
+import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { usePreferredTarget } from "@/play/config";
 import {
   type AdoptedScript,
@@ -329,6 +328,9 @@ export function GameModelDrawer({
                   <ModelList
                     rows={matched.slice(0, ROW_CAP)}
                     buildpics={buildpics?.units}
+                    // No pics yet is not the same as no pics: a row says
+                    // nothing about a unit's picture until the read lands.
+                    pending={!buildpics && units.length > 0}
                     onPick={(row) => void pick(row)}
                   />
                   <Footnotes
@@ -401,10 +403,13 @@ function GameList({
 function ModelList({
   rows,
   buildpics,
+  pending,
   onPick,
 }: {
   rows: GameModelRow[];
-  buildpics?: Record<string, { name?: string } | undefined>;
+  buildpics?: Record<string, UnitDisplay | undefined>;
+  /** The pics have not come back yet, so a row claims nothing about them. */
+  pending: boolean;
   onPick: (row: GameModelRow) => void;
 }) {
   if (rows.length === 0) {
@@ -427,6 +432,7 @@ function ModelList({
             <BuildPic
               row={row}
               display={row.unit ? buildpics?.[row.unit] : undefined}
+              pending={pending}
             />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm">{row.label}</span>
@@ -449,27 +455,20 @@ function ModelList({
 /**
  * The unit's build pic, or why there is not one.
  *
- * A model no unitdef names has no unit to have a pic, which is not the same as a
- * unit whose game ships none, so it says so with the builder's own mark rather
- * than borrowing `buildPicMissing`'s wording about a game shipping nothing.
+ * A model no unitdef names has no unit to have a pic at all, which `UnitIcon`
+ * has no way to say (it only knows about a unit whose picture is missing or
+ * unreadable), so that case keeps its own mark here rather than growing
+ * `UnitIcon` a state none of its other callers need.
  */
 function BuildPic({
   row,
   display,
+  pending,
 }: {
   row: GameModelRow;
-  display?: { name?: string };
+  display?: UnitDisplay;
+  pending: boolean;
 }) {
-  const src = row.unit ? unitIconSrc(display) : undefined;
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        className="size-9 shrink-0 rounded bg-muted object-contain"
-      />
-    );
-  }
   if (!row.unit) {
     return (
       <span
@@ -480,16 +479,7 @@ function BuildPic({
       </span>
     );
   }
-  const missing = buildPicMissing(display);
-  return (
-    <span
-      className="flex size-9 shrink-0 flex-col items-center justify-center rounded bg-muted text-center text-[0.5625rem] leading-tight text-muted-foreground"
-      title={missing.title}
-    >
-      <ImageOff className="size-3.5" />
-      {missing.label}
-    </span>
-  );
+  return <UnitIcon display={display} pending={pending} size="lg" />;
 }
 
 /** What the list is not showing, and why. Every one of these is a real state

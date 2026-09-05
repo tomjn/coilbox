@@ -11,8 +11,8 @@ import {
   useUnitsyncUnitDataset,
 } from "../config";
 import { encyclopediaSections, type UnitCell } from "../unitEncyclopedia";
-import { unitIconSrc } from "../unitIcon";
 import { DetailError, DetailLoading, NotFound } from "./components/states";
+import { UnitIcon } from "./components/UnitIcon";
 
 /**
  * How many cells the grid draws before it stops, in the shape `UnitPicker.tsx`'s
@@ -123,6 +123,9 @@ export default function GameUnitsPage() {
     game?.primaryArchive.name,
     allCellIds,
   );
+  // No pics yet is not the same as no pics: a cell said nothing about a
+  // unit's picture either way, which read the same as a game that ships none.
+  const buildpicsPending = !buildpics && allCellIds.length > 0;
 
   if (error && !data)
     return (
@@ -221,6 +224,7 @@ export default function GameUnitsPage() {
                   cell={cell}
                   gameName={game.name}
                   display={buildpics?.units[cell.id]}
+                  pending={buildpicsPending}
                 />
               ))}
             </ul>
@@ -250,28 +254,20 @@ function UnitCellItem({
   cell,
   gameName,
   display,
+  pending,
 }: {
   cell: UnitCell;
   gameName: string;
   display?: UnitDisplay;
+  pending: boolean;
 }) {
-  const src = unitIconSrc(display);
   return (
     <li>
       <Link
         to={`/content/games/${encodeURIComponent(gameName)}/units/${encodeURIComponent(cell.id)}`}
         className="flex flex-col items-center gap-1 rounded-lg border border-border/50 bg-card p-2 text-center transition-colors hover:border-border hover:bg-accent/50"
       >
-        {src ? (
-          <img
-            src={src}
-            alt=""
-            loading="lazy"
-            className="size-16 rounded object-contain"
-          />
-        ) : (
-          <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
-        )}
+        <UnitIcon display={display} pending={pending} size="xl" />
         {/* Wraps to a second line rather than truncating: a game unit's name
             (e.g. SplinterFaction's "Federation of Kala Command Unit") is
             often too long for the cell, and cutting it off leaves cells
