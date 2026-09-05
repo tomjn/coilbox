@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel, settings)."
+description = "Allows the mapconv plugin's commands (probe, suggest-sources, compile, decompile, cancel)."
 permissions = [
   "allow-mc-probe",
   "allow-mc-suggest-sources",
@@ -14,6 +14,4 @@ permissions = [
   "allow-mc-cancel",
   "allow-mc-open-path",
   "allow-mc-open-url",
-  "allow-mc-settings-load",
-  "allow-mc-settings-save",
 ]

@@ -6,14 +6,12 @@
 
 mod archive;
 mod mapinfo;
-mod settings;
 mod sidecar;
 mod smf;
 
 use image::GenericImageView;
 use picoframe_core::CliResult;
 use serde_json::json;
-use settings::{load_settings, save_settings, Settings};
 use sidecar::{
     build_compile_args, build_decompile_args, match_sources, resolve_sidecar, CompileOpts,
     DecompileOpts, LogLine,
@@ -44,12 +42,6 @@ fn missing(name: &str) -> String {
 fn sidecar_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Option<PathBuf> {
     let base = app.path().resource_dir().ok();
     resolve_sidecar(base.as_deref(), name)
-}
-
-/// The plugin's settings-file path under app-data.
-fn settings_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let base = coilbox_portable::data_dir(app)?.join("mapconv");
-    Ok(base.join("settings.json"))
 }
 
 /// Standard base64 (no line breaks), for embedding the extracted minimap as a
@@ -817,36 +809,6 @@ async fn mc_open_url(url: String) -> CliResult {
     }
 }
 
-/// `mc_settings_load` — read the whole settings map, backing the frame's
-/// `SettingsStorage` adapter at app boot.
-#[tauri::command]
-async fn mc_settings_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
-    let path = match settings_path(&app) {
-        Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    Ok(match load_settings(&path) {
-        Ok(entries) => CliResult::ok(json!({ "entries": entries })),
-        Err(e) => CliResult::err(e),
-    })
-}
-
-/// `mc_settings_save` — persist the whole settings map (atomic overwrite).
-#[tauri::command]
-async fn mc_settings_save<R: Runtime>(
-    app: AppHandle<R>,
-    entries: Settings,
-) -> Result<CliResult, ()> {
-    let path = match settings_path(&app) {
-        Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    Ok(match save_settings(&path, &entries) {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e),
-    })
-}
-
 /// Build the plugin. Registered as `"coilbox-mapconv"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-mapconv|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -866,9 +828,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_decompile,
             mc_cancel,
             mc_open_path,
-            mc_open_url,
-            mc_settings_load,
-            mc_settings_save
+            mc_open_url
         ])
         .build()
 }
