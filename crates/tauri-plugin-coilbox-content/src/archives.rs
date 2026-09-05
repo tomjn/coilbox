@@ -9,7 +9,9 @@
 //! only when its immediate parent is one of those three directories, which keeps
 //! the guard in Rust rather than trusting the caller to have hidden the button.
 
-use std::path::Path;
+use picoframe_core::CliResult;
+use serde_json::json;
+use std::path::{Path, PathBuf};
 
 /// Archive extensions a user can have downloaded. `.sdp` is a rapid package.
 const ARCHIVE_EXTS: &[&str] = &["sd7", "sdz", "sdd", "sdp"];
@@ -71,6 +73,20 @@ pub(crate) fn delete(path: &Path) -> Result<u64, String> {
             std::fs::remove_dir_all(path).map_err(|e| format!("delete failed: {e}"))?;
             Ok(bytes)
         }
+    }
+}
+
+/// `content_delete_archive`: delete one downloaded game or map archive and
+/// report the bytes it freed. `path` is an on-disk archive path from a scan.
+/// Guarded by [`classify`], which refuses anything outside a content
+/// root's `games`/`maps`/`packages` so the engine's base archives cannot go.
+#[tauri::command]
+pub(crate) async fn content_delete_archive(path: String) -> CliResult {
+    let p = PathBuf::from(&path);
+    match tauri::async_runtime::spawn_blocking(move || delete(&p)).await {
+        Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete archive task failed: {e}")),
     }
 }
 
