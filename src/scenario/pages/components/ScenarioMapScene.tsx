@@ -119,8 +119,6 @@ import {
   addWaypoint,
   editGroup,
   groupLabel,
-  parsePathKey,
-  parsePathLineKey,
   pathLineKey,
   removeGroup,
   targetOptions,
@@ -149,15 +147,12 @@ import {
   removeSelection,
 } from "./selection";
 import { modeDigit } from "./shortcuts";
-import { startMarkers } from "./startPositions";
 import { useCameraMovement, useMapCamera } from "./useMapCamera";
 import { useMapKeyboard } from "./useMapKeyboard";
+import { useMapOverlays } from "./useMapOverlays";
 import { useMapPlacementPreview } from "./useMapPlacementPreview";
 import { useMapSelection, useSelectionCleanup } from "./useMapSelection";
-import { useScenarioPaths } from "./useScenarioPaths";
-import { useScenarioStarts } from "./useScenarioStarts";
-import { useScenarioZones } from "./useScenarioZones";
-import { parseZoneKey, removeZone, renameZone, zoneExtent } from "./zones";
+import { removeZone, renameZone, zoneExtent } from "./zones";
 
 /** How long one building of a build order stands on screen before the next one
  *  arrives. Slow enough to read the base going up, brisk enough that a
@@ -331,8 +326,6 @@ export const ScenarioMapScene = forwardRef<
     sayRef,
   } = useMapSelection(scenario);
 
-  const groups = scenario.groups;
-
   // Which base the author asked to edit the shared layout of (issue #1414).
   // Held against the base rather than as a mode of the editor, so working on
   // another base is back to the answer that loses nobody's work: a copy.
@@ -425,64 +418,33 @@ export const ScenarioMapScene = forwardRef<
     [onChange, setSelected],
   );
 
-  // A zone key names either the zone or one of its resize handles, and both
-  // mean the same zone is what is selected.
-  const zoneRef = selected ? parseZoneKey(selected) : null;
-  const pickedZone =
-    scenario.zones.find((zone) => zone.id === zoneRef?.id) ?? null;
-
-  const { draftZones } = behaviour;
-  const zones = useMemo(
-    () => (draftZones ? [...scenario.zones, ...draftZones] : scenario.zones),
-    [scenario.zones, draftZones],
-  );
-  const zonesLayer = useScenarioZones(
-    handle,
-    zones,
-    assets,
-    units.groundAt,
-    pickedZone?.id ?? null,
-  );
-
-  // The map's own start positions, which is what an author orients against and
-  // the only way to see where a participant would come down.
-  const { startPositions } = assets;
-  const { setup } = scenario;
-  const starts = useMemo(
-    () => startMarkers(startPositions, setup),
-    [startPositions, setup],
-  );
-  useScenarioStarts(handle, starts, assets, units.groundAt);
-
   const picked = units.placements.find((p) => p.key === selected) ?? null;
-  // A group is what is being worked on whether one of its units or one of its
-  // waypoints was clicked, so both answer the same question.
-  const pathRef = selected ? parsePathKey(selected) : null;
-  const pickedGroup =
-    groups.find(
-      (group) =>
-        group.id ===
-        (pathRef?.groupId ?? (picked?.kind === "group" ? picked.id : null)),
-    ) ?? null;
 
-  const selectedLine = selected ? parsePathLineKey(selected) : null;
-  // Which of them is being worked on, and so gets knobs on its points: the one a
-  // panel is putting points into, failing that the one a point or a line of is
-  // selected, failing that the selected group's own.
-  const activePath =
-    picking?.pathId ??
-    pathRef?.groupId ??
-    selectedLine ??
-    pickedGroup?.id ??
-    null;
-  const pathsLayer = useScenarioPaths(
+  // The zones sheet, the paths drawn over the ground and the start position
+  // markers: the map's own decorations, and what is currently being worked on
+  // among them, in `useMapOverlays.ts`. Nothing in it calls `onChange`:
+  // renaming `pickedZone`, deleting a waypoint off `pathRef` and removing
+  // `pickedGroup` all stay here, next to the `onChange` calls they make.
+  const { draftZones } = behaviour;
+  const {
+    pickedZone,
+    zonesLayer,
+    pathRef,
+    pickedGroup,
+    selectedLine,
+    pathsLayer,
+  } = useMapOverlays({
     handle,
+    scenario,
+    map: assets,
+    groundAt: units.groundAt,
+    selected,
+    draftZones,
     paths,
-    assets,
-    units.groundAt,
-    activePath,
-    pathRef ? selected : null,
-  );
+    startPositions: assets.startPositions,
+    pickingPathId: picking?.pathId,
+    picked,
+  });
 
   // The game's own units, for the panels that pick one and for the build grid
   // every base building is dragged and turned onto.
