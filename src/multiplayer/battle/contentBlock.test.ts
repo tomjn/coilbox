@@ -9,6 +9,7 @@ function content(p: Partial<LaunchContent> = {}): LaunchContent {
   return {
     hasTarget: true,
     targetLoading: false,
+    unreadable: false,
     contentKnown: true,
     mapMissing: false,
     gameMissing: false,
@@ -62,6 +63,17 @@ describe("launchBlock", () => {
     expect(
       launchBlock(content({ hasTarget: false, targetLoading: true })),
     ).toBeNull();
+  });
+
+  // An unreadable install means "unknown", not "missing" (issue #1386, #2458):
+  // reporting the content as missing would send a player chasing a download
+  // for something they may already have.
+  it("blocks with its own reason when the install cannot be read, even if a stale missing flag is set", () => {
+    const block = launchBlock(
+      content({ unreadable: true, contentKnown: false, mapMissing: true }),
+    );
+    expect(block?.short).toBe("Can't check content");
+    expect(block?.reason).toContain("could not read");
   });
 
   it("falls back to a generic noun when the host named nothing", () => {

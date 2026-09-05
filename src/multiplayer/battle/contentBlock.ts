@@ -17,6 +17,15 @@ export interface LaunchContent {
   hasTarget: boolean;
   targetLoading: boolean;
   /**
+   * The content scan stopped without saying what is installed and will not try
+   * again on its own, e.g. a preferred engine with no libunitsync in it (mirrors
+   * `resolveContent.ts`'s `unreadable`, issue #1386). Whether the map or game is
+   * present is unknown here, not false, so this blocks on its own rather than
+   * falling through to `mapMissing`/`gameMissing`: reporting "missing" would send
+   * a player chasing a download for content they may already have.
+   */
+  unreadable: boolean;
+  /**
    * The content scan has settled, so a missing verdict is a fact rather than a
    * list that has not loaded yet. A false verdict mid-scan reads as "you do not
    * have this game" for a game that is installed.
@@ -50,6 +59,13 @@ export function launchBlock(c: LaunchContent): LaunchBlock | null {
       short: "No engine",
       reason:
         "No engine is selected, so this battle cannot start. Add a content folder with an engine in Settings, Content folders.",
+    };
+  }
+  if (c.unreadable) {
+    return {
+      short: "Can't check content",
+      reason:
+        "Coilbox could not read what is installed, so it cannot tell whether you have this battle's game or map. Pick another engine in Settings, Engines to fix this.",
     };
   }
   if (!c.contentKnown) return null;
