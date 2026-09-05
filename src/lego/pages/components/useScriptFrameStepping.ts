@@ -9,8 +9,8 @@ import {
   applyTimelineFrame,
   restoreFromPlayback,
 } from "./animationPlayback";
+import { disposeBaked, showBaked } from "./bakedPlayback";
 import { attachGizmo } from "./gizmoCommit";
-import { disposeBaked, showBaked } from "./ModelViewport";
 import { type SceneState, syncScene } from "./sceneState";
 
 export interface ScriptFrameSteppingDeps {

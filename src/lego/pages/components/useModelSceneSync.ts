@@ -2,7 +2,8 @@ import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
-import { applySceneScale, frameObject, showBaked } from "./ModelViewport";
+import { showBaked } from "./bakedPlayback";
+import { applySceneScale, frameObject } from "./ModelViewport";
 import { type SceneState, syncScene } from "./sceneState";
 
 /**
