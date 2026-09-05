@@ -1548,50 +1548,6 @@ async fn content_prune_rapid_pool(root: String, apply: bool) -> CliResult {
     }
 }
 
-/// `content_reclaim_caches` — size (and, when `apply`, clear) the app's grow-only
-/// generated-image / info caches under the app cache dir. `apply=false` is a dry
-/// run that reports per-cache sizes without deleting. Every cache regenerates on
-/// demand, so clearing is always safe.
-#[tauri::command]
-async fn content_reclaim_caches<R: Runtime>(app: AppHandle<R>, apply: Option<bool>) -> CliResult {
-    let cache_root = match coilbox_portable::cache_dir(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    let apply = apply.unwrap_or(false);
-    match tauri::async_runtime::spawn_blocking(move || caches::reclaim(&cache_root, apply)).await {
-        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
-        Err(e) => CliResult::err(format!("reclaim task failed: {e}")),
-    }
-}
-
-/// `content_storage_overview`: where one content root's disk has gone, broken
-/// down by engines, games, maps, replays, saves, the rapid pool and everything
-/// else (issue #386). One root per call, so the UI can render each as it lands.
-/// A recursive walk of a large pool is not instant. See [`storage::overview`].
-#[tauri::command]
-async fn content_storage_overview(root: String) -> CliResult {
-    let p = PathBuf::from(&root);
-    match tauri::async_runtime::spawn_blocking(move || storage::overview(&p)).await {
-        Ok(overview) => CliResult::ok(json!({ "overview": overview })),
-        Err(e) => CliResult::err(format!("storage overview task failed: {e}")),
-    }
-}
-
-/// `content_delete_engine`: remove one installed engine directory and report the
-/// bytes it freed. Guarded by [`storage::delete_engine`], which only accepts a
-/// real directory sitting inside a folder named `engine`, so the command cannot
-/// be turned into an arbitrary recursive delete.
-#[tauri::command]
-async fn content_delete_engine(path: String) -> CliResult {
-    let p = PathBuf::from(&path);
-    match tauri::async_runtime::spawn_blocking(move || storage::delete_engine(&p)).await {
-        Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("delete engine task failed: {e}")),
-    }
-}
-
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -1641,9 +1597,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_widget_remove,
             content_warm_rapid_pool,
             content_prune_rapid_pool,
-            content_reclaim_caches,
-            content_storage_overview,
-            content_delete_engine,
+            caches::content_reclaim_caches,
+            storage::content_storage_overview,
+            storage::content_delete_engine,
             build_tree_export::content_export_build_tree_html,
             build_tree_export::content_export_build_tree_zip,
             content_export_challenge,
