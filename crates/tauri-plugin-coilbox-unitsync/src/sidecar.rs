@@ -211,6 +211,12 @@ pub fn build_unit_script_args(lib: &str, datadir: &str, game: &str, unit: &str) 
 ///
 /// The objects travel by file for the same reason `--unit-render-keys`' units do:
 /// a blueprint's worth of them is past what Windows takes on a command line.
+///
+/// The mode's own fields and cross field rule (both the units file and the
+/// cache directory are required, checked by the worker's `from_args`) live
+/// once in `coilbox_unitsync_worker::UnitModelsArgs`, so this function only
+/// has to add `--lib`/`--datadir`, which every mode takes and `Mode::to_args`
+/// does not include (issue #2448).
 pub fn build_unit_models_args(
     lib: &str,
     datadir: &str,
@@ -218,13 +224,13 @@ pub fn build_unit_models_args(
     units_file: &str,
     cache_dir: &str,
 ) -> Vec<String> {
+    let mode = coilbox_unitsync_worker::Mode::UnitModels(coilbox_unitsync_worker::UnitModelsArgs {
+        game: game.into(),
+        units_file: units_file.into(),
+        cache_dir: cache_dir.into(),
+    });
     let mut args = build_args(lib, datadir);
-    args.push("--unit-models".into());
-    args.push("--game".into());
-    args.push(game.into());
-    args.push("--units-file".into());
-    args.push(units_file.into());
-    push_cache_dir(&mut args, Some(cache_dir));
+    args.extend(mode.to_args());
     args
 }
 
@@ -857,24 +863,34 @@ mod tests {
         assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
     }
 
-    /// The batch's units travel in a file, and the cache directory is where the
-    /// models it writes end up, so both have to reach the worker.
+    /// The whole point of sharing `UnitModelsArgs` with the worker: what
+    /// `build_unit_models_args` writes, the worker's own `from_args` reads
+    /// back whole. A test that only checks a flag appears at some position
+    /// cannot catch the sidecar and the worker disagreeing about the mode's
+    /// fields, and this one can (issue #2448).
     #[test]
-    fn build_unit_models_args_carry_the_game_the_units_file_and_the_cache_dir() {
+    fn build_unit_models_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UnitModelsArgs;
+
+        let expected = UnitModelsArgs {
+            game: "BAR.sdd".into(),
+            units_file: "/tmp/objects.json".into(),
+            cache_dir: "/cache/models".into(),
+        };
         let a = build_unit_models_args(
             "/eng/libunitsync.so",
             "/data",
-            "BAR.sdd",
-            "/tmp/objects.json",
-            "/cache/models",
+            &expected.game,
+            &expected.units_file,
+            &expected.cache_dir,
         );
-        assert!(a.contains(&"--unit-models".to_string()));
+        assert!(
+            a.contains(&"--lib".to_string()),
+            "the shared lib/datadir args are still prepended"
+        );
         assert!(!a.contains(&"--unit-model".to_string()));
-        let g = a.iter().position(|x| x == "--game").unwrap();
-        assert_eq!(a[g + 1], "BAR.sdd");
-        let u = a.iter().position(|x| x == "--units-file").unwrap();
-        assert_eq!(a[u + 1], "/tmp/objects.json");
-        assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
+        let recovered = UnitModelsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, expected);
     }
 
     /// The whole point of sharing `UnitRenderArgs` with the worker: what
