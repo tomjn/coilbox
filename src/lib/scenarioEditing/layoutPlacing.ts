@@ -28,7 +28,7 @@ import type { SnapBuilding } from "@/blueprint/footprint";
 import { recordGameName, type StoredBlueprint } from "@/blueprint/library";
 import type { BlueprintBuilding } from "@/blueprint/model";
 import type { PreviewBuilding } from "@/placement/preview";
-import type { Point, Scenario } from "../../model";
+import type { Point, Scenario } from "@/scenario/model";
 
 /** Where a layout the editor is about to place is coming from. */
 export type LayoutSource = "scenario" | "library";

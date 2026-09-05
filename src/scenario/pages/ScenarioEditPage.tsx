@@ -32,6 +32,16 @@ import { useUnitsyncScan } from "@/content/config";
 import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { ErrorBoundary } from "@/general/ErrorBoundary";
+import {
+  type EditHistory,
+  emptyHistory,
+  isRedoKey,
+  isTypingTarget,
+  isUndoKey,
+  modKeyLabel,
+  redoEdit,
+  undoEdit,
+} from "@/lib/scenarioEditing/history";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
 import { scenarioIsAttached } from "../../campaign/missionScenario";
@@ -50,16 +60,6 @@ import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { duplicateScenario } from "./components/duplicate";
 import { applyEdit, type ScenarioEdit } from "./components/edits";
-import {
-  type EditHistory,
-  emptyHistory,
-  isRedoKey,
-  isTypingTarget,
-  isUndoKey,
-  modKeyLabel,
-  redoEdit,
-  undoEdit,
-} from "./components/history";
 import { MissionLuaView } from "./components/MissionLuaView";
 import { MissionProblemsList } from "./components/MissionProblemsList";
 import { ObjectivePanel } from "./components/ObjectivePanel";

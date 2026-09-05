@@ -88,6 +88,13 @@ import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { nextDrawerKey } from "@/general/drawerKey";
 import {
+  buildableBy,
+  movedQueued,
+  plusQueued,
+  strayDefs,
+  withoutQueued,
+} from "@/lib/scenarioEditing/bases";
+import {
   BuildOrderPopover,
   LayoutNameField,
   LayoutNotes,
@@ -96,13 +103,6 @@ import {
 import type { Participant } from "@/play/config";
 import type { PlacedBuilding, ScenarioBase } from "../../model";
 import type { MissionIssue } from "../../validate";
-import {
-  buildableBy,
-  movedQueued,
-  plusQueued,
-  strayDefs,
-  withoutQueued,
-} from "./bases";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { FieldProblem, RowProblem } from "./panels";
 import { SubstituteBaseForm } from "./SubstituteBaseForm";

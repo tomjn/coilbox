@@ -15,11 +15,11 @@ import {
   ONE_SQUARE,
   type Standing,
 } from "@/blueprint/footprint";
+import { addBase, setOrigin } from "@/lib/scenarioEditing/bases";
+import { addActor } from "@/lib/scenarioEditing/editing";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
-import { addBase, setOrigin } from "./bases";
 import { sceneContents } from "./contents";
-import { addActor } from "./editing";
 import { addGroup, addWaypoint, pathKey } from "./groups";
 import {
   addedPointWords,

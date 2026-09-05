@@ -22,13 +22,13 @@ import {
 } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Scenario } from "../../model";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import type { Scenario } from "../../model";
 import {
   CommandRestrictionPanel,
   UnitRestrictionPanel,

@@ -12,6 +12,7 @@
  * picked is `focusCamera` in `scene.ts`.
  */
 
+import { GROUP_SPACING } from "@/lib/scenarioEditing/placements";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
 import {
   baseBuildings,
@@ -20,7 +21,6 @@ import {
   type Scenario,
 } from "../../model";
 import { baseLabels, groupSize, parsePathKey, uniqueLabels } from "./groups";
-import { GROUP_SPACING } from "./placements";
 import { parseZoneKey, zoneCenter, zoneExtent, zoneKey } from "./zones";
 
 /** The kinds of thing the list holds, in the order it lists them. */

@@ -41,6 +41,31 @@ import {
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
+import {
+  editBase,
+  editBaseLayout,
+  type LayoutEdit,
+  moveBuilding,
+  removeBase,
+  removeBlueprint,
+  renameBlueprint,
+  setBlueprintOrdered,
+  setOrigin,
+  setQueue,
+  sharingLayout,
+  substituteQueues,
+} from "@/lib/scenarioEditing/bases";
+import {
+  canTurn,
+  duplicatePlacement,
+  editActor,
+  removePlacement,
+  setActorState,
+  turnPlacement,
+} from "@/lib/scenarioEditing/editing";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
+import type { LayoutChoice } from "@/lib/scenarioEditing/layoutPlacing";
+import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { useFieldText } from "@/lib/useFieldText";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
@@ -99,20 +124,6 @@ import {
 import type { MissionIssue } from "../../validate";
 import { ActorControls } from "./ActorControls";
 import { BaseControls } from "./BaseControls";
-import {
-  editBase,
-  editBaseLayout,
-  type LayoutEdit,
-  moveBuilding,
-  removeBase,
-  removeBlueprint,
-  renameBlueprint,
-  setBlueprintOrdered,
-  setOrigin,
-  setQueue,
-  sharingLayout,
-  substituteQueues,
-} from "./bases";
 import { ContentsList } from "./ContentsList";
 import {
   type ContentEntry,
@@ -120,14 +131,6 @@ import {
   sceneContents,
   unplacedLayouts,
 } from "./contents";
-import {
-  canTurn,
-  duplicatePlacement,
-  editActor,
-  removePlacement,
-  setActorState,
-  turnPlacement,
-} from "./editing";
 import type { ScenarioEdit } from "./edits";
 import { GroupControls } from "./GroupControls";
 import {
@@ -141,8 +144,6 @@ import {
   removeGroup,
   targetOptions,
 } from "./groups";
-import { isTypingTarget } from "./history";
-import type { LayoutChoice } from "./layoutPlacing";
 import {
   type MapStep,
   type MapThings,
@@ -152,7 +153,6 @@ import {
 } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
-import { scenarioPlacements } from "./placements";
 import type { RowFocus } from "./problemTargets";
 import { turnSelectionAround } from "./rigidTurn";
 import {

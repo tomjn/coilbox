@@ -15,19 +15,19 @@
 import { describe, expect, it } from "vitest";
 
 import type { BaseBlueprint } from "@/blueprint/model";
-import type { Scenario } from "@/scenario/model";
-import { renameBlueprint } from "@/scenario/pages/components/bases";
+import { renameBlueprint } from "@/lib/scenarioEditing/bases";
 import {
   movePlacement,
   removePlacement,
   turnPlacement,
-} from "@/scenario/pages/components/editing";
+} from "@/lib/scenarioEditing/editing";
 import {
   type EditHistory,
   emptyHistory,
   redoEdit,
   undoEdit,
-} from "@/scenario/pages/components/history";
+} from "@/lib/scenarioEditing/history";
+import type { Scenario } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID } from "./blueprintDocument";
 import { applyLayoutEdit } from "./blueprintHistory";
 import { placementKey } from "./placements";

@@ -26,7 +26,7 @@ import {
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "@/scenario/pages/components/history";
+} from "@/lib/scenarioEditing/history";
 import { LayoutNameField } from "./LayoutControls";
 
 afterEach(cleanup);

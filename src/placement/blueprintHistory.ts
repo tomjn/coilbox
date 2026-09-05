@@ -25,7 +25,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { BaseBlueprint } from "@/blueprint/model";
-import type { Scenario } from "@/scenario/model";
 import {
   type EditHistory,
   emptyHistory,
@@ -35,7 +34,8 @@ import {
   recordEdit,
   redoEdit,
   undoEdit,
-} from "@/scenario/pages/components/history";
+} from "@/lib/scenarioEditing/history";
+import type { Scenario } from "@/scenario/model";
 import { blueprintDocument, documentLayout } from "./blueprintDocument";
 
 /** An edit to the document a layout is placed in, which is what every rule in

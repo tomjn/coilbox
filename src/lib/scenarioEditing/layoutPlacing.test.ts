@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildGridSnap } from "@/blueprint/footprint";
 import type { StoredBlueprint } from "@/blueprint/library";
-import { newScenario } from "../../create";
-import type { Scenario } from "../../model";
+import { newScenario } from "@/scenario/create";
+import type { Scenario } from "@/scenario/model";
 import {
   layoutChoiceKey,
   layoutGhost,

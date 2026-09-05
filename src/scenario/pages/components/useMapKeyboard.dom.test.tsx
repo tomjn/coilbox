@@ -14,17 +14,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useCallback, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { addBase } from "@/lib/scenarioEditing/bases";
+import { addActor } from "@/lib/scenarioEditing/editing";
+import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { baseFootprints, type Placement } from "@/placement/placements";
 import type { PlaceKind } from "@/placement/preview";
 import { newScenario } from "../../create";
 import type { Point, Scenario } from "../../model";
-import { addBase } from "./bases";
 import { sceneContents } from "./contents";
-import { addActor } from "./editing";
 import { editedScenario } from "./edits";
 import { addGroup, pathKey } from "./groups";
 import { scenarioPaths } from "./orderPaths";
-import { scenarioPlacements } from "./placements";
 import {
   type MapSelection,
   primaryKey,

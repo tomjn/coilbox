@@ -43,7 +43,6 @@ import {
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
-import { baseBuildings, type Point } from "@/scenario/model";
 import {
   addBuilding,
   buildingUnits,
@@ -52,13 +51,14 @@ import {
   renameBlueprint,
   setBlueprintOrdered,
   strayDefs,
-} from "@/scenario/pages/components/bases";
+} from "@/lib/scenarioEditing/bases";
 import {
   movePlacement,
   removePlacement,
   turnPlacement,
-} from "@/scenario/pages/components/editing";
-import { isTypingTarget } from "@/scenario/pages/components/history";
+} from "@/lib/scenarioEditing/editing";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
+import { baseBuildings, type Point } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
 import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";

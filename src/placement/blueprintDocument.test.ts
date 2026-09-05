@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { BaseBlueprint } from "@/blueprint/model";
-import { addBuilding, removeBuilding } from "@/scenario/pages/components/bases";
-import { movePlacement } from "@/scenario/pages/components/editing";
+import { addBuilding, removeBuilding } from "@/lib/scenarioEditing/bases";
+import { movePlacement } from "@/lib/scenarioEditing/editing";
 import {
   BLUEPRINT_BASE_ID,
   blueprintDocument,

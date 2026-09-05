@@ -14,7 +14,7 @@
  * so a button's tooltip and the overflow menu's list read the same words.
  */
 
-import { modKeyLabel } from "./history";
+import { modKeyLabel } from "@/lib/scenarioEditing/history";
 
 /** The parts of a key press these read, so they can be tested without a DOM,
  *  the same narrowing `history.ts`'s shortcuts use. */

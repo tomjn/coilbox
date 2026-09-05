@@ -27,14 +27,14 @@ import {
 } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NO_EXTENSIONS } from "../../extensions";
-import type { Scenario } from "../../model";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import { NO_EXTENSIONS } from "../../extensions";
+import type { Scenario } from "../../model";
 import { VarPanel } from "./VarPanel";
 
 // The panel's delete notice has no shell here (issue #2280), the same gap

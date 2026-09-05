@@ -18,8 +18,8 @@
  */
 
 import type { BaseBlueprint } from "@/blueprint/model";
+import { addBase, setBlueprintOrdered } from "@/lib/scenarioEditing/bases";
 import type { Point, Scenario } from "../../model";
-import { addBase, setBlueprintOrdered } from "./bases";
 
 export function takeBlueprint(
   scenario: Scenario,

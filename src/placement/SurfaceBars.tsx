@@ -36,7 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { modKeyLabel } from "@/scenario/pages/components/history";
+import { modKeyLabel } from "@/lib/scenarioEditing/history";
 
 /**
  * The way back from an edit, and forward again.

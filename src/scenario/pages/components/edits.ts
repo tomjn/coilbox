@@ -23,8 +23,12 @@
  * each other lost an edit too, which is what `saving.ts` is about.
  */
 
+import {
+  type EditHistory,
+  type HistoryStep,
+  recordEdit,
+} from "@/lib/scenarioEditing/history";
 import type { Scenario } from "../../model";
-import { type EditHistory, type HistoryStep, recordEdit } from "./history";
 
 /** A document, or how to make one from the document as it stands. */
 export type ScenarioEdit = Scenario | ((current: Scenario) => Scenario);

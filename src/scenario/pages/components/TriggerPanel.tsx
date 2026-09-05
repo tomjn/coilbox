@@ -38,6 +38,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { modKeyLabel } from "@/lib/scenarioEditing/history";
 import { useFieldProblem } from "@/lib/useFieldProblem";
 import { useFieldText } from "@/lib/useFieldText";
 import type { ExtensionTypes } from "../../extensions";
@@ -47,7 +48,6 @@ import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import { notifyDeleted } from "./deleteNotice";
 import { focusListRow } from "./focusListRow";
-import { modKeyLabel } from "./history";
 import { EditorPanel, type EditorPanelHandle, FieldProblem } from "./panels";
 import type { RowFocus } from "./problemTargets";
 import { AddStep, StepRow } from "./TriggerSteps";

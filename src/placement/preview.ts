@@ -36,13 +36,13 @@ import {
   snapToBuildGrid,
   unjudged,
 } from "@/blueprint/footprint";
+import { turnFacing } from "@/lib/scenarioEditing/editing";
 import {
   baseBuildings,
   type Facing,
   type Point,
   type Scenario,
 } from "@/scenario/model";
-import { turnFacing } from "@/scenario/pages/components/editing";
 import {
   type BuildingUnit,
   type Placement,

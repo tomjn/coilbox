@@ -25,16 +25,19 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useMemo, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { newScenario } from "../../create";
-import type { ActorState, Scenario, ScenarioActor } from "../../model";
-import { ActorControls } from "./ActorControls";
-import { MIN_ACTOR_HP, normaliseActorState } from "./editing";
+import {
+  MIN_ACTOR_HP,
+  normaliseActorState,
+} from "@/lib/scenarioEditing/editing";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import { newScenario } from "../../create";
+import type { ActorState, Scenario, ScenarioActor } from "../../model";
+import { ActorControls } from "./ActorControls";
 import { missionProblemsIn } from "./useMissionProblems";
 
 afterEach(cleanup);

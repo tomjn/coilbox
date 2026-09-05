@@ -7,13 +7,13 @@ import {
   substituteBlueprint,
 } from "@/blueprint/substitution";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { newScenario } from "../../create";
+import { newScenario } from "@/scenario/create";
 import {
   baseBuildings,
   parseScenarioJson,
   type Scenario,
   type ScenarioBase,
-} from "../../model";
+} from "@/scenario/model";
 import {
   addBase,
   addBuilding,

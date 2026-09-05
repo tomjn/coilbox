@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BaseBlueprint } from "@/blueprint/model";
-import type { Scenario } from "../../model";
+import type { Scenario } from "@/scenario/model";
 import {
   type EditHistory,
   emptyHistory,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import type { Participant } from "@/play/config";
 import type { Scenario } from "@/scenario/model";
-import { scenarioPlacements } from "@/scenario/pages/components/placements";
 import {
   absentIn,
   baseFootprints,

@@ -19,15 +19,15 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { NO_EXTENSIONS } from "../../extensions";
-import type { Scenario, ScenarioParam } from "../../model";
-import type { MissionIssue } from "../../validate";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import { NO_EXTENSIONS } from "../../extensions";
+import type { Scenario, ScenarioParam } from "../../model";
+import type { MissionIssue } from "../../validate";
 import { StepRow } from "./TriggerSteps";
 import type { StepList } from "./triggers";
 

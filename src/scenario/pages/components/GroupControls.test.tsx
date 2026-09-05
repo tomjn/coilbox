@@ -22,16 +22,16 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useMemo, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { newScenario } from "../../create";
-import type { GroupUnit, Scenario } from "../../model";
-import { GroupControls, UnitRow } from "./GroupControls";
-import { MAX_GROUP_COUNT } from "./groups";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import { newScenario } from "../../create";
+import type { GroupUnit, Scenario } from "../../model";
+import { GroupControls, UnitRow } from "./GroupControls";
+import { MAX_GROUP_COUNT } from "./groups";
 import { missionProblemsIn } from "./useMissionProblems";
 
 afterEach(cleanup);

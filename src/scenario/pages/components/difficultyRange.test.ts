@@ -9,12 +9,12 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { editBase } from "@/lib/scenarioEditing/bases";
+import { editActor } from "@/lib/scenarioEditing/editing";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
 import { usesDifficulty } from "../../model";
-import { editBase } from "./bases";
 import { rangeWith } from "./DifficultyRangeFields";
-import { editActor } from "./editing";
 import { editGroup } from "./groups";
 import { editTrigger } from "./triggers";
 

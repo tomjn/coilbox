@@ -22,13 +22,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ScenarioZone } from "../../model";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import type { ScenarioZone } from "../../model";
 import { ZoneBar } from "./ScenarioMapScene";
 
 afterEach(cleanup);

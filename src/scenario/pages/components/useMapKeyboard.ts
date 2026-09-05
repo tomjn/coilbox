@@ -27,14 +27,14 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
+import { setOrigin } from "@/lib/scenarioEditing/bases";
+import { canTurn } from "@/lib/scenarioEditing/editing";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { mapKeyAction } from "@/placement/mapKeys";
 import type { PlaceKind } from "@/placement/preview";
 import type { Point, Scenario } from "../../model";
-import { setOrigin } from "./bases";
-import { canTurn } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import { addWaypoint } from "./groups";
-import { isTypingTarget } from "./history";
 import {
   addedPointWords,
   cursorWords,

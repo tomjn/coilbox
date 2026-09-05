@@ -12,9 +12,9 @@
  * author draws one area and the mission tests another.
  */
 
+import { turnedAbout } from "@/lib/scenarioEditing/editing";
 import type { Heading } from "@/placement/mapKeys";
 import type { Point, Scenario, ScenarioZone } from "../../model";
-import { turnedAbout } from "./editing";
 
 /**
  * The smallest a zone may be, in elmos: the side of a box, or the radius of a

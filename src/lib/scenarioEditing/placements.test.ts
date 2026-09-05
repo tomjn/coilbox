@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { baseFootprints } from "@/placement/placements";
-import type { Scenario } from "../../model";
+import type { Scenario } from "@/scenario/model";
 import { groupFormationOffset, scenarioPlacements } from "./placements";
 
 type Registries = Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">;

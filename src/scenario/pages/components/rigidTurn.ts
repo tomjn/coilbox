@@ -65,8 +65,8 @@
  */
 
 import type { FootprintMark } from "@/blueprint/footprint";
+import { turnedAbout } from "@/lib/scenarioEditing/editing";
 import type { Point, Scenario } from "../../model";
-import { turnedAbout } from "./editing";
 import {
   type LayoutEditFor,
   moveOnMap,

@@ -44,6 +44,20 @@ import { useUnitsyncScan } from "@/content/config";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import {
+  addBase,
+  addBuilding,
+  buildingUnits,
+  type LayoutEdit,
+  placeBlueprint,
+} from "@/lib/scenarioEditing/bases";
+import { addActor } from "@/lib/scenarioEditing/editing";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
+import {
+  type LayoutChoice,
+  layoutGhost,
+  layoutOrigin,
+} from "@/lib/scenarioEditing/layoutPlacing";
+import {
   type Placement,
   parsePlacementKey,
   placementKey,
@@ -57,15 +71,7 @@ import {
   type Scenario,
   type ScenarioZone,
 } from "../../model";
-import {
-  addBase,
-  addBuilding,
-  buildingUnits,
-  type LayoutEdit,
-  placeBlueprint,
-} from "./bases";
 import { takeBlueprint } from "./blueprintImport";
-import { addActor } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import {
   addGroup,
@@ -73,9 +79,7 @@ import {
   DEFAULT_GROUP_COUNT,
   MAX_GROUP_COUNT,
 } from "./groups";
-import { isTypingTarget } from "./history";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
-import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
 import type { PathSource } from "./orderPaths";
 import { boxFromDrag, keysInBox } from "./selection";
 import { TeamSelect } from "./TeamSelect";

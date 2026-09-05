@@ -13,7 +13,7 @@
 
 import type { SnapBuilding } from "@/blueprint/footprint";
 import { type Placement, placementKey } from "@/placement/placements";
-import { baseBuildings, type Point, type Scenario } from "../../model";
+import { baseBuildings, type Point, type Scenario } from "@/scenario/model";
 
 /**
  * How far apart a group's units stand, in elmos.
