@@ -10,8 +10,11 @@
 //! `src/blueprint/library.ts`), so a field added there costs nothing here, and a
 //! document this build cannot read is skipped rather than sinking the list.
 
+use picoframe_core::CliResult;
 use serde::Serialize;
+use serde_json::json;
 use std::path::{Path, PathBuf};
+use tauri::{AppHandle, Runtime};
 
 /// One stored layout: the id it is filed under, and the document itself.
 #[derive(Serialize)]
@@ -87,6 +90,63 @@ pub fn delete(dir: &Path, id: &str) -> Result<(), String> {
         std::fs::remove_file(&path).map_err(|e| format!("delete blueprint: {e}"))?;
     }
     Ok(())
+}
+
+/// Directory holding the blueprint library, under the app data dir.
+fn blueprints_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?.join("blueprints"))
+}
+
+/// `content_blueprints`, every layout in the blueprint library. The documents
+/// are opaque here: the frontend owns their shape.
+#[tauri::command]
+pub(crate) async fn content_blueprints<R: Runtime>(app: AppHandle<R>) -> CliResult {
+    let dir = match blueprints_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    match tauri::async_runtime::spawn_blocking(move || list(&dir)).await {
+        Ok(items) => CliResult::ok(json!({ "items": items })),
+        Err(e) => CliResult::err(format!("list blueprints task failed: {e}")),
+    }
+}
+
+/// `content_blueprint_save`, write one layout under its id, replacing what was
+/// there. Ids are `[A-Za-z0-9-_]+`, which is what a UUID is.
+#[tauri::command]
+pub(crate) async fn content_blueprint_save<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+    json: String,
+) -> CliResult {
+    let dir = match blueprints_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || save(&dir, &id, &json)).await;
+    match res {
+        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("save blueprint task failed: {e}")),
+    }
+}
+
+/// `content_blueprint_delete`, drop one layout from the library.
+#[tauri::command]
+pub(crate) async fn content_blueprint_delete<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+) -> CliResult {
+    let dir = match blueprints_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || delete(&dir, &id)).await;
+    match res {
+        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete blueprint task failed: {e}")),
+    }
 }
 
 #[cfg(test)]
