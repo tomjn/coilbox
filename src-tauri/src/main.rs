@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod asset_protocol;
+mod settings;
 mod win_job;
 
 // Work around a WebKitGTK + AppImage failure on Linux: the AppImage bundles its
@@ -225,7 +226,11 @@ fn main() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![prepare_for_update])
+        .invoke_handler(tauri::generate_handler![
+            prepare_for_update,
+            settings::app_settings_load,
+            settings::app_settings_save
+        ])
         .run(tauri::generate_context!())
         .expect("error while running coilbox");
 }
