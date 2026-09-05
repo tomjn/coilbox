@@ -14,7 +14,9 @@
 //! at the top level that no category names is summed as "other", so a stray
 //! 20 GB folder is visible rather than silently missing from the total.
 
+use picoframe_core::CliResult;
 use serde::Serialize;
+use serde_json::json;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -239,6 +241,33 @@ fn inside_engine_dir(path: &Path) -> bool {
             .map(|n| n.to_string_lossy().eq_ignore_ascii_case(ENGINE_DIR))
             .unwrap_or(false)
     })
+}
+
+/// `content_storage_overview`: where one content root's disk has gone, broken
+/// down by engines, games, maps, replays, saves, the rapid pool and everything
+/// else (issue #386). One root per call, so the UI can render each as it lands.
+/// A recursive walk of a large pool is not instant. See [`overview`].
+#[tauri::command]
+pub(crate) async fn content_storage_overview(root: String) -> CliResult {
+    let p = PathBuf::from(&root);
+    match tauri::async_runtime::spawn_blocking(move || overview(&p)).await {
+        Ok(overview) => CliResult::ok(json!({ "overview": overview })),
+        Err(e) => CliResult::err(format!("storage overview task failed: {e}")),
+    }
+}
+
+/// `content_delete_engine`: remove one installed engine directory and report the
+/// bytes it freed. Guarded by [`delete_engine`], which only accepts a
+/// real directory sitting inside a folder named `engine`, so the command cannot
+/// be turned into an arbitrary recursive delete.
+#[tauri::command]
+pub(crate) async fn content_delete_engine(path: String) -> CliResult {
+    let p = PathBuf::from(&path);
+    match tauri::async_runtime::spawn_blocking(move || delete_engine(&p)).await {
+        Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete engine task failed: {e}")),
+    }
 }
 
 #[cfg(test)]
