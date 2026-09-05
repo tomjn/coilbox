@@ -50,6 +50,7 @@ import {
   type LayoutEdit,
   placeBlueprint,
 } from "@/lib/scenarioEditing/bases";
+import { addActor } from "@/lib/scenarioEditing/editing";
 import {
   type Placement,
   parsePlacementKey,
@@ -65,7 +66,6 @@ import {
   type ScenarioZone,
 } from "../../model";
 import { takeBlueprint } from "./blueprintImport";
-import { addActor } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import {
   addGroup,

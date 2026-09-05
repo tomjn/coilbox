@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BaseBlueprint } from "@/blueprint/model";
 import { addBuilding, removeBuilding } from "@/lib/scenarioEditing/bases";
-import { movePlacement } from "@/scenario/pages/components/editing";
+import { movePlacement } from "@/lib/scenarioEditing/editing";
 import {
   BLUEPRINT_BASE_ID,
   blueprintDocument,

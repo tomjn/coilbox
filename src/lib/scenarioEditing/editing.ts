@@ -35,8 +35,8 @@ import type {
   Scenario,
   ScenarioActor,
   ScenarioGroup,
-} from "../../model";
-import { baseBuildings } from "../../model";
+} from "@/scenario/model";
+import { baseBuildings } from "@/scenario/model";
 
 /** Positions are whole elmos. The engine takes fractions, but nothing in an
  *  editor gains from writing 1023.9997 into a document. */

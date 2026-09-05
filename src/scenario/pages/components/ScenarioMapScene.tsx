@@ -55,6 +55,14 @@ import {
   sharingLayout,
   substituteQueues,
 } from "@/lib/scenarioEditing/bases";
+import {
+  canTurn,
+  duplicatePlacement,
+  editActor,
+  removePlacement,
+  setActorState,
+  turnPlacement,
+} from "@/lib/scenarioEditing/editing";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { useFieldText } from "@/lib/useFieldText";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
@@ -121,14 +129,6 @@ import {
   sceneContents,
   unplacedLayouts,
 } from "./contents";
-import {
-  canTurn,
-  duplicatePlacement,
-  editActor,
-  removePlacement,
-  setActorState,
-  turnPlacement,
-} from "./editing";
 import type { ScenarioEdit } from "./edits";
 import { GroupControls } from "./GroupControls";
 import {

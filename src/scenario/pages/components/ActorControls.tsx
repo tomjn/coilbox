@@ -50,12 +50,12 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { MIN_ACTOR_HP } from "@/lib/scenarioEditing/editing";
 import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
 import type { ActorState, Facing, ScenarioActor } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { DifficultyRangeFields } from "./DifficultyRangeFields";
-import { MIN_ACTOR_HP } from "./editing";
 import { FieldProblem, RowProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
 import { entryFieldProblem } from "./triggerProblems";

@@ -3,8 +3,8 @@ import { BUILD_SQUARE, buildGridSnap } from "@/blueprint/footprint";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { dragKeys } from "@/placement/placements";
 import { draggedBuilding } from "@/placement/preview";
-import { newScenario } from "../../create";
-import type { Point, Scenario } from "../../model";
+import { newScenario } from "@/scenario/create";
+import type { Point, Scenario } from "@/scenario/model";
 import {
   addActor,
   canTurn,

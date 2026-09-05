@@ -52,12 +52,12 @@ import {
   setBlueprintOrdered,
   strayDefs,
 } from "@/lib/scenarioEditing/bases";
-import { baseBuildings, type Point } from "@/scenario/model";
 import {
   movePlacement,
   removePlacement,
   turnPlacement,
-} from "@/scenario/pages/components/editing";
+} from "@/lib/scenarioEditing/editing";
+import { baseBuildings, type Point } from "@/scenario/model";
 import { isTypingTarget } from "@/scenario/pages/components/history";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";

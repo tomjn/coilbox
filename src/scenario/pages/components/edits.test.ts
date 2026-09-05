@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addBase, removeBase } from "@/lib/scenarioEditing/bases";
+import { addActor } from "@/lib/scenarioEditing/editing";
 import type { Point, Scenario } from "../../model";
-import { addActor } from "./editing";
 import { applyEdit } from "./edits";
 import { type EditHistory, emptyHistory, undoEdit } from "./history";
 

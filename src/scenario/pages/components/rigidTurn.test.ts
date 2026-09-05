@@ -4,9 +4,9 @@ import {
   type Footprint,
   snapToBuildGrid,
 } from "@/blueprint/footprint";
+import { turnedAbout } from "@/lib/scenarioEditing/editing";
 import { newScenario } from "../../create";
 import type { Point, Scenario, ScenarioOrder } from "../../model";
-import { turnedAbout } from "./editing";
 import { positionOn } from "./mapKeyboard";
 import { turnedAroundWords, turnPivot, turnSelectionAround } from "./rigidTurn";
 import { turnSelection } from "./selection";

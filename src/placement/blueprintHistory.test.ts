@@ -16,12 +16,12 @@ import { describe, expect, it } from "vitest";
 
 import type { BaseBlueprint } from "@/blueprint/model";
 import { renameBlueprint } from "@/lib/scenarioEditing/bases";
-import type { Scenario } from "@/scenario/model";
 import {
   movePlacement,
   removePlacement,
   turnPlacement,
-} from "@/scenario/pages/components/editing";
+} from "@/lib/scenarioEditing/editing";
+import type { Scenario } from "@/scenario/model";
 import {
   type EditHistory,
   emptyHistory,
