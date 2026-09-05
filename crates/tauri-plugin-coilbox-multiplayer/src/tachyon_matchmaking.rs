@@ -415,7 +415,10 @@ pub(crate) fn mp_matchmaking_ready(registry: State<'_, Registry>, server_key: St
 /// `mp_matchmaking_cancel`, Tachyon only: stop searching, or turn down a match
 /// that has been found.
 #[tauri::command]
-pub(crate) fn mp_matchmaking_cancel(registry: State<'_, Registry>, server_key: String) -> CliResult {
+pub(crate) fn mp_matchmaking_cancel(
+    registry: State<'_, Registry>,
+    server_key: String,
+) -> CliResult {
     matchmaking_action(registry.inner(), &server_key, MatchmakingAction::Cancel)
 }
 
