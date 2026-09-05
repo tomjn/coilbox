@@ -1,7 +1,7 @@
 import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
-import { applyHoverVisual, resolveHovered } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
+import { applyHoverVisual, resolveHovered } from "./selectionAndHoverOutlines";
 
 /**
  * Draw the piece hovered from outside the canvas, e.g. because the sidebar

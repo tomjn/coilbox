@@ -1,7 +1,8 @@
 import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
-import { applyHoverVisual, attachGizmo, showSelection } from "./ModelViewport";
+import { attachGizmo } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
+import { applyHoverVisual, showSelection } from "./selectionAndHoverOutlines";
 
 /** Draw the selection's outlines and washes, and point the gizmo at it. */
 export function useModelSelection(
