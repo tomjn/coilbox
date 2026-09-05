@@ -8,6 +8,12 @@ import {
 } from "../assets/have";
 import { type AssetUpload, uploadAssetsToHub } from "../assets/upload";
 import { MINIMAP_VARIANT } from "../assets/vocabulary";
+import {
+  createSweptAtTracker,
+  type HubSweepProgress,
+  type HubSweepReport,
+  type HubSweepTarget,
+} from "../sweepFrame";
 
 /**
  * Sending the hub a picture of every map on this computer (issue #2379).
@@ -62,20 +68,20 @@ import { MINIMAP_VARIANT } from "../assets/vocabulary";
  * that out is thirty days with no uploads at all.
  */
 
-/** How far along a sweep is, for a progress line. Counted in maps. */
-export interface MapPictureSweepProgress {
-  /**
-   * What the sweep is doing now. `reading` is the survey over the whole library,
-   * `asking` is the have check, `encoding` is making the pictures the hub asked
-   * for, and `sending` is the transfer.
-   */
-  phase: "reading" | "asking" | "encoding" | "sending";
-  done: number;
-  total: number;
-}
+/**
+ * How far along a sweep is, for a progress line. Counted in maps. `reading`
+ * is the survey over the whole library, `asking` is the have check,
+ * `encoding` is making the pictures the hub asked for, and `sending` is the
+ * transfer.
+ */
+export type MapPictureSweepProgress = HubSweepProgress<
+  "reading" | "asking" | "encoding" | "sending"
+>;
 
-/** What a sweep did, in counts rather than in words. */
-export interface MapPictureSweepReport {
+/** What a sweep did, in counts rather than in words. `skipped` is the maps
+ *  that produced no picture, and why. */
+export interface MapPictureSweepReport
+  extends HubSweepReport<MapMinimapsResult["skipped"][number]> {
   /** Maps the library offered a picture for, after duplicates, working folders
    *  and maps with no minimap in them. */
   read: number;
@@ -88,10 +94,6 @@ export interface MapPictureSweepReport {
   left: number;
   /** Why the run did less than the whole library, when it did. */
   stopped?: string;
-  /** Maps that produced no picture, and why. */
-  skipped: MapMinimapsResult["skipped"];
-  /** Anything the worker reported while reading. */
-  errors: string[];
 }
 
 /** Everything this reaches outside itself, so a test can count the calls. */
@@ -112,11 +114,7 @@ export const liveMapPictureSweepTools: MapPictureSweepTools = {
   record: recordBackfillWrites,
 };
 
-export interface MapPictureSweepTarget {
-  hubUrl: string;
-  enginePath: string;
-  dataDir: string;
-}
+export type MapPictureSweepTarget = HubSweepTarget;
 
 /**
  * What the hourly allowance is counted against for map pictures.
@@ -312,32 +310,15 @@ async function sweep(
   };
 }
 
-/**
- * When a map picture sweep last finished, or null on a machine that has never
- * run one.
- *
- * Guarded the way every other `localStorage` reader here is: a webview with
- * storage off reads as never, which is a line that does not appear rather than a
- * run that cannot start.
- */
-export function lastMapSweptAt(): number | null {
-  try {
-    const raw = localStorage.getItem(LAST_MAP_SWEPT_KEY);
-    const at = raw ? Number(raw) : Number.NaN;
-    return Number.isFinite(at) && at > 0 ? at : null;
-  } catch {
-    return null;
-  }
-}
+const sweptAt = createSweptAtTracker(LAST_MAP_SWEPT_KEY);
+
+/** When a map picture sweep last finished, or null on a machine that has
+ *  never run one. See `createSweptAtTracker` in `../sweepFrame` for what this
+ *  guards against. */
+export const lastMapSweptAt = sweptAt.lastSweptAt;
 
 /** Write down that a sweep has just finished. */
-export function rememberMapSweptAt(now = Date.now()): void {
-  try {
-    localStorage.setItem(LAST_MAP_SWEPT_KEY, String(now));
-  } catch {
-    // No storage. The sweep still happened, it simply cannot say so next launch.
-  }
-}
+export const rememberMapSweptAt = sweptAt.rememberSweptAt;
 
 /**
  * What to tell somebody a sweep did, in one sentence.
