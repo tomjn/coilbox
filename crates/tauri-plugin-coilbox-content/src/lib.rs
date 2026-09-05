@@ -860,134 +860,6 @@ async fn content_open_path(path: String) -> CliResult {
     }
 }
 
-/// `content_list_replays` — list demo files under `<root>/demos` and
-/// `<root>/replays`, and in the same folders of every engine installed under the
-/// root (fast fs metadata, no decoding). `root` is a `ContentRoot.path`.
-#[tauri::command]
-async fn content_list_replays(root: String) -> CliResult {
-    let p = PathBuf::from(&root);
-    match tauri::async_runtime::spawn_blocking(move || demo::list_replays(&p)).await {
-        Ok(replays) => CliResult::ok(json!({ "replays": replays })),
-        Err(e) => CliResult::err(format!("list replays task failed: {e}")),
-    }
-}
-
-/// `content_demo_info`, decode one replay: native header + start-script (map,
-/// game, players, sides, ally-teams) plus the trailer's winner, with `demotool`
-/// as a fallback for a trailer format the decoder refuses. `enginePath` is an
-/// `Engine.path` (where `demotool` lives). `replayPath` is an absolute demo path.
-#[tauri::command]
-async fn content_demo_info(engine_path: String, replay_path: String) -> CliResult {
-    let engine = PathBuf::from(&engine_path);
-    let demo_path = PathBuf::from(&replay_path);
-    match tauri::async_runtime::spawn_blocking(move || demo::demo_info(&engine, &demo_path)).await {
-        Ok(Ok(info)) => CliResult::ok(json!({ "info": info })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("demo info task failed: {e}")),
-    }
-}
-
-/// `content_replay_trailer`: decode the records after a replay's demo stream,
-/// which are the winning ally-teams and every team's statistics samples. No
-/// engine folder and no `demotool`, so it answers for a replay whose game is not
-/// installed. `replayPath` is an absolute demo path from `content_list_replays`.
-/// Read on demand (it reads the whole file), not during listing.
-#[tauri::command]
-async fn content_replay_trailer(replay_path: String) -> CliResult {
-    let demo_path = PathBuf::from(&replay_path);
-    match tauri::async_runtime::spawn_blocking(move || demo::read_trailer(&demo_path)).await {
-        Ok(Ok(trailer)) => CliResult::ok(json!({ "trailer": trailer })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("replay trailer task failed: {e}")),
-    }
-}
-
-/// `content_demo_chat` — extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
-/// lines) by running `demotool --dump`. `enginePath` holds `demotool`; `replayPath`
-/// is an absolute demo path. Read on demand (it walks the whole demo stream), not
-/// during listing.
-#[tauri::command]
-async fn content_demo_chat(engine_path: String, replay_path: String) -> CliResult {
-    let engine = PathBuf::from(&engine_path);
-    let demo_path = PathBuf::from(&replay_path);
-    match tauri::async_runtime::spawn_blocking(move || demo::demo_chat(&engine, &demo_path)).await {
-        Ok(Ok(chat)) => CliResult::ok(json!(chat)),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("demo chat task failed: {e}")),
-    }
-}
-
-/// `content_rewrite_demo` — write a "remixed" **copy** of a replay whose
-/// embedded `gametype` is `targetGametype` (and, when `engineVersion` is given,
-/// whose header engine version is restamped), so the engine loads a different
-/// local game build when the copy is watched. Returns the new sibling path; the
-/// source is never modified (see `demo::rewrite_demo`). `replayPath` is an
-/// absolute demo path from `content_list_replays`.
-#[tauri::command]
-async fn content_rewrite_demo(
-    replay_path: String,
-    target_gametype: String,
-    engine_version: Option<String>,
-) -> CliResult {
-    let src = PathBuf::from(&replay_path);
-    match tauri::async_runtime::spawn_blocking(move || {
-        demo::rewrite_demo(&src, &target_gametype, engine_version.as_deref())
-    })
-    .await
-    {
-        Ok(Ok(path)) => CliResult::ok(json!({ "path": path.to_string_lossy() })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("rewrite demo task failed: {e}")),
-    }
-}
-
-/// `content_delete_replay` — delete one replay file. `path` must be a `.sdfz`/`.sdf`
-/// path from `content_list_replays` (guarded against deleting anything else).
-#[tauri::command]
-async fn content_delete_replay(path: String) -> CliResult {
-    let p = PathBuf::from(&path);
-    if !demo::is_replay_path(&p) {
-        return CliResult::err("not a replay file".to_string());
-    }
-    match std::fs::remove_file(&p) {
-        Ok(()) => CliResult::ok(json!({ "ok": true })),
-        Err(e) => CliResult::err(format!("delete failed: {e}")),
-    }
-}
-
-/// `content_delete_replays`: delete a batch of replays, for the storage screen's
-/// bulk cleanup (issue #386). Each path is guarded the same way
-/// `content_delete_replay` guards its one, and a path that fails is skipped with a
-/// reason rather than aborting the batch. `apply=false` sizes the batch without
-/// deleting. See [`demo::delete_replays`].
-#[tauri::command]
-async fn content_delete_replays(paths: Vec<String>, apply: bool) -> CliResult {
-    let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-    match tauri::async_runtime::spawn_blocking(move || demo::delete_replays(&paths, apply)).await {
-        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
-        Err(e) => CliResult::err(format!("delete replays task failed: {e}")),
-    }
-}
-
-/// `content_gather_replays`: move the replays sitting inside each installed
-/// engine's own folder into the root's `demos/`, so deleting an old engine
-/// folder does not take them (issue #971). `apply` false previews without moving
-/// anything. `root` is a `ContentRoot.path`. See [`demo::gather_replays`].
-#[tauri::command]
-async fn content_gather_replays(root: String, apply: bool) -> CliResult {
-    let p = PathBuf::from(&root);
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
-    match tauri::async_runtime::spawn_blocking(move || demo::gather_replays(&p, apply, now_ms))
-        .await
-    {
-        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
-        Err(e) => CliResult::err(format!("gather replays task failed: {e}")),
-    }
-}
-
 /// `content_export_challenge`, write a caller-serialized challenge container
 /// (the pretty-printed JSON text from `code.ts`'s `encodeChallengeFile`) to a
 /// caller-chosen path. Opaque, the frontend owns the container format and picks
@@ -1064,20 +936,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_list_engines,
             content_verify_engine,
             content_open_path,
-            content_list_replays,
-            content_demo_info,
-            content_replay_trailer,
+            demo::content_list_replays,
+            demo::content_demo_info,
+            demo::content_replay_trailer,
             metrics::content_metric_registry,
             stats::content_stats_ingest,
             stats::content_stats_query,
             stats_watcher::content_stats_watch_start,
             stats_watcher::content_stats_watch_stop,
-            content_demo_chat,
-            content_rewrite_demo,
-            content_delete_replay,
-            content_delete_replays,
+            demo::content_demo_chat,
+            demo::content_rewrite_demo,
+            demo::content_delete_replay,
+            demo::content_delete_replays,
             archives::content_delete_archive,
-            content_gather_replays,
+            demo::content_gather_replays,
             savegame::content_list_saves,
             savegame::content_delete_save,
             settings_backup::content_config_profiles,
