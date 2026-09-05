@@ -26,6 +26,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum Mode {
     UnitRender(UnitRenderArgs),
+    UnitModels(UnitModelsArgs),
 }
 
 impl Mode {
@@ -35,6 +36,7 @@ impl Mode {
     pub fn to_args(&self) -> Vec<String> {
         match self {
             Mode::UnitRender(args) => args.to_args(),
+            Mode::UnitModels(args) => args.to_args(),
         }
     }
 }
@@ -254,6 +256,79 @@ impl UnitRenderArgs {
     }
 }
 
+/// `--unit-models`: read a batch of units' models out of one game archive in
+/// one mount (issue #1684), rather than the one mount per unit `--unit-model`
+/// pays. The cache directory is the whole output, so it is required rather
+/// than optional, the rule that used to live as a runtime string check in
+/// `main.rs` alone and could drift from what `sidecar.rs` actually sent.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnitModelsArgs {
+    pub game: String,
+    /// A JSON file of `objectname` strings, one per unit to read. A file
+    /// rather than an argument because a whole game's roster is past what
+    /// Windows takes on a command line.
+    pub units_file: String,
+    /// Where each flattened model and its textures are written. Required:
+    /// the files are this mode's whole output, and there is nothing to report
+    /// without somewhere to put them.
+    pub cache_dir: String,
+}
+
+impl UnitModelsArgs {
+    /// Build the flags for `--unit-models` mode: the game the units come out
+    /// of, the file naming them, and the cache directory they are written
+    /// into.
+    pub fn to_args(&self) -> Vec<String> {
+        vec![
+            "--unit-models".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--units-file".to_string(),
+            self.units_file.clone(),
+            "--cache-dir".to_string(),
+            self.cache_dir.clone(),
+        ]
+    }
+
+    /// Recover a `--unit-models` invocation from a worker argv. As with
+    /// [`UnitRenderArgs::from_args`], `args` may be exactly what
+    /// [`UnitModelsArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// `--units-file` and `--cache-dir` are both required: the mode has
+    /// nothing to read without the first and nowhere to write without the
+    /// second, so a missing one is refused rather than treated as a quiet
+    /// no-op.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut units_file = None;
+        let mut cache_dir = None;
+
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--units-file" => units_file = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+
+        let Some(units_file) = units_file else {
+            return Err("--unit-models needs --units-file <json>".into());
+        };
+        let Some(cache_dir) = cache_dir else {
+            return Err("--unit-models needs --cache-dir <directory>".into());
+        };
+
+        Ok(UnitModelsArgs {
+            game: game.unwrap_or_default(),
+            units_file,
+            cache_dir,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,5 +464,67 @@ mod tests {
     fn a_mode_dispatches_to_args_to_its_variant() {
         let a = args(None);
         assert_eq!(Mode::UnitRender(a.clone()).to_args(), a.to_args());
+    }
+
+    fn unit_models_args() -> UnitModelsArgs {
+        UnitModelsArgs {
+            game: "BAR.sdd".into(),
+            units_file: "/tmp/objects.json".into(),
+            cache_dir: "/cache/models".into(),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn unit_models_round_trips_through_to_args_and_from_args() {
+        let original = unit_models_args();
+        let recovered = UnitModelsArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// `from_args` is also handed a full process argv, carrying `--lib` and
+    /// `--datadir` and the `--unit-models` flag itself, none of which this
+    /// mode owns.
+    #[test]
+    fn unit_models_ignores_unrecognised_tokens_around_its_own_flags() {
+        let mut argv = vec![
+            "--lib".to_string(),
+            "/engines/one/libunitsync.so".to_string(),
+            "--datadir".to_string(),
+            "/data".to_string(),
+        ];
+        argv.extend(unit_models_args().to_args());
+        let recovered = UnitModelsArgs::from_args(&argv).expect("valid argv");
+        assert_eq!(recovered, unit_models_args());
+    }
+
+    /// The cache directory is this mode's whole output, so a missing one is
+    /// refused rather than treated as a quiet no-op.
+    #[test]
+    fn unit_models_missing_cache_dir_is_refused() {
+        let mut a = unit_models_args().to_args();
+        let at = a.iter().position(|x| x == "--cache-dir").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(UnitModelsArgs::from_args(&a).is_err());
+    }
+
+    /// There is nothing to read without a units file, so a missing one is
+    /// refused the same way.
+    #[test]
+    fn unit_models_missing_units_file_is_refused() {
+        let mut a = unit_models_args().to_args();
+        let at = a.iter().position(|x| x == "--units-file").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(UnitModelsArgs::from_args(&a).is_err());
+    }
+
+    #[test]
+    fn unit_models_dispatches_to_args_to_its_variant() {
+        let a = unit_models_args();
+        assert_eq!(Mode::UnitModels(a.clone()).to_args(), a.to_args());
     }
 }

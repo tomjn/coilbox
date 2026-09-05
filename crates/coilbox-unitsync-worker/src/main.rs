@@ -119,10 +119,14 @@ struct Args {
     /// `--unit-model`: read one unit's model out of `--game`, named by the
     /// unitdef `objectname` given in `--object`.
     unit_model: bool,
-    /// `--unit-models`: read a batch of units' models out of `--game` in one
-    /// mount, named by the `objectname`s in `--units-file`, and write each into
-    /// `--cache-dir`.
-    unit_models: bool,
+    /// `--unit-models`: read a batch of units' models out of a game in one
+    /// mount, named by the `objectname`s in a units file, and write each into
+    /// a cache directory. Its fields and cross field rule (both the units
+    /// file and the cache directory are required, since there is nothing to
+    /// read without the first and nowhere to write without the second) live
+    /// once in `coilbox_unitsync_worker::UnitModelsArgs`, shared with the
+    /// sidecar plugin that builds this flag's argv (issue #2448).
+    unit_models: Option<Mode>,
     /// `--unit-script`: find and read `--unit`'s animation script inside
     /// `--game`, following the unit script framework's own resolution order.
     unit_script: bool,
@@ -446,22 +450,14 @@ fn run() -> i32 {
     }
 
     // Unit models: the same read for a batch of units in one mount (issue
-    // #1684). The cache directory is the output, so there is nothing to do
-    // without one.
-    if args.unit_models {
-        let Some(units_file) = args.units_file.clone() else {
-            unitmodels::emit_error("--unit-models needs --units-file <json>".into());
-            return 1;
-        };
-        let Some(cache_dir) = cache_dir else {
-            unitmodels::emit_error("--unit-models needs --cache-dir <directory>".into());
-            return 1;
-        };
-        let objects: Vec<String> = match std::fs::read_to_string(&units_file)
-            .map_err(|e| format!("could not read units file {units_file}: {e}"))
+    // #1684). Both the units file and the cache directory are required, a
+    // rule that now lives in `UnitModelsArgs::from_args`, not here.
+    if let Some(Mode::UnitModels(mode)) = &args.unit_models {
+        let objects: Vec<String> = match std::fs::read_to_string(&mode.units_file)
+            .map_err(|e| format!("could not read units file {}: {e}", mode.units_file))
             .and_then(|raw| {
                 serde_json::from_str(&raw)
-                    .map_err(|e| format!("could not parse units file {units_file}: {e}"))
+                    .map_err(|e| format!("could not parse units file {}: {e}", mode.units_file))
             }) {
             Ok(v) => v,
             Err(e) => {
@@ -469,9 +465,8 @@ fn run() -> i32 {
                 return 1;
             }
         };
-        let game_archive = args.game.clone().unwrap_or_default();
         return match std::panic::catch_unwind(|| {
-            unitmodels::render(&args.lib, &game_archive, &objects, cache_dir)
+            unitmodels::render(&args.lib, &mode.game, &objects, Path::new(&mode.cache_dir))
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -960,7 +955,14 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_dataset = false;
     let mut unit_model = false;
     let mut unit_script = false;
-    let mut unit_models = false;
+    // `--unit-models`' own fields (units file, cache directory) are not
+    // collected into locals here for its own use: `Mode::UnitModels`'s
+    // `from_args` below re-scans `raw` for those, the single place that
+    // mode's fields and cross field rule are defined (issue #2448). The
+    // shared `units_file`/`cache_dir` locals below still exist and are still
+    // read from `raw` too, since other modes that have not migrated yet
+    // still use them.
+    let mut unit_models_flag = false;
     // `--unit-render`'s own flags (angle, footprint, pixels, dimensions, render
     // source) are not collected into locals here: `Mode::UnitRender`'s
     // `from_args` below re-scans `raw` for those, which is the single place
@@ -1030,7 +1032,7 @@ fn parse_args() -> Result<Args, String> {
             "--unit-dataset" => unit_dataset = true,
             "--unit-model" => unit_model = true,
             "--unit-script" => unit_script = true,
-            "--unit-models" => unit_models = true,
+            "--unit-models" => unit_models_flag = true,
             "--unit-render" => unit_render_flag = true,
             // Consumed by `Mode::UnitRender`'s `from_args` below, not stored here.
             "--model-digest" | "--source-member" | "--source-archive" | "--angle" => {
@@ -1126,7 +1128,13 @@ fn parse_args() -> Result<Args, String> {
         unit_dataset,
         unit_model,
         unit_script,
-        unit_models,
+        unit_models: if unit_models_flag {
+            Some(Mode::UnitModels(
+                coilbox_unitsync_worker::UnitModelsArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         unit_render: if unit_render_flag {
             Some(Mode::UnitRender(
                 coilbox_unitsync_worker::UnitRenderArgs::from_args(&raw)?,
@@ -1192,6 +1200,17 @@ fn absolutize(args: &mut Args) {
         }
         if let Some(abs) = absolute_path(&mode.asset_dir) {
             mode.asset_dir = abs;
+        }
+    }
+    // `Mode::UnitModels` holds its own copy of `--units-file`/`--cache-dir`,
+    // read separately from `raw` in `parse_args`, so it needs the same
+    // treatment.
+    if let Some(Mode::UnitModels(mode)) = args.unit_models.as_mut() {
+        if let Some(abs) = absolute_path(&mode.units_file) {
+            mode.units_file = abs;
+        }
+        if let Some(abs) = absolute_path(&mode.cache_dir) {
+            mode.cache_dir = abs;
         }
     }
 }
@@ -1561,7 +1580,7 @@ mod tests {
             unit_buildpics: false,
             unit_dataset: false,
             unit_model: false,
-            unit_models: false,
+            unit_models: None,
             unit_render: None,
             unit_render_keys: false,
             units_file: None,
