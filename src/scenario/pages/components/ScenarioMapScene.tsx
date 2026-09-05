@@ -63,6 +63,7 @@ import {
   setActorState,
   turnPlacement,
 } from "@/lib/scenarioEditing/editing";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { useFieldText } from "@/lib/useFieldText";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
@@ -142,7 +143,6 @@ import {
   removeGroup,
   targetOptions,
 } from "./groups";
-import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
 import {
   type MapStep,

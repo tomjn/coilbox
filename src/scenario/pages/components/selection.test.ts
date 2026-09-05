@@ -6,12 +6,12 @@ import {
   ONE_SQUARE,
   type Standing,
 } from "@/blueprint/footprint";
+import { recordEdit, undoEdit } from "@/lib/scenarioEditing/history";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { newScenario } from "../../create";
 import type { Scenario, ScenarioOrder, ScenarioZone } from "../../model";
 import { sceneContents } from "./contents";
 import { pathKey } from "./groups";
-import { recordEdit, undoEdit } from "./history";
 import { orderPathId, scenarioPaths } from "./orderPaths";
 import {
   addKeys,

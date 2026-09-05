@@ -57,8 +57,8 @@ import {
   removePlacement,
   turnPlacement,
 } from "@/lib/scenarioEditing/editing";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { baseBuildings, type Point } from "@/scenario/model";
-import { isTypingTarget } from "@/scenario/pages/components/history";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
 import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";

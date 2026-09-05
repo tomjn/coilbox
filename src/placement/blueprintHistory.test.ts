@@ -21,13 +21,13 @@ import {
   removePlacement,
   turnPlacement,
 } from "@/lib/scenarioEditing/editing";
-import type { Scenario } from "@/scenario/model";
 import {
   type EditHistory,
   emptyHistory,
   redoEdit,
   undoEdit,
-} from "@/scenario/pages/components/history";
+} from "@/lib/scenarioEditing/history";
+import type { Scenario } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID } from "./blueprintDocument";
 import { applyLayoutEdit } from "./blueprintHistory";
 import { placementKey } from "./placements";

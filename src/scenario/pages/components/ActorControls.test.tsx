@@ -29,15 +29,15 @@ import {
   MIN_ACTOR_HP,
   normaliseActorState,
 } from "@/lib/scenarioEditing/editing";
-import { newScenario } from "../../create";
-import type { ActorState, Scenario, ScenarioActor } from "../../model";
-import { ActorControls } from "./ActorControls";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import { newScenario } from "../../create";
+import type { ActorState, Scenario, ScenarioActor } from "../../model";
+import { ActorControls } from "./ActorControls";
 import { missionProblemsIn } from "./useMissionProblems";
 
 afterEach(cleanup);

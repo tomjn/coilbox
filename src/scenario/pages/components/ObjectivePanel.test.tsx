@@ -25,13 +25,13 @@ import {
 } from "@testing-library/react";
 import { useMemo, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Scenario, ScenarioObjective, ScenarioTrigger } from "../../model";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import type { Scenario, ScenarioObjective, ScenarioTrigger } from "../../model";
 import { ObjectivePanel } from "./ObjectivePanel";
 import { missionProblemsIn } from "./useMissionProblems";
 

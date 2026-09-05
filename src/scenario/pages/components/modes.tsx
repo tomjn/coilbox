@@ -51,6 +51,7 @@ import {
   placeBlueprint,
 } from "@/lib/scenarioEditing/bases";
 import { addActor } from "@/lib/scenarioEditing/editing";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import {
   type Placement,
   parsePlacementKey,
@@ -73,7 +74,6 @@ import {
   DEFAULT_GROUP_COUNT,
   MAX_GROUP_COUNT,
 } from "./groups";
-import { isTypingTarget } from "./history";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
 import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
 import type { PathSource } from "./orderPaths";

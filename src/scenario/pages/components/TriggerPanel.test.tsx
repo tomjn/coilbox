@@ -30,16 +30,16 @@ import {
 import type { Ref } from "react";
 import { useMemo, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NO_EXTENSIONS } from "../../extensions";
-import { NO_GATE } from "../../gating";
-import type { Scenario, ScenarioTrigger, ScenarioZone } from "../../model";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   redoEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import { NO_EXTENSIONS } from "../../extensions";
+import { NO_GATE } from "../../gating";
+import type { Scenario, ScenarioTrigger, ScenarioZone } from "../../model";
 import type { RowFocus } from "./problemTargets";
 import { TriggerPanel, type TriggerPanelHandle } from "./TriggerPanel";
 import { setStepParam } from "./triggers";

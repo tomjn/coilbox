@@ -28,14 +28,14 @@ import {
 } from "@testing-library/react";
 import { useMemo, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Scenario, ScenarioDialogue, ScenarioTrigger } from "../../model";
-import { DialoguePanel } from "./DialoguePanel";
 import {
   type EditHistory,
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
+import type { Scenario, ScenarioDialogue, ScenarioTrigger } from "../../model";
+import { DialoguePanel } from "./DialoguePanel";
 import { missionProblemsIn } from "./useMissionProblems";
 
 // The panel's delete notice has no shell here (issue #2280), the same gap

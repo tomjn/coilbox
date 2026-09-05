@@ -20,7 +20,7 @@ import {
   emptyHistory,
   recordEdit,
   undoEdit,
-} from "./history";
+} from "@/lib/scenarioEditing/history";
 import { NameField, TextField } from "./panels";
 
 afterEach(cleanup);
