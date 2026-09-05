@@ -872,23 +872,6 @@ async fn content_export_challenge(dest: String, text: String) -> CliResult {
     }
 }
 
-/// `content_write_file`, write caller-serialized text to a caller-chosen path.
-/// Opaque like the challenge export beside it: the frontend owns what is in the
-/// file and picks the destination. Reading goes through
-/// `content_import_container`, the other half of the pair.
-///
-/// Callers are the keymap export it was first written for, and the send of a
-/// base layout into a game's own `LuaUI/Config/blueprints.json`, which is why it
-/// makes the directory when it has to (issue #1480). How far it will go is
-/// [`container_file::write`].
-#[tauri::command]
-async fn content_write_file(dest: String, text: String) -> CliResult {
-    match container_file::write(&dest, &text) {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e),
-    }
-}
-
 /// `content_import_challenge`, read a challenge file the user picked and hand its
 /// raw text back for the frontend to decode through the same `decodeChallenge` a
 /// pasted code uses (issue #476).
@@ -975,7 +958,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             build_tree_export::content_export_build_tree_html,
             build_tree_export::content_export_build_tree_zip,
             content_export_challenge,
-            content_write_file,
+            container_file::content_write_file,
             content_import_challenge,
             content_import_container,
             branding::branding_catalog,
