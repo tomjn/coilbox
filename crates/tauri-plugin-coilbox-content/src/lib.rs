@@ -454,7 +454,7 @@ fn ensure_portable_seed_in(
 async fn content_candidates<R: Runtime>(
     app: AppHandle<R>,
     include_zerok: Option<bool>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     // Portable mode is self-contained: the only "candidate" is the app dir itself,
     // never the shared OS locations (which we don't even stat).
     let candidates = match portable_seed_dir() {
@@ -484,24 +484,24 @@ async fn content_candidates<R: Runtime>(
             "valid": valid,
         }));
     }
-    Ok(CliResult::ok(json!({ "candidates": out })))
+    CliResult::ok(json!({ "candidates": out }))
 }
 
 /// `content_state_load` — the persisted snapshot (the cross-plugin read API),
 /// re-validated against disk so a folder/engine deleted between runs is reflected.
 #[tauri::command]
-async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let path = match store_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let store = match load_store(&path) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
     state.roots = ensure_portable_seed(state.roots);
-    Ok(CliResult::ok(json!({ "state": state })))
+    CliResult::ok(json!({ "state": state }))
 }
 
 /// `content_rescan` — recompute roots/engines from scratch and persist.
@@ -510,14 +510,14 @@ async fn content_rescan<R: Runtime>(
     app: AppHandle<R>,
     with_counts: Option<bool>,
     include_zerok: Option<bool>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let path = match store_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let store = match load_store(&path) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let app2 = app.clone();
     let user_roots = store.user_roots.clone();
@@ -536,25 +536,25 @@ async fn content_rescan<R: Runtime>(
     .await;
     let state = match result {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(format!("rescan task failed: {e}"))),
+        Err(e) => return CliResult::err(format!("rescan task failed: {e}")),
     };
     if let Err(e) = persist(&path, store, &state) {
-        return Ok(CliResult::err(e));
+        return CliResult::err(e);
     }
-    Ok(CliResult::ok(json!({ "state": state })))
+    CliResult::ok(json!({ "state": state }))
 }
 
 /// `content_scan_root` — rescan a single tracked root, preserving its origins/
 /// source, and update the snapshot entry. Returns the refreshed root.
 #[tauri::command]
-async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> Result<CliResult, ()> {
+async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
     let sp = match store_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let mut store = match load_store(&sp) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let canon = canonical(Path::new(&path));
 
@@ -598,7 +598,7 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> Resul
         tauri::async_runtime::spawn_blocking(move || build_root(acc, true, now_ms())).await;
     let root = match result {
         Ok(r) => r,
-        Err(e) => return Ok(CliResult::err(format!("scan task failed: {e}"))),
+        Err(e) => return CliResult::err(format!("scan task failed: {e}")),
     };
 
     if let Some(snap) = store.snapshot.as_mut() {
@@ -608,10 +608,10 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> Resul
         }
         let snapshot = snap.clone();
         if let Err(e) = persist(&sp, store, &snapshot) {
-            return Ok(CliResult::err(e));
+            return CliResult::err(e);
         }
     }
-    Ok(CliResult::ok(json!({ "root": root })))
+    CliResult::ok(json!({ "root": root }))
 }
 
 /// Add a root by canonical path: validate (unless `force`), record the user root
@@ -661,7 +661,7 @@ async fn content_add_root<R: Runtime>(
     label: Option<String>,
     force: Option<bool>,
     portable: Option<bool>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let canon = canonical(Path::new(&path));
     match add_root_inner(
         &app,
@@ -670,8 +670,8 @@ async fn content_add_root<R: Runtime>(
         force.unwrap_or(false),
         portable.unwrap_or(false),
     ) {
-        Ok(state) => Ok(CliResult::ok(json!({ "state": state }))),
-        Err(e) => Ok(CliResult::err(e)),
+        Ok(state) => CliResult::ok(json!({ "state": state })),
+        Err(e) => CliResult::err(e),
     }
 }
 
@@ -679,46 +679,41 @@ async fn content_add_root<R: Runtime>(
 /// and register it as a forced root (it is empty, so it fails the normal Spring
 /// layout check). Returns the recomputed state, so the caller learns the new id.
 #[tauri::command]
-async fn content_create_standard_root<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+async fn content_create_standard_root<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let base = base_dirs(&app, false);
     let Some(path) = paths::standard_root_path(current_os(), &base) else {
-        return Ok(CliResult::err(
-            "No standard content location is known for this platform.",
-        ));
+        return CliResult::err("No standard content location is known for this platform.");
     };
     if let Err(e) = std::fs::create_dir_all(&path) {
-        return Ok(CliResult::err(format!(
-            "Couldn't create {}: {e}",
-            path.display()
-        )));
+        return CliResult::err(format!("Couldn't create {}: {e}", path.display()));
     }
     let canon = canonical(&path);
     match add_root_inner(&app, &canon, None, true, false) {
-        Ok(state) => Ok(CliResult::ok(json!({ "state": state }))),
-        Err(e) => Ok(CliResult::err(e)),
+        Ok(state) => CliResult::ok(json!({ "state": state })),
+        Err(e) => CliResult::err(e),
     }
 }
 
 /// `content_remove_root` — remove a manual root (auto roots can't be removed).
 #[tauri::command]
-async fn content_remove_root<R: Runtime>(app: AppHandle<R>, path: String) -> Result<CliResult, ()> {
+async fn content_remove_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
     let sp = match store_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let canon = canonical(Path::new(&path));
     let mut store = match load_store(&sp) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     store
         .user_roots
         .retain(|u| canonical(&resolve_stored(&u.path)) != canon);
     let state = compute_state(&app, &store, true, false);
     if let Err(e) = persist(&sp, store, &state) {
-        return Ok(CliResult::err(e));
+        return CliResult::err(e);
     }
-    Ok(CliResult::ok(json!({ "state": state })))
+    CliResult::ok(json!({ "state": state }))
 }
 
 /// `content_recreate_root` — recreate the on-disk folder for a configured root
@@ -726,25 +721,19 @@ async fn content_remove_root<R: Runtime>(app: AppHandle<R>, path: String) -> Res
 /// fails the Spring-layout check, exactly as `content_create_standard_root`). The
 /// path is expected to already be one of the user's roots.
 #[tauri::command]
-async fn content_recreate_root<R: Runtime>(
-    app: AppHandle<R>,
-    path: String,
-) -> Result<CliResult, ()> {
+async fn content_recreate_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
     let sp = match store_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let target = resolve_stored(&path);
     if let Err(e) = std::fs::create_dir_all(&target) {
-        return Ok(CliResult::err(format!(
-            "Couldn't create {}: {e}",
-            target.display()
-        )));
+        return CliResult::err(format!("Couldn't create {}: {e}", target.display()));
     }
     let canon = canonical(&target);
     let mut store = match load_store(&sp) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     // Force the matching user root so the freshly-created (empty) folder validates.
     match store
@@ -757,7 +746,7 @@ async fn content_recreate_root<R: Runtime>(
             // Not previously tracked — register it so the new folder is usable.
             let stored = match stored_root_path(false, &canon) {
                 Ok(s) => s,
-                Err(e) => return Ok(CliResult::err(e)),
+                Err(e) => return CliResult::err(e),
             };
             store.user_roots.push(UserRoot {
                 path: stored,
@@ -768,9 +757,9 @@ async fn content_recreate_root<R: Runtime>(
     }
     let state = compute_state(&app, &store, true, false);
     if let Err(e) = persist(&sp, store, &state) {
-        return Ok(CliResult::err(e));
+        return CliResult::err(e);
     }
-    Ok(CliResult::ok(json!({ "state": state })))
+    CliResult::ok(json!({ "state": state }))
 }
 
 /// `content_list_engines`, every engine across tracked roots (read API).
@@ -780,39 +769,36 @@ async fn content_recreate_root<R: Runtime>(
 /// `ensure_portable_seed` after `refresh_against_disk` to recover a live portable
 /// root before collecting engines (issue #539, following on from #524).
 #[tauri::command]
-async fn content_list_engines<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+async fn content_list_engines<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let path = match store_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let store = match load_store(&path) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
     state.roots = ensure_portable_seed(state.roots);
     let engines: Vec<_> = state.roots.into_iter().flat_map(|r| r.engines).collect();
-    Ok(CliResult::ok(json!({ "engines": engines })))
+    CliResult::ok(json!({ "engines": engines }))
 }
 
 /// `content_verify_engine` — execute the engine binary to read its sync-version.
 /// The engine must be one tracked in the snapshot and its executable must live
 /// within its content root (refuses to run anything else).
 #[tauri::command]
-async fn content_verify_engine<R: Runtime>(
-    app: AppHandle<R>,
-    path: String,
-) -> Result<CliResult, ()> {
+async fn content_verify_engine<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
     let sp = match store_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let mut store = match load_store(&sp) {
         Ok(s) => s,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let Some(snap) = store.snapshot.as_mut() else {
-        return Ok(CliResult::err("no scan yet — run a rescan first"));
+        return CliResult::err("no scan yet — run a rescan first");
     };
 
     let target = canonical(Path::new(&path));
@@ -828,18 +814,14 @@ async fn content_verify_engine<R: Runtime>(
         }
     }
     let Some((ri, ei)) = found else {
-        return Ok(CliResult::err(
-            "engine not found in tracked roots — rescan first",
-        ));
+        return CliResult::err("engine not found in tracked roots — rescan first");
     };
 
     // Security: the executable must be inside its content root.
     let root_canon = canonical(Path::new(&snap.roots[ri].path));
     let exe = PathBuf::from(snap.roots[ri].engines[ei].executable.clone());
     if !canonical(&exe).starts_with(&root_canon) {
-        return Ok(CliResult::err(
-            "engine executable is outside its content root — refusing to run",
-        ));
+        return CliResult::err("engine executable is outside its content root — refusing to run");
     }
 
     let exe2 = exe.clone();
@@ -848,8 +830,8 @@ async fn content_verify_engine<R: Runtime>(
             .await;
     let version = match result {
         Ok(Ok(v)) => v,
-        Ok(Err(e)) => return Ok(CliResult::err(e)),
-        Err(e) => return Ok(CliResult::err(format!("verify task failed: {e}"))),
+        Ok(Err(e)) => return CliResult::err(e),
+        Err(e) => return CliResult::err(format!("verify task failed: {e}")),
     };
 
     let now = now_ms();
@@ -858,9 +840,9 @@ async fn content_verify_engine<R: Runtime>(
     let engine = snap.roots[ri].engines[ei].clone();
     let snapshot = snap.clone();
     if let Err(e) = persist(&sp, store, &snapshot) {
-        return Ok(CliResult::err(e));
+        return CliResult::err(e);
     }
-    Ok(CliResult::ok(json!({ "engine": engine })))
+    CliResult::ok(json!({ "engine": engine }))
 }
 
 /// `content_open_path` — reveal a content folder (or an engine's directory) in
@@ -868,9 +850,9 @@ async fn content_verify_engine<R: Runtime>(
 /// frontend opener plugin, so any user content root opens regardless of the
 /// opener capability's path scope (which can't enumerate arbitrary user folders).
 #[tauri::command]
-async fn content_open_path(path: String) -> Result<CliResult, ()> {
+async fn content_open_path(path: String) -> CliResult {
     if !Path::new(&path).exists() {
-        return Ok(CliResult::err(format!("path does not exist: {path}")));
+        return CliResult::err(format!("path does not exist: {path}"));
     }
     let program = if cfg!(target_os = "macos") {
         "open"
@@ -880,8 +862,8 @@ async fn content_open_path(path: String) -> Result<CliResult, ()> {
         "xdg-open"
     };
     match std::process::Command::new(program).arg(&path).spawn() {
-        Ok(_) => Ok(CliResult::ok(json!({}))),
-        Err(e) => Ok(CliResult::err(format!("failed to open {path}: {e}"))),
+        Ok(_) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(format!("failed to open {path}: {e}")),
     }
 }
 
@@ -889,11 +871,11 @@ async fn content_open_path(path: String) -> Result<CliResult, ()> {
 /// `<root>/replays`, and in the same folders of every engine installed under the
 /// root (fast fs metadata, no decoding). `root` is a `ContentRoot.path`.
 #[tauri::command]
-async fn content_list_replays(root: String) -> Result<CliResult, ()> {
+async fn content_list_replays(root: String) -> CliResult {
     let p = PathBuf::from(&root);
     match tauri::async_runtime::spawn_blocking(move || demo::list_replays(&p)).await {
-        Ok(replays) => Ok(CliResult::ok(json!({ "replays": replays }))),
-        Err(e) => Ok(CliResult::err(format!("list replays task failed: {e}"))),
+        Ok(replays) => CliResult::ok(json!({ "replays": replays })),
+        Err(e) => CliResult::err(format!("list replays task failed: {e}")),
     }
 }
 
@@ -902,13 +884,13 @@ async fn content_list_replays(root: String) -> Result<CliResult, ()> {
 /// as a fallback for a trailer format the decoder refuses. `enginePath` is an
 /// `Engine.path` (where `demotool` lives). `replayPath` is an absolute demo path.
 #[tauri::command]
-async fn content_demo_info(engine_path: String, replay_path: String) -> Result<CliResult, ()> {
+async fn content_demo_info(engine_path: String, replay_path: String) -> CliResult {
     let engine = PathBuf::from(&engine_path);
     let demo_path = PathBuf::from(&replay_path);
     match tauri::async_runtime::spawn_blocking(move || demo::demo_info(&engine, &demo_path)).await {
-        Ok(Ok(info)) => Ok(CliResult::ok(json!({ "info": info }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("demo info task failed: {e}"))),
+        Ok(Ok(info)) => CliResult::ok(json!({ "info": info })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo info task failed: {e}")),
     }
 }
 
@@ -918,12 +900,12 @@ async fn content_demo_info(engine_path: String, replay_path: String) -> Result<C
 /// installed. `replayPath` is an absolute demo path from `content_list_replays`.
 /// Read on demand (it reads the whole file), not during listing.
 #[tauri::command]
-async fn content_replay_trailer(replay_path: String) -> Result<CliResult, ()> {
+async fn content_replay_trailer(replay_path: String) -> CliResult {
     let demo_path = PathBuf::from(&replay_path);
     match tauri::async_runtime::spawn_blocking(move || demo::read_trailer(&demo_path)).await {
-        Ok(Ok(trailer)) => Ok(CliResult::ok(json!({ "trailer": trailer }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("replay trailer task failed: {e}"))),
+        Ok(Ok(trailer)) => CliResult::ok(json!({ "trailer": trailer })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("replay trailer task failed: {e}")),
     }
 }
 
@@ -934,8 +916,8 @@ async fn content_replay_trailer(replay_path: String) -> Result<CliResult, ()> {
 /// rather than from a list of its own, so adding a metric is one line in
 /// `metrics.rs`. See [`metrics::METRICS`].
 #[tauri::command]
-async fn content_metric_registry() -> Result<CliResult, ()> {
-    Ok(CliResult::ok(json!({ "metrics": metrics::METRICS })))
+async fn content_metric_registry() -> CliResult {
+    CliResult::ok(json!({ "metrics": metrics::METRICS }))
 }
 
 /// `content_stats_ingest`, incrementally parse every replay under `roots` into the
@@ -952,10 +934,10 @@ async fn content_stats_ingest<R: Runtime>(
     roots: Vec<String>,
     engine_path: String,
     dry_run: Option<bool>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let sp = match stats_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let dry_run = dry_run.unwrap_or(false);
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -970,26 +952,26 @@ async fn content_stats_ingest<R: Runtime>(
     })
     .await;
     match res {
-        Ok(Ok((summary, store))) => Ok(CliResult::ok(
-            json!({ "summary": summary, "records": store.records }),
-        )),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("stats ingest task failed: {e}"))),
+        Ok(Ok((summary, store))) => {
+            CliResult::ok(json!({ "summary": summary, "records": store.records }))
+        }
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("stats ingest task failed: {e}")),
     }
 }
 
 /// `content_stats_query` — return the whole local stats record set (the flat table
 /// every stats view aggregates over). Read-only; never triggers an ingest.
 #[tauri::command]
-async fn content_stats_query<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+async fn content_stats_query<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let sp = match stats_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     match tauri::async_runtime::spawn_blocking(move || stats::load(&sp)).await {
-        Ok(Ok(store)) => Ok(CliResult::ok(json!({ "records": store.records }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("stats query task failed: {e}"))),
+        Ok(Ok(store)) => CliResult::ok(json!({ "records": store.records })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("stats query task failed: {e}")),
     }
 }
 
@@ -1005,25 +987,25 @@ async fn content_stats_watch_start<R: Runtime>(
     app: AppHandle<R>,
     roots: Vec<String>,
     engine_path: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let sp = match stats_path(&app) {
         Ok(p) => p,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
     let engine_dir = PathBuf::from(&engine_path);
     match stats_watcher::start(app, root_paths, engine_dir, sp) {
-        Ok(()) => Ok(CliResult::ok(json!({ "watching": true }))),
-        Err(e) => Ok(CliResult::err(e)),
+        Ok(()) => CliResult::ok(json!({ "watching": true })),
+        Err(e) => CliResult::err(e),
     }
 }
 
 /// `content_stats_watch_stop` (#462): stop the live filesystem watcher, if one
 /// is running. Idempotent.
 #[tauri::command]
-fn content_stats_watch_stop() -> Result<CliResult, ()> {
+fn content_stats_watch_stop() -> CliResult {
     stats_watcher::stop();
-    Ok(CliResult::ok(json!({ "watching": false })))
+    CliResult::ok(json!({ "watching": false }))
 }
 
 /// `content_demo_chat` — extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
@@ -1031,13 +1013,13 @@ fn content_stats_watch_stop() -> Result<CliResult, ()> {
 /// is an absolute demo path. Read on demand (it walks the whole demo stream), not
 /// during listing.
 #[tauri::command]
-async fn content_demo_chat(engine_path: String, replay_path: String) -> Result<CliResult, ()> {
+async fn content_demo_chat(engine_path: String, replay_path: String) -> CliResult {
     let engine = PathBuf::from(&engine_path);
     let demo_path = PathBuf::from(&replay_path);
     match tauri::async_runtime::spawn_blocking(move || demo::demo_chat(&engine, &demo_path)).await {
-        Ok(Ok(chat)) => Ok(CliResult::ok(json!(chat))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("demo chat task failed: {e}"))),
+        Ok(Ok(chat)) => CliResult::ok(json!(chat)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo chat task failed: {e}")),
     }
 }
 
@@ -1052,34 +1034,34 @@ async fn content_rewrite_demo(
     replay_path: String,
     target_gametype: String,
     engine_version: Option<String>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let src = PathBuf::from(&replay_path);
     match tauri::async_runtime::spawn_blocking(move || {
         demo::rewrite_demo(&src, &target_gametype, engine_version.as_deref())
     })
     .await
     {
-        Ok(Ok(path)) => Ok(CliResult::ok(json!({ "path": path.to_string_lossy() }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("rewrite demo task failed: {e}"))),
+        Ok(Ok(path)) => CliResult::ok(json!({ "path": path.to_string_lossy() })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("rewrite demo task failed: {e}")),
     }
 }
 
 /// `content_list_saves` — list singleplayer savegames under `<root>/Saves` (fast
 /// fs metadata + a best-effort map/game read). `root` is a `ContentRoot.path`.
 #[tauri::command]
-async fn content_list_saves(root: String) -> Result<CliResult, ()> {
+async fn content_list_saves(root: String) -> CliResult {
     let p = PathBuf::from(&root);
     match tauri::async_runtime::spawn_blocking(move || savegame::list_saves(&p)).await {
-        Ok(saves) => Ok(CliResult::ok(json!({ "saves": saves }))),
-        Err(e) => Ok(CliResult::err(format!("list saves task failed: {e}"))),
+        Ok(saves) => CliResult::ok(json!({ "saves": saves })),
+        Err(e) => CliResult::err(format!("list saves task failed: {e}")),
     }
 }
 
 /// `content_delete_save` — delete one savegame file. `path` must be a `.ssf`/`.slsf`
 /// path from `content_list_saves` (guarded against deleting anything else).
 #[tauri::command]
-async fn content_delete_save(path: String) -> Result<CliResult, ()> {
+async fn content_delete_save(path: String) -> CliResult {
     let p = PathBuf::from(&path);
     let ok_ext = p
         .extension()
@@ -1087,25 +1069,25 @@ async fn content_delete_save(path: String) -> Result<CliResult, ()> {
         .map(|e| e.eq_ignore_ascii_case("ssf") || e.eq_ignore_ascii_case("slsf"))
         .unwrap_or(false);
     if !ok_ext {
-        return Ok(CliResult::err("not a savegame file".to_string()));
+        return CliResult::err("not a savegame file".to_string());
     }
     match std::fs::remove_file(&p) {
-        Ok(()) => Ok(CliResult::ok(json!({ "ok": true }))),
-        Err(e) => Ok(CliResult::err(format!("delete failed: {e}"))),
+        Ok(()) => CliResult::ok(json!({ "ok": true })),
+        Err(e) => CliResult::err(format!("delete failed: {e}")),
     }
 }
 
 /// `content_delete_replay` — delete one replay file. `path` must be a `.sdfz`/`.sdf`
 /// path from `content_list_replays` (guarded against deleting anything else).
 #[tauri::command]
-async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
+async fn content_delete_replay(path: String) -> CliResult {
     let p = PathBuf::from(&path);
     if !demo::is_replay_path(&p) {
-        return Ok(CliResult::err("not a replay file".to_string()));
+        return CliResult::err("not a replay file".to_string());
     }
     match std::fs::remove_file(&p) {
-        Ok(()) => Ok(CliResult::ok(json!({ "ok": true }))),
-        Err(e) => Ok(CliResult::err(format!("delete failed: {e}"))),
+        Ok(()) => CliResult::ok(json!({ "ok": true })),
+        Err(e) => CliResult::err(format!("delete failed: {e}")),
     }
 }
 
@@ -1115,11 +1097,11 @@ async fn content_delete_replay(path: String) -> Result<CliResult, ()> {
 /// reason rather than aborting the batch. `apply=false` sizes the batch without
 /// deleting. See [`demo::delete_replays`].
 #[tauri::command]
-async fn content_delete_replays(paths: Vec<String>, apply: bool) -> Result<CliResult, ()> {
+async fn content_delete_replays(paths: Vec<String>, apply: bool) -> CliResult {
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     match tauri::async_runtime::spawn_blocking(move || demo::delete_replays(&paths, apply)).await {
-        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
-        Err(e) => Ok(CliResult::err(format!("delete replays task failed: {e}"))),
+        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
+        Err(e) => CliResult::err(format!("delete replays task failed: {e}")),
     }
 }
 
@@ -1128,12 +1110,12 @@ async fn content_delete_replays(paths: Vec<String>, apply: bool) -> Result<CliRe
 /// Guarded by [`archives::classify`], which refuses anything outside a content
 /// root's `games`/`maps`/`packages` so the engine's base archives cannot go.
 #[tauri::command]
-async fn content_delete_archive(path: String) -> Result<CliResult, ()> {
+async fn content_delete_archive(path: String) -> CliResult {
     let p = PathBuf::from(&path);
     match tauri::async_runtime::spawn_blocking(move || archives::delete(&p)).await {
-        Ok(Ok(bytes)) => Ok(CliResult::ok(json!({ "bytes": bytes }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("delete archive task failed: {e}"))),
+        Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete archive task failed: {e}")),
     }
 }
 
@@ -1142,7 +1124,7 @@ async fn content_delete_archive(path: String) -> Result<CliResult, ()> {
 /// folder does not take them (issue #971). `apply` false previews without moving
 /// anything. `root` is a `ContentRoot.path`. See [`demo::gather_replays`].
 #[tauri::command]
-async fn content_gather_replays(root: String, apply: bool) -> Result<CliResult, ()> {
+async fn content_gather_replays(root: String, apply: bool) -> CliResult {
     let p = PathBuf::from(&root);
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1151,8 +1133,8 @@ async fn content_gather_replays(root: String, apply: bool) -> Result<CliResult, 
     match tauri::async_runtime::spawn_blocking(move || demo::gather_replays(&p, apply, now_ms))
         .await
     {
-        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
-        Err(e) => Ok(CliResult::err(format!("gather replays task failed: {e}"))),
+        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
+        Err(e) => CliResult::err(format!("gather replays task failed: {e}")),
     }
 }
 
@@ -1161,11 +1143,11 @@ async fn content_gather_replays(root: String, apply: bool) -> Result<CliResult, 
 /// Opaque: the frontend owns the markup and picks the destination via the save
 /// dialog (mirrors `campaign_export`).
 #[tauri::command]
-async fn content_export_build_tree_html(dest: String, html: String) -> Result<CliResult, ()> {
-    Ok(match build_tree_export::write_html(&dest, &html) {
+async fn content_export_build_tree_html(dest: String, html: String) -> CliResult {
+    match build_tree_export::write_html(&dest, &html) {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
-    })
+    }
 }
 
 /// `content_export_build_tree_zip` — assemble the build-tree export zip
@@ -1176,11 +1158,11 @@ async fn content_export_build_tree_html(dest: String, html: String) -> Result<Cl
 async fn content_export_build_tree_zip(
     dest: String,
     files: Vec<build_tree_export::ExportFile>,
-) -> Result<CliResult, ()> {
-    Ok(match build_tree_export::write_zip(&dest, &files) {
+) -> CliResult {
+    match build_tree_export::write_zip(&dest, &files) {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
-    })
+    }
 }
 
 /// `content_export_challenge`, write a caller-serialized challenge container
@@ -1188,11 +1170,11 @@ async fn content_export_build_tree_zip(
 /// caller-chosen path. Opaque, the frontend owns the container format and picks
 /// the destination via the save dialog (mirrors `campaign_export`, issue #476).
 #[tauri::command]
-async fn content_export_challenge(dest: String, text: String) -> Result<CliResult, ()> {
-    Ok(match std::fs::write(&dest, text) {
+async fn content_export_challenge(dest: String, text: String) -> CliResult {
+    match std::fs::write(&dest, text) {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(format!("could not write challenge export: {e}")),
-    })
+    }
 }
 
 /// `content_write_file`, write caller-serialized text to a caller-chosen path.
@@ -1205,22 +1187,22 @@ async fn content_export_challenge(dest: String, text: String) -> Result<CliResul
 /// makes the directory when it has to (issue #1480). How far it will go is
 /// [`container_file::write`].
 #[tauri::command]
-async fn content_write_file(dest: String, text: String) -> Result<CliResult, ()> {
-    Ok(match container_file::write(&dest, &text) {
+async fn content_write_file(dest: String, text: String) -> CliResult {
+    match container_file::write(&dest, &text) {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
-    })
+    }
 }
 
 /// `content_import_challenge`, read a challenge file the user picked and hand its
 /// raw text back for the frontend to decode through the same `decodeChallenge` a
 /// pasted code uses (issue #476).
 #[tauri::command]
-async fn content_import_challenge(src: String) -> Result<CliResult, ()> {
-    Ok(match std::fs::read_to_string(&src) {
+async fn content_import_challenge(src: String) -> CliResult {
+    match std::fs::read_to_string(&src) {
         Ok(text) => CliResult::ok(json!({ "text": text })),
         Err(e) => CliResult::err(format!("could not read challenge import: {e}")),
-    })
+    }
 }
 
 /// `content_import_container`, read whatever coilbox `.json` the user picked in
@@ -1231,11 +1213,11 @@ async fn content_import_challenge(src: String) -> Result<CliResult, ()> {
 /// command. It is the same read as `content_import_challenge` without the
 /// assumption about what is inside.
 #[tauri::command]
-async fn content_import_container(src: String) -> Result<CliResult, ()> {
-    Ok(match std::fs::read_to_string(&src) {
+async fn content_import_container(src: String) -> CliResult {
+    match std::fs::read_to_string(&src) {
         Ok(text) => CliResult::ok(json!({ "text": text })),
         Err(e) => CliResult::err(format!("could not read that file: {e}")),
-    })
+    }
 }
 
 /// `branding_catalog`, answer with the branding catalog JSON already on disk (the
@@ -1243,7 +1225,7 @@ async fn content_import_container(src: String) -> Result<CliResult, ()> {
 /// past its TTL. Returns the raw JSON text. The frontend parses and matches it, so
 /// Rust stays schema-agnostic.
 #[tauri::command]
-async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<CliResult, ()> {
+async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> CliResult {
     let cache_file = coilbox_portable::cache_dir(&app)
         .ok()
         .map(|d| d.join("coilbox-branding").join("catalog.json"));
@@ -1253,7 +1235,7 @@ async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<
         .ok()
         .and_then(|d| branding::seed_file(&d, |p| p.exists()));
     let res = branding::resolve_catalog(&url, cache_file, seed_file).await;
-    Ok(CliResult::ok(json!(res)))
+    CliResult::ok(json!(res))
 }
 
 /// `branding_image` fetches the first working image URL (https only), caches the
@@ -1270,9 +1252,9 @@ async fn branding_image<R: Runtime>(
     app: AppHandle<R>,
     urls: Vec<String>,
     reencode: bool,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let resolved = branding::resolve_image(&urls, branding_image_dir(&app), reencode).await;
-    Ok(CliResult::ok(json!(resolved.unwrap_or_default())))
+    CliResult::ok(json!(resolved.unwrap_or_default()))
 }
 
 /// Subdirectory of the app cache dir holding catalog art fetched over the
@@ -1307,19 +1289,16 @@ fn blueprints_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 /// root (its `springsettings.cfg` / `LuaUI/Config` / `uikeys.txt`). `rootPath` is a
 /// `ContentRoot.path`.
 #[tauri::command]
-async fn content_config_profiles<R: Runtime>(
-    app: AppHandle<R>,
-    root_path: String,
-) -> Result<CliResult, ()> {
+async fn content_config_profiles<R: Runtime>(app: AppHandle<R>, root_path: String) -> CliResult {
     let dir = match profiles_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let profiles =
         tauri::async_runtime::spawn_blocking(move || settings_backup::list(&dir, &root_path)).await;
     match profiles {
-        Ok(profiles) => Ok(CliResult::ok(json!({ "profiles": profiles }))),
-        Err(e) => Ok(CliResult::err(format!("list profiles task failed: {e}"))),
+        Ok(profiles) => CliResult::ok(json!({ "profiles": profiles })),
+        Err(e) => CliResult::err(format!("list profiles task failed: {e}")),
     }
 }
 
@@ -1330,19 +1309,19 @@ async fn content_config_backup<R: Runtime>(
     app: AppHandle<R>,
     root_path: String,
     name: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let dir = match profiles_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res = tauri::async_runtime::spawn_blocking(move || {
         settings_backup::backup(&dir, &root_path, &name)
     })
     .await;
     match res {
-        Ok(Ok(profile)) => Ok(CliResult::ok(json!({ "profile": profile }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("backup task failed: {e}"))),
+        Ok(Ok(profile)) => CliResult::ok(json!({ "profile": profile })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("backup task failed: {e}")),
     }
 }
 
@@ -1355,10 +1334,10 @@ async fn content_config_restore<R: Runtime>(
     root_path: String,
     slug: String,
     overwrite: Option<bool>,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let dir = match profiles_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let overwrite = overwrite.unwrap_or(false);
     let res = tauri::async_runtime::spawn_blocking(move || {
@@ -1366,9 +1345,9 @@ async fn content_config_restore<R: Runtime>(
     })
     .await;
     match res {
-        Ok(Ok(outcome)) => Ok(CliResult::ok(json!(outcome))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("restore task failed: {e}"))),
+        Ok(Ok(outcome)) => CliResult::ok(json!(outcome)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("restore task failed: {e}")),
     }
 }
 
@@ -1378,19 +1357,19 @@ async fn content_config_delete_profile<R: Runtime>(
     app: AppHandle<R>,
     root_path: String,
     slug: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let dir = match profiles_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res = tauri::async_runtime::spawn_blocking(move || {
         settings_backup::delete(&dir, &root_path, &slug)
     })
     .await;
     match res {
-        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("delete profile task failed: {e}"))),
+        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete profile task failed: {e}")),
     }
 }
 
@@ -1398,44 +1377,41 @@ async fn content_config_delete_profile<R: Runtime>(
 /// `springsettings.cfg`. `configDir` is that file's directory, which unitsync
 /// reports, so a portable engine's own config dir is handled without guessing.
 #[tauri::command]
-async fn content_keybinds_read(config_dir: String) -> Result<CliResult, ()> {
+async fn content_keybinds_read(config_dir: String) -> CliResult {
     let res = tauri::async_runtime::spawn_blocking(move || keybinds::read(&config_dir)).await;
     match res {
-        Ok(r) => Ok(CliResult::ok(json!(r))),
-        Err(e) => Ok(CliResult::err(format!("read keybinds task failed: {e}"))),
+        Ok(r) => CliResult::ok(json!(r)),
+        Err(e) => CliResult::err(format!("read keybinds task failed: {e}")),
     }
 }
 
 /// `content_keybinds_write`, replace that `uikeys.txt`, keeping a one-time
 /// `.bak` of a file coilbox did not write.
 #[tauri::command]
-async fn content_keybinds_write(config_dir: String, text: String) -> Result<CliResult, ()> {
+async fn content_keybinds_write(config_dir: String, text: String) -> CliResult {
     let res =
         tauri::async_runtime::spawn_blocking(move || keybinds::write(&config_dir, &text)).await;
     match res {
-        Ok(Ok(r)) => Ok(CliResult::ok(json!(r))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("write keybinds task failed: {e}"))),
+        Ok(Ok(r)) => CliResult::ok(json!(r)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("write keybinds task failed: {e}")),
     }
 }
 
 /// `content_keymaps`, saved keymaps for a content root, newest first. Separate
 /// from config profiles because a keymap is worth moving on its own.
 #[tauri::command]
-async fn content_keymaps<R: Runtime>(
-    app: AppHandle<R>,
-    root_path: String,
-) -> Result<CliResult, ()> {
+async fn content_keymaps<R: Runtime>(app: AppHandle<R>, root_path: String) -> CliResult {
     let dir = match keymaps_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res =
         tauri::async_runtime::spawn_blocking(move || keybinds::keymaps_list(&dir, &root_path))
             .await;
     match res {
-        Ok(keymaps) => Ok(CliResult::ok(json!({ "keymaps": keymaps }))),
-        Err(e) => Ok(CliResult::err(format!("list keymaps task failed: {e}"))),
+        Ok(keymaps) => CliResult::ok(json!({ "keymaps": keymaps })),
+        Err(e) => CliResult::err(format!("list keymaps task failed: {e}")),
     }
 }
 
@@ -1447,19 +1423,19 @@ async fn content_keymap_save<R: Runtime>(
     root_path: String,
     name: String,
     json: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let dir = match keymaps_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res = tauri::async_runtime::spawn_blocking(move || {
         keybinds::keymaps_save(&dir, &root_path, &name, &json)
     })
     .await;
     match res {
-        Ok(Ok(keymap)) => Ok(CliResult::ok(json!({ "keymap": keymap }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("save keymap task failed: {e}"))),
+        Ok(Ok(keymap)) => CliResult::ok(json!({ "keymap": keymap })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("save keymap task failed: {e}")),
     }
 }
 
@@ -1469,33 +1445,33 @@ async fn content_keymap_delete<R: Runtime>(
     app: AppHandle<R>,
     root_path: String,
     slug: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let dir = match keymaps_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res = tauri::async_runtime::spawn_blocking(move || {
         keybinds::keymaps_delete(&dir, &root_path, &slug)
     })
     .await;
     match res {
-        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("delete keymap task failed: {e}"))),
+        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete keymap task failed: {e}")),
     }
 }
 
 /// `content_blueprints`, every layout in the blueprint library. The documents
 /// are opaque here: the frontend owns their shape.
 #[tauri::command]
-async fn content_blueprints<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+async fn content_blueprints<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let dir = match blueprints_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     match tauri::async_runtime::spawn_blocking(move || blueprints::list(&dir)).await {
-        Ok(items) => Ok(CliResult::ok(json!({ "items": items }))),
-        Err(e) => Ok(CliResult::err(format!("list blueprints task failed: {e}"))),
+        Ok(items) => CliResult::ok(json!({ "items": items })),
+        Err(e) => CliResult::err(format!("list blueprints task failed: {e}")),
     }
 }
 
@@ -1506,35 +1482,32 @@ async fn content_blueprint_save<R: Runtime>(
     app: AppHandle<R>,
     id: String,
     json: String,
-) -> Result<CliResult, ()> {
+) -> CliResult {
     let dir = match blueprints_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res =
         tauri::async_runtime::spawn_blocking(move || blueprints::save(&dir, &id, &json)).await;
     match res {
-        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("save blueprint task failed: {e}"))),
+        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("save blueprint task failed: {e}")),
     }
 }
 
 /// `content_blueprint_delete`, drop one layout from the library.
 #[tauri::command]
-async fn content_blueprint_delete<R: Runtime>(
-    app: AppHandle<R>,
-    id: String,
-) -> Result<CliResult, ()> {
+async fn content_blueprint_delete<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult {
     let dir = match blueprints_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res = tauri::async_runtime::spawn_blocking(move || blueprints::delete(&dir, &id)).await;
     match res {
-        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("delete blueprint task failed: {e}"))),
+        Ok(Ok(())) => CliResult::ok(json!({ "ok": true })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete blueprint task failed: {e}")),
     }
 }
 
@@ -1554,20 +1527,17 @@ fn widget_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 /// `content_widget_status`, what is installed under a content root against
 /// what coilbox ships. `rootPath` is a `ContentRoot.path`.
 #[tauri::command]
-async fn content_widget_status<R: Runtime>(
-    app: AppHandle<R>,
-    root_path: String,
-) -> Result<CliResult, ()> {
+async fn content_widget_status<R: Runtime>(app: AppHandle<R>, root_path: String) -> CliResult {
     let src = match widget_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res =
         tauri::async_runtime::spawn_blocking(move || widget::status(&src, Path::new(&root_path)))
             .await;
     match res {
-        Ok(status) => Ok(CliResult::ok(json!(status))),
-        Err(e) => Ok(CliResult::err(format!("widget status task failed: {e}"))),
+        Ok(status) => CliResult::ok(json!(status)),
+        Err(e) => CliResult::err(format!("widget status task failed: {e}")),
     }
 }
 
@@ -1575,34 +1545,31 @@ async fn content_widget_status<R: Runtime>(
 /// `LuaUI/`. The same command updates one already there. Only ever run from the
 /// button: coilbox never installs a widget on its own.
 #[tauri::command]
-async fn content_widget_install<R: Runtime>(
-    app: AppHandle<R>,
-    root_path: String,
-) -> Result<CliResult, ()> {
+async fn content_widget_install<R: Runtime>(app: AppHandle<R>, root_path: String) -> CliResult {
     let src = match widget_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let res =
         tauri::async_runtime::spawn_blocking(move || widget::install(&src, Path::new(&root_path)))
             .await;
     match res {
-        Ok(Ok(written)) => Ok(CliResult::ok(json!({ "written": written }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("widget install task failed: {e}"))),
+        Ok(Ok(written)) => CliResult::ok(json!({ "written": written })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("widget install task failed: {e}")),
     }
 }
 
 /// `content_widget_remove`, take the blueprint widget out of a content root.
 /// The library file and the spool are data rather than the widget, and stay.
 #[tauri::command]
-async fn content_widget_remove(root_path: String) -> Result<CliResult, ()> {
+async fn content_widget_remove(root_path: String) -> CliResult {
     let res =
         tauri::async_runtime::spawn_blocking(move || widget::remove(Path::new(&root_path))).await;
     match res {
-        Ok(Ok(removed)) => Ok(CliResult::ok(json!({ "removed": removed }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("widget remove task failed: {e}"))),
+        Ok(Ok(removed)) => CliResult::ok(json!({ "removed": removed })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("widget remove task failed: {e}")),
     }
 }
 
@@ -1610,11 +1577,11 @@ async fn content_widget_remove(root_path: String) -> Result<CliResult, ()> {
 /// across the given roots into the OS page cache so the engine's first rapid-tag
 /// resolution is warm. Manifests only; returns a cache-warm summary.
 #[tauri::command]
-async fn content_warm_rapid_pool(roots: Vec<String>) -> Result<CliResult, ()> {
+async fn content_warm_rapid_pool(roots: Vec<String>) -> CliResult {
     let paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
     match tauri::async_runtime::spawn_blocking(move || rapid_pool::warm(&paths)).await {
-        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
-        Err(e) => Ok(CliResult::err(format!("warm task failed: {e}"))),
+        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
+        Err(e) => CliResult::err(format!("warm task failed: {e}")),
     }
 }
 
@@ -1622,14 +1589,14 @@ async fn content_warm_rapid_pool(roots: Vec<String>) -> Result<CliResult, ()> {
 /// (pool blobs referenced by no on-disk `.sdp`, plus `*.incomplete` leftovers).
 /// `apply=false` is a dry run that computes the summary without deleting.
 #[tauri::command]
-async fn content_prune_rapid_pool(root: String, apply: bool) -> Result<CliResult, ()> {
+async fn content_prune_rapid_pool(root: String, apply: bool) -> CliResult {
     let res =
         tauri::async_runtime::spawn_blocking(move || rapid_pool::prune(Path::new(&root), apply))
             .await;
     match res {
-        Ok(Ok(summary)) => Ok(CliResult::ok(json!({ "summary": summary }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("prune task failed: {e}"))),
+        Ok(Ok(summary)) => CliResult::ok(json!({ "summary": summary })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("prune task failed: {e}")),
     }
 }
 
@@ -1638,18 +1605,15 @@ async fn content_prune_rapid_pool(root: String, apply: bool) -> Result<CliResult
 /// run that reports per-cache sizes without deleting. Every cache regenerates on
 /// demand, so clearing is always safe.
 #[tauri::command]
-async fn content_reclaim_caches<R: Runtime>(
-    app: AppHandle<R>,
-    apply: Option<bool>,
-) -> Result<CliResult, ()> {
+async fn content_reclaim_caches<R: Runtime>(app: AppHandle<R>, apply: Option<bool>) -> CliResult {
     let cache_root = match coilbox_portable::cache_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let apply = apply.unwrap_or(false);
     match tauri::async_runtime::spawn_blocking(move || caches::reclaim(&cache_root, apply)).await {
-        Ok(summary) => Ok(CliResult::ok(json!({ "summary": summary }))),
-        Err(e) => Ok(CliResult::err(format!("reclaim task failed: {e}"))),
+        Ok(summary) => CliResult::ok(json!({ "summary": summary })),
+        Err(e) => CliResult::err(format!("reclaim task failed: {e}")),
     }
 }
 
@@ -1658,11 +1622,11 @@ async fn content_reclaim_caches<R: Runtime>(
 /// else (issue #386). One root per call, so the UI can render each as it lands.
 /// A recursive walk of a large pool is not instant. See [`storage::overview`].
 #[tauri::command]
-async fn content_storage_overview(root: String) -> Result<CliResult, ()> {
+async fn content_storage_overview(root: String) -> CliResult {
     let p = PathBuf::from(&root);
     match tauri::async_runtime::spawn_blocking(move || storage::overview(&p)).await {
-        Ok(overview) => Ok(CliResult::ok(json!({ "overview": overview }))),
-        Err(e) => Ok(CliResult::err(format!("storage overview task failed: {e}"))),
+        Ok(overview) => CliResult::ok(json!({ "overview": overview })),
+        Err(e) => CliResult::err(format!("storage overview task failed: {e}")),
     }
 }
 
@@ -1671,12 +1635,12 @@ async fn content_storage_overview(root: String) -> Result<CliResult, ()> {
 /// real directory sitting inside a folder named `engine`, so the command cannot
 /// be turned into an arbitrary recursive delete.
 #[tauri::command]
-async fn content_delete_engine(path: String) -> Result<CliResult, ()> {
+async fn content_delete_engine(path: String) -> CliResult {
     let p = PathBuf::from(&path);
     match tauri::async_runtime::spawn_blocking(move || storage::delete_engine(&p)).await {
-        Ok(Ok(bytes)) => Ok(CliResult::ok(json!({ "bytes": bytes }))),
-        Ok(Err(e)) => Ok(CliResult::err(e)),
-        Err(e) => Ok(CliResult::err(format!("delete engine task failed: {e}"))),
+        Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("delete engine task failed: {e}")),
     }
 }
 
