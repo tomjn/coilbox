@@ -262,10 +262,8 @@ async fn direct_stop_discovery(discovery: State<'_, ActiveDiscovery>) -> Result<
 /// the person hosting can tell which one their friend can reach. So all of them
 /// are answered, named, and none is chosen here.
 #[tauri::command]
-async fn direct_local_addresses() -> Result<CliResult, ()> {
-    Ok(CliResult::ok(
-        json!({ "addresses": discovery::local_addresses() }),
-    ))
+async fn direct_local_addresses() -> CliResult {
+    CliResult::ok(json!({ "addresses": discovery::local_addresses() }))
 }
 
 /// `direct_open_ports`: ask the router to open every port given, then look from
