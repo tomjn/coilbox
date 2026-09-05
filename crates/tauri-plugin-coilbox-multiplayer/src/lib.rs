@@ -3266,42 +3266,6 @@ fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> 
     }
 }
 
-/// `mp_turn_credentials`: get a relay credential for this connection, asking the
-/// lobby for one if we do not already hold a live one.
-///
-/// The answer says whether there is a credential and when it runs out. The
-/// credential itself is not in it: the password is a secret and the relay agent
-/// is started from Rust, so nothing above this needs to see it. What starts a
-/// relayed battle calls [`turn::credentials`] directly (issue #2017).
-///
-/// A server that has not said it has a relay is not asked at all, so today it
-/// answers with the sentence [`turn::NoCredential::NoRelay`] carries, without a
-/// line going out.
-#[tauri::command]
-async fn mp_turn_credentials(
-    registry: State<'_, Registry>,
-    server_key: String,
-) -> Result<CliResult, ()> {
-    // The same budget the login handshake gets, because it is the same round
-    // trip to the same server.
-    let waited =
-        turn::credentials(registry.inner(), &server_key, conn::now_ms(), READY_TIMEOUT).await;
-    Ok(match waited {
-        Ok(_) => {
-            let expires_at = lock_or_recover(&registry)
-                .get(&server_key)
-                .and_then(|conn| {
-                    lock_or_recover(&conn.state)
-                        .turn_credentials
-                        .as_ref()
-                        .map(|c| c.expires_at)
-                });
-            CliResult::ok(json!({ "granted": true, "expiresAt": expires_at }))
-        }
-        Err(e) => CliResult::err(e.to_string()),
-    })
-}
-
 /// `mp_probe_host`: ask whether a battle host's game port refuses us outright.
 ///
 /// Read the [`probe`] module docs before acting on the result. Only `refused`
@@ -3505,7 +3469,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_build_battle_config,
             mp_build_host_config,
             mp_probe_host,
-            mp_turn_credentials,
+            turn::mp_turn_credentials,
             mp_relay_traffic,
             mp_leftover_relay_agent,
             mp_relay_left_running,
