@@ -189,10 +189,10 @@ async fn us_cancel(reg: State<'_, SharedRegistry>, run_id: String) -> Result<Cli
 
 /// `us_history` — summaries of every saved report, newest first.
 #[tauri::command]
-async fn us_history<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+async fn us_history<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let results_dir = match results_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let mut runs = Vec::new();
     for f in list_report_files(&results_dir) {
@@ -208,27 +208,27 @@ async fn us_history<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
             .unwrap_or_default();
         runs.push(ReportSummary::from_report(&name, &rep));
     }
-    Ok(CliResult::ok(json!({ "runs": runs })))
+    CliResult::ok(json!({ "runs": runs }))
 }
 
 /// `us_report` — full parsed report for one filename (basename only, no traversal).
 #[tauri::command]
-async fn us_report<R: Runtime>(app: AppHandle<R>, file: String) -> Result<CliResult, ()> {
+async fn us_report<R: Runtime>(app: AppHandle<R>, file: String) -> CliResult {
     let results_dir = match results_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let Some(name) = std::path::Path::new(&file).file_name() else {
-        return Ok(CliResult::err("invalid report filename"));
+        return CliResult::err("invalid report filename");
     };
     let path = results_dir.join(name);
-    Ok(match std::fs::read_to_string(&path) {
+    match std::fs::read_to_string(&path) {
         Ok(content) => match serde_json::from_str::<Report>(&content) {
             Ok(rep) => CliResult::ok(json!({ "report": rep })),
             Err(e) => CliResult::err(format!("could not parse report: {e}")),
         },
         Err(e) => CliResult::err(format!("could not read report: {e}")),
-    })
+    }
 }
 
 /// `us_seed_sql` — generate seed SQL via uberstress's `gen-seed-sql` subcommand,
@@ -256,69 +256,61 @@ async fn us_seed_sql(count: i64, prefix: Option<String>, password: Option<String
 /// `us_results_dir` — the directory reports are saved in (created if missing),
 /// so the UI can open it in the OS file manager.
 #[tauri::command]
-async fn us_results_dir<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+async fn us_results_dir<R: Runtime>(app: AppHandle<R>) -> CliResult {
     let results_dir = match results_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     if let Err(e) = std::fs::create_dir_all(&results_dir) {
-        return Ok(CliResult::err(format!("could not create results dir: {e}")));
+        return CliResult::err(format!("could not create results dir: {e}"));
     }
-    Ok(CliResult::ok(
-        json!({ "path": results_dir.to_string_lossy() }),
-    ))
+    CliResult::ok(json!({ "path": results_dir.to_string_lossy() }))
 }
 
 /// `us_export_report` — copy a saved report (basename only, no traversal) to a
 /// destination path the user picked.
 #[tauri::command]
-async fn us_export_report<R: Runtime>(
-    app: AppHandle<R>,
-    file: String,
-    dest: String,
-) -> Result<CliResult, ()> {
+async fn us_export_report<R: Runtime>(app: AppHandle<R>, file: String, dest: String) -> CliResult {
     let results_dir = match results_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let Some(name) = std::path::Path::new(&file).file_name() else {
-        return Ok(CliResult::err("invalid report filename"));
+        return CliResult::err("invalid report filename");
     };
     let src = results_dir.join(name);
-    Ok(match std::fs::copy(&src, &dest) {
+    match std::fs::copy(&src, &dest) {
         Ok(_) => CliResult::ok(json!({ "dest": dest })),
         Err(e) => CliResult::err(format!("could not export report: {e}")),
-    })
+    }
 }
 
 /// `us_import_report` — copy an external report JSON into the results dir after
 /// validating it parses as a report. Returns the imported filename.
 #[tauri::command]
-async fn us_import_report<R: Runtime>(app: AppHandle<R>, src: String) -> Result<CliResult, ()> {
+async fn us_import_report<R: Runtime>(app: AppHandle<R>, src: String) -> CliResult {
     let results_dir = match results_dir(&app) {
         Ok(d) => d,
-        Err(e) => return Ok(CliResult::err(e)),
+        Err(e) => return CliResult::err(e),
     };
     let content = match std::fs::read_to_string(&src) {
         Ok(c) => c,
-        Err(e) => return Ok(CliResult::err(format!("could not read {src}: {e}"))),
+        Err(e) => return CliResult::err(format!("could not read {src}: {e}")),
     };
     if let Err(e) = serde_json::from_str::<Report>(&content) {
-        return Ok(CliResult::err(format!(
-            "not a valid uberstress report: {e}"
-        )));
+        return CliResult::err(format!("not a valid uberstress report: {e}"));
     }
     let Some(name) = std::path::Path::new(&src).file_name() else {
-        return Ok(CliResult::err("invalid source filename"));
+        return CliResult::err("invalid source filename");
     };
     if let Err(e) = std::fs::create_dir_all(&results_dir) {
-        return Ok(CliResult::err(format!("could not create results dir: {e}")));
+        return CliResult::err(format!("could not create results dir: {e}"));
     }
     let dest = results_dir.join(name);
-    Ok(match std::fs::write(&dest, &content) {
+    match std::fs::write(&dest, &content) {
         Ok(()) => CliResult::ok(json!({ "file": name.to_string_lossy() })),
         Err(e) => CliResult::err(format!("could not import report: {e}")),
-    })
+    }
 }
 
 /// Build the plugin. Registered as `"coilbox-uberstress"` (crate name minus the
