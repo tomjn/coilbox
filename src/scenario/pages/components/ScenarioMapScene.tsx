@@ -11,8 +11,7 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router";
-import { buildGridSnap, buildingFootprints } from "@/blueprint/footprint";
-import { onBuildGrid } from "@/blueprint/offGrid";
+import { buildGridSnap } from "@/blueprint/footprint";
 import { useGameSides } from "@/blueprint/useGameSides";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -30,42 +29,21 @@ import {
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import {
-  editBase,
-  editBaseLayout,
   type LayoutEdit,
-  moveBuilding,
-  removeBase,
   removeBlueprint,
-  renameBlueprint,
-  setBlueprintOrdered,
   setOrigin,
-  setQueue,
-  sharingLayout,
-  substituteQueues,
 } from "@/lib/scenarioEditing/bases";
 import {
   canTurn,
   duplicatePlacement,
-  editActor,
   removePlacement,
-  setActorState,
   turnPlacement,
 } from "@/lib/scenarioEditing/editing";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import type { LayoutChoice } from "@/lib/scenarioEditing/layoutPlacing";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
-import {
-  absentIn,
-  dragKeys,
-  noSlopeIn,
-  overlappingIn,
-  placementKey,
-  sceneUnchecked,
-  tooDeepIn,
-  tooShallowIn,
-  unstableIn,
-} from "@/placement/placements";
+import { dragKeys, placementKey, sceneUnchecked } from "@/placement/placements";
 import {
   previewArmed,
   previewNote,
@@ -73,7 +51,6 @@ import {
 } from "@/placement/preview";
 import {
   HistoryControls,
-  PlaybackBar,
   SelectionTools,
   turnNoteText,
 } from "@/placement/SurfaceBars";
@@ -84,10 +61,8 @@ import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
 import { useScenarioUnits } from "@/placement/useScenarioUnits";
 import { usePreferredTarget } from "@/play/config";
 import type { ExtensionTypes } from "../../extensions";
-import { baseBuildings, type Point, type Scenario } from "../../model";
+import type { Point, Scenario } from "../../model";
 import type { MissionIssue } from "../../validate";
-import { ActorControls } from "./ActorControls";
-import { BaseControls } from "./BaseControls";
 import { ContentsList } from "./ContentsList";
 import {
   type ContentEntry,
@@ -100,7 +75,6 @@ import { GroupControls } from "./GroupControls";
 import {
   addWaypoint,
   editGroup,
-  groupLabel,
   pathLineKey,
   removeGroup,
   targetOptions,
@@ -110,19 +84,18 @@ import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
 import type { RowFocus } from "./problemTargets";
 import { turnSelectionAround } from "./rigidTurn";
+import { PathBar, UnitsNote, ZoneBar } from "./ScenarioMapBars";
 import {
-  ClickMapBar,
-  PathBar,
-  ScenarioSelectionBar,
-  SelectionCountBar,
-  UnitsNote,
-  ZoneBar,
-} from "./ScenarioMapBars";
+  ClickAnswerBars,
+  ModeStatusBar,
+  PlacementSelectionBar,
+  ScenarioPlaybackBar,
+  TallyBar,
+} from "./ScenarioMapSceneBars";
 import {
   addedWords,
   addKeys,
   countSelection,
-  countWords,
   entryKeys,
   inSelection,
   moveSelection,
@@ -601,22 +574,6 @@ export const ScenarioMapScene = forwardRef<
     },
   });
 
-  // A drawn unit is described by the entry it belongs to, and each of the three
-  // kinds has a panel of its own.
-  const pickedActor =
-    (picked?.kind === "actor" &&
-      scenario.actors.find((a) => a.id === picked.id)) ||
-    null;
-  const pickedBase =
-    (picked?.kind === "base" &&
-      scenario.bases.find((b) => b.id === picked.id)) ||
-    null;
-  // The layout it is placed from, which is what its name, its build order and
-  // its sharing are all about.
-  const pickedLayout = pickedBase
-    ? scenario.blueprints.find((b) => b.id === pickedBase.blueprint)
-    : undefined;
-
   /**
    * A group's own controls, wherever the group was reached from.
    *
@@ -995,273 +952,58 @@ export const ScenarioMapScene = forwardRef<
       }
       bars={
         <>
-          {/* The mode's own controls, and only while the mode has some. Select
-              has none, so its bar is not drawn at all rather than drawn empty.
-              The row shares one backdrop rather than each control finding its
-              own: a mode's `controls` are arbitrary (selects, a count field, a
-              button), so painting the panel once is what makes every one of
-              them opaque over the map, present ones and any added later, rather
-              than a fix repeated per control (issue #1188). */}
-          {behaviour.controls && (
-            <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card p-1">
-              {behaviour.controls}
-            </div>
-          )}
-          {/* What the squares under the pointer are saying, said in words as
-              well: a mark is a colour, and a colour on its own is not a
-              statement anybody can act on (issue #1464). It carries the offer
-              of a spot the whole thing fits (issue #1482) in the same breath,
-              because the offer only exists where the spot is trouble, and two
-              chips for one thought was two rows of the wall this column had
-              become (issue #2285). */}
-          {spot && (
-            <p
-              className={`w-fit rounded px-2 py-1 text-[11px] backdrop-blur ${
-                spot.trouble
-                  ? "bg-amber-950/80 text-amber-200"
-                  : "bg-card/70 text-muted-foreground"
-              }`}
-            >
-              {spot.text}
-            </p>
-          )}
+          {/* The mode's own controls, and only while the mode has some, plus
+              the sentence over the terrain about the spot under the pointer:
+              a mark is a colour, and a colour on its own is not a statement
+              anybody can act on (issues #1188, #1464, #2285). */}
+          <ModeStatusBar controls={behaviour.controls} spot={spot} />
           {picked && (
-            // Turning and deleting are the rail's now. What is left here is
-            // what the bar was always for: naming what is selected, and the
-            // controls for whatever kind of thing it turned out to be.
-            <ScenarioSelectionBar placement={picked}>
-              {pickedActor && (
-                <ActorControls
-                  key={pickedActor.id}
-                  actor={pickedActor}
-                  participants={scenario.setup.participants}
-                  issues={issues}
-                  onEdit={(patch) =>
-                    onChange((doc) => editActor(doc, pickedActor.id, patch))
-                  }
-                  onState={(state) =>
-                    onChange((doc) => setActorState(doc, pickedActor.id, state))
-                  }
-                />
-              )}
-              {picked.kind === "group" && groupControls}
-              {picked.kind === "base" && pickedBase && (
-                <BaseControls
-                  key={`${pickedBase.id}#${picked.index}`}
-                  base={pickedBase}
-                  buildings={baseBuildings(scenario.blueprints, pickedBase)}
-                  index={picked.index}
-                  layout={pickedLayout}
-                  layoutName={pickedLayout?.name ?? ""}
-                  ordered={pickedLayout?.ordered === true}
-                  sharedWith={sharingLayout(scenario, pickedBase.id).length}
-                  sharedEdit={sharedBase === pickedBase.id}
-                  overlaps={overlappingIn(
-                    units.placements,
-                    footprints,
-                    pickedBase.id,
-                  )}
-                  unstable={unstableIn(
-                    units.placements,
-                    footprints,
-                    pickedBase.id,
-                  )}
-                  tooDeep={tooDeepIn(
-                    units.placements,
-                    footprints,
-                    pickedBase.id,
-                  )}
-                  // Nothing on a map with no water, where every one of these is
-                  // refused for the same reason and the surface says that
-                  // reason once (issue #1536). Naming them here as well would
-                  // be the wall of cyan written out in words. Only this half:
-                  // a map with no sea is why a building wants water it cannot
-                  // find, and never why one is under too much (issue #1552).
-                  tooShallow={
-                    waterless === null
-                      ? tooShallowIn(
-                          units.placements,
-                          footprints,
-                          pickedBase.id,
-                        )
-                      : []
-                  }
-                  // Only once the reads are in. Before that everything is
-                  // unjudged for a moment, and a panel opening on a wall of
-                  // warnings that clears itself teaches an author to ignore it
-                  // (issue #1491).
-                  noSlope={
-                    units.settled
-                      ? noSlopeIn(units.placements, footprints, pickedBase.id)
-                      : undefined
-                  }
-                  absent={absentIn(units.placements, footprints, pickedBase.id)}
-                  designedFor={pickedLayout?.designedFor}
-                  onMap={mapName}
-                  participants={scenario.setup.participants}
-                  units={gameUnits.units}
-                  unitsLoading={gameUnits.loading}
-                  sides={gameSides}
-                  gameArchive={gameUnits.archive}
-                  moving={moving === pickedBase.id}
-                  issues={issues}
-                  onEdit={(patch) =>
-                    onChange((doc) => editBase(doc, pickedBase.id, patch))
-                  }
-                  onRename={(name) =>
-                    onChange((doc) =>
-                      renameBlueprint(
-                        doc,
-                        pickedBase.id,
-                        name,
-                        layoutEdit(pickedBase.id),
-                      ),
-                    )
-                  }
-                  onOrdered={(on) =>
-                    onChange((doc) =>
-                      setBlueprintOrdered(
-                        doc,
-                        pickedBase.id,
-                        on,
-                        layoutEdit(pickedBase.id),
-                      ),
-                    )
-                  }
-                  // The selection stays where it is rather than following the
-                  // building that moved, because what is selected here is a place
-                  // in the base: the bar above calls it "base building 3".
-                  onMoveBuilding={(at, delta) =>
-                    onChange((doc) =>
-                      moveBuilding(
-                        doc,
-                        pickedBase.id,
-                        at,
-                        delta,
-                        layoutEdit(pickedBase.id),
-                      ),
-                    )
-                  }
-                  onPlay={() =>
-                    setPlayback({
-                      base: pickedBase.id,
-                      step: 0,
-                      playing: !reduceMotion,
-                    })
-                  }
-                  onSharedEdit={(on) =>
-                    setSharedBase(on ? pickedBase.id : null)
-                  }
-                  onQueue={(queue, repeat) =>
-                    onChange((doc) =>
-                      setQueue(doc, pickedBase.id, picked.index, queue, repeat),
-                    )
-                  }
-                  onMove={(on) => setMovingBase(on ? pickedBase.id : null)}
-                  // A layout edit, so it copies a shared layout rather than
-                  // moving every base placed from it, and the history holds it
-                  // like any other (#1427).
-                  onSnapToGrid={() =>
-                    onChange((doc) =>
-                      editBaseLayout(
-                        doc,
-                        pickedBase.id,
-                        layoutEdit(pickedBase.id),
-                        (buildings) =>
-                          onBuildGrid(
-                            buildings,
-                            buildingFootprints(gameUnits.units),
-                            pickedBase.origin,
-                          ),
-                      ),
-                    )
-                  }
-                  // A layout edit like the snap above, so converting one of two
-                  // bases placed from a layout converts one of them (#1466).
-                  // The queues are the base's rather than the layout's, so they
-                  // go through the plan first, while the bases sharing the
-                  // layout are still the bases sharing it (#1493).
-                  onSubstitute={(next, plan) =>
-                    onChange((doc) => {
-                      const how = layoutEdit(pickedBase.id);
-                      return editBaseLayout(
-                        substituteQueues(doc, pickedBase.id, plan, how),
-                        pickedBase.id,
-                        how,
-                        () => next.buildings,
-                      );
-                    })
-                  }
-                  onDelete={() => {
-                    onChange((doc) => removeBase(doc, pickedBase.id));
-                    setSelected(null);
-                  }}
-                />
-              )}
-            </ScenarioSelectionBar>
+            <PlacementSelectionBar
+              scenario={scenario}
+              picked={picked}
+              groupControls={groupControls}
+              issues={issues}
+              onChange={onChange}
+              layoutEdit={layoutEdit}
+              placements={units.placements}
+              footprints={footprints}
+              waterless={waterless}
+              settled={units.settled}
+              mapName={mapName}
+              gameUnits={gameUnits}
+              gameSides={gameSides}
+              moving={moving}
+              sharedBase={sharedBase}
+              reduceMotion={reduceMotion}
+              setPlayback={setPlayback}
+              setSharedBase={setSharedBase}
+              setMovingBase={setMovingBase}
+              setSelected={setSelected}
+            />
           )}
           {/* What the outlined square beside the selected building means while
               a turn is being considered (issue #1541) is `turnNote` on the
               rail's Turn now. It is only ever said while the pointer is on that
               button, which is where its tooltip already is, so it does not need
               a bar of its own across the view. */}
-          {drawingPath && pickedGroup && (
-            <ClickMapBar
-              message={
-                <>
-                  Click the map to add points to{" "}
-                  <span className="font-mono">
-                    {groupLabel(scenario.groups, pickedGroup.id)} ·{" "}
-                    {pickedGroup.orders[drawingPath.order].kind}
-                  </span>
-                </>
-              }
-              onDone={() => setDrawing(null)}
-              onAt={onPlace}
-              worldWidth={assets.worldWidth}
-              worldHeight={assets.worldHeight}
-            />
-          )}
-          {moving && (
-            <ClickMapBar
-              message="Click the map to put this base's origin there, buildings and all"
-              onDone={() => setMovingBase(null)}
-              onAt={onPlace}
-              worldWidth={assets.worldWidth}
-              worldHeight={assets.worldHeight}
-            />
-          )}
+          <ClickAnswerBars
+            drawingPath={drawingPath}
+            pickedGroup={pickedGroup}
+            groups={scenario.groups}
+            onDrawingDone={() => setDrawing(null)}
+            moving={moving}
+            onMovingDone={() => setMovingBase(null)}
+            picking={picking}
+            onPlace={onPlace}
+            worldWidth={assets.worldWidth}
+            worldHeight={assets.worldHeight}
+          />
           {playing && (
-            <PlaybackBar
-              step={playing.step}
+            <ScenarioPlaybackBar
+              playing={playing}
               total={total}
-              def={steps[playing.step - 1]?.def ?? ""}
-              playing={playing.playing}
-              onStep={(step) =>
-                setPlayback((at) => at && { ...at, step, playing: false })
-              }
-              onPlaying={(on) =>
-                setPlayback(
-                  (at) =>
-                    at && {
-                      ...at,
-                      playing: on,
-                      // Playing from the end starts again, so the button is never
-                      // one that does nothing.
-                      step: on && at.step >= total ? 0 : at.step,
-                    },
-                )
-              }
-              onDone={() => setPlayback(null)}
-            />
-          )}
-          {picking && !drawingPath && !moving && (
-            <ClickMapBar
-              message={picking.message}
-              onDone={picking.onDone}
-              onAt={onPlace}
-              worldWidth={assets.worldWidth}
-              worldHeight={assets.worldHeight}
+              steps={steps}
+              setPlayback={setPlayback}
             />
           )}
           {pathRef && selected && (
@@ -1299,8 +1041,8 @@ export const ScenarioMapScene = forwardRef<
               Its own bar rather than a note in the corner, because the corner is
               for what is true of the whole scene (issue #2350). */}
           {selection.length > 1 && (
-            <SelectionCountBar
-              what={countWords(selection)}
+            <TallyBar
+              selection={selection}
               onClear={() => setSelection(NO_SELECTION)}
             />
           )}
