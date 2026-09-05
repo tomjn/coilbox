@@ -1,6 +1,6 @@
 import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
-import { attachGizmo } from "./ModelViewport";
+import { attachGizmo } from "./gizmoCommit";
 import type { SceneState } from "./sceneState";
 import { applyHoverVisual, showSelection } from "./selectionAndHoverOutlines";
 

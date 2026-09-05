@@ -9,8 +9,8 @@ import {
   showCollisionVolume,
   showPieceCollisionVolumes,
 } from "./collisionVolumes";
+import { attachGizmo } from "./gizmoCommit";
 import {
-  attachGizmo,
   COLLISION_DIM_OPACITY,
   COLLISION_OPACITY,
   COLLISION_OVERLAY_OPACITY,

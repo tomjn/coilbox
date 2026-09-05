@@ -11,11 +11,11 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
+import { pieceIdOf } from "./gizmoCommit";
 import {
   CORNER_COLOUR,
   CUSTOM_COLOUR,
   FACE_COLOUR,
-  pieceIdOf,
   points,
   ROTATION_STEP,
   SEAT_COLOUR,

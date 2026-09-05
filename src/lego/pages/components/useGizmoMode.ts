@@ -1,6 +1,7 @@
 import { type RefObject, useEffect } from "react";
 import { showCollisionHandles } from "./collisionHandles";
-import { attachGizmo, type GizmoMode, gizmoMode } from "./ModelViewport";
+import { attachGizmo, gizmoMode } from "./gizmoCommit";
+import type { GizmoMode } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
 
 /**
