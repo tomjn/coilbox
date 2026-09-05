@@ -84,6 +84,7 @@ function BattleRoomPage() {
   const block = launchBlock({
     hasTarget: !!room.target,
     targetLoading: room.targetLoading,
+    unreadable: room.contentUnreadable,
     contentKnown: room.contentKnown,
     mapMissing: room.mapMissing,
     gameMissing: room.gameMissing,
@@ -277,7 +278,11 @@ function BattleRoomPage() {
   // ourselves we launch via the Start button instead (see `onStart`), so this is
   // skipped — our own in-game flag must not trigger a client launch.
   const launchedRef = useRef(false);
-  const canRun = !!room.target && !room.mapMissing && !room.gameMissing;
+  const canRun =
+    !!room.target &&
+    !room.contentUnreadable &&
+    !room.mapMissing &&
+    !room.gameMissing;
   const { launch: doLaunch } = launch;
   // Our launch for this match has finished, so the engine is no longer ours to
   // be in. With the host still in-game that means we dropped out of a running

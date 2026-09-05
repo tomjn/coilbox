@@ -7,6 +7,11 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncScan,
 } from "@/content/config";
+import {
+  exactGameRequirement,
+  exactMapRequirement,
+  resolveVerdict,
+} from "@/content/resolveContent";
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
 import { notify } from "@/notify/notify";
 import {
@@ -165,6 +170,14 @@ export interface BattleRoomView {
   gameMissing: boolean;
   /** True once local content presence is known (scan settled). */
   contentKnown: boolean;
+  /**
+   * The content scan stopped without saying what is installed and will not try
+   * again on its own, e.g. a preferred engine with no libunitsync in it (issue
+   * #1386, shared with `resolveContent.ts` via `contentBlock.ts`'s `unreadable`).
+   * `mapMissing`/`gameMissing` stay false here rather than guessing, so this is
+   * checked on its own by the launch block and the caller.
+   */
+  contentUnreadable: boolean;
   sync: SyncState;
   /**
    * The reason the last battle action (kick, force, ready, start, leave, …)
@@ -440,13 +453,35 @@ export function useBattleRoom(): BattleRoomView {
   const setErr = useCallback((e: unknown) => setActionError(mpErr(e)), []);
 
   // Content presence is scan-authoritative (the scanned map/game lists), so a
-  // forced rescan after a download flips it. Only "known" once the scan settles,
-  // so we don't briefly report content missing (and flag ourselves unsynced)
-  // while unitsync is still loading.
-  const scanSettled = !scan.loading || games.length > 0 || maps.length > 0;
-  const contentKnown = !!target && scanSettled;
-  const mapMissing = contentKnown && !localMap;
-  const gameMissing = contentKnown && !localGame;
+  // forced rescan after a download flips it. The exact-name match and the
+  // "is this knowable yet" logic are the same `resolveContent.ts` the resolve
+  // drawer uses for imports (issue #2458). This room only adds its own extra
+  // blockers on top (players not ready, host not present).
+  const contentVerdict = resolveVerdict({
+    requirements: battle
+      ? [exactGameRequirement(battle.modname), exactMapRequirement(battle.map)]
+      : [],
+    installed: {
+      games: games.map((g) => ({ name: g.name })),
+      maps: maps.map((m) => m.name),
+      engineVersions: [],
+    },
+    targetLoading,
+    hasTarget: !!target,
+    scan,
+    enginesLoading: false,
+    engineCatalogPending: false,
+  });
+  // `!!target` is checked again on top of the verdict's own "knowable yet" read:
+  // with no target at all the verdict has nothing to wait on and calls itself
+  // settled immediately, which would otherwise read as "known" here too.
+  const contentKnown =
+    !!target && !contentVerdict.loading && !contentVerdict.unreadable;
+  const contentUnreadable = !!target && contentVerdict.unreadable;
+  const mapMissing =
+    contentKnown && contentVerdict.missing.some((r) => r.kind === "map");
+  const gameMissing =
+    contentKnown && contentVerdict.missing.some((r) => r.kind === "game");
 
   const rows = useMemo(
     () => (battle ? membersToRows(battle, me, state?.users) : []),
@@ -1146,6 +1181,7 @@ export function useBattleRoom(): BattleRoomView {
     mapMissing,
     gameMissing,
     contentKnown,
+    contentUnreadable,
     sync,
     actionError,
     hostIngame,
