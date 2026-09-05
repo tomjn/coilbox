@@ -3,13 +3,16 @@
 //! internal locking is needed. All IO is best-effort - a failure is logged and
 //! never breaks live chat.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use coilbox_lobby_protocol::ChatMsg;
+use picoframe_core::CliResult;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tauri::Runtime;
 
 /// One persisted DM line: the thread key (`peer`) plus the message.
 #[derive(Serialize, Deserialize)]
@@ -126,6 +129,57 @@ impl DmLog {
             Err(e) => eprintln!("dmlog: open failed: {e}"),
         }
     }
+}
+
+/// `mp_chat_logs`: enumerate saved chat logs (DM + channel threads) across every
+/// account, for the log viewer. Reads the log dirs directly, so it works with no
+/// active connection. Each account's threads are newest-activity first.
+#[tauri::command]
+pub(crate) fn mp_chat_logs<R: Runtime>(app: tauri::AppHandle<R>) -> CliResult {
+    let (dm_dir, chan_dir) = match crate::log_dirs(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let mut accounts: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for (dir, kind) in [(&dm_dir, "dm"), (&chan_dir, "channel")] {
+        for stem in account_stems(dir) {
+            let log = DmLog::new(dir, &stem);
+            for (name, count, last_at) in log.summaries() {
+                accounts.entry(stem.clone()).or_default().push(json!({
+                    "kind": kind,
+                    "name": name,
+                    "messageCount": count,
+                    "lastAt": last_at,
+                }));
+            }
+        }
+    }
+    let out: Vec<Value> = accounts
+        .into_iter()
+        .map(|(account, mut threads)| {
+            threads.sort_by(|a, b| b["lastAt"].as_u64().cmp(&a["lastAt"].as_u64()));
+            json!({ "account": account, "threads": threads })
+        })
+        .collect();
+    CliResult::ok(json!({ "accounts": out }))
+}
+
+/// `mp_chat_log_open`: load one saved thread's messages (a DM peer or a channel)
+/// for `account` (a log file stem from `mp_chat_logs`). `kind` selects the store.
+#[tauri::command]
+pub(crate) fn mp_chat_log_open<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    account: String,
+    kind: String,
+    name: String,
+) -> CliResult {
+    let (dm_dir, chan_dir) = match crate::log_dirs(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let dir = if kind == "channel" { chan_dir } else { dm_dir };
+    let log = DmLog::new(&dir, &account);
+    CliResult::ok(json!({ "messages": log.thread(&name) }))
 }
 
 /// Somewhere for a test to keep conversation logs that is not the developer's own
