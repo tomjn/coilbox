@@ -18,11 +18,7 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router";
-import {
-  buildGridSnap,
-  buildingFootprints,
-  type FootprintMark,
-} from "@/blueprint/footprint";
+import { buildGridSnap, buildingFootprints } from "@/blueprint/footprint";
 import { onBuildGrid } from "@/blueprint/offGrid";
 import { useGameSides } from "@/blueprint/useGameSides";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
@@ -64,30 +60,24 @@ import {
 } from "@/lib/scenarioEditing/editing";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import type { LayoutChoice } from "@/lib/scenarioEditing/layoutPlacing";
-import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { useFieldText } from "@/lib/useFieldText";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
   absentIn,
-  baseFootprints,
   dragKeys,
   noSlopeIn,
   overlappingIn,
   type Placement,
   placementKey,
   sceneUnchecked,
-  sceneWaterless,
   tooDeepIn,
   tooShallowIn,
   unstableIn,
 } from "@/placement/placements";
 import {
-  placeKind,
   previewArmed,
-  previewChecks,
   previewNote,
-  turnedMarks,
   withoutBuilding,
 } from "@/placement/preview";
 import {
@@ -129,7 +119,6 @@ import {
   addWaypoint,
   editGroup,
   groupLabel,
-  orderWaypoints,
   parsePathKey,
   parsePathLineKey,
   pathLineKey,
@@ -163,6 +152,7 @@ import { modeDigit } from "./shortcuts";
 import { startMarkers } from "./startPositions";
 import { useCameraMovement, useMapCamera } from "./useMapCamera";
 import { useMapKeyboard } from "./useMapKeyboard";
+import { useMapPlacementPreview } from "./useMapPlacementPreview";
 import { useMapSelection, useSelectionCleanup } from "./useMapSelection";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
@@ -173,10 +163,6 @@ import { parseZoneKey, removeZone, renameZone, zoneExtent } from "./zones";
  *  arrives. Slow enough to read the base going up, brisk enough that a
  *  twenty-building opening is not a coffee break. */
 const PLAYBACK_STEP_MS = 700;
-
-/** One list for every "nothing to draw", so a layer with nothing on it is not
- *  cleared and redrawn on every render. */
-const NOTHING: FootprintMark[] = [];
 
 /**
  * The scenario's map as the surface it is authored on.
@@ -498,39 +484,47 @@ export const ScenarioMapScene = forwardRef<
     pathRef ? selected : null,
   );
 
-  // Which order the map is putting points into. Held loosely: it is only obeyed
-  // while its group is still the selection and its order is still one that has a
-  // path, so deleting either of them ends the drawing rather than stranding it.
-  const [drawing, setDrawing] = useState<{
-    groupId: string;
-    order: number;
-  } | null>(null);
-  const drawingOrder =
-    drawing && pickedGroup?.id === drawing.groupId
-      ? pickedGroup.orders[drawing.order]
-      : undefined;
-  const drawingPath =
-    drawing && drawingOrder && orderWaypoints(drawingOrder) ? drawing : null;
+  // The game's own units, for the panels that pick one and for the build grid
+  // every base building is dragged and turned onto.
+  const gameUnits = useGameUnits(scenario.setup.gameName);
+  const snap = useMemo(() => buildGridSnap(gameUnits.units), [gameUnits.units]);
+  // What the game calls each side's units, which is all a base's conversion
+  // needs beyond the units themselves (issue #1466).
+  const gameSides = useGameSides(gameUnits.archive);
 
-  // Which base the map is waiting for a point for, held as loosely as a path
-  // being drawn: a base that has been deleted stops the map waiting for it.
-  const [movingBase, setMovingBase] = useState<string | null>(null);
-  const moving = scenario.bases.some((b) => b.id === movingBase)
-    ? movingBase
-    : null;
-
-  // What a click on the map would do, from the same three conditions
-  // `previewArmed`'s `answering` and `previewNote`'s stand down for: a path
-  // being drawn, a base's origin being moved, a point a panel asked for, or
-  // else whatever is armed. Computed once so the ghost, the sentence over the
-  // terrain and the keyboard's own announcement (issue #2359) all name the
-  // same click.
-  const placing = placeKind(drawingPath, moving, picking);
-
-  // Whether the map is waiting for a point: a path being drawn, a base being
-  // moved, or a point a panel asked for. While one of those is outstanding its
-  // bar is the only thing the map says over the terrain (issue #2285).
-  const answering = placing.kind !== "arm";
+  // The path being drawn, the base being moved, what a click on the map would
+  // do about either, and the footprints every placed building stands on
+  // (issues #1315, #1464, #1541). Held apart in `useMapPlacementPreview.ts`,
+  // which owns this state and these reads and calls no `onChange` the same way
+  // `useMapSelection` does not: deciding what a click writes to the document
+  // is `onPlace`'s, right below, reading `drawingPath` and `moving` back out.
+  const {
+    drawing,
+    setDrawing,
+    drawingPath,
+    moving,
+    setMovingBase,
+    placing,
+    answering,
+    footprints,
+    footprintsAt,
+    footprintAt,
+    checks,
+    waterless,
+    turning,
+    setTurning,
+    turned,
+  } = useMapPlacementPreview({
+    scenario,
+    placements: units.placements,
+    ground: units.ground,
+    settled: units.settled,
+    gameUnits: gameUnits.units,
+    snap,
+    pickedGroup,
+    picking,
+    selected,
+  });
 
   // Answering a question the author asked is what a click means while one is
   // outstanding, in whatever mode: a point on a path being drawn, or the place
@@ -547,53 +541,6 @@ export const ScenarioMapScene = forwardRef<
         }
       : (picking?.onPick ?? behaviour.place);
 
-  // The game's own units, for the panels that pick one and for the build grid
-  // every base building is dragged and turned onto.
-  const gameUnits = useGameUnits(scenario.setup.gameName);
-  const snap = useMemo(() => buildGridSnap(gameUnits.units), [gameUnits.units]);
-  // What the game calls each side's units, which is all a base's conversion
-  // needs beyond the units themselves (issue #1466).
-  const gameSides = useGameSides(gameUnits.archive);
-
-  // The ground each of those buildings stands on, and which of them are fighting
-  // over it. Drawn for the whole document rather than for the selected base, so
-  // a layout that cannot be built says so without being clicked on first.
-  // Which of them the map's terrain will not take goes in the same pass (issue
-  // #1315): a base whose half floats is a mission that ships broken, and this
-  // is where the layout is sitting on the real ground it will be played on.
-  const footprints = useMemo(
-    () => baseFootprints(units.placements, gameUnits.units, units.ground),
-    [units.placements, gameUnits.units, units.ground],
-  );
-  // The same two questions, asked of a document the keyboard has not drawn yet
-  // (issue #2315): a move or a turn has to hear the verdict the document will
-  // carry once the edit lands, not the one `footprints` above still holds from
-  // before the key was pressed. Flattened the same way `units.placements` is,
-  // through the same snap, so the two never disagree about where a building
-  // will actually stand.
-  const footprintsAt = useCallback(
-    (doc: Scenario) =>
-      baseFootprints(
-        scenarioPlacements(doc, snap),
-        gameUnits.units,
-        units.ground,
-      ),
-    [snap, gameUnits.units, units.ground],
-  );
-  // The same two questions asked about a layout the pointer is carrying rather
-  // than about one the document holds, so an author placing a whole base sees
-  // where it lands before they land it (issue #1464). Built once per game and
-  // map, because a pointer move must not cost a scan of the unit dataset.
-  const checks = useMemo(
-    () => previewChecks(gameUnits.units, units.ground),
-    [gameUnits.units, units.ground],
-  );
-  // A map with no sea refuses every naval building on it wherever it is put, so
-  // that is said once about the map instead of once per building (issue #1536).
-  // Held back until the reads have settled, like the unchecked note beside it.
-  const waterless = units.settled
-    ? sceneWaterless(footprints, units.ground)
-    : null;
   const preview = useLayoutPreview({
     handle,
     worldWidth: assets.worldWidth,
@@ -653,32 +600,9 @@ export const ScenarioMapScene = forwardRef<
     selected,
   );
 
-  // The ground the selected building stands on: what says it is selected, and
-  // what the pointer can take hold of to move it (issue #1716). Null for
-  // everything else the map can select, which is everything with no footprint.
-  const footprintAt = useCallback(
-    (key: string) => footprints.find((mark) => mark.key === key)?.rect ?? null,
-    [footprints],
-  );
-
-  // Where a turn would stand the selected building, drawn while the Turn button
-  // is under the pointer or has the focus (issue #1541). A turn is the one edit
-  // with nothing under the pointer to hang a preview on, so the button is the
-  // hover. Empty for a square footprint, which does not move at all.
-  const [turning, setTurning] = useState(false);
-  const turned = useMemo(
-    () =>
-      turning && selected
-        ? turnedMarks(
-            scenario,
-            selected,
-            checks.footprintOf,
-            footprints,
-            checks.standingOf,
-          )
-        : NOTHING,
-    [turning, selected, scenario, checks, footprints],
-  );
+  // Where a turn would stand the selected building, drawn while the Turn
+  // button is under the pointer or has the focus (issue #1541): `turned`,
+  // from `useMapPlacementPreview` above.
   useScenarioFootprints(handle, turned, assets, units.groundAt, "offered");
 
   useMapEditing({
