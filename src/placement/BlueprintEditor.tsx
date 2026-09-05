@@ -42,7 +42,7 @@ import {
 } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import { baseBuildings, type Point } from "@/scenario/model";
 import {
   addBuilding,

@@ -33,7 +33,7 @@ import type { BaseBlueprint } from "@/blueprint/model";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import { usePreferredTarget } from "@/play/config";
 import { MapPickerDrawer } from "@/play/pages/components/MapPickerDrawer";
 import type { Point } from "@/scenario/model";

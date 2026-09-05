@@ -40,8 +40,8 @@ import {
 } from "@/components/ui/tooltip";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
+import type { MapScene3D } from "@/lib/mapScene";
 import { useFieldText } from "@/lib/useFieldText";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {

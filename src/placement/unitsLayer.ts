@@ -24,7 +24,7 @@ import {
   buildModel,
   prepareTextureAtlas,
 } from "@/content/unitModel";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import type { Rgb } from "@/play/config";
 import { animates, eased, fadeAt } from "./arrivals";
 import { facingToYaw, type Placement } from "./placements";

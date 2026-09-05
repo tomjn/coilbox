@@ -18,7 +18,7 @@ import {
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import { useReduceMotion } from "@/general/display";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario } from "@/scenario/model";
 import { scenarioPlacements } from "@/scenario/pages/components/placements";

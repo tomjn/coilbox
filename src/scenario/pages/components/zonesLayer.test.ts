@@ -17,7 +17,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import type { ScenarioZone } from "../../model";
 import { MARQUEE_ZONE_ID } from "./zones";
 import { createZonesLayer } from "./zonesLayer";

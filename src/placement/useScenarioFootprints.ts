@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { FootprintMark } from "@/blueprint/footprint";
 import { useReduceMotion } from "@/general/display";
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import type { Point } from "@/scenario/model";
 import {
   createFootprintsLayer,

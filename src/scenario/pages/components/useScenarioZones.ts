@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import type { MapScene3D } from "@/lib/mapScene";
 import type { Point, ScenarioZone } from "../../model";
 import { createZonesLayer, type ZonesLayer } from "./zonesLayer";
 
