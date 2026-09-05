@@ -217,6 +217,36 @@ fn main() {
     std::process::exit(run());
 }
 
+/// Run a mode's rendering closure inside `catch_unwind`, so a `libunitsync`
+/// abort or panic anywhere behind `f` fails only this worker process rather
+/// than crashing past a mode boundary. `on_success` turns the closure's
+/// output into printed JSON and an exit code, and `on_panic` prints that
+/// mode's own error shape: most modes call a shared `emit_error(String)`, but
+/// a few build their output struct directly, and this keeps either working
+/// unchanged. On panic the exit code is always 1.
+fn run_mode<T>(
+    f: impl FnOnce() -> T,
+    on_success: impl FnOnce(T) -> i32,
+    on_panic: impl FnOnce(),
+) -> i32 {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(out) => on_success(out),
+        Err(_) => {
+            on_panic();
+            1
+        }
+    }
+}
+
+/// The common `on_success` for `run_mode`: print the output as JSON and exit
+/// 0. Every mode but `--config-set` (whose exit code reflects whether the
+/// write succeeded) and the default scan (whose closure returns a `Result`
+/// rather than an infallible output) passes this straight through.
+fn print_ok<T: serde::Serialize>(out: T) -> i32 {
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+    0
+}
+
 fn run() -> i32 {
     let mut args = match parse_args() {
         Ok(v) => v,
@@ -261,18 +291,11 @@ fn run() -> i32 {
                     return 1;
                 }
             };
-            return match std::panic::catch_unwind(|| {
-                lua::run_repl(&args.lib, &mode.archive, &chunks)
-            }) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    lua::emit_repl_error("worker panicked while executing Lua".into());
-                    1
-                }
-            };
+            return run_mode(
+                || lua::run_repl(&args.lib, &mode.archive, &chunks),
+                print_ok,
+                || lua::emit_repl_error("worker panicked while executing Lua".into()),
+            );
         }
         let source = match mode.source_file.as_deref() {
             Some(p) => match std::fs::read_to_string(p) {
@@ -284,16 +307,11 @@ fn run() -> i32 {
             },
             None => String::new(),
         };
-        return match std::panic::catch_unwind(|| lua::run(&args.lib, &mode.archive, &source)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                lua::emit_error("worker panicked while executing Lua".into());
-                1
-            }
-        };
+        return run_mode(
+            || lua::run(&args.lib, &mode.archive, &source),
+            print_ok,
+            || lua::emit_error("worker panicked while executing Lua".into()),
+        );
     }
 
     // Seed corpus: every map layer and every game's build pics, in one Init.
@@ -305,79 +323,61 @@ fn run() -> i32 {
             return 1;
         };
         let dry_run = args.dry_run;
-        return match std::panic::catch_unwind(|| {
-            seed::run(&args.lib, Path::new(&root), cache_dir, dry_run)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                seed::emit_error("worker panicked while walking the library".into());
-                1
-            }
-        };
+        return run_mode(
+            || seed::run(&args.lib, Path::new(&root), cache_dir, dry_run),
+            print_ok,
+            || seed::emit_error("worker panicked while walking the library".into()),
+        );
     }
 
     // Batch thumbnails: a small minimap for every map in one Init.
     if let Some(Mode::Thumbnails(mode)) = &args.thumbnails {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            minimap::render_all(&args.lib, mode.mip, cache_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
+        return run_mode(
+            || minimap::render_all(&args.lib, mode.mip, cache_dir),
+            print_ok,
+            || {
                 let out = model::ThumbnailsOutput {
                     errors: vec!["worker panicked while rendering thumbnails".into()],
                     ..Default::default()
                 };
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                1
-            }
-        };
+            },
+        );
     }
 
     // Batch map metadata: every map's mapinfo in one Init, disk-cached per map.
     // Checked before the --map modes because it takes no --map of its own.
     if let Some(Mode::MapMeta(mode)) = &args.map_meta {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| mapmeta::read_all(&args.lib, cache_dir)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
+        return run_mode(
+            || mapmeta::read_all(&args.lib, cache_dir),
+            print_ok,
+            || {
                 let out = model::MapMetaOutput {
                     errors: vec!["worker panicked while reading map metadata".into()],
                     ..Default::default()
                 };
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                1
-            }
-        };
+            },
+        );
     }
 
     // Batch game headers: resolve every game's loadpicture art in one Init, for
     // the Games grid. Keyed on cheap file identity (not sync-checksum).
     if let Some(Mode::GameHeaders(mode)) = &args.game_headers {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| archive::game_headers(&args.lib, cache_dir)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
+        return run_mode(
+            || archive::game_headers(&args.lib, cache_dir),
+            print_ok,
+            || {
                 let out = model::GameHeadersOutput {
                     errors: vec!["worker panicked while resolving game headers".into()],
                     ..Default::default()
                 };
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                1
-            }
-        };
+            },
+        );
     }
 
     // Unit build icons: resolve start-unit build pics for one game in one Init,
@@ -386,18 +386,11 @@ fn run() -> i32 {
     if let Some(Mode::UnitBuildpics(mode)) = &args.unit_buildpics {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         let asset_dir = mode.asset_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            buildpic::render(&args.lib, &mode.game, &mode.units, cache_dir, asset_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                buildpic::emit_error("worker panicked while resolving unit build pics".into());
-                1
-            }
-        };
+        return run_mode(
+            || buildpic::render(&args.lib, &mode.game, &mode.units, cache_dir, asset_dir),
+            print_ok,
+            || buildpic::emit_error("worker panicked while resolving unit build pics".into()),
+        );
     }
 
     // Faction logos: resolve each side's `Sidepics/<side>` emblem for one game in
@@ -405,18 +398,11 @@ fn run() -> i32 {
     // --game modes.
     if let Some(Mode::FactionLogos(mode)) = &args.faction_logos {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            factionlogo::render(&args.lib, &mode.game, &mode.sides, cache_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                factionlogo::emit_error("worker panicked while resolving faction logos".into());
-                1
-            }
-        };
+        return run_mode(
+            || factionlogo::render(&args.lib, &mode.game, &mode.sides, cache_dir),
+            print_ok,
+            || factionlogo::emit_error("worker panicked while resolving faction logos".into()),
+        );
     }
 
     // Unit dataset: read one game's reusable unit graph (units + buildoptions
@@ -424,35 +410,22 @@ fn run() -> i32 {
     // game-detail mode because it also keys off --game.
     if let Some(Mode::UnitDataset(mode)) = &args.unit_dataset {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| dataset::render(&args.lib, &mode.game, cache_dir))
-        {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                dataset::emit_error("worker panicked while reading unit dataset".into());
-                1
-            }
-        };
+        return run_mode(
+            || dataset::render(&args.lib, &mode.game, cache_dir),
+            print_ok,
+            || dataset::emit_error("worker panicked while reading unit dataset".into()),
+        );
     }
 
     // Unit model: read one unit's model out of a game's archive and flatten it
     // for the viewer. Keys off --game, so checked before the --game modes.
     if let Some(Mode::UnitModel(mode)) = &args.unit_model {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            unitmodel::render(&args.lib, &mode.game, &mode.object, cache_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                unitmodel::emit_error("worker panicked while reading a unit model".into());
-                1
-            }
-        };
+        return run_mode(
+            || unitmodel::render(&args.lib, &mode.game, &mode.object, cache_dir),
+            print_ok,
+            || unitmodel::emit_error("worker panicked while reading a unit model".into()),
+        );
     }
 
     // Unit script: find and read one unit's animation script inside a game.
@@ -460,18 +433,11 @@ fn run() -> i32 {
     // definition key rather than by a path, because the script name is a
     // definition field the game may compute.
     if let Some(Mode::UnitScript(mode)) = &args.unit_script {
-        return match std::panic::catch_unwind(|| {
-            unitscriptfile::render(&args.lib, &mode.game, &mode.unit)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                unitscriptfile::emit_error("worker panicked while reading a unit script".into());
-                1
-            }
-        };
+        return run_mode(
+            || unitscriptfile::render(&args.lib, &mode.game, &mode.unit),
+            print_ok,
+            || unitscriptfile::emit_error("worker panicked while reading a unit script".into()),
+        );
     }
 
     // Unit models: the same read for a batch of units in one mount (issue
@@ -490,18 +456,11 @@ fn run() -> i32 {
                 return 1;
             }
         };
-        return match std::panic::catch_unwind(|| {
-            unitmodels::render(&args.lib, &mode.game, &objects, Path::new(&mode.cache_dir))
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                unitmodels::emit_error("worker panicked while reading unit models".into());
-                1
-            }
-        };
+        return run_mode(
+            || unitmodels::render(&args.lib, &mode.game, &objects, Path::new(&mode.cache_dir)),
+            print_ok,
+            || unitmodels::emit_error("worker panicked while reading unit models".into()),
+        );
     }
 
     // Unit render: encode pixels the webview drew as the hub's render asset.
@@ -526,18 +485,11 @@ fn run() -> i32 {
             asset_dir: Path::new(&mode.asset_dir),
             source,
         };
-        return match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            unitrender::render(&args.lib, &req)
-        })) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                unitrender::emit_error("worker panicked while encoding a unit render".into());
-                1
-            }
-        };
+        return run_mode(
+            || unitrender::render(&args.lib, &req),
+            print_ok,
+            || unitrender::emit_error("worker panicked while encoding a unit render".into()),
+        );
     }
 
     // Unit render keys: what a batch of units' renders would be called, without
@@ -566,122 +518,87 @@ fn run() -> i32 {
         } else {
             mode.angles.clone()
         };
-        return match std::panic::catch_unwind(|| {
-            renderkey::render(
-                &args.lib,
-                &mode.game,
-                &requests,
-                &angles,
-                mode.renderer_version,
-            )
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                renderkey::emit_error("worker panicked while reading unit render keys".into());
-                1
-            }
-        };
+        return run_mode(
+            || {
+                renderkey::render(
+                    &args.lib,
+                    &mode.game,
+                    &requests,
+                    &angles,
+                    mode.renderer_version,
+                )
+            },
+            print_ok,
+            || renderkey::emit_error("worker panicked while reading unit render keys".into()),
+        );
     }
 
     // Archive browsing: list a member tree, read one member for preview, or
     // extract one member to a destination path (download).
     if let Some(Mode::Archive(mode)) = &args.archive {
         if let (Some(inner), Some(dest)) = (mode.file.as_deref(), mode.extract.as_deref()) {
-            return match std::panic::catch_unwind(|| {
-                archive::extract(&args.lib, &mode.archive, inner, dest)
-            }) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
+            return run_mode(
+                || archive::extract(&args.lib, &mode.archive, inner, dest),
+                print_ok,
+                || {
                     archive::emit_extract_error(
                         "worker panicked while extracting archive member".into(),
-                    );
-                    1
-                }
-            };
+                    )
+                },
+            );
         }
         if let Some(inner) = mode.file.as_deref() {
-            return match std::panic::catch_unwind(|| archive::file(&args.lib, &mode.archive, inner))
-            {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    archive::emit_file_error("worker panicked while reading archive member".into());
-                    1
-                }
-            };
+            return run_mode(
+                || archive::file(&args.lib, &mode.archive, inner),
+                print_ok,
+                || archive::emit_file_error("worker panicked while reading archive member".into()),
+            );
         }
-        return match std::panic::catch_unwind(|| archive::tree(&args.lib, &mode.archive)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                archive::emit_tree_error("worker panicked while listing archive".into());
-                1
-            }
-        };
+        return run_mode(
+            || archive::tree(&args.lib, &mode.archive),
+            print_ok,
+            || archive::emit_tree_error("worker panicked while listing archive".into()),
+        );
     }
 
     // Skirmish AIs: native engine AIs, plus a game's Lua AIs when --game is
     // given. Checked before game detail because that mode also keys off --game.
     if let Some(Mode::SkirmishAis(mode)) = &args.skirmish_ais {
         let game = mode.game.clone();
-        return match std::panic::catch_unwind(|| skirmishai::render(&args.lib, game.as_deref())) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                skirmishai::emit_error("worker panicked while listing skirmish AIs".into());
-                1
-            }
-        };
+        return run_mode(
+            || skirmishai::render(&args.lib, game.as_deref()),
+            print_ok,
+            || skirmishai::emit_error("worker panicked while listing skirmish AIs".into()),
+        );
     }
 
     // Game detail: load one game's archives to read its sides + unit count.
     if let Some(Mode::Game(mode)) = &args.game {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| game::render(&args.lib, &mode.game, cache_dir)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                game::emit_error("worker panicked while reading game info".into());
-                1
-            }
-        };
+        return run_mode(
+            || game::render(&args.lib, &mode.game, cache_dir),
+            print_ok,
+            || game::emit_error("worker panicked while reading game info".into()),
+        );
     }
 
     // Engine settings: read a curated set of config values (a separate, light
     // unitsync session — no archive scan).
     if args.config.is_some() {
-        return match std::panic::catch_unwind(|| config::render(&args.lib)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                config::emit_error("worker panicked while reading engine config".into());
-                1
-            }
-        };
+        return run_mode(
+            || config::render(&args.lib),
+            print_ok,
+            || config::emit_error("worker panicked while reading engine config".into()),
+        );
     }
 
     // Engine settings write: set one curated config key via SetSpringConfig*.
     // `--config-key` being required now lives in `ConfigSetArgs::from_args`,
     // not here.
     if let Some(Mode::ConfigSet(mode)) = &args.config_set {
-        return match std::panic::catch_unwind(|| config::apply(&args.lib, &mode.key, &mode.value)) {
-            Ok(out) => {
+        return run_mode(
+            || config::apply(&args.lib, &mode.key, &mode.value),
+            |out| {
                 let ok = out.ok;
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 if ok {
@@ -689,100 +606,68 @@ fn run() -> i32 {
                 } else {
                     1
                 }
-            }
-            Err(_) => {
-                config::emit_write_error("worker panicked while writing engine config".into());
-                1
-            }
-        };
+            },
+            || config::emit_write_error("worker panicked while writing engine config".into()),
+        );
     }
 
     // Lazy map info: one map's options + attributed warnings (mounts the map).
     // `--map` being required now lives in `MapInfoArgs::from_args`, not here.
     if let Some(Mode::MapInfo(mode)) = &args.map_info {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| map_info(&args.lib, &mode.map, cache_dir)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
+        return run_mode(
+            || map_info(&args.lib, &mode.map, cache_dir),
+            print_ok,
+            || {
                 let out = model::MapInfoOutput {
                     errors: vec!["worker panicked while reading map info".into()],
                     ..Default::default()
                 };
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                1
-            }
-        };
+            },
+        );
     }
 
     // Map skybox: read one map's `atmosphere.skyBox` DDS cube map as raw bytes.
     // `--map` being required now lives in `MapSkyboxArgs::from_args`, not here.
     if let Some(Mode::MapSkybox(mode)) = &args.map_skybox {
-        return match std::panic::catch_unwind(|| archive::map_skybox(&args.lib, &mode.map)) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                archive::emit_skybox_error("worker panicked while reading map skybox".into());
-                1
-            }
-        };
+        return run_mode(
+            || archive::map_skybox(&args.lib, &mode.map),
+            print_ok,
+            || archive::emit_skybox_error("worker panicked while reading map skybox".into()),
+        );
     }
 
     // Heightmap: render one map's height infomap to a grayscale PNG data URL.
     if let Some(Mode::Heightmap(mode)) = &args.heightmap {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         let asset_dir = mode.asset_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            heightmap::render(&args.lib, &mode.map, cache_dir, asset_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                heightmap::emit_error("worker panicked while rendering heightmap".into());
-                1
-            }
-        };
+        return run_mode(
+            || heightmap::render(&args.lib, &mode.map, cache_dir, asset_dir),
+            print_ok,
+            || heightmap::emit_error("worker panicked while rendering heightmap".into()),
+        );
     }
 
     // Height field: write one map's raw heights out for the terrain check.
     if let Some(Mode::HeightField(mode)) = &args.height_field {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            heightfield::render(&args.lib, &mode.map, cache_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                heightfield::emit_error("worker panicked while reading heights".into());
-                1
-            }
-        };
+        return run_mode(
+            || heightfield::render(&args.lib, &mode.map, cache_dir),
+            print_ok,
+            || heightfield::emit_error("worker panicked while reading heights".into()),
+        );
     }
 
     // Metalmap: render one map's metal infomap to a green-on-transparent RGBA PNG.
     if let Some(Mode::Metalmap(mode)) = &args.metalmap {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         let asset_dir = mode.asset_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            metalmap::render(&args.lib, &mode.map, mode.max_side, cache_dir, asset_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                metalmap::emit_error("worker panicked while rendering metalmap".into());
-                1
-            }
-        };
+        return run_mode(
+            || metalmap::render(&args.lib, &mode.map, mode.max_side, cache_dir, asset_dir),
+            print_ok,
+            || metalmap::emit_error("worker panicked while rendering metalmap".into()),
+        );
     }
 
     // Typemap: store one map's terrain-type infomap as the hub's overlay asset.
@@ -796,18 +681,11 @@ fn run() -> i32 {
             typemap::emit_error("--typemap needs --asset-dir".into());
             return 1;
         };
-        return match std::panic::catch_unwind(|| {
-            typemap::render(&args.lib, &map, Path::new(&asset_dir))
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                typemap::emit_error("worker panicked while reading the type map".into());
-                1
-            }
-        };
+        return run_mode(
+            || typemap::render(&args.lib, &map, Path::new(&asset_dir)),
+            print_ok,
+            || typemap::emit_error("worker panicked while reading the type map".into()),
+        );
     }
 
     // Map catalog: a map's facts in the shape the hub takes. Reads archives
@@ -816,16 +694,11 @@ fn run() -> i32 {
     if let Some(Mode::MapCatalog(mode)) = &args.map_catalog {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         if let Some(map) = &mode.map {
-            return match std::panic::catch_unwind(|| mapcatalog::read(&args.lib, map, cache_dir)) {
-                Ok(out) => {
-                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                    0
-                }
-                Err(_) => {
-                    mapcatalog::emit_error("worker panicked while reading the map's facts".into());
-                    1
-                }
-            };
+            return run_mode(
+                || mapcatalog::read(&args.lib, map, cache_dir),
+                print_ok,
+                || mapcatalog::emit_error("worker panicked while reading the map's facts".into()),
+            );
         }
         let only = match mode.maps_file.as_deref() {
             None => None,
@@ -842,18 +715,11 @@ fn run() -> i32 {
             },
         };
         let keys_only = mode.keys_only;
-        return match std::panic::catch_unwind(|| {
-            mapcatalog::walk(&args.lib, only.as_deref(), keys_only, cache_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                mapcatalog::emit_walk_error("worker panicked while walking the map library".into());
-                1
-            }
-        };
+        return run_mode(
+            || mapcatalog::walk(&args.lib, only.as_deref(), keys_only, cache_dir),
+            print_ok,
+            || mapcatalog::emit_walk_error("worker panicked while walking the map library".into()),
+        );
     }
 
     // Map minimaps: name every map's minimap, and with --asset-dir encode it as
@@ -877,54 +743,46 @@ fn run() -> i32 {
         };
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         let asset_dir = mode.asset_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            minimap::assets(&args.lib, only.as_deref(), cache_dir, asset_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
+        return run_mode(
+            || minimap::assets(&args.lib, only.as_deref(), cache_dir, asset_dir),
+            print_ok,
+            || {
                 minimap::emit_assets_error(
                     "worker panicked while reading the maps' minimaps".into(),
-                );
-                1
-            }
-        };
+                )
+            },
+        );
     }
 
     // Single minimap renders one map. The default mode scans everything.
     if let Some(Mode::Minimap(mode)) = &args.minimap {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         let asset_dir = mode.asset_dir.as_deref().map(Path::new);
-        return match std::panic::catch_unwind(|| {
-            minimap::render(&args.lib, &mode.map, mode.mip, cache_dir, asset_dir)
-        }) {
-            Ok(out) => {
-                println!("{}", serde_json::to_string(&out).unwrap_or_default());
-                0
-            }
-            Err(_) => {
-                minimap::emit_error("worker panicked while rendering minimap".into());
-                1
-            }
-        };
+        return run_mode(
+            || minimap::render(&args.lib, &mode.map, mode.mip, cache_dir, asset_dir),
+            print_ok,
+            || minimap::emit_error("worker panicked while rendering minimap".into()),
+        );
     }
 
-    match std::panic::catch_unwind(|| scan(&args.lib)) {
-        Ok(Ok(out)) => {
-            print_json(&out);
-            0
-        }
-        Ok(Err(e)) => {
-            emit_error(e);
-            1
-        }
-        Err(_) => {
-            emit_error("worker panicked during unitsync scan".into());
-            1
-        }
-    }
+    // The default full scan is the one mode whose closure is itself fallible
+    // (`scan` returns a `Result`, unlike every other mode's infallible
+    // render), so its `on_success` has to branch on that inner result rather
+    // than always print-and-0 like `print_ok`.
+    run_mode(
+        || scan(&args.lib),
+        |result| match result {
+            Ok(out) => {
+                print_json(&out);
+                0
+            }
+            Err(e) => {
+                emit_error(e);
+                1
+            }
+        },
+        || emit_error("worker panicked during unitsync scan".into()),
+    )
 }
 
 fn parse_args() -> Result<Args, String> {
