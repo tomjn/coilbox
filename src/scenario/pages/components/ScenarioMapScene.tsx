@@ -141,7 +141,6 @@ import {
   type MapThings,
   moveOnMap,
   pointFrom,
-  thingWords,
 } from "./mapKeyboard";
 import { EDITOR_MODES, LAYOUTS_MODE_ID, ZONES_MODE_ID } from "./modes";
 import { pathLabel, removePathWaypoint, scenarioPaths } from "./orderPaths";
@@ -154,21 +153,17 @@ import {
   countWords,
   entryKeys,
   inSelection,
-  type MapSelection,
-  marqueeWords,
   moveSelection,
   NO_SELECTION,
   primaryKey,
   removedWords,
   removeSelection,
-  selectOne,
-  stillThere,
-  toggleKey,
 } from "./selection";
 import { modeDigit } from "./shortcuts";
 import { startMarkers } from "./startPositions";
 import { useCameraMovement, useMapCamera } from "./useMapCamera";
 import { useMapKeyboard } from "./useMapKeyboard";
+import { useMapSelection, useSelectionCleanup } from "./useMapSelection";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
 import { useScenarioZones } from "./useScenarioZones";
@@ -334,91 +329,23 @@ export const ScenarioMapScene = forwardRef<
   // An author who has asked for less motion gets the steps and not the film.
   const reduceMotion = useReduceMotion();
   const [modeId, setModeId] = useState(EDITOR_MODES[0].id);
-  /**
-   * Everything selected on the map, newest last (issue #2279).
-   *
-   * `selected` below is the last of them, and it is what every bar, panel and
-   * layer that only ever handled one thing goes on reading. That is what makes a
-   * multi-selection an addition to this file rather than a rewrite of it: the
-   * only things that read the whole list are the ones that act on all of it.
-   */
-  const [selection, showSelection] = useState<MapSelection>(NO_SELECTION);
-  // Also held in a ref, because a click that selects something and the click
-  // that acts on that selection can both land before React renders: placing a
-  // building adds it to the base the click before it selected (issue #904).
-  const selectionRef = useRef<MapSelection>(NO_SELECTION);
-  const setSelection = useCallback((next: MapSelection) => {
-    selectionRef.current = next;
-    showSelection(next);
-  }, []);
-  const selected = primaryKey(selection);
-  /** What a click does to the selection: this instead of what was selected, or
-   *  with Shift held, this as well, or out again if it was already in. */
-  const setSelected = useCallback(
-    (key: string | null, add = false) => {
-      setSelection(add ? toggleKey(selectionRef.current, key) : selectOne(key));
-    },
-    [setSelection],
-  );
-  // Said through the map's own live region, which `useMapKeyboard` owns. Held in
-  // a ref because that hook is resolved further down this render and the
-  // callbacks above are built before it.
-  const sayRef = useRef<(text: string) => void>(() => {});
-  // What the announcements name things by, filled in below once the document has
-  // been flattened into the three lists that name them. A ref for the same
-  // reason: a click reads it when the click happens, not when the handler was
-  // built.
-  const thingsRef = useRef<MapThings>({
-    scenario,
-    entries: [],
-    placements: [],
-    paths: [],
-  });
+  // Everything selected on the map, newest last (issue #2279), and the two
+  // ways of changing it: a click's key, or a marquee's catch. Held apart in
+  // `useMapSelection.ts`, which the selection bar's own reads below draw on
+  // the same way the whole file draws on `useMapCamera`.
+  const {
+    selection,
+    selectionRef,
+    selected,
+    setSelection,
+    setSelected,
+    select,
+    selectMany,
+    thingsRef,
+    sayRef,
+  } = useMapSelection(scenario);
 
   const groups = scenario.groups;
-  /**
-   * What a click on the map selects.
-   *
-   * A drawn path line stands for the orders that drew it: the line is the
-   * easiest thing on a big map to hit and the orders are what an author who hit
-   * it wants (#842). A group's line means the group, because a group has units
-   * to select and controls to open. A trigger's line means itself, because it
-   * has neither, and selecting it is what puts knobs on its points.
-   */
-  const select = useCallback(
-    (key: string | null, add = false) => {
-      const line = key ? parsePathLineKey(key) : null;
-      const meant = line
-        ? groups.some((one) => one.id === line)
-          ? placementKey("group", line, 0)
-          : key
-        : key;
-      setSelected(meant, add);
-      // Only a Shift-click says anything. A plain click replaces the selection,
-      // and the bar that opens for it is the account of that. Six Shift-clicks
-      // would otherwise be six sentences nobody asked for (issue #2279).
-      if (!add || !meant) return;
-      const named = thingWords(thingsRef.current, meant);
-      const after = selectionRef.current;
-      sayRef.current(
-        inSelection(after, meant)
-          ? addedWords(named, after)
-          : removedWords(named, after),
-      );
-    },
-    [groups, setSelected],
-  );
-
-  /** What a marquee selects: everything inside the box, instead of what was
-   *  selected or as well as it (issue #2279). */
-  const selectMany = useCallback(
-    (keys: string[], add: boolean) => {
-      const after = add ? addKeys(selectionRef.current, keys) : keys;
-      setSelection(after);
-      sayRef.current(marqueeWords(keys.length, after));
-    },
-    [setSelection],
-  );
 
   // Which base the author asked to edit the shared layout of (issue #1414).
   // Held against the base rather than as a mode of the editor, so working on
@@ -485,6 +412,7 @@ export const ScenarioMapScene = forwardRef<
   // `selectionRef` rather than the `selected` this closure was rendered with,
   // the same reason a click reads it that way: the selection can have changed
   // in a tick this render has not caught up with yet.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: selectionRef is the stable ref useMapSelection returns, read through .current on purpose so this handle's identity does not change on every selection (issue #904). Biome cannot see the useRef behind the hook's own boundary to infer that on its own.
   useImperativeHandle(
     ref,
     () => ({
@@ -922,6 +850,7 @@ export const ScenarioMapScene = forwardRef<
    * rows is building a selection, not asking to be flown to each of them in
    * turn.
    */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: selectionRef and sayRef are the stable refs useMapSelection returns, read through .current on purpose so this callback's identity does not change on every selection. Biome cannot see the useRef behind the hook's own boundary to infer that on its own.
   const toggleEntry = useCallback(
     (entry: ContentEntry) => {
       const keys = entryKeys(scenario, entry);
@@ -956,20 +885,18 @@ export const ScenarioMapScene = forwardRef<
   // Shift-click and an arrow key are announced in the same voice (issue #2279).
   sayRef.current = keys.say;
 
-  /**
-   * Keys pointing at things the document no longer holds, dropped.
-   *
-   * An undo, a delete taken from a panel, or an edit that emptied a group can
-   * all leave a selection naming units nobody is drawing any more, and the next
-   * Delete would then work through keys that mean nothing. Off the drawn list
-   * rather than the document, because that is the list the keys address.
-   */
-  useEffect(() => {
-    const held = selectionRef.current;
-    if (held.length === 0 || !units.settled) return;
-    const kept = stillThere(held, units.placements, scenario);
-    if (kept.length !== held.length) setSelection(kept);
-  }, [units.placements, units.settled, scenario, setSelection]);
+  // Keys pointing at things the document no longer holds, dropped, in
+  // `useMapSelection.ts`. Called here rather than beside the state above so
+  // this effect keeps the same place among the map's other effects: it needs
+  // `units.placements` and `units.settled`, which only exist once the units
+  // layer built from them further up this render has run.
+  useSelectionCleanup(
+    selectionRef,
+    setSelection,
+    units.placements,
+    units.settled,
+    scenario,
+  );
 
   // Mirrored in refs so a mission problem's row can land on whatever the map
   // currently holds without retriggering every time an unrelated edit gives
