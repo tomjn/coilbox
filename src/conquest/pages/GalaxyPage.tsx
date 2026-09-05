@@ -30,6 +30,7 @@ import {
 } from "../../general/display";
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
+import { resolveGameByShortname } from "../../play/installedGames";
 import { getProfile } from "../../profile/profile";
 import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
@@ -45,12 +46,7 @@ import {
   substituteExcludedMaps,
 } from "../generate";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
-import {
-  NEUTRAL,
-  newConquestState,
-  playableFactions,
-  resolveGameByShortname,
-} from "../model";
+import { NEUTRAL, newConquestState, playableFactions } from "../model";
 import { mergeConquestNames } from "../names";
 import { advanceTurn, attackableNodes } from "../rules";
 import { BattleOverlay } from "./components/BattleOverlay";

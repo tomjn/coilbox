@@ -9,8 +9,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { compareGameVersions } from "../../../conquest/model";
 import { useReplayTarget } from "../../../play/config";
+import { compareGameVersions } from "../../../play/installedGames";
 import { contentRewriteDemo } from "../../bindings";
 import { useUnitsyncScan } from "../../config";
 import {

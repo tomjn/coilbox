@@ -1,6 +1,4 @@
 import { useCallback } from "react";
-import type { InstalledGame } from "../conquest/model";
-import { resolveGameByShortname } from "../conquest/model";
 import type { SkirmishAi } from "../content/bindings";
 import { buildEdgeMap } from "../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
@@ -8,6 +6,8 @@ import type { ReplayProvenance } from "../content/replayUserState";
 import { usePreferredTarget } from "../play/config";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
+import type { InstalledGame } from "../play/installedGames";
+import { resolveGameByShortname } from "../play/installedGames";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { disabledUnitsFor, perkTotals } from "./build";
 import type { RogueliteRun, RunNode } from "./model";

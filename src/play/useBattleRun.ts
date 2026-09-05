@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
-import type { GameRef, InstalledGame } from "../conquest/model";
-import { resolveGameByShortname } from "../conquest/model";
+import type { GameRef } from "../conquest/model";
 import { contentListReplays, type SkirmishAi } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
@@ -23,6 +22,8 @@ import {
 import type { SkirmishDraft } from "./drafts";
 import type { GameAiConfig } from "./gameAi";
 import { mergeGameAi } from "./gameAi";
+import type { InstalledGame } from "./installedGames";
+import { resolveGameByShortname } from "./installedGames";
 import { usePlay } from "./PlayProvider";
 
 /* -------------------------------------------------------------------------- *
