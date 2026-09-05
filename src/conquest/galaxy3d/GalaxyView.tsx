@@ -10,7 +10,6 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { assetUrl } from "../../lib/assetUrl";
 import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, GalaxyNode, Incursion, NodeStar } from "../model";
-import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
 import { bodyLabel, isVoidNode, type VoidBody, voidBodiesFor } from "./bodies";
 import { createWinBurst } from "./burst";
@@ -23,6 +22,7 @@ import {
   trimLane,
   type WorldPos,
 } from "./layout";
+import { createOwners } from "./owners";
 import { buildStarfield } from "./starfield";
 import {
   accretionTexture,
@@ -186,8 +186,6 @@ const HOVER_LANE_BOOST = 1.6;
 const HOVER_LANE_FADE = 0.4;
 
 const NEUTRAL_COLOR = "#6b7280";
-/** The quiet blue-grey of an unowned lane (the base lane pair's colour). */
-const BASE_LANE_HEX = 0x93a7c8;
 
 /**
  * Stellar classes for the selectable stars. The star itself is coloured by
@@ -390,7 +388,13 @@ export function nodeBodyLabel(
 }
 
 /** One lane segment in 3D: [x1, y1, z1, x2, y2, z2]. */
-type LaneSeg = [number, number, number, number, number, number];
+export type LaneSeg = [number, number, number, number, number, number];
+
+/** A lane overlay's two meshes (crisp core + soft halo), see `makeLanePair`. */
+export interface LanePair {
+  core: THREE.Mesh;
+  halo: THREE.Mesh;
+}
 
 /**
  * A merged flat-quad geometry for the lanes: `LineBasicMaterial` linewidth is
@@ -453,31 +457,6 @@ function laneQuadGeometry(
   }
   geo.setIndex(indices);
   return geo;
-}
-
-/** Split segments into short dashes (for the contested-lane overlay). */
-function dashSegments(
-  segments: LaneSeg[],
-  dashLen: number,
-  gapLen: number,
-): LaneSeg[] {
-  const out: LaneSeg[] = [];
-  for (const [x1, y1, z1, x2, y2, z2] of segments) {
-    const len = Math.hypot(x2 - x1, z2 - z1);
-    if (len === 0) continue;
-    const at3 = (t: number): [number, number, number] => [
-      x1 + (x2 - x1) * t,
-      y1 + (y2 - y1) * t,
-      z1 + (z2 - z1) * t,
-    ];
-    for (let at = 0; at < len; at += dashLen + gapLen) {
-      const end = Math.min(at + dashLen, len);
-      // Skip stubby leftovers — a dash shorter than its own caps looks messy.
-      if (end - at < dashLen * 0.5) break;
-      out.push([...at3(at / len), ...at3(end / len)] as LaneSeg);
-    }
-  }
-  return out;
 }
 
 /**
@@ -1085,10 +1064,6 @@ export function GalaxyView({
     const laneCoreTex = filamentTexture(0.11);
     const laneHaloTex = filamentTexture(0.26);
     disposables.push(laneCoreTex, laneHaloTex);
-    interface LanePair {
-      core: THREE.Mesh;
-      halo: THREE.Mesh;
-    }
     const makeLanePair = (opts: {
       color?: number;
       vertexColors?: boolean;
@@ -1205,7 +1180,7 @@ export function GalaxyView({
         chevrons.push({ mesh, mat, t: 0 });
       }
     };
-    // Lay chevrons out along the current open routes (called from applyOwners).
+    // Lay chevrons out along the current open routes (called from owners.ts).
     const layoutChevrons = (routes: LaneSeg[]) => {
       if (!flowEnabled) return;
       ensureChevrons(routes.length * CHEVRONS_PER_ROUTE);
@@ -1487,7 +1462,7 @@ export function GalaxyView({
       return geo;
     };
     // Theatre skin: flat filled region markers instead of star sprites,
-    // tinted a dark shade of the owner colour (kept in styleRing).
+    // tinted a dark shade of the owner colour (kept in owners.ts's styleRing).
     const discMats: (THREE.MeshBasicMaterial | undefined)[] = [];
     const discGeo = new THREE.CircleGeometry(1.35, 32);
     disposables.push(discGeo);
@@ -2825,7 +2800,7 @@ export function GalaxyView({
 
     // Owner-tinted uppercase labels: colour carries territory at a glance, kept
     // legible by lerping the faction colour toward white. Recoloured on capture
-    // by applyOwners.
+    // by owners.ts's apply.
     const labelCss = (owner: string | undefined): string =>
       `#${ownerColor(owner)
         .clone()
@@ -2979,132 +2954,36 @@ export function GalaxyView({
 
     /* ---------------------- live-mutation callbacks ------------------------ */
 
-    const applyOwners = () => {
-      const current = ownersRef.current;
-      galaxy.nodes.forEach((n, i) => {
-        if (i !== sel.idx) styleRing(i);
-        const label = labelObjects[i];
-        if (label)
-          (label.element as HTMLElement).style.color = labelCss(
-            current[n.id] ?? n.owner,
-          );
-      });
-      // Re-categorise every lane: contested (exactly one player end, drawn
-      // dashed), same-owner (both ends one faction, drawn in its colour),
-      // else the quiet neutral base.
-      const baseSegs: LaneSeg[] = [];
-      const baseSegColors: THREE.Color[] = [];
-      const factionSegs: LaneSeg[] = [];
-      const factionSegColors: THREE.Color[] = [];
-      const frontierSegs: LaneSeg[] = [];
-      const frontierEnds: [string, string][] = [];
-      const routeSegs: LaneSeg[] = [];
-      const pathSegs: LaneSeg[] = [];
-      // The quiet base lane, dimmed by whichever end is more faded.
-      const pushBase = (seg: LaneSeg, a: string, b: string) => {
-        baseSegs.push(seg);
-        baseSegColors.push(
-          new THREE.Color(BASE_LANE_HEX).multiplyScalar(laneDim(a, b)),
-        );
-      };
-      for (const [a, b] of galaxy.links) {
-        const seg = trimmedSeg(a, b);
-        if (!seg) continue;
-        // Fog: a lane with both ends hidden vanishes; one end hidden draws as
-        // the quiet neutral base ("something lies beyond").
-        const visA = isVisible(a);
-        const visB = isVisible(b);
-        if (!visA && !visB) continue;
-        if (!visA || !visB) {
-          pushBase(seg, a, b);
-          continue;
-        }
-        const ownerA = current[a] ?? NEUTRAL;
-        const ownerB = current[b] ?? NEUTRAL;
-        const aPlayer = ownerA === playerFactionId;
-        const bPlayer = ownerB === playerFactionId;
-        if (laneFlow) {
-          // Run lanes: the route already travelled is a bright green trail;
-          // forward lanes out of the current node (you -> a choice) are
-          // directional routes; everything else is quiet base, dimmed by
-          // emphasis. No faction-coloured lanes — a node's *type* is not an
-          // allegiance. `trimmedSeg(a, b)` runs source -> target, so the pulse
-          // flows outward.
-          if (pathLinksRef.current?.has(`${a} ${b}`)) pathSegs.push(seg);
-          else if (aPlayer && !bPlayer) routeSegs.push(seg);
-          else pushBase(seg, a, b);
-          continue;
-        }
-        if (aPlayer !== bPlayer) {
-          frontierSegs.push(seg);
-          frontierEnds.push([a, b]);
-        } else if (ownerA === ownerB && ownerA !== NEUTRAL) {
-          factionSegs.push(seg);
-          // clone: ownerColor returns the shared cached faction colour.
-          factionSegColors.push(
-            ownerColor(ownerA).clone().multiplyScalar(laneDim(a, b)),
-          );
-        } else {
-          pushBase(seg, a, b);
-        }
-      }
-      setLanePair(lanes, baseSegs, baseSegColors);
-      if (laneFlow) {
-        setLanePair(factionLanes, []); // runs have no shared-owner lanes
-        // Solid, not dashed. Full-brightness colours since run routes carry no
-        // hover grading of their own.
-        setLanePair(
-          frontier,
-          routeSegs,
-          routeSegs.map(() => new THREE.Color(0xffffff)),
-        );
-        setLanePair(pathTaken, pathSegs); // green trail behind you
-        layoutChevrons(routeSegs);
-      } else {
-        setLanePair(factionLanes, factionSegs, factionSegColors);
-        // Dashed per segment rather than in one pass, so each dash inherits
-        // the brightness of the lane it came from.
-        const dashes: LaneSeg[] = [];
-        const dashColors: THREE.Color[] = [];
-        frontierSegs.forEach((seg, i) => {
-          const [endA, endB] = frontierEnds[i];
-          const tint = new THREE.Color(0xffffff).multiplyScalar(
-            laneDim(endA, endB),
-          );
-          for (const dash of dashSegments([seg], 1.5, 1.2)) {
-            dashes.push(dash);
-            dashColors.push(tint);
-          }
-        });
-        setLanePair(frontier, dashes, dashColors);
-      }
-    };
-    applyOwnersRef.current = applyOwners;
-
-    /** Reset a ring to its plain ownership style (shape, colour, opacity). */
-    const styleRing = (i: number) => {
-      const mat = ownerRingMats[i];
-      const ring = ownerRings[i];
-      if (!mat || !ring) return;
-      const owner =
-        ownersRef.current[galaxy.nodes[i].id] ?? galaxy.nodes[i].owner;
-      ring.geometry = ringGeoFor(
-        owner === NEUTRAL ? 0 : factionSides(galaxy, owner),
-      );
-      mat.color.copy(ownerColor(owner));
-      mat.opacity =
-        (owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75) *
-        dimOf(galaxy.nodes[i].id);
-      // Theatre region markers fill with a dark shade of the owner colour.
-      const disc = discMats[i];
-      if (disc) {
-        disc.color
-          .copy(
-            owner === NEUTRAL ? new THREE.Color(0x39404e) : ownerColor(owner),
-          )
-          .multiplyScalar(owner === NEUTRAL ? 1 : 0.45);
-      }
-    };
+    // Ownership styling: ring shape/colour/opacity, label colour, and the
+    // three lane overlays, all re-derived on every ownership/fog/hover
+    // change. See owners.ts. `styleRing` is exported so selection and hover
+    // (below) can put a ring they were overriding back to its plain style.
+    const owners = createOwners(
+      galaxy,
+      playerFactionId,
+      laneFlow,
+      ownersRef,
+      pathLinksRef,
+      isVisible,
+      laneDim,
+      ownerColor,
+      dimOf,
+      trimmedSeg,
+      setLanePair,
+      layoutChevrons,
+      lanes,
+      factionLanes,
+      frontier,
+      pathTaken,
+      labelObjects,
+      labelCss,
+      ownerRingMats,
+      ownerRings,
+      discMats,
+      ringGeoFor,
+      () => sel.idx,
+    );
+    applyOwnersRef.current = owners.apply;
 
     // Selection enlarges the node's own ownership ring and pulses its colour
     // (see the animation loop) — no second ring.
@@ -3114,7 +2993,7 @@ export function GalaxyView({
       const idx = selId ? nodeIds.indexOf(selId) : -1;
       if (sel.idx >= 0 && sel.idx !== idx) {
         ownerRings[sel.idx]?.scale.setScalar(1);
-        styleRing(sel.idx);
+        owners.styleRing(sel.idx);
       }
       sel.idx = idx;
       if (idx >= 0) {
@@ -3159,7 +3038,7 @@ export function GalaxyView({
     );
     applyVisibilityRef.current = visibility.apply;
 
-    applyOwners();
+    owners.apply();
     applySelection();
     visibility.apply();
 
@@ -3201,7 +3080,7 @@ export function GalaxyView({
         mat.opacity = 1;
       } else {
         ring.scale.setScalar(1);
-        styleRing(i);
+        owners.styleRing(i);
       }
     };
 
@@ -3215,7 +3094,7 @@ export function GalaxyView({
       // node's lanes means rebuilding them. That is the same work an ownership
       // change already does, and it only runs when the hovered node changes.
       hoveredNodeId = idx >= 0 ? galaxy.nodes[idx].id : null;
-      applyOwners();
+      owners.apply();
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
       }
@@ -3608,8 +3487,8 @@ export function GalaxyView({
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
-  // idle under reduce-motion). Fog changes touch both lanes (via applyOwners)
-  // and the per-node styling.
+  // idle under reduce-motion). Fog changes touch both lanes (via owners.ts's
+  // apply) and the per-node styling.
   useEffect(() => {
     ownersRef.current = owners;
     visibleRef.current = visibleIds;
