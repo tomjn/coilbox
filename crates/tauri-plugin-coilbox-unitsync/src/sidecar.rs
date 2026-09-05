@@ -72,16 +72,13 @@ pub fn build_args(lib: &str, datadir: &str) -> Vec<String> {
     ]
 }
 
-/// Append `--cache-dir <dir>` when a PNG cache directory is given.
-fn push_cache_dir(args: &mut Vec<String>, cache_dir: Option<&str>) {
-    if let Some(dir) = cache_dir {
-        args.push("--cache-dir".into());
-        args.push(dir.into());
-    }
-}
-
-/// Build args for minimap mode: scan args plus the map name, mip level, and the
-/// optional on-disk PNG cache directory.
+/// Build args for the bare `--map` minimap mode: scan args plus the map
+/// name, mip level, and the optional on-disk PNG cache directory.
+///
+/// No caller here ever sends an asset directory (the app draws its own
+/// minimap preview and never asks the worker to encode one as a hub asset),
+/// but `run()` still honours `MinimapArgs::asset_dir` when given, so the
+/// field stays part of the contract (issue #2448).
 pub fn build_minimap_args(
     lib: &str,
     datadir: &str,
@@ -90,11 +87,15 @@ pub fn build_minimap_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--map".into());
-    args.push(map.into());
-    args.push("--mip".into());
-    args.push(mip.to_string());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Minimap(coilbox_unitsync_worker::MinimapArgs {
+            map: map.into(),
+            mip,
+            cache_dir: cache_dir.map(String::from),
+            asset_dir: None,
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -483,8 +484,12 @@ pub fn build_map_meta_args(lib: &str, datadir: &str, cache_dir: Option<&str>) ->
     args
 }
 
-/// Build args for game-detail mode: scan args plus the game's archive name and
-/// the optional on-disk info-blob cache directory.
+/// Build args for the bare `--game` game-detail mode: scan args plus the
+/// game's archive name and the optional on-disk info-blob cache directory.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::GameArgs`, so
+/// this function only has to add `--lib`/`--datadir`, which every mode takes
+/// and `Mode::to_args` does not include (issue #2448).
 pub fn build_game_args(
     lib: &str,
     datadir: &str,
@@ -492,9 +497,13 @@ pub fn build_game_args(
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--game".into());
-    args.push(game.into());
-    push_cache_dir(&mut args, cache_dir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Game(coilbox_unitsync_worker::GameArgs {
+            game: game.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -661,32 +670,55 @@ pub fn build_config_set_args(lib: &str, datadir: &str, key: &str, value: &str) -
     args
 }
 
-/// Build args for archive-tree mode: scan args plus the archive name.
+/// Build args for `--archive` tree mode: scan args plus the archive name.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::ArchiveArgs`, so
+/// this function only has to add `--lib`/`--datadir`, which every mode takes
+/// and `Mode::to_args` does not include (issue #2448).
 pub fn build_archive_tree_args(lib: &str, datadir: &str, archive: &str) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--archive".into());
-    args.push(archive.into());
+    args.extend(
+        coilbox_unitsync_worker::Mode::Archive(coilbox_unitsync_worker::ArchiveArgs {
+            archive: archive.into(),
+            file: None,
+            extract: None,
+        })
+        .to_args(),
+    );
     args
 }
 
-/// Build args for archive-file (member preview) mode: the archive name plus the
-/// member's path within it.
+/// Build args for `--archive` file (member preview) mode: the archive name
+/// plus the member's path within it.
 pub fn build_archive_file_args(lib: &str, datadir: &str, archive: &str, file: &str) -> Vec<String> {
-    let mut args = build_archive_tree_args(lib, datadir, archive);
-    args.push("--file".into());
-    args.push(file.into());
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Archive(coilbox_unitsync_worker::ArchiveArgs {
+            archive: archive.into(),
+            file: Some(file.into()),
+            extract: None,
+        })
+        .to_args(),
+    );
     args
 }
 
 /// Build args for `--lua` mode: scan args plus the `--lua` flag, the archive to
 /// mount, and the path of the temp file holding the user's Lua source.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::LuaArgs`, so this
+/// function only has to add `--lib`/`--datadir`, which every mode takes and
+/// `Mode::to_args` does not include (issue #2448).
 pub fn build_lua_args(lib: &str, datadir: &str, archive: &str, source_file: &str) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--lua".into());
-    args.push("--archive".into());
-    args.push(archive.into());
-    args.push("--source-file".into());
-    args.push(source_file.into());
+    args.extend(
+        coilbox_unitsync_worker::Mode::Lua(coilbox_unitsync_worker::LuaArgs {
+            archive: archive.into(),
+            source_file: Some(source_file.into()),
+            chunks_file: None,
+        })
+        .to_args(),
+    );
     args
 }
 
@@ -700,16 +732,19 @@ pub fn build_lua_repl_args(
     chunks_file: &str,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
-    args.push("--lua".into());
-    args.push("--archive".into());
-    args.push(archive.into());
-    args.push("--chunks-file".into());
-    args.push(chunks_file.into());
+    args.extend(
+        coilbox_unitsync_worker::Mode::Lua(coilbox_unitsync_worker::LuaArgs {
+            archive: archive.into(),
+            source_file: None,
+            chunks_file: Some(chunks_file.into()),
+        })
+        .to_args(),
+    );
     args
 }
 
-/// Build args for archive-extract (download) mode: the file-preview args plus the
-/// destination path the member's full bytes are written to.
+/// Build args for `--archive` extract (download) mode: the archive and
+/// member plus the destination path the member's full bytes are written to.
 pub fn build_archive_extract_args(
     lib: &str,
     datadir: &str,
@@ -717,8 +752,15 @@ pub fn build_archive_extract_args(
     file: &str,
     dest: &str,
 ) -> Vec<String> {
-    let mut args = build_archive_file_args(lib, datadir, archive, file);
-    args.push("--extract".into());
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Archive(coilbox_unitsync_worker::ArchiveArgs {
+            archive: archive.into(),
+            file: Some(file.into()),
+            extract: Some(dest.into()),
+        })
+        .to_args(),
+    );
     args.push(dest.into());
     args
 }
@@ -793,8 +835,14 @@ mod tests {
         assert_eq!(recovered.cache_dir, None);
     }
 
+    /// What `build_minimap_args` writes, the worker's own `from_args` reads
+    /// back whole. A test that only checks a flag landed somewhere in the
+    /// argv cannot catch the sidecar and the worker disagreeing about the
+    /// mode's fields, and this one can (issue #2448).
     #[test]
-    fn minimap_args_append_cache_dir_when_present() {
+    fn build_minimap_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MinimapArgs;
+
         let with = build_minimap_args(
             "/eng/libunitsync.dylib",
             "/data",
@@ -802,9 +850,25 @@ mod tests {
             1,
             Some("/cache/thumbs"),
         );
-        assert_eq!(&with[with.len() - 2..], &["--cache-dir", "/cache/thumbs"]);
+        let recovered = MinimapArgs::from_args(&with).expect("valid argv");
+        assert_eq!(
+            recovered,
+            MinimapArgs {
+                map: "Map v1".into(),
+                mip: 1,
+                cache_dir: Some("/cache/thumbs".into()),
+                asset_dir: None,
+            }
+        );
+
         let without = build_minimap_args("/eng/libunitsync.dylib", "/data", "Map v1", 1, None);
         assert!(!without.iter().any(|a| a == "--cache-dir"));
+        assert_eq!(
+            MinimapArgs::from_args(&without)
+                .expect("valid argv")
+                .cache_dir,
+            None
+        );
     }
 
     /// What `build_heightmap_args` writes, the worker's own `from_args`
@@ -1007,15 +1071,28 @@ mod tests {
         );
     }
 
+    /// What `build_game_args` writes, the worker's own `from_args` reads
+    /// back whole. A test that only checks a flag landed somewhere in the
+    /// argv cannot catch the sidecar and the worker disagreeing about the
+    /// mode's fields, and this one can (issue #2448).
     #[test]
-    fn build_game_args_appends_cache_dir() {
+    fn build_game_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::GameArgs;
+
         let g = build_game_args(
             "/eng/libunitsync.so",
             "/data",
             "game.sdd",
             Some("/cache/info"),
         );
-        assert_eq!(&g[g.len() - 2..], &["--cache-dir", "/cache/info"]);
+        let recovered = GameArgs::from_args(&g).expect("valid argv");
+        assert_eq!(
+            recovered,
+            GameArgs {
+                game: "game.sdd".into(),
+                cache_dir: Some("/cache/info".into()),
+            }
+        );
     }
 
     /// What `build_map_meta_args` writes, the worker's own `from_args` reads
@@ -1118,23 +1195,33 @@ mod tests {
         assert_eq!(recovered, MapMinimapsArgs::default());
     }
 
+    /// What each `build_archive_*_args` writes, the worker's own `from_args`
+    /// reads back whole, for all three shapes: a bare tree listing, a file
+    /// preview, and an extract. A test that only checks a flag landed
+    /// somewhere in the argv cannot catch the sidecar and the worker
+    /// disagreeing about the mode's fields, and this one can (issue #2448).
     #[test]
-    fn build_archive_args_carry_archive_and_member() {
+    fn build_archive_args_round_trip_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::ArchiveArgs;
+
         let tree = build_archive_tree_args("/eng/libunitsync.so", "/data", "Map.sd7");
-        assert_eq!(tree.last(), Some(&"Map.sd7".to_string()));
-        assert!(tree.contains(&"--archive".to_string()));
-        assert!(!tree.contains(&"--file".to_string()));
+        assert_eq!(
+            ArchiveArgs::from_args(&tree).expect("valid argv"),
+            ArchiveArgs {
+                archive: "Map.sd7".into(),
+                file: None,
+                extract: None,
+            }
+        );
 
         let file = build_archive_file_args("/eng/libunitsync.so", "/data", "Map.sd7", "maps/x.smd");
-        assert!(file.contains(&"--archive".to_string()));
         assert_eq!(
-            &file[file.len() - 4..],
-            &[
-                "--archive".to_string(),
-                "Map.sd7".to_string(),
-                "--file".to_string(),
-                "maps/x.smd".to_string(),
-            ]
+            ArchiveArgs::from_args(&file).expect("valid argv"),
+            ArchiveArgs {
+                archive: "Map.sd7".into(),
+                file: Some("maps/x.smd".into()),
+                extract: None,
+            }
         );
 
         let extract = build_archive_extract_args(
@@ -1144,10 +1231,13 @@ mod tests {
             "maps/x.smd",
             "/out/x.smd",
         );
-        assert!(extract.contains(&"--file".to_string()));
         assert_eq!(
-            &extract[extract.len() - 2..],
-            &["--extract".to_string(), "/out/x.smd".to_string()],
+            ArchiveArgs::from_args(&extract).expect("valid argv"),
+            ArchiveArgs {
+                archive: "Map.sd7".into(),
+                file: Some("maps/x.smd".into()),
+                extract: Some("/out/x.smd".into()),
+            }
         );
     }
 
@@ -1565,34 +1655,42 @@ mod tests {
         assert_eq!(resolve_sidecar_in(None, None, |_| true), None);
     }
 
+    /// What `build_lua_args` writes, the worker's own `from_args` reads back
+    /// whole. A test that only checks a flag landed somewhere in the argv
+    /// cannot catch the sidecar and the worker disagreeing about the mode's
+    /// fields, and this one can (issue #2448).
     #[test]
-    fn build_lua_args_carry_archive_and_source_file() {
+    fn build_lua_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::LuaArgs;
+
         let a = build_lua_args("/eng/libunitsync.so", "/data", "Map v1", "/tmp/x.lua");
-        assert!(a.contains(&"--lua".to_string()));
         assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = LuaArgs::from_args(&a).expect("valid argv");
         assert_eq!(
-            &a[a.len() - 4..],
-            &[
-                "--archive".to_string(),
-                "Map v1".to_string(),
-                "--source-file".to_string(),
-                "/tmp/x.lua".to_string(),
-            ]
+            recovered,
+            LuaArgs {
+                archive: "Map v1".into(),
+                source_file: Some("/tmp/x.lua".into()),
+                chunks_file: None,
+            }
         );
     }
 
+    /// The REPL replay shape carries `--chunks-file` instead of
+    /// `--source-file`, and that has to round trip too (issue #2448).
     #[test]
-    fn build_lua_repl_args_carry_archive_and_chunks_file() {
+    fn build_lua_repl_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::LuaArgs;
+
         let a = build_lua_repl_args("/eng/libunitsync.so", "/data", "Map v1", "/tmp/c.json");
-        assert!(a.contains(&"--lua".to_string()));
+        let recovered = LuaArgs::from_args(&a).expect("valid argv");
         assert_eq!(
-            &a[a.len() - 4..],
-            &[
-                "--archive".to_string(),
-                "Map v1".to_string(),
-                "--chunks-file".to_string(),
-                "/tmp/c.json".to_string(),
-            ]
+            recovered,
+            LuaArgs {
+                archive: "Map v1".into(),
+                source_file: None,
+                chunks_file: Some("/tmp/c.json".into()),
+            }
         );
     }
 }
