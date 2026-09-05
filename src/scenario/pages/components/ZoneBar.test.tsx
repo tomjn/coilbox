@@ -29,7 +29,7 @@ import {
   undoEdit,
 } from "@/lib/scenarioEditing/history";
 import type { ScenarioZone } from "../../model";
-import { ZoneBar } from "./ScenarioMapScene";
+import { ZoneBar } from "./ScenarioMapBars";
 
 afterEach(cleanup);
 
