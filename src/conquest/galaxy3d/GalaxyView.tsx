@@ -14,6 +14,7 @@ import { mulberry32 } from "../rng";
 import { bodyLabel, isVoidNode, type VoidBody, voidBodiesFor } from "./bodies";
 import { createWinBurst } from "./burst";
 import { factionSides } from "./factionShape";
+import { createFocus } from "./focus";
 import {
   hashString,
   layoutNodes,
@@ -3130,84 +3131,24 @@ export function GalaxyView({
     /* ------------------------------ camera focus --------------------------- */
 
     // Ease the camera in on a node (zoomed) when `focusNodeId` is set, and back
-    // to the framed overview when cleared. While a node is focused user controls
-    // are locked; the ease itself is driven from the loop (snapped under
-    // reduce-motion). Keeps the current view direction, just pulls closer.
-    // `introTo` is the framed overview position (captured before the intro
-    // pulled the camera back), so this must NOT read `camera.position` here.
+    // to the framed overview when cleared. Also drives the faction-switch
+    // recentre ease. See focus.ts. `introTo` is the framed overview position
+    // (captured before the intro pulled the camera back).
     const framedTarget = focus.clone();
     const framedPos = introTo.clone();
-    const FOCUS_DIST = 30;
-    const FOCUS_MS = 650;
-    let focusAnim: {
-      fromT: THREE.Vector3;
-      toT: THREE.Vector3;
-      fromP: THREE.Vector3;
-      toP: THREE.Vector3;
-      t0: number;
-    } | null = null;
-    let focusShown: string | null = focusRef.current ?? null;
-
-    const focusGoal = (id: string | null) => {
-      const p = id ? positions.get(id) : undefined;
-      if (p) {
-        const target = new THREE.Vector3(p[0], p[1], p[2]);
-        const dir = framedPos.clone().sub(framedTarget).normalize();
-        return { target, pos: target.clone().addScaledVector(dir, FOCUS_DIST) };
-      }
-      return { target: framedTarget.clone(), pos: framedPos.clone() };
-    };
-
-    const applyFocus = (immediate: boolean) => {
-      const id = focusRef.current ?? null;
-      // No change (e.g. the mount-time effect firing with no focus) must not
-      // spawn an ease that fights the intro.
-      if (!immediate && id === focusShown) return;
-      focusShown = id;
-      // Releasing focus (a node was selected, or empty space clicked): unlock
-      // controls and STAY at the current pose. Flying back to the framed
-      // overview here read as "undoing" the fly-in the user just triggered.
-      if (!id) {
-        focusAnim = null;
-        if (controls) controls.enabled = true;
-        return;
-      }
-      const goal = focusGoal(id);
-      if (controls) controls.enabled = false;
-      if (immediate || reduceMotion) {
-        controls?.target.copy(goal.target);
-        camera.position.copy(goal.pos);
-        controls?.update();
-        focusAnim = null;
-        render();
-        return;
-      }
-      focusAnim = {
-        fromT: controls ? controls.target.clone() : goal.target.clone(),
-        toT: goal.target,
-        fromP: camera.position.clone(),
-        toP: goal.pos,
-        t0: performance.now(),
-      };
-    };
-    applyFocusRef.current = () => applyFocus(false);
-    // A node focused at mount (rare) snaps; otherwise the intro/overview runs.
-    if (focusShown) applyFocus(true);
-    // A faction switch rebuilds the scene with a new focus centroid: start from
-    // the previous camera pose and ease to the new framed overview so the
-    // recentre is a transition, not a jump. (The focus loop drives the ease and
-    // suppresses controls while it runs.)
-    else if (factionOnlyRebuild && !reduceMotion && camPoseRef.current) {
-      camera.position.copy(camPoseRef.current.pos);
-      controls.target.copy(camPoseRef.current.target);
-      focusAnim = {
-        fromT: camPoseRef.current.target.clone(),
-        toT: framedTarget.clone(),
-        fromP: camPoseRef.current.pos.clone(),
-        toP: framedPos.clone(),
-        t0: performance.now(),
-      };
-    }
+    const cameraFocus = createFocus(
+      camera,
+      controls,
+      render,
+      positions,
+      focusRef,
+      framedTarget,
+      framedPos,
+      reduceMotion,
+      factionOnlyRebuild,
+      camPoseRef.current,
+    );
+    applyFocusRef.current = () => cameraFocus.apply(false);
 
     /* ---------------------------- animation loop --------------------------- */
 
@@ -3246,21 +3187,14 @@ export function GalaxyView({
                 lm.target;
             }
             // Hand controls back — unless a node was focused mid-intro.
-            if (controls) controls.enabled = !focusShown;
+            if (controls) controls.enabled = !cameraFocus.isFocused();
             introActive = false;
           }
         }
 
-        // Camera focus ease (in on a node / back to the overview). Never during
-        // the intro — the two must not both drive the camera in one frame.
-        if (focusAnim && controls && !introActive) {
-          const e = easeOut(Math.min(1, (now - focusAnim.t0) / FOCUS_MS));
-          controls.target.lerpVectors(focusAnim.fromT, focusAnim.toT, e);
-          camera.position.lerpVectors(focusAnim.fromP, focusAnim.toP, e);
-          // Track the moving target so the orientation doesn't snap at the end.
-          camera.lookAt(controls.target);
-          if (e >= 1) focusAnim = null;
-        }
+        // Camera focus ease (in on a node / back to the overview). Never
+        // during the intro, so the two never drive the camera in one frame.
+        if (!introActive) cameraFocus.tick(now);
 
         if (effects) {
           uTime.value = now / 1000;
@@ -3388,7 +3322,11 @@ export function GalaxyView({
 
         // Controls own the camera only in the free overview — not during the
         // intro, a focus ease, or while a node is focused (controls locked).
-        if (!introActive && !focusAnim && !focusShown) {
+        if (
+          !introActive &&
+          !cameraFocus.isAnimating() &&
+          !cameraFocus.isFocused()
+        ) {
           easeHeading();
           controls?.update();
         }
