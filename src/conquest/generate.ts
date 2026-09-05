@@ -1,5 +1,10 @@
 import type { NodeMaps } from "../challenge/nodeMaps";
-import type { Faction, GalaxyDoc, GalaxyNode } from "./model";
+import {
+  applyChallengeMaps as applyChallengeMapsShared,
+  restoreChallengeMap as restoreChallengeMapShared,
+  substituteExcludedMaps as substituteExcludedMapsShared,
+} from "./mapSubstitution";
+import type { Faction, GalaxyDoc, GalaxyNode, NodeBattleSpec } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import type { ConquestNames } from "./names";
 import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
@@ -624,7 +629,9 @@ export function generateGalaxy(
  * written back, since authored galaxies a game ships are not ours to rewrite.
  *
  * `maps` is everything installed. Returns the doc unchanged when nothing needed
- * swapping, so callers can memo on identity.
+ * swapping, so callers can memo on identity. The node-walking and identity
+ * mechanics are shared with warpath in {@link substituteExcludedMapsShared},
+ * this is just conquest's difficulty-tier picking rule.
  */
 export function substituteExcludedMaps(
   galaxy: GalaxyDoc,
@@ -632,24 +639,16 @@ export function substituteExcludedMaps(
   isExcluded: (mapName: string) => boolean,
 ): GalaxyDoc {
   const byArea = mapsByArea(maps.filter((m) => !isExcluded(m.name)));
-  if (byArea.length === 0) return galaxy;
-
-  let changed = false;
-  const nodes = galaxy.nodes.map((node) => {
-    const current = node.battle.mapName;
-    if (!current || !isExcluded(current)) return node;
-    const tier = mapTier(byArea, node.difficulty);
-    const pool = tier.length > 0 ? tier : byArea;
-    const replacement = pool[hashString(node.id) % pool.length].name;
-    changed = true;
-    // The old map's download hint goes with it, or the battle screen would still
-    // offer to fetch the map we just excluded.
-    return {
-      ...node,
-      battle: { ...node.battle, mapName: replacement, mapDownload: undefined },
-    };
-  });
-  return changed ? { ...galaxy, nodes } : galaxy;
+  return substituteExcludedMapsShared<GalaxyDoc, GalaxyNode, NodeBattleSpec>(
+    galaxy,
+    isExcluded,
+    (node) => {
+      if (byArea.length === 0) return undefined;
+      const tier = mapTier(byArea, node.difficulty);
+      const pool = tier.length > 0 ? tier : byArea;
+      return { name: pool[hashString(node.id) % pool.length].name };
+    },
+  );
 }
 
 /**
@@ -676,41 +675,19 @@ export function applyChallengeMaps(
   nodeMaps: NodeMaps | undefined,
   maps: GenMap[],
 ): GalaxyDoc {
-  if (!nodeMaps) return galaxy;
   const available = new Set(maps.map((m) => m.name));
   const byArea = mapsByArea(maps);
-
-  let changed = false;
-  const nodes = galaxy.nodes.map((node) => {
-    const wanted = nodeMaps[node.id];
-    if (!wanted) return node;
-    let used = wanted;
-    if (!available.has(wanted) && byArea.length > 0) {
+  return applyChallengeMapsShared<GalaxyDoc, GalaxyNode, NodeBattleSpec>(
+    galaxy,
+    nodeMaps,
+    (mapName) => (available.has(mapName) ? { name: mapName } : undefined),
+    (node) => {
+      if (byArea.length === 0) return undefined;
       const tier = mapTier(byArea, node.difficulty);
       const pool = tier.length > 0 ? tier : byArea;
-      used = pool[hashString(node.id) % pool.length].name;
-    }
-    const substitutedFrom = used === wanted ? undefined : wanted;
-    if (
-      node.battle.mapName === used &&
-      node.battle.mapSubstitutedFrom === substitutedFrom
-    ) {
-      return node;
-    }
-    changed = true;
-    // The generated map's download hint goes with it, or the battle screen
-    // would offer to fetch a map this node no longer uses.
-    return {
-      ...node,
-      battle: {
-        ...node.battle,
-        mapName: used,
-        mapDownload: undefined,
-        mapSubstitutedFrom: substitutedFrom,
-      },
-    };
-  });
-  return changed ? { ...galaxy, nodes } : galaxy;
+      return { name: pool[hashString(node.id) % pool.length].name };
+    },
+  );
 }
 
 /**
@@ -731,25 +708,7 @@ export function restoreChallengeMap(
   galaxy: GalaxyDoc,
   nodeId: string,
 ): GalaxyDoc {
-  const node = galaxy.nodes.find((n) => n.id === nodeId);
-  const wanted = node?.battle.mapSubstitutedFrom;
-  if (!node || !wanted) return galaxy;
-  const nodes = galaxy.nodes.map((n) =>
-    n.id === nodeId
-      ? {
-          ...n,
-          battle: {
-            ...n.battle,
-            mapName: wanted,
-            // The stand-in's download hint goes with the stand-in, and the map
-            // taking its place is already here.
-            mapDownload: undefined,
-            mapSubstitutedFrom: undefined,
-          },
-        }
-      : n,
-  );
-  return { ...galaxy, nodes };
+  return restoreChallengeMapShared(galaxy, nodeId);
 }
 
 /** The content environment a reroll resolves at call time (never persisted). */

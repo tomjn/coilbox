@@ -1,5 +1,10 @@
 import type { MapDownloadHint } from "../campaign/model";
 import type { NodeMaps } from "../challenge/nodeMaps";
+import {
+  applyChallengeMaps as applyChallengeMapsShared,
+  restoreChallengeMap as restoreChallengeMapShared,
+  substituteExcludedMaps as substituteExcludedMapsShared,
+} from "../conquest/mapSubstitution";
 import type { GameRef } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
 import {
@@ -439,7 +444,9 @@ function maxHullFor(difficulty: number, ascension: number): number {
  * written back, matching conquest's `substituteExcludedMaps`.
  *
  * `maps` is everything installed. Returns the run unchanged when nothing needed
- * swapping, so callers can memo on identity.
+ * swapping, so callers can memo on identity. The node-walking and identity
+ * mechanics are shared with conquest in `substituteExcludedMapsShared`, this is
+ * just warpath's depth-biased picking rule.
  */
 export function substituteExcludedMaps(
   run: RogueliteRun,
@@ -447,28 +454,16 @@ export function substituteExcludedMaps(
   isExcluded: (mapName: string) => boolean,
 ): RogueliteRun {
   const pool = maps.filter((m) => !isExcluded(m.name));
-  if (pool.length === 0) return run;
-
   const cols = Math.max(...run.nodes.map((n) => n.col)) + 1;
-  let changed = false;
-  const nodes = run.nodes.map((node): RunNode => {
-    const battle = node.battle;
-    if (!battle?.mapName || !isExcluded(battle.mapName)) return node;
-    const depthFrac = cols > 1 ? node.col / (cols - 1) : 0;
-    const replacement = pickMap(
-      mulberry32(hashString(node.id)),
-      pool,
-      depthFrac,
-    );
-    changed = true;
-    // The old map's download hint goes with it, or the encounter screen would
-    // still offer to fetch the map we just excluded.
-    return {
-      ...node,
-      battle: { ...battle, mapName: replacement.name, mapDownload: undefined },
-    };
-  });
-  return changed ? { ...run, nodes } : run;
+  return substituteExcludedMapsShared<RogueliteRun, RunNode, EncounterSpec>(
+    run,
+    isExcluded,
+    (node) => {
+      if (pool.length === 0) return undefined;
+      const depthFrac = cols > 1 ? node.col / (cols - 1) : 0;
+      return pickMap(mulberry32(hashString(node.id)), pool, depthFrac);
+    },
+  );
 }
 
 /**
@@ -488,43 +483,18 @@ export function applyChallengeMaps(
   nodeMaps: NodeMaps | undefined,
   maps: GenRunMap[],
 ): RogueliteRun {
-  if (!nodeMaps) return run;
   const byName = new Map(maps.map((m) => [m.name, m]));
   const cols = Math.max(...run.nodes.map((n) => n.col)) + 1;
-
-  let changed = false;
-  const nodes = run.nodes.map((node): RunNode => {
-    const battle = node.battle;
-    const wanted = nodeMaps[node.id];
-    if (!battle || !wanted) return node;
-    let used = byName.get(wanted);
-    let substitutedFrom: string | undefined;
-    if (!used && maps.length > 0) {
+  return applyChallengeMapsShared<RogueliteRun, RunNode, EncounterSpec>(
+    run,
+    nodeMaps,
+    (mapName) => byName.get(mapName),
+    (node) => {
+      if (maps.length === 0) return undefined;
       const depthFrac = cols > 1 ? node.col / (cols - 1) : 0;
-      used = pickMap(mulberry32(hashString(node.id)), maps, depthFrac);
-      substitutedFrom = wanted;
-    }
-    const mapName = used?.name ?? wanted;
-    if (
-      battle.mapName === mapName &&
-      battle.mapSubstitutedFrom === substitutedFrom
-    ) {
-      return node;
-    }
-    changed = true;
-    return {
-      ...node,
-      battle: {
-        ...battle,
-        mapName,
-        // The hint follows the map: the new one's if this install knows it,
-        // none at all if the challenge named a map nobody here has heard of.
-        mapDownload: used?.mapDownload,
-        mapSubstitutedFrom: substitutedFrom,
-      },
-    };
-  });
-  return changed ? { ...run, nodes } : run;
+      return pickMap(mulberry32(hashString(node.id)), maps, depthFrac);
+    },
+  );
 }
 
 /**
@@ -540,26 +510,7 @@ export function restoreChallengeMap(
   run: RogueliteRun,
   nodeId: string,
 ): RogueliteRun {
-  const node = run.nodes.find((n) => n.id === nodeId);
-  const wanted = node?.battle?.mapSubstitutedFrom;
-  if (!node?.battle || !wanted) return run;
-  const nodes = run.nodes.map(
-    (n): RunNode =>
-      n.id === nodeId && n.battle
-        ? {
-            ...n,
-            battle: {
-              ...n.battle,
-              mapName: wanted,
-              // The stand-in's download hint goes with the stand-in, and the map
-              // taking its place is already here.
-              mapDownload: undefined,
-              mapSubstitutedFrom: undefined,
-            },
-          }
-        : n,
-  );
-  return { ...run, nodes };
+  return restoreChallengeMapShared(run, nodeId);
 }
 
 export function generateRun(opts: GenerateRunOpts): RogueliteRun {
