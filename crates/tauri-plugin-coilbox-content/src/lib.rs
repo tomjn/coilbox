@@ -132,13 +132,6 @@ fn store_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
         .join("state.json"))
 }
 
-/// The replay-stats store, alongside the content `state.json` under app-data.
-fn stats_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    Ok(coilbox_portable::data_dir(app)?
-        .join("content")
-        .join("stats.json"))
-}
-
 /// Gather real filesystem anchors from the environment + tauri path APIs.
 fn base_dirs<R: Runtime>(app: &AppHandle<R>, include_zerok: bool) -> BaseDirs {
     let home = std::env::var_os("HOME")
@@ -909,94 +902,6 @@ async fn content_replay_trailer(replay_path: String) -> CliResult {
     }
 }
 
-/// `content_stats_ingest`, incrementally parse every replay under `roots` into the
-/// local stats database, decoding only files new or changed since the last pass
-/// (idempotent, keyed by filename). The winner comes from each replay's own
-/// trailer. `enginePath` locates `demotool` only as a fallback for a trailer
-/// format the decoder refuses, and the native decode still records map/players/
-/// game either way. With `dryRun`, the pass runs but the store isn't written
-/// (returns the would-be summary). `roots` are `ContentRoot.path`s. Runs off the
-/// UI thread.
-#[tauri::command]
-async fn content_stats_ingest<R: Runtime>(
-    app: AppHandle<R>,
-    roots: Vec<String>,
-    engine_path: String,
-    dry_run: Option<bool>,
-) -> CliResult {
-    let sp = match stats_path(&app) {
-        Ok(p) => p,
-        Err(e) => return CliResult::err(e),
-    };
-    let dry_run = dry_run.unwrap_or(false);
-    let res = tauri::async_runtime::spawn_blocking(move || {
-        let mut store = stats::load(&sp)?;
-        let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
-        let engine_dir = PathBuf::from(&engine_path);
-        let summary = stats::ingest(&root_paths, &engine_dir, &mut store);
-        if !dry_run {
-            stats::save(&sp, &store)?;
-        }
-        Ok::<_, String>((summary, store))
-    })
-    .await;
-    match res {
-        Ok(Ok((summary, store))) => {
-            CliResult::ok(json!({ "summary": summary, "records": store.records }))
-        }
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("stats ingest task failed: {e}")),
-    }
-}
-
-/// `content_stats_query` — return the whole local stats record set (the flat table
-/// every stats view aggregates over). Read-only; never triggers an ingest.
-#[tauri::command]
-async fn content_stats_query<R: Runtime>(app: AppHandle<R>) -> CliResult {
-    let sp = match stats_path(&app) {
-        Ok(p) => p,
-        Err(e) => return CliResult::err(e),
-    };
-    match tauri::async_runtime::spawn_blocking(move || stats::load(&sp)).await {
-        Ok(Ok(store)) => CliResult::ok(json!({ "records": store.records })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("stats query task failed: {e}")),
-    }
-}
-
-/// `content_stats_watch_start` (#462): start (or restart) the live filesystem
-/// watcher over `roots`' demos/replays folders, so a newly-arrived replay is
-/// ingested as it lands rather than only on the next scan-on-open. Idempotent:
-/// replaces any watcher already running. `enginePath` is used the same way as
-/// [`content_stats_ingest`]'s. A watcher that fails to start (e.g. the OS watch
-/// couldn't be constructed) reports an error but never crashes the app,
-/// scan-on-open keeps working regardless.
-#[tauri::command]
-async fn content_stats_watch_start<R: Runtime>(
-    app: AppHandle<R>,
-    roots: Vec<String>,
-    engine_path: String,
-) -> CliResult {
-    let sp = match stats_path(&app) {
-        Ok(p) => p,
-        Err(e) => return CliResult::err(e),
-    };
-    let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
-    let engine_dir = PathBuf::from(&engine_path);
-    match stats_watcher::start(app, root_paths, engine_dir, sp) {
-        Ok(()) => CliResult::ok(json!({ "watching": true })),
-        Err(e) => CliResult::err(e),
-    }
-}
-
-/// `content_stats_watch_stop` (#462): stop the live filesystem watcher, if one
-/// is running. Idempotent.
-#[tauri::command]
-fn content_stats_watch_stop() -> CliResult {
-    stats_watcher::stop();
-    CliResult::ok(json!({ "watching": false }))
-}
-
 /// `content_demo_chat` — extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
 /// lines) by running `demotool --dump`. `enginePath` holds `demotool`; `replayPath`
 /// is an absolute demo path. Read on demand (it walks the whole demo stream), not
@@ -1208,10 +1113,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_demo_info,
             content_replay_trailer,
             metrics::content_metric_registry,
-            content_stats_ingest,
-            content_stats_query,
-            content_stats_watch_start,
-            content_stats_watch_stop,
+            stats::content_stats_ingest,
+            stats::content_stats_query,
+            stats_watcher::content_stats_watch_start,
+            stats_watcher::content_stats_watch_stop,
             content_demo_chat,
             content_rewrite_demo,
             content_delete_replay,
