@@ -20,6 +20,7 @@
  */
 
 import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
+import type { LayoutEdit } from "@/lib/scenarioEditing/bases";
 import type { Heading } from "@/placement/mapKeys";
 import { type Placement, parsePlacementKey } from "@/placement/placements";
 import { previewCount, unjudgedClause } from "@/placement/preview";
@@ -30,7 +31,6 @@ import {
   type Scenario,
   type ScenarioZone,
 } from "../../model";
-import type { LayoutEdit } from "./bases";
 import type { ContentEntry } from "./contents";
 import { contentsSelection } from "./contents";
 import {

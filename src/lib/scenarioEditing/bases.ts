@@ -56,7 +56,7 @@ import type {
   Point,
   Scenario,
   ScenarioBase,
-} from "../../model";
+} from "@/scenario/model";
 
 /** Whole elmos. The engine takes fractions, but an author never means
  *  1023.9997. */

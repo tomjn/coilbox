@@ -15,8 +15,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { BaseBlueprint } from "@/blueprint/model";
+import { renameBlueprint } from "@/lib/scenarioEditing/bases";
 import type { Scenario } from "@/scenario/model";
-import { renameBlueprint } from "@/scenario/pages/components/bases";
 import {
   movePlacement,
   removePlacement,

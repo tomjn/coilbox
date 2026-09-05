@@ -34,10 +34,10 @@ import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAs
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
 import type { MapScene3D } from "@/lib/mapScene";
+import { strayDefs } from "@/lib/scenarioEditing/bases";
 import { usePreferredTarget } from "@/play/config";
 import { MapPickerDrawer } from "@/play/pages/components/MapPickerDrawer";
 import type { Point } from "@/scenario/model";
-import { strayDefs } from "@/scenario/pages/components/bases";
 import { isTypingTarget } from "@/scenario/pages/components/history";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { layoutFraming } from "./ground";

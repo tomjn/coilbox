@@ -61,11 +61,11 @@ import { knownUnits, unknownUnitsWarning } from "@/blueprint/units";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { useUnitsyncEngineConfig, useUnitsyncScan } from "@/content/config";
 import { engineConfigDir, underConfigDir } from "@/content/enginePaths";
+import { replaceBlueprint } from "@/lib/scenarioEditing/bases";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import type { Scenario } from "../../model";
-import { replaceBlueprint } from "./bases";
 import { carryBlueprint } from "./blueprintImport";
 import { EditorPanel } from "./panels";
 

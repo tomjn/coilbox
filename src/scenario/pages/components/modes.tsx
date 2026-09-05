@@ -44,6 +44,13 @@ import { useUnitsyncScan } from "@/content/config";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import {
+  addBase,
+  addBuilding,
+  buildingUnits,
+  type LayoutEdit,
+  placeBlueprint,
+} from "@/lib/scenarioEditing/bases";
+import {
   type Placement,
   parsePlacementKey,
   placementKey,
@@ -57,13 +64,6 @@ import {
   type Scenario,
   type ScenarioZone,
 } from "../../model";
-import {
-  addBase,
-  addBuilding,
-  buildingUnits,
-  type LayoutEdit,
-  placeBlueprint,
-} from "./bases";
 import { takeBlueprint } from "./blueprintImport";
 import { addActor } from "./editing";
 import type { ScenarioEdit } from "./edits";

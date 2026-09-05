@@ -18,6 +18,12 @@
 import { BUILD_SQUARE, type SnapBuilding } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
 import {
+  addBase,
+  editBaseLayout,
+  type LayoutEdit,
+  removeBuilding,
+} from "@/lib/scenarioEditing/bases";
+import {
   type PlacementRef,
   parsePlacementKey,
   placementKey,
@@ -31,12 +37,6 @@ import type {
   ScenarioGroup,
 } from "../../model";
 import { baseBuildings } from "../../model";
-import {
-  addBase,
-  editBaseLayout,
-  type LayoutEdit,
-  removeBuilding,
-} from "./bases";
 
 /** Positions are whole elmos. The engine takes fractions, but nothing in an
  *  editor gains from writing 1023.9997 into a document. */

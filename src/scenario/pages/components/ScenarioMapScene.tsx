@@ -41,6 +41,20 @@ import {
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
+import {
+  editBase,
+  editBaseLayout,
+  type LayoutEdit,
+  moveBuilding,
+  removeBase,
+  removeBlueprint,
+  renameBlueprint,
+  setBlueprintOrdered,
+  setOrigin,
+  setQueue,
+  sharingLayout,
+  substituteQueues,
+} from "@/lib/scenarioEditing/bases";
 import { useFieldText } from "@/lib/useFieldText";
 import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
@@ -99,20 +113,6 @@ import {
 import type { MissionIssue } from "../../validate";
 import { ActorControls } from "./ActorControls";
 import { BaseControls } from "./BaseControls";
-import {
-  editBase,
-  editBaseLayout,
-  type LayoutEdit,
-  moveBuilding,
-  removeBase,
-  removeBlueprint,
-  renameBlueprint,
-  setBlueprintOrdered,
-  setOrigin,
-  setQueue,
-  sharingLayout,
-  substituteQueues,
-} from "./bases";
 import { ContentsList } from "./ContentsList";
 import {
   type ContentEntry,

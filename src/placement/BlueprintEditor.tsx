@@ -43,7 +43,6 @@ import {
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
-import { baseBuildings, type Point } from "@/scenario/model";
 import {
   addBuilding,
   buildingUnits,
@@ -52,7 +51,8 @@ import {
   renameBlueprint,
   setBlueprintOrdered,
   strayDefs,
-} from "@/scenario/pages/components/bases";
+} from "@/lib/scenarioEditing/bases";
+import { baseBuildings, type Point } from "@/scenario/model";
 import {
   movePlacement,
   removePlacement,
