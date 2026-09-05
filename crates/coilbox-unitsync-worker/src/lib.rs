@@ -18,13 +18,16 @@
 //! `--map-info`, `--map-skybox`, `--map-catalog`, `--map-minimaps`,
 //! `--heightmap`, `--height-field`, `--metalmap`, `--unit-buildpics`,
 //! `--faction-logos`, `--unit-dataset`, `--unit-model`, `--unit-script`,
-//! `--skirmish-ais`, `--game-headers` and `--thumbnails` have migrated so
-//! far. The other 5 modes still have their flags written by hand in the
-//! three old places: the Lua REPL, the archive/file/extract group and the
-//! default minimap render. `--typemap` stays a hand written CLI flag with no
-//! builder, per issue #2517. These move here one family at a time, matching
-//! how this crate already ships (135 commits since May 2026 says a sweeping
-//! rewrite is not this crate's style).
+//! `--skirmish-ais`, `--game-headers`, `--thumbnails`, `--lua`, `--archive`
+//! and the two flagless defaults (a bare `--game` and a bare `--map`) have
+//! migrated. `--typemap` stays a hand written CLI flag with no builder, per
+//! issue #2517. A bare `--game` (game detail) was never tracked in this
+//! module's own list across earlier seams, even though the comments in
+//! `main.rs`'s `parse_args` already called it out as unmigrated. It moved
+//! here alongside the tracked five once that came to light (issue #2448).
+//! These moved one family at a time, matching how this crate already ships
+//! (135 commits since May 2026 says a sweeping rewrite is not this crate's
+//! style).
 
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new
@@ -56,6 +59,14 @@ pub enum Mode {
     SkirmishAis(SkirmishAisArgs),
     GameHeaders(GameHeadersArgs),
     Thumbnails(ThumbnailsArgs),
+    Lua(LuaArgs),
+    Archive(ArchiveArgs),
+    /// A bare `--game` with no other mode flag: game detail. Named `Game`
+    /// rather than `GameDetail` to match the CLI flag it comes from, the
+    /// same convention every other variant here follows.
+    Game(GameArgs),
+    /// A bare `--map` with no other mode flag: the single minimap render.
+    Minimap(MinimapArgs),
 }
 
 impl Mode {
@@ -85,6 +96,10 @@ impl Mode {
             Mode::SkirmishAis(args) => args.to_args(),
             Mode::GameHeaders(args) => args.to_args(),
             Mode::Thumbnails(args) => args.to_args(),
+            Mode::Lua(args) => args.to_args(),
+            Mode::Archive(args) => args.to_args(),
+            Mode::Game(args) => args.to_args(),
+            Mode::Minimap(args) => args.to_args(),
         }
     }
 }
@@ -1414,6 +1429,251 @@ impl ThumbnailsArgs {
     }
 }
 
+/// `--lua`: run a Lua snippet through the archive-mounted parser, or replay a
+/// JSON array of REPL chunks when `chunks_file` is given. `chunks_file`
+/// present switches `run()` to replay mode ahead of a plain `source_file`,
+/// the same priority `run()` gave the two before this moved here. Neither
+/// `archive` nor `source_file` was ever required by `run()` (an absent
+/// source reads as an empty snippet), so a missing one recovers as
+/// empty/`None` rather than an error, the same treatment the old code gave
+/// them.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct LuaArgs {
+    pub archive: String,
+    pub source_file: Option<String>,
+    pub chunks_file: Option<String>,
+}
+
+impl LuaArgs {
+    /// Build the flags for `--lua` mode: the flag itself, the archive to
+    /// mount, and whichever of the source file or the chunks file is given.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--lua".to_string(),
+            "--archive".to_string(),
+            self.archive.clone(),
+        ];
+        if let Some(p) = &self.source_file {
+            args.push("--source-file".to_string());
+            args.push(p.clone());
+        }
+        if let Some(p) = &self.chunks_file {
+            args.push("--chunks-file".to_string());
+            args.push(p.clone());
+        }
+        args
+    }
+
+    /// Recover a `--lua` invocation from a worker argv. As with the other
+    /// modes' `from_args` functions, `args` may be exactly what
+    /// [`LuaArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut archive = None;
+        let mut source_file = None;
+        let mut chunks_file = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--archive" => archive = it.next().cloned(),
+                "--source-file" => source_file = it.next().cloned(),
+                "--chunks-file" => chunks_file = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(LuaArgs {
+            archive: archive.unwrap_or_default(),
+            source_file,
+            chunks_file,
+        })
+    }
+}
+
+/// `--archive`: browse one archive's member tree, preview one member's
+/// bytes, or extract one member to a destination path (download). `file` and
+/// `extract` layer: neither given is a tree listing, `file` alone is a
+/// preview, and both together is an extract. `extract` given without `file`
+/// is silently ignored by `run()`, the same treatment the old code gave the
+/// combination, since there is no member named to extract.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArchiveArgs {
+    pub archive: String,
+    pub file: Option<String>,
+    pub extract: Option<String>,
+}
+
+impl ArchiveArgs {
+    /// Build the flags for `--archive` mode: the archive to browse, and the
+    /// member and destination path when this is a preview or an extract.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec!["--archive".to_string(), self.archive.clone()];
+        if let Some(f) = &self.file {
+            args.push("--file".to_string());
+            args.push(f.clone());
+        }
+        if let Some(e) = &self.extract {
+            args.push("--extract".to_string());
+            args.push(e.clone());
+        }
+        args
+    }
+
+    /// Recover an `--archive` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`ArchiveArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut archive = None;
+        let mut file = None;
+        let mut extract = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--archive" => archive = it.next().cloned(),
+                "--file" => file = it.next().cloned(),
+                "--extract" => extract = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(ArchiveArgs {
+            archive: archive.unwrap_or_default(),
+            file,
+            extract,
+        })
+    }
+}
+
+/// A bare `--game` with no other mode flag: game detail, loading one game's
+/// archives to read its sides and unit count. `--unit-model` and its
+/// siblings key off `--game` too, but each needs its own explicit mode flag
+/// alongside it. A bare `--game` on its own is what selects this mode
+/// instead, which is why `run()` checks it only after every mode with an
+/// explicit flag of its own. Neither field was ever required by `run()`, so
+/// a missing one recovers as empty/`None` rather than an error, the same
+/// treatment the old code gave it.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct GameArgs {
+    pub game: String,
+    pub cache_dir: Option<String>,
+}
+
+impl GameArgs {
+    /// Build the flags for the bare `--game` mode: the game to read, and the
+    /// optional on-disk info-blob cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec!["--game".to_string(), self.game.clone()];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a bare `--game` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`GameArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(GameArgs {
+            game: game.unwrap_or_default(),
+            cache_dir,
+        })
+    }
+}
+
+/// A bare `--map` with no other mode flag: render one map's minimap.
+/// `--map-minimaps`, `--map-info` and their siblings key off `--map` too,
+/// but each needs its own explicit mode flag alongside it. A bare `--map` on
+/// its own is what selects this mode instead, which is why `run()` checks it
+/// last of every `--map` combination. `mip` defaults to 1 (512 square), the
+/// same default the shared `mip` local in `parse_args` applied before this
+/// moved here.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinimapArgs {
+    pub map: String,
+    pub mip: i32,
+    pub cache_dir: Option<String>,
+    pub asset_dir: Option<String>,
+}
+
+impl Default for MinimapArgs {
+    fn default() -> Self {
+        MinimapArgs {
+            map: String::new(),
+            mip: 1,
+            cache_dir: None,
+            asset_dir: None,
+        }
+    }
+}
+
+impl MinimapArgs {
+    /// Build the flags for the bare `--map` mode: the map to render, the mip
+    /// level, and the optional on-disk cache and asset directories.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--map".to_string(),
+            self.map.clone(),
+            "--mip".to_string(),
+            self.mip.to_string(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        if let Some(dir) = &self.asset_dir {
+            args.push("--asset-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a bare `--map` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`MinimapArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// A missing `--mip` recovers as 1, the same default the shared `mip`
+    /// local in `parse_args` used before this moved here.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut map = None;
+        let mut mip = 1;
+        let mut cache_dir = None;
+        let mut asset_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--map" => map = it.next().cloned(),
+                "--mip" => {
+                    mip = it
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                        .ok_or("--mip needs an integer")?
+                }
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                "--asset-dir" => asset_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(MinimapArgs {
+            map: map.unwrap_or_default(),
+            mip,
+            cache_dir,
+            asset_dir,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2321,5 +2581,168 @@ mod tests {
     fn thumbnails_dispatches_to_args_to_its_variant() {
         let a = thumbnails_args();
         assert_eq!(Mode::Thumbnails(a.clone()).to_args(), a.to_args());
+    }
+
+    fn lua_args() -> LuaArgs {
+        LuaArgs {
+            archive: "BAR.sdd".into(),
+            source_file: Some("/tmp/x.lua".into()),
+            chunks_file: None,
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn lua_with_a_source_file_round_trips_through_to_args_and_from_args() {
+        let original = lua_args();
+        let recovered = LuaArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// The REPL replay shape carries `chunks_file` instead of `source_file`,
+    /// and that has to round trip too.
+    #[test]
+    fn lua_with_a_chunks_file_round_trips_through_to_args_and_from_args() {
+        let original = LuaArgs {
+            source_file: None,
+            chunks_file: Some("/tmp/c.json".into()),
+            ..lua_args()
+        };
+        let recovered = LuaArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// `from_args` is also handed a full process argv, carrying `--lib` and
+    /// `--datadir`, neither of which this mode owns.
+    #[test]
+    fn lua_ignores_unrecognised_tokens_around_its_own_flags() {
+        let mut argv = vec![
+            "--lib".to_string(),
+            "/engines/one/libunitsync.so".to_string(),
+            "--datadir".to_string(),
+            "/data".to_string(),
+        ];
+        argv.extend(lua_args().to_args());
+        let recovered = LuaArgs::from_args(&argv).expect("valid argv");
+        assert_eq!(recovered, lua_args());
+    }
+
+    #[test]
+    fn lua_dispatches_to_args_to_its_variant() {
+        let a = lua_args();
+        assert_eq!(Mode::Lua(a.clone()).to_args(), a.to_args());
+    }
+
+    fn archive_extract_args() -> ArchiveArgs {
+        ArchiveArgs {
+            archive: "Map.sd7".into(),
+            file: Some("maps/x.smd".into()),
+            extract: Some("/out/x.smd".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole, for the extract
+    /// shape (archive, member and destination all given).
+    #[test]
+    fn archive_extract_round_trips_through_to_args_and_from_args() {
+        let original = archive_extract_args();
+        let recovered = ArchiveArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A file preview (no extract destination) has to round trip too.
+    #[test]
+    fn archive_file_preview_round_trips_through_to_args_and_from_args() {
+        let original = ArchiveArgs {
+            extract: None,
+            ..archive_extract_args()
+        };
+        let a = original.to_args();
+        assert!(!a.contains(&"--extract".to_string()));
+        let recovered = ArchiveArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A bare tree listing (neither file nor extract) has to round trip too.
+    #[test]
+    fn archive_tree_listing_round_trips_through_to_args_and_from_args() {
+        let original = ArchiveArgs {
+            file: None,
+            extract: None,
+            ..archive_extract_args()
+        };
+        let a = original.to_args();
+        assert!(!a.contains(&"--file".to_string()));
+        assert!(!a.contains(&"--extract".to_string()));
+        let recovered = ArchiveArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn archive_dispatches_to_args_to_its_variant() {
+        let a = archive_extract_args();
+        assert_eq!(Mode::Archive(a.clone()).to_args(), a.to_args());
+    }
+
+    fn game_args() -> GameArgs {
+        GameArgs {
+            game: "BAR.sdd".into(),
+            cache_dir: Some("/cache/game".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn game_round_trips_through_to_args_and_from_args() {
+        let original = game_args();
+        let recovered = GameArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn game_dispatches_to_args_to_its_variant() {
+        let a = game_args();
+        assert_eq!(Mode::Game(a.clone()).to_args(), a.to_args());
+    }
+
+    fn minimap_args() -> MinimapArgs {
+        MinimapArgs {
+            map: "Map v1".into(),
+            mip: 2,
+            cache_dir: Some("/cache/thumbs".into()),
+            asset_dir: Some("/assets".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn minimap_round_trips_through_to_args_and_from_args() {
+        let original = minimap_args();
+        let recovered = MinimapArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A missing `--mip` recovers as 1, the same default the shared `mip`
+    /// local in `parse_args` used before this moved here.
+    #[test]
+    fn minimap_missing_mip_defaults_to_1() {
+        let mut a = minimap_args().to_args();
+        let at = a.iter().position(|x| x == "--mip").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        let recovered = MinimapArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered.mip, 1);
+    }
+
+    #[test]
+    fn minimap_dispatches_to_args_to_its_variant() {
+        let a = minimap_args();
+        assert_eq!(Mode::Minimap(a.clone()).to_args(), a.to_args());
     }
 }

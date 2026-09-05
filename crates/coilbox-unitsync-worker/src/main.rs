@@ -55,12 +55,18 @@ const LIST_SEP: char = if cfg!(windows) { ';' } else { ':' };
 struct Args {
     lib: String,
     datadir: String,
+    /// `--map` alone (typemap's own `--map`, checked ahead of the default
+    /// minimap render). `--typemap` is the one mode left with no shared
+    /// contract (issue #2517), so this stays a raw field for it.
     map: Option<String>,
-    game: Option<String>,
-    archive: Option<String>,
-    file: Option<String>,
-    /// Destination path for `--extract` (download one member to disk).
-    extract: Option<String>,
+    /// A bare `--game` with no other mode flag: game detail. Its field lives
+    /// once in `coilbox_unitsync_worker::GameArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #2448).
+    game: Option<Mode>,
+    /// `--archive`: browse, preview or extract one archive's member. Its
+    /// fields live once in `coilbox_unitsync_worker::ArchiveArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    archive: Option<Mode>,
     /// `--thumbnails`: render a small minimap for every installed map in one
     /// Init. Its fields live once in
     /// `coilbox_unitsync_worker::ThumbnailsArgs`, shared with the sidecar
@@ -181,19 +187,24 @@ struct Args {
     /// `coilbox_unitsync_worker::FactionLogosArgs`, shared with the sidecar
     /// plugin that builds this flag's argv (issue #2448).
     faction_logos: Option<Mode>,
-    /// `--lua`: run a Lua snippet through the parser against `--archive`, reading
-    /// the script from `--source-file`.
-    lua: bool,
-    source_file: Option<String>,
-    /// `--chunks-file`: a JSON array of Lua chunks for REPL replay mode
-    /// (combined with `--lua`), an alternative to a single `--source-file`.
-    chunks_file: Option<String>,
-    mip: i32,
-    /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
+    /// `--lua`: run a Lua snippet through the parser against an archive, or
+    /// replay a JSON array of chunks in REPL mode. Its fields live once in
+    /// `coilbox_unitsync_worker::LuaArgs`, shared with the sidecar plugin
+    /// that builds this flag's argv (issue #2448).
+    lua: Option<Mode>,
+    /// A bare `--map` with no other mode flag: the default minimap render.
+    /// Its fields live once in `coilbox_unitsync_worker::MinimapArgs`,
+    /// shared with the sidecar plugin that builds this flag's argv (issue
+    /// #2448).
+    minimap: Option<Mode>,
+    /// Directory for the on-disk seed-corpus cache (`--seed` only: every
+    /// other mode with a cache directory keeps its own copy in its `Mode`
+    /// payload).
     cache_dir: Option<String>,
-    /// `--asset-dir`: where to write encoded hub assets. Set only when something
-    /// intends to upload them, since the pictures the app itself draws come back
-    /// in the JSON and need no file.
+    /// `--asset-dir`: where to write encoded hub assets, for `--seed` and
+    /// `--typemap` (the two modes left with no shared contract). Set only
+    /// when something intends to upload them, since the pictures the app
+    /// itself draws come back in the JSON and need no file.
     asset_dir: Option<String>,
     /// `--seed`: walk the whole library and write the hub's seed corpus into
     /// `--asset-dir`, with a manifest describing every file.
@@ -234,10 +245,9 @@ fn run() -> i32 {
     let cache_dir = args.cache_dir.as_deref().map(Path::new);
 
     // Lua console: mount one archive and run a user snippet through the parser.
-    if args.lua {
-        let archive = args.archive.clone().unwrap_or_default();
+    if let Some(Mode::Lua(mode)) = &args.lua {
         // REPL replay mode: `--chunks-file` holds a JSON array of session chunks.
-        if let Some(p) = args.chunks_file.as_deref() {
+        if let Some(p) = mode.chunks_file.as_deref() {
             let chunks: Vec<String> = match std::fs::read_to_string(p) {
                 Ok(s) => match serde_json::from_str(&s) {
                     Ok(c) => c,
@@ -251,7 +261,9 @@ fn run() -> i32 {
                     return 1;
                 }
             };
-            return match std::panic::catch_unwind(|| lua::run_repl(&args.lib, &archive, &chunks)) {
+            return match std::panic::catch_unwind(|| {
+                lua::run_repl(&args.lib, &mode.archive, &chunks)
+            }) {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());
                     0
@@ -262,7 +274,7 @@ fn run() -> i32 {
                 }
             };
         }
-        let source = match args.source_file.as_deref() {
+        let source = match mode.source_file.as_deref() {
             Some(p) => match std::fs::read_to_string(p) {
                 Ok(s) => s,
                 Err(e) => {
@@ -272,7 +284,7 @@ fn run() -> i32 {
             },
             None => String::new(),
         };
-        return match std::panic::catch_unwind(|| lua::run(&args.lib, &archive, &source)) {
+        return match std::panic::catch_unwind(|| lua::run(&args.lib, &mode.archive, &source)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
@@ -576,10 +588,10 @@ fn run() -> i32 {
 
     // Archive browsing: list a member tree, read one member for preview, or
     // extract one member to a destination path (download).
-    if let Some(archive_name) = args.archive.clone() {
-        if let (Some(inner), Some(dest)) = (args.file.clone(), args.extract.clone()) {
+    if let Some(Mode::Archive(mode)) = &args.archive {
+        if let (Some(inner), Some(dest)) = (mode.file.as_deref(), mode.extract.as_deref()) {
             return match std::panic::catch_unwind(|| {
-                archive::extract(&args.lib, &archive_name, &inner, &dest)
+                archive::extract(&args.lib, &mode.archive, inner, dest)
             }) {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -593,10 +605,9 @@ fn run() -> i32 {
                 }
             };
         }
-        if let Some(inner) = args.file.clone() {
-            return match std::panic::catch_unwind(|| {
-                archive::file(&args.lib, &archive_name, &inner)
-            }) {
+        if let Some(inner) = mode.file.as_deref() {
+            return match std::panic::catch_unwind(|| archive::file(&args.lib, &mode.archive, inner))
+            {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());
                     0
@@ -607,7 +618,7 @@ fn run() -> i32 {
                 }
             };
         }
-        return match std::panic::catch_unwind(|| archive::tree(&args.lib, &archive_name)) {
+        return match std::panic::catch_unwind(|| archive::tree(&args.lib, &mode.archive)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
@@ -636,9 +647,9 @@ fn run() -> i32 {
     }
 
     // Game detail: load one game's archives to read its sides + unit count.
-    if let Some(game_archive) = args.game.clone() {
-        return match std::panic::catch_unwind(|| game::render(&args.lib, &game_archive, cache_dir))
-        {
+    if let Some(Mode::Game(mode)) = &args.game {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return match std::panic::catch_unwind(|| game::render(&args.lib, &mode.game, cache_dir)) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
@@ -882,11 +893,12 @@ fn run() -> i32 {
         };
     }
 
-    // Single minimap renders one map; default mode scans everything.
-    if let Some(map) = args.map.clone() {
-        let asset_dir = args.asset_dir.as_deref().map(Path::new);
+    // Single minimap renders one map. The default mode scans everything.
+    if let Some(Mode::Minimap(mode)) = &args.minimap {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        let asset_dir = mode.asset_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            minimap::render(&args.lib, &map, args.mip, cache_dir, asset_dir)
+            minimap::render(&args.lib, &mode.map, mode.mip, cache_dir, asset_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -918,17 +930,24 @@ fn run() -> i32 {
 fn parse_args() -> Result<Args, String> {
     let mut lib = None;
     let mut datadir = None;
+    // `--map`'s presence alone (no other mode flag) is what gates
+    // `Mode::Minimap` below. `--typemap` still reads this same local
+    // directly, since it is the one mode left with no shared contract (issue
+    // #2517).
     let mut map = None;
+    // `--game`'s presence alone (no other mode flag) is what gates
+    // `Mode::Game` below. `Mode::Game`'s own `from_args` re-scans `raw` for
+    // its fields, the same treatment `Mode::Minimap`'s below gets (issue
+    // #2448).
     let mut game = None;
+    // `--archive`'s presence alone is what gates `Mode::Archive` below (or,
+    // combined with `--lua`, is `Mode::Lua`'s own field instead). Both
+    // `from_args` functions re-scan `raw` for it independently.
     let mut archive = None;
-    let mut file = None;
-    let mut extract = None;
     // `--thumbnails`' own fields (mip, cache directory) are not collected
     // into locals here for its own use: `Mode::Thumbnails`'s `from_args`
     // below re-scans `raw` for those, the same treatment `--heightmap` and
-    // its siblings got above (issue #2448). The shared `mip`/`cache_dir`
-    // locals below still exist and are still read from `raw` too, since the
-    // unmigrated single-minimap mode still uses them.
+    // its siblings got above (issue #2448).
     let mut thumbnails_flag = false;
     // `--heightmap`'s own fields (map, cache directory, asset directory) are
     // not collected into locals here for its own use: `Mode::Heightmap`'s
@@ -983,9 +1002,7 @@ fn parse_args() -> Result<Args, String> {
     let mut config_set_flag = false;
     // `--skirmish-ais`' own field (game) is not collected into a local here
     // for its own use: `Mode::SkirmishAis`'s `from_args` below re-scans
-    // `raw` for it (issue #2448). The shared `game` local below still exists
-    // and is still read from `raw` too, since the unmigrated game-detail
-    // mode still uses it.
+    // `raw` for it (issue #2448).
     let mut skirmish_ais_flag = false;
     // `--game-headers`' own field (cache directory) is not collected into a
     // local here for its own use: `Mode::GameHeaders`'s `from_args` below
@@ -1011,10 +1028,7 @@ fn parse_args() -> Result<Args, String> {
     // `--unit-models`' own fields (units file, cache directory) are not
     // collected into locals here for its own use: `Mode::UnitModels`'s
     // `from_args` below re-scans `raw` for those, the single place that
-    // mode's fields and cross field rule are defined (issue #2448). The
-    // shared `units_file`/`cache_dir` locals below still exist and are still
-    // read from `raw` too, since other modes that have not migrated yet
-    // still use them.
+    // mode's fields and cross field rule are defined (issue #2448).
     let mut unit_models_flag = false;
     // `--unit-render`'s own flags (angle, footprint, pixels, dimensions, render
     // source) are not collected into locals here: `Mode::UnitRender`'s
@@ -1035,11 +1049,16 @@ fn parse_args() -> Result<Args, String> {
     // collected into locals here for its own use: `Mode::FactionLogos`'s
     // `from_args` below re-scans `raw` for those (issue #2448).
     let mut faction_logos_flag = false;
-    let mut lua = false;
-    let mut source_file = None;
-    let mut chunks_file = None;
-    let mut mip = 1; // 512x512 by default
+    // `--lua`'s own fields (archive, source file, chunks file) are not
+    // collected into locals here for its own use: `Mode::Lua`'s `from_args`
+    // below re-scans `raw` for those (issue #2448).
+    let mut lua_flag = false;
+    // `--seed`'s cache directory. `Mode::Minimap`'s own `from_args` re-scans
+    // `raw` for its own copy, the same treatment `Mode::Thumbnails` and its
+    // siblings got above (issue #2448). This local stays because `--seed` is
+    // deliberate manual maintainer tooling that has never moved onto `Mode`.
     let mut cache_dir = None;
+    // `--seed` and `--typemap`'s asset directory, for the same reason.
     let mut asset_dir = None;
     let mut seed = false;
     let mut dry_run = false;
@@ -1052,8 +1071,11 @@ fn parse_args() -> Result<Args, String> {
             "--map" => map = it.next(),
             "--game" => game = it.next(),
             "--archive" => archive = it.next(),
-            "--file" => file = it.next(),
-            "--extract" => extract = it.next(),
+            // Consumed by `Mode::Archive`'s `from_args` below, not stored
+            // here.
+            "--file" | "--extract" => {
+                it.next();
+            }
             "--thumbnails" => thumbnails_flag = true,
             "--heightmap" => heightmap_flag = true,
             "--height-field" => height_field_flag = true,
@@ -1137,14 +1159,15 @@ fn parse_args() -> Result<Args, String> {
             "--sides" => {
                 it.next();
             }
-            "--lua" => lua = true,
-            "--source-file" => source_file = it.next(),
-            "--chunks-file" => chunks_file = it.next(),
+            "--lua" => lua_flag = true,
+            // Consumed by `Mode::Lua`'s `from_args` below, not stored here.
+            "--source-file" | "--chunks-file" => {
+                it.next();
+            }
+            // Consumed by `Mode::Minimap`'s and `Mode::Thumbnails`'s
+            // `from_args` below, not stored here.
             "--mip" => {
-                mip = it
-                    .next()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or("--mip needs an integer")?
+                it.next();
             }
             other => return Err(format!("unknown argument: {other}")),
         }
@@ -1152,11 +1175,21 @@ fn parse_args() -> Result<Args, String> {
     Ok(Args {
         lib: lib.ok_or("missing --lib <path-to-libunitsync>")?,
         datadir: datadir.ok_or("missing --datadir <content-root>")?,
-        map,
-        game,
-        archive,
-        file,
-        extract,
+        map: map.clone(),
+        game: if game.is_some() {
+            Some(Mode::Game(coilbox_unitsync_worker::GameArgs::from_args(
+                &raw,
+            )?))
+        } else {
+            None
+        },
+        archive: if archive.is_some() {
+            Some(Mode::Archive(
+                coilbox_unitsync_worker::ArchiveArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         thumbnails: if thumbnails_flag {
             Some(Mode::Thumbnails(
                 coilbox_unitsync_worker::ThumbnailsArgs::from_args(&raw)?,
@@ -1303,10 +1336,20 @@ fn parse_args() -> Result<Args, String> {
         } else {
             None
         },
-        lua,
-        source_file,
-        chunks_file,
-        mip,
+        lua: if lua_flag {
+            Some(Mode::Lua(coilbox_unitsync_worker::LuaArgs::from_args(
+                &raw,
+            )?))
+        } else {
+            None
+        },
+        minimap: if map.is_some() {
+            Some(Mode::Minimap(
+                coilbox_unitsync_worker::MinimapArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         cache_dir,
         asset_dir,
         seed,
@@ -1324,16 +1367,14 @@ fn parse_args() -> Result<Args, String> {
 /// treatment for the same reason.
 ///
 /// Only paths this worker opens or writes are listed. `--config-key`,
-/// `--map`, `--game` and `--archive` are unitsync names, not paths.
+/// `--map`, `--game`, `--archive` and `--file` are unitsync/member names,
+/// not paths.
 fn absolutize(args: &mut Args) {
     for path in [
         Some(&mut args.lib),
         Some(&mut args.datadir),
         args.cache_dir.as_mut(),
         args.asset_dir.as_mut(),
-        args.extract.as_mut(),
-        args.source_file.as_mut(),
-        args.chunks_file.as_mut(),
     ]
     .into_iter()
     .flatten()
@@ -1525,6 +1566,55 @@ fn absolutize(args: &mut Args) {
         if let Some(dir) = &mut mode.cache_dir {
             if let Some(abs) = absolute_path(dir) {
                 *dir = abs;
+            }
+        }
+    }
+    // `Mode::Lua` holds its own copy of `--source-file`/`--chunks-file`,
+    // read separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--archive` is a unitsync name, not a path, so it is left
+    // alone.
+    if let Some(Mode::Lua(mode)) = args.lua.as_mut() {
+        for path in [mode.source_file.as_mut(), mode.chunks_file.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
+            }
+        }
+    }
+    // `Mode::Archive` holds its own copy of `--extract`'s destination path,
+    // read separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--archive` and `--file` name an archive and a member
+    // inside it, not paths on this machine, so they are left alone.
+    if let Some(Mode::Archive(mode)) = args.archive.as_mut() {
+        if let Some(dest) = &mut mode.extract {
+            if let Some(abs) = absolute_path(dest) {
+                *dest = abs;
+            }
+        }
+    }
+    // `Mode::Game` holds its own copy of `--cache-dir`, read separately from
+    // `raw` in `parse_args`, so it needs the same treatment. `--game` is a
+    // unitsync name, not a path, so it is left alone.
+    if let Some(Mode::Game(mode)) = args.game.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::Minimap` holds its own copy of `--cache-dir`/`--asset-dir`,
+    // read separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--map` is a unitsync name, not a path, so it is left
+    // alone.
+    if let Some(Mode::Minimap(mode)) = args.minimap.as_mut() {
+        for path in [mode.cache_dir.as_mut(), mode.asset_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
             }
         }
     }
@@ -1872,8 +1962,6 @@ mod tests {
             map: None,
             game: None,
             archive: None,
-            file: None,
-            extract: None,
             thumbnails: None,
             heightmap: None,
             height_field: None,
@@ -1896,10 +1984,8 @@ mod tests {
             unit_render_keys: None,
             unit_script: None,
             faction_logos: None,
-            lua: false,
-            source_file: None,
-            chunks_file: None,
-            mip: 1,
+            lua: None,
+            minimap: None,
             cache_dir: cache_dir.map(str::to_string),
             asset_dir: asset_dir.map(str::to_string),
             seed: false,
