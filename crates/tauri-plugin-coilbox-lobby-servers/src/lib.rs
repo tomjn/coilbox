@@ -164,17 +164,13 @@ fn write_to_keychain(
 
 /// `ls_store_credential`: [`store_credential`] over IPC, off the polling thread.
 #[tauri::command]
-async fn ls_store_credential(
-    server_id: String,
-    username: String,
-    secret: String,
-) -> Result<CliResult, ()> {
+async fn ls_store_credential(server_id: String, username: String, secret: String) -> CliResult {
     let stored =
         off_the_polling_thread(move || store_credential(&server_id, &username, &secret)).await;
-    Ok(match stored {
+    match stored {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
-    })
+    }
 }
 
 /// Read a secret through `/usr/bin/security` instead of the in-process API.
@@ -350,12 +346,12 @@ fn read_from_keychain(
 /// `ls_get_credential`: [`get_credential`] over IPC, off the polling thread. A
 /// missing entry resolves with `{ "secret": null }`.
 #[tauri::command]
-async fn ls_get_credential(server_id: String, username: String) -> Result<CliResult, ()> {
+async fn ls_get_credential(server_id: String, username: String) -> CliResult {
     let read = off_the_polling_thread(move || get_credential(&server_id, &username)).await;
-    Ok(match read {
+    match read {
         Ok(secret) => CliResult::ok(json!({ "secret": secret })),
         Err(e) => CliResult::err(e),
-    })
+    }
 }
 
 /// Delete a stored secret from the keychain and the cache. A missing entry is
@@ -400,12 +396,12 @@ fn delete_from_keychain(server_id: &str, username: &str, key: &str) -> Result<()
 
 /// `ls_delete_credential`: [`delete_credential`] over IPC, off the polling thread.
 #[tauri::command]
-async fn ls_delete_credential(server_id: String, username: String) -> Result<CliResult, ()> {
+async fn ls_delete_credential(server_id: String, username: String) -> CliResult {
     let deleted = off_the_polling_thread(move || delete_credential(&server_id, &username)).await;
-    Ok(match deleted {
+    match deleted {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
-    })
+    }
 }
 
 /// Build the plugin. Registered as `"coilbox-lobby-servers"`.
