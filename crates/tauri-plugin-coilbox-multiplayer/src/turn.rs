@@ -24,9 +24,12 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use coilbox_lobby_protocol::{command, Delta, LobbyState, TurnCredentials};
+use picoframe_core::CliResult;
+use serde_json::json;
+use tauri::State;
 use tokio::sync::watch;
 
-use crate::conn::{ConnProtocol, Outbound, Registry};
+use crate::conn::{now_ms, ConnProtocol, Outbound, Registry, READY_TIMEOUT};
 use crate::lock_or_recover;
 use crate::relay_sidecar::Turn;
 
@@ -241,6 +244,41 @@ pub async fn credentials(
         });
     }
     usable(&minted)
+}
+
+/// `mp_turn_credentials`: get a relay credential for this connection, asking the
+/// lobby for one if we do not already hold a live one.
+///
+/// The answer says whether there is a credential and when it runs out. The
+/// credential itself is not in it: the password is a secret and the relay agent
+/// is started from Rust, so nothing above this needs to see it. What starts a
+/// relayed battle calls [`credentials`] directly (issue #2017).
+///
+/// A server that has not said it has a relay is not asked at all, so today it
+/// answers with the sentence [`NoCredential::NoRelay`] carries, without a line
+/// going out.
+#[tauri::command]
+pub(crate) async fn mp_turn_credentials(
+    registry: State<'_, Registry>,
+    server_key: String,
+) -> Result<CliResult, ()> {
+    // The same budget the login handshake gets, because it is the same round
+    // trip to the same server.
+    let waited = credentials(registry.inner(), &server_key, now_ms(), READY_TIMEOUT).await;
+    Ok(match waited {
+        Ok(_) => {
+            let expires_at = lock_or_recover(&registry)
+                .get(&server_key)
+                .and_then(|conn| {
+                    lock_or_recover(&conn.state)
+                        .turn_credentials
+                        .as_ref()
+                        .map(|c| c.expires_at)
+                });
+            CliResult::ok(json!({ "granted": true, "expiresAt": expires_at }))
+        }
+        Err(e) => CliResult::err(e.to_string()),
+    })
 }
 
 /// A credential to replace the one a relay is already running on, whatever the

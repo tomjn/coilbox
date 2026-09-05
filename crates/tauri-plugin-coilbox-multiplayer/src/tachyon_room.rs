@@ -114,11 +114,14 @@ use coilbox_lobby_protocol::{
 use coilbox_tachyon_protocol::merge_patch;
 use coilbox_tachyon_protocol::types::{self, LobbyCreateResponse, LobbyDetails, LobbyJoinResponse};
 use coilbox_tachyon_protocol::TachyonMessage;
+use picoframe_core::CliResult;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tauri::State;
 use tauri_plugin_coilbox_play::script::BattleConfig;
 use tokio::sync::mpsc;
 
+use crate::conn::{Registry, TachyonAction};
 use crate::tachyon_lobbies::handle_for;
 use crate::tachyon_rpc::{Failure, FailureReason, HandlerResult};
 use crate::tachyon_users::SUBSCRIBE_LIMIT;
@@ -1068,6 +1071,67 @@ fn count(value: usize) -> u32 {
 /// than sixteen of either has nowhere to put the rest and they land on the last.
 fn index_of(index: usize) -> u8 {
     u8::try_from(index).unwrap_or(u8::MAX).min(15)
+}
+
+/// `mp_create_lobby`, Tachyon only: make a lobby of our own.
+///
+/// A lobby is not a battle this machine hosts. It is a room the server owns,
+/// which we are put in as its first player, and the match only gets a machine to
+/// run on when a member asks for it to start. So there is no port, no NAT mode
+/// and no content hash to send, and nothing here seats us as a host.
+#[tauri::command]
+pub(crate) fn mp_create_lobby(
+    registry: State<'_, Registry>,
+    server_key: String,
+    name: String,
+    map_name: String,
+    ally_teams: u8,
+    players_per_team: u8,
+    bosses_enabled: bool,
+) -> CliResult {
+    crate::tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::CreateLobby(NewLobby {
+            name,
+            map_name,
+            ally_teams,
+            players_per_team,
+            bosses_enabled,
+        }),
+    )
+    .unwrap_or_else(|| CliResult::err("this server hosts battles rather than lobbies"))
+}
+
+/// `mp_appoint_boss`, Tachyon only: make a member a boss, so they may change the
+/// lobby. Tachyon has no founder, and a boss is the nearest thing it has.
+#[tauri::command]
+pub(crate) fn mp_appoint_boss(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    crate::tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::AppointBoss { username }),
+    )
+    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
+}
+
+/// `mp_unboss`, Tachyon only: stand a boss down.
+#[tauri::command]
+pub(crate) fn mp_unboss(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    crate::tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::Unboss { username }),
+    )
+    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
 }
 
 #[cfg(test)]

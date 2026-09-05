@@ -110,10 +110,8 @@ use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tachyon_conn::TachyonMarkers;
 use tachyon_friends::FriendAction;
-use tachyon_matchmaking::MatchmakingAction;
 use tachyon_messaging::Conversation;
-use tachyon_parties::PartyAction;
-use tachyon_room::{NewLobby, RoomAction, VoteChoice};
+use tachyon_room::{RoomAction, VoteChoice};
 use tauri::{
     ipc::Channel,
     plugin::{Builder, TauriPlugin},
@@ -147,7 +145,7 @@ pub(crate) fn lock_or_recover<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 /// The two lobby chat-log directories under the app data dir: DM history and
 /// channel history. Both hold one `<sanitized serverKey>.jsonl` per account.
-fn log_dirs<R: Runtime>(
+pub(crate) fn log_dirs<R: Runtime>(
     app: &tauri::AppHandle<R>,
 ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     let base = coilbox_portable::data_dir(app)?.join("coilbox");
@@ -206,7 +204,7 @@ fn enqueue_all(registry: &Registry, server_key: &str, lines: Vec<String>) -> Cli
 ///
 /// Having a request client is what makes a connection a Tachyon one, which is
 /// the same test `mp_tachyon_request` makes.
-fn tachyon_action(
+pub(crate) fn tachyon_action(
     registry: &Registry,
     server_key: &str,
     action: TachyonAction,
@@ -1330,136 +1328,6 @@ fn mp_friend_request_list(registry: State<'_, Registry>, server_key: String) -> 
     )
 }
 
-/// Queue one party action, refusing on a connection with no parties.
-///
-/// The seven commands differ only in the action they name, so the refusal and
-/// the Tachyon test are written once. TASServer has no parties at all, which is
-/// why there is no line to fall back to.
-fn party_action(registry: &Registry, server_key: &str, action: PartyAction) -> CliResult {
-    tachyon_action(registry, server_key, TachyonAction::Party(action))
-        .unwrap_or_else(|| CliResult::err("this server does not have parties"))
-}
-
-/// `mp_party_create`, Tachyon only: start a party of your own.
-#[tauri::command]
-fn mp_party_create(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Create)
-}
-
-/// `mp_party_leave`, Tachyon only: leave the party you are in.
-#[tauri::command]
-fn mp_party_leave(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Leave)
-}
-
-/// `mp_party_invite`, Tachyon only: ask somebody into your party.
-#[tauri::command]
-fn mp_party_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Invite(username))
-}
-
-/// `mp_party_cancel_invite`, Tachyon only: withdraw an invitation you sent.
-#[tauri::command]
-fn mp_party_cancel_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    party_action(
-        registry.inner(),
-        &server_key,
-        PartyAction::CancelInvite(username),
-    )
-}
-
-/// `mp_party_kick_member`, Tachyon only: put a member out of your party.
-#[tauri::command]
-fn mp_party_kick_member(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Kick(username))
-}
-
-/// `mp_party_accept_invite`, Tachyon only: take up an invitation. A party has no
-/// name, so it is named by the id the state carries.
-#[tauri::command]
-fn mp_party_accept_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    party_id: String,
-) -> CliResult {
-    party_action(registry.inner(), &server_key, PartyAction::Accept(party_id))
-}
-
-/// `mp_party_decline_invite`, Tachyon only: turn an invitation down.
-#[tauri::command]
-fn mp_party_decline_invite(
-    registry: State<'_, Registry>,
-    server_key: String,
-    party_id: String,
-) -> CliResult {
-    party_action(
-        registry.inner(),
-        &server_key,
-        PartyAction::Decline(party_id),
-    )
-}
-
-/// Queue one matchmaking action, refusing on a connection with no matchmaking.
-///
-/// The four commands differ only in the action they name, so the refusal and the
-/// Tachyon test are written once. TASServer has no matchmaking at all, which is
-/// why there is no line to fall back to.
-fn matchmaking_action(
-    registry: &Registry,
-    server_key: &str,
-    action: MatchmakingAction,
-) -> CliResult {
-    tachyon_action(registry, server_key, TachyonAction::Matchmaking(action))
-        .unwrap_or_else(|| CliResult::err("this server does not have matchmaking"))
-}
-
-/// `mp_matchmaking_list`, Tachyon only: fetch the queues on offer. The
-/// connection asks once as it comes up, so this is the screen asking again.
-#[tauri::command]
-fn mp_matchmaking_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::List)
-}
-
-/// `mp_matchmaking_queue`, Tachyon only: start searching in one queue. A party
-/// searches as one, so this puts every member of yours in it.
-#[tauri::command]
-fn mp_matchmaking_queue(
-    registry: State<'_, Registry>,
-    server_key: String,
-    queue_id: String,
-) -> CliResult {
-    matchmaking_action(
-        registry.inner(),
-        &server_key,
-        MatchmakingAction::Search(queue_id),
-    )
-}
-
-/// `mp_matchmaking_ready`, Tachyon only: accept the match the server has found.
-#[tauri::command]
-fn mp_matchmaking_ready(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::Accept)
-}
-
-/// `mp_matchmaking_cancel`, Tachyon only: stop searching, or turn down a match
-/// that has been found.
-#[tauri::command]
-fn mp_matchmaking_cancel(registry: State<'_, Registry>, server_key: String) -> CliResult {
-    matchmaking_action(registry.inner(), &server_key, MatchmakingAction::Cancel)
-}
-
 /// `mp_join_battle` — join an open battle (optional battle key and script password).
 #[tauri::command]
 fn mp_join_battle(
@@ -2454,36 +2322,6 @@ fn mp_zerok_open_battle(
     .unwrap_or_else(|| CliResult::err("this server does not open battles for its players"))
 }
 
-/// `mp_create_lobby`, Tachyon only: make a lobby of our own.
-///
-/// A lobby is not a battle this machine hosts. It is a room the server owns,
-/// which we are put in as its first player, and the match only gets a machine to
-/// run on when a member asks for it to start. So there is no port, no NAT mode
-/// and no content hash to send, and nothing here seats us as a host.
-#[tauri::command]
-fn mp_create_lobby(
-    registry: State<'_, Registry>,
-    server_key: String,
-    name: String,
-    map_name: String,
-    ally_teams: u8,
-    players_per_team: u8,
-    bosses_enabled: bool,
-) -> CliResult {
-    tachyon_action(
-        registry.inner(),
-        &server_key,
-        TachyonAction::CreateLobby(NewLobby {
-            name,
-            map_name,
-            ally_teams,
-            players_per_team,
-            bosses_enabled,
-        }),
-    )
-    .unwrap_or_else(|| CliResult::err("this server hosts battles rather than lobbies"))
-}
-
 /// `mp_start_battle`: ask for the match to begin.
 #[tauri::command]
 fn mp_start_battle(registry: State<'_, Registry>, server_key: String) -> CliResult {
@@ -2845,33 +2683,6 @@ fn mp_cast_vote(
         &server_key,
         command::say_battle(&format!("!vote {letter}")),
     )
-}
-
-/// `mp_appoint_boss`, Tachyon only: make a member a boss, so they may change the
-/// lobby. Tachyon has no founder, and a boss is the nearest thing it has.
-#[tauri::command]
-fn mp_appoint_boss(
-    registry: State<'_, Registry>,
-    server_key: String,
-    username: String,
-) -> CliResult {
-    tachyon_action(
-        registry.inner(),
-        &server_key,
-        TachyonAction::Room(RoomAction::AppointBoss { username }),
-    )
-    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
-}
-
-/// `mp_unboss`, Tachyon only: stand a boss down.
-#[tauri::command]
-fn mp_unboss(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
-    tachyon_action(
-        registry.inner(),
-        &server_key,
-        TachyonAction::Room(RoomAction::Unboss { username }),
-    )
-    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
 }
 
 /// `mp_set_start_rect` — host: set an ally team's start rectangle.
@@ -3455,158 +3266,6 @@ fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> 
     }
 }
 
-/// `mp_turn_credentials`: get a relay credential for this connection, asking the
-/// lobby for one if we do not already hold a live one.
-///
-/// The answer says whether there is a credential and when it runs out. The
-/// credential itself is not in it: the password is a secret and the relay agent
-/// is started from Rust, so nothing above this needs to see it. What starts a
-/// relayed battle calls [`turn::credentials`] directly (issue #2017).
-///
-/// A server that has not said it has a relay is not asked at all, so today it
-/// answers with the sentence [`turn::NoCredential::NoRelay`] carries, without a
-/// line going out.
-#[tauri::command]
-async fn mp_turn_credentials(
-    registry: State<'_, Registry>,
-    server_key: String,
-) -> Result<CliResult, ()> {
-    // The same budget the login handshake gets, because it is the same round
-    // trip to the same server.
-    let waited =
-        turn::credentials(registry.inner(), &server_key, conn::now_ms(), READY_TIMEOUT).await;
-    Ok(match waited {
-        Ok(_) => {
-            let expires_at = lock_or_recover(&registry)
-                .get(&server_key)
-                .and_then(|conn| {
-                    lock_or_recover(&conn.state)
-                        .turn_credentials
-                        .as_ref()
-                        .map(|c| c.expires_at)
-                });
-            CliResult::ok(json!({ "granted": true, "expiresAt": expires_at }))
-        }
-        Err(e) => CliResult::err(e.to_string()),
-    })
-}
-
-/// `mp_probe_host`: ask whether a battle host's game port refuses us outright.
-///
-/// Read the [`probe`] module docs before acting on the result. Only `refused`
-/// and `unresolved` mean anything. `silent` is the normal answer from a
-/// perfectly healthy host, so it must never be surfaced as a problem.
-#[tauri::command]
-async fn mp_probe_host(host: String, port: u16) -> CliResult {
-    let outcome = tauri::async_runtime::spawn_blocking(move || {
-        probe::probe(&host, port, probe::PROBE_TIMEOUT).as_str()
-    })
-    .await;
-    match outcome {
-        Ok(o) => CliResult::ok(json!({ "outcome": o })),
-        Err(e) => CliResult::err(format!("probe failed to run: {e}")),
-    }
-}
-
-/// `mp_chat_logs` — enumerate saved chat logs (DM + channel threads) across every
-/// account, for the log viewer. Reads the log dirs directly, so it works with no
-/// active connection. Each account's threads are newest-activity first.
-#[tauri::command]
-fn mp_chat_logs<R: Runtime>(app: tauri::AppHandle<R>) -> CliResult {
-    let (dm_dir, chan_dir) = match log_dirs(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    let mut accounts: BTreeMap<String, Vec<Value>> = BTreeMap::new();
-    for (dir, kind) in [(&dm_dir, "dm"), (&chan_dir, "channel")] {
-        for stem in dmlog::account_stems(dir) {
-            let log = dmlog::DmLog::new(dir, &stem);
-            for (name, count, last_at) in log.summaries() {
-                accounts.entry(stem.clone()).or_default().push(json!({
-                    "kind": kind,
-                    "name": name,
-                    "messageCount": count,
-                    "lastAt": last_at,
-                }));
-            }
-        }
-    }
-    let out: Vec<Value> = accounts
-        .into_iter()
-        .map(|(account, mut threads)| {
-            threads.sort_by(|a, b| b["lastAt"].as_u64().cmp(&a["lastAt"].as_u64()));
-            json!({ "account": account, "threads": threads })
-        })
-        .collect();
-    CliResult::ok(json!({ "accounts": out }))
-}
-
-/// `mp_chat_log_open` — load one saved thread's messages (a DM peer or a channel)
-/// for `account` (a log file stem from `mp_chat_logs`). `kind` selects the store.
-#[tauri::command]
-fn mp_chat_log_open<R: Runtime>(
-    app: tauri::AppHandle<R>,
-    account: String,
-    kind: String,
-    name: String,
-) -> CliResult {
-    let (dm_dir, chan_dir) = match log_dirs(&app) {
-        Ok(d) => d,
-        Err(e) => return CliResult::err(e),
-    };
-    let dir = if kind == "channel" { chan_dir } else { dm_dir };
-    let log = dmlog::DmLog::new(&dir, &account);
-    CliResult::ok(json!({ "messages": log.thread(&name) }))
-}
-
-/// `mp_tachyon_sign_in`: run the OAuth browser sign-in against a Tachyon server and
-/// keep the result.
-///
-/// `base_url` is the server's own origin, for example
-/// `https://server4.beyondallreason.info`. Nothing below it is hardcoded: the
-/// endpoints come from the server's discovery document.
-///
-/// This resolves only once the user has finished in the browser, which can take a
-/// minute, or fails if they never do. No token comes back over IPC. The refresh
-/// token goes to the OS keychain under `{serverId}:{username}` and the access token
-/// stays in memory on the Rust side.
-#[tauri::command]
-async fn mp_tachyon_sign_in(base_url: String, server_id: String, username: String) -> CliResult {
-    let open =
-        |url: &str| tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string());
-    match tachyon_auth::sign_in_and_store(&base_url, &server_id, &username, open).await {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e.to_string()),
-    }
-}
-
-/// `mp_tachyon_sign_out`: forget a Tachyon account on this machine, both the stored
-/// refresh token and any access token still in memory.
-///
-/// It cannot go further than this machine. Teiserver has no RFC 7009 revocation
-/// endpoint, so nothing can tell the server to throw its own copy away and the
-/// refresh token stays valid there. Say that rather than promise more.
-#[tauri::command]
-async fn mp_tachyon_sign_out(server_id: String, username: String) -> CliResult {
-    match tachyon_auth::sign_out(&server_id, &username).await {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e.to_string()),
-    }
-}
-
-/// `mp_tachyon_signed_in`: whether a connect for this account can get a token
-/// without opening a browser.
-///
-/// False once the server has refused the stored sign-in, which is what tells an
-/// auto-reconnect to stop rather than retry a refusal that will not change.
-#[tauri::command]
-async fn mp_tachyon_signed_in(server_id: String, username: String) -> CliResult {
-    match tachyon_auth::signed_in(&server_id, &username).await {
-        Ok(signed_in) => CliResult::ok(json!({ "signedIn": signed_in })),
-        Err(e) => CliResult::err(e.to_string()),
-    }
-}
-
 /// How long quitting waits for the lobby to mint one last relay credential.
 ///
 /// A budget for the quit rather than a deadline the lobby has to meet. Half a
@@ -3703,17 +3362,17 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_unfriend,
             mp_friend_list,
             mp_friend_request_list,
-            mp_party_create,
-            mp_party_leave,
-            mp_party_invite,
-            mp_party_cancel_invite,
-            mp_party_kick_member,
-            mp_party_accept_invite,
-            mp_party_decline_invite,
-            mp_matchmaking_list,
-            mp_matchmaking_queue,
-            mp_matchmaking_ready,
-            mp_matchmaking_cancel,
+            tachyon_parties::mp_party_create,
+            tachyon_parties::mp_party_leave,
+            tachyon_parties::mp_party_invite,
+            tachyon_parties::mp_party_cancel_invite,
+            tachyon_parties::mp_party_kick_member,
+            tachyon_parties::mp_party_accept_invite,
+            tachyon_parties::mp_party_decline_invite,
+            tachyon_matchmaking::mp_matchmaking_list,
+            tachyon_matchmaking::mp_matchmaking_queue,
+            tachyon_matchmaking::mp_matchmaking_ready,
+            tachyon_matchmaking::mp_matchmaking_cancel,
             mp_join_battle,
             mp_join_battle_deny,
             mp_leave_battle,
@@ -3721,7 +3380,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_set_battle_status,
             mp_open_battle,
             mp_zerok_open_battle,
-            mp_create_lobby,
+            tachyon_room::mp_create_lobby,
             mp_start_battle,
             mp_update_battle_info,
             mp_add_bot,
@@ -3733,26 +3392,26 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_force_spectator,
             mp_kick,
             mp_cast_vote,
-            mp_appoint_boss,
-            mp_unboss,
+            tachyon_room::mp_appoint_boss,
+            tachyon_room::mp_unboss,
             mp_set_start_rect,
             mp_remove_start_rect,
             mp_set_script_tags,
             mp_remove_script_tags,
             mp_build_battle_config,
             mp_build_host_config,
-            mp_probe_host,
-            mp_turn_credentials,
+            probe::mp_probe_host,
+            turn::mp_turn_credentials,
             mp_relay_traffic,
             mp_leftover_relay_agent,
             mp_relay_left_running,
             mp_ask_leftover_relay_to_stop,
             mp_watch_engine,
-            mp_chat_logs,
-            mp_chat_log_open,
-            mp_tachyon_sign_in,
-            mp_tachyon_sign_out,
-            mp_tachyon_signed_in,
+            dmlog::mp_chat_logs,
+            dmlog::mp_chat_log_open,
+            tachyon_auth::mp_tachyon_sign_in,
+            tachyon_auth::mp_tachyon_sign_out,
+            tachyon_auth::mp_tachyon_signed_in,
             tachyon_debug::mp_tachyon_request,
         ])
         .build()
