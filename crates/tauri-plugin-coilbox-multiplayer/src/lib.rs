@@ -3370,54 +3370,6 @@ fn mp_chat_log_open<R: Runtime>(
     CliResult::ok(json!({ "messages": log.thread(&name) }))
 }
 
-/// `mp_tachyon_sign_in`: run the OAuth browser sign-in against a Tachyon server and
-/// keep the result.
-///
-/// `base_url` is the server's own origin, for example
-/// `https://server4.beyondallreason.info`. Nothing below it is hardcoded: the
-/// endpoints come from the server's discovery document.
-///
-/// This resolves only once the user has finished in the browser, which can take a
-/// minute, or fails if they never do. No token comes back over IPC. The refresh
-/// token goes to the OS keychain under `{serverId}:{username}` and the access token
-/// stays in memory on the Rust side.
-#[tauri::command]
-async fn mp_tachyon_sign_in(base_url: String, server_id: String, username: String) -> CliResult {
-    let open =
-        |url: &str| tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string());
-    match tachyon_auth::sign_in_and_store(&base_url, &server_id, &username, open).await {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e.to_string()),
-    }
-}
-
-/// `mp_tachyon_sign_out`: forget a Tachyon account on this machine, both the stored
-/// refresh token and any access token still in memory.
-///
-/// It cannot go further than this machine. Teiserver has no RFC 7009 revocation
-/// endpoint, so nothing can tell the server to throw its own copy away and the
-/// refresh token stays valid there. Say that rather than promise more.
-#[tauri::command]
-async fn mp_tachyon_sign_out(server_id: String, username: String) -> CliResult {
-    match tachyon_auth::sign_out(&server_id, &username).await {
-        Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(e.to_string()),
-    }
-}
-
-/// `mp_tachyon_signed_in`: whether a connect for this account can get a token
-/// without opening a browser.
-///
-/// False once the server has refused the stored sign-in, which is what tells an
-/// auto-reconnect to stop rather than retry a refusal that will not change.
-#[tauri::command]
-async fn mp_tachyon_signed_in(server_id: String, username: String) -> CliResult {
-    match tachyon_auth::signed_in(&server_id, &username).await {
-        Ok(signed_in) => CliResult::ok(json!({ "signedIn": signed_in })),
-        Err(e) => CliResult::err(e.to_string()),
-    }
-}
-
 /// How long quitting waits for the lobby to mint one last relay credential.
 ///
 /// A budget for the quit rather than a deadline the lobby has to meet. Half a
@@ -3561,9 +3513,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_watch_engine,
             mp_chat_logs,
             mp_chat_log_open,
-            mp_tachyon_sign_in,
-            mp_tachyon_sign_out,
-            mp_tachyon_signed_in,
+            tachyon_auth::mp_tachyon_sign_in,
+            tachyon_auth::mp_tachyon_sign_out,
+            tachyon_auth::mp_tachyon_signed_in,
             tachyon_debug::mp_tachyon_request,
         ])
         .build()
