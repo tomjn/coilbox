@@ -82,7 +82,12 @@ export function useResolveContent(
   const contentTargets = useContentTargets();
   const writeRoot = useWriteRoot();
   const writePath = writeRoot.path;
-  const { enqueue, statusFor: queueStatusFor, items } = useDownloadQueue();
+  const {
+    enqueue,
+    statusFor: queueStatusFor,
+    items,
+    failureFor,
+  } = useDownloadQueue();
 
   const hasEngineReq = requirements.some((r) => r.kind === "engine");
   const [engineCatalog, setEngineCatalog] = useState<{
@@ -213,8 +218,15 @@ export function useResolveContent(
   );
 
   const errorFor = useCallback(
-    (req: ContentRequirement) => itemFor(req)?.error ?? null,
-    [itemFor],
+    (req: ContentRequirement) => {
+      // The row wins while it is still there, then the queue's longer-lived
+      // record of the failure takes over once it has been pruned (issue #2504).
+      const item = itemFor(req);
+      if (item?.error) return item.error;
+      const input = enqueueInputFor(req);
+      return input ? failureFor(identityOf(input)) : null;
+    },
+    [itemFor, enqueueInputFor, failureFor],
   );
   const canDownload = useCallback(
     (req: ContentRequirement) => enqueueInputFor(req) !== null,
