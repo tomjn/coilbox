@@ -26,13 +26,13 @@ import { unknownBuildings, unknownUnitsWarning } from "@/blueprint/units";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { InstalledGameInfo } from "@/container/gameIdentity";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import type { Scenario } from "../../model";
 import {
   type LayoutChoice,
   layoutChoiceKey,
   layoutOptions,
   parseLayoutChoice,
-} from "./layoutPlacing";
+} from "@/lib/scenarioEditing/layoutPlacing";
+import type { Scenario } from "../../model";
 import { TeamSelect } from "./TeamSelect";
 
 /** What one arriving layout is worth saying about, worst first, and what it

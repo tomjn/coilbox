@@ -53,6 +53,11 @@ import {
 import { addActor } from "@/lib/scenarioEditing/editing";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import {
+  type LayoutChoice,
+  layoutGhost,
+  layoutOrigin,
+} from "@/lib/scenarioEditing/layoutPlacing";
+import {
   type Placement,
   parsePlacementKey,
   placementKey,
@@ -75,7 +80,6 @@ import {
   MAX_GROUP_COUNT,
 } from "./groups";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
-import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
 import type { PathSource } from "./orderPaths";
 import { boxFromDrag, keysInBox } from "./selection";
 import { TeamSelect } from "./TeamSelect";

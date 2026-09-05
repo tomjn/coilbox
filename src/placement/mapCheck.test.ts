@@ -7,7 +7,7 @@ import {
   buildingFootprints,
 } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
-import { layoutOrigin } from "@/scenario/pages/components/layoutPlacing";
+import { layoutOrigin } from "@/lib/scenarioEditing/layoutPlacing";
 import {
   checkMapFor,
   checkSpot,

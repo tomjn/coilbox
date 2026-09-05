@@ -24,8 +24,8 @@ import type {
   Standing,
 } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
+import { layoutOrigin } from "@/lib/scenarioEditing/layoutPlacing";
 import type { Point } from "@/scenario/model";
-import { layoutOrigin } from "@/scenario/pages/components/layoutPlacing";
 import { clampToMap } from "./pointer";
 import {
   type NudgeOffer,
