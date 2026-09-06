@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
+import type { RunNodeType } from "@/runlite/model";
 import { useHeldUnitPictures } from "../../assets/useUnitPictures";
 import type {
   BlueprintShape,
   GalaxyShape,
   HubPreview,
   PreviewStat,
+  RunShape,
 } from "../../preview";
 import { SetupPackContents } from "./SetupPackContents";
 
@@ -17,10 +19,11 @@ import { SetupPackContents } from "./SetupPackContents";
  * here and nothing else.
  *
  * A preset is its composition, a pack is its contents, a conquest challenge is
- * its galaxy, and a scenario is how much there is of it. Nothing is fetched to
- * draw any of that and no picture is stored anywhere, with one exception: a pack
- * of maps is drawn as its maps, and a picture of a map has to be looked for. That
- * is `./SetupPackContents.tsx`, kept in its own file for the same reason.
+ * its galaxy, a warpath challenge is its run, and a scenario is how much there
+ * is of it. Nothing is fetched to draw any of that and no picture is stored
+ * anywhere, with one exception: a pack of maps is drawn as its maps, and a
+ * picture of a map has to be looked for. That is `./SetupPackContents.tsx`,
+ * kept in its own file for the same reason.
  */
 export function ItemPreview({ preview }: { preview: HubPreview }) {
   if (preview.kind === "preset") {
@@ -68,6 +71,7 @@ export function ItemPreview({ preview }: { preview: HubPreview }) {
     return (
       <div className="flex flex-col gap-3">
         {preview.galaxy && <Galaxy shape={preview.galaxy} />}
+        {preview.run && <RunMap shape={preview.run} />}
         <Stats stats={preview.stats} />
       </div>
     );
@@ -231,5 +235,127 @@ export function Galaxy({
         ))}
       </g>
     </svg>
+  );
+}
+
+/** What each kind of stop on a run is, in the order it reads on the map.
+ * Colours match the hub website's drawing of the same run
+ * (`lib/gallery/warpathRun.ts` in tomjn/coilbox-hub), so a challenge looks the
+ * same wherever it is opened. */
+const RUN_NODE_KINDS: { type: RunNodeType; label: string; color: string }[] = [
+  { type: "start", label: "Start", color: "#e5e5e5" },
+  { type: "battle", label: "Battle", color: "#2f7dff" },
+  { type: "elite", label: "Elite", color: "#ffb300" },
+  { type: "event", label: "Event", color: "#a855f7" },
+  { type: "reward", label: "Reward", color: "#00c853" },
+  { type: "shop", label: "Depot", color: "#14b8a6" },
+  { type: "boss", label: "Boss", color: "#ff3524" },
+];
+
+const RUN_COLORS = new Map(RUN_NODE_KINDS.map((k) => [k.type, k.color]));
+
+/** One run map is drawn per page, so a fixed filter id is safe. */
+const RUN_GLOW = "hub-preview-run-glow";
+
+/**
+ * A warpath run's route.
+ *
+ * Read left to right: the start is on the left, the boss is on the right and
+ * largest, and the columns of two to four nodes a run branches through sit
+ * between them, joined by forward routes. This is the same shape the hub
+ * website draws for the same challenge (`lib/gallery/warpathRun.ts` in
+ * tomjn/coilbox-hub) - a run's character is how many fights it makes you take
+ * against how many chances to recover, which colour by node type is what
+ * shows.
+ *
+ * Wide rather than square: a run is up to thirteen columns of at most four
+ * nodes, and a square box would leave the route a thin line down the middle
+ * of it.
+ *
+ * The legend costs seven lines of text, which reads fine once at item-page
+ * size and would be smaller than anyone could read under a card-sized drawing,
+ * so `legend` defaults to shown and `BrowseCardArt.tsx` turns it off.
+ *
+ * Exported so `BrowseCardArt.tsx` can draw the same run at card size.
+ */
+export function RunMap({
+  shape,
+  className = "mx-auto w-full max-w-md",
+  legend = true,
+}: {
+  shape: RunShape;
+  className?: string;
+  legend?: boolean;
+}) {
+  const inset = 4;
+  const atX = (v: number) => inset + v * (100 - inset * 2);
+  const atY = (v: number) => inset + v * (40 - inset * 2);
+  const kinds = RUN_NODE_KINDS.filter((k) =>
+    shape.steps.some((s) => s.type === k.type),
+  );
+  const fights = shape.steps.filter(
+    (s) => s.type === "battle" || s.type === "elite" || s.type === "boss",
+  ).length;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <svg
+        viewBox="0 0 100 40"
+        className={className}
+        role="img"
+        aria-label={`${shape.columns} stops from the start to the boss, ${shape.steps.length} nodes in all, ${fights} of them fights`}
+      >
+        <defs>
+          <filter id={RUN_GLOW} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation={1.1} result="halo" />
+            <feMerge>
+              <feMergeNode in="halo" />
+              <feMergeNode in="halo" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        {shape.routes.map(([a, b]) => (
+          <line
+            key={`${a}-${b}`}
+            x1={atX(shape.steps[a].x)}
+            y1={atY(shape.steps[a].y)}
+            x2={atX(shape.steps[b].x)}
+            y2={atY(shape.steps[b].y)}
+            stroke="currentColor"
+            strokeWidth={0.3}
+            className="text-border"
+          />
+        ))}
+        <g filter={`url(#${RUN_GLOW})`}>
+          {shape.steps.map((step) => (
+            <circle
+              key={step.id}
+              cx={atX(step.x)}
+              cy={atY(step.y)}
+              r={step.type === "boss" ? 1.8 : 1.1}
+              fill={RUN_COLORS.get(step.type) ?? UNCLAIMED}
+            />
+          ))}
+        </g>
+      </svg>
+      {legend && (
+        <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+          {kinds.map((kind) => (
+            <li
+              key={kind.type}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-full"
+                style={{ background: kind.color }}
+              />
+              {kind.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

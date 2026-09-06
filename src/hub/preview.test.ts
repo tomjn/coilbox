@@ -31,6 +31,17 @@ const CONQUEST = {
   layout: "spiral",
 };
 
+/** Settings a real warpath challenge carries, which is the least the
+ * generator will accept. */
+const WARPATH = {
+  seed: 7,
+  length: "long",
+  difficulty: 3,
+  ascension: 2,
+  game: { shortname: "sf" },
+  factionId: "arm",
+};
+
 describe("readPreview", () => {
   it("groups a preset's participants into ally teams", () => {
     const preview = readPreview(
@@ -253,21 +264,11 @@ describe("readPreview", () => {
     expect(preview).toBeNull();
   });
 
-  it("shows a warpath challenge's numbers and no galaxy", () => {
+  it("rebuilds a warpath challenge's run from its seed", () => {
     const preview = readPreview(
-      container("challenge", {
-        mode: "warpath",
-        settings: {
-          seed: 7,
-          length: "long",
-          difficulty: 3,
-          ascension: 2,
-          game: { shortname: "sf" },
-          factionId: "arm",
-        },
-      }),
+      container("challenge", { mode: "warpath", settings: WARPATH }),
     );
-    expect(preview).toEqual({
+    expect(preview).toMatchObject({
       kind: "challenge",
       galaxy: null,
       stats: [
@@ -276,16 +277,47 @@ describe("readPreview", () => {
         { label: "Ascension", value: "2" },
       ],
     });
+    if (preview?.kind !== "challenge" || !preview.run) {
+      throw new Error("expected a run");
+    }
+    const { steps, routes, columns } = preview.run;
+    // "long" is 13 columns in the generator.
+    expect(columns).toBe(13);
+    expect(steps.length).toBeGreaterThan(0);
+    expect(routes.length).toBeGreaterThan(0);
+    expect(steps[0].type).toBe("start");
+    expect(steps.at(-1)?.type).toBe("boss");
+    for (const step of steps) {
+      expect(step.x).toBeGreaterThanOrEqual(0);
+      expect(step.x).toBeLessThanOrEqual(1);
+      expect(step.y).toBeGreaterThanOrEqual(0);
+      expect(step.y).toBeLessThanOrEqual(1);
+    }
   });
 
-  it("leaves ascension off a run that has none", () => {
+  it("draws the same run every time, because the seed decides it", () => {
+    const once = readPreview(
+      container("challenge", { mode: "warpath", settings: WARPATH }),
+    );
+    const again = readPreview(
+      container("challenge", { mode: "warpath", settings: WARPATH }),
+    );
+    expect(once).toEqual(again);
+  });
+
+  it("leaves ascension off a run that has none, and has no run to draw either", () => {
     const preview = readPreview(
       container("challenge", {
         mode: "warpath",
         settings: { length: "short", difficulty: 1, ascension: 0 },
       }),
     );
-    expect(preview).toMatchObject({
+    // No game or factionId, so the settings will not parse into a run - the
+    // same reason a conquest challenge without them has no galaxy.
+    expect(preview).toEqual({
+      kind: "challenge",
+      galaxy: null,
+      run: null,
       stats: [
         { label: "Length", value: "short" },
         { label: "Difficulty", value: "1" },
