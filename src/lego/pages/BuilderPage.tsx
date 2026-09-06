@@ -960,10 +960,13 @@ function Builder({ id }: { id: string | undefined }) {
                       ),
                     })),
                 }}
-                // The same reasoning, for the marker the aim point panel is
-                // about: opening the panel draws the point it is describing.
-                showAimPoint={asideOpen && aside === "aim"}
-                onAimChange={setAimPoint}
+                aimPoint={{
+                  // The same reasoning, for the marker the aim point panel
+                  // is about: opening the panel draws the point it is
+                  // describing.
+                  showAimPoint: asideOpen && aside === "aim",
+                  onAimChange: setAimPoint,
+                }}
               />
             </div>
 

@@ -407,17 +407,20 @@ interface Props {
       volume: LegoCollisionVolume,
     ) => void;
   };
-  /** Draws the aim point whether or not its own toggle is on, so the panel
-   *  that sets it has the point it is about on screen. */
-  showAimPoint?: boolean;
-  /**
-   * Where a dragged aim point goes, which also puts the move handles on it.
-   * Committed on release like everything else here.
-   *
-   * A point has no size and no rotation, so this is the move gizmo only: there
-   * are no faces to grab the way a volume has.
-   */
-  onAimChange?: (mid: [number, number, number]) => void;
+  /** The aim point, while its panel has the gizmo on it. */
+  aimPoint: {
+    /** Draws the aim point whether or not its own toggle is on, so the panel
+     *  that sets it has the point it is about on screen. */
+    showAimPoint?: boolean;
+    /**
+     * Where a dragged aim point goes, which also puts the move handles on
+     * it. Committed on release like everything else here.
+     *
+     * A point has no size and no rotation, so this is the move gizmo only:
+     * there are no faces to grab the way a volume has.
+     */
+    onAimChange?: (mid: [number, number, number]) => void;
+  };
 }
 
 export function ModelViewport({
@@ -431,8 +434,7 @@ export function ModelViewport({
   symmetry,
   anchorPlacement,
   collisionEditing,
-  showAimPoint = false,
-  onAimChange,
+  aimPoint,
 }: Props) {
   const { pack, raw, project } = document;
   const {
@@ -471,6 +473,7 @@ export function ModelViewport({
     editPieceCollisionId = null,
     onPieceCollisionVolumeChange,
   } = collisionEditing;
+  const { showAimPoint = false, onAimChange } = aimPoint;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
