@@ -1417,6 +1417,164 @@ const uberstressHistory: Drawing = {
  * doorway does not claim anyone is online. And the people who turn advanced mode
  * on look at the same grid as everyone else.
  */
+/**
+ * Colour chips set around a ring, with one lifted out and enlarged.
+ *
+ * Appearance is the one settings page whose subject is colour itself, so the
+ * picture is the choice rather than the control that makes it. Laid out as a row
+ * the chips read as a legend to something, which is what a card has no room to
+ * explain. On a ring they read as a palette to pick from, and the lifted one
+ * says a pick has been made.
+ */
+const appearanceSettings: Drawing = {
+  pools: [
+    [138, 78, 126, 0.18],
+    [258, 132, 84, 0.09],
+  ],
+  paint: (p) => {
+    const cx = 138;
+    const cy = 84;
+    const chips = [
+      [138, 38],
+      [171, 51],
+      [184, 84],
+      [171, 117],
+      [138, 130],
+      [105, 117],
+      [92, 84],
+      [105, 51],
+    ]
+      .map(
+        ([x, y], i) =>
+          `<circle cx="${x}" cy="${y}" r="7.5" fill="${p.line}" fill-opacity="${round(0.22 + (i % 4) * 0.11)}"/>`,
+      )
+      .join("");
+    return (
+      `<circle cx="${cx}" cy="${cy}" r="46" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.3"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="30" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.16"/>` +
+      chips +
+      `<path d="M196 80 L232 72" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.34" stroke-linecap="round"/>` +
+      `<circle cx="254" cy="70" r="17" fill="${p.spark}" fill-opacity="0.5"/>` +
+      `<circle cx="254" cy="70" r="17" fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.75"/>`
+    );
+  },
+};
+
+/**
+ * A bank of faders at different settings.
+ *
+ * Engine settings is a long list of values you nudge, and the fader is the one
+ * control that shows a value and its range at once. Uneven positions, because a
+ * bank all set to the same place reads as a graphic rather than as something
+ * somebody has been adjusting.
+ */
+const engineSettings: Drawing = {
+  paint: (p) => {
+    const rows = [
+      [44, 118],
+      [70, 208],
+      [96, 152],
+      [122, 246],
+    ];
+    const tracks = rows
+      .map(
+        ([y]) =>
+          `<rect x="52" y="${y - 2}" width="216" height="4" rx="2" fill="${p.faint}" fill-opacity="0.26"/>`,
+      )
+      .join("");
+    const filled = rows
+      .map(
+        ([y, x]) =>
+          `<rect x="52" y="${y - 2}" width="${x - 52}" height="4" rx="2" fill="${p.line}" fill-opacity="0.44"/>`,
+      )
+      .join("");
+    const knobs = rows
+      .map(
+        ([y, x], i) =>
+          `<circle cx="${x}" cy="${y}" r="${i === 1 ? 8 : 6.5}" fill="${i === 1 ? p.spark : p.line}" fill-opacity="${i === 1 ? 0.85 : 0.5}"/>`,
+      )
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.12">` +
+      [80, 132, 184, 236]
+        .map((x) => `<path d="M${x} 30 L${x} 138"/>`)
+        .join("") +
+      "</g>" +
+      tracks +
+      filled +
+      knobs
+    );
+  },
+  pools: [
+    [160, 76, 130, 0.17],
+    [48, 140, 82, 0.09],
+  ],
+};
+
+/**
+ * A stack of account cards, the front one signed in.
+ *
+ * These are the lobby server logins, and a player who opens this page usually
+ * has more than one: a main, a smurf, a second server. A stack says "several of
+ * these" where a single card would have said "your account".
+ */
+const accountSettings: Drawing = {
+  pools: [
+    [158, 72, 128, 0.17],
+    [56, 142, 82, 0.09],
+  ],
+  paint: (p) => {
+    const card = (x: number, y: number, opacity: number) =>
+      `<rect x="${x}" y="${y}" width="150" height="40" rx="6" fill="${p.line}" fill-opacity="${opacity}"/>` +
+      `<rect x="${x}" y="${y}" width="150" height="40" rx="6" fill="none" stroke="${p.faint}" stroke-width="1.1" stroke-opacity="0.3"/>`;
+    return (
+      card(102, 34, 0.08) +
+      card(90, 56, 0.12) +
+      card(78, 78, 0.18) +
+      `<rect x="78" y="78" width="150" height="40" rx="6" fill="none" stroke="${p.spark}" stroke-width="1.6" stroke-opacity="0.6"/>` +
+      `<circle cx="100" cy="98" r="11" fill="${p.spark}" fill-opacity="0.55"/>` +
+      `<rect x="120" y="90" width="62" height="4" rx="2" fill="${p.spark}" fill-opacity="0.5"/>` +
+      `<rect x="120" y="101" width="40" height="4" rx="2" fill="${p.faint}" fill-opacity="0.42"/>` +
+      `<circle cx="214" cy="98" r="4" fill="${p.spark}" fill-opacity="0.9"/>`
+    );
+  },
+};
+
+/**
+ * One dial, turned, with its scale around it.
+ *
+ * The index page over every section, so the picture is the act of adjusting
+ * rather than any one thing adjusted. Deliberately a single object with a
+ * pointer: the Appearance card is also round, and eight chips scattered on a
+ * ring against one dial with a needle do not read as the same picture.
+ */
+const allSettings: Drawing = {
+  pools: [
+    [160, 80, 132, 0.18],
+    [62, 140, 80, 0.09],
+  ],
+  paint: (p) => {
+    const cx = 160;
+    const cy = 84;
+    const ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      .map((i) => {
+        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const inner = 52;
+        const outer = i % 3 === 0 ? 64 : 59;
+        return `<path d="M${round(cx + Math.cos(a) * inner)} ${round(cy + Math.sin(a) * inner)} L${round(cx + Math.cos(a) * outer)} ${round(cy + Math.sin(a) * outer)}"/>`;
+      })
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.4" stroke-opacity="0.34" stroke-linecap="round">${ticks}</g>` +
+      `<circle cx="${cx}" cy="${cy}" r="44" fill="${p.line}" fill-opacity="0.12"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="44" fill="none" stroke="${p.line}" stroke-width="1.6" stroke-opacity="0.5"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="26" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.2"/>` +
+      `<path d="M${cx} ${cy} L191 60" fill="none" stroke="${p.spark}" stroke-width="2.6" stroke-opacity="0.8" stroke-linecap="round"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="5" fill="${p.spark}" fill-opacity="0.9"/>`
+    );
+  },
+};
+
 const DRAWINGS: Record<string, Drawing> = {
   "play.skirmish": skirmish,
   "play.replays": replays,
@@ -1452,6 +1610,14 @@ const DRAWINGS: Record<string, Drawing> = {
   "animation.cob": cobTools,
   "uberstress.run": uberstressRun,
   "uberstress.history": uberstressHistory,
+  // The Settings group's cards. They sit on the welcome page only, not in the
+  // sidebar, but the grid draws them exactly as it draws every other tool, so
+  // without these four they were the one group on the page still showing the
+  // procedural field.
+  "settings.appearance": appearanceSettings,
+  "settings.engine": engineSettings,
+  "settings.accounts": accountSettings,
+  "settings.all": allSettings,
 };
 
 /** Tool ids with a bundled illustration, for tests and for the preview page. */

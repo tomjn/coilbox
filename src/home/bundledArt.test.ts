@@ -203,6 +203,10 @@ describe("the chain with bundled art registered", () => {
       "animation.cob",
       "uberstress.run",
       "uberstress.history",
+      "settings.appearance",
+      "settings.engine",
+      "settings.accounts",
+      "settings.all",
     ]) {
       expect(covered, toolId).toContain(toolId);
     }
