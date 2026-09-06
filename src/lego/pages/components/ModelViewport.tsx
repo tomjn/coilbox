@@ -366,16 +366,20 @@ interface Props {
     on: boolean;
     onChange: (on: boolean) => void;
   };
-  /**
-   * Arms the next click on the model to drop a snap anchor where it lands,
-   * rather than selecting. The gizmo comes off while it is armed, since its
-   * handles sit over the middle of the very piece being clicked.
-   */
-  placingAnchor?: boolean;
-  /** Where the click landed, in the clicked piece's part space. */
-  onPlaceAnchor?: (pieceId: string, position: Vec3) => void;
-  /** A click that missed the model, which is how you change your mind. */
-  onCancelAnchor?: () => void;
+  /** Arming the next click to drop a snap anchor instead of selecting, and
+   *  what to do with the click that follows. */
+  anchorPlacement: {
+    /**
+     * Arms the next click on the model to drop a snap anchor where it lands,
+     * rather than selecting. The gizmo comes off while it is armed, since its
+     * handles sit over the middle of the very piece being clicked.
+     */
+    placingAnchor?: boolean;
+    /** Where the click landed, in the clicked piece's part space. */
+    onPlaceAnchor?: (pieceId: string, position: Vec3) => void;
+    /** A click that missed the model, which is how you change your mind. */
+    onCancelAnchor?: () => void;
+  };
   /**
    * Puts the gizmo on the collision volume rather than on the selected piece,
    * so its size and where it sits are dragged rather than typed. The volume is
@@ -421,9 +425,7 @@ export function ModelViewport({
   onGround,
   pieceActions,
   symmetry,
-  placingAnchor = false,
-  onPlaceAnchor,
-  onCancelAnchor,
+  anchorPlacement,
   editCollision = false,
   onCollisionChange,
   editPieceCollisionId = null,
@@ -457,6 +459,11 @@ export function ModelViewport({
     canDelete,
   } = pieceActions;
   const { on: symmetryOn, onChange: onSymmetryChange } = symmetry;
+  const {
+    placingAnchor = false,
+    onPlaceAnchor,
+    onCancelAnchor,
+  } = anchorPlacement;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.

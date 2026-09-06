@@ -921,9 +921,11 @@ function Builder({ id }: { id: string | undefined }) {
                   canDelete: transformRoots(draft, selectedIds).length > 0,
                 }}
                 symmetry={{ on: symmetry.on, onChange: symmetry.setOn }}
-                placingAnchor={placingAnchor}
-                onPlaceAnchor={placeAnchor}
-                onCancelAnchor={() => setPlacingAnchor(false)}
+                anchorPlacement={{
+                  placingAnchor,
+                  onPlaceAnchor: placeAnchor,
+                  onCancelAnchor: () => setPlacingAnchor(false),
+                }}
                 // The panel is where a volume is read and changed, so opening it
                 // is what puts the handles on the volume. Nothing else has to be
                 // switched on, and closing it gives them back to the pieces.
