@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { CoilboxGlyph } from "@/components/CoilboxGlyph";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -50,11 +50,10 @@ import { HeaderAccount } from "./components/HeaderAccount";
  * gallery only worked if you already knew what was on it. This is the same
  * gallery the website serves, over the same filters, so a player can go looking.
  *
- * This screen never imports anything itself. Every way into a card - its
- * title, and the View button beside it - opens the item's own page
- * (`./ItemPage.tsx`, issue #1366), which has room for the whole description,
- * shows what the container actually holds, and is where Import lives. A card
- * is a summary, not a decision.
+ * This screen never imports anything itself. A card is the link to the item's
+ * own page (`./ItemPage.tsx`, issue #1366, whole-card treatment issue #2561),
+ * which has room for the whole description, shows what the container actually
+ * holds, and is where Import lives. A card is a summary, not a decision.
  *
  * Filtering follows the website's shape rather than growing a row of boxes. Kind
  * is a set of chips, the search box is the API's `q`, and author and tag are set
@@ -392,16 +391,21 @@ export default function BrowsePage() {
                     // Three groups with room between them - what it is, what it is
                     // for, what to do about it - rather than five evenly spaced
                     // lines, which read as one undifferentiated block.
-                    className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
+                    //
+                    // `relative` is what the title link's `after:inset-0` covers:
+                    // it stretches to the nearest positioned ancestor, which is
+                    // this element, so the whole card is the hit area (issue
+                    // #2561) while the chips and action button stay reachable by
+                    // sitting above it in stacking order (`relative z-10` below).
+                    className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
                   >
-                    <button
-                      type="button"
-                      className="group flex w-full flex-col gap-1.5 text-left"
-                      onClick={() => navigate(hubItemRoute(item.id))}
-                    >
-                      <span className="text-sm font-medium group-hover:underline">
+                    <div className="flex w-full flex-col gap-1.5 text-left">
+                      <Link
+                        to={hubItemRoute(item.id)}
+                        className="text-sm font-medium after:absolute after:inset-0 hover:underline"
+                      >
                         {item.title}
-                      </span>
+                      </Link>
                       {/* Under the title, and free to wrap. Beside each other on
                           one line, a narrow card squeezed the date until it broke
                           across three lines and set the row's height. */}
@@ -419,8 +423,8 @@ export default function BrowsePage() {
                           {item.description}
                         </span>
                       )}
-                    </button>
-                    <div className="flex flex-wrap gap-1.5 text-xs">
+                    </div>
+                    <div className="relative z-10 flex flex-wrap gap-1.5 text-xs">
                       {item.game_name &&
                         (pinnedMatcher ? (
                           <span className={CHIP_CLASS}>{item.game_name}</span>
@@ -499,25 +503,25 @@ export default function BrowsePage() {
 }
 
 /**
- * What a card offers, which depends on whether you already have the item
- * (issue #1368). Something already imported offers only Open, straight to the
- * local copy.
+ * What a card offers on top of the title link, which depends on whether you
+ * already have the item (issue #1368). Something already imported offers
+ * Open, straight to the local copy, sitting above the card's own link in
+ * stacking order so it still takes its own click (issue #2561).
  *
- * Something not yet imported offers View, the same destination its title
- * already opens: the item's own page (`./ItemPage.tsx`), where the description
- * is in full, the container is fetched and checked, and Import actually runs
- * (issue #1397). This button used to say Import and only navigate, which read
- * as importing when it never did.
+ * Something not yet imported offers nothing here: the card itself is now the
+ * way to its own page (`./ItemPage.tsx`), where the description is in full,
+ * the container is fetched and checked, and Import actually runs (issue
+ * #1397). A separate View button used to repeat that same destination.
  *
  * A second copy is not a thing anybody asked for: an imported preset that has
  * since been edited is a new preset with no tie back to the hub item, so
  * "import again" answered a question nobody had. Somebody who does want a
  * fresh copy can remove theirs from the item's own page and import it.
  *
- * An item imported before and since deleted offers View again, and the card
- * says nothing about the history. It read as a third paragraph on a card that
- * already had a description, and a card is a summary. The item's own page has
- * room to say it, and does.
+ * An item imported before and since deleted goes back to offering nothing
+ * here, and the card says nothing about the history. It read as a third
+ * paragraph on a card that already had a description, and a card is a
+ * summary. The item's own page has room to say it, and does.
  */
 function ItemActions({
   item,
@@ -528,36 +532,25 @@ function ItemActions({
   presence: HubItemPresence;
   onOpen: (route: string) => void;
 }) {
-  if (presence.state === "here") {
-    return (
-      // "Imported" sits with the button rather than up in the header, because
-      // it is about what pressing it does, not about what the item is.
-      <div className="mt-auto flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onOpen(presence.route)}
-          aria-label={`Open ${item.title}`}
-        >
-          <ArrowRight /> Open
-        </Button>
-        <Badge variant="outline" className="gap-1">
-          <Check className="size-3" aria-hidden /> Imported
-        </Badge>
-      </div>
-    );
-  }
+  if (presence.state !== "here") return null;
 
   return (
-    <div className="mt-auto flex flex-wrap items-center gap-2">
+    // "Imported" sits with the button rather than up in the header, because
+    // it is about what pressing it does, not about what the item is.
+    // `relative z-10` is what keeps this reachable above the card's own link
+    // (issue #2561).
+    <div className="relative z-10 mt-auto flex flex-wrap items-center gap-2">
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onOpen(hubItemRoute(item.id))}
-        aria-label={`View ${item.title}`}
+        onClick={() => onOpen(presence.route)}
+        aria-label={`Open ${item.title}`}
       >
-        <ArrowRight /> View
+        <ArrowRight /> Open
       </Button>
+      <Badge variant="outline" className="gap-1">
+        <Check className="size-3" aria-hidden /> Imported
+      </Badge>
     </div>
   );
 }
