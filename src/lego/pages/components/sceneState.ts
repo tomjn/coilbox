@@ -188,6 +188,17 @@ export interface SceneState {
    *  selected without waiting for a render to see the new prop. */
   selectedIdsRef: { current: string[] };
   onHoverRef: { current: ((pieceId: string | null) => void) | undefined };
+  /** Told which piece a click landed on, or `null` for a click that missed. */
+  onSelectRef: {
+    current: (pieceId: string | null, additive: boolean) => void;
+  };
+  /**
+   * Whether a drag is in progress right now: the gizmo's own drag, or a
+   * collision face being sized. Read by the hover handlers, so a drag pins
+   * the hover highlight rather than having it flicker onto whatever the
+   * gizmo drags the cursor over.
+   */
+  dragging: boolean;
 }
 
 /**
