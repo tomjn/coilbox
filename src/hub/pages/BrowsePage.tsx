@@ -1,4 +1,4 @@
-import { Button, Input, useDrawer } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   AlertCircle,
@@ -6,7 +6,6 @@ import {
   Check,
   Globe,
   Loader2,
-  Package2,
   RotateCw,
   Search,
   X,
@@ -23,7 +22,6 @@ import { EmptyState } from "@/downloads/pages/components/states";
 import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
 import { getGameMatcher, getProfile } from "@/profile/profile";
-import { isProfileHidden } from "../../profile/hidden";
 import {
   describeItem,
   HUB_KINDS,
@@ -44,6 +42,7 @@ import type { HubItemPresence } from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { FilterCombobox } from "./components/FilterCombobox";
 import { HeaderAccount } from "./components/HeaderAccount";
+import { ShareMenu } from "./components/ShareMenu";
 
 /**
  * Browse what other players have shared on Coilbox Hub (issue #1347), without
@@ -233,18 +232,6 @@ export default function BrowsePage() {
     );
   }, [filters.game, installedGameLabel, page]);
 
-  const drawer = useDrawer();
-  const openExport = async () => {
-    const { ExportPackForm } = await import(
-      "../../packs/pages/components/ExportPackForm"
-    );
-    drawer.open({
-      title: "Share a setup pack",
-      width: "26rem",
-      content: <ExportPackForm />,
-    });
-  };
-
   const active = useMemo(
     () => CLICKABLE.filter((f) => filters[f.key]?.trim()),
     [filters],
@@ -298,12 +285,8 @@ export default function BrowsePage() {
         descriptionClassName="max-w-none"
         actions={
           <>
+            <ShareMenu hubUrl={hubUrl} />
             <HeaderAccount hubUrl={hubUrl} />
-            {!isProfileHidden("content.setupPacks") && (
-              <Button variant="outline" size="sm" onClick={openExport}>
-                <Package2 size={16} /> Share a pack
-              </Button>
-            )}
             <Button
               variant="outline"
               size="sm"

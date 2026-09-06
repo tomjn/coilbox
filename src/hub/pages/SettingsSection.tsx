@@ -1,20 +1,14 @@
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
 import { Field } from "@/components/Field";
-import { getProfile, isHubAssetUploadOffered } from "../../profile/profile";
-import { useAssetUploadConsent } from "../assetUploads";
+import { getProfile } from "../../profile/profile";
 import {
   DEFAULT_HUB_URL,
   isValidHubUrl,
   resolveHubUrl,
   useHubUrlSetting,
 } from "../config";
-import { AccountControl } from "./components/AccountControl";
-import { AssetUploadControl } from "./components/AssetUploadControl";
-import { GameFactsControl } from "./components/GameFactsControl";
-import { GamePicturesControl } from "./components/GamePicturesControl";
-import { MapCatalogControl } from "./components/MapCatalogControl";
-import { MapPicturesControl } from "./components/MapPicturesControl";
+import { ShareAssetsPanel } from "./components/ShareAssetsPanel";
 
 /**
  * The hub plugin's settings section (`/settings/hub`, issue #1353): lets a player
@@ -42,28 +36,12 @@ import { MapPicturesControl } from "./components/MapPicturesControl";
  * that points at the reader. See `../importCount.ts`. A distribution can still
  * switch the whole thing off with `hubImportCounts`.
  *
- * Sending pictures made from local game files (issue #1635) does have a switch,
- * last, because it is the one thing here that takes something off this machine
- * and publishes it. It sits under the account control on purpose: it is only
- * meaningful once you know whose name the uploads would carry.
- *
- * Sending what the maps say (issue #1737) and what the games say (issue #1875)
- * ride the same agreement rather than a second switch, and appear only once it
- * has been given. Both are buttons rather than something that happens on its
- * own, because either sweep reads every archive of its kind on the machine and
- * nothing about opening this page says that is wanted now.
- *
- * Four sections and not three, because a map and a game each have two halves to
- * contribute: what it says, and what it looks like. The maps half of the
- * pictures pair arrived last (issue #2379), and until it did the switch above
- * promised pictures of maps that nothing in coilbox could send. Its own button
- * rather than folded into the map catalog sweep: the measurements finish in one
- * press and the pictures are rationed by the hour, so one button would hold the
- * cheap half hostage to the slow one.
+ * Signing in and the four sharing controls themselves are `ShareAssetsPanel`
+ * (`./components/ShareAssetsPanel.tsx`), shared with the hub page's Share menu
+ * (issue #2562) so the same panel does the work wherever it is opened from.
  */
 export default function HubSettings() {
   const [userUrl, setUserUrl] = useHubUrlSetting();
-  const [uploadsAgreed, setUploadsAgreed] = useAssetUploadConsent();
   const [draft, setDraft] = useState(userUrl);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,20 +98,7 @@ export default function HubSettings() {
         </div>
       </Field>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <AccountControl hubUrl={effective} />
-      <AssetUploadControl
-        agreed={uploadsAgreed}
-        onChange={setUploadsAgreed}
-        offered={isHubAssetUploadOffered()}
-      />
-      {isHubAssetUploadOffered() && (
-        <>
-          <MapCatalogControl hubUrl={effective} agreed={uploadsAgreed} />
-          <MapPicturesControl hubUrl={effective} agreed={uploadsAgreed} />
-          <GameFactsControl hubUrl={effective} agreed={uploadsAgreed} />
-          <GamePicturesControl hubUrl={effective} agreed={uploadsAgreed} />
-        </>
-      )}
+      <ShareAssetsPanel hubUrl={effective} />
     </div>
   );
 }
