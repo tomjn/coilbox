@@ -1,5 +1,12 @@
 import type { LucideIcon } from "lucide-react";
-import { Gamepad2, Milestone, Orbit, Rocket, Swords } from "lucide-react";
+import {
+  CircleArrowUp,
+  Gamepad2,
+  Milestone,
+  Orbit,
+  Rocket,
+  Swords,
+} from "lucide-react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
 import type { Campaign, ProgressFile } from "../campaign/model";
 import { resumeMissionId } from "../campaign/progress";
@@ -14,6 +21,7 @@ import type { SkirmishPreset } from "../play/presets";
 import { useSkirmishPresets } from "../play/presets";
 import type { RunStatus } from "../runlite/model";
 import { useRuns } from "../runlite/runs";
+import { useAvailableUpdate } from "../updater/UpdaterProvider";
 
 /** Which part of Coilbox a resume candidate came from. */
 export type ResumeKind =
@@ -21,7 +29,8 @@ export type ResumeKind =
   | "warpath"
   | "conquest"
   | "campaign"
-  | "skirmish";
+  | "skirmish"
+  | "update";
 
 /**
  * One thing the player could pick up again.
@@ -81,6 +90,11 @@ export const RESUME_KIND_COPY: Record<ResumeKind, ResumeKindCopy> = {
   conquest: { label: "Conquest", action: "Resume conquest" },
   campaign: { label: "Campaign", action: "Resume mission" },
   skirmish: { label: "Skirmish setup", action: "Open setup" },
+  // Not a thing you left, unlike everything above it, but it competes for the
+  // same slots on the same rule. The action goes to the updates page rather
+  // than installing from the card: an update is a restart, so it is not
+  // something to set off with one click from the welcome screen.
+  update: { label: "Coilbox update", action: "Update Coilbox" },
 };
 
 /**
@@ -98,6 +112,7 @@ export const RESUME_KIND_ICON: Record<ResumeKind, LucideIcon> = {
   conquest: Orbit,
   campaign: Milestone,
   skirmish: Swords,
+  update: CircleArrowUp,
 };
 
 /** Whether the window is still open at `now`. `"soon"` has not closed yet. */
@@ -352,6 +367,52 @@ export function skirmishCandidate(
 }
 
 /** Everything {@link collectCandidates} reads, gathered by {@link useResume}. */
+/**
+ * The fields of an available update {@link updateCandidate} reads. Tauri's
+ * `Update` satisfies it, and a test writes two strings rather than a resource
+ * handle.
+ */
+export type UpdateSummary = {
+  version: string;
+  /** RFC 3339, as `tauri-plugin-updater` reformats the manifest's `pub_date`. */
+  date?: string;
+};
+
+/**
+ * The available update, as a card that competes with the rest.
+ *
+ * It ranks on the release date, not on when the check found it. Detection time
+ * is always this session, which would put the update top of the page every
+ * launch until it was installed. The release date makes it what it actually is:
+ * something that happened on a day, which a run you played yesterday can
+ * outrank and a run you last touched in March cannot.
+ *
+ * No `expiresAt`. An update waits indefinitely, so it never pre-empts a battle
+ * you can still rejoin.
+ *
+ * A manifest with no `pub_date` gives nothing to rank on, so there is no card.
+ * The topbar badge is the surface that always shows an update, and the one this
+ * is deliberately not a replacement for.
+ */
+export function updateCandidate(
+  update: UpdateSummary | null,
+  installedVersion: string | null,
+): ResumeCandidate | undefined {
+  if (!update) return undefined;
+  const touchedAt = update.date ? Date.parse(update.date) : Number.NaN;
+  if (!Number.isFinite(touchedAt)) return undefined;
+  return {
+    id: `update:${update.version}`,
+    kind: "update",
+    title: `Coilbox ${update.version}`,
+    detail: installedVersion
+      ? `You have ${installedVersion}`
+      : "Ready to install",
+    to: "/settings/updates",
+    touchedAt,
+  };
+}
+
 export interface ResumeSources {
   runs: Record<string, RunSummary>;
   campaigns: readonly { campaign: Campaign }[];
@@ -361,6 +422,9 @@ export interface ResumeSources {
   lobby: LobbySnapshot | null;
   draft: StoredSkirmishDraft;
   presets: readonly SkirmishPreset[];
+  update: UpdateSummary | null;
+  /** The running app version, for the update card's second line. */
+  installedVersion: string | null;
 }
 
 /**
@@ -383,6 +447,9 @@ export function collectCandidates(
     conquestCandidate(sources.galaxies, sources.conquests),
     campaignCandidate(sources.campaigns, sources.progress),
     skirmishCandidate(sources.draft, sources.presets),
+    // Last in the fixed order, so a tie on the timestamp goes to the thing you
+    // were playing.
+    updateCandidate(sources.update, sources.installedVersion),
   ].filter((c): c is ResumeCandidate => c !== undefined);
 }
 
@@ -422,6 +489,11 @@ export function useResume(): {
   const { presets } = useSkirmishPresets();
   const [draft] = useSkirmishDraft();
   const { mirror } = useMultiplayer();
+  // Not part of `loading`: the updater checks over the network after launch, so
+  // there is no settled point to wait for, and an update found while the page
+  // sits open is new information rather than a late answer. Same reasoning as
+  // the lobby.
+  const { update, version } = useAvailableUpdate();
 
   const now = Date.now();
   const candidates = rankCandidates(
@@ -435,6 +507,8 @@ export function useResume(): {
         lobby: mirror.state,
         draft,
         presets,
+        update,
+        installedVersion: version,
       },
       now,
     ),

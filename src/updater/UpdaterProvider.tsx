@@ -74,6 +74,27 @@ export function useUpdater(): UpdaterContextValue {
   return ctx;
 }
 
+/**
+ * The available update and the running version, or nulls when there is no
+ * provider above.
+ *
+ * {@link useUpdater} throws without one, which is right for the updater's own
+ * badge and settings page: those exist to show updater state, so no provider is
+ * a wiring bug worth failing loudly on.
+ *
+ * The home page is a different case. It reads the update as one source among a
+ * dozen, and a zone test has no business mounting the updater to render a
+ * Warpath card. Absent provider means no update to offer, which is the same
+ * answer as a provider that has not found one.
+ */
+export function useAvailableUpdate(): {
+  update: Update | null;
+  version: string | null;
+} {
+  const ctx = useContext(UpdaterContext);
+  return { update: ctx?.update ?? null, version: ctx?.version ?? null };
+}
+
 export function UpdaterProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState<string | null>(null);
   const [update, setUpdate] = useState<Update | null>(null);

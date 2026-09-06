@@ -36,6 +36,7 @@ import {
   type RunSummary,
   rankCandidates,
   skirmishCandidate,
+  updateCandidate,
   warpathCandidate,
 } from "./continue";
 
@@ -469,6 +470,60 @@ describe("skirmishCandidate", () => {
   });
 });
 
+describe("updateCandidate", () => {
+  it("offers the available update, naming both versions", () => {
+    const c = updateCandidate(
+      { version: "1.12.0", date: minutesAgo(60) },
+      "1.11.1",
+    );
+    expect(c?.title).toBe("Coilbox 1.12.0");
+    expect(c?.detail).toBe("You have 1.11.1");
+    expect(c?.to).toBe("/settings/updates");
+  });
+
+  it("offers nothing when there is no update", () => {
+    expect(updateCandidate(null, "1.11.1")).toBeUndefined();
+  });
+
+  it("ranks on the release date, not on when the check found it", () => {
+    // The whole reason the date is read off the manifest. Detection time is
+    // always this session, which would pin the card to the top of the page
+    // every launch until it was installed.
+    const c = updateCandidate(
+      { version: "1.12.0", date: minutesAgo(60) },
+      "1.11.1",
+    );
+    expect(c?.touchedAt).toBe(NOW - 60 * 60_000);
+  });
+
+  it("waits indefinitely, so it never pre-empts a rejoinable battle", () => {
+    expect(
+      updateCandidate({ version: "1.12.0", date: minutesAgo(1) }, "1.11.1")
+        ?.expiresAt,
+    ).toBeUndefined();
+  });
+
+  it("offers nothing when the manifest carried no date", () => {
+    // Nothing to rank on. The topbar badge is the surface that always shows an
+    // update, so there is no need to invent a timestamp for this one.
+    expect(updateCandidate({ version: "1.12.0" }, "1.11.1")).toBeUndefined();
+  });
+
+  it("offers nothing when the date did not parse", () => {
+    expect(
+      updateCandidate({ version: "1.12.0", date: "soon" }, "1.11.1"),
+    ).toBeUndefined();
+  });
+
+  it("still offers when the running version is not known yet", () => {
+    const c = updateCandidate(
+      { version: "1.12.0", date: minutesAgo(60) },
+      null,
+    );
+    expect(c?.detail).toBe("Ready to install");
+  });
+});
+
 // --- Collection --------------------------------------------------------------
 
 const emptySources: ResumeSources = {
@@ -480,6 +535,8 @@ const emptySources: ResumeSources = {
   lobby: null,
   draft: defaultSkirmishDraft,
   presets: [],
+  update: null,
+  installedVersion: null,
 };
 
 describe("collectCandidates", () => {
@@ -518,6 +575,8 @@ describe("collectCandidates", () => {
       lobby: lobby(),
       draft: draft({ touchedAt: NOW - 30 * 60_000 }),
       presets: [],
+      update: { version: "1.12.0", date: minutesAgo(30) },
+      installedVersion: "1.11.1",
     };
     // Every disk-backed source is touched at the same moment on purpose: this is
     // the order that decides a tie, so it is asserted rather than assumed.
@@ -527,7 +586,60 @@ describe("collectCandidates", () => {
       "conquest",
       "campaign",
       "skirmish",
+      "update",
     ]);
+  });
+
+  it("lets a fresh release outrank a run you have not touched in a while", () => {
+    const ranked = rankCandidates(
+      collectCandidates(
+        {
+          ...emptySources,
+          runs: run("Kappa Reach", minutesAgo(4000)),
+          update: { version: "1.12.0", date: minutesAgo(60) },
+          installedVersion: "1.11.1",
+        },
+        NOW,
+      ),
+      NOW,
+    );
+    expect(ranked.map((c) => c.kind)).toEqual(["update", "warpath"]);
+  });
+
+  it("lets a run you played yesterday push a week-old release down", () => {
+    // What "competes as a normal candidate" buys, and its cost: an update can be
+    // pushed off the row entirely. The topbar badge is the guaranteed surface.
+    const ranked = rankCandidates(
+      collectCandidates(
+        {
+          ...emptySources,
+          runs: run("Kappa Reach", minutesAgo(60)),
+          update: { version: "1.12.0", date: minutesAgo(10080) },
+          installedVersion: "1.11.1",
+        },
+        NOW,
+      ),
+      NOW,
+    );
+    expect(ranked.map((c) => c.kind)).toEqual(["warpath", "update"]);
+  });
+
+  it("keeps a rejoinable battle above an update released minutes ago", () => {
+    // The battle's window shuts and the update's does not, so rule 2 applies
+    // to the update exactly as it does to everything else.
+    const ranked = rankCandidates(
+      collectCandidates(
+        {
+          ...emptySources,
+          lobby: lobby(),
+          update: { version: "1.12.0", date: minutesAgo(1) },
+          installedVersion: "1.11.1",
+        },
+        NOW,
+      ),
+      NOW,
+    );
+    expect(ranked.map((c) => c.kind)).toEqual(["battle", "update"]);
   });
 
   it("ranks the live battle over everything, then recency", () => {
