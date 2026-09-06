@@ -55,16 +55,22 @@ export interface Canvas3DScene {
  * A layout effect rather than a plain one: the size a view is first drawn at,
  * and anything it publishes from that size, has to be settled before the frame
  * is painted.
+ *
+ * `ready` is whether the view has anything to build yet. A view whose inputs
+ * are still arriving says false, and no renderer is made until it says true: a
+ * WebGL context made and thrown away for a build that returns nothing is not
+ * free, and a map preview's sources settle in several steps.
  */
 export function useCanvas3D(
   hostRef: RefObject<HTMLElement | null>,
   build: (canvas: Canvas3D) => Canvas3DScene | undefined,
   deps: DependencyList,
+  ready = true,
 ): void {
   // biome-ignore lint/correctness/useExhaustiveDependencies: the caller passes what its own build reads, the way useMemo takes a list
   useLayoutEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host || !ready) return;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     host.appendChild(renderer.domElement);
@@ -137,5 +143,5 @@ export function useCanvas3D(
     };
     // Spread rather than passed straight through, because the lint rule wants
     // to see an array literal here. The contents are still the caller's.
-  }, [...deps]);
+  }, [ready, ...deps]);
 }
