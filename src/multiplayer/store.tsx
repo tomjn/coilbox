@@ -28,15 +28,7 @@ import {
   useLobbyAccounts,
 } from "../lobby-servers/config";
 import { notify } from "../notify/notify";
-import {
-  AUTO_AWAY_ENABLED_KEY,
-  AUTO_AWAY_MINUTES_KEY,
-  type ClientFlags,
-  clampAwayMinutes,
-  DEFAULT_AUTO_AWAY_MINUTES,
-  resolveStatus,
-  sameStatus,
-} from "./awayStatus";
+import type { ClientFlags } from "./awayStatus";
 import {
   forgetBattleMovedUnless,
   recordBattleMoved,
@@ -63,7 +55,6 @@ import {
   mpReattach,
   mpRegister,
   mpRegisterZerok,
-  mpSetStatus,
   mpSnapshot,
   mpTachyonSignedIn,
   mpTachyonSignIn,
@@ -95,16 +86,11 @@ import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
 import { MatchFoundPanel } from "./MatchFoundPanel";
-import {
-  autoJoinsChannels,
-  protocolForKey,
-  publishesStatus,
-  syncsOnReady,
-} from "./protocol";
+import { autoJoinsChannels, protocolForKey, syncsOnReady } from "./protocol";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { newScriptPassword } from "./scriptPassword";
-import { useIdle } from "./useIdle";
+import { useAwayStatus } from "./useAwayStatus";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
 /**
@@ -853,54 +839,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
   }, [activeKey, mirror.phase, mirror.state, favourites]);
 
-  // --- Away status (issue #333) ----------------------------------------------
-  // `MYSTATUS` carries `ingame` and `away` on one line, so the provider owns both
-  // bits rather than each caller sending its own pair and clearing the other's.
-  // Inputs: the battle room's launch flag, the topbar's manual toggle, and the
-  // idle watcher. Both choices are session state, cleared with the connection.
-  const [ingame, setIngameState] = useState(false);
-  const [manualAway, setManualAway] = useState(false);
-  const [autoAway] = useSetting<boolean>(AUTO_AWAY_ENABLED_KEY, true);
-  const [autoAwayMinutes] = useSetting<number>(
-    AUTO_AWAY_MINUTES_KEY,
-    DEFAULT_AUTO_AWAY_MINUTES,
+  // Away status (issue #333): see useAwayStatus for the design. Owns the ingame
+  // and manual-away bits, and is the only sender of MYSTATUS.
+  const { status, setIngame, manualAway, setManualAway } = useAwayStatus(
+    activeKey,
+    protocol,
+    mirror.phase,
   );
-  // Watching only pays off when idling could actually change the status: not
-  // while disconnected, off, already manually away, or in a game (where the
-  // engine, not the webview, is taking the input).
-  const idle = useIdle(
-    activeKey != null && autoAway && !manualAway && !ingame,
-    clampAwayMinutes(autoAwayMinutes),
-  );
-  const status = useMemo(
-    () => resolveStatus({ ingame, manualAway, idle }),
-    [ingame, manualAway, idle],
-  );
-
-  // What we last put on the wire, or null for "unknown". A session starts unknown
-  // rather than assuming the server's defaults, because the reattach path adopts a
-  // connection that may already be flagged in-game (a reload during a match). We'd
-  // otherwise dedupe the clearing send away and stay in-game until the app quits.
-  const sentStatusRef = useRef<ClientFlags | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: activeKey is the reset trigger (a session change), not read in the body
-  useEffect(() => {
-    sentStatusRef.current = null;
-    setIngameState(false);
-    setManualAway(false);
-  }, [activeKey]);
-
-  // Tachyon carries readiness per lobby rather than as a client-wide status, so a
-  // Tachyon connection publishes nothing here (see `publishesStatus`).
-  useEffect(() => {
-    if (activeKey == null || mirror.phase !== "ready") return;
-    if (!publishesStatus(protocol)) return;
-    const sent = sentStatusRef.current;
-    if (sent && sameStatus(sent, status)) return;
-    sentStatusRef.current = status;
-    mpSetStatus({ serverKey: activeKey, ...status }).catch((e) =>
-      console.warn("multiplayer: MYSTATUS failed", e),
-    );
-  }, [activeKey, protocol, mirror.phase, status]);
 
   // --- Auto-rejoin on unexpected server drop (issue #192) --------------------
   // Distinct from the reload-reattach path above: this handles a genuine server-
@@ -1863,7 +1808,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         justWentIngame: ingameFlash,
         channelJoinFailures,
         status,
-        setIngame: setIngameState,
+        setIngame,
         manualAway,
         setManualAway,
       }}
