@@ -39,9 +39,9 @@ describe("parseRef", () => {
       kind: "route",
       to: "/singleplayer",
     });
-    expect(parseRef("@route/content/games")).toEqual({
+    expect(parseRef("@route/library/games")).toEqual({
       kind: "route",
-      to: "/content/games",
+      to: "/library/games",
     });
     expect(parseRef("@route/")).toBeNull();
   });

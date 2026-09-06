@@ -48,7 +48,7 @@ vi.mock("../useWidgetFiles", () => ({ useWidgetFiles: () => {} }));
 vi.mock("@/deeplink/useImportParam", () => ({ useImportParam: () => ({}) }));
 vi.mock("@/hub/imports", () => ({ useRecordHubImport: () => () => {} }));
 vi.mock("../store", () => ({
-  blueprintRoute: (id: string) => `/content/blueprints/${id}`,
+  blueprintRoute: (id: string) => `/library/blueprints/${id}`,
   saveBlueprint: async (record: StoredBlueprint) => record,
   useBlueprintLibrary: () => ({
     records: [RECORD],
@@ -86,7 +86,7 @@ describe("BlueprintsPage", () => {
 
   it("keeps the menu out of the link, so the card still opens the layout", () => {
     const link = cardLink(markup());
-    expect(link).toContain('href="/content/blueprints/b1"');
+    expect(link).toContain('href="/library/blueprints/b1"');
     expect(link).not.toContain("<button");
   });
 

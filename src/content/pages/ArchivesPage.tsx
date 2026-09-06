@@ -60,7 +60,7 @@ export default function ArchivesPage() {
             return (
               <li key={a.name}>
                 <Link
-                  to={`/content/archives/${encodeURIComponent(a.name)}`}
+                  to={`/library/archives/${encodeURIComponent(a.name)}`}
                   className="flex items-center gap-2 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-border hover:bg-accent/40"
                 >
                   <Boxes className="size-4 shrink-0 text-muted-foreground" />

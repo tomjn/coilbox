@@ -342,7 +342,7 @@ export function BlueprintOnMap({
           engine coilbox is using.
         </p>
         <Link
-          to="/content/maps"
+          to="/library/maps"
           className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
         >
           Manage maps

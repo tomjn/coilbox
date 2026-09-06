@@ -795,7 +795,7 @@ export const ScenarioMapScene = forwardRef<
           <p className="mt-1 font-mono text-xs opacity-70">{assets.error}</p>
         )}
         <Link
-          to="/content/maps"
+          to="/library/maps"
           className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
         >
           Manage maps

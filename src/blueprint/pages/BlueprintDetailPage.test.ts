@@ -66,7 +66,7 @@ vi.mock("@/hub/assets/useBlueprintBackfill", () => ({
 // this test does not stand up. What it does is tested on its own.
 vi.mock("../useWidgetFiles", () => ({ useWidgetFiles: () => {} }));
 vi.mock("../store", () => ({
-  blueprintRoute: (id: string) => `/content/blueprints/${id}`,
+  blueprintRoute: (id: string) => `/library/blueprints/${id}`,
   deleteBlueprint: async () => {},
   saveBlueprint: async (record: StoredBlueprint) => record,
   useBlueprintLibrary: () => ({
@@ -82,12 +82,12 @@ function markup(): string {
   return renderToStaticMarkup(
     createElement(
       MemoryRouter,
-      { initialEntries: ["/content/blueprints/b1"] },
+      { initialEntries: ["/library/blueprints/b1"] },
       createElement(
         Routes,
         null,
         createElement(Route, {
-          path: "/content/blueprints/:id",
+          path: "/library/blueprints/:id",
           element: createElement(BlueprintDetailPage),
         }),
       ),

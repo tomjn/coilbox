@@ -23,7 +23,7 @@ export function LuaConsoleDrawer({
       enginePath={enginePath}
       dataDir={dataDir}
       archive={archive}
-      popOutTo={`/content/archives/${encodeURIComponent(archive)}/repl`}
+      popOutTo={`/library/archives/${encodeURIComponent(archive)}/repl`}
       onPopOut={() => drawer.close()}
     />
   );

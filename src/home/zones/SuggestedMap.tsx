@@ -163,7 +163,7 @@ export function SuggestedMapCard({
         // Installed: the card is the way to the map, so the whole surface is the
         // link and the band carries no button to nest inside it.
         <Link
-          to={`/content/maps/${encodeURIComponent(installedName)}`}
+          to={`/library/maps/${encodeURIComponent(installedName)}`}
           className={cn(surface, INTERACTIVE_CLASS)}
         >
           {body}

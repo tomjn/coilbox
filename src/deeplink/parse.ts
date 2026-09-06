@@ -34,8 +34,8 @@ export const DEEP_LINK_SCHEME = "coilbox";
  * filled from the link's `id` param for the screens that need one.
  */
 export const OPEN_SCREENS = {
-  map: { route: "/content/maps/:id", needsId: true },
-  game: { route: "/content/games/:id", needsId: true },
+  map: { route: "/library/maps/:id", needsId: true },
+  game: { route: "/library/games/:id", needsId: true },
   replay: { route: "/play/replays/:id", needsId: true },
   conquest: { route: "/conquest", needsId: false },
   warpath: { route: "/warpath", needsId: false },

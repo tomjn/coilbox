@@ -57,7 +57,7 @@ export function GameHeader({
       />
 
       <Link
-        to="/content/games"
+        to="/library/games"
         className="absolute left-3 top-3 inline-flex items-center gap-1 rounded bg-black/40 px-2 py-1 text-xs text-white backdrop-blur-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       >
         <ArrowLeft className="size-3.5" /> Games

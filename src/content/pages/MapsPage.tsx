@@ -185,7 +185,7 @@ export default function MapsPage() {
                 />
                 {/* Stretched link: anywhere but the Play button opens the map detail. */}
                 <Link
-                  to={`/content/maps/${encodeURIComponent(m.name)}`}
+                  to={`/library/maps/${encodeURIComponent(m.name)}`}
                   aria-label={m.name}
                   className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                 />

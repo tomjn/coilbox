@@ -139,10 +139,10 @@ function renderPage({
   mockDatasetStatus = datasetStatus;
   return render(
     <MemoryRouter
-      initialEntries={[`/content/games/${encodeURIComponent(GAME_NAME)}`]}
+      initialEntries={[`/library/games/${encodeURIComponent(GAME_NAME)}`]}
     >
       <Routes>
-        <Route path="/content/games/:name" element={<GameDetailPage />} />
+        <Route path="/library/games/:name" element={<GameDetailPage />} />
       </Routes>
     </MemoryRouter>,
   );

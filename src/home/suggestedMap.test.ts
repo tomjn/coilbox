@@ -940,7 +940,7 @@ describe("the suggested map card", () => {
       art: "coilbox://localhost/unitsyncthumb/abc.png",
       install: { state: "installed" },
     });
-    expect(html).toContain('href="/content/maps/Fallendell_V4"');
+    expect(html).toContain('href="/library/maps/Fallendell_V4"');
     expect(html).toContain("Installed");
     expect(html).not.toContain("<button");
   });

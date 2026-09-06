@@ -150,13 +150,13 @@ export default function GameDetailPage() {
   if (error && !data)
     return (
       <DetailError
-        backTo="/content/games"
+        backTo="/library/games"
         message={error}
         onRetry={() => run(true)}
       />
     );
-  if (!data || loading) return <DetailLoading backTo="/content/games" />;
-  if (!game) return <NotFound backTo="/content/games" label="game" />;
+  if (!data || loading) return <DetailLoading backTo="/library/games" />;
+  if (!game) return <NotFound backTo="/library/games" label="game" />;
 
   const otherInfo = Object.entries(game.info).filter(
     ([k]) => !HEADLINE_KEYS.has(k),
@@ -251,7 +251,7 @@ export default function GameDetailPage() {
               </Button>
             ) : (
               <Link
-                to={`/content/games/${encodeURIComponent(game.name)}/units`}
+                to={`/library/games/${encodeURIComponent(game.name)}/units`}
                 className={cn(
                   buttonVariants({ variant: "outline", size: "sm" }),
                 )}
@@ -397,7 +397,7 @@ export default function GameDetailPage() {
                 <DeleteArchiveButton
                   path={game.primaryArchive.path}
                   name={game.primaryArchive.name}
-                  onDeleted={() => navigate("/content/games")}
+                  onDeleted={() => navigate("/library/games")}
                 />
               )}
           </div>

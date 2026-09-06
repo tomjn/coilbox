@@ -171,7 +171,7 @@ export default function RunListPage() {
                 , or see what it found in{" "}
                 <Link
                   className="underline underline-offset-4"
-                  to="/content/games"
+                  to="/library/games"
                 >
                   Content → Games
                 </Link>
@@ -188,7 +188,7 @@ export default function RunListPage() {
               No games installed. Add one from{" "}
               <Link
                 className="underline underline-offset-4"
-                to="/content/games"
+                to="/library/games"
               >
                 Content → Games
               </Link>
