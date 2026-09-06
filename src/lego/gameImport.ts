@@ -4,8 +4,9 @@
  *
  * A `.sdd` game is already a folder, so its models are files and there is
  * nothing to do: the path is the archive's folder plus the member, and
- * `lego_import_s3o` finds the textures by walking up to `unittextures/` exactly
- * as it does for a file picked by hand. A `.sdz`, `.sd7` or rapid `.sdp` holds
+ * `lego_import_s3o` and `lego_import_3do` find the textures by walking up to
+ * `unittextures/` exactly as either does for a file picked by hand. A `.sdz`,
+ * `.sd7` or rapid `.sdp` holds
  * the same bytes with no path to them, so the member is unpacked into a temp
  * folder shaped like a game, `objects3d/` beside `unittextures/`, and the same
  * walk then works unchanged.

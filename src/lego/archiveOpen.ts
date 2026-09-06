@@ -35,12 +35,13 @@ export interface ArchiveOpenRequest {
 /**
  * Whether the builder could open a member at all.
  *
- * Only a `.s3o`. A `.3do` is Total Annihilation's format: the archive browser
- * draws one, because the viewer reads both, but the import reads `.s3o` alone
- * and there is nothing to offer for the older format.
+ * A `.s3o` or a `.3do`. The archive browser draws both, and the import reads
+ * both too: a `.3do`, Total Annihilation's older format, is converted rather
+ * than read, but it lands in the builder the same way.
  */
 export function openableInBuilder(member: string): boolean {
-  return member.toLowerCase().endsWith(".s3o");
+  const lower = member.toLowerCase();
+  return lower.endsWith(".s3o") || lower.endsWith(".3do");
 }
 
 /** Where to send somebody who wants this member open in the builder. */
@@ -77,5 +78,5 @@ export function openRequest(
  *  dialog's import names one. */
 export function modelName(member: string): string {
   const file = member.replace(/\\/g, "/").split("/").at(-1) ?? member;
-  return file.replace(/\.s3o$/i, "");
+  return file.replace(/\.(s3o|3do)$/i, "");
 }
