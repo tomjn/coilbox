@@ -16,6 +16,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 }));
 
 import { makeContainer } from "@/container/container";
+import { parseScenario } from "@/scenario/model";
 import {
   hubItemPageUrl,
   publishFailureMessage,
@@ -28,7 +29,10 @@ const BASE = "https://hub.example";
 
 /** A share code as the drawer would hand one over. Raw JSON rather than a
  * base64 code: `identify()` reads either, and this keeps the test readable. */
-function code(kind: "preset" | "campaign", payload: unknown = {}): string {
+function code(
+  kind: "preset" | "campaign" | "scenario",
+  payload: unknown = {},
+): string {
   return JSON.stringify(makeContainer(kind, 1, payload));
 }
 
@@ -37,6 +41,20 @@ const PRESET = code("preset", {
   mapName: "Comet Catcher Remake",
   participants: [],
 });
+
+/** A scenario container as `ShareScenarioForm` builds one, set up or not. */
+function scenarioCode(setup: { gameName: string; mapName: string }): string {
+  const scenario = parseScenario({
+    id: "s1",
+    name: "Ambush at the pass",
+    setup: { ...setup, participants: [] },
+    zones: [],
+    dialogue: [],
+    triggers: [],
+  });
+  if (!scenario) throw new Error("fixture is not a valid scenario");
+  return code("scenario", { scenario, media: {} });
+}
 
 function publication(overrides: Partial<{ code: string; title: string }> = {}) {
   return {
@@ -75,6 +93,21 @@ describe("whyNotPublishable", () => {
     expect(whyNotPublishable(publication({ title: "  " }))).toContain(
       "Give it a title",
     );
+  });
+
+  it("refuses a scenario that names no game and map", () => {
+    const draft = scenarioCode({ gameName: "", mapName: "" });
+    expect(whyNotPublishable(publication({ code: draft }))).toBe(
+      "This scenario names no game and map, so there is nothing to play yet. Set both before sharing it.",
+    );
+  });
+
+  it("takes a scenario that names both a game and a map", () => {
+    const ready = scenarioCode({
+      gameName: "BAR",
+      mapName: "Comet Catcher",
+    });
+    expect(whyNotPublishable(publication({ code: ready }))).toBeNull();
   });
 
   it("refuses a container past the size the app would import", () => {
