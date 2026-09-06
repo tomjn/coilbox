@@ -44,7 +44,7 @@ describe("hubItemsUrl", () => {
   });
 
   it("leaves blank filters off rather than sending them empty", () => {
-    expect(hubItemsUrl(BASE, { kind: "", q: "  ", game: "" })).toBe(
+    expect(hubItemsUrl(BASE, { kind: [], tag: [""], q: "  ", game: "" })).toBe(
       `${BASE}/api/v1/items`,
     );
   });
@@ -52,12 +52,13 @@ describe("hubItemsUrl", () => {
   it("carries every filter the API accepts", () => {
     const url = new URL(
       hubItemsUrl(BASE, {
-        kind: "challenge",
+        kind: ["challenge"],
         game: "Balanced Annihilation",
         map: "Comet Catcher",
-        tag: "1v1",
-        author: "tomjn",
+        tag: ["1v1"],
+        author: ["tomjn"],
         q: "obsidian",
+        sort: "title",
         page: 3,
       }),
     );
@@ -68,8 +69,26 @@ describe("hubItemsUrl", () => {
       tag: "1v1",
       author: "tomjn",
       q: "obsidian",
+      sort: "title",
       page: "3",
     });
+  });
+
+  it("repeats kind, author and tag for more than one value", () => {
+    const url = new URL(
+      hubItemsUrl(BASE, {
+        kind: ["preset", "blueprint"],
+        author: ["tomjn", "someone"],
+        tag: ["1v1", "flat"],
+      }),
+    );
+    expect(url.searchParams.getAll("kind")).toEqual(["preset", "blueprint"]);
+    expect(url.searchParams.getAll("author")).toEqual(["tomjn", "someone"]);
+    expect(url.searchParams.getAll("tag")).toEqual(["1v1", "flat"]);
+  });
+
+  it("omits sort when it is newest, the default", () => {
+    expect(hubItemsUrl(BASE, { sort: undefined })).toBe(`${BASE}/api/v1/items`);
   });
 
   it("omits page 1, which is the default", () => {
