@@ -32,8 +32,14 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
+| Settings      | Engine settings | `#/settings/engine-settings` | `settings.engine` | no³ |
+| Settings      | Appearance    | `#/settings/frame.appearance` | `settings.appearance` | no³ |
+| Settings      | Accounts      | `#/settings/lobby-servers` | `settings.accounts` | no³ |
+| Settings      | All settings  | `#/settings`         | `settings.all`     | no       |
 
 ¹ **Campaigns** only appears in the sidebar once at least one campaign exists (bundled or created locally), and **Scenarios** once at least one scenario names a game and a map. Until then the item is hidden automatically.
+
+³ **Settings** items are not on the `hide` list. They link to settings sections rather than to routes of their own, so `hideSettings` already governs them: hide `engine-settings`, `frame.appearance` or `lobby-servers` and both the settings section and its card here disappear together.
 
 ² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle Room** shows only while you're in a battle. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead.
 

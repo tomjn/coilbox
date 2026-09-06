@@ -1,5 +1,14 @@
+import { FRAME_APPEARANCE_SETTINGS_ID } from "@picoframe/frame";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Settings2, Wrench } from "lucide-react";
+import {
+  Palette,
+  ServerCog,
+  Settings,
+  Settings2,
+  SlidersHorizontal,
+  Wrench,
+} from "lucide-react";
+import { isSettingsHidden } from "../profile/hidden";
 import { FullscreenControls } from "./fullscreen";
 import GeneralSettings from "./pages/SettingsSection";
 import { QuitControl } from "./quit";
@@ -23,6 +32,64 @@ const generalPlugin: FramePlugin = {
   id: "general",
   version: "0.0.0",
   routes: [],
+  // Settings had no way in from the welcome page and one gear in the sidebar
+  // footer, which is the least visible corner of the window. The pages have
+  // always been there, so this group is signposting rather than new screens.
+  //
+  // Declared here because no one plugin owns settings: the sections come from a
+  // dozen plugins and the frame, and this one already declares the two groups
+  // (General, Advanced) that belong to nobody else.
+  //
+  // Each item links to a settings section rather than a route of its own, so
+  // there are no new routes and nothing to add to `docs/routes.md`.
+  nav: [
+    {
+      id: "settings",
+      label: "Settings",
+      // Last. Everything above it is somewhere you go to do something, and this
+      // is where you go to change how those behave.
+      order: 60,
+      items: [
+        {
+          id: "settings.engine",
+          label: "Engine settings",
+          to: "/settings/engine-settings",
+          order: 0,
+          icon: SlidersHorizontal,
+          // Gated on the settings section rather than on a `hide` id of its
+          // own. A distribution that hides the section wants the card gone too,
+          // and one id cannot drift from the other.
+          useVisible: () => !isSettingsHidden("engine-settings"),
+        },
+        {
+          id: "settings.appearance",
+          label: "Appearance",
+          to: `/settings/${FRAME_APPEARANCE_SETTINGS_ID}`,
+          order: 1,
+          icon: Palette,
+          useVisible: () => !isSettingsHidden(FRAME_APPEARANCE_SETTINGS_ID),
+        },
+        {
+          // The lobby server logins, not the Coilbox hub sign-in. A player with
+          // more than one account manages them here.
+          id: "settings.accounts",
+          label: "Accounts",
+          to: "/settings/lobby-servers",
+          order: 2,
+          icon: ServerCog,
+          useVisible: () => !isSettingsHidden("lobby-servers"),
+        },
+        {
+          // Everything else, including the sections this group does not name.
+          id: "settings.all",
+          label: "All settings",
+          to: "/settings",
+          order: 3,
+          icon: Settings,
+        },
+      ],
+    },
+  ],
   Provider: GeneralProvider,
   slots: [
     { slot: "topbar.right", Component: FullscreenControls },
