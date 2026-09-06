@@ -246,7 +246,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | -------------------- | --------------------- |
 | `downloads.browse`   | Downloads > Browse Rapid |
 | `downloads.games`    | Downloads > Games     |
-| `content.games`      | Content > Games       |
+| `library.games`      | Library > Games       |
 | `content.setupPacks` | Coilbox hub's "Share a pack" button |
 | `multiplayer.stats`  | Multiplayer > Player stats |
 | `conquest.list`      | Play > Conquest       |
@@ -254,12 +254,14 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `campaign.builder`   | Campaign Builder > Builder |
 
 ```json
-{ "version": 1, "hide": ["downloads.games", "content.games"] }
+{ "version": 1, "hide": ["downloads.games", "library.games"] }
 ```
 
 > Adding a new hideable nav item is a one-line change in that plugin's `index.ts`
 > (`useVisible: () => !isProfileHidden("<id>")`), so this list can grow on request.
 > See **[routes.md](routes.md)** for the full list of pages and nav ids.
+
+> **Renamed ids still work.** Content became Library, so `content.maps`, `content.games`, `content.blueprints`, `content.archives` and the `content` settings section are now `library.*` and `library`. A profile written against the old names keeps working, in `hide`, `hideSettings` and `art` alike, and the profile health check names the replacement rather than reporting the id as matching nothing. `content.setupPacks` did not change, because it never named a nav item.
 
 ### `hideSettings` (string[])
 

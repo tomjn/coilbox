@@ -1432,10 +1432,12 @@ const DRAWINGS: Record<string, Drawing> = {
   "multiplayer.battles": battles,
   "multiplayer.battle": battleRoom,
   "multiplayer.stats": stats,
-  "content.maps": maps,
-  "content.games": games,
-  "content.blueprints": blueprints,
-  "content.archives": archives,
+  "library.maps": maps,
+  "library.games": games,
+  "library.blueprints": blueprints,
+  "library.archives": archives,
+  // Not a nav item, and not renamed with the rest. It gates the hub screen's
+  // "Share a pack" button. See `HIDEABLE_NAV_IDS`.
   "content.setupPacks": setupPacks,
   "downloads.browse": downloads,
   "downloads.maps": downloadMaps,

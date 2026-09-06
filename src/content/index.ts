@@ -58,6 +58,29 @@ import StorageSection from "./pages/StorageSection";
  * lazy): the frame settings page renders them directly without a Suspense
  * boundary, so React.lazy can't be used there.
  */
+/**
+ * The browser paths that moved from `content/` to `library/`, relative to both
+ * prefixes.
+ *
+ * One list, read twice: once to build the live `library/` routes' retired twins,
+ * and once by the test that checks every live route has one. Kept beside the
+ * routes rather than in the profile's rename map, because these are paths a
+ * player pasted somewhere, and that map is about ids a profile author wrote.
+ */
+export const RENAMED_TO_LIBRARY: readonly string[] = [
+  "maps",
+  "maps/:name",
+  "games",
+  "games/:name",
+  "games/:name/units",
+  "games/:name/units/:unit",
+  "blueprints",
+  "blueprints/:id",
+  "archives",
+  "archives/:name",
+  "archives/:name/repl",
+];
+
 const contentPlugin: FramePlugin = {
   id: "content",
   version: "0.0.0",
@@ -66,41 +89,41 @@ const contentPlugin: FramePlugin = {
   Provider: ContentStartupProvider,
   nav: [
     {
-      id: "content",
-      label: "Content",
+      id: "library",
+      label: "Library",
       order: 15,
       items: [
         {
-          id: "content.maps",
+          id: "library.maps",
           label: "Maps",
-          to: "/content/maps",
+          to: "/library/maps",
           order: 0,
           icon: MapIcon,
         },
         {
-          id: "content.games",
+          id: "library.games",
           label: "Games",
-          to: "/content/games",
+          to: "/library/games",
           order: 1,
           icon: Gamepad2,
           // A single-game distribution can hide the multi-game browser.
-          useVisible: () => !isProfileHidden("content.games"),
+          useVisible: () => !isProfileHidden("library.games"),
         },
         {
           // Layouts you keep, beside the maps and games they are drawn for and
           // above the modding tool below (issue #1415).
-          id: "content.blueprints",
+          id: "library.blueprints",
           label: "Blueprints",
-          to: "/content/blueprints",
+          to: "/library/blueprints",
           order: 1.5,
           icon: Blocks,
         },
         {
           // Archive explorer is a modding tool — gated behind advanced mode,
           // unlike the player-facing Maps/Games in this same group.
-          id: "content.archives",
+          id: "library.archives",
           label: "Archives",
-          to: "/content/archives",
+          to: "/library/archives",
           order: 2,
           icon: ArchiveIcon,
           useVisible: useAdvancedMode,
@@ -110,35 +133,35 @@ const contentPlugin: FramePlugin = {
   ],
   routes: [
     {
-      path: "content/maps",
+      path: "library/maps",
       lazy: () => import("./pages/MapsPage"),
       crumb: "Maps",
     },
     {
-      path: "content/maps/:name",
+      path: "library/maps/:name",
       lazy: () => import("./pages/MapDetailPage"),
       crumb: (c) => c.params.name ?? "Map",
     },
     {
-      path: "content/games",
+      path: "library/games",
       lazy: gateProfileHidden(
-        "content.games",
+        "library.games",
         () => import("./pages/GamesPage"),
       ),
       crumb: "Games",
     },
     {
-      path: "content/games/:name",
+      path: "library/games/:name",
       lazy: gateProfileHidden(
-        "content.games",
+        "library.games",
         () => import("./pages/GameDetailPage"),
       ),
       crumb: (c) => c.params.name ?? "Game",
     },
     {
-      path: "content/games/:name/units",
+      path: "library/games/:name/units",
       lazy: gateProfileHidden(
-        "content.games",
+        "library.games",
         () => import("./pages/GameUnitsPage"),
       ),
       crumb: "Units",
@@ -148,9 +171,9 @@ const contentPlugin: FramePlugin = {
       // renders before the dataset is read. A def key is a worse label than a
       // name and a better one than nothing, the same trade the blueprint
       // route already makes for a uuid.
-      path: "content/games/:name/units/:unit",
+      path: "library/games/:name/units/:unit",
       lazy: gateProfileHidden(
-        "content.games",
+        "library.games",
         () => import("./pages/GameUnitPage"),
       ),
       crumb: (c) => c.params.unit ?? "Unit",
@@ -159,31 +182,31 @@ const contentPlugin: FramePlugin = {
       // The blueprint library (issue #1415). Its pages live under
       // `../blueprint/`, with the model and the store they read, because a
       // layout is its own thing rather than part of the content browser.
-      path: "content/blueprints",
+      path: "library/blueprints",
       lazy: () => import("../blueprint/pages/BlueprintsPage"),
       crumb: "Blueprints",
     },
     {
       // The route param is an opaque uuid, so the crumb resolves the layout's
       // name from the session cache, falling back when the list is not read.
-      path: "content/blueprints/:id",
+      path: "library/blueprints/:id",
       lazy: () => import("../blueprint/pages/BlueprintDetailPage"),
       crumb: (c) =>
         (c.params.id && cachedBlueprint(c.params.id)?.layout.name) ||
         "Blueprint",
     },
     {
-      path: "content/archives",
+      path: "library/archives",
       lazy: gateAdvanced(() => import("./pages/ArchivesPage")),
       crumb: "Archives",
     },
     {
-      path: "content/archives/:name",
+      path: "library/archives/:name",
       lazy: gateAdvanced(() => import("./pages/ArchiveDetailPage")),
       crumb: (c) => c.params.name ?? "Archive",
     },
     {
-      path: "content/archives/:name/repl",
+      path: "library/archives/:name/repl",
       lazy: gateAdvanced(() => import("./pages/ArchiveReplPage")),
       crumb: (c) =>
         c.params.name ? `${c.params.name} · Lua REPL` : "Lua REPL",
@@ -191,36 +214,44 @@ const contentPlugin: FramePlugin = {
     {
       path: "content/setup-packs",
       lazy: async () => ({
-        default: makeLegacyRedirect(() => "/downloads/maps"),
+        default: makeLegacyRedirect("/downloads/maps"),
       }),
     },
+    // The browser paths retired when Content became Library. Every live route
+    // above has one, built from the same list so a page cannot gain a `library/`
+    // path without its old `content/` one following. Deep links to these are
+    // everywhere a player can paste a URL, and the four already-retired paths
+    // below stay where they are rather than gaining `library/` twins nobody
+    // should be writing.
+    ...RENAMED_TO_LIBRARY.map((path) => ({
+      path: `content/${path}`,
+      lazy: async () => ({
+        default: makeLegacyRedirect(`/library/${path}`),
+      }),
+    })),
     // Legacy paths (#467 moved Replays to Singleplayer and Stats to
     // Multiplayer as "Player stats") — kept so old bookmarks and provenance
     // links already written into `content.replayState` still resolve.
     {
       path: "content/replays",
       lazy: async () => ({
-        default: makeLegacyRedirect(() => "/play/replays"),
+        default: makeLegacyRedirect("/play/replays"),
       }),
     },
     {
       path: "content/replays/:name",
       lazy: async () => ({
-        default: makeLegacyRedirect(
-          (name) => `/play/replays/${encodeURIComponent(name ?? "")}`,
-        ),
+        default: makeLegacyRedirect("/play/replays/:name"),
       }),
     },
     {
       path: "content/stats",
-      lazy: async () => ({ default: makeLegacyRedirect(() => "/stats") }),
+      lazy: async () => ({ default: makeLegacyRedirect("/stats") }),
     },
     {
       path: "content/stats/:name",
       lazy: async () => ({
-        default: makeLegacyRedirect(
-          (name) => `/stats/${encodeURIComponent(name ?? "")}`,
-        ),
+        default: makeLegacyRedirect("/stats/:name"),
       }),
     },
   ],
@@ -310,8 +341,8 @@ const contentPlugin: FramePlugin = {
     // Content: the files on disk and where they come from. Configuration rather
     // than play, so it sits below everything a player touches while playing.
     {
-      id: "content",
-      title: "Content",
+      id: "library",
+      title: "Library",
       description:
         "Where your games, maps and engines live, and where new ones come from.",
       order: 80,
@@ -321,7 +352,7 @@ const contentPlugin: FramePlugin = {
       id: "content-folders",
       title: "Content folders",
       description: "The folders coilbox reads games and maps from.",
-      parent: "content",
+      parent: "library",
       order: 10,
       icon: FolderTree,
       Component: FoldersSection,
@@ -330,7 +361,7 @@ const contentPlugin: FramePlugin = {
       id: "engines",
       title: "Engines",
       description: "The engine versions you have, and getting more.",
-      parent: "content",
+      parent: "library",
       order: 20,
       icon: Boxes,
       Component: EnginesSection,
@@ -339,7 +370,7 @@ const contentPlugin: FramePlugin = {
       id: "storage",
       title: "Storage",
       description: "What is taking up space, and clearing it out.",
-      parent: "content",
+      parent: "library",
       order: 40,
       icon: HardDrive,
       width: "lg",

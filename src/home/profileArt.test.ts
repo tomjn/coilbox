@@ -100,7 +100,7 @@ describe("a distribution that names its own art", () => {
   });
 
   it("says nothing about a tool it did not name", () => {
-    expect(resolveCardArtOverrides(entries).has("content.maps")).toBe(false);
+    expect(resolveCardArtOverrides(entries).has("library.maps")).toBe(false);
   });
 
   it("reads the surviving cards zone when one is repeated", () => {

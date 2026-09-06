@@ -26,7 +26,10 @@ const mapconvPlugin: FramePlugin = {
   nav: [
     {
       id: "mapconv",
-      label: "mapconv",
+      // The group is the map making tools, of which mapconv is one. The id,
+      // the routes and the settings section keep the tool's own name, because
+      // that is what a distribution profile and the docs refer to.
+      label: "Mapping Tools",
       order: 40,
       items: [
         {

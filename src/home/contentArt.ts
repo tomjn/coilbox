@@ -334,8 +334,8 @@ export const PICK_PRIORITY: readonly string[] = [
   "play.replays",
   "scenario.list",
   "campaign.list",
-  "content.games",
-  "content.maps",
+  "library.games",
+  "library.maps",
 ];
 
 /** What each tool would show, best first, before the collisions are settled. */
@@ -354,11 +354,11 @@ export function contentOffers(
   add("campaign.list", one(campaignPick(sources.campaigns, sources.progress)));
   // The game in your saved setup first, then the rest of the shelf. It is a
   // member of the collection like any other, and it is the one you play.
-  add("content.games", [
+  add("library.games", [
     ...one(gamePick(sources.draft)),
     ...collectionPicks(sources.games, "game"),
   ]);
-  add("content.maps", collectionPicks(sources.maps, "map"));
+  add("library.maps", collectionPicks(sources.maps, "map"));
   return offers;
 }
 

@@ -66,7 +66,7 @@ describe("settings declarations", () => {
       "updates",
       "game-updates",
       "multiplayer",
-      "content",
+      "library",
       "advanced",
     ]);
   });
@@ -94,7 +94,7 @@ describe("settings declarations", () => {
       "chat-highlights",
       "ignored-users",
     ]);
-    expect(childrenOf("content")).toEqual([
+    expect(childrenOf("library")).toEqual([
       "content-folders",
       "engines",
       "downloads",

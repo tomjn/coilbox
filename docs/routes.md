@@ -25,9 +25,9 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Multiplayer   | Matchmaking   | `#/matchmaking`      | `multiplayer.matchmaking` | no²|
 | Multiplayer   | Battle Room   | `#/battle`           | `multiplayer.battle`  | no²   |
 | Multiplayer   | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
-| Content       | Maps          | `#/content/maps`     | `content.maps`     | no       |
-| Content       | Games         | `#/content/games`    | `content.games`    | **yes**  |
-| Content       | Blueprints    | `#/content/blueprints` | `content.blueprints` | no    |
+| Library       | Maps          | `#/library/maps`     | `library.maps`     | no       |
+| Library       | Games         | `#/library/games`    | `library.games`    | **yes**  |
+| Library       | Blueprints    | `#/library/blueprints` | `library.blueprints` | no    |
 | Downloads     | Coilbox hub   | `#/hub`              | `hub.browse`       | **yes**  |
 | Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
@@ -37,9 +37,13 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle Room** shows only while you're in a battle. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `conquest.list`, `content.games`, `downloads.browse`, `downloads.games`, `hub.browse`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `conquest.list`, `library.games`, `downloads.browse`, `downloads.games`, `hub.browse`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
 
 > **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467). `#/content/setup-packs` redirects to `#/downloads/maps`, since the Setup packs page is gone and sharing a pack now happens from the Coilbox hub screen instead.
+>
+> Content became Library, so every browser path moved from `#/content/` to `#/library/`. The old ones redirect: `#/content/maps`, `#/content/maps/:name`, `#/content/games`, `#/content/games/:name`, `#/content/games/:name/units`, `#/content/games/:name/units/:unit`, `#/content/blueprints`, `#/content/blueprints/:id`, `#/content/archives`, `#/content/archives/:name` and `#/content/archives/:name/repl`.
+>
+> The nav ids moved with them. A distribution profile written against `content.maps`, `content.games`, `content.blueprints`, `content.archives` or the `content` settings section keeps working, in `hide`, `hideSettings` and the home page `art` map alike. The old names are mapped in `src/profile/renamedIds.ts`. `content.setupPacks` did not move, because it never named a nav item.
 
 ## Advanced-mode pages
 
@@ -47,20 +51,22 @@ These are hidden unless **Advanced mode** is on (Settings > General). They're mo
 
 | Sidebar group    | Item        | Link (`href`)          | Nav id                 |
 | ---------------- | ----------- | ----------------------- | ----------------------- |
-| Content          | Archives    | `#/content/archives`   | `content.archives`     |
+| Library          | Archives    | `#/library/archives`   | `library.archives`     |
 | uberstress       | Run         | `#/uberstress`         | `uberstress.run`       |
 | uberstress       | History     | `#/uberstress/history` | `uberstress.history`   |
 | Campaign Builder | Campaigns   | `#/campaign-builder`   | `campaign.builder`     |
 | Campaign Builder | Scenarios   | `#/scenario-builder`   | `scenario.builder`     |
-| mapconv          | Projects    | `#/mapconv/projects`   | `mapconv.projects`     |
-| mapconv          | Compile     | `#/mapconv`            | `mapconv.compile`      |
-| mapconv          | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    |
+| Mapping Tools    | Projects    | `#/mapconv/projects`   | `mapconv.projects`     |
+| Mapping Tools    | Compile     | `#/mapconv`            | `mapconv.compile`      |
+| Mapping Tools    | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    |
 | animation        | BOS → Lua   | `#/animation`          | `animation.bos2lua`    |
 | animation        | COB tools   | `#/animation/cob`      | `animation.cob`        |
 | unit builder     | Units       | `#/lego`               | `lego.units`           |
 | unit builder     | Lego Parts  | `#/lego/parts`         | `lego.parts`           |
 
-(mapconv and animation also add a few external-link items, wiki/tool guides, that open in the browser rather than routing in-app.)
+(Mapping Tools and animation also add a few external-link items, wiki/tool guides, that open in the browser rather than routing in-app.)
+
+The Mapping Tools group keeps the nav group id `mapconv`, the `#/mapconv/*` paths and the `mapconv` settings section. Only the sidebar label changed, because mapconv is the name of the tool itself.
 
 **Campaign Builder** is one sidebar group (nav group id `builder`), shared by the campaign and scenario plugins. It is not two separate "Campaign Builder" and "Scenario Builder" groups. `src/scenario/index.ts` registers its item into the same `builder` group under the label "Campaign Builder", so the two items merge into one group in the sidebar.
 
@@ -70,17 +76,17 @@ Reachable by clicking through the lists above. Not sidebar items, but you can de
 
 | Link (`href`)                             | What it is                                    |
 | ------------------------------------------ | ---------------------------------------------- |
-| `#/content/maps/:name`                    | A single map's detail page                     |
-| `#/content/games/:name`                   | A single game's detail page                    |
-| `#/content/games/:name/units`             | A single game's unit list                      |
-| `#/content/games/:name/units/:unit`       | A single unit's detail page                    |
-| `#/content/blueprints/:id`                | A single layout's detail page                  |
+| `#/library/maps/:name`                    | A single map's detail page                     |
+| `#/library/games/:name`                   | A single game's detail page                    |
+| `#/library/games/:name/units`             | A single game's unit list                      |
+| `#/library/games/:name/units/:unit`       | A single unit's detail page                    |
+| `#/library/blueprints/:id`                | A single layout's detail page                  |
 | `#/play/replays/:name`                    | A single replay's detail page                  |
 | `#/stats/:name`                           | A player's dossier (head-to-head stats)        |
 | `#/chatlogs`                              | Saved chat history (DMs and channels), read from disk with no live connection |
 | `#/hub/:id`                               | A single shared Coilbox hub item's page        |
-| `#/content/archives/:name`                | A single archive (advanced)                    |
-| `#/content/archives/:name/repl`           | An archive's Lua console (advanced)            |
+| `#/library/archives/:name`                | A single archive (advanced)                    |
+| `#/library/archives/:name/repl`           | An archive's Lua console (advanced)            |
 | `#/campaign/:id`                          | A campaign's mission list                      |
 | `#/campaign/:id/:missionId`               | A mission briefing/result                      |
 | `#/campaign-builder/:id`                  | Editing a campaign (advanced)                  |
@@ -115,7 +121,7 @@ Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hi
 | → Lobby servers           | `lobby-servers`    | `#/settings/lobby-servers`     |
 | → Chat highlights          | `chat-highlights`  | `#/settings/chat-highlights`   |
 | → Ignored users              | `ignored-users`    | `#/settings/ignored-users`     |
-| Content                   | `content`          | `#/settings/content`           |
+| Library                   | `library`          | `#/settings/library`           |
 | → Content folders         | `content-folders`  | `#/settings/content-folders`   |
 | → Engines                  | `engines`          | `#/settings/engines`           |
 | → Downloads                 | `downloads`        | `#/settings/downloads`         |
@@ -135,7 +141,7 @@ A profile's [`welcome`](distribution-profile.md#welcome-object) HTML commonly po
 ```html
 <a href="#/play/skirmish">Play Skirmish</a>
 <a href="#/campaign">Campaigns</a>
-<a href="#/content/maps">Maps</a>
+<a href="#/library/maps">Maps</a>
 <a href="#/play/replays">Replays</a>
 <a href="#/battles">Multiplayer</a>
 <a href="#/settings">Settings</a>
