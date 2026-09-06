@@ -264,10 +264,14 @@ export const ZOOM_OUT_PADDING = 1.3;
 export const ROTATION_STEP = Math.PI / 12;
 
 interface Props {
-  pack: LoadedPack;
-  /** The meshes of a unit imported from somebody else's model, if it is one. */
-  raw: RawGeometry | null;
-  project: LegoProject;
+  /** The piece hierarchy, and the raw geometry of a unit imported from
+   *  somebody else's model rather than built from parts. */
+  document: {
+    pack: LoadedPack;
+    /** The meshes of a unit imported from somebody else's model, if it is one. */
+    raw: RawGeometry | null;
+    project: LegoProject;
+  };
   /** Every selected piece, oldest first. One is the ordinary case. */
   selectedIds: string[];
   /** `additive` is a Shift or Cmd click: add this piece to the selection
@@ -394,9 +398,7 @@ interface Props {
 }
 
 export function ModelViewport({
-  pack,
-  raw,
-  project,
+  document,
   selectedIds,
   onSelect,
   onTransform,
@@ -430,6 +432,7 @@ export function ModelViewport({
   showAimPoint = false,
   onAimChange,
 }: Props) {
+  const { pack, raw, project } = document;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.

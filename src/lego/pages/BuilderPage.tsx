@@ -886,9 +886,7 @@ function Builder({ id }: { id: string | undefined }) {
               ) : null}
 
               <ModelViewport
-                pack={pack}
-                raw={raw}
-                project={draft}
+                document={{ pack, raw, project: draft }}
                 selectedIds={selectedIds}
                 onSelect={selectPiece}
                 onTransform={transformPiece}
