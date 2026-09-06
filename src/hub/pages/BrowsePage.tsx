@@ -29,6 +29,7 @@ import {
   HUB_KINDS,
   type HubFilters,
   type HubItem,
+  type HubKind,
   kindLabelPlural,
   kindsPlural,
 } from "../api";
@@ -214,6 +215,28 @@ export default function BrowsePage() {
     [filters],
   );
 
+  // Kind and search count towards "a filter is active" alongside the four
+  // clickable ones, even though they get their own token shape below (a
+  // toggle group and a text box, not a value set by clicking a card).
+  const activeCount =
+    active.length + (filters.kind ? 1 : 0) + (filters.q?.trim() ? 1 : 0);
+  const filtersActive = activeCount > 0;
+
+  /** Empties the search box along with clearing `q`, so the debounce effect
+   * does not put it straight back after the box's own value changes. */
+  const clearSearch = useCallback(() => {
+    setSearch("");
+    setFilters((f) => ({ ...f, q: undefined, page: 1 }));
+  }, []);
+
+  /** Every filter at once: the "Clear all" token and the empty state's
+   * button both drop straight back to the unfiltered list, rather than
+   * undoing each filter in turn. */
+  const clearAllFilters = useCallback(() => {
+    setSearch("");
+    setFilters({ page: 1 });
+  }, []);
+
   const lastPage = page?.lastPage ?? 1;
   const current = page?.page ?? filters.page ?? 1;
 
@@ -339,8 +362,20 @@ export default function BrowsePage() {
             </span>
           )}
         </div>
-        {active.length > 0 && (
+        {filtersActive && (
           <div className="flex flex-wrap items-center gap-2">
+            {filters.kind && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setFilter("kind", "")}
+              >
+                Kind: {kindLabelPlural(filters.kind as HubKind)}
+                <X className="size-3" aria-hidden />
+                <span className="sr-only">Clear this filter</span>
+              </Button>
+            )}
             {active.map((f) => (
               <Button
                 key={f.key}
@@ -354,6 +389,28 @@ export default function BrowsePage() {
                 <span className="sr-only">Clear this filter</span>
               </Button>
             ))}
+            {!!filters.q?.trim() && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={clearSearch}
+              >
+                Search: {filters.q}
+                <X className="size-3" aria-hidden />
+                <span className="sr-only">Clear this filter</span>
+              </Button>
+            )}
+            {activeCount > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={clearAllFilters}
+              >
+                Clear all
+              </Button>
+            )}
           </div>
         )}
       </PageHeader>
@@ -400,12 +457,21 @@ export default function BrowsePage() {
             className={loading ? "opacity-60 transition-opacity" : undefined}
           >
             {page && page.items.length === 0 && (
-              <EmptyState icon={Globe}>
-                {emptyReason(
-                  active.length > 0 || !!filters.kind || !!filters.q?.trim(),
-                  pinnedMatcher !== null,
-                  pinnedGame,
-                )}
+              <EmptyState
+                icon={Globe}
+                action={
+                  filtersActive && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearAllFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  )
+                }
+              >
+                {emptyReason(filtersActive, pinnedMatcher !== null, pinnedGame)}
               </EmptyState>
             )}
             {page && page.items.length > 0 && (
