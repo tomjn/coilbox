@@ -21,6 +21,7 @@ import { useHubUrl } from "../../config";
 import {
   type BlueprintShape,
   type GalaxyShape,
+  type HubPreview,
   readPreview,
 } from "../../preview";
 import { Galaxy } from "./ItemPreview";
@@ -58,6 +59,8 @@ export function BrowseCardArt({ item }: { item: HubItem }) {
         <BlueprintArt item={item} />
       ) : item.kind === "challenge" && item.mode === "conquest" ? (
         <ConquestArt item={item} />
+      ) : item.kind === "scenario" ? (
+        <ScenarioArt item={item} />
       ) : (
         <KindArt item={item} />
       )}
@@ -155,6 +158,28 @@ function ConquestArt({ item }: { item: HubItem }) {
   );
 }
 
+/**
+ * A scenario's own map, read off the same container the item page fetches for
+ * `ItemPreview.tsx`. The listing's `map_name` is null for every scenario today
+ * (issue #2600: the hub does not populate it at publish time), so this is the
+ * only way to learn it - the container names the map at `setup.mapName`, and
+ * `scenarioPreview()` reads it in. Draws with {@link MapArt}, the same
+ * minimap a preset's card gets from its listing field.
+ *
+ * While the container has not arrived yet, or the scenario turns out to have
+ * no map name after all (an unset draft), the slot falls back to
+ * {@link KindArt} - the same box, same size, so the fetch landing does not
+ * reflow the card.
+ */
+function ScenarioArt({ item }: { item: HubItem }) {
+  const hubUrl = useHubUrl();
+  const mapName = useScenarioCardMapName(hubUrl, item.id);
+
+  if (!mapName) return <KindArt item={item} />;
+
+  return <MapArt mapName={mapName} />;
+}
+
 /** Everything else: a tinted plate with the kind's own glyph, the one
  * `KindIcon` draws in every badge, so a card without a picture at least reads
  * as "this kind of thing" rather than as a blank box. */
@@ -181,14 +206,17 @@ const KIND_TINT: Record<HubKind, string> = {
   blueprint: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
 };
 
-/** Read one blueprint's layout off its container, or null when the item's
- * detail could not be fetched, its container could not be fetched, or the
- * container did not turn out to hold a blueprint after all. Never throws: this
- * runs unattended for every blueprint card on the page. */
-async function fetchBlueprintLayout(
+/** Fetch one item's container and read it into a preview, or null when the
+ * item's detail could not be fetched, its container could not be fetched, or
+ * the container decoded into nothing `readPreview` recognises. Never throws:
+ * this runs unattended for every card on the page. The shared first half of a
+ * blueprint's layout, a conquest challenge's galaxy and a scenario's map -
+ * each reads the same container fetch and picks a different field off the
+ * preview it returns. */
+async function fetchItemPreview(
   hubUrl: string,
   id: string,
-): Promise<BlueprintShape | null> {
+): Promise<HubPreview | null> {
   const detail = await fetchHubItem(hubUrl, id);
   if (!detail.ok) return null;
   const result = await fetchImportPlan(
@@ -198,7 +226,15 @@ async function fetchBlueprintLayout(
   if (!result.ok) return null;
   const container = asContainer(decodeContainerText(result.text));
   if (!container) return null;
-  const preview = readPreview(container);
+  return readPreview(container);
+}
+
+/** Read one blueprint's layout off its container. See {@link fetchItemPreview}. */
+async function fetchBlueprintLayout(
+  hubUrl: string,
+  id: string,
+): Promise<BlueprintShape | null> {
+  const preview = await fetchItemPreview(hubUrl, id);
   return preview?.kind === "blueprint" ? preview.layout : null;
 }
 
@@ -251,25 +287,14 @@ function useBlueprintCardLayout(
   return layout;
 }
 
-/** Read one conquest challenge's galaxy off its container, or null when the
- * item's detail could not be fetched, its container could not be fetched, or
- * the container did not turn out to hold a galaxy to draw after all (a
- * challenge `preview.ts` could not rebuild). Never throws: this runs
- * unattended for every challenge card on the page. */
+/** Read one conquest challenge's galaxy off its container - null too when the
+ * container did not turn out to hold a galaxy to draw (a challenge
+ * `preview.ts` could not rebuild). See {@link fetchItemPreview}. */
 async function fetchConquestGalaxy(
   hubUrl: string,
   id: string,
 ): Promise<GalaxyShape | null> {
-  const detail = await fetchHubItem(hubUrl, id);
-  if (!detail.ok) return null;
-  const result = await fetchImportPlan(
-    detail.value.container_url,
-    fetchImportText,
-  );
-  if (!result.ok) return null;
-  const container = asContainer(decodeContainerText(result.text));
-  if (!container) return null;
-  const preview = readPreview(container);
+  const preview = await fetchItemPreview(hubUrl, id);
   return preview?.kind === "challenge" ? preview.galaxy : null;
 }
 
@@ -314,4 +339,58 @@ function useConquestCardGalaxy(
   }, [hubUrl, id, key]);
 
   return galaxy;
+}
+
+/** Read one scenario's map name off its container - null too when the
+ * container did not turn out to hold a scenario with a map set (issue #2600).
+ * See {@link fetchItemPreview}. */
+async function fetchScenarioMapName(
+  hubUrl: string,
+  id: string,
+): Promise<string | null> {
+  const preview = await fetchItemPreview(hubUrl, id);
+  return preview?.kind === "scenario" ? preview.map : null;
+}
+
+/** Session cache of resolved map names, keyed by `hubUrl::id`, so paging away
+ * from a scenario card and back does not repeat its container fetch. Holds
+ * `null` for "asked and got nothing to draw", which is itself worth
+ * remembering rather than asking again on every remount. */
+const scenarioMapNameCache = new Map<string, string | null>();
+/** Open reads, so two mounts of the same card (StrictMode, or a duplicate id on
+ * the page) share one fetch rather than opening two. */
+const scenarioMapNamePending = new Map<string, Promise<string | null>>();
+
+/** `undefined` while nothing has answered yet, otherwise the cached answer -
+ * `null` included, for "asked and there is nothing to draw". Both fall back to
+ * {@link KindArt} in the caller, so the distinction is only ever used here to
+ * decide whether to fetch. */
+function useScenarioCardMapName(
+  hubUrl: string,
+  id: string,
+): string | null | undefined {
+  const key = `${hubUrl}::${id}`;
+  const [mapName, setMapName] = useState<string | null | undefined>(() =>
+    scenarioMapNameCache.get(key),
+  );
+
+  useEffect(() => {
+    const cached = scenarioMapNameCache.get(key);
+    if (cached !== undefined) {
+      setMapName(cached);
+      return;
+    }
+    let cancelled = false;
+    shareInFlight(scenarioMapNamePending, key, () =>
+      fetchScenarioMapName(hubUrl, id),
+    ).then((result) => {
+      scenarioMapNameCache.set(key, result);
+      if (!cancelled) setMapName(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hubUrl, id, key]);
+
+  return mapName;
 }

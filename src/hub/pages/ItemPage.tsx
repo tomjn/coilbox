@@ -231,6 +231,15 @@ export default function ItemPage() {
   const offPin =
     item !== null && !matchesPinnedGame(item.game_name, pinnedMatcher);
 
+  // A scenario's map never reaches the listing (issue #2600: the hub does not
+  // populate `map_name` for one), but the container this page fetches anyway
+  // names it at `setup.mapName`, and `scenarioPreview()` reads it in. Falling
+  // back to that costs no extra fetch, unlike the browse grid's card art,
+  // which has to open a container per card just to learn this.
+  const containerMapName =
+    fetched?.preview?.kind === "scenario" ? fetched.preview.map : null;
+  const mapName = item?.map_name ?? containerMapName;
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex flex-col gap-2 border-b border-border px-6 py-4">
@@ -335,8 +344,8 @@ export default function ItemPage() {
               {/* A pack draws its own maps under a heading, one or twenty
                   (issue #1721), and the row holds one name at most, so the slot
                   would show the first of them and no more. */}
-              {item.map_name && item.kind !== "setup-pack" && (
-                <ItemMapPicture mapName={item.map_name} />
+              {mapName && item.kind !== "setup-pack" && (
+                <ItemMapPicture mapName={mapName} />
               )}
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
                 <Meta label="Game">
@@ -354,7 +363,7 @@ export default function ItemPage() {
                   )}
                 </Meta>
                 <Meta label="Map">
-                  {item.map_name ?? (
+                  {mapName ?? (
                     <span className="text-muted-foreground">
                       Not tied to one map
                     </span>

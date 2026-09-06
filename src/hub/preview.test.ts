@@ -304,6 +304,7 @@ describe("readPreview", () => {
     };
     const expected = {
       kind: "scenario",
+      map: null,
       stats: [
         { label: "Objectives", value: "2" },
         { label: "Triggers", value: "3" },
@@ -321,6 +322,43 @@ describe("readPreview", () => {
       container("scenario", { scenario: { objectives: [], triggers: [] } }),
     );
     expect(preview).toBeNull();
+  });
+
+  it("reads a scenario's map off its setup (issue #2600)", () => {
+    const preview = readPreview(
+      container("scenario", {
+        scenario: {
+          objectives: [{}],
+          setup: { mapName: "Comet Catcher Redux", gameName: "SF 0.1" },
+        },
+      }),
+    );
+    expect(preview).toMatchObject({
+      kind: "scenario",
+      map: "Comet Catcher Redux",
+    });
+  });
+
+  it("shows a scenario with only an unnamed map and no other stats", () => {
+    const preview = readPreview(
+      container("scenario", {
+        scenario: { setup: { mapName: "Comet Catcher Redux" } },
+      }),
+    );
+    expect(preview).toEqual({
+      kind: "scenario",
+      map: "Comet Catcher Redux",
+      stats: [],
+    });
+  });
+
+  it("leaves the map null for a draft with none set yet", () => {
+    const preview = readPreview(
+      container("scenario", {
+        scenario: { objectives: [{}], setup: { mapName: "" } },
+      }),
+    );
+    expect(preview).toMatchObject({ kind: "scenario", map: null });
   });
 
   it("sizes a blueprint's squares by what each building stands on", () => {
