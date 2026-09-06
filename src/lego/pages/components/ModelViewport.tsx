@@ -336,22 +336,27 @@ interface Props {
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
   onGround?: () => void;
-  /** Duplicate the selected piece and everything under it (Cmd D). */
-  onDuplicate: () => void;
-  canDuplicate: boolean;
-  /**
-   * Paste under the selected piece (Cmd V). Always enabled: it reads the
-   * system clipboard on click, so there is nothing to check synchronously
-   * before then, and a mistaken paste reports itself rather than needing
-   * to be prevented.
-   */
-  onPaste: () => void;
-  /** Save the selected piece and everything under it, to reuse in another unit. */
-  onSaveAsCompound: () => void;
-  canSaveAsCompound: boolean;
-  /** Delete every selected piece (Backspace). */
-  onDelete: () => void;
-  canDelete: boolean;
+  /** The toolbar's actions on the current selection: duplicate, paste,
+   *  save as a compound and delete, and whether each is available. */
+  pieceActions: {
+    /** Duplicate the selected piece and everything under it (Cmd D). */
+    onDuplicate: () => void;
+    canDuplicate: boolean;
+    /**
+     * Paste under the selected piece (Cmd V). Always enabled: it reads the
+     * system clipboard on click, so there is nothing to check synchronously
+     * before then, and a mistaken paste reports itself rather than needing
+     * to be prevented.
+     */
+    onPaste: () => void;
+    /** Save the selected piece and everything under it, to reuse in another
+     *  unit. */
+    onSaveAsCompound: () => void;
+    canSaveAsCompound: boolean;
+    /** Delete every selected piece (Backspace). */
+    onDelete: () => void;
+    canDelete: boolean;
+  };
   /**
    * Whether a new piece gets a mirrored twin the first time it is placed off
    * the centre line (M). A setting for the session, not part of the unit, so it
@@ -412,13 +417,7 @@ export function ModelViewport({
   scriptPlayback,
   uniformScale = false,
   onGround,
-  onDuplicate,
-  canDuplicate,
-  onPaste,
-  onSaveAsCompound,
-  canSaveAsCompound,
-  onDelete,
-  canDelete,
+  pieceActions,
   symmetry,
   onSymmetryChange,
   placingAnchor = false,
@@ -447,6 +446,15 @@ export function ModelViewport({
     scriptFrame = 0,
     onScriptFrame,
   } = scriptPlayback;
+  const {
+    onDuplicate,
+    canDuplicate,
+    onPaste,
+    onSaveAsCompound,
+    canSaveAsCompound,
+    onDelete,
+    canDelete,
+  } = pieceActions;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.

@@ -907,16 +907,19 @@ function Builder({ id }: { id: string | undefined }) {
                   edit((project) => sitOnGround(project, pack, raw))
                 }
                 onReady={doc.onCapture}
-                onDuplicate={duplicateSelection}
-                canDuplicate={transformRoots(draft, selectedIds).length > 0}
-                onPaste={() => void pasteClipboard()}
-                onSaveAsCompound={() => void saveSelectionAsCompound()}
-                // Not for an imported unit: a compound is pieces made of
-                // parts, and one saved out of raw geometry would name meshes
-                // that only mean anything inside the unit they came from.
-                canSaveAsCompound={selectedIds.length > 0 && !imported}
-                onDelete={removeSelected}
-                canDelete={transformRoots(draft, selectedIds).length > 0}
+                pieceActions={{
+                  onDuplicate: duplicateSelection,
+                  canDuplicate: transformRoots(draft, selectedIds).length > 0,
+                  onPaste: () => void pasteClipboard(),
+                  onSaveAsCompound: () => void saveSelectionAsCompound(),
+                  // Not for an imported unit: a compound is pieces made of
+                  // parts, and one saved out of raw geometry would name
+                  // meshes that only mean anything inside the unit they
+                  // came from.
+                  canSaveAsCompound: selectedIds.length > 0 && !imported,
+                  onDelete: removeSelected,
+                  canDelete: transformRoots(draft, selectedIds).length > 0,
+                }}
                 symmetry={symmetry.on}
                 onSymmetryChange={symmetry.setOn}
                 placingAnchor={placingAnchor}
