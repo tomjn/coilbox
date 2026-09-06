@@ -359,11 +359,13 @@ interface Props {
   };
   /**
    * Whether a new piece gets a mirrored twin the first time it is placed off
-   * the centre line (M). A setting for the session, not part of the unit, so it
-   * lives with the page rather than the document.
+   * the centre line (M). A setting for the session, not part of the unit, so
+   * it lives with the page rather than the document.
    */
-  symmetry: boolean;
-  onSymmetryChange: (on: boolean) => void;
+  symmetry: {
+    on: boolean;
+    onChange: (on: boolean) => void;
+  };
   /**
    * Arms the next click on the model to drop a snap anchor where it lands,
    * rather than selecting. The gizmo comes off while it is armed, since its
@@ -419,7 +421,6 @@ export function ModelViewport({
   onGround,
   pieceActions,
   symmetry,
-  onSymmetryChange,
   placingAnchor = false,
   onPlaceAnchor,
   onCancelAnchor,
@@ -455,6 +456,7 @@ export function ModelViewport({
     onDelete,
     canDelete,
   } = pieceActions;
+  const { on: symmetryOn, onChange: onSymmetryChange } = symmetry;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
@@ -1123,9 +1125,9 @@ export function ModelViewport({
                 <TooltipTrigger asChild>
                   <Button
                     size="icon"
-                    variant={symmetry ? "default" : "outline"}
-                    onClick={() => onSymmetryChange(!symmetry)}
-                    aria-pressed={symmetry}
+                    variant={symmetryOn ? "default" : "outline"}
+                    onClick={() => onSymmetryChange(!symmetryOn)}
+                    aria-pressed={symmetryOn}
                     aria-label="Symmetry"
                   >
                     <FlipHorizontal2 className="size-4" />

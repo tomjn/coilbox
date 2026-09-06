@@ -920,8 +920,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,
                 }}
-                symmetry={symmetry.on}
-                onSymmetryChange={symmetry.setOn}
+                symmetry={{ on: symmetry.on, onChange: symmetry.setOn }}
                 placingAnchor={placingAnchor}
                 onPlaceAnchor={placeAnchor}
                 onCancelAnchor={() => setPlacingAnchor(false)}
