@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Ground } from "@/blueprint/buildable";
 import { buildGridSnap } from "@/blueprint/footprint";
 import {
-  loadUnitsyncUnitModel,
+  loadUnitsyncUnitModels,
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "@/content/config";
@@ -237,12 +237,17 @@ export function useScenarioUnits(
       minHeight,
       maxHeight,
       objectName: (def) => lookups.current.objectNames.get(def.toLowerCase()),
-      loadModel: (object) => {
+      loadModels: (objects) => {
         const gameArchive = lookups.current.resolve;
         if (!enginePath || !dataDir || !gameArchive) {
           return Promise.reject(new Error("no game to read models from"));
         }
-        return loadUnitsyncUnitModel(enginePath, dataDir, gameArchive, object);
+        return loadUnitsyncUnitModels(
+          enginePath,
+          dataDir,
+          gameArchive,
+          objects,
+        );
       },
       teamColor: (team) => teamColor(lookups.current.participants, team),
       motion: () => !still.current,

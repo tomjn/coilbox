@@ -64,12 +64,13 @@ import {
   unitsyncThumbnails,
   unitsyncUnitBuildpics,
   unitsyncUnitDataset,
-  unitsyncUnitModel,
+  unitsyncUnitModels,
 } from "./bindings";
 import { liveCacheHit } from "./cachedFile";
 import { engineLabel, newestEngineId } from "./engineVersion";
 import { shareInFlight } from "./inFlight";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
+import { readCachedModel } from "./modelFile";
 import { deriveSetup } from "./setup";
 import { unitIconDataUrl } from "./unitIcon";
 
@@ -742,36 +743,71 @@ export function useUnitsyncUnitDataset(
   return { dataset, status, reload, loading: status === "loading" };
 }
 
-/** Session cache of read models, keyed by `dataDir::engine::game::object`. */
-const unitModelCache = new Map<string, UnitModelResult>();
-/** In-flight reads, so a view asking for the same model twice waits once. */
-const unitModelPending = new Map<string, Promise<UnitModelResult>>();
+/** Session cache of read models, keyed by `dataDir::engine::game::object`.
+ *  Null for an object the game has no model for, so it is not asked again. */
+const unitModelCache = new Map<string, UnitModelResult | null>();
+/** In-flight batch reads, so two draws asking for one list wait once. */
+const unitModelsPending = new Map<
+  string,
+  Promise<Map<string, UnitModelResult | null>>
+>();
 
 /**
- * Read one unit's model, off the session cache when it is already there.
+ * Read several units' models in one archive mount, off the session cache for
+ * any already read.
  *
- * The promise behind {@link useUnitsyncUnitModel}, for a view that needs many
- * models at once rather than one: the scenario editor draws every unit a
- * document places, which is a list it only knows at render time and cannot turn
- * into a fixed number of hook calls.
+ * For a view that needs many models at once rather than one: the scenario
+ * editor draws every unit a document places, which is a list it only knows at
+ * render time and cannot turn into a fixed number of hook calls. One mount for
+ * the list rather than one a model, because a mount is a second or more on a
+ * large game (issue #1684). The models come back as files in the model cache
+ * dir and are read over the asset protocol, so a whole scenario's geometry
+ * never crosses the IPC bridge at once.
+ *
+ * The map answers every object asked for: the model, or null for one the game
+ * has no model for.
  */
-export function loadUnitsyncUnitModel(
+export async function loadUnitsyncUnitModels(
   enginePath: string,
   dataDir: string,
   gameArchive: string,
-  object: string,
-): Promise<UnitModelResult> {
-  const key = `${dataDir}::${enginePath}::${gameArchive}::${object}`;
-  const cached = unitModelCache.get(key);
-  if (cached) return Promise.resolve(cached);
-  return shareInFlight(unitModelPending, key, () =>
-    unitsyncUnitModel({ enginePath, dataDir, gameArchive, object }).then(
-      (res) => {
-        unitModelCache.set(key, res);
-        return res;
-      },
-    ),
+  objects: string[],
+): Promise<Map<string, UnitModelResult | null>> {
+  const prefix = `${dataDir}::${enginePath}::${gameArchive}`;
+  const out = new Map<string, UnitModelResult | null>();
+  const wanted: string[] = [];
+  for (const object of objects) {
+    const cached = unitModelCache.get(`${prefix}::${object}`);
+    if (cached !== undefined) out.set(object, cached);
+    else wanted.push(object);
+  }
+  if (wanted.length === 0) return out;
+  wanted.sort();
+  const read = await shareInFlight(
+    unitModelsPending,
+    `${prefix}::${wanted.join("|")}`,
+    async () => {
+      const res = await unitsyncUnitModels({
+        enginePath,
+        dataDir,
+        gameArchive,
+        objects: wanted,
+      });
+      const got = new Map<string, UnitModelResult | null>();
+      await Promise.all(
+        wanted.map(async (object) => {
+          const file = res.models[object];
+          got.set(object, file ? await readCachedModel(file.file) : null);
+        }),
+      );
+      for (const [object, model] of got) {
+        unitModelCache.set(`${prefix}::${object}`, model);
+      }
+      return got;
+    },
   );
+  for (const [object, model] of read) out.set(object, model);
+  return out;
 }
 
 /**
@@ -800,20 +836,22 @@ export function useUnitsyncUnitModel(
     }
     const key = `${dataDir}::${enginePath}::${gameArchive}::${object}`;
     const cached = unitModelCache.get(key);
-    if (cached) {
+    if (cached !== undefined) {
       setModel(cached);
       setLoading(false);
-      setFailed(false);
+      setFailed(cached === null);
       return;
     }
     let cancelled = false;
     setModel(null);
     setFailed(false);
     setLoading(true);
-    loadUnitsyncUnitModel(enginePath, dataDir, gameArchive, object)
-      .then((res) => {
+    loadUnitsyncUnitModels(enginePath, dataDir, gameArchive, [object])
+      .then((got) => {
         if (cancelled) return;
+        const res = got.get(object) ?? null;
         setModel(res);
+        setFailed(res === null);
         setLoading(false);
       })
       .catch(() => {

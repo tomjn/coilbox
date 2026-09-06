@@ -90,8 +90,12 @@ export interface UnitsLayerDeps {
   maxHeight: number;
   /** The unitdef's `objectname`, or undefined when the game has no such unit. */
   objectName: (def: string) => string | undefined;
-  /** Read a model by `objectname`. Rejects when unitsync cannot be reached. */
-  loadModel: (object: string) => Promise<UnitModelResult>;
+  /** Read models by `objectname`, in one ask for the lot, because each ask
+   *  mounts the game's archive. A name the game has no model for maps to
+   *  null. Rejects when unitsync cannot be reached. */
+  loadModels: (
+    objects: string[],
+  ) => Promise<Map<string, UnitModelResult | null>>;
   /** The colour a team's units are painted in, as 0..1 float RGB. */
   teamColor: (team: string) => Rgb;
   /** Whether motion is wanted, read at draw time because it is a preference
@@ -200,6 +204,8 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   /** Built models, keyed by `objectname` and colour, or by colour alone for the
    *  marker. Kept across redraws. */
   const prototypes = new Map<string, BuiltModel>();
+  /** Objects a read came back without, so a redraw does not ask again. */
+  const modelless = new Set<string>();
   const objects = new Map<string, THREE.Object3D>();
   const watchers = new Set<() => void>();
   let generation = 0;
@@ -312,21 +318,20 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   const prototypeFor = async (
     def: string,
     colour: THREE.Color,
+    models: ReadonlyMap<string, UnitModelResult | null>,
   ): Promise<{ built: BuiltModel; drawable: boolean }> => {
     const object = deps.objectName(def);
     if (!object) return { built: markerFor(colour), drawable: false };
     const key = `${object}|${colour.getHexString()}`;
     const cached = prototypes.get(key);
     if (cached) return { built: cached, drawable: true };
-    let model: UnitModelResult | null = null;
-    try {
-      model = await deps.loadModel(object);
-    } catch {
-      model = null;
-    }
+    const model = models.get(object) ?? null;
     // A model that read but has no pieces draws nothing at all, which is the
     // same problem as a missing one from the map's point of view.
-    if (!model?.root) return { built: markerFor(colour), drawable: false };
+    if (!model?.root) {
+      modelless.add(object);
+      return { built: markerFor(colour), drawable: false };
+    }
     // Merged, because a model on the map is only ever drawn standing still and
     // its piece tree costs a draw call a piece for every unit placed (#2293).
     //
@@ -457,27 +462,57 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
       else batches.set(key, [placement]);
     }
 
+    // One read for every model this pass needs and has not built yet. Each
+    // read mounts the game's archive, which on a large game is a second or
+    // more, so eleven unit types were eleven mounts one after another.
+    const wanted = new Set<string>();
     for (const batch of batches.values()) {
+      const object = deps.objectName(batch[0].def);
+      if (!object || modelless.has(object)) continue;
       const colour = colorOf(deps.teamColor(batch[0].team));
-      const { built, drawable } = await prototypeFor(batch[0].def, colour);
-      if (disposed || mine !== generation) return { missing: drawnMissing() };
-      for (const placement of batch) {
-        const instance = built.object.clone();
-        place(instance, placement);
-        arriving.push({ object: instance, born: performance.now() });
-        sizeAt(instance, ARRIVE_FROM);
-        root.add(instance);
-        shown.set(placement.key, {
-          object: instance,
-          def: placement.def,
-          colour: colours.get(placement.key) ?? "",
-          at: standingAt(placement),
-          drawable,
-        });
-        objects.set(placement.key, instance);
-      }
-      handle.render();
+      if (prototypes.has(`${object}|${colour.getHexString()}`)) continue;
+      wanted.add(object);
     }
+    let models: Map<string, UnitModelResult | null> = new Map();
+    if (wanted.size > 0) {
+      try {
+        models = await deps.loadModels([...wanted]);
+      } catch {
+        models = new Map();
+      }
+    }
+    if (disposed || mine !== generation) return { missing: drawnMissing() };
+
+    // Each formation stands up as its own model is built rather than waiting
+    // for the last one, and the builds run together.
+    await Promise.all(
+      [...batches.values()].map(async (batch) => {
+        const colour = colorOf(deps.teamColor(batch[0].team));
+        const { built, drawable } = await prototypeFor(
+          batch[0].def,
+          colour,
+          models,
+        );
+        if (disposed || mine !== generation) return;
+        for (const placement of batch) {
+          const instance = built.object.clone();
+          place(instance, placement);
+          arriving.push({ object: instance, born: performance.now() });
+          sizeAt(instance, ARRIVE_FROM);
+          root.add(instance);
+          shown.set(placement.key, {
+            object: instance,
+            def: placement.def,
+            colour: colours.get(placement.key) ?? "",
+            at: standingAt(placement),
+            drawable,
+          });
+          objects.set(placement.key, instance);
+        }
+        handle.render();
+      }),
+    );
+    if (disposed || mine !== generation) return { missing: drawnMissing() };
 
     wake();
     handle.render();
