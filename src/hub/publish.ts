@@ -6,6 +6,8 @@ import {
   makeContainer,
 } from "@/container/container";
 import { MAX_IMPORT_BYTES } from "@/deeplink/fetchImport";
+import { isSetUp } from "@/scenario/listing";
+import { parseScenarioPayload } from "@/scenario/transfer";
 import {
   COLD_START,
   HUB_KINDS,
@@ -82,6 +84,17 @@ export function whyNotPublishable(publication: Publication): string | null {
   const size = new TextEncoder().encode(JSON.stringify(container)).byteLength;
   if (size > MAX_IMPORT_BYTES) {
     return "This is too large to share. Coilbox would refuse to import it.";
+  }
+
+  // A scenario naming no game and map is a draft, not a valid empty value
+  // (issue #2603). `isSetUp` is the same judgement the Scenarios page filters
+  // playable ones by, so publishing cannot hand the hub something nobody could
+  // ever launch.
+  if (found.kind === "scenario") {
+    const parsed = parseScenarioPayload(container.payload);
+    if (parsed && !isSetUp(parsed.scenario)) {
+      return "This scenario names no game and map, so there is nothing to play yet. Set both before sharing it.";
+    }
   }
 
   if (publication.title.trim() === "") {
