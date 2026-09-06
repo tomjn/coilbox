@@ -13,6 +13,7 @@ import {
   CARD_SHELL_CLASS,
 } from "../cardShell";
 import { forgetContentArt } from "../contentArt";
+import { groupDescription } from "../groupDescription";
 import { homeToolGroups, splitGroupItems } from "../nav";
 import { openExternal, useResolvedNavItem } from "../navItem";
 import { accentHueRotate, useThemeColor } from "../useThemeColor";
@@ -75,6 +76,7 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
     <div className="mt-6 space-y-8">
       {groups.map((group) => {
         const { tools, links } = splitGroupItems(group.items);
+        const description = groupDescription(group.id);
         // The suggested map's card is a picture of a map, so a group holding it
         // has a picture in it whatever its tools resolved to.
         const withSuggested = group.id === SUGGESTED_MAP_GROUP && suggested;
@@ -87,9 +89,19 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
             className="hidden has-[[data-nav-item]]:block"
           >
             {group.label && (
-              <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {group.label}
-              </h2>
+              <div className="mb-3">
+                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {group.label}
+                </h2>
+                {/* What the group is for, in one line. Absent for the link
+                    groups a distribution injects, which this cannot describe.
+                    See `../groupDescription`. */}
+                {description && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {description}
+                  </p>
+                )}
+              </div>
             )}
             <div className="flex flex-wrap gap-3">
               {tools.map((item) => (
