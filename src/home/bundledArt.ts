@@ -1418,44 +1418,60 @@ const uberstressHistory: Drawing = {
  * on look at the same grid as everyone else.
  */
 /**
- * Colour chips set around a ring, with one lifted out and enlarged.
+ * Three colour fields overlapping, with the tones they make laid out beneath.
  *
  * Appearance is the one settings page whose subject is colour itself, so the
- * picture is the choice rather than the control that makes it. Laid out as a row
- * the chips read as a legend to something, which is what a card has no room to
- * explain. On a ring they read as a palette to pick from, and the lifted one
- * says a pick has been made.
+ * picture is the choice rather than the control that makes it.
+ *
+ * Two drafts went before this. A ring of chips read as a diagram: a symmetric
+ * object with empty margins, where every card around it is a crop of somewhere.
+ * Chips riding a curve fixed the composition and broke a different rule, because
+ * markers spaced along a sweeping line is exactly what the Campaigns card is,
+ * and at card size the two were the same picture in different colours.
+ *
+ * Overlapping fields belong to nothing else on the page, and they say what a
+ * palette is for rather than what it looks like: colours that make other colours
+ * where they meet. The strip along the foot is what came out.
  */
 const appearanceSettings: Drawing = {
   pools: [
-    [138, 78, 126, 0.18],
-    [258, 132, 84, 0.09],
+    [150, 74, 132, 0.19],
+    [268, 148, 88, 0.09],
   ],
   paint: (p) => {
-    const cx = 138;
-    const cy = 84;
-    const chips = [
-      [138, 38],
-      [171, 51],
-      [184, 84],
-      [171, 117],
-      [138, 130],
-      [105, 117],
-      [92, 84],
-      [105, 51],
-    ]
+    const fields: readonly (readonly [number, number, number])[] = [
+      [116, 72, 52],
+      [176, 66, 46],
+      [148, 116, 44],
+    ];
+    const washes = fields
       .map(
-        ([x, y], i) =>
-          `<circle cx="${x}" cy="${y}" r="7.5" fill="${p.line}" fill-opacity="${round(0.22 + (i % 4) * 0.11)}"/>`,
+        ([x, y, r], i) =>
+          `<circle cx="${x}" cy="${y}" r="${r}" fill="${i === 2 ? p.line : p.faint}" fill-opacity="${round(0.12 + i * 0.02)}"/>`,
+      )
+      .join("");
+    const edges = fields
+      .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`)
+      .join("");
+    const grid = [-20, 20, 60, 100, 140, 180, 220, 260, 300]
+      .map((x) => `<path d="M${x} -10 L${x} 210"/>`)
+      .join("");
+    // What the fields resolve to, read off left to right. Cropped by the right
+    // edge, so the strip is longer than the card.
+    const strip = [0, 1, 2, 3, 4, 5, 6]
+      .map(
+        (i) =>
+          `<rect x="${218 + i * 18}" y="${104 - i * 2}" width="13" height="${26 + i * 2}" rx="2.5" fill="${p.line}" fill-opacity="${round(0.5 - i * 0.06)}"/>`,
       )
       .join("");
     return (
-      `<circle cx="${cx}" cy="${cy}" r="46" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.3"/>` +
-      `<circle cx="${cx}" cy="${cy}" r="30" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.16"/>` +
-      chips +
-      `<path d="M196 80 L232 72" fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.34" stroke-linecap="round"/>` +
-      `<circle cx="254" cy="70" r="17" fill="${p.spark}" fill-opacity="0.5"/>` +
-      `<circle cx="254" cy="70" r="17" fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.75"/>`
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.08">${grid}</g>` +
+      washes +
+      `<g fill="none" stroke="${p.line}" stroke-width="1.4" stroke-opacity="0.4">${edges}</g>` +
+      strip +
+      // Where all three meet, which is the one tone none of them had alone.
+      `<circle cx="147" cy="85" r="13" fill="${p.spark}" fill-opacity="0.42"/>` +
+      `<circle cx="147" cy="85" r="13" fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.8"/>`
     );
   },
 };
@@ -1541,36 +1557,52 @@ const accountSettings: Drawing = {
 };
 
 /**
- * One dial, turned, with its scale around it.
+ * A panel of dials, cropped, one of them under the hand.
  *
- * The index page over every section, so the picture is the act of adjusting
- * rather than any one thing adjusted. Deliberately a single object with a
- * pointer: the Appearance card is also round, and eight chips scattered on a
- * ring against one dial with a needle do not read as the same picture.
+ * The index page over every section, so the subject is the whole bank rather
+ * than any one control on it. A single centred dial said "a setting". Several at
+ * different sizes, one running off the left edge, say "all of them", and let the
+ * card be a crop of a bigger panel the way the tool cards around it are.
+ *
+ * Only the dial in focus gets a needle and a full scale. The others are turned
+ * down to structure, so the eye lands once rather than reading three faces.
  */
 const allSettings: Drawing = {
   pools: [
-    [160, 80, 132, 0.18],
-    [62, 140, 80, 0.09],
+    [196, 68, 130, 0.19],
+    [46, 152, 96, 0.1],
   ],
   paint: (p) => {
-    const cx = 160;
-    const cy = 84;
-    const ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-      .map((i) => {
-        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
-        const inner = 52;
-        const outer = i % 3 === 0 ? 64 : 59;
+    /** Tick marks around a dial, every third one longer. */
+    const scale = (cx: number, cy: number, inner: number, count: number) =>
+      Array.from({ length: count }, (_, i) => {
+        const a = (i / count) * Math.PI * 2 - Math.PI / 2;
+        const outer = inner + (i % 3 === 0 ? 11 : 6);
         return `<path d="M${round(cx + Math.cos(a) * inner)} ${round(cy + Math.sin(a) * inner)} L${round(cx + Math.cos(a) * outer)} ${round(cy + Math.sin(a) * outer)}"/>`;
-      })
-      .join("");
+      }).join("");
+    const face = (cx: number, cy: number, r: number, opacity: number) =>
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${p.line}" fill-opacity="${round(opacity * 0.5)}"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${p.line}" stroke-width="1.5" stroke-opacity="${opacity}"/>`;
     return (
-      `<g fill="none" stroke="${p.faint}" stroke-width="1.4" stroke-opacity="0.34" stroke-linecap="round">${ticks}</g>` +
-      `<circle cx="${cx}" cy="${cy}" r="44" fill="${p.line}" fill-opacity="0.12"/>` +
-      `<circle cx="${cx}" cy="${cy}" r="44" fill="none" stroke="${p.line}" stroke-width="1.6" stroke-opacity="0.5"/>` +
-      `<circle cx="${cx}" cy="${cy}" r="26" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.2"/>` +
-      `<path d="M${cx} ${cy} L191 60" fill="none" stroke="${p.spark}" stroke-width="2.6" stroke-opacity="0.8" stroke-linecap="round"/>` +
-      `<circle cx="${cx}" cy="${cy}" r="5" fill="${p.spark}" fill-opacity="0.9"/>`
+      // The rail the bank is mounted on, running the full width.
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.16">` +
+      '<path d="M-10 32 L330 32"/>' +
+      '<path d="M-10 148 L330 148"/>' +
+      "</g>" +
+      // Cropped by the left edge, which is what makes this a panel rather than a
+      // diagram of three circles.
+      face(-4, 104, 40, 0.24) +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.22">${scale(-4, 104, 46, 12)}</g>` +
+      face(78, 56, 26, 0.3) +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.26">${scale(78, 56, 32, 10)}</g>` +
+      `<path d="M78 56 L62 38" fill="none" stroke="${p.faint}" stroke-width="2" stroke-opacity="0.5" stroke-linecap="round"/>` +
+      // The one in focus.
+      face(208, 92, 44, 0.5) +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.4" stroke-opacity="0.4" stroke-linecap="round">${scale(208, 92, 51, 12)}</g>` +
+      `<circle cx="208" cy="92" r="26" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.24"/>` +
+      `<path d="M208 92 L240 64" fill="none" stroke="${p.spark}" stroke-width="2.8" stroke-opacity="0.85" stroke-linecap="round"/>` +
+      `<circle cx="208" cy="92" r="5" fill="${p.spark}" fill-opacity="0.9"/>` +
+      `<circle cx="240" cy="64" r="3.5" fill="${p.spark}" fill-opacity="0.6"/>`
     );
   },
 };
