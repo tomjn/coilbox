@@ -1,11 +1,10 @@
-import { Slot, useTheme } from "@picoframe/frame";
+import { Slot } from "@picoframe/frame";
 import { Fragment, type ReactNode } from "react";
-import { backdropStyle, resolveHomeBackground } from "./background";
 import { type HomeEntry, type ZoneId, zonesOnPage } from "./config";
 import HomeMarkup from "./HomeMarkup";
 import type { HomeLayoutProps } from "./layout";
 import type { SuggestedPlacement } from "./suggestedMap";
-import { accentHueRotate, useThemeColor } from "./useThemeColor";
+import { useHomeBackdropStyle } from "./useHomeBackdropStyle";
 import Continue from "./zones/Continue";
 import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
@@ -36,20 +35,9 @@ export default function StackedLayout({
   background,
   suggested = "cards",
 }: HomeLayoutProps) {
-  // The resolved scheme and the reactive colour, so the default backdrop's
-  // drawing repaints when the ramp flips or the accent changes, the same way
-  // the tool cards re-ask the chain. A cycling accent additionally
-  // counter-rotates the drawing's hue so it turns with the page (see
-  // `accentHueRotate`), but only the default: a distribution's own image is
-  // not theme-tinted.
-  const { resolved, accent } = useTheme();
-  const themeColor = useThemeColor();
-  const resolvedBackground = resolveHomeBackground(background);
-  const backdrop = backdropStyle(resolvedBackground, resolved, themeColor);
-  if (backdrop && resolvedBackground.kind === "default") {
-    const hueFilter = accentHueRotate(accent, themeColor);
-    if (hueFilter) backdrop.filter = hueFilter;
-  }
+  // See `./useHomeBackdropStyle` for what this resolves to and why the hue
+  // rotation for a cycling accent lives there rather than here.
+  const backdrop = useHomeBackdropStyle(background);
   return (
     <div className="relative min-h-full">
       {backdrop && (

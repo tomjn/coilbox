@@ -20,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { EmptyState } from "@/downloads/pages/components/states";
+import { resolveHome } from "@/home/config";
+import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import { isProfileHidden } from "../../profile/hidden";
 import {
@@ -122,6 +124,14 @@ export default function BrowsePage() {
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // The same backdrop the home page paints, at the same profile-resolved
+  // strength (issue #2564). `resolveHome` reads the one `home.background` key
+  // the home page reads, and `useHomeBackdropStyle` is the home page's own
+  // resolution of it into a style, not a second one written for this page.
+  const backdrop = useHomeBackdropStyle(
+    resolveHome(getProfile().home).background,
+  );
 
   // The distribution's own game pin, if it set one. Read once: the profile is
   // loaded at startup and never changes, and a fresh predicate every render would
@@ -348,154 +358,179 @@ export default function BrowsePage() {
         )}
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        {loading && !page && (
-          <p
-            role="status"
-            className="flex items-center gap-2 p-6 text-sm text-muted-foreground"
-          >
-            <Loader2 size={15} className="animate-spin" /> Loading the hub…
-          </p>
+      <div className="relative min-h-0 flex-1">
+        {/* The home page's own backdrop (issue #2564), on a layer behind the
+            grid rather than inside the scrolling area: this div is a fixed-size
+            flex item, so an absolutely positioned child fills the visible area
+            and stays put while the grid beneath it scrolls, with no sticky
+            trick needed. `pointer-events-none` and no `z-index` keep it out of
+            the cards' stacking order, so the title link's whole-card hit area
+            and the raised chips/actions (issue #2561) still take every click. */}
+        {backdrop && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-background"
+            style={backdrop}
+          />
         )}
-        {error && (
-          <Alert variant="destructive" className="m-2">
-            <AlertCircle size={15} />
-            <AlertDescription className="flex flex-wrap items-center gap-3 text-destructive">
-              {error}
-              <Button variant="outline" size="sm" onClick={retry}>
-                <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try again
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        {/* The previous page's results, dimmed rather than unmounted, while a
-            fetch for new ones is in flight (issue #2560). An error above does
-            not clear this: whatever was on screen stays there. */}
-        <div className={loading ? "opacity-60 transition-opacity" : undefined}>
-          {page && page.items.length === 0 && (
-            <EmptyState icon={Globe}>
-              {emptyReason(
-                active.length > 0 || !!filters.kind || !!filters.q?.trim(),
-                pinnedMatcher !== null,
-                pinnedGame,
-              )}
-            </EmptyState>
-          )}
-          {page && page.items.length > 0 && (
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
-              {page.items.map((item) => {
-                const presence = presenceOf(item);
-                return (
-                  <li
-                    key={item.id}
-                    // Three groups with room between them - what it is, what it is
-                    // for, what to do about it - rather than five evenly spaced
-                    // lines, which read as one undifferentiated block.
-                    //
-                    // `relative` is what the title link's `after:inset-0` covers:
-                    // it stretches to the nearest positioned ancestor, which is
-                    // this element, so the whole card is the hit area (issue
-                    // #2561) while the chips and action button stay reachable by
-                    // sitting above it in stacking order (`relative z-10` below).
-                    className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
-                  >
-                    <div className="flex w-full flex-col gap-1.5 text-left">
-                      <Link
-                        to={hubItemRoute(item.id)}
-                        className="text-sm font-medium after:absolute after:inset-0 hover:underline"
-                      >
-                        {item.title}
-                      </Link>
-                      {/* Under the title, and free to wrap. Beside each other on
-                          one line, a narrow card squeezed the date until it broke
-                          across three lines and set the row's height. */}
-                      <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
-                        <Badge variant="secondary" className="gap-1">
-                          <KindIcon kind={item.kind} mode={item.mode} />
-                          {describeItem(item.kind, item.mode)}
-                        </Badge>
-                        <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                          {formatDate(item.created_at)}
-                        </span>
-                      </span>
-                      {item.description && (
-                        <span className="mt-1 line-clamp-3 text-xs text-muted-foreground">
-                          {item.description}
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative z-10 flex flex-wrap gap-1.5 text-xs">
-                      {item.game_name &&
-                        (pinnedMatcher ? (
-                          <span className={CHIP_CLASS}>{item.game_name}</span>
-                        ) : (
-                          <FilterChip
-                            label={item.game_name}
-                            onClick={() =>
-                              setFilter("game", item.game_name ?? "")
-                            }
-                          />
-                        ))}
-                      {item.map_name && (
-                        <FilterChip
-                          label={item.map_name}
-                          onClick={() => setFilter("map", item.map_name ?? "")}
-                        />
-                      )}
-                      <FilterChip
-                        label={`by ${item.author_name}`}
-                        onClick={() => setFilter("author", item.author_name)}
-                      />
-                      {item.tags.map((tag) => (
-                        <FilterChip
-                          key={tag}
-                          label={`#${tag}`}
-                          onClick={() => setFilter("tag", tag)}
-                        />
-                      ))}
-                    </div>
-                    <ItemActions
-                      item={item}
-                      presence={presence}
-                      onOpen={(route) => navigate(route)}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {page?.truncated && (
-            <p className="mt-4 max-w-prose text-xs text-muted-foreground">
-              Only the first {page.truncated.scanned} items on the hub were
-              read, so there may be more for this game than are listed here.
-              Search to narrow it down.
+        <div className="h-full overflow-auto p-4">
+          {loading && !page && (
+            <p
+              role="status"
+              className="flex items-center gap-2 p-6 text-sm text-muted-foreground"
+            >
+              <Loader2 size={15} className="animate-spin" /> Loading the hub…
             </p>
           )}
-          {page && lastPage > 1 && (
-            <div className="mt-4 flex items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={current <= 1}
-                onClick={() =>
-                  setFilters((f) => ({ ...f, page: Math.max(1, current - 1) }))
-                }
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {current} of {lastPage}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={current >= lastPage}
-                onClick={() => setFilters((f) => ({ ...f, page: current + 1 }))}
-              >
-                Next
-              </Button>
-            </div>
+          {error && (
+            <Alert variant="destructive" className="m-2">
+              <AlertCircle size={15} />
+              <AlertDescription className="flex flex-wrap items-center gap-3 text-destructive">
+                {error}
+                <Button variant="outline" size="sm" onClick={retry}>
+                  <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try again
+                </Button>
+              </AlertDescription>
+            </Alert>
           )}
+          {/* The previous page's results, dimmed rather than unmounted, while a
+            fetch for new ones is in flight (issue #2560). An error above does
+            not clear this: whatever was on screen stays there. */}
+          <div
+            className={loading ? "opacity-60 transition-opacity" : undefined}
+          >
+            {page && page.items.length === 0 && (
+              <EmptyState icon={Globe}>
+                {emptyReason(
+                  active.length > 0 || !!filters.kind || !!filters.q?.trim(),
+                  pinnedMatcher !== null,
+                  pinnedGame,
+                )}
+              </EmptyState>
+            )}
+            {page && page.items.length > 0 && (
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
+                {page.items.map((item) => {
+                  const presence = presenceOf(item);
+                  return (
+                    <li
+                      key={item.id}
+                      // Three groups with room between them - what it is, what it is
+                      // for, what to do about it - rather than five evenly spaced
+                      // lines, which read as one undifferentiated block.
+                      //
+                      // `relative` is what the title link's `after:inset-0` covers:
+                      // it stretches to the nearest positioned ancestor, which is
+                      // this element, so the whole card is the hit area (issue
+                      // #2561) while the chips and action button stay reachable by
+                      // sitting above it in stacking order (`relative z-10` below).
+                      className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
+                    >
+                      <div className="flex w-full flex-col gap-1.5 text-left">
+                        <Link
+                          to={hubItemRoute(item.id)}
+                          className="text-sm font-medium after:absolute after:inset-0 hover:underline"
+                        >
+                          {item.title}
+                        </Link>
+                        {/* Under the title, and free to wrap. Beside each other on
+                          one line, a narrow card squeezed the date until it broke
+                          across three lines and set the row's height. */}
+                        <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+                          <Badge variant="secondary" className="gap-1">
+                            <KindIcon kind={item.kind} mode={item.mode} />
+                            {describeItem(item.kind, item.mode)}
+                          </Badge>
+                          <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                            {formatDate(item.created_at)}
+                          </span>
+                        </span>
+                        {item.description && (
+                          <span className="mt-1 line-clamp-3 text-xs text-muted-foreground">
+                            {item.description}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative z-10 flex flex-wrap gap-1.5 text-xs">
+                        {item.game_name &&
+                          (pinnedMatcher ? (
+                            <span className={CHIP_CLASS}>{item.game_name}</span>
+                          ) : (
+                            <FilterChip
+                              label={item.game_name}
+                              onClick={() =>
+                                setFilter("game", item.game_name ?? "")
+                              }
+                            />
+                          ))}
+                        {item.map_name && (
+                          <FilterChip
+                            label={item.map_name}
+                            onClick={() =>
+                              setFilter("map", item.map_name ?? "")
+                            }
+                          />
+                        )}
+                        <FilterChip
+                          label={`by ${item.author_name}`}
+                          onClick={() => setFilter("author", item.author_name)}
+                        />
+                        {item.tags.map((tag) => (
+                          <FilterChip
+                            key={tag}
+                            label={`#${tag}`}
+                            onClick={() => setFilter("tag", tag)}
+                          />
+                        ))}
+                      </div>
+                      <ItemActions
+                        item={item}
+                        presence={presence}
+                        onOpen={(route) => navigate(route)}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {page?.truncated && (
+              <p className="mt-4 max-w-prose text-xs text-muted-foreground">
+                Only the first {page.truncated.scanned} items on the hub were
+                read, so there may be more for this game than are listed here.
+                Search to narrow it down.
+              </p>
+            )}
+            {page && lastPage > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={current <= 1}
+                  onClick={() =>
+                    setFilters((f) => ({
+                      ...f,
+                      page: Math.max(1, current - 1),
+                    }))
+                  }
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {current} of {lastPage}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={current >= lastPage}
+                  onClick={() =>
+                    setFilters((f) => ({ ...f, page: current + 1 }))
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
