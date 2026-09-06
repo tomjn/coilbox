@@ -380,29 +380,33 @@ interface Props {
     /** A click that missed the model, which is how you change your mind. */
     onCancelAnchor?: () => void;
   };
-  /**
-   * Puts the gizmo on the collision volume rather than on the selected piece,
-   * so its size and where it sits are dragged rather than typed. The volume is
-   * shown while this is on whether or not its own toggle is.
-   */
-  editCollision?: boolean;
-  /** Where a dragged volume goes. Committed on release, like a piece's. */
-  onCollisionChange?: (volume: LegoCollisionVolume) => void;
-  /**
-   * The piece whose own box takes the handles instead, drawn wide so it stands
-   * out from the rest. Null leaves them on the unit's volume.
-   *
-   * A separate prop from `editCollision` rather than a mode inside it, because
-   * the two boxes are set in the same panel and only one of them can have the
-   * handles at a time: whichever the panel says.
-   */
-  editPieceCollisionId?: string | null;
-  /** Where a dragged piece box goes. The piece keeps whether anything hits it,
-   *  which the panel owns, so only the volume comes back here. */
-  onPieceCollisionVolumeChange?: (
-    pieceId: string,
-    volume: LegoCollisionVolume,
-  ) => void;
+  /** The collision volume, the unit's own or one piece's, while its panel
+   *  has the gizmo on it. */
+  collisionEditing: {
+    /**
+     * Puts the gizmo on the collision volume rather than on the selected
+     * piece, so its size and where it sits are dragged rather than typed.
+     * The volume is shown while this is on whether or not its own toggle is.
+     */
+    editCollision?: boolean;
+    /** Where a dragged volume goes. Committed on release, like a piece's. */
+    onCollisionChange?: (volume: LegoCollisionVolume) => void;
+    /**
+     * The piece whose own box takes the handles instead, drawn wide so it
+     * stands out from the rest. Null leaves them on the unit's volume.
+     *
+     * A separate field from `editCollision` rather than a mode inside it,
+     * because the two boxes are set in the same panel and only one of them
+     * can have the handles at a time: whichever the panel says.
+     */
+    editPieceCollisionId?: string | null;
+    /** Where a dragged piece box goes. The piece keeps whether anything hits
+     *  it, which the panel owns, so only the volume comes back here. */
+    onPieceCollisionVolumeChange?: (
+      pieceId: string,
+      volume: LegoCollisionVolume,
+    ) => void;
+  };
   /** Draws the aim point whether or not its own toggle is on, so the panel
    *  that sets it has the point it is about on screen. */
   showAimPoint?: boolean;
@@ -426,10 +430,7 @@ export function ModelViewport({
   pieceActions,
   symmetry,
   anchorPlacement,
-  editCollision = false,
-  onCollisionChange,
-  editPieceCollisionId = null,
-  onPieceCollisionVolumeChange,
+  collisionEditing,
   showAimPoint = false,
   onAimChange,
 }: Props) {
@@ -464,6 +465,12 @@ export function ModelViewport({
     onPlaceAnchor,
     onCancelAnchor,
   } = anchorPlacement;
+  const {
+    editCollision = false,
+    onCollisionChange,
+    editPieceCollisionId = null,
+    onPieceCollisionVolumeChange,
+  } = collisionEditing;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.

@@ -926,38 +926,40 @@ function Builder({ id }: { id: string | undefined }) {
                   onPlaceAnchor: placeAnchor,
                   onCancelAnchor: () => setPlacingAnchor(false),
                 }}
-                // The panel is where a volume is read and changed, so opening it
-                // is what puts the handles on the volume. Nothing else has to be
-                // switched on, and closing it gives them back to the pieces.
-                // Putting the whole side panel away closes it too, so the handles
-                // never outlive the thing that explains them.
-                editCollision={collisionOpen}
-                onCollisionChange={(collisionVolume) =>
-                  edit((project) => ({ ...project, collisionVolume }))
-                }
-                // The selected piece while this panel is open, and null the
-                // rest of the time, which leaves the handles on the unit's own
-                // volume. See `collisionPieceId`.
-                editPieceCollisionId={collisionPieceId}
-                onPieceCollisionVolumeChange={(pieceId, volume) =>
-                  edit((project) => ({
-                    ...project,
-                    pieces: project.pieces.map((piece) =>
-                      piece.id === pieceId
-                        ? {
-                            ...piece,
-                            // A dragged box keeps whether anything hits the
-                            // piece, which is the switch above it in the panel
-                            // and not something a drag has an opinion about.
-                            collision: {
-                              hit: piece.collision?.hit !== false,
-                              volume,
-                            },
-                          }
-                        : piece,
-                    ),
-                  }))
-                }
+                collisionEditing={{
+                  // The panel is where a volume is read and changed, so
+                  // opening it is what puts the handles on the volume.
+                  // Nothing else has to be switched on, and closing it gives
+                  // them back to the pieces. Putting the whole side panel
+                  // away closes it too, so the handles never outlive the
+                  // thing that explains them.
+                  editCollision: collisionOpen,
+                  onCollisionChange: (collisionVolume) =>
+                    edit((project) => ({ ...project, collisionVolume })),
+                  // The selected piece while this panel is open, and null
+                  // the rest of the time, which leaves the handles on the
+                  // unit's own volume. See `collisionPieceId`.
+                  editPieceCollisionId: collisionPieceId,
+                  onPieceCollisionVolumeChange: (pieceId, volume) =>
+                    edit((project) => ({
+                      ...project,
+                      pieces: project.pieces.map((piece) =>
+                        piece.id === pieceId
+                          ? {
+                              ...piece,
+                              // A dragged box keeps whether anything hits the
+                              // piece, which is the switch above it in the
+                              // panel and not something a drag has an
+                              // opinion about.
+                              collision: {
+                                hit: piece.collision?.hit !== false,
+                                volume,
+                              },
+                            }
+                          : piece,
+                      ),
+                    })),
+                }}
                 // The same reasoning, for the marker the aim point panel is
                 // about: opening the panel draws the point it is describing.
                 showAimPoint={asideOpen && aside === "aim"}
