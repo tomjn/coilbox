@@ -46,10 +46,11 @@ import {
 } from "../friends";
 import { useIgnoreActions } from "../ignore";
 import { canChannelModerate, chanServInfo } from "../moderation";
+import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
-import { useMpRevealed, useMultiplayer } from "../store";
+import { useMultiplayer } from "../store";
 
 /**
  * Wrap an icon-only header button with a hover/focus tooltip so its purpose is

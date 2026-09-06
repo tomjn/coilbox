@@ -46,10 +46,11 @@ import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
 import { VotePanel } from "../battle/VotePanel";
+import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
-import { useMpRevealed, useMultiplayer } from "../store";
+import { useMultiplayer } from "../store";
 
 /**
  * The battle room for a joined multiplayer battle. Reads the live battle from the

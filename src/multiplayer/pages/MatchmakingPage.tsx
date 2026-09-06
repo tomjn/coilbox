@@ -16,7 +16,8 @@ import {
   mpMatchmakingQueue,
 } from "../bindings";
 import { describeQueue, searchingIn } from "../matchmaking";
-import { useMpMatchmaking, useMultiplayer } from "../store";
+import { useMpMatchmaking } from "../navPredicates";
+import { useMultiplayer } from "../store";
 
 /**
  * The matchmaking screen: the queues this server offers, and the search you have
