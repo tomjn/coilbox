@@ -80,7 +80,7 @@ In-flight deduplication. Every unitsync hook in config.ts that fetches by key (m
 
 Batched models. The units layer collects every distinct object name in the draw, calls `unitsync_unit_models` once, and reads each model back from the file the worker wrote into the model cache dir. Models for one draw load in parallel and the scene fills in as each batch's geometry is built. The single-model command stays for callers outside the scenario editor.
 
-Disk cache for small JSON. The unitsync plugin caches the unit dataset, game info and skirmish AI list on disk with the thumb cache helper (`coilbox-thumb-cache`), keyed by the archive's path, size and modification time the way model textures already are. A cold start after a restart reads the file instead of spawning a worker. The 20s skirmish AI scan is the largest single win here.
+Disk cache for the skirmish AI list. The unit dataset and game info are already cached on disk by the worker's `infocache` module, keyed by the archive's path, size and modification time. The skirmish AI list is not, and it took 20s on the cold run. It joins `infocache`, keyed by the engine library's file identity plus the game archive's, so a restart reads the file after one cheap unitsync `Init` instead of mounting the game.
 
 ## 4. Progressive scene
 
