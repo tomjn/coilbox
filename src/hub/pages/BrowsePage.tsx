@@ -133,18 +133,21 @@ export default function BrowsePage() {
     [],
   );
 
+  // The previous page and error are left in place while a new fetch is in
+  // flight, rather than cleared up front: clearing them here is what made the
+  // grid unmount on every debounced keystroke (issue #2560). A result either
+  // replaces the old page, or an error joins it without discarding it.
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setError(null);
     loadBrowsePage(hubUrl, filters, pinnedMatcher, controller.signal).then(
       (result) => {
         if (controller.signal.aborted) return;
         setLoading(false);
         if (result.ok) {
+          setError(null);
           setPage(result.value);
         } else {
-          setPage(null);
           setError(result.reason);
         }
       },
@@ -309,8 +312,9 @@ export default function BrowsePage() {
           {/* Beside the chips rather than after them in the same wrapping row,
               so a narrow window wraps the chips under each other and leaves the
               count where it is, instead of stranding it on a line of its own. */}
-          {page && !loading && (
-            <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
+          {page && (
+            <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+              {loading && <Loader2 size={13} className="animate-spin" />}
               {page.total} {page.total === 1 ? "item" : "items"}
             </span>
           )}
@@ -335,7 +339,7 @@ export default function BrowsePage() {
       </PageHeader>
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {loading && (
+        {loading && !page && (
           <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
             <Loader2 size={15} className="animate-spin" /> loading the hub…
           </p>
@@ -351,128 +355,133 @@ export default function BrowsePage() {
             </AlertDescription>
           </Alert>
         )}
-        {!loading && !error && page && page.items.length === 0 && (
-          <EmptyState icon={Globe}>
-            {emptyReason(
-              active.length > 0 || !!filters.kind || !!filters.q?.trim(),
-              pinnedMatcher !== null,
-              pinnedGame,
-            )}
-          </EmptyState>
-        )}
-        {!loading && page && page.items.length > 0 && (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
-            {page.items.map((item) => {
-              const presence = presenceOf(item);
-              return (
-                <li
-                  key={item.id}
-                  // Three groups with room between them - what it is, what it is
-                  // for, what to do about it - rather than five evenly spaced
-                  // lines, which read as one undifferentiated block.
-                  className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
-                >
-                  <button
-                    type="button"
-                    className="group flex w-full flex-col gap-1.5 text-left"
-                    onClick={() => navigate(hubItemRoute(item.id))}
+        {/* The previous page's results, dimmed rather than unmounted, while a
+            fetch for new ones is in flight (issue #2560). An error above does
+            not clear this: whatever was on screen stays there. */}
+        <div className={loading ? "opacity-60 transition-opacity" : undefined}>
+          {page && page.items.length === 0 && (
+            <EmptyState icon={Globe}>
+              {emptyReason(
+                active.length > 0 || !!filters.kind || !!filters.q?.trim(),
+                pinnedMatcher !== null,
+                pinnedGame,
+              )}
+            </EmptyState>
+          )}
+          {page && page.items.length > 0 && (
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
+              {page.items.map((item) => {
+                const presence = presenceOf(item);
+                return (
+                  <li
+                    key={item.id}
+                    // Three groups with room between them - what it is, what it is
+                    // for, what to do about it - rather than five evenly spaced
+                    // lines, which read as one undifferentiated block.
+                    className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
                   >
-                    <span
-                      className="text-sm font-medium group-hover:underline"
-                      title={item.title}
+                    <button
+                      type="button"
+                      className="group flex w-full flex-col gap-1.5 text-left"
+                      onClick={() => navigate(hubItemRoute(item.id))}
                     >
-                      {item.title}
-                    </span>
-                    {/* Under the title, and free to wrap. Beside each other on
-                        one line, a narrow card squeezed the date until it broke
-                        across three lines and set the row's height. */}
-                    <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
-                      <Badge variant="secondary" className="gap-1">
-                        <KindIcon kind={item.kind} mode={item.mode} />
-                        {describeItem(item.kind, item.mode)}
-                      </Badge>
-                      <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                        {formatDate(item.created_at)}
+                      <span
+                        className="text-sm font-medium group-hover:underline"
+                        title={item.title}
+                      >
+                        {item.title}
                       </span>
-                    </span>
-                    {item.description && (
-                      <span className="mt-1 line-clamp-3 text-xs text-muted-foreground">
-                        {item.description}
+                      {/* Under the title, and free to wrap. Beside each other on
+                          one line, a narrow card squeezed the date until it broke
+                          across three lines and set the row's height. */}
+                      <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+                        <Badge variant="secondary" className="gap-1">
+                          <KindIcon kind={item.kind} mode={item.mode} />
+                          {describeItem(item.kind, item.mode)}
+                        </Badge>
+                        <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                          {formatDate(item.created_at)}
+                        </span>
                       </span>
-                    )}
-                  </button>
-                  <div className="flex flex-wrap gap-1.5 text-xs">
-                    {item.game_name &&
-                      (pinnedMatcher ? (
-                        <span className={CHIP_CLASS}>{item.game_name}</span>
-                      ) : (
+                      {item.description && (
+                        <span className="mt-1 line-clamp-3 text-xs text-muted-foreground">
+                          {item.description}
+                        </span>
+                      )}
+                    </button>
+                    <div className="flex flex-wrap gap-1.5 text-xs">
+                      {item.game_name &&
+                        (pinnedMatcher ? (
+                          <span className={CHIP_CLASS}>{item.game_name}</span>
+                        ) : (
+                          <FilterChip
+                            label={item.game_name}
+                            onClick={() =>
+                              setFilter("game", item.game_name ?? "")
+                            }
+                          />
+                        ))}
+                      {item.map_name && (
                         <FilterChip
-                          label={item.game_name}
-                          onClick={() =>
-                            setFilter("game", item.game_name ?? "")
-                          }
+                          label={item.map_name}
+                          onClick={() => setFilter("map", item.map_name ?? "")}
+                        />
+                      )}
+                      <FilterChip
+                        label={`by ${item.author_name}`}
+                        onClick={() => setFilter("author", item.author_name)}
+                      />
+                      {item.tags.map((tag) => (
+                        <FilterChip
+                          key={tag}
+                          label={`#${tag}`}
+                          onClick={() => setFilter("tag", tag)}
                         />
                       ))}
-                    {item.map_name && (
-                      <FilterChip
-                        label={item.map_name}
-                        onClick={() => setFilter("map", item.map_name ?? "")}
-                      />
-                    )}
-                    <FilterChip
-                      label={`by ${item.author_name}`}
-                      onClick={() => setFilter("author", item.author_name)}
+                    </div>
+                    <ItemActions
+                      item={item}
+                      presence={presence}
+                      onOpen={(route) => navigate(route)}
                     />
-                    {item.tags.map((tag) => (
-                      <FilterChip
-                        key={tag}
-                        label={`#${tag}`}
-                        onClick={() => setFilter("tag", tag)}
-                      />
-                    ))}
-                  </div>
-                  <ItemActions
-                    item={item}
-                    presence={presence}
-                    onOpen={(route) => navigate(route)}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {!loading && page?.truncated && (
-          <p className="mt-4 max-w-prose text-xs text-muted-foreground">
-            Only the first {page.truncated.scanned} items on the hub were read,
-            so there may be more for this game than are listed here. Search to
-            narrow it down.
-          </p>
-        )}
-        {!loading && page && lastPage > 1 && (
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={current <= 1}
-              onClick={() =>
-                setFilters((f) => ({ ...f, page: Math.max(1, current - 1) }))
-              }
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {current} of {lastPage}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={current >= lastPage}
-              onClick={() => setFilters((f) => ({ ...f, page: current + 1 }))}
-            >
-              Next
-            </Button>
-          </div>
-        )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {page?.truncated && (
+            <p className="mt-4 max-w-prose text-xs text-muted-foreground">
+              Only the first {page.truncated.scanned} items on the hub were
+              read, so there may be more for this game than are listed here.
+              Search to narrow it down.
+            </p>
+          )}
+          {page && lastPage > 1 && (
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={current <= 1}
+                onClick={() =>
+                  setFilters((f) => ({ ...f, page: Math.max(1, current - 1) }))
+                }
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {current} of {lastPage}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={current >= lastPage}
+                onClick={() => setFilters((f) => ({ ...f, page: current + 1 }))}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
