@@ -18,18 +18,24 @@ import {
 } from "../../assets/useMapPicture";
 import { KindIcon } from "../../components/KindIcon";
 import { useHubUrl } from "../../config";
-import { type BlueprintShape, readPreview } from "../../preview";
+import {
+  type BlueprintShape,
+  type GalaxyShape,
+  readPreview,
+} from "../../preview";
+import { Galaxy } from "./ItemPreview";
 
 /**
  * The art slot on a hub browse card (issue #2559). Nine cards of title, badge
  * and chips read as one undifferentiated block, so every card gets a picture,
  * filled in the order the issue sets out: a map picture, then a blueprint's own
- * layout, then a tinted plate carrying the kind glyph everything else already
- * has in its badge.
+ * layout, then a conquest challenge's own galaxy (issue #2598), then a tinted
+ * plate carrying the kind glyph everything else already has in its badge.
  *
- * The slot is a fixed `aspect-video` box regardless of which of the three fills
- * it, so a picture that resolves after the grid first paints - a minimap render,
- * a blueprint's container fetch - never reflows the row it sits in. It is
+ * The slot is a fixed `aspect-video` box regardless of which fills it, so a
+ * picture that resolves after the grid first paints - a minimap render, a
+ * blueprint's or challenge's container fetch - never reflows the row it sits
+ * in. It is
  * `aria-hidden`: the card's title link already names the item and its badge
  * already names the kind, so the picture, the plan and the glyph all repeat
  * something a screen reader has already been told, and would otherwise say it a
@@ -50,6 +56,8 @@ export function BrowseCardArt({ item }: { item: HubItem }) {
         <MapArt mapName={item.map_name as string} />
       ) : item.kind === "blueprint" ? (
         <BlueprintArt item={item} />
+      ) : item.kind === "challenge" && item.mode === "conquest" ? (
+        <ConquestArt item={item} />
       ) : (
         <KindArt item={item} />
       )}
@@ -118,6 +126,31 @@ function BlueprintArt({ item }: { item: HubItem }) {
   return (
     <div className="flex size-full items-center justify-center p-2">
       <LayoutPlan shape={layout} className="size-full" />
+    </div>
+  );
+}
+
+/**
+ * A conquest challenge's galaxy, read off the same container the item page
+ * fetches for `ItemPreview.tsx` - there is no image stored anywhere for a
+ * challenge, only the settings its galaxy is regenerated from. Drawn with the
+ * same `Galaxy` component the item page uses, sized to fill the card rather
+ * than capped at a column's width.
+ *
+ * While the container has not arrived yet, or turned out not to be a conquest
+ * challenge with a galaxy to draw after all, the slot falls back to
+ * {@link KindArt} - the same box, same size, so the fetch landing does not
+ * reflow the card.
+ */
+function ConquestArt({ item }: { item: HubItem }) {
+  const hubUrl = useHubUrl();
+  const galaxy = useConquestCardGalaxy(hubUrl, item.id);
+
+  if (!galaxy) return <KindArt item={item} />;
+
+  return (
+    <div className="flex size-full items-center justify-center p-2">
+      <Galaxy shape={galaxy} className="size-full" />
     </div>
   );
 }
@@ -216,4 +249,69 @@ function useBlueprintCardLayout(
   }, [hubUrl, id, key]);
 
   return layout;
+}
+
+/** Read one conquest challenge's galaxy off its container, or null when the
+ * item's detail could not be fetched, its container could not be fetched, or
+ * the container did not turn out to hold a galaxy to draw after all (a
+ * challenge `preview.ts` could not rebuild). Never throws: this runs
+ * unattended for every challenge card on the page. */
+async function fetchConquestGalaxy(
+  hubUrl: string,
+  id: string,
+): Promise<GalaxyShape | null> {
+  const detail = await fetchHubItem(hubUrl, id);
+  if (!detail.ok) return null;
+  const result = await fetchImportPlan(
+    detail.value.container_url,
+    fetchImportText,
+  );
+  if (!result.ok) return null;
+  const container = asContainer(decodeContainerText(result.text));
+  if (!container) return null;
+  const preview = readPreview(container);
+  return preview?.kind === "challenge" ? preview.galaxy : null;
+}
+
+/** Session cache of resolved galaxies, keyed by `hubUrl::id`, so paging away
+ * from a challenge card and back does not repeat its container fetch. Holds
+ * `null` for "asked and got nothing to draw", which is itself worth
+ * remembering rather than asking again on every remount. */
+const conquestGalaxyCache = new Map<string, GalaxyShape | null>();
+/** Open reads, so two mounts of the same card (StrictMode, or a duplicate id on
+ * the page) share one fetch rather than opening two. */
+const conquestGalaxyPending = new Map<string, Promise<GalaxyShape | null>>();
+
+/** `undefined` while nothing has answered yet, otherwise the cached answer -
+ * `null` included, for "asked and there is nothing to draw". Both fall back to
+ * {@link KindArt} in the caller, so the distinction is only ever used here to
+ * decide whether to fetch. */
+function useConquestCardGalaxy(
+  hubUrl: string,
+  id: string,
+): GalaxyShape | null | undefined {
+  const key = `${hubUrl}::${id}`;
+  const [galaxy, setGalaxy] = useState<GalaxyShape | null | undefined>(() =>
+    conquestGalaxyCache.get(key),
+  );
+
+  useEffect(() => {
+    const cached = conquestGalaxyCache.get(key);
+    if (cached !== undefined) {
+      setGalaxy(cached);
+      return;
+    }
+    let cancelled = false;
+    shareInFlight(conquestGalaxyPending, key, () =>
+      fetchConquestGalaxy(hubUrl, id),
+    ).then((result) => {
+      conquestGalaxyCache.set(key, result);
+      if (!cancelled) setGalaxy(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hubUrl, id, key]);
+
+  return galaxy;
 }
