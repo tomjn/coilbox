@@ -292,13 +292,21 @@ export default function BrowsePage() {
             variant="outline"
             size="sm"
             spacing={1}
-            value={filters.kind ?? ""}
-            // Radix clears the value when the lit chip is pressed again, which
-            // is how "all kinds" is chosen: there is no separate All chip.
-            onValueChange={(v) => setFilter("kind", v)}
+            // "" (no kind filter) is represented by its own "all" chip below,
+            // rather than by no chip being lit, so the group's state is always
+            // one of the radios and clearing it is pressing a specific one
+            // (issue #2566).
+            value={filters.kind || "all"}
+            onValueChange={(v) => setFilter("kind", v === "all" ? "" : v)}
             aria-label="Kind"
             className="flex-wrap"
           >
+            <ToggleGroupItem
+              value="all"
+              className="data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+            >
+              All
+            </ToggleGroupItem>
             {HUB_KINDS.map((kind) => (
               <ToggleGroupItem
                 key={kind}
@@ -313,7 +321,10 @@ export default function BrowsePage() {
               so a narrow window wraps the chips under each other and leaves the
               count where it is, instead of stranding it on a line of its own. */}
           {page && (
-            <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+            <span
+              role="status"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground"
+            >
               {loading && <Loader2 size={13} className="animate-spin" />}
               {page.total} {page.total === 1 ? "item" : "items"}
             </span>
@@ -340,8 +351,11 @@ export default function BrowsePage() {
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
         {loading && !page && (
-          <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-            <Loader2 size={15} className="animate-spin" /> loading the hub…
+          <p
+            role="status"
+            className="flex items-center gap-2 p-6 text-sm text-muted-foreground"
+          >
+            <Loader2 size={15} className="animate-spin" /> Loading the hub…
           </p>
         )}
         {error && (
@@ -385,10 +399,7 @@ export default function BrowsePage() {
                       className="group flex w-full flex-col gap-1.5 text-left"
                       onClick={() => navigate(hubItemRoute(item.id))}
                     >
-                      <span
-                        className="text-sm font-medium group-hover:underline"
-                        title={item.title}
-                      >
+                      <span className="text-sm font-medium group-hover:underline">
                         {item.title}
                       </span>
                       {/* Under the title, and free to wrap. Beside each other on
