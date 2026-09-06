@@ -14,6 +14,7 @@ import {
   useUnitsyncScan,
 } from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
+import { shareInFlight } from "../content/inFlight";
 import { withoutGeneratedGames } from "../lib/generatedGames";
 import { type GameListState, gameListState } from "./gameListState";
 
@@ -268,6 +269,7 @@ export function useReplayTarget(demoVersion: string): {
 
 /** Session cache of AI lists, keyed by `dataDir::enginePath::gameArchive`. */
 const skirmishAiCache = new Map<string, SkirmishAisResult>();
+const skirmishAiPending = new Map<string, Promise<SkirmishAisResult>>();
 
 /**
  * List the skirmish AIs available for a game: native engine AIs plus the game's
@@ -307,7 +309,9 @@ export function useSkirmishAis(
     }
     let cancelled = false;
     setLoading(true);
-    unitsyncSkirmishAis({ enginePath, dataDir, gameArchive })
+    shareInFlight(skirmishAiPending, k, () =>
+      unitsyncSkirmishAis({ enginePath, dataDir, gameArchive }),
+    )
       .then((res) => {
         if (cancelled) return;
         skirmishAiCache.set(k, res);
