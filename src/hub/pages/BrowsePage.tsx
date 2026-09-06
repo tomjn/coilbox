@@ -11,7 +11,15 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type InputHTMLAttributes,
+  type Ref,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, useNavigate } from "react-router";
 import { CoilboxGlyph } from "@/components/CoilboxGlyph";
 import { PageHeader } from "@/components/PageHeader";
@@ -28,6 +36,7 @@ import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
+import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import {
   describeItem,
@@ -106,6 +115,21 @@ const CLICKABLE = [
 
 type ClickableKey = (typeof CLICKABLE)[number]["key"];
 
+/**
+ * `@picoframe/frame`'s `Input` forwards `ref` to the underlying `<input>` at
+ * runtime (React 19 passes `ref` through to any function component, no
+ * `forwardRef` needed), but its published type is plain `InputHTMLAttributes`
+ * with no `ref`, so TypeScript refuses it. The "/" shortcut (issue #2567)
+ * genuinely needs the DOM node to focus, so this re-types the same component
+ * the same way `MissionLuaView.tsx`'s `FindInput` already does, rather than
+ * reaching for a hand-rolled input.
+ */
+const SearchInput = Input as unknown as (
+  props: InputHTMLAttributes<HTMLInputElement> & {
+    ref?: Ref<HTMLInputElement>;
+  },
+) => ReturnType<typeof Input>;
+
 function formatDate(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime())
@@ -122,6 +146,8 @@ export default function BrowsePage() {
   const [page, setPage] = useState<BrowseResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLElement>(null);
 
   // Typing is separate from the filter it eventually sets, so the list is not
   // refetched on every keystroke.
@@ -131,6 +157,25 @@ export default function BrowsePage() {
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // "/" jumps to the search box (issue #2567), the binding a search-heavy
+  // page is expected to answer to. `isTypingTarget` is the same guard the
+  // scenario editor and the placement tools already use to keep a shortcut
+  // out of a field's own keystrokes. The `[role="dialog"], [role="menu"]`
+  // check does the same for the share menu and any dialog, so "/" never
+  // fights a Radix widget that is mid-interaction.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTypingTarget(event.target as HTMLElement | null)) return;
+      if (document.querySelector('[role="dialog"], [role="menu"]')) return;
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // The same backdrop the home page paints, at the same profile-resolved
   // strength (issue #2564). `resolveHome` reads the one `home.background` key
@@ -177,6 +222,18 @@ export default function BrowsePage() {
 
   const setFilter = useCallback((key: ClickableKey | "kind", value: string) => {
     setFilters((f) => ({ ...f, [key]: value, page: 1 }));
+  }, []);
+
+  /** Sets the page and brings the results back into view (issue #2567).
+   * Without this, Previous and Next left the scroll position and the
+   * keyboard focus at the pager, at the bottom of whatever the old page had
+   * been, so the new page loaded off screen. */
+  const goToPage = useCallback((next: number) => {
+    setFilters((f) => ({ ...f, page: next }));
+    const results = resultsRef.current;
+    if (!results) return;
+    results.scrollTop = 0;
+    results.focus({ preventScroll: true });
   }, []);
 
   // Games and maps installed locally, for the game/map filter suggestions. The
@@ -327,7 +384,8 @@ export default function BrowsePage() {
                 size={14}
                 className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
-              <Input
+              <SearchInput
+                ref={searchInputRef}
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -362,7 +420,7 @@ export default function BrowsePage() {
             edge, reachable only by scrolling the whole page sideways. The
             chips wrap here rather than scrolling, so every kind is on screen
             at every width. */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <ToggleGroup
               type="single"
               variant="outline"
@@ -403,6 +461,16 @@ export default function BrowsePage() {
               >
                 {loading && <Loader2 size={13} className="animate-spin" />}
                 {page.total} {page.total === 1 ? "item" : "items"}
+              </span>
+            )}
+            {/* Beside the count rather than below the grid (issue #2567):
+              down there, only someone who kept scrolling to the end ever saw
+              that the list stops short of everything the hub holds. */}
+            {page?.truncated && (
+              <span className="max-w-prose text-xs text-muted-foreground">
+                Only the first {page.truncated.scanned} items on the hub were
+                read, so there may be more for this game than are listed here.
+                Search to narrow it down.
               </span>
             )}
           </div>
@@ -475,7 +543,17 @@ export default function BrowsePage() {
               style={backdrop}
             />
           )}
-          <div className="h-full overflow-auto p-4">
+          <section
+            ref={resultsRef}
+            // A `<section>` with a name is a landmark a screen reader can
+            // jump back to. -1 keeps it out of the tab order (nothing to tab
+            // to on purpose) while staying a valid `.focus()` target, so
+            // paging can land a keyboard user here rather than leaving them
+            // at the pager (issue #2567).
+            tabIndex={-1}
+            aria-label="Hub results"
+            className="h-full overflow-auto p-4"
+          >
             {loading && !page && (
               <p
                 role="status"
@@ -622,25 +700,13 @@ export default function BrowsePage() {
                   })}
                 </ul>
               )}
-              {page?.truncated && (
-                <p className="mt-4 max-w-prose text-xs text-muted-foreground">
-                  Only the first {page.truncated.scanned} items on the hub were
-                  read, so there may be more for this game than are listed here.
-                  Search to narrow it down.
-                </p>
-              )}
               {page && lastPage > 1 && (
                 <div className="mt-4 flex items-center justify-center gap-3">
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={current <= 1}
-                    onClick={() =>
-                      setFilters((f) => ({
-                        ...f,
-                        page: Math.max(1, current - 1),
-                      }))
-                    }
+                    onClick={() => goToPage(Math.max(1, current - 1))}
                   >
                     Previous
                   </Button>
@@ -651,16 +717,14 @@ export default function BrowsePage() {
                     variant="outline"
                     size="sm"
                     disabled={current >= lastPage}
-                    onClick={() =>
-                      setFilters((f) => ({ ...f, page: current + 1 }))
-                    }
+                    onClick={() => goToPage(current + 1)}
                   >
                     Next
                   </Button>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </TooltipProvider>
