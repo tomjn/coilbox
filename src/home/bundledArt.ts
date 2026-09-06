@@ -1417,6 +1417,196 @@ const uberstressHistory: Drawing = {
  * doorway does not claim anyone is online. And the people who turn advanced mode
  * on look at the same grid as everyone else.
  */
+/**
+ * Three colour fields overlapping, with the tones they make laid out beneath.
+ *
+ * Appearance is the one settings page whose subject is colour itself, so the
+ * picture is the choice rather than the control that makes it.
+ *
+ * Two drafts went before this. A ring of chips read as a diagram: a symmetric
+ * object with empty margins, where every card around it is a crop of somewhere.
+ * Chips riding a curve fixed the composition and broke a different rule, because
+ * markers spaced along a sweeping line is exactly what the Campaigns card is,
+ * and at card size the two were the same picture in different colours.
+ *
+ * Overlapping fields belong to nothing else on the page, and they say what a
+ * palette is for rather than what it looks like: colours that make other colours
+ * where they meet. The strip along the foot is what came out.
+ */
+const appearanceSettings: Drawing = {
+  pools: [
+    [150, 74, 132, 0.19],
+    [268, 148, 88, 0.09],
+  ],
+  paint: (p) => {
+    const fields: readonly (readonly [number, number, number])[] = [
+      [116, 72, 52],
+      [176, 66, 46],
+      [148, 116, 44],
+    ];
+    const washes = fields
+      .map(
+        ([x, y, r], i) =>
+          `<circle cx="${x}" cy="${y}" r="${r}" fill="${i === 2 ? p.line : p.faint}" fill-opacity="${round(0.12 + i * 0.02)}"/>`,
+      )
+      .join("");
+    const edges = fields
+      .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`)
+      .join("");
+    const grid = [-20, 20, 60, 100, 140, 180, 220, 260, 300]
+      .map((x) => `<path d="M${x} -10 L${x} 210"/>`)
+      .join("");
+    // What the fields resolve to, read off left to right. Cropped by the right
+    // edge, so the strip is longer than the card.
+    const strip = [0, 1, 2, 3, 4, 5, 6]
+      .map(
+        (i) =>
+          `<rect x="${218 + i * 18}" y="${104 - i * 2}" width="13" height="${26 + i * 2}" rx="2.5" fill="${p.line}" fill-opacity="${round(0.5 - i * 0.06)}"/>`,
+      )
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.08">${grid}</g>` +
+      washes +
+      `<g fill="none" stroke="${p.line}" stroke-width="1.4" stroke-opacity="0.4">${edges}</g>` +
+      strip +
+      // Where all three meet, which is the one tone none of them had alone.
+      `<circle cx="147" cy="85" r="13" fill="${p.spark}" fill-opacity="0.42"/>` +
+      `<circle cx="147" cy="85" r="13" fill="none" stroke="${p.spark}" stroke-width="1.8" stroke-opacity="0.8"/>`
+    );
+  },
+};
+
+/**
+ * A bank of faders at different settings.
+ *
+ * Engine settings is a long list of values you nudge, and the fader is the one
+ * control that shows a value and its range at once. Uneven positions, because a
+ * bank all set to the same place reads as a graphic rather than as something
+ * somebody has been adjusting.
+ */
+const engineSettings: Drawing = {
+  paint: (p) => {
+    const rows = [
+      [44, 118],
+      [70, 208],
+      [96, 152],
+      [122, 246],
+    ];
+    const tracks = rows
+      .map(
+        ([y]) =>
+          `<rect x="52" y="${y - 2}" width="216" height="4" rx="2" fill="${p.faint}" fill-opacity="0.26"/>`,
+      )
+      .join("");
+    const filled = rows
+      .map(
+        ([y, x]) =>
+          `<rect x="52" y="${y - 2}" width="${x - 52}" height="4" rx="2" fill="${p.line}" fill-opacity="0.44"/>`,
+      )
+      .join("");
+    const knobs = rows
+      .map(
+        ([y, x], i) =>
+          `<circle cx="${x}" cy="${y}" r="${i === 1 ? 8 : 6.5}" fill="${i === 1 ? p.spark : p.line}" fill-opacity="${i === 1 ? 0.85 : 0.5}"/>`,
+      )
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.12">` +
+      [80, 132, 184, 236]
+        .map((x) => `<path d="M${x} 30 L${x} 138"/>`)
+        .join("") +
+      "</g>" +
+      tracks +
+      filled +
+      knobs
+    );
+  },
+  pools: [
+    [160, 76, 130, 0.17],
+    [48, 140, 82, 0.09],
+  ],
+};
+
+/**
+ * A stack of account cards, the front one signed in.
+ *
+ * These are the lobby server logins, and a player who opens this page usually
+ * has more than one: a main, a smurf, a second server. A stack says "several of
+ * these" where a single card would have said "your account".
+ */
+const accountSettings: Drawing = {
+  pools: [
+    [158, 72, 128, 0.17],
+    [56, 142, 82, 0.09],
+  ],
+  paint: (p) => {
+    const card = (x: number, y: number, opacity: number) =>
+      `<rect x="${x}" y="${y}" width="150" height="40" rx="6" fill="${p.line}" fill-opacity="${opacity}"/>` +
+      `<rect x="${x}" y="${y}" width="150" height="40" rx="6" fill="none" stroke="${p.faint}" stroke-width="1.1" stroke-opacity="0.3"/>`;
+    return (
+      card(102, 34, 0.08) +
+      card(90, 56, 0.12) +
+      card(78, 78, 0.18) +
+      `<rect x="78" y="78" width="150" height="40" rx="6" fill="none" stroke="${p.spark}" stroke-width="1.6" stroke-opacity="0.6"/>` +
+      `<circle cx="100" cy="98" r="11" fill="${p.spark}" fill-opacity="0.55"/>` +
+      `<rect x="120" y="90" width="62" height="4" rx="2" fill="${p.spark}" fill-opacity="0.5"/>` +
+      `<rect x="120" y="101" width="40" height="4" rx="2" fill="${p.faint}" fill-opacity="0.42"/>` +
+      `<circle cx="214" cy="98" r="4" fill="${p.spark}" fill-opacity="0.9"/>`
+    );
+  },
+};
+
+/**
+ * A panel of dials, cropped, one of them under the hand.
+ *
+ * The index page over every section, so the subject is the whole bank rather
+ * than any one control on it. A single centred dial said "a setting". Several at
+ * different sizes, one running off the left edge, say "all of them", and let the
+ * card be a crop of a bigger panel the way the tool cards around it are.
+ *
+ * Only the dial in focus gets a needle and a full scale. The others are turned
+ * down to structure, so the eye lands once rather than reading three faces.
+ */
+const allSettings: Drawing = {
+  pools: [
+    [196, 68, 130, 0.19],
+    [46, 152, 96, 0.1],
+  ],
+  paint: (p) => {
+    /** Tick marks around a dial, every third one longer. */
+    const scale = (cx: number, cy: number, inner: number, count: number) =>
+      Array.from({ length: count }, (_, i) => {
+        const a = (i / count) * Math.PI * 2 - Math.PI / 2;
+        const outer = inner + (i % 3 === 0 ? 11 : 6);
+        return `<path d="M${round(cx + Math.cos(a) * inner)} ${round(cy + Math.sin(a) * inner)} L${round(cx + Math.cos(a) * outer)} ${round(cy + Math.sin(a) * outer)}"/>`;
+      }).join("");
+    const face = (cx: number, cy: number, r: number, opacity: number) =>
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${p.line}" fill-opacity="${round(opacity * 0.5)}"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${p.line}" stroke-width="1.5" stroke-opacity="${opacity}"/>`;
+    return (
+      // The rail the bank is mounted on, running the full width.
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.16">` +
+      '<path d="M-10 32 L330 32"/>' +
+      '<path d="M-10 148 L330 148"/>' +
+      "</g>" +
+      // Cropped by the left edge, which is what makes this a panel rather than a
+      // diagram of three circles.
+      face(-4, 104, 40, 0.24) +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.22">${scale(-4, 104, 46, 12)}</g>` +
+      face(78, 56, 26, 0.3) +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.26">${scale(78, 56, 32, 10)}</g>` +
+      `<path d="M78 56 L62 38" fill="none" stroke="${p.faint}" stroke-width="2" stroke-opacity="0.5" stroke-linecap="round"/>` +
+      // The one in focus.
+      face(208, 92, 44, 0.5) +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.4" stroke-opacity="0.4" stroke-linecap="round">${scale(208, 92, 51, 12)}</g>` +
+      `<circle cx="208" cy="92" r="26" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.24"/>` +
+      `<path d="M208 92 L240 64" fill="none" stroke="${p.spark}" stroke-width="2.8" stroke-opacity="0.85" stroke-linecap="round"/>` +
+      `<circle cx="208" cy="92" r="5" fill="${p.spark}" fill-opacity="0.9"/>` +
+      `<circle cx="240" cy="64" r="3.5" fill="${p.spark}" fill-opacity="0.6"/>`
+    );
+  },
+};
+
 const DRAWINGS: Record<string, Drawing> = {
   "play.skirmish": skirmish,
   "play.replays": replays,
@@ -1452,6 +1642,14 @@ const DRAWINGS: Record<string, Drawing> = {
   "animation.cob": cobTools,
   "uberstress.run": uberstressRun,
   "uberstress.history": uberstressHistory,
+  // The Settings group's cards. They sit on the welcome page only, not in the
+  // sidebar, but the grid draws them exactly as it draws every other tool, so
+  // without these four they were the one group on the page still showing the
+  // procedural field.
+  "settings.appearance": appearanceSettings,
+  "settings.engine": engineSettings,
+  "settings.accounts": accountSettings,
+  "settings.all": allSettings,
 };
 
 /** Tool ids with a bundled illustration, for tests and for the preview page. */
