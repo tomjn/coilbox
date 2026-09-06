@@ -65,6 +65,30 @@ export function pickedCollisionPiece(
   return picked?.id ?? null;
 }
 
+/**
+ * The piece the viewport's collision handles land on, given the canvas
+ * selection, or null to leave them on the unit's own volume.
+ *
+ * The root counts as nothing selected even when it is the selection, because
+ * opening a document selects the root before the builder does anything else
+ * (`reduceDocument`'s "open" case in document.ts), so every freshly opened or
+ * created unit would otherwise hand the handles to the root's own one-elmo
+ * box rather than the unit's volume the panel above describes. On a unit with
+ * one real piece that box is close enough in size to the unit's own that a
+ * drag looks right on screen and commits for real, while the Size and Offset
+ * fields, which read the unit's own volume, never move (issue #2549). The
+ * root can still be picked from the piece list below to give it a box on
+ * purpose. It just no longer catches a drag aimed at the unit's volume by
+ * accident.
+ */
+export function collisionHandlePieceId(
+  project: LegoProject,
+  selectedId: string | null,
+): string | null {
+  if (!selectedId || selectedId === project.rootPieceId) return null;
+  return pickedCollisionPiece(project, selectedId);
+}
+
 interface Props {
   project: LegoProject;
   pack: LoadedPack;

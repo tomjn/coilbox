@@ -97,7 +97,7 @@ import { ModelViewport } from "./components/ModelViewport";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
-import { pickedCollisionPiece } from "./components/PieceCollisionFields";
+import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
 import { SetPanel } from "./components/SetPanel";
 import { TestDrawer } from "./components/TestDrawer";
@@ -598,11 +598,10 @@ function Builder({ id }: { id: string | undefined }) {
   // want to change is already how everything else in the builder works.
   //
   // Nothing selected leaves them on the unit's own volume, which is also the
-  // way back from a piece.
+  // way back from a piece. See `collisionHandlePieceId` for why the root
+  // counts as nothing selected here too.
   const collisionPieceId =
-    draft && collisionOpen && selectedId
-      ? pickedCollisionPiece(draft, selectedId)
-      : null;
+    draft && collisionOpen ? collisionHandlePieceId(draft, selectedId) : null;
 
   /** Stop the preview. Whatever is on screen describes the unit before a script
    *  change: the presets it just stopped using, or the script it just left. */
