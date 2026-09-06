@@ -32,12 +32,14 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
-| Settings      | Appearance    | `#/settings/frame.appearance` | `settings.appearance` | no³ |
-| Settings      | Engine settings | `#/settings/engine-settings` | `settings.engine` | no³ |
-| Settings      | Accounts      | `#/settings/lobby-servers` | `settings.accounts` | no³ |
-| Settings      | All settings  | `#/settings`         | `settings.all`     | no       |
+| Settings⁴     | Appearance    | `#/settings/frame.appearance` | `settings.appearance` | no³ |
+| Settings⁴     | Engine settings | `#/settings/engine-settings` | `settings.engine` | no³ |
+| Settings⁴     | Accounts      | `#/settings/lobby-servers` | `settings.accounts` | no³ |
+| Settings⁴     | All settings  | `#/settings`         | `settings.all`     | no       |
 
 ¹ **Campaigns** only appears in the sidebar once at least one campaign exists (bundled or created locally), and **Scenarios** once at least one scenario names a game and a map. Until then the item is hidden automatically.
+
+⁴ **Settings** items appear on the welcome page only, not in the sidebar. The sidebar's way in is the footer gear, which also carries the settings badge. Four Settings rows above a row already saying Settings was two answers to one question.
 
 ³ **Settings** items are not on the `hide` list. They link to settings sections rather than to routes of their own, so `hideSettings` already governs them: hide `engine-settings`, `frame.appearance` or `lobby-servers` and both the settings section and its card here disappear together.
 
