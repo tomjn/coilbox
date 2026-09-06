@@ -886,76 +886,87 @@ function Builder({ id }: { id: string | undefined }) {
               ) : null}
 
               <ModelViewport
-                pack={pack}
-                raw={raw}
-                project={draft}
-                selectedIds={selectedIds}
-                onSelect={selectPiece}
-                onTransform={transformPiece}
-                onTransformMany={transformPieces}
-                hoveredId={hoveredId}
-                onHover={setHoveredId}
-                playing={playing}
-                scriptTimeline={scriptTimeline}
-                scriptPaused={scriptPaused}
-                scriptFrame={scriptFrame}
-                onScriptFrame={setScriptFrame}
+                document={{ pack, raw, project: draft }}
+                selection={{
+                  selectedIds,
+                  onSelect: selectPiece,
+                  onTransform: transformPiece,
+                  onTransformMany: transformPieces,
+                  hoveredId,
+                  onHover: setHoveredId,
+                }}
+                scriptPlayback={{
+                  playing,
+                  scriptTimeline,
+                  scriptPaused,
+                  scriptFrame,
+                  onScriptFrame: setScriptFrame,
+                }}
                 uniformScale={uniformScale}
                 onGround={() =>
                   edit((project) => sitOnGround(project, pack, raw))
                 }
                 onReady={doc.onCapture}
-                onDuplicate={duplicateSelection}
-                canDuplicate={transformRoots(draft, selectedIds).length > 0}
-                onPaste={() => void pasteClipboard()}
-                onSaveAsCompound={() => void saveSelectionAsCompound()}
-                // Not for an imported unit: a compound is pieces made of
-                // parts, and one saved out of raw geometry would name meshes
-                // that only mean anything inside the unit they came from.
-                canSaveAsCompound={selectedIds.length > 0 && !imported}
-                onDelete={removeSelected}
-                canDelete={transformRoots(draft, selectedIds).length > 0}
-                symmetry={symmetry.on}
-                onSymmetryChange={symmetry.setOn}
-                placingAnchor={placingAnchor}
-                onPlaceAnchor={placeAnchor}
-                onCancelAnchor={() => setPlacingAnchor(false)}
-                // The panel is where a volume is read and changed, so opening it
-                // is what puts the handles on the volume. Nothing else has to be
-                // switched on, and closing it gives them back to the pieces.
-                // Putting the whole side panel away closes it too, so the handles
-                // never outlive the thing that explains them.
-                editCollision={collisionOpen}
-                onCollisionChange={(collisionVolume) =>
-                  edit((project) => ({ ...project, collisionVolume }))
-                }
-                // The selected piece while this panel is open, and null the
-                // rest of the time, which leaves the handles on the unit's own
-                // volume. See `collisionPieceId`.
-                editPieceCollisionId={collisionPieceId}
-                onPieceCollisionVolumeChange={(pieceId, volume) =>
-                  edit((project) => ({
-                    ...project,
-                    pieces: project.pieces.map((piece) =>
-                      piece.id === pieceId
-                        ? {
-                            ...piece,
-                            // A dragged box keeps whether anything hits the
-                            // piece, which is the switch above it in the panel
-                            // and not something a drag has an opinion about.
-                            collision: {
-                              hit: piece.collision?.hit !== false,
-                              volume,
-                            },
-                          }
-                        : piece,
-                    ),
-                  }))
-                }
-                // The same reasoning, for the marker the aim point panel is
-                // about: opening the panel draws the point it is describing.
-                showAimPoint={asideOpen && aside === "aim"}
-                onAimChange={setAimPoint}
+                pieceActions={{
+                  onDuplicate: duplicateSelection,
+                  canDuplicate: transformRoots(draft, selectedIds).length > 0,
+                  onPaste: () => void pasteClipboard(),
+                  onSaveAsCompound: () => void saveSelectionAsCompound(),
+                  // Not for an imported unit: a compound is pieces made of
+                  // parts, and one saved out of raw geometry would name
+                  // meshes that only mean anything inside the unit they
+                  // came from.
+                  canSaveAsCompound: selectedIds.length > 0 && !imported,
+                  onDelete: removeSelected,
+                  canDelete: transformRoots(draft, selectedIds).length > 0,
+                }}
+                symmetry={{ on: symmetry.on, onChange: symmetry.setOn }}
+                anchorPlacement={{
+                  placingAnchor,
+                  onPlaceAnchor: placeAnchor,
+                  onCancelAnchor: () => setPlacingAnchor(false),
+                }}
+                collisionEditing={{
+                  // The panel is where a volume is read and changed, so
+                  // opening it is what puts the handles on the volume.
+                  // Nothing else has to be switched on, and closing it gives
+                  // them back to the pieces. Putting the whole side panel
+                  // away closes it too, so the handles never outlive the
+                  // thing that explains them.
+                  editCollision: collisionOpen,
+                  onCollisionChange: (collisionVolume) =>
+                    edit((project) => ({ ...project, collisionVolume })),
+                  // The selected piece while this panel is open, and null
+                  // the rest of the time, which leaves the handles on the
+                  // unit's own volume. See `collisionPieceId`.
+                  editPieceCollisionId: collisionPieceId,
+                  onPieceCollisionVolumeChange: (pieceId, volume) =>
+                    edit((project) => ({
+                      ...project,
+                      pieces: project.pieces.map((piece) =>
+                        piece.id === pieceId
+                          ? {
+                              ...piece,
+                              // A dragged box keeps whether anything hits the
+                              // piece, which is the switch above it in the
+                              // panel and not something a drag has an
+                              // opinion about.
+                              collision: {
+                                hit: piece.collision?.hit !== false,
+                                volume,
+                              },
+                            }
+                          : piece,
+                      ),
+                    })),
+                }}
+                aimPoint={{
+                  // The same reasoning, for the marker the aim point panel
+                  // is about: opening the panel draws the point it is
+                  // describing.
+                  showAimPoint: asideOpen && aside === "aim",
+                  onAimChange: setAimPoint,
+                }}
               />
             </div>
 

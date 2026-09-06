@@ -264,28 +264,36 @@ export const ZOOM_OUT_PADDING = 1.3;
 export const ROTATION_STEP = Math.PI / 12;
 
 interface Props {
-  pack: LoadedPack;
-  /** The meshes of a unit imported from somebody else's model, if it is one. */
-  raw: RawGeometry | null;
-  project: LegoProject;
-  /** Every selected piece, oldest first. One is the ordinary case. */
-  selectedIds: string[];
-  /** `additive` is a Shift or Cmd click: add this piece to the selection
-   *  rather than replacing it. */
-  onSelect: (pieceId: string | null, additive: boolean) => void;
-  /** Committed when a drag ends, not on every frame of it. */
-  onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
-  /** The same, for a set: every piece's new transform in one edit, so a group
-   *  drag is one undo step rather than one per piece. */
-  onTransformMany: (changes: Map<string, PieceTransform>) => void;
-  /**
-   * The piece to highlight as hovered regardless of where the pointer is, e.g.
-   * because the sidebar's tree row for it is hovered instead of the canvas.
-   */
-  hoveredId?: string | null;
-  /** Told whenever the piece under the pointer in this view changes, so the
-   *  sidebar tree can highlight the matching row. */
-  onHover?: (pieceId: string | null) => void;
+  /** The piece hierarchy, and the raw geometry of a unit imported from
+   *  somebody else's model rather than built from parts. */
+  document: {
+    pack: LoadedPack;
+    /** The meshes of a unit imported from somebody else's model, if it is one. */
+    raw: RawGeometry | null;
+    project: LegoProject;
+  };
+  /** Which pieces are picked, and what a click, a drag or a hover does. */
+  selection: {
+    /** Every selected piece, oldest first. One is the ordinary case. */
+    selectedIds: string[];
+    /** `additive` is a Shift or Cmd click: add this piece to the selection
+     *  rather than replacing it. */
+    onSelect: (pieceId: string | null, additive: boolean) => void;
+    /** Committed when a drag ends, not on every frame of it. */
+    onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
+    /** The same, for a set: every piece's new transform in one edit, so a
+     *  group drag is one undo step rather than one per piece. */
+    onTransformMany: (changes: Map<string, PieceTransform>) => void;
+    /**
+     * The piece to highlight as hovered regardless of where the pointer is,
+     * e.g. because the sidebar's tree row for it is hovered instead of the
+     * canvas.
+     */
+    hoveredId?: string | null;
+    /** Told whenever the piece under the pointer in this view changes, so the
+     *  sidebar tree can highlight the matching row. */
+    onHover?: (pieceId: string | null) => void;
+  };
   /**
    * Handed a function that draws a frame and returns the canvas, rather than
    * the canvas itself. WebGL discards its drawing buffer once the frame is
@@ -296,140 +304,176 @@ interface Props {
    * still waiting on its textures. Ask again later rather than storing that.
    */
   onReady?: (capture: () => HTMLCanvasElement | null) => void;
-  /** Runs the applied presets. Nothing is written: stopping restores the rest
-   *  pose exactly, because it comes back from the document. */
-  playing?: boolean;
-  /**
-   * Poses to play instead of the presets, for a unit whose script is its own.
-   * The presets are gone for such a unit, so this is what playing means for it.
-   */
-  scriptTimeline?: ScriptTimeline | null;
-  /**
-   * True while a script run's clock is frozen on `scriptFrame` rather than
-   * advancing on its own. The bake and detached gizmo stay exactly as they
-   * are while paused, so scrubbing and stepping only ever change the pose.
-   */
-  scriptPaused?: boolean;
-  /**
-   * The frame a paused run is held on, and where the clock in a resumed run
-   * picks back up from. Ignored for the preset codepath.
-   */
-  scriptFrame?: number;
-  /**
-   * Told which frame a script run is showing, every tick it is not paused, so
-   * a scrubber can track playback and know where a pause should hold.
-   */
-  onScriptFrame?: (frame: number) => void;
+  /** The applied presets, or a unit's own script, playing or scrubbed. */
+  scriptPlayback: {
+    /** Runs the applied presets. Nothing is written: stopping restores the
+     *  rest pose exactly, because it comes back from the document. */
+    playing?: boolean;
+    /**
+     * Poses to play instead of the presets, for a unit whose script is its
+     * own. The presets are gone for such a unit, so this is what playing
+     * means for it.
+     */
+    scriptTimeline?: ScriptTimeline | null;
+    /**
+     * True while a script run's clock is frozen on `scriptFrame` rather than
+     * advancing on its own. The bake and detached gizmo stay exactly as they
+     * are while paused, so scrubbing and stepping only ever change the pose.
+     */
+    scriptPaused?: boolean;
+    /**
+     * The frame a paused run is held on, and where the clock in a resumed run
+     * picks back up from. Ignored for the preset codepath.
+     */
+    scriptFrame?: number;
+    /**
+     * Told which frame a script run is showing, every tick it is not paused,
+     * so a scrubber can track playback and know where a pause should hold.
+     */
+    onScriptFrame?: (frame: number) => void;
+  };
   /** Scale handles keep the piece's proportions. */
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
   onGround?: () => void;
-  /** Duplicate the selected piece and everything under it (Cmd D). */
-  onDuplicate: () => void;
-  canDuplicate: boolean;
-  /**
-   * Paste under the selected piece (Cmd V). Always enabled: it reads the
-   * system clipboard on click, so there is nothing to check synchronously
-   * before then, and a mistaken paste reports itself rather than needing
-   * to be prevented.
-   */
-  onPaste: () => void;
-  /** Save the selected piece and everything under it, to reuse in another unit. */
-  onSaveAsCompound: () => void;
-  canSaveAsCompound: boolean;
-  /** Delete every selected piece (Backspace). */
-  onDelete: () => void;
-  canDelete: boolean;
+  /** The toolbar's actions on the current selection: duplicate, paste,
+   *  save as a compound and delete, and whether each is available. */
+  pieceActions: {
+    /** Duplicate the selected piece and everything under it (Cmd D). */
+    onDuplicate: () => void;
+    canDuplicate: boolean;
+    /**
+     * Paste under the selected piece (Cmd V). Always enabled: it reads the
+     * system clipboard on click, so there is nothing to check synchronously
+     * before then, and a mistaken paste reports itself rather than needing
+     * to be prevented.
+     */
+    onPaste: () => void;
+    /** Save the selected piece and everything under it, to reuse in another
+     *  unit. */
+    onSaveAsCompound: () => void;
+    canSaveAsCompound: boolean;
+    /** Delete every selected piece (Backspace). */
+    onDelete: () => void;
+    canDelete: boolean;
+  };
   /**
    * Whether a new piece gets a mirrored twin the first time it is placed off
-   * the centre line (M). A setting for the session, not part of the unit, so it
-   * lives with the page rather than the document.
+   * the centre line (M). A setting for the session, not part of the unit, so
+   * it lives with the page rather than the document.
    */
-  symmetry: boolean;
-  onSymmetryChange: (on: boolean) => void;
-  /**
-   * Arms the next click on the model to drop a snap anchor where it lands,
-   * rather than selecting. The gizmo comes off while it is armed, since its
-   * handles sit over the middle of the very piece being clicked.
-   */
-  placingAnchor?: boolean;
-  /** Where the click landed, in the clicked piece's part space. */
-  onPlaceAnchor?: (pieceId: string, position: Vec3) => void;
-  /** A click that missed the model, which is how you change your mind. */
-  onCancelAnchor?: () => void;
-  /**
-   * Puts the gizmo on the collision volume rather than on the selected piece,
-   * so its size and where it sits are dragged rather than typed. The volume is
-   * shown while this is on whether or not its own toggle is.
-   */
-  editCollision?: boolean;
-  /** Where a dragged volume goes. Committed on release, like a piece's. */
-  onCollisionChange?: (volume: LegoCollisionVolume) => void;
-  /**
-   * The piece whose own box takes the handles instead, drawn wide so it stands
-   * out from the rest. Null leaves them on the unit's volume.
-   *
-   * A separate prop from `editCollision` rather than a mode inside it, because
-   * the two boxes are set in the same panel and only one of them can have the
-   * handles at a time: whichever the panel says.
-   */
-  editPieceCollisionId?: string | null;
-  /** Where a dragged piece box goes. The piece keeps whether anything hits it,
-   *  which the panel owns, so only the volume comes back here. */
-  onPieceCollisionVolumeChange?: (
-    pieceId: string,
-    volume: LegoCollisionVolume,
-  ) => void;
-  /** Draws the aim point whether or not its own toggle is on, so the panel
-   *  that sets it has the point it is about on screen. */
-  showAimPoint?: boolean;
-  /**
-   * Where a dragged aim point goes, which also puts the move handles on it.
-   * Committed on release like everything else here.
-   *
-   * A point has no size and no rotation, so this is the move gizmo only: there
-   * are no faces to grab the way a volume has.
-   */
-  onAimChange?: (mid: [number, number, number]) => void;
+  symmetry: {
+    on: boolean;
+    onChange: (on: boolean) => void;
+  };
+  /** Arming the next click to drop a snap anchor instead of selecting, and
+   *  what to do with the click that follows. */
+  anchorPlacement: {
+    /**
+     * Arms the next click on the model to drop a snap anchor where it lands,
+     * rather than selecting. The gizmo comes off while it is armed, since its
+     * handles sit over the middle of the very piece being clicked.
+     */
+    placingAnchor?: boolean;
+    /** Where the click landed, in the clicked piece's part space. */
+    onPlaceAnchor?: (pieceId: string, position: Vec3) => void;
+    /** A click that missed the model, which is how you change your mind. */
+    onCancelAnchor?: () => void;
+  };
+  /** The collision volume, the unit's own or one piece's, while its panel
+   *  has the gizmo on it. */
+  collisionEditing: {
+    /**
+     * Puts the gizmo on the collision volume rather than on the selected
+     * piece, so its size and where it sits are dragged rather than typed.
+     * The volume is shown while this is on whether or not its own toggle is.
+     */
+    editCollision?: boolean;
+    /** Where a dragged volume goes. Committed on release, like a piece's. */
+    onCollisionChange?: (volume: LegoCollisionVolume) => void;
+    /**
+     * The piece whose own box takes the handles instead, drawn wide so it
+     * stands out from the rest. Null leaves them on the unit's volume.
+     *
+     * A separate field from `editCollision` rather than a mode inside it,
+     * because the two boxes are set in the same panel and only one of them
+     * can have the handles at a time: whichever the panel says.
+     */
+    editPieceCollisionId?: string | null;
+    /** Where a dragged piece box goes. The piece keeps whether anything hits
+     *  it, which the panel owns, so only the volume comes back here. */
+    onPieceCollisionVolumeChange?: (
+      pieceId: string,
+      volume: LegoCollisionVolume,
+    ) => void;
+  };
+  /** The aim point, while its panel has the gizmo on it. */
+  aimPoint: {
+    /** Draws the aim point whether or not its own toggle is on, so the panel
+     *  that sets it has the point it is about on screen. */
+    showAimPoint?: boolean;
+    /**
+     * Where a dragged aim point goes, which also puts the move handles on
+     * it. Committed on release like everything else here.
+     *
+     * A point has no size and no rotation, so this is the move gizmo only:
+     * there are no faces to grab the way a volume has.
+     */
+    onAimChange?: (mid: [number, number, number]) => void;
+  };
 }
 
 export function ModelViewport({
-  pack,
-  raw,
-  project,
-  selectedIds,
-  onSelect,
-  onTransform,
-  onTransformMany,
-  hoveredId,
-  onHover,
+  document,
+  selection,
   onReady,
-  playing = false,
-  scriptTimeline = null,
-  scriptPaused = false,
-  scriptFrame = 0,
-  onScriptFrame,
+  scriptPlayback,
   uniformScale = false,
   onGround,
-  onDuplicate,
-  canDuplicate,
-  onPaste,
-  onSaveAsCompound,
-  canSaveAsCompound,
-  onDelete,
-  canDelete,
+  pieceActions,
   symmetry,
-  onSymmetryChange,
-  placingAnchor = false,
-  onPlaceAnchor,
-  onCancelAnchor,
-  editCollision = false,
-  onCollisionChange,
-  editPieceCollisionId = null,
-  onPieceCollisionVolumeChange,
-  showAimPoint = false,
-  onAimChange,
+  anchorPlacement,
+  collisionEditing,
+  aimPoint,
 }: Props) {
+  const { pack, raw, project } = document;
+  const {
+    selectedIds,
+    onSelect,
+    onTransform,
+    onTransformMany,
+    hoveredId,
+    onHover,
+  } = selection;
+  const {
+    playing = false,
+    scriptTimeline = null,
+    scriptPaused = false,
+    scriptFrame = 0,
+    onScriptFrame,
+  } = scriptPlayback;
+  const {
+    onDuplicate,
+    canDuplicate,
+    onPaste,
+    onSaveAsCompound,
+    canSaveAsCompound,
+    onDelete,
+    canDelete,
+  } = pieceActions;
+  const { on: symmetryOn, onChange: onSymmetryChange } = symmetry;
+  const {
+    placingAnchor = false,
+    onPlaceAnchor,
+    onCancelAnchor,
+  } = anchorPlacement;
+  const {
+    editCollision = false,
+    onCollisionChange,
+    editPieceCollisionId = null,
+    onPieceCollisionVolumeChange,
+  } = collisionEditing;
+  const { showAimPoint = false, onAimChange } = aimPoint;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
@@ -1098,9 +1142,9 @@ export function ModelViewport({
                 <TooltipTrigger asChild>
                   <Button
                     size="icon"
-                    variant={symmetry ? "default" : "outline"}
-                    onClick={() => onSymmetryChange(!symmetry)}
-                    aria-pressed={symmetry}
+                    variant={symmetryOn ? "default" : "outline"}
+                    onClick={() => onSymmetryChange(!symmetryOn)}
+                    aria-pressed={symmetryOn}
                     aria-label="Symmetry"
                   >
                     <FlipHorizontal2 className="size-4" />
