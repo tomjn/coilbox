@@ -78,10 +78,7 @@ function MapArt({ mapName }: { mapName: string }) {
   if (picture.from === "placeholder") {
     return (
       <div className="flex size-full items-center justify-center p-3">
-        <MapOutline
-          picture={picture}
-          className="max-h-full max-w-full text-muted-foreground/70"
-        />
+        <MapOutline picture={picture} className="max-h-full max-w-full" />
       </div>
     );
   }
