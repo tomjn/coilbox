@@ -214,8 +214,11 @@ describe("the resume row", () => {
       candidates: [HERO, WARPATH, CONQUEST],
       loading: false,
     });
+    // The hero prints no action words, because the whole card is the link and
+    // its action is an icon. The rail's cards still spell theirs out: they are
+    // small and their words are the only thing saying what the card does.
     expect(text()).toBe(
-      "Skirmish setup Last setup Last setup detail Open setup " +
+      "Skirmish setup Last setup Last setup detail " +
         "Warpath run Kestrel Kestrel detail Resume run " +
         "Conquest Orion Reach Orion Reach detail Resume conquest",
     );

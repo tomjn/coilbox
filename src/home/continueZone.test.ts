@@ -71,9 +71,20 @@ function text(node: unknown): string[] {
   return kids === undefined ? [] : text(kids);
 }
 
-/** The card's action link, or undefined when there is no card. */
+/** The card's action link, which is the whole card. */
 function action(node: unknown) {
   return nodes(node).find((n) => n.type === Link)?.props;
+}
+
+/**
+ * The inert icon inside the link that shows what the card does.
+ *
+ * Found by its tooltip, because it is the only thing in the card carrying one.
+ * A `span` rather than a button: nesting an interactive element inside the
+ * card's link would be invalid markup.
+ */
+function affordance(node: unknown) {
+  return nodes(node).find((n) => n.type === "span" && n.props.title)?.props;
 }
 
 beforeEach(() => {
@@ -83,11 +94,12 @@ beforeEach(() => {
 describe("Continue zone", () => {
   it("shows the best candidate's kind, title and detail", () => {
     resume.mockReturnValue({ candidates: [WARPATH, CONQUEST], loading: false });
+    // Three lines, not four. The action's words used to be a fourth, next to a
+    // heading already saying Warpath run and a title already naming the run.
     expect(text(Continue({}))).toEqual([
       "Warpath run",
       "Kestrel",
       "BAR · health 8/10",
-      "Resume run",
     ]);
   });
 
@@ -104,8 +116,13 @@ describe("Continue zone", () => {
   it("words its action for the kind it is offering", () => {
     resume.mockReturnValue({ candidates: [CONQUEST], loading: false });
     // The wording comes from the collector, so the rail describes the same run
-    // the same way.
-    expect(text(Continue({}))).toContain("Resume conquest");
+    // the same way. It is not on screen as words: the whole card is the link and
+    // the action is an icon, so the wording lives in the link's label and in the
+    // icon's tooltip.
+    expect(action(Continue({}))?.["aria-label"]).toBe(
+      "Resume conquest: Orion Reach",
+    );
+    expect(affordance(Continue({}))?.title).toBe("Resume conquest");
   });
 
   it("offers to rejoin a battle rather than resume it", () => {
@@ -123,7 +140,24 @@ describe("Continue zone", () => {
       ],
       loading: false,
     });
-    expect(text(Continue({}))).toContain("Rejoin battle");
+    expect(action(Continue({}))?.["aria-label"]).toBe(
+      "Rejoin battle: All Welcome 8v8",
+    );
+    expect(affordance(Continue({}))?.title).toBe("Rejoin battle");
+  });
+
+  it("makes the whole card the link, with nothing interactive inside it", () => {
+    // One thing to do, so one target. Nesting a button or a second link inside
+    // the card's link is invalid markup that assistive technology handles
+    // badly, so the visible affordance is an inert span.
+    resume.mockReturnValue({ candidates: [WARPATH], loading: false });
+    const all = nodes(Continue({}));
+    expect(all.filter((n) => n.type === Link)).toHaveLength(1);
+    expect(all.filter((n) => n.type === "button")).toEqual([]);
+    // The heading is inside that link, which is valid and keeps the card in
+    // both of the lists this page is navigated by.
+    expect(action(Continue({}))).toBeDefined();
+    expect(all.some((n) => n.type === "h2")).toBe(true);
   });
 
   it("names the thing its action resumes, not just the verb", () => {
