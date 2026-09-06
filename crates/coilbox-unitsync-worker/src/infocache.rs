@@ -104,6 +104,28 @@ fn name_identity(us: &Unitsync, map_name: &str, kind: &str) -> Option<String> {
     Some(format!("n{:016x}", h.finish()))
 }
 
+/// Cache identity for a skirmish AI list: the engine library's file identity,
+/// because the native AIs ship with the engine, plus the game archive's when a
+/// game is given, because its Lua AIs and its `validais.lua` ship with the
+/// game. `None` when the game is named but its archive will not resolve, so a
+/// list read against the wrong archive is never remembered.
+pub fn skirmish_key(us: &Unitsync, lib: &Path, game_archive: Option<&str>) -> Option<String> {
+    let engine = identity(lib, "skirmishai-engine")?;
+    let game = match game_archive.filter(|g| !g.is_empty()) {
+        Some(g) => {
+            let dir = us.archive_path(g)?;
+            identity(&Path::new(&dir).join(g), "skirmishai-game")?
+        }
+        None => String::new(),
+    };
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    INFO_CACHE_VERSION.hash(&mut h);
+    "skirmishai".hash(&mut h);
+    engine.hash(&mut h);
+    game.hash(&mut h);
+    Some(format!("a{:016x}", h.finish()))
+}
+
 /// Cache identity for the sha256 of a map archive's own bytes, which is what the
 /// catalog's `source_hash` is (issue #1737).
 ///

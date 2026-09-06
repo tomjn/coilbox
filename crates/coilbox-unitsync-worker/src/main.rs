@@ -565,8 +565,9 @@ fn run() -> i32 {
     // given. Checked before game detail because that mode also keys off --game.
     if let Some(Mode::SkirmishAis(mode)) = &args.skirmish_ais {
         let game = mode.game.clone();
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return run_mode(
-            || skirmishai::render(&args.lib, game.as_deref()),
+            || skirmishai::render(&args.lib, game.as_deref(), cache_dir),
             print_ok,
             || skirmishai::emit_error("worker panicked while listing skirmish AIs".into()),
         );
@@ -1456,6 +1457,15 @@ fn absolutize(args: &mut Args) {
     // `raw` in `parse_args`, so it needs the same treatment. `--game` is a
     // unitsync name, not a path, so it is left alone.
     if let Some(Mode::Game(mode)) = args.game.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::SkirmishAis` holds its own copy of `--cache-dir` for the same
+    // reason `Mode::Game` does.
+    if let Some(Mode::SkirmishAis(mode)) = args.skirmish_ais.as_mut() {
         if let Some(dir) = &mut mode.cache_dir {
             if let Some(abs) = absolute_path(dir) {
                 *dir = abs;
