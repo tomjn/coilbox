@@ -51,10 +51,13 @@ const generalPlugin: FramePlugin = {
       order: 60,
       items: [
         {
+          // Second. Engine settings is the deepest of these and the one a
+          // player reaches for least often, whatever its weight in the
+          // settings tree.
           id: "settings.engine",
           label: "Engine settings",
           to: "/settings/engine-settings",
-          order: 0,
+          order: 1,
           icon: SlidersHorizontal,
           // Gated on the settings section rather than on a `hide` id of its
           // own. A distribution that hides the section wants the card gone too,
@@ -62,10 +65,12 @@ const generalPlugin: FramePlugin = {
           useVisible: () => !isSettingsHidden("engine-settings"),
         },
         {
+          // First. The one people come here to change on day one, and the one
+          // that needs no knowledge of Spring to want.
           id: "settings.appearance",
           label: "Appearance",
           to: `/settings/${FRAME_APPEARANCE_SETTINGS_ID}`,
-          order: 1,
+          order: 0,
           icon: Palette,
           useVisible: () => !isSettingsHidden(FRAME_APPEARANCE_SETTINGS_ID),
         },

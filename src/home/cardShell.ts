@@ -155,3 +155,20 @@ export const CARD_FOCUS_CLASS =
  */
 export const ART_BUTTON_CLASS =
   "border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]";
+
+/**
+ * A section heading on the welcome page: the tool grid's group labels, and the
+ * Continue hero's label, which is a heading for the same reason.
+ *
+ * Shared rather than written twice because the hero's whole argument for being a
+ * heading is that it already looked like one (#1091). Two copies of the string
+ * let that quietly stop being true.
+ *
+ * Full-strength ink. The heading and the line under it were both
+ * `text-muted-foreground`, which flattened the pair into an aside above the
+ * cards. `src/theme/tertiaryText.test.ts` shows there is no tier below muted
+ * that clears AA, so the hierarchy comes from raising the heading rather than
+ * dimming its description.
+ */
+export const GROUP_HEADING_CLASS =
+  "text-xs font-semibold uppercase tracking-wide text-foreground";

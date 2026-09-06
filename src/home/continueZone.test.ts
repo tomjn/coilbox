@@ -31,6 +31,7 @@ vi.mock("./continue", async (importOriginal) => ({
 }));
 
 import { Link } from "react-router";
+import { GROUP_HEADING_CLASS } from "./cardShell";
 import Continue from "./zones/Continue";
 
 const WARPATH: ResumeCandidate = {
@@ -147,13 +148,16 @@ describe("Continue zone", () => {
     expect(headings[0].props.id).toBe("home-continue-heading");
   });
 
-  it("changes nothing on screen by moving the heading", () => {
+  it("draws its heading exactly as the tool grid draws a group's", () => {
     // The label already carried the tool grid's group-heading styling, so the
     // page was drawing it as a section heading and only the tag was wrong.
+    // Asserted against the shared constant rather than a copy of the string,
+    // because a copy cannot catch the two drifting apart, which is the only
+    // thing this ever needed to check.
     resume.mockReturnValue({ candidates: [WARPATH], loading: false });
     const all = nodes(Continue({}));
     expect(all.find((n) => n.type === "h2")?.props.className).toBe(
-      "text-xs font-medium uppercase tracking-wide text-muted-foreground",
+      GROUP_HEADING_CLASS,
     );
     expect(
       all.find((n) => n.props.children === "Kestrel")?.props.className,

@@ -1,6 +1,7 @@
 import { buttonVariants, cn } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { Link } from "react-router";
+import { GROUP_HEADING_CLASS } from "../cardShell";
 import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
 
 /**
@@ -38,10 +39,11 @@ import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
  * most important one, which named a thing and said nothing about what sort of
  * thing it was (#1091).
  *
- * So the label is the heading and the name is the text under it. Nothing moves
- * on screen: the label already carries the tool grid's group-heading styling
- * (`text-xs uppercase tracking-wide text-muted-foreground`), so the page was
- * already drawing it as a section heading and only the tag was wrong.
+ * So the label is the heading and the name is the text under it. Nothing moved
+ * on screen when that changed: the label already carried the tool grid's
+ * group-heading styling, so the page was drawing it as a section heading and
+ * only the tag was wrong. It still tracks that styling, which is now
+ * full-strength ink rather than muted.
  *
  * What that costs is the run's name in the heading list. It is in the link list
  * instead, because the action beside it says "Resume run: Fractured Fringe"
@@ -101,10 +103,7 @@ export default function Continue({ className }: { className?: string }) {
         </span>
         <div className="min-w-0">
           {/* The heading is the kind, not the run's name. See below. */}
-          <h2
-            id="home-continue-heading"
-            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-          >
+          <h2 id="home-continue-heading" className={GROUP_HEADING_CLASS}>
             {label}
           </h2>
           <p className="text-xl font-semibold">{top.title}</p>

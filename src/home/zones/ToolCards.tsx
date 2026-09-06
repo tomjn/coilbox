@@ -11,6 +11,7 @@ import {
   ART_CARD_CLASS as ART_SHELL_CLASS,
   CARD_FOCUS_CLASS,
   CARD_SHELL_CLASS,
+  GROUP_HEADING_CLASS,
 } from "../cardShell";
 import { forgetContentArt } from "../contentArt";
 import { groupDescription } from "../groupDescription";
@@ -90,9 +91,7 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
           >
             {group.label && (
               <div className="mb-3">
-                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {group.label}
-                </h2>
+                <h2 className={GROUP_HEADING_CLASS}>{group.label}</h2>
                 {/* What the group is for, in one line. Absent for the link
                     groups a distribution injects, which this cannot describe.
                     See `../groupDescription`. */}

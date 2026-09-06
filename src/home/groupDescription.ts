@@ -31,7 +31,7 @@ const GROUP_DESCRIPTIONS: Readonly<Record<string, string>> = {
   downloads: "Find and install maps, games and other content.",
   builder: "Build your own campaigns and scenarios.",
   uberstress: "Run engine stress tests and compare the results.",
-  mapconv: "Compile and decompile Spring maps.",
+  mapconv: "Compile and decompile maps.",
   lego: "Assemble units from parts and inspect s3o models.",
   animation: "Convert BOS to Lua, and work with COB scripts.",
   settings: "Engine options, appearance, accounts, and everything else.",
