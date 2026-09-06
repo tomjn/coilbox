@@ -895,11 +895,13 @@ function Builder({ id }: { id: string | undefined }) {
                   hoveredId,
                   onHover: setHoveredId,
                 }}
-                playing={playing}
-                scriptTimeline={scriptTimeline}
-                scriptPaused={scriptPaused}
-                scriptFrame={scriptFrame}
-                onScriptFrame={setScriptFrame}
+                scriptPlayback={{
+                  playing,
+                  scriptTimeline,
+                  scriptPaused,
+                  scriptFrame,
+                  onScriptFrame: setScriptFrame,
+                }}
                 uniformScale={uniformScale}
                 onGround={() =>
                   edit((project) => sitOnGround(project, pack, raw))

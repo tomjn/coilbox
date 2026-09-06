@@ -304,30 +304,34 @@ interface Props {
    * still waiting on its textures. Ask again later rather than storing that.
    */
   onReady?: (capture: () => HTMLCanvasElement | null) => void;
-  /** Runs the applied presets. Nothing is written: stopping restores the rest
-   *  pose exactly, because it comes back from the document. */
-  playing?: boolean;
-  /**
-   * Poses to play instead of the presets, for a unit whose script is its own.
-   * The presets are gone for such a unit, so this is what playing means for it.
-   */
-  scriptTimeline?: ScriptTimeline | null;
-  /**
-   * True while a script run's clock is frozen on `scriptFrame` rather than
-   * advancing on its own. The bake and detached gizmo stay exactly as they
-   * are while paused, so scrubbing and stepping only ever change the pose.
-   */
-  scriptPaused?: boolean;
-  /**
-   * The frame a paused run is held on, and where the clock in a resumed run
-   * picks back up from. Ignored for the preset codepath.
-   */
-  scriptFrame?: number;
-  /**
-   * Told which frame a script run is showing, every tick it is not paused, so
-   * a scrubber can track playback and know where a pause should hold.
-   */
-  onScriptFrame?: (frame: number) => void;
+  /** The applied presets, or a unit's own script, playing or scrubbed. */
+  scriptPlayback: {
+    /** Runs the applied presets. Nothing is written: stopping restores the
+     *  rest pose exactly, because it comes back from the document. */
+    playing?: boolean;
+    /**
+     * Poses to play instead of the presets, for a unit whose script is its
+     * own. The presets are gone for such a unit, so this is what playing
+     * means for it.
+     */
+    scriptTimeline?: ScriptTimeline | null;
+    /**
+     * True while a script run's clock is frozen on `scriptFrame` rather than
+     * advancing on its own. The bake and detached gizmo stay exactly as they
+     * are while paused, so scrubbing and stepping only ever change the pose.
+     */
+    scriptPaused?: boolean;
+    /**
+     * The frame a paused run is held on, and where the clock in a resumed run
+     * picks back up from. Ignored for the preset codepath.
+     */
+    scriptFrame?: number;
+    /**
+     * Told which frame a script run is showing, every tick it is not paused,
+     * so a scrubber can track playback and know where a pause should hold.
+     */
+    onScriptFrame?: (frame: number) => void;
+  };
   /** Scale handles keep the piece's proportions. */
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
@@ -405,11 +409,7 @@ export function ModelViewport({
   document,
   selection,
   onReady,
-  playing = false,
-  scriptTimeline = null,
-  scriptPaused = false,
-  scriptFrame = 0,
-  onScriptFrame,
+  scriptPlayback,
   uniformScale = false,
   onGround,
   onDuplicate,
@@ -440,6 +440,13 @@ export function ModelViewport({
     hoveredId,
     onHover,
   } = selection;
+  const {
+    playing = false,
+    scriptTimeline = null,
+    scriptPaused = false,
+    scriptFrame = 0,
+    onScriptFrame,
+  } = scriptPlayback;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
