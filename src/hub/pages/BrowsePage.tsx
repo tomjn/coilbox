@@ -182,11 +182,18 @@ export default function BrowsePage() {
   // values in: the hub filters `game` by `game_key`, a version-independent
   // modinfo shortname such as "SF" (issue #2587). The matching local field is
   // `info.shortname`, not `name` - the same field `container/shortnames.ts`
-  // reads to carry a game's identity across a build. The dropdown below is
-  // keyed on it, with `info.name` (also version-free) as the label, so every
-  // installed version of a game collapses to the one option that actually
-  // returns results, and a game whose modinfo has no shortname is left off the
-  // list rather than offered as a dead end.
+  // reads to carry a game's identity across a build.
+  //
+  // The label is not `info.name` either: unitsync computes that field as the
+  // modinfo `name` with `version` appended (`"SplinterFaction $VERSION"`,
+  // `"Metal Factions v2.58"`), which is exactly the versioned string the
+  // version-independent filter does not promise (issue #2590). `info.name_pure`
+  // is the same modinfo `name` before that append, so it is what actually
+  // names the game. A game whose modinfo never set it, or whose own `name`
+  // field literally is the unsubstituted `$VERSION` placeholder, falls back to
+  // the shortname: short and version-free rather than wrong. A game whose
+  // modinfo has no shortname is left off the list rather than offered as a
+  // dead end.
   const { selected: scanTarget } = useScanTargetSelection();
   const { data: scanData } = useUnitsyncScan(
     scanTarget?.enginePath,
@@ -197,7 +204,10 @@ export default function BrowsePage() {
     for (const g of scanData?.games ?? []) {
       const key = g.info?.shortname?.trim();
       if (!key) continue;
-      if (!byKey.has(key)) byKey.set(key, g.info?.name?.trim() || key);
+      if (byKey.has(key)) continue;
+      const namePure = g.info?.name_pure?.trim();
+      const label = namePure && !namePure.includes("$VERSION") ? namePure : key;
+      byKey.set(key, label);
     }
     return [...byKey.entries()]
       .map(([value, label]) => ({ value, label }))
