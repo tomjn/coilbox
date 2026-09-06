@@ -18,7 +18,7 @@ export default function ArchiveReplPage() {
     selected?.rootPath,
   );
   const archive = archives.find((a) => a.name === decoded);
-  const backTo = `/content/archives/${encodeURIComponent(decoded)}`;
+  const backTo = `/library/archives/${encodeURIComponent(decoded)}`;
 
   if (!data || loading) return <DetailLoading backTo={backTo} />;
   if (!archive || !selected?.enginePath || !selected?.rootPath)

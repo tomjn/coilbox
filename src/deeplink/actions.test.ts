@@ -109,7 +109,7 @@ describe("prepareImport", () => {
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.plan.kind).toBe("blueprint");
-      expect(r.plan.route).toContain("/content/blueprints?import=");
+      expect(r.plan.route).toContain("/library/blueprints?import=");
       expect(r.plan.label).toMatch(/blueprint/i);
     }
   });

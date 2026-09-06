@@ -155,15 +155,15 @@ export default function GameUnitPage() {
   if (error && !data)
     return (
       <DetailError
-        backTo="/content/games"
+        backTo="/library/games"
         message={error}
         onRetry={() => run(true)}
       />
     );
-  if (!data || loading) return <DetailLoading backTo="/content/games" />;
-  if (!game) return <NotFound backTo="/content/games" label="game" />;
+  if (!data || loading) return <DetailLoading backTo="/library/games" />;
+  if (!game) return <NotFound backTo="/library/games" label="game" />;
 
-  const unitsBackTo = `/content/games/${encodeURIComponent(game.name)}/units`;
+  const unitsBackTo = `/library/games/${encodeURIComponent(game.name)}/units`;
 
   if (datasetStatus === "error")
     return (
@@ -244,7 +244,7 @@ export default function GameUnitPage() {
 
   const label = (targetId: string) => unitLabel(byId.get(targetId), targetId);
   const unitPath = (targetId: string) =>
-    `/content/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(targetId)}`;
+    `/library/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(targetId)}`;
 
   // The game's own data for one hop of the morph chain: whichever of
   // `fromId`'s declared morph targets names `toId`, with every key but

@@ -113,12 +113,12 @@ describe("bundledCardArtSvg", () => {
   });
 });
 
-describe("content.archives", () => {
+describe("library.archives", () => {
   it("gives each drum's side walls the same opacity as the rim above them", () => {
     // Issue #1382: the rim ellipse took a per-ring stroke-opacity but the
     // vertical paths beside it did not, so the drum's sides stayed fully
     // opaque whatever the palette set.
-    const svg = bundledCardArtSvg("content.archives", THEME, DARK) ?? "";
+    const svg = bundledCardArtSvg("library.archives", THEME, DARK) ?? "";
     const rings = [
       ...svg.matchAll(
         /<ellipse[^>]*stroke-opacity="([\d.]+)"\/><path[^>]*stroke-opacity="([\d.]+)"\/><path[^>]*stroke-opacity="([\d.]+)"\/>/g,
@@ -186,9 +186,9 @@ describe("the chain with bundled art registered", () => {
       "multiplayer.battles",
       "multiplayer.battle",
       "multiplayer.stats",
-      "content.games",
-      "content.blueprints",
-      "content.archives",
+      "library.games",
+      "library.blueprints",
+      "library.archives",
       "content.setupPacks",
       "downloads.maps",
       "downloads.games",

@@ -1,4 +1,5 @@
 import type { GameFilter, ProfileSource } from "./profile";
+import { canonicalProfileId } from "./renamedIds";
 
 export type HealthStatus = "ok" | "warn" | "error" | "unknown";
 
@@ -137,12 +138,15 @@ export function checkHideIds(
   hideable: string[],
 ): HealthCheck | null {
   if (hide.length === 0) return null;
-  const unknown = hide.filter((id) => !hideable.includes(id));
+  const unknown = hide.filter(
+    (id) => !hideable.includes(canonicalProfileId(id)),
+  );
   if (unknown.length === 0) {
     return {
       id: "hide",
       status: "ok",
       label: `Hide list: ${hide.length} id(s), all match a hideable feature`,
+      hint: renamedHint(hide),
     };
   }
   return {
@@ -156,6 +160,22 @@ export function checkHideIds(
 }
 
 /**
+ * A note naming each id this profile writes under an old name, or nothing when
+ * it writes none.
+ *
+ * A renamed id still works, so this is not a warning. It is the only place a
+ * profile author finds out the name moved, because the check they would
+ * otherwise fail is the one the rename map stops from firing.
+ */
+function renamedHint(ids: string[]): string | undefined {
+  const renamed = ids.filter((id) => canonicalProfileId(id) !== id);
+  if (renamed.length === 0) return undefined;
+  return `${renamed
+    .map((id) => `'${id}' is now '${canonicalProfileId(id)}'`)
+    .join("; ")}. The old names still work.`;
+}
+
+/**
  * Warn when a `hideSettings` id matches no settings section. Every section id is
  * hideable, so this only catches typos / stale ids. Same shape as {@link checkHideIds}.
  */
@@ -164,12 +184,15 @@ export function checkHideSettingsIds(
   settingsIds: string[],
 ): HealthCheck | null {
   if (hideSettings.length === 0) return null;
-  const unknown = hideSettings.filter((id) => !settingsIds.includes(id));
+  const unknown = hideSettings.filter(
+    (id) => !settingsIds.includes(canonicalProfileId(id)),
+  );
   if (unknown.length === 0) {
     return {
       id: "hideSettings",
       status: "ok",
       label: `Hide settings: ${hideSettings.length} id(s), all match a section`,
+      hint: renamedHint(hideSettings),
     };
   }
   return {

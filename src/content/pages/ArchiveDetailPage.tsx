@@ -69,8 +69,8 @@ export default function ArchiveDetailPage() {
   );
   const selectedSize = tree?.files.find((f) => f.path === selectedFile)?.size;
 
-  if (!data || loading) return <DetailLoading backTo="/content/archives" />;
-  if (!archive) return <NotFound backTo="/content/archives" label="archive" />;
+  if (!data || loading) return <DetailLoading backTo="/library/archives" />;
+  if (!archive) return <NotFound backTo="/library/archives" label="archive" />;
 
   // Dependencies: a game's own deps, or a map's other archives.
   const game = data.games.find((g) => g.primaryArchive.name === decoded);
@@ -86,12 +86,12 @@ export default function ArchiveDetailPage() {
     archive.kind === "game" && archive.gameName
       ? {
           label: "View game",
-          to: `/content/games/${encodeURIComponent(archive.gameName)}`,
+          to: `/library/games/${encodeURIComponent(archive.gameName)}`,
         }
       : archive.kind === "map" && archive.mapName
         ? {
             label: "View map",
-            to: `/content/maps/${encodeURIComponent(archive.mapName)}`,
+            to: `/library/maps/${encodeURIComponent(archive.mapName)}`,
           }
         : null;
 
@@ -137,7 +137,7 @@ export default function ArchiveDetailPage() {
     <div className="flex h-full min-h-0 flex-col gap-5 p-4">
       <header className="flex shrink-0 flex-col gap-1">
         <Link
-          to="/content/archives"
+          to="/library/archives"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
           <ArrowLeft className="size-3.5" /> Archives
@@ -196,7 +196,7 @@ export default function ArchiveDetailPage() {
               <DeleteArchiveButton
                 path={onDiskPath}
                 name={archive.name}
-                onDeleted={() => navigate("/content/archives")}
+                onDeleted={() => navigate("/library/archives")}
               />
             )}
           </div>

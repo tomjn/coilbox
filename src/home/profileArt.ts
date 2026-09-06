@@ -43,6 +43,7 @@
 
 import { assetUrl } from "../lib/assetUrl";
 import { parseRef } from "../profile/refs";
+import { canonicalProfileId } from "../profile/renamedIds";
 import type { ArtOverrides } from "./artOverride";
 import { type HomeEntry, noteHomeIssue, showHomeValue } from "./config";
 
@@ -86,7 +87,10 @@ export function readArtMap(value: unknown, issues?: string[]): ArtOverrides {
   const overrides = new Map<string, string | false>();
   for (const [toolId, entry] of Object.entries(value)) {
     const art = toolArt(toolId, entry, issues);
-    if (art !== undefined) overrides.set(toolId, art);
+    // Keyed by nav item id, so an id renamed since the profile was written
+    // would drop the author's picture and put a stock one back with no warning.
+    // Same map the `hide` list is read through.
+    if (art !== undefined) overrides.set(canonicalProfileId(toolId), art);
   }
   return overrides;
 }

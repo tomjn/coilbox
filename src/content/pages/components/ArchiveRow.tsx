@@ -20,17 +20,17 @@ export function ArchiveRow({
 }) {
   const navigate = useNavigate();
   const size = formatBytes(archive.size);
-  const detailTo = `/content/archives/${encodeURIComponent(archive.name)}`;
+  const detailTo = `/library/archives/${encodeURIComponent(archive.name)}`;
   const linked =
     classification?.kind === "game" && classification.gameName
       ? {
           label: "View game",
-          to: `/content/games/${encodeURIComponent(classification.gameName)}`,
+          to: `/library/games/${encodeURIComponent(classification.gameName)}`,
         }
       : classification?.kind === "map" && classification.mapName
         ? {
             label: "View map",
-            to: `/content/maps/${encodeURIComponent(classification.mapName)}`,
+            to: `/library/maps/${encodeURIComponent(classification.mapName)}`,
           }
         : null;
 

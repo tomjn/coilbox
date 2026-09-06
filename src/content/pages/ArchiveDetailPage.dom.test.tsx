@@ -95,9 +95,9 @@ afterEach(cleanup);
 
 function renderAtAlpha() {
   return render(
-    <MemoryRouter initialEntries={["/content/archives/alpha.sdz"]}>
+    <MemoryRouter initialEntries={["/library/archives/alpha.sdz"]}>
       <Routes>
-        <Route path="/content/archives/:name" element={<ArchiveDetailPage />} />
+        <Route path="/library/archives/:name" element={<ArchiveDetailPage />} />
       </Routes>
     </MemoryRouter>,
   );

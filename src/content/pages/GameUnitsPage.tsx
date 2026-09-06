@@ -130,15 +130,15 @@ export default function GameUnitsPage() {
   if (error && !data)
     return (
       <DetailError
-        backTo="/content/games"
+        backTo="/library/games"
         message={error}
         onRetry={() => run(true)}
       />
     );
-  if (!data || loading) return <DetailLoading backTo="/content/games" />;
-  if (!game) return <NotFound backTo="/content/games" label="game" />;
+  if (!data || loading) return <DetailLoading backTo="/library/games" />;
+  if (!game) return <NotFound backTo="/library/games" label="game" />;
 
-  const backTo = `/content/games/${encodeURIComponent(game.name)}`;
+  const backTo = `/library/games/${encodeURIComponent(game.name)}`;
 
   if (datasetStatus === "error")
     return (
@@ -264,7 +264,7 @@ function UnitCellItem({
   return (
     <li>
       <Link
-        to={`/content/games/${encodeURIComponent(gameName)}/units/${encodeURIComponent(cell.id)}`}
+        to={`/library/games/${encodeURIComponent(gameName)}/units/${encodeURIComponent(cell.id)}`}
         className="flex flex-col items-center gap-1 rounded-lg border border-border/50 bg-card p-2 text-center transition-colors hover:border-border hover:bg-accent/50"
       >
         <UnitIcon display={display} pending={pending} size="xl" />

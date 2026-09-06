@@ -27,7 +27,7 @@ import {
 /** Where one layout is edited. Here rather than on the page it addresses, so
  *  that anything wanting the address does not pull the page in behind it. */
 export function blueprintRoute(id: string): string {
-  return `/content/blueprints/${encodeURIComponent(id)}`;
+  return `/library/blueprints/${encodeURIComponent(id)}`;
 }
 
 /** Read and parse every stored document, newest edit first. A document that

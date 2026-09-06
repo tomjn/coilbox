@@ -17,7 +17,7 @@ function base(): HealthInputs {
     scenarioFailures: [],
     writable: { writeRoot: { writable: true }, dataDir: { writable: true } },
     hide: [],
-    hideableNavIds: ["content.games", "downloads.browse", "downloads.games"],
+    hideableNavIds: ["library.games", "downloads.browse", "downloads.games"],
     hideSettings: [],
     settingsIds: ["content-folders", "engines", "uberstress"],
     linkIcons: [],
@@ -238,16 +238,24 @@ describe("deriveHealthChecks", () => {
 
   describe("hide id no-op advisory", () => {
     it("warns and names a hide id that matches nothing", () => {
-      const c = byId({ ...base(), hide: ["content.gmaes"] }, "hide");
+      const c = byId({ ...base(), hide: ["library.gmaes"] }, "hide");
       expect(c.status).toBe("warn");
-      expect(c.hint).toContain("hide id 'content.gmaes' matches nothing");
+      expect(c.hint).toContain("hide id 'library.gmaes' matches nothing");
       // lists the ids the profile could actually hide.
-      expect(c.hint).toContain("content.games");
+      expect(c.hint).toContain("library.games");
     });
 
     it("does not warn when every hide id is hideable", () => {
+      const c = byId({ ...base(), hide: ["library.games"] }, "hide");
+      expect(c.status).toBe("ok");
+    });
+
+    it("accepts an id renamed since the profile was written", () => {
+      // The whole point of the rename map: a shipped profile nobody here can
+      // edit must not start reporting a working id as matching nothing.
       const c = byId({ ...base(), hide: ["content.games"] }, "hide");
       expect(c.status).toBe("ok");
+      expect(c.hint).toContain("'content.games' is now 'library.games'");
     });
 
     it("adds no hide row when the profile hides nothing", () => {

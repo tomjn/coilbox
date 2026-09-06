@@ -2,6 +2,7 @@ import { NavGate } from "@picoframe/frame";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import type { ComponentType } from "react";
 import { getProfile } from "./profile";
+import { canonicalProfileId } from "./renamedIds";
 
 /**
  * Nav hiding driven by the distribution profile's `hide` list. A bundled build can
@@ -31,7 +32,7 @@ import { getProfile } from "./profile";
  * pack sharing off keeps it off now the page has gone.
  */
 export const HIDEABLE_NAV_IDS: string[] = [
-  "content.games",
+  "library.games",
   "content.setupPacks",
   "downloads.browse",
   "downloads.games",
@@ -49,12 +50,14 @@ export const HIDEABLE_NAV_IDS: string[] = [
  * static module value, so it needn't (and doesn't) use React state.
  */
 export function isProfileHidden(id: string): boolean {
-  return getProfile().hide?.includes(id) ?? false;
+  const hide = getProfile().hide;
+  return hide?.some((h) => canonicalProfileId(h) === id) ?? false;
 }
 
 /** Is this settings section hidden by the active profile? */
 export function isSettingsHidden(id: string): boolean {
-  return getProfile().hideSettings?.includes(id) ?? false;
+  const hide = getProfile().hideSettings;
+  return hide?.some((h) => canonicalProfileId(h) === id) ?? false;
 }
 
 /**

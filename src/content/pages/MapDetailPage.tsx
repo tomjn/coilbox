@@ -154,14 +154,14 @@ export default function MapDetailPage() {
   if (error && !data)
     return (
       <DetailError
-        backTo="/content/maps"
+        backTo="/library/maps"
         message={error}
         onRetry={() => run(true)}
       />
     );
-  if (!data || loading) return <DetailLoading backTo="/content/maps" />;
+  if (!data || loading) return <DetailLoading backTo="/library/maps" />;
   const scanned = data.maps.find((m) => m.name === decoded);
-  if (!scanned) return <NotFound backTo="/content/maps" label="map" />;
+  if (!scanned) return <NotFound backTo="/library/maps" label="map" />;
   // Proportions and mapinfo arrive after the scan now, so fold in whichever of
   // those tiers has landed.
   const [map] = mergeMapTiers([scanned], thumbs, meta);
@@ -226,7 +226,7 @@ export default function MapDetailPage() {
     <div className="flex flex-col gap-5 p-4">
       <header className="flex flex-col gap-1">
         <Link
-          to="/content/maps"
+          to="/library/maps"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
           <ArrowLeft className="size-3.5" /> Maps
@@ -284,7 +284,7 @@ export default function MapDetailPage() {
           <DeleteArchiveButton
             path={archivePath}
             name={archiveName ?? map.name}
-            onDeleted={() => navigate("/content/maps")}
+            onDeleted={() => navigate("/library/maps")}
           />
         )}
       </section>

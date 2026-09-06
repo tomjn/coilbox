@@ -393,20 +393,20 @@ describe("assignPicks", () => {
     const picks = assignPicks(
       new Map([
         ["play.skirmish", [map("Shared")]],
-        ["content.maps", [map("Shared"), map("Another")]],
+        ["library.maps", [map("Shared"), map("Another")]],
       ]),
     );
-    expect(picks.get("content.maps")).toEqual(map("Another"));
+    expect(picks.get("library.maps")).toEqual(map("Another"));
   });
 
   it("keeps maps and games in separate namespaces", () => {
     const picks = assignPicks(
       new Map<string, ContentPick[]>([
         ["play.skirmish", [map("Twin")]],
-        ["content.games", [{ kind: "game", gameName: "Twin" }]],
+        ["library.games", [{ kind: "game", gameName: "Twin" }]],
       ]),
     );
-    expect(picks.get("content.games")).toEqual({
+    expect(picks.get("library.games")).toEqual({
       kind: "game",
       gameName: "Twin",
     });
@@ -484,14 +484,14 @@ describe("contentPicks", () => {
 
   it("shows a map you own on the Maps card, and never the one already used", () => {
     const picks = contentPicks(populated);
-    expect(picks.get("content.maps")).toEqual({
+    expect(picks.get("library.maps")).toEqual({
       kind: "map",
       mapName: "Isthmus v3",
     });
   });
 
   it("shows a game you own on the Games card", () => {
-    expect(contentPicks(populated).get("content.games")).toEqual({
+    expect(contentPicks(populated).get("library.games")).toEqual({
       kind: "game",
       gameName: "Metal Factions v2.58",
     });
@@ -503,7 +503,7 @@ describe("contentPicks", () => {
       draft: { gameName: "", mapName: SHARED },
       games: [{ name: "Balanced Annihilation V15.9.8" }],
     });
-    expect(picks.get("content.games")).toEqual({
+    expect(picks.get("library.games")).toEqual({
       kind: "game",
       gameName: "Balanced Annihilation V15.9.8",
     });
@@ -558,10 +558,10 @@ describe("contentPicks", () => {
     // yields its offer for exactly the same reason an image does.
     const offers = contentOffers({
       ...populated,
-      overridden: new Set(["play.skirmish", "content.maps"]),
+      overridden: new Set(["play.skirmish", "library.maps"]),
     });
     expect(offers.has("play.skirmish")).toBe(false);
-    expect(offers.has("content.maps")).toBe(false);
+    expect(offers.has("library.maps")).toBe(false);
     expect(offers.has("play.replays")).toBe(true);
   });
 
@@ -590,7 +590,7 @@ describe("contentPicks", () => {
     });
     expect(picks.has("play.skirmish")).toBe(false);
     expect(picks.has("play.replays")).toBe(false);
-    expect(picks.get("content.maps")).toEqual({
+    expect(picks.get("library.maps")).toEqual({
       kind: "map",
       mapName: "Isthmus v3",
     });
@@ -616,7 +616,7 @@ describe("contentPicks", () => {
       kind: "map",
       mapName: SHARED,
     });
-    expect(picks.get("content.maps")).toEqual({
+    expect(picks.get("library.maps")).toEqual({
       kind: "map",
       mapName: "Isthmus v3",
     });
@@ -627,7 +627,7 @@ describe("contentPicks", () => {
       ...populated,
       claimed: [{ kind: "map", mapName: "Metal Factions v2.58" }],
     });
-    expect(picks.get("content.games")).toEqual({
+    expect(picks.get("library.games")).toEqual({
       kind: "game",
       gameName: "Metal Factions v2.58",
     });
@@ -769,7 +769,7 @@ function snapshot(
 describe("pruneRemembered", () => {
   const last = snapshot([
     ["play.skirmish", mapPick("Valles Marineris 2.6.1"), "coilbox://a"],
-    ["content.maps", mapPick("Isthmus v3"), "coilbox://b"],
+    ["library.maps", mapPick("Isthmus v3"), "coilbox://b"],
   ]);
 
   it("keeps a picture this launch has picked again", () => {
@@ -794,7 +794,7 @@ describe("pruneRemembered", () => {
       new Map([["play.skirmish", mapPick("Somewhere Else v1")]]),
     );
     expect(kept.has("play.skirmish")).toBe(false);
-    expect(kept.has("content.maps")).toBe(true);
+    expect(kept.has("library.maps")).toBe(true);
   });
 
   it("drops a picture another card has been given", () => {
@@ -804,7 +804,7 @@ describe("pruneRemembered", () => {
       last,
       new Map([["play.skirmish", mapPick("Isthmus v3")]]),
     );
-    expect(kept.has("content.maps")).toBe(false);
+    expect(kept.has("library.maps")).toBe(false);
   });
 
   it("drops a picture the suggested map has claimed", () => {
@@ -812,7 +812,7 @@ describe("pruneRemembered", () => {
       mapPick("Valles Marineris 2.6.1"),
     ]);
     expect(kept.has("play.skirmish")).toBe(false);
-    expect(kept.has("content.maps")).toBe(true);
+    expect(kept.has("library.maps")).toBe(true);
   });
 
   it("matches a claim whatever case each side was written in", () => {
@@ -826,7 +826,7 @@ describe("pruneRemembered", () => {
 
   it("keeps a game whose name matches a claimed map", () => {
     const games = snapshot([
-      ["content.games", { kind: "game", gameName: "Twin" }, "coilbox://g"],
+      ["library.games", { kind: "game", gameName: "Twin" }, "coilbox://g"],
     ]);
     expect(pruneRemembered(games, new Map(), [mapPick("Twin")]).size).toBe(1);
   });
@@ -839,8 +839,8 @@ describe("pruneRemembered", () => {
     // now names is the one the Maps card was showing last launch.
     const stale = snapshot([
       ["play.skirmish", mapPick("Isthmus v3"), "coilbox://old"],
-      ["content.maps", mapPick("Tabula-v6"), "coilbox://maps"],
-      ["content.games", { kind: "game", gameName: "MF" }, "coilbox://games"],
+      ["library.maps", mapPick("Tabula-v6"), "coilbox://maps"],
+      ["library.games", { kind: "game", gameName: "MF" }, "coilbox://games"],
     ]);
     const fresh = contentPicks({
       draft: { gameName: "MF", mapName: "Tabula-v6" },
@@ -850,7 +850,7 @@ describe("pruneRemembered", () => {
       scenarios: [],
       ...noCollections,
     });
-    expect(fresh.has("content.maps")).toBe(false);
+    expect(fresh.has("library.maps")).toBe(false);
     const kept = pruneRemembered(stale, fresh);
     const painted = new Map(fresh);
     for (const [toolId, entry] of kept)
@@ -893,18 +893,18 @@ describe("rememberedFrom", () => {
     const next = rememberedFrom(
       new Map([["play.skirmish", "coilbox://new"]]),
       new Map([["play.skirmish", mapPick("A")]]),
-      snapshot([["content.maps", mapPick("B"), "coilbox://old"]]),
+      snapshot([["library.maps", mapPick("B"), "coilbox://old"]]),
     );
-    expect(next.get("content.maps")?.url).toBe("coilbox://old");
+    expect(next.get("library.maps")?.url).toBe("coilbox://old");
   });
 
   it("refuses to carry a picture this publish gave to another card", () => {
     const next = rememberedFrom(
       new Map([["play.skirmish", "coilbox://new"]]),
       new Map([["play.skirmish", mapPick("B")]]),
-      snapshot([["content.maps", mapPick("B"), "coilbox://old"]]),
+      snapshot([["library.maps", mapPick("B"), "coilbox://old"]]),
     );
-    expect(next.has("content.maps")).toBe(false);
+    expect(next.has("library.maps")).toBe(false);
   });
 });
 
@@ -912,7 +912,7 @@ describe("the stored snapshot", () => {
   it("round trips both kinds of pick", () => {
     const entries = snapshot([
       ["play.skirmish", mapPick("Valles Marineris 2.6.1"), "coilbox://a"],
-      ["content.games", { kind: "game", gameName: "MF v2.58" }, "coilbox://b"],
+      ["library.games", { kind: "game", gameName: "MF v2.58" }, "coilbox://b"],
     ]);
     expect([...decodeRemembered(encodeRemembered(entries))]).toEqual([
       ...entries,
@@ -1012,11 +1012,11 @@ describe("painting from the snapshot", () => {
     rememberContentArt(
       snapshot([
         ["play.skirmish", mapPick("A"), "coilbox://one"],
-        ["content.maps", mapPick("B"), "coilbox://two"],
+        ["library.maps", mapPick("B"), "coilbox://two"],
       ]),
     );
     forgetContentArt("coilbox://one");
-    expect(rememberedContentArt().get("content.maps")?.url).toBe(
+    expect(rememberedContentArt().get("library.maps")?.url).toBe(
       "coilbox://two",
     );
   });
@@ -1099,10 +1099,10 @@ describe("where the snapshot is kept", () => {
     );
     store.set(
       PACKAGE,
-      encodeRemembered(snapshot([["content.maps", mapPick("B"), "package"]])),
+      encodeRemembered(snapshot([["library.maps", mapPick("B"), "package"]])),
     );
     loadContentArt("/pkg/.coilbox");
-    expect([...rememberedContentArt().keys()]).toEqual(["content.maps"]);
+    expect([...rememberedContentArt().keys()]).toEqual(["library.maps"]);
   });
 
   it("starts a portable package empty rather than on the other install's picks", () => {
@@ -1120,7 +1120,7 @@ describe("where the snapshot is kept", () => {
     const vanilla = encodeRemembered(
       snapshot([
         ["play.skirmish", mapPick("A"), "vanilla-a"],
-        ["content.maps", mapPick("B"), "vanilla-b"],
+        ["library.maps", mapPick("B"), "vanilla-b"],
       ]),
     );
     store.set(VANILLA, vanilla);
@@ -1275,7 +1275,7 @@ describe("resolvePicks", () => {
   it("takes a game's header art from the batch the Games grid already fetched", async () => {
     const out = await resolvePicks(
       new Map([
-        ["content.games", { kind: "game", gameName: "Metal Factions v2.58" }],
+        ["library.games", { kind: "game", gameName: "Metal Factions v2.58" }],
       ]),
       "/engine",
       "/root",
@@ -1283,19 +1283,19 @@ describe("resolvePicks", () => {
         ["Metal Factions v2.58", "coilbox://localhost/unitsyncheader/h-1.jpg"],
       ]),
     );
-    expect(out.get("content.games")).toBe(
+    expect(out.get("library.games")).toBe(
       "coilbox://localhost/unitsyncheader/h-1.jpg",
     );
   });
 
   it("leaves a game with no header art out of the result", async () => {
     const out = await resolvePicks(
-      new Map([["content.games", { kind: "game", gameName: "No Art" }]]),
+      new Map([["library.games", { kind: "game", gameName: "No Art" }]]),
       "/engine",
       "/root",
       new Map(),
     );
-    expect(out.has("content.games")).toBe(false);
+    expect(out.has("library.games")).toBe(false);
   });
 
   it("falls back to an inline render that never reached the cache", async () => {

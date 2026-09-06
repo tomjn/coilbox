@@ -58,7 +58,7 @@ export function GameCard({
     >
       {/* Stretched link: anywhere but the Play button opens the game detail. */}
       <Link
-        to={`/content/games/${encodeURIComponent(game.name)}`}
+        to={`/library/games/${encodeURIComponent(game.name)}`}
         aria-label={game.name}
         className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       />

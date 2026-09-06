@@ -121,11 +121,11 @@ function renderPage({
   return render(
     <MemoryRouter
       initialEntries={[
-        `/content/games/${encodeURIComponent(GAME_NAME)}/units${search}`,
+        `/library/games/${encodeURIComponent(GAME_NAME)}/units${search}`,
       ]}
     >
       <Routes>
-        <Route path="/content/games/:name/units" element={<GameUnitsPage />} />
+        <Route path="/library/games/:name/units" element={<GameUnitsPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -232,7 +232,7 @@ describe("GameUnitsPage", () => {
     const cell = await screen.findByText("Commander");
     const link = cell.closest("a");
     expect(link?.getAttribute("href")).toBe(
-      `/content/games/${encodeURIComponent(GAME_NAME)}/units/armcom`,
+      `/library/games/${encodeURIComponent(GAME_NAME)}/units/armcom`,
     );
   });
 

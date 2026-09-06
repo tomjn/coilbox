@@ -82,7 +82,7 @@ function FactionBuildButton({
   // to, so this falls back to the same disabled treatment as a 0 count below
   // rather than linking to a filter that would just come back empty.
   const browseHref = side.startUnit
-    ? `/content/games/${encodeURIComponent(ctx.gameName)}/units?faction=${encodeURIComponent(side.startUnit)}`
+    ? `/library/games/${encodeURIComponent(ctx.gameName)}/units?faction=${encodeURIComponent(side.startUnit)}`
     : undefined;
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/50 p-3">

@@ -158,12 +158,12 @@ function renderUnit(
   return render(
     <MemoryRouter
       initialEntries={[
-        `/content/games/${encodeURIComponent(GAME_NAME)}/units/${id}`,
+        `/library/games/${encodeURIComponent(GAME_NAME)}/units/${id}`,
       ]}
     >
       <Routes>
         <Route
-          path="/content/games/:name/units/:unit"
+          path="/library/games/:name/units/:unit"
           element={<GameUnitPage />}
         />
       </Routes>

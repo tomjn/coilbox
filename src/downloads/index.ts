@@ -111,7 +111,7 @@ const downloadsPlugin: FramePlugin = {
       id: "downloads",
       title: "Downloads",
       description: "Where downloads come from and where they land.",
-      parent: "content",
+      parent: "library",
       order: 30,
       icon: Download,
       Component: DownloadsSettings,

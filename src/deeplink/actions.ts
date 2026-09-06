@@ -162,7 +162,7 @@ export function prepareImport(code: string): PrepareImportResult {
         ok: true,
         plan: {
           ...(base as ImportPlan),
-          route: importRoute("/content/blueprints", code),
+          route: importRoute("/library/blueprints", code),
           label: containerKindName("blueprint"),
         },
       };

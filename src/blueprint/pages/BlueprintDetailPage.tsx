@@ -282,7 +282,7 @@ export default function BlueprintDetailPage() {
               // the layout straight back.
               pending.current = null;
               await deleteBlueprint(record.id);
-              navigate("/content/blueprints");
+              navigate("/library/blueprints");
             }}
           />
         </div>
@@ -332,7 +332,7 @@ export default function BlueprintDetailPage() {
 function BackLink() {
   return (
     <Link
-      to="/content/blueprints"
+      to="/library/blueprints"
       className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
     >
       <ArrowLeft className="size-3.5" /> Blueprints

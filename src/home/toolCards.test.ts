@@ -346,7 +346,7 @@ describe("where the suggested map's card goes", () => {
         { ...DOCS },
       ],
     },
-    { id: "content", label: "Content", items: [{ ...SKIRMISH, id: "c" }] },
+    { id: "library", label: "Library", items: [{ ...SKIRMISH, id: "c" }] },
   ];
 
   /** The grid, with a recognisable stand-in for the map card. */
@@ -378,7 +378,7 @@ describe("where the suggested map's card goes", () => {
     expect(html.match(/SUGGESTED/g)).toHaveLength(1);
     expect(section(html, "Downloads")).toContain("SUGGESTED");
     expect(section(html, "Play")).not.toContain("SUGGESTED");
-    expect(section(html, "Content")).not.toContain("SUGGESTED");
+    expect(section(html, "Library")).not.toContain("SUGGESTED");
   });
 
   it("puts it after the tools and before the shared links card", () => {

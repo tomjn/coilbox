@@ -245,7 +245,7 @@ export default function ConquestListPage() {
               )}
               {state === "unreadable" ? (
                 <Link
-                  to="/content/games"
+                  to="/library/games"
                   className={cn(buttonVariants({ variant: "outline" }))}
                 >
                   Open Content &gt; Games
@@ -694,7 +694,7 @@ function GenerateGalaxyForm({
     (scan.data.games.length === 0 || gameChoices.length === 0) ? (
     <>
       Install a game first (
-      <Link className="underline underline-offset-4" to="/content/games">
+      <Link className="underline underline-offset-4" to="/library/games">
         Content → Games
       </Link>
       ).
@@ -704,7 +704,7 @@ function GenerateGalaxyForm({
   ) : maps.length === 0 && scan.data ? (
     <>
       Install at least one map first (
-      <Link className="underline underline-offset-4" to="/content/maps">
+      <Link className="underline underline-offset-4" to="/library/maps">
         Content → Maps
       </Link>
       ).
