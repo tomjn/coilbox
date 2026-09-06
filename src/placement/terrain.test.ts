@@ -111,6 +111,12 @@ describe("heightGrid", () => {
     expect(heightGrid(bytes, 3, 3)).toBeNull();
     expect(heightGrid(bytes, 0, 0)).toBeNull();
   });
+
+  it("keeps the words out of the grid's enumerable keys", () => {
+    const read = grid(2, 2, [0, 1, 2, 3]);
+    expect(Object.keys(read)).toEqual(["width", "height"]);
+    expect(read.words.length).toBe(4);
+  });
 });
 
 describe("fieldFromGrid", () => {
