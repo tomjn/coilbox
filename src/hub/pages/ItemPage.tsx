@@ -419,6 +419,10 @@ export default function ItemPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
+                  No account needed. What this page shows above is what you get,
+                  fetched before you press the button.
+                </p>
+                <p className="text-xs text-muted-foreground">
                   {presence.state === "gone" &&
                     "You imported this before. Nothing of it is here now. "}
                   Coilbox downloads it from {hostOf(hubUrl)} and opens it in the
