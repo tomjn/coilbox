@@ -47,6 +47,16 @@ describe("the Settings nav group", () => {
     expect(group("settings").order ?? 100).toBeGreaterThan(Math.max(...others));
   });
 
+  it("stays off the sidebar, which already has the footer gear", () => {
+    // Four Settings rows above a footer row already saying Settings was two
+    // answers to one question. The gear also carries the settings badge, which
+    // this group has no way to show, so the gear is the one that stays.
+    const onSidebar = group("settings")
+      .items.filter((i) => i.sidebar !== false)
+      .map((i) => i.id);
+    expect(onSidebar, "would duplicate the footer gear").toEqual([]);
+  });
+
   it("adds no routes, so the group cannot drift from docs/routes.md", () => {
     // `routesDoc.test.ts` checks `path`, not `to`. If this group ever grows a
     // route it has to be documented, and this is the reminder.

@@ -42,6 +42,12 @@ const generalPlugin: FramePlugin = {
   //
   // Each item links to a settings section rather than a route of its own, so
   // there are no new routes and nothing to add to `docs/routes.md`.
+  //
+  // Welcome page only, via `sidebar: false` on every item. The sidebar already
+  // had a way in and still does: the frame's footer gear, which carries the
+  // settings badge this group has no way to show. Listing four more Settings
+  // rows above a row already saying Settings was two answers to one question.
+  // The welcome page is where the gap actually was.
   nav: [
     {
       id: "settings",
@@ -58,6 +64,7 @@ const generalPlugin: FramePlugin = {
           label: "Engine settings",
           to: "/settings/engine-settings",
           order: 1,
+          sidebar: false,
           icon: SlidersHorizontal,
           // Gated on the settings section rather than on a `hide` id of its
           // own. A distribution that hides the section wants the card gone too,
@@ -71,6 +78,7 @@ const generalPlugin: FramePlugin = {
           label: "Appearance",
           to: `/settings/${FRAME_APPEARANCE_SETTINGS_ID}`,
           order: 0,
+          sidebar: false,
           icon: Palette,
           useVisible: () => !isSettingsHidden(FRAME_APPEARANCE_SETTINGS_ID),
         },
@@ -81,6 +89,7 @@ const generalPlugin: FramePlugin = {
           label: "Accounts",
           to: "/settings/lobby-servers",
           order: 2,
+          sidebar: false,
           icon: ServerCog,
           useVisible: () => !isSettingsHidden("lobby-servers"),
         },
@@ -90,6 +99,7 @@ const generalPlugin: FramePlugin = {
           label: "All settings",
           to: "/settings",
           order: 3,
+          sidebar: false,
           icon: Settings,
         },
       ],
