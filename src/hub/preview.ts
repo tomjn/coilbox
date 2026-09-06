@@ -123,7 +123,7 @@ export type HubPreview =
   | { kind: "preset"; teams: PresetTeam[]; playing: number }
   | ({ kind: "setup-pack" } & SetupPackContents)
   | { kind: "challenge"; galaxy: GalaxyShape | null; stats: PreviewStat[] }
-  | { kind: "scenario"; stats: PreviewStat[] }
+  | { kind: "scenario"; stats: PreviewStat[]; map: string | null }
   | {
       kind: "blueprint";
       layout: BlueprintShape;
@@ -391,11 +391,22 @@ function shapeOf(galaxy: GalaxyDoc): GalaxyShape {
 }
 
 /** A scenario is a lot of moving parts and no picture. The counts say how much
- * there is to it, which is what somebody deciding whether to play it wants. */
+ * there is to it, which is what somebody deciding whether to play it wants.
+ *
+ * The document also names the map it is set on, at `setup.mapName`
+ * (issue #2600) - the same field `launch.ts` and `compile.ts` read to run it.
+ * The hub listing does not carry that name (a separate, hub-side gap), so this
+ * is the only place a scenario's map can be read from today, and it is why the
+ * card art fetches the container at all. */
 function scenarioPreview(payload: Record<string, unknown>): HubPreview | null {
   // A scenario export wraps the document beside its dialogue media, so the
   // shape to read is the wrapper. A bare document is accepted too.
   const scenario = (payload.scenario ?? payload) as Record<string, unknown>;
+  const setup = scenario.setup as Record<string, unknown> | undefined;
+  const map =
+    typeof setup?.mapName === "string" && setup.mapName !== ""
+      ? setup.mapName
+      : null;
   const stats = [
     { label: "Objectives", n: count(scenario.objectives) },
     { label: "Triggers", n: count(scenario.triggers) },
@@ -407,7 +418,7 @@ function scenarioPreview(payload: Record<string, unknown>): HubPreview | null {
     .filter((s) => s.n > 0)
     .map((s) => ({ label: s.label, value: String(s.n) }));
 
-  return stats.length > 0 ? { kind: "scenario", stats } : null;
+  return stats.length > 0 || map ? { kind: "scenario", stats, map } : null;
 }
 
 /** How many, for a list or for a keyed record. `teams` is keyed by participant
