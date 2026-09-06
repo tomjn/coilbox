@@ -256,6 +256,11 @@ export default function BrowsePage() {
             {kindsPlural()} shared by other players.
           </>
         }
+        // One short sentence with the whole header width free beside it
+        // (issue #2563): the 65ch cap PageHeader sets by default wrapped it
+        // to two lines for no reason, since nothing else was competing for
+        // the row.
+        descriptionClassName="max-w-none"
         actions={
           <>
             <HeaderAccount hubUrl={hubUrl} />

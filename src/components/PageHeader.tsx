@@ -23,12 +23,20 @@ import { cn } from "@/lib/utils";
  * `max-w-full` lets them wrap once they no longer do, rather than running off
  * the right edge as the hand written version does at 600px.
  *
+ * `descriptionClassName` is an escape hatch from the 65ch cap, not a second way
+ * to set it. It exists for a header whose description is one short sentence and
+ * whose actions leave the rest of the row empty (issue #2563's hub browse
+ * header): there the cap wraps a line that already fits, for no reason. Reach
+ * for it only when the description is short enough that widening it will not
+ * itself repeat the 190-character problem the cap exists to avoid.
+ *
  * This is for the top of a route page. Drawer, panel and overlay headers have
  * their own constraints and keep their own markup.
  */
 export function PageHeader({
   title,
   description,
+  descriptionClassName,
   actions,
   className,
   children,
@@ -37,6 +45,9 @@ export function PageHeader({
   title: ReactNode;
   /** What the page is for. Omitted on pages that say it another way. */
   description?: ReactNode;
+  /** Overrides the description's default classes (65ch cap, small muted text).
+   * See the escape-hatch note above - most callers should leave this unset. */
+  descriptionClassName?: string;
   /** Buttons acting on the page. A falsy value leaves the row to the title. */
   actions?: ReactNode;
   className?: string;
@@ -56,7 +67,12 @@ export function PageHeader({
         ) : null}
       </div>
       {description ? (
-        <p className="max-w-prose text-sm text-muted-foreground">
+        <p
+          className={cn(
+            "max-w-prose text-sm text-muted-foreground",
+            descriptionClassName,
+          )}
+        >
           {description}
         </p>
       ) : null}
