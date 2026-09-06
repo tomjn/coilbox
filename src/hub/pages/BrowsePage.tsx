@@ -244,15 +244,23 @@ export default function BrowsePage() {
     <div className="flex h-full flex-col">
       <PageHeader
         className="gap-3 border-b border-border px-6 py-4"
-        title="Coilbox hub"
+        title={
+          <>
+            <CoilboxGlyph size={18} /> Coilbox hub
+          </>
+        }
         description={
           <>
             {/* Built from the kinds the chips below offer, so the sentence
                 cannot say four when there are five (issue #1502). */}
-            {kindsPlural()} shared by other players. Importing needs no account,
-            and nothing is imported until you have seen what it is and said yes.
+            {kindsPlural()} shared by other players.
           </>
         }
+        // One short sentence with the whole header width free beside it
+        // (issue #2563): the 65ch cap PageHeader sets by default wrapped it
+        // to two lines for no reason, since nothing else was competing for
+        // the row.
+        descriptionClassName="max-w-none"
         actions={
           <>
             <HeaderAccount hubUrl={hubUrl} />
