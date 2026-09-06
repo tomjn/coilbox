@@ -32,8 +32,8 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
-| Settings      | Engine settings | `#/settings/engine-settings` | `settings.engine` | no³ |
 | Settings      | Appearance    | `#/settings/frame.appearance` | `settings.appearance` | no³ |
+| Settings      | Engine settings | `#/settings/engine-settings` | `settings.engine` | no³ |
 | Settings      | Accounts      | `#/settings/lobby-servers` | `settings.accounts` | no³ |
 | Settings      | All settings  | `#/settings`         | `settings.all`     | no       |
 
