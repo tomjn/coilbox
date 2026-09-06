@@ -111,7 +111,7 @@ import {
   unitsyncUnitRenderKeys,
 } from "@/content/bindings";
 import { isSddName } from "@/content/format";
-import { unitModelTextureUrl } from "@/lib/assetUrl";
+import { readCachedModel } from "@/content/modelFile";
 import { toBase64 } from "@/lib/base64";
 import {
   reportAssetUploadStopped,
@@ -293,19 +293,6 @@ export const liveBackfillTools: BackfillTools = {
   held: localRenders,
   remember: rememberLocalRender,
 };
-
-/**
- * Read back a model the batch wrote into the model-texture cache.
- *
- * Over the asset protocol rather than through the IPC bridge, which is the point
- * of the batch writing files at all: a flattened model is megabytes of floats,
- * and the textures it names are already loaded from this same root.
- */
-export async function readCachedModel(file: string): Promise<UnitModelResult> {
-  const res = await fetch(unitModelTextureUrl(file));
-  if (!res.ok) throw new Error(`could not read model ${file}: ${res.status}`);
-  return (await res.json()) as UnitModelResult;
-}
 
 /**
  * Offer the hub the pictures of these units, and say what that came to.

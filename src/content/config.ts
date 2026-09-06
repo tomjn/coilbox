@@ -64,11 +64,13 @@ import {
   unitsyncThumbnails,
   unitsyncUnitBuildpics,
   unitsyncUnitDataset,
-  unitsyncUnitModel,
+  unitsyncUnitModels,
 } from "./bindings";
 import { liveCacheHit } from "./cachedFile";
 import { engineLabel, newestEngineId } from "./engineVersion";
+import { shareInFlight } from "./inFlight";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
+import { readCachedModel } from "./modelFile";
 import { deriveSetup } from "./setup";
 import { unitIconDataUrl } from "./unitIcon";
 
@@ -574,6 +576,8 @@ export type UnitsyncInfoStatus =
 
 /** Session cache of game info, keyed by `dataDir::enginePath::gameArchive`. */
 const gameInfoCache = new Map<string, GameInfoResult>();
+/** Open reads, so two askers for one game wait on one worker. */
+const gameInfoPending = new Map<string, Promise<GameInfoResult>>();
 
 /**
  * Fetch (or read from cache) a game's info, sharing `useUnitsyncGameInfo`'s
@@ -590,7 +594,9 @@ export async function primeGameInfo(
   const key = `${dataDir}::${enginePath}::${gameArchive}`;
   const cached = gameInfoCache.get(key);
   if (cached) return cached;
-  const res = await unitsyncGameInfo({ enginePath, dataDir, gameArchive });
+  const res = await shareInFlight(gameInfoPending, key, () =>
+    unitsyncGameInfo({ enginePath, dataDir, gameArchive }),
+  );
   if (res.checksum) gameInfoCache.set(key, res);
   return res;
 }
@@ -622,7 +628,9 @@ export function useUnitsyncGameInfo(
     }
     let cancelled = false;
     setStatus("loading");
-    unitsyncGameInfo({ enginePath, dataDir, gameArchive })
+    shareInFlight(gameInfoPending, key, () =>
+      unitsyncGameInfo({ enginePath, dataDir, gameArchive }),
+    )
       .then((res) => {
         if (cancelled) return;
         setInfo(res);
@@ -665,6 +673,8 @@ export function invalidateGameInfo(
 
 /** Session cache of unit datasets, keyed by `dataDir::enginePath::gameArchive`. */
 const unitDatasetCache = new Map<string, UnitDatasetResult>();
+/** Open reads, so a page mounting the hook eight times spawns one worker. */
+const unitDatasetPending = new Map<string, Promise<UnitDatasetResult>>();
 
 /**
  * Lazily load a game's reusable unit graph (units + `buildoptions` edges). Loads
@@ -697,7 +707,9 @@ export function useUnitsyncUnitDataset(
     }
     let cancelled = false;
     setStatus("loading");
-    unitsyncUnitDataset({ enginePath, dataDir, gameArchive })
+    shareInFlight(unitDatasetPending, key, () =>
+      unitsyncUnitDataset({ enginePath, dataDir, gameArchive }),
+    )
       .then((res) => {
         if (cancelled) return;
         setDataset(res);
@@ -731,38 +743,71 @@ export function useUnitsyncUnitDataset(
   return { dataset, status, reload, loading: status === "loading" };
 }
 
-/** Session cache of read models, keyed by `dataDir::engine::game::object`. */
-const unitModelCache = new Map<string, UnitModelResult>();
-/** In-flight reads, so a view asking for the same model twice waits once. */
-const unitModelPending = new Map<string, Promise<UnitModelResult>>();
+/** Session cache of read models, keyed by `dataDir::engine::game::object`.
+ *  Null for an object the game has no model for, so it is not asked again. */
+const unitModelCache = new Map<string, UnitModelResult | null>();
+/** In-flight batch reads, so two draws asking for one list wait once. */
+const unitModelsPending = new Map<
+  string,
+  Promise<Map<string, UnitModelResult | null>>
+>();
 
 /**
- * Read one unit's model, off the session cache when it is already there.
+ * Read several units' models in one archive mount, off the session cache for
+ * any already read.
  *
- * The promise behind {@link useUnitsyncUnitModel}, for a view that needs many
- * models at once rather than one: the scenario editor draws every unit a
- * document places, which is a list it only knows at render time and cannot turn
- * into a fixed number of hook calls.
+ * For a view that needs many models at once rather than one: the scenario
+ * editor draws every unit a document places, which is a list it only knows at
+ * render time and cannot turn into a fixed number of hook calls. One mount for
+ * the list rather than one a model, because a mount is a second or more on a
+ * large game (issue #1684). The models come back as files in the model cache
+ * dir and are read over the asset protocol, so a whole scenario's geometry
+ * never crosses the IPC bridge at once.
+ *
+ * The map answers every object asked for: the model, or null for one the game
+ * has no model for.
  */
-export function loadUnitsyncUnitModel(
+export async function loadUnitsyncUnitModels(
   enginePath: string,
   dataDir: string,
   gameArchive: string,
-  object: string,
-): Promise<UnitModelResult> {
-  const key = `${dataDir}::${enginePath}::${gameArchive}::${object}`;
-  const cached = unitModelCache.get(key);
-  if (cached) return Promise.resolve(cached);
-  const inFlight = unitModelPending.get(key);
-  if (inFlight) return inFlight;
-  const read = unitsyncUnitModel({ enginePath, dataDir, gameArchive, object })
-    .then((res) => {
-      unitModelCache.set(key, res);
-      return res;
-    })
-    .finally(() => unitModelPending.delete(key));
-  unitModelPending.set(key, read);
-  return read;
+  objects: string[],
+): Promise<Map<string, UnitModelResult | null>> {
+  const prefix = `${dataDir}::${enginePath}::${gameArchive}`;
+  const out = new Map<string, UnitModelResult | null>();
+  const wanted: string[] = [];
+  for (const object of objects) {
+    const cached = unitModelCache.get(`${prefix}::${object}`);
+    if (cached !== undefined) out.set(object, cached);
+    else wanted.push(object);
+  }
+  if (wanted.length === 0) return out;
+  wanted.sort();
+  const read = await shareInFlight(
+    unitModelsPending,
+    `${prefix}::${wanted.join("|")}`,
+    async () => {
+      const res = await unitsyncUnitModels({
+        enginePath,
+        dataDir,
+        gameArchive,
+        objects: wanted,
+      });
+      const got = new Map<string, UnitModelResult | null>();
+      await Promise.all(
+        wanted.map(async (object) => {
+          const file = res.models[object];
+          got.set(object, file ? await readCachedModel(file.file) : null);
+        }),
+      );
+      for (const [object, model] of got) {
+        unitModelCache.set(`${prefix}::${object}`, model);
+      }
+      return got;
+    },
+  );
+  for (const [object, model] of read) out.set(object, model);
+  return out;
 }
 
 /**
@@ -791,20 +836,22 @@ export function useUnitsyncUnitModel(
     }
     const key = `${dataDir}::${enginePath}::${gameArchive}::${object}`;
     const cached = unitModelCache.get(key);
-    if (cached) {
+    if (cached !== undefined) {
       setModel(cached);
       setLoading(false);
-      setFailed(false);
+      setFailed(cached === null);
       return;
     }
     let cancelled = false;
     setModel(null);
     setFailed(false);
     setLoading(true);
-    loadUnitsyncUnitModel(enginePath, dataDir, gameArchive, object)
-      .then((res) => {
+    loadUnitsyncUnitModels(enginePath, dataDir, gameArchive, [object])
+      .then((got) => {
         if (cancelled) return;
+        const res = got.get(object) ?? null;
         setModel(res);
+        setFailed(res === null);
         setLoading(false);
       })
       .catch(() => {
@@ -1400,6 +1447,8 @@ export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
  * three caches below.
  */
 const minimapCache = new Map<string, MinimapResult>();
+/** Open renders, keyed like the cache. */
+const minimapPending = new Map<string, Promise<MinimapResult>>();
 
 /**
  * The mip a list of small thumbnails should ask for: `1024 >> 3` = 128px, ample
@@ -1495,7 +1544,9 @@ export function useUnitsyncMinimap(
       // mip 0 = 1024px, the engine's minimap ceiling. That is what the 3D
       // preview needs, because the minimap is the diffuse texture draped over
       // its terrain.
-      const res = await unitsyncMinimap({ enginePath, dataDir, mapName, mip });
+      const res = await shareInFlight(minimapPending, key, () =>
+        unitsyncMinimap({ enginePath, dataDir, mapName, mip }),
+      );
       if (cancelled) return;
       // Only remember a render that produced an image. A map unitsync cannot
       // see yet answers successfully with nothing, and caching that pins the
@@ -1523,13 +1574,16 @@ export function useUnitsyncMinimap(
  *  `dataDir::enginePath::mapName`. No size in the key: the vocabulary decides
  *  it, so one map has one picture (issue #1730). */
 const heightmapCache = new Map<string, HeightmapResult>();
+const heightmapPending = new Map<string, Promise<HeightmapResult>>();
 
 /** Session cache of raw height grids, keyed by `dataDir::enginePath::mapName`.
  *  The result is a file name, not the grid, so this is small. */
 const heightFieldCache = new Map<string, HeightFieldResult>();
+const heightFieldPending = new Map<string, Promise<HeightFieldResult>>();
 
 /** Session cache of metalmap results, keyed by `dataDir::enginePath::mapName`. */
 const metalmapCache = new Map<string, MetalmapResult>();
+const metalmapPending = new Map<string, Promise<MetalmapResult>>();
 
 /**
  * Drop the cached minimap + heightmap for one map, so the next render of the
@@ -1582,6 +1636,7 @@ function useUnitsyncMapAsset<
   T extends { file?: string; dataUrl?: string; errors?: string[] },
 >(
   cache: Map<string, T>,
+  pending: Map<string, Promise<T>>,
   fetchAsset: (args: {
     enginePath: string;
     dataDir: string;
@@ -1619,7 +1674,9 @@ function useUnitsyncMapAsset<
         apply(cached);
         return;
       }
-      const res = await fetchAsset({ enginePath, dataDir, mapName });
+      const res = await shareInFlight(pending, key, () =>
+        fetchAsset({ enginePath, dataDir, mapName }),
+      );
       if (cancelled) return;
       // Same rule as the minimap: an empty render is a state, not an answer.
       if (renderedUrl(res, unitsyncThumbUrl)) cache.set(key, res);
@@ -1634,7 +1691,7 @@ function useUnitsyncMapAsset<
     return () => {
       cancelled = true;
     };
-  }, [cache, fetchAsset, enginePath, dataDir, mapName]);
+  }, [cache, pending, fetchAsset, enginePath, dataDir, mapName]);
 
   return { data, url, loading, error };
 }
@@ -1655,6 +1712,7 @@ export function useUnitsyncHeightmap(
 ) {
   const { data, url, loading, error } = useUnitsyncMapAsset(
     heightmapCache,
+    heightmapPending,
     unitsyncHeightmap,
     enginePath,
     dataDir,
@@ -1685,6 +1743,7 @@ export function useUnitsyncHeightField(
 ) {
   return useUnitsyncMapAsset(
     heightFieldCache,
+    heightFieldPending,
     unitsyncHeightField,
     enginePath,
     dataDir,
@@ -1700,6 +1759,7 @@ export function useUnitsyncMetalmap(
 ) {
   return useUnitsyncMapAsset(
     metalmapCache,
+    metalmapPending,
     unitsyncMetalmap,
     enginePath,
     dataDir,
@@ -1709,6 +1769,7 @@ export function useUnitsyncMetalmap(
 
 /** Session cache of skybox results, keyed by `dataDir::enginePath::mapName`. */
 const skyboxCache = new Map<string, MapSkyboxResult>();
+const skyboxPending = new Map<string, Promise<MapSkyboxResult>>();
 
 /**
  * Lazily read and cache a map's skybox DDS (raw-bytes `data:` URL) for the 3D
@@ -1720,34 +1781,43 @@ export function useUnitsyncMapSkybox(
   mapName?: string,
 ) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
       setDataUrl(null);
+      setLoading(false);
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
     const cached = skyboxCache.get(key);
     if (cached) {
       setDataUrl(cached.dataUrl ?? null);
+      setLoading(false);
       return;
     }
     let cancelled = false;
     setDataUrl(null);
-    unitsyncMapSkybox({ enginePath, dataDir, mapName })
+    setLoading(true);
+    shareInFlight(skyboxPending, key, () =>
+      unitsyncMapSkybox({ enginePath, dataDir, mapName }),
+    )
       .then((res) => {
         if (cancelled) return;
         skyboxCache.set(key, res);
         setDataUrl(res.dataUrl ?? null);
       })
       // A skybox is optional; a failed read just leaves the flat sky colour.
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [enginePath, dataDir, mapName]);
 
-  return { dataUrl };
+  return { dataUrl, loading };
 }
 
 /* -------------------------------------------------------------------------- *

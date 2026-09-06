@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Ground } from "@/blueprint/buildable";
 import { buildGridSnap } from "@/blueprint/footprint";
 import {
-  loadUnitsyncUnitModel,
+  loadUnitsyncUnitModels,
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "@/content/config";
@@ -22,6 +22,7 @@ import type { MapScene3D } from "@/lib/mapScene";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario } from "@/scenario/model";
+import type { ModelsStage, StageState } from "./mapLoad";
 import { type Placement, teamColor } from "./placements";
 import {
   cornerGround,
@@ -117,6 +118,8 @@ export interface ScenarioUnitsState {
    * mapless editor, whose floor is level on purpose.
    */
   heightsUnread: boolean;
+  /** How far the unit reads have got, for the indicator over the scene. */
+  load: { unitDefs: StageState; models: ModelsStage };
 }
 
 /**
@@ -237,15 +240,21 @@ export function useScenarioUnits(
       minHeight,
       maxHeight,
       objectName: (def) => lookups.current.objectNames.get(def.toLowerCase()),
-      loadModel: (object) => {
+      loadModels: (objects) => {
         const gameArchive = lookups.current.resolve;
         if (!enginePath || !dataDir || !gameArchive) {
           return Promise.reject(new Error("no game to read models from"));
         }
-        return loadUnitsyncUnitModel(enginePath, dataDir, gameArchive, object);
+        return loadUnitsyncUnitModels(
+          enginePath,
+          dataDir,
+          gameArchive,
+          objects,
+        );
       },
       teamColor: (team) => teamColor(lookups.current.participants, team),
       motion: () => !still.current,
+      onProgress: (done, total) => setProgress({ done, total }),
     });
     setLayer(built);
     return () => {
@@ -266,6 +275,10 @@ export function useScenarioUnits(
 
   const [missing, setMissing] = useState<string[]>([]);
   const [drawing, setDrawing] = useState(false);
+  // How far the current pass has got, and which layer has finished a pass,
+  // so a layer rebuilt for a new map reads as loading again.
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [drawnLayer, setDrawnLayer] = useState<UnitsLayer | null>(null);
   // Nothing is drawn until the game's unit defs have settled one way or the
   // other. Drawing before that fills the map with marker boxes for units the
   // game does have, and says so in the caption.
@@ -283,6 +296,7 @@ export function useScenarioUnits(
         if (cancelled) return;
         setMissing(result.missing);
         setDrawing(false);
+        setDrawnLayer(layer);
       })
       .catch(() => {
         if (!cancelled) setDrawing(false);
@@ -318,16 +332,38 @@ export function useScenarioUnits(
       : null;
   }, [flat, grid, worldWidth, worldHeight, minHeight, maxHeight]);
 
+  const gameMissing = !!gameName && !!scan.data && !game;
+  const unitDefs: StageState = !archive
+    ? scan.loading
+      ? "loading"
+      : gameMissing
+        ? "failed"
+        : "idle"
+    : status === "ready"
+      ? "done"
+      : status === "loading" || status === "idle"
+        ? "loading"
+        : "failed";
+  const models: ModelsStage =
+    placements.length === 0 || !enginePath || unitDefs === "idle"
+      ? { state: "idle", done: 0, total: 0 }
+      : unitDefs === "failed"
+        ? { state: "failed", ...progress }
+        : drawing || drawnLayer !== layer
+          ? { state: "loading", ...progress }
+          : { state: "done", ...progress };
+
   return {
     placed: placements.length,
     missing,
     drawing,
-    gameMissing: !!gameName && !!scan.data && !game,
+    gameMissing,
     layer,
     placements,
     groundAt,
     ground,
     settled: defsReady && heightRead,
     heightsUnread,
+    load: { unitDefs, models },
   };
 }

@@ -630,11 +630,17 @@ pub fn build_map_skybox_args(lib: &str, datadir: &str, map_name: &str) -> Vec<St
 /// `coilbox_unitsync_worker::SkirmishAisArgs`, so this function only has to
 /// add `--lib`/`--datadir`, which every mode takes and `Mode::to_args` does
 /// not include (issue #2448).
-pub fn build_skirmish_ai_args(lib: &str, datadir: &str, game: Option<&str>) -> Vec<String> {
+pub fn build_skirmish_ai_args(
+    lib: &str,
+    datadir: &str,
+    game: Option<&str>,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.extend(
         coilbox_unitsync_worker::Mode::SkirmishAis(coilbox_unitsync_worker::SkirmishAisArgs {
             game: game.map(String::from),
+            cache_dir: cache_dir.map(String::from),
         })
         .to_args(),
     );
@@ -984,24 +990,33 @@ mod tests {
     fn build_skirmish_ai_args_flag_and_optional_game() {
         use coilbox_unitsync_worker::SkirmishAisArgs;
 
-        let no_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", None);
+        let no_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", None, None);
         assert!(no_game.contains(&"--skirmish-ais".to_string()));
         assert!(!no_game.contains(&"--game".to_string()));
         assert_eq!(
             SkirmishAisArgs::from_args(&no_game).expect("valid argv"),
-            SkirmishAisArgs { game: None }
+            SkirmishAisArgs {
+                game: None,
+                cache_dir: None
+            }
         );
 
-        let with_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", Some("BAR.sdd"));
+        let with_game = build_skirmish_ai_args(
+            "/eng/libunitsync.so",
+            "/data",
+            Some("BAR.sdd"),
+            Some("/cache"),
+        );
         assert!(with_game.contains(&"--skirmish-ais".to_string()));
         assert_eq!(
             SkirmishAisArgs::from_args(&with_game).expect("valid argv"),
             SkirmishAisArgs {
-                game: Some("BAR.sdd".into())
+                game: Some("BAR.sdd".into()),
+                cache_dir: Some("/cache".into()),
             }
         );
 
-        let empty_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", Some(""));
+        let empty_game = build_skirmish_ai_args("/eng/libunitsync.so", "/data", Some(""), None);
         assert!(!empty_game.contains(&"--game".to_string()));
     }
 

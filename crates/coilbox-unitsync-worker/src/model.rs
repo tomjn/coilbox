@@ -1161,7 +1161,7 @@ pub struct MapInfoOutput {
 }
 
 /// A skirmish AI available to play against: a native engine AI or a game Lua AI.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SkirmishAi {
     /// unitsync `shortName` — the value written to `[AI].ShortName` / `[TEAM].LuaAI`.
@@ -1177,7 +1177,7 @@ pub struct SkirmishAi {
 }
 
 /// Output of the `skirmish-ais` mode: the AIs available, optionally for a game.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SkirmishAiOutput {
     pub ais: Vec<SkirmishAi>,
