@@ -256,8 +256,9 @@ function Body({
   if (!openableInBuilder(request.member)) {
     return (
       <p className="text-sm text-muted-foreground">
-        {request.member} is not a <code>.s3o</code>. The builder reads that
-        format alone, so there is nothing here it could open.
+        {request.member} is not a <code>.s3o</code> or a <code>.3do</code>. The
+        builder reads those formats alone, so there is nothing here it could
+        open.
       </p>
     );
   }

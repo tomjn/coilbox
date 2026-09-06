@@ -13,8 +13,12 @@ describe("openableInBuilder", () => {
     expect(openableInBuilder("objects3d/armcom.s3o")).toBe(true);
   });
 
-  it("is not a .3do, which the import cannot read", () => {
-    expect(openableInBuilder("objects3d/armcom.3do")).toBe(false);
+  it("is a .3do too, whatever case it is written in", () => {
+    expect(openableInBuilder("objects3d/ARMCOM.3DO")).toBe(true);
+    expect(openableInBuilder("objects3d/armcom.3do")).toBe(true);
+  });
+
+  it("is not anything else", () => {
     expect(openableInBuilder("unittextures/armcom.dds")).toBe(false);
   });
 });
@@ -68,5 +72,9 @@ describe("modelName", () => {
   it("is the file's own name without its extension or its folders", () => {
     expect(modelName("objects3d/arm/armcom.s3o")).toBe("armcom");
     expect(modelName("objects3d\\arm\\armcom.S3O")).toBe("armcom");
+  });
+
+  it("strips a .3do extension too", () => {
+    expect(modelName("objects3d/armcom.3do")).toBe("armcom");
   });
 });

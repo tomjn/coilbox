@@ -115,35 +115,28 @@ export function ArchiveModelPreview({
         </dd>
       </dl>
       <div className="flex shrink-0 items-center gap-3 border-t border-border/50 px-3 py-2">
-        {format === "s3o" ? (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() =>
-                navigate(
-                  builderOpenUrl({
-                    archive,
-                    member: path,
-                    ...(archiveLabel ? { name: archiveLabel } : {}),
-                  }),
-                )
-              }
-            >
-              <Blocks className="size-3.5" /> Open in the builder
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Takes its own copy of the geometry and texture, so updating{" "}
-              {archive} later cannot change the unit.
-            </span>
-          </>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            The builder reads <code>.s3o</code> alone, so this one can be looked
-            at here but not opened.
-          </span>
-        )}
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          onClick={() =>
+            navigate(
+              builderOpenUrl({
+                archive,
+                member: path,
+                ...(archiveLabel ? { name: archiveLabel } : {}),
+              }),
+            )
+          }
+        >
+          <Blocks className="size-3.5" /> Open in the builder
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {format === "3do"
+            ? "Converts its geometry and texture tiles into a unit of their own, so updating " +
+              `${archive} later cannot change it.`
+            : `Takes its own copy of the geometry and texture, so updating ${archive} later cannot change the unit.`}
+        </span>
       </div>
       <ModelNotes model={model} archive={archive} />
     </div>
