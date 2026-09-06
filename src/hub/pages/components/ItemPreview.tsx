@@ -163,8 +163,21 @@ const GLOW = "hub-preview-system-glow";
  *
  * The `viewBox` is the unit square the shape was fitted to, scaled up and inset
  * so a system at the edge is not clipped by its own glow.
+ *
+ * Exported so `BrowseCardArt.tsx` can draw the same galaxy at card size
+ * (issue #2598): one renderer, sized by `className` rather than duplicated.
  */
-function Galaxy({ shape }: { shape: GalaxyShape }) {
+export function Galaxy({
+  shape,
+  className = "mx-auto w-full max-w-md",
+}: {
+  shape: GalaxyShape;
+  // Capped rather than full width by default. The shape is square, so at the
+  // column's own width it would be taller than the screen and read as a chart
+  // rather than a picture of the thing being shared. A card's fixed box calls
+  // for a different fit, so the caller can override it.
+  className?: string;
+}) {
   const inset = 4;
   const scale = 100 - inset * 2;
   const at = (v: number) => inset + v * scale;
@@ -175,10 +188,7 @@ function Galaxy({ shape }: { shape: GalaxyShape }) {
   return (
     <svg
       viewBox="0 0 100 100"
-      // Capped rather than full width. The shape is square, so at the column's
-      // own width it would be taller than the screen and read as a chart rather
-      // than a picture of the thing being shared.
-      className="mx-auto w-full max-w-md"
+      className={className}
       role="img"
       aria-label={`${shape.systems.length} systems joined by ${shape.lanes.length} jump lanes, ${held} of them held at the start`}
     >
