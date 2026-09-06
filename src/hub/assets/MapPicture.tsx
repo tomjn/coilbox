@@ -150,8 +150,13 @@ export function MapDrawing({
  * so wants the outline where a picture would go rather than the whole card. Both
  * are the same drawing, so a map with no picture is the same shape on a grid of
  * them as it is on its own.
+ *
+ * Exported for the hub browse card's art slot (`../pages/components/BrowseCardArt.tsx`,
+ * issue #2559), which draws this on its own rather than through
+ * `MapPictureCard`'s captioned layout - a browse card already has the map's
+ * name in its own chip, so a second caption under the outline would repeat it.
  */
-function MapOutline({
+export function MapOutline({
   picture,
   className,
 }: {

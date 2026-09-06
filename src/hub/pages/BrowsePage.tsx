@@ -47,6 +47,7 @@ import { KindIcon } from "../components/KindIcon";
 import { hubItemRoute, useHubUrl } from "../config";
 import type { HubItemPresence } from "../importRecord";
 import { useHubItemPresence } from "../imports";
+import { BrowseCardArt } from "./components/BrowseCardArt";
 import { FilterCombobox } from "./components/FilterCombobox";
 import { HeaderAccount } from "./components/HeaderAccount";
 import { ShareMenu } from "./components/ShareMenu";
@@ -105,6 +106,14 @@ const CLICKABLE = [
 ] as const;
 
 type ClickableKey = (typeof CLICKABLE)[number]["key"];
+
+/** The tail of an item id, to tell two same-titled cards apart. Short enough to
+ * sit next to a title without competing with it, and always different for two
+ * different items, unlike the date, game and author a same-titled pair also
+ * tends to share. */
+function idSuffix(id: string): string {
+  return id.length > 6 ? id.slice(-6) : id;
+}
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
@@ -253,6 +262,22 @@ export default function BrowsePage() {
     () => CLICKABLE.filter((f) => filters[f.key]?.trim()),
     [filters],
   );
+
+  // Titles that more than one card on this page shares (issue #2559). Two "SF
+  // Double Cold Fusion" blueprints, published the same day by the same author,
+  // read as one card twice unless something on the card itself tells them
+  // apart. A picture alone does not: two blueprints of similar bases can look
+  // alike too. So a shared title gets the item id's own tail appended, which is
+  // never the same for two different items.
+  const duplicateTitles = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of page?.items ?? []) {
+      counts.set(it.title, (counts.get(it.title) ?? 0) + 1);
+    }
+    return new Set(
+      [...counts].filter(([, count]) => count > 1).map(([title]) => title),
+    );
+  }, [page]);
 
   // Kind and search count towards "a filter is active" alongside the four
   // clickable ones, even though they get their own token shape below (a
@@ -542,12 +567,18 @@ export default function BrowsePage() {
                         // sitting above it in stacking order (`relative z-10` below).
                         className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
                       >
+                        <BrowseCardArt item={item} />
                         <div className="flex w-full flex-col gap-1.5 text-left">
                           <Link
                             to={hubItemRoute(item.id)}
                             className="text-sm font-medium after:absolute after:inset-0 hover:underline"
                           >
                             {item.title}
+                            {duplicateTitles.has(item.title) && (
+                              <span className="ml-1 font-normal text-muted-foreground">
+                                #{idSuffix(item.id)}
+                              </span>
+                            )}
                           </Link>
                           {/* Under the title, and free to wrap. Beside each other on
                           one line, a narrow card squeezed the date until it broke
