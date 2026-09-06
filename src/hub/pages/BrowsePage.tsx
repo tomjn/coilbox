@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
+  Filter,
   Globe,
   Loader2,
   RotateCw,
@@ -17,6 +18,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { resolveHome } from "@/home/config";
@@ -273,373 +280,390 @@ export default function BrowsePage() {
   const current = page?.page ?? filters.page ?? 1;
 
   return (
-    <div className="flex h-full flex-col">
-      <PageHeader
-        className="gap-3 border-b border-border px-6 py-4"
-        title={
-          <>
-            <CoilboxGlyph size={18} /> Coilbox hub
-          </>
-        }
-        description={
-          <>
-            {/* Built from the kinds the chips below offer, so the sentence
+    <TooltipProvider>
+      <div className="flex h-full flex-col">
+        <PageHeader
+          className="gap-3 border-b border-border px-6 py-4"
+          title={
+            <>
+              <CoilboxGlyph size={18} /> Coilbox hub
+            </>
+          }
+          description={
+            <>
+              {/* Built from the kinds the chips below offer, so the sentence
                 cannot say four when there are five (issue #1502). */}
-            {kindsPlural()} shared by other players.
-          </>
-        }
-        // One short sentence with the whole header width free beside it
-        // (issue #2563): the 65ch cap PageHeader sets by default wrapped it
-        // to two lines for no reason, since nothing else was competing for
-        // the row.
-        descriptionClassName="max-w-none"
-        actions={
-          <>
-            <ShareMenu hubUrl={hubUrl} />
-            <HeaderAccount hubUrl={hubUrl} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void openUrl(hubUrl)}
-            >
-              <CoilboxGlyph size={16} /> Hub website
-            </Button>
-          </>
-        }
-      >
-        {pinnedMatcher && (
-          <p className="text-sm text-muted-foreground">
-            This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
-            the hub shows its things, plus anything not tied to a game.
-          </p>
-        )}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative max-w-xs flex-1">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search titles and descriptions…"
-              aria-label="Search the hub"
-              className="h-9 pl-7"
-            />
-          </div>
-          {!pinnedMatcher && (
+              {kindsPlural()} shared by other players.
+            </>
+          }
+          // One short sentence with the whole header width free beside it
+          // (issue #2563): the 65ch cap PageHeader sets by default wrapped it
+          // to two lines for no reason, since nothing else was competing for
+          // the row.
+          descriptionClassName="max-w-none"
+          actions={
+            <>
+              <ShareMenu hubUrl={hubUrl} />
+              <HeaderAccount hubUrl={hubUrl} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void openUrl(hubUrl)}
+              >
+                <CoilboxGlyph size={16} /> Hub website
+              </Button>
+            </>
+          }
+        >
+          {pinnedMatcher && (
+            <p className="text-sm text-muted-foreground">
+              This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
+              the hub shows its things, plus anything not tied to a game.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative max-w-xs flex-1">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search titles and descriptions…"
+                aria-label="Search the hub"
+                className="h-9 pl-7"
+              />
+            </div>
+            {!pinnedMatcher && (
+              <FilterCombobox
+                value={filters.game ?? ""}
+                onCommit={(v) => setFilter("game", v)}
+                options={gameOptions}
+                placeholder="Game"
+                ariaLabel="Filter by game"
+                className="h-9 w-36"
+              />
+            )}
             <FilterCombobox
-              value={filters.game ?? ""}
-              onCommit={(v) => setFilter("game", v)}
-              options={gameOptions}
-              placeholder="Game"
-              ariaLabel="Filter by game"
+              value={filters.map ?? ""}
+              onCommit={(v) => setFilter("map", v)}
+              options={installedMaps}
+              placeholder="Map"
+              ariaLabel="Filter by map"
               className="h-9 w-36"
             />
-          )}
-          <FilterCombobox
-            value={filters.map ?? ""}
-            onCommit={(v) => setFilter("map", v)}
-            options={installedMaps}
-            placeholder="Map"
-            ariaLabel="Filter by map"
-            className="h-9 w-36"
-          />
-        </div>
-        {/* The kind chips get a row of their own (issue #1795). Sharing one
+          </div>
+          {/* The kind chips get a row of their own (issue #1795). Sharing one
             with the search box and the two comboboxes, they reached the right
             edge at the default 1100px window and pushed the count onto a line
             by itself, and at the 600px minimum the last chip sat past that
             edge, reachable only by scrolling the whole page sideways. The
             chips wrap here rather than scrolling, so every kind is on screen
             at every width. */}
-        <div className="flex items-center gap-3">
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            spacing={1}
-            // "" (no kind filter) is represented by its own "all" chip below,
-            // rather than by no chip being lit, so the group's state is always
-            // one of the radios and clearing it is pressing a specific one
-            // (issue #2566).
-            value={filters.kind || "all"}
-            onValueChange={(v) => setFilter("kind", v === "all" ? "" : v)}
-            aria-label="Kind"
-            className="flex-wrap"
-          >
-            <ToggleGroupItem
-              value="all"
-              className="data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+          <div className="flex items-center gap-3">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              spacing={1}
+              // "" (no kind filter) is represented by its own "all" chip below,
+              // rather than by no chip being lit, so the group's state is always
+              // one of the radios and clearing it is pressing a specific one
+              // (issue #2566).
+              value={filters.kind || "all"}
+              onValueChange={(v) => setFilter("kind", v === "all" ? "" : v)}
+              aria-label="Kind"
+              className="flex-wrap"
             >
-              All
-            </ToggleGroupItem>
-            {HUB_KINDS.map((kind) => (
               <ToggleGroupItem
-                key={kind}
-                value={kind}
+                value="all"
                 className="data-[state=on]:border-primary data-[state=on]:bg-primary/10"
               >
-                {kindLabelPlural(kind)}
+                All
               </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          {/* Beside the chips rather than after them in the same wrapping row,
+              {HUB_KINDS.map((kind) => (
+                <ToggleGroupItem
+                  key={kind}
+                  value={kind}
+                  className="data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+                >
+                  {kindLabelPlural(kind)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {/* Beside the chips rather than after them in the same wrapping row,
               so a narrow window wraps the chips under each other and leaves the
               count where it is, instead of stranding it on a line of its own. */}
-          {page && (
-            <span
-              role="status"
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground"
-            >
-              {loading && <Loader2 size={13} className="animate-spin" />}
-              {page.total} {page.total === 1 ? "item" : "items"}
-            </span>
-          )}
-        </div>
-        {filtersActive && (
-          <div className="flex flex-wrap items-center gap-2">
-            {filters.kind && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => setFilter("kind", "")}
+            {page && (
+              <span
+                role="status"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground"
               >
-                Kind: {kindLabelPlural(filters.kind as HubKind)}
-                <X className="size-3" aria-hidden />
-                <span className="sr-only">Clear this filter</span>
-              </Button>
-            )}
-            {active.map((f) => (
-              <Button
-                key={f.key}
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => setFilter(f.key, "")}
-              >
-                {f.label}: {f.key === "game" ? gameFilterLabel : filters[f.key]}
-                <X className="size-3" aria-hidden />
-                <span className="sr-only">Clear this filter</span>
-              </Button>
-            ))}
-            {!!filters.q?.trim() && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={clearSearch}
-              >
-                Search: {filters.q}
-                <X className="size-3" aria-hidden />
-                <span className="sr-only">Clear this filter</span>
-              </Button>
-            )}
-            {activeCount > 1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={clearAllFilters}
-              >
-                Clear all
-              </Button>
+                {loading && <Loader2 size={13} className="animate-spin" />}
+                {page.total} {page.total === 1 ? "item" : "items"}
+              </span>
             )}
           </div>
-        )}
-      </PageHeader>
+          {filtersActive && (
+            <div className="flex flex-wrap items-center gap-2">
+              {filters.kind && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => setFilter("kind", "")}
+                >
+                  Kind: {kindLabelPlural(filters.kind as HubKind)}
+                  <X className="size-3" aria-hidden />
+                  <span className="sr-only">Clear this filter</span>
+                </Button>
+              )}
+              {active.map((f) => (
+                <Button
+                  key={f.key}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => setFilter(f.key, "")}
+                >
+                  {f.label}:{" "}
+                  {f.key === "game" ? gameFilterLabel : filters[f.key]}
+                  <X className="size-3" aria-hidden />
+                  <span className="sr-only">Clear this filter</span>
+                </Button>
+              ))}
+              {!!filters.q?.trim() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={clearSearch}
+                >
+                  Search: {filters.q}
+                  <X className="size-3" aria-hidden />
+                  <span className="sr-only">Clear this filter</span>
+                </Button>
+              )}
+              {activeCount > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={clearAllFilters}
+                >
+                  Clear all
+                </Button>
+              )}
+            </div>
+          )}
+        </PageHeader>
 
-      <div className="relative min-h-0 flex-1">
-        {/* The home page's own backdrop (issue #2564), on a layer behind the
+        <div className="relative min-h-0 flex-1">
+          {/* The home page's own backdrop (issue #2564), on a layer behind the
             grid rather than inside the scrolling area: this div is a fixed-size
             flex item, so an absolutely positioned child fills the visible area
             and stays put while the grid beneath it scrolls, with no sticky
             trick needed. `pointer-events-none` and no `z-index` keep it out of
             the cards' stacking order, so the title link's whole-card hit area
             and the raised chips/actions (issue #2561) still take every click. */}
-        {backdrop && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-background"
-            style={backdrop}
-          />
-        )}
-        <div className="h-full overflow-auto p-4">
-          {loading && !page && (
-            <p
-              role="status"
-              className="flex items-center gap-2 p-6 text-sm text-muted-foreground"
-            >
-              <Loader2 size={15} className="animate-spin" /> Loading the hub…
-            </p>
+          {backdrop && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-background"
+              style={backdrop}
+            />
           )}
-          {error && (
-            <Alert variant="destructive" className="m-2">
-              <AlertCircle size={15} />
-              <AlertDescription className="flex flex-wrap items-center gap-3 text-destructive">
-                {error}
-                <Button variant="outline" size="sm" onClick={retry}>
-                  <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try again
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          {/* The previous page's results, dimmed rather than unmounted, while a
-            fetch for new ones is in flight (issue #2560). An error above does
-            not clear this: whatever was on screen stays there. */}
-          <div
-            className={loading ? "opacity-60 transition-opacity" : undefined}
-          >
-            {page && page.items.length === 0 && (
-              <EmptyState
-                icon={Globe}
-                action={
-                  filtersActive && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearAllFilters}
-                    >
-                      Clear filters
-                    </Button>
-                  )
-                }
+          <div className="h-full overflow-auto p-4">
+            {loading && !page && (
+              <p
+                role="status"
+                className="flex items-center gap-2 p-6 text-sm text-muted-foreground"
               >
-                {emptyReason(filtersActive, pinnedMatcher !== null, pinnedGame)}
-              </EmptyState>
-            )}
-            {page && page.items.length > 0 && (
-              <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
-                {page.items.map((item) => {
-                  const presence = presenceOf(item);
-                  return (
-                    <li
-                      key={item.id}
-                      // Three groups with room between them - what it is, what it is
-                      // for, what to do about it - rather than five evenly spaced
-                      // lines, which read as one undifferentiated block.
-                      //
-                      // `relative` is what the title link's `after:inset-0` covers:
-                      // it stretches to the nearest positioned ancestor, which is
-                      // this element, so the whole card is the hit area (issue
-                      // #2561) while the chips and action button stay reachable by
-                      // sitting above it in stacking order (`relative z-10` below).
-                      className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
-                    >
-                      <div className="flex w-full flex-col gap-1.5 text-left">
-                        <Link
-                          to={hubItemRoute(item.id)}
-                          className="text-sm font-medium after:absolute after:inset-0 hover:underline"
-                        >
-                          {item.title}
-                        </Link>
-                        {/* Under the title, and free to wrap. Beside each other on
-                          one line, a narrow card squeezed the date until it broke
-                          across three lines and set the row's height. */}
-                        <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
-                          <Badge variant="secondary" className="gap-1">
-                            <KindIcon kind={item.kind} mode={item.mode} />
-                            {describeItem(item.kind, item.mode)}
-                          </Badge>
-                          <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                            {formatDate(item.created_at)}
-                          </span>
-                        </span>
-                        {item.description && (
-                          <span className="mt-1 line-clamp-3 text-xs text-muted-foreground">
-                            {item.description}
-                          </span>
-                        )}
-                      </div>
-                      <div className="relative z-10 flex flex-wrap gap-1.5 text-xs">
-                        {item.game_name &&
-                          (pinnedMatcher || !item.game_key ? (
-                            // No `game_key` means no filter value could ever
-                            // reach this item (issue #2587), so the chip is
-                            // shown but not pressable rather than a button
-                            // that empties the grid the way `game_name` did.
-                            <span className={CHIP_CLASS}>{item.game_name}</span>
-                          ) : (
-                            <FilterChip
-                              label={item.game_name}
-                              onClick={() =>
-                                setFilter("game", item.game_key ?? "")
-                              }
-                            />
-                          ))}
-                        {item.map_name && (
-                          <FilterChip
-                            label={item.map_name}
-                            onClick={() =>
-                              setFilter("map", item.map_name ?? "")
-                            }
-                          />
-                        )}
-                        <FilterChip
-                          label={`by ${item.author_name}`}
-                          onClick={() => setFilter("author", item.author_name)}
-                        />
-                        {item.tags.map((tag) => (
-                          <FilterChip
-                            key={tag}
-                            label={`#${tag}`}
-                            onClick={() => setFilter("tag", tag)}
-                          />
-                        ))}
-                      </div>
-                      <ItemActions
-                        item={item}
-                        presence={presence}
-                        onOpen={(route) => navigate(route)}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {page?.truncated && (
-              <p className="mt-4 max-w-prose text-xs text-muted-foreground">
-                Only the first {page.truncated.scanned} items on the hub were
-                read, so there may be more for this game than are listed here.
-                Search to narrow it down.
+                <Loader2 size={15} className="animate-spin" /> Loading the hub…
               </p>
             )}
-            {page && lastPage > 1 && (
-              <div className="mt-4 flex items-center justify-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={current <= 1}
-                  onClick={() =>
-                    setFilters((f) => ({
-                      ...f,
-                      page: Math.max(1, current - 1),
-                    }))
-                  }
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {current} of {lastPage}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={current >= lastPage}
-                  onClick={() =>
-                    setFilters((f) => ({ ...f, page: current + 1 }))
-                  }
-                >
-                  Next
-                </Button>
-              </div>
+            {error && (
+              <Alert variant="destructive" className="m-2">
+                <AlertCircle size={15} />
+                <AlertDescription className="flex flex-wrap items-center gap-3 text-destructive">
+                  {error}
+                  <Button variant="outline" size="sm" onClick={retry}>
+                    <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try
+                    again
+                  </Button>
+                </AlertDescription>
+              </Alert>
             )}
+            {/* The previous page's results, dimmed rather than unmounted, while a
+            fetch for new ones is in flight (issue #2560). An error above does
+            not clear this: whatever was on screen stays there. */}
+            <div
+              className={loading ? "opacity-60 transition-opacity" : undefined}
+            >
+              {page && page.items.length === 0 && (
+                <EmptyState
+                  icon={Globe}
+                  action={
+                    filtersActive && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearAllFilters}
+                      >
+                        Clear filters
+                      </Button>
+                    )
+                  }
+                >
+                  {emptyReason(
+                    filtersActive,
+                    pinnedMatcher !== null,
+                    pinnedGame,
+                  )}
+                </EmptyState>
+              )}
+              {page && page.items.length > 0 && (
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
+                  {page.items.map((item) => {
+                    const presence = presenceOf(item);
+                    return (
+                      <li
+                        key={item.id}
+                        // Three groups with room between them - what it is, what it is
+                        // for, what to do about it - rather than five evenly spaced
+                        // lines, which read as one undifferentiated block.
+                        //
+                        // `relative` is what the title link's `after:inset-0` covers:
+                        // it stretches to the nearest positioned ancestor, which is
+                        // this element, so the whole card is the hit area (issue
+                        // #2561) while the chips and action button stay reachable by
+                        // sitting above it in stacking order (`relative z-10` below).
+                        className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
+                      >
+                        <div className="flex w-full flex-col gap-1.5 text-left">
+                          <Link
+                            to={hubItemRoute(item.id)}
+                            className="text-sm font-medium after:absolute after:inset-0 hover:underline"
+                          >
+                            {item.title}
+                          </Link>
+                          {/* Under the title, and free to wrap. Beside each other on
+                          one line, a narrow card squeezed the date until it broke
+                          across three lines and set the row's height. */}
+                          <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+                            <Badge variant="secondary" className="gap-1">
+                              <KindIcon kind={item.kind} mode={item.mode} />
+                              {describeItem(item.kind, item.mode)}
+                            </Badge>
+                            <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                              {formatDate(item.created_at)}
+                            </span>
+                          </span>
+                          {item.description && (
+                            <span className="mt-1 line-clamp-3 text-xs text-muted-foreground">
+                              {item.description}
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative z-10 flex flex-wrap gap-1.5 text-xs">
+                          {item.game_name &&
+                            (pinnedMatcher || !item.game_key ? (
+                              // No `game_key` means no filter value could ever
+                              // reach this item (issue #2587), so the text is
+                              // shown plain rather than in the pressable chip's
+                              // pill shape, which would promise a button that
+                              // does nothing (issue #2568).
+                              <span className={PLAIN_TEXT_CLASS}>
+                                {item.game_name}
+                              </span>
+                            ) : (
+                              <FilterChip
+                                label={item.game_name}
+                                filterValue={item.game_name}
+                                onClick={() =>
+                                  setFilter("game", item.game_key ?? "")
+                                }
+                              />
+                            ))}
+                          {item.map_name && (
+                            <FilterChip
+                              label={item.map_name}
+                              filterValue={item.map_name}
+                              onClick={() =>
+                                setFilter("map", item.map_name ?? "")
+                              }
+                            />
+                          )}
+                          <FilterChip
+                            label={`by ${item.author_name}`}
+                            filterValue={item.author_name}
+                            onClick={() =>
+                              setFilter("author", item.author_name)
+                            }
+                          />
+                          {item.tags.map((tag) => (
+                            <FilterChip
+                              key={tag}
+                              label={`#${tag}`}
+                              filterValue={`#${tag}`}
+                              onClick={() => setFilter("tag", tag)}
+                            />
+                          ))}
+                        </div>
+                        <ItemActions
+                          item={item}
+                          presence={presence}
+                          onOpen={(route) => navigate(route)}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {page?.truncated && (
+                <p className="mt-4 max-w-prose text-xs text-muted-foreground">
+                  Only the first {page.truncated.scanned} items on the hub were
+                  read, so there may be more for this game than are listed here.
+                  Search to narrow it down.
+                </p>
+              )}
+              {page && lastPage > 1 && (
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={current <= 1}
+                    onClick={() =>
+                      setFilters((f) => ({
+                        ...f,
+                        page: Math.max(1, current - 1),
+                      }))
+                    }
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {current} of {lastPage}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={current >= lastPage}
+                    onClick={() =>
+                      setFilters((f) => ({ ...f, page: current + 1 }))
+                    }
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -714,25 +738,50 @@ function emptyReason(
   return "The hub has nothing on it yet. Anything you share will show up here.";
 }
 
-/** How a card's game, map, author and tag are drawn, pressable or not. */
-const CHIP_CLASS =
-  "rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground";
+/**
+ * A card's game, map, author and tag used to share the kind badge's pill
+ * shape, so a first-time player pressing one to read it lost the list they
+ * were looking at (issue #2568). A pressable chip now reads as a control -
+ * an outlined pill rather than the kind badge's filled one, with a filter
+ * glyph that appears on hover or focus and a tooltip spelling out what
+ * pressing it does - and the rare chip that cannot filter (a `game_name`
+ * with no `game_key`, issue #2587) is plain text with no pill at all, so it
+ * never promises a button that does nothing.
+ */
+const PRESSABLE_CHIP_CLASS =
+  "group inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-xs text-foreground transition-colors hover:border-primary/60 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/** A card's game, map, author or tag, which filters the list when pressed. */
+/** The one case a chip cannot filter by (issue #2587): plain text, not a
+ * pill, so it never looks pressable. */
+const PLAIN_TEXT_CLASS = "text-muted-foreground";
+
+/** A card's game, map, author or tag, which replaces the current filters
+ * with this value when pressed. */
 function FilterChip({
   label,
+  filterValue,
   onClick,
 }: {
   label: string;
+  filterValue: string;
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${CHIP_CLASS} transition-colors hover:border-foreground/30 hover:text-foreground`}
-    >
-      {label}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className={PRESSABLE_CHIP_CLASS}
+        >
+          {label}
+          <Filter
+            aria-hidden
+            className="size-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Show only {filterValue}</TooltipContent>
+    </Tooltip>
   );
 }
