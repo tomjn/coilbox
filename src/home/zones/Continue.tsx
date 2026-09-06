@@ -1,7 +1,7 @@
 import { buttonVariants, cn } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { Link } from "react-router";
-import { GROUP_HEADING_CLASS } from "../cardShell";
+import { CARD_FOCUS_CLASS, GROUP_HEADING_CLASS } from "../cardShell";
 import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
 
 /**
@@ -57,19 +57,37 @@ import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
  * is a thing to decide rather than to do quietly, and it papers over a heading
  * rather than fixing it.
  *
- * ## The action sits next to the text
+ * ## The whole card is the action
  *
- * Not pinned to the far edge. `justify-between` put the icon, label, title and
- * detail on the left and the button on the right, so how far apart they ended up
- * was whatever the card had spare. On a 1256px page that measured 166px with two
+ * There is one thing to do here, so there is one target and it is the card. The
+ * rail's cards beside it already work this way, and a card that is entirely a
+ * link cannot leave a reader guessing which part of it is clickable.
+ *
+ * That also fixes what the button had become. Spelled out ("Resume conquest")
+ * and filled, it was the loudest thing on the page while sitting next to a
+ * heading that already said Conquest and a title that already named the run. The
+ * words were a third copy. Now the icon carries it at `size="icon"`, the words
+ * live in the link's label, and the card's own text says what it goes back to.
+ *
+ * The affordance is a `span`, not a button or a second link. It sits inside the
+ * card's link, and nesting one interactive element in another is invalid markup
+ * that assistive technology handles badly. Nothing is lost by it being inert:
+ * the whole card already does the one thing it would have done.
+ *
+ * ## It is the same height as the cards beside it
+ *
+ * `p-4` here against the rail card's `p-2.5`. Two different cards holding
+ * different things, so their heights agree by arrangement rather than by either
+ * one measuring the other. At `p-5` and `p-3` this card was 105px and its
+ * neighbours 101px, and it stood proud of the row for no reason a reader could
+ * see. `ResumeRail` carries the rest of that note.
+ *
+ * Packed left rather than pinned to the far edge, which predates this and still
+ * holds. `justify-between` made the gap between the words and the action
+ * whatever the card had spare: on a 1256px page that measured 166px with two
  * rail cards beside it, 434px with one and 702px with none (#1059), so the page
  * with a single thing to resume, the page the hero matters most on, was the one
  * that looked the emptiest.
- *
- * Packed left, the action is the same short step from the words it acts on at
- * every width, and the card's spare room is one space at its end rather than a
- * hole through its middle. The card is sized to its content by the layout, so on
- * most pages there is no spare room to see.
  *
  * Layout-agnostic: no page-level spacing or width of its own, because the
  * `stacked` layout is a compatibility contract and a later layout has to be able
@@ -93,37 +111,46 @@ export default function Continue({ className }: { className?: string }) {
     <section
       aria-labelledby="home-continue-heading"
       className={cn(
-        "flex flex-wrap items-center gap-4 rounded-lg border border-primary/40 bg-card p-5 text-card-foreground",
+        "rounded-lg border border-primary/40 bg-card text-card-foreground",
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-4">
+      {/* Named for the thing it resumes, not just for the verb. Read out of its
+          visual context the verb alone was "Open setup" with no setup named, so
+          a screen reader listing the page's links (which is how many people
+          navigate one) had the page's most important control saying the least.
+          The action's own words open the label, so voice control still reaches
+          it by the icon's tooltip and by what the card says. */}
+      <Link
+        to={top.to}
+        aria-label={`${action}: ${top.title}`}
+        className={cn(
+          "flex flex-wrap items-center gap-4 rounded-lg p-4 transition-colors hover:bg-accent/50",
+          CARD_FOCUS_CLASS,
+        )}
+      >
         <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
           <Icon className="size-6" aria-hidden />
         </span>
-        <div className="min-w-0">
-          {/* The heading is the kind, not the run's name. See below. */}
+        <div className="min-w-0 flex-1">
+          {/* The heading is the kind, not the run's name. See above. A heading
+              inside a link is valid, and the link's own label is what gets read
+              as its name, so both lists the page is navigated by still work. */}
           <h2 id="home-continue-heading" className={GROUP_HEADING_CLASS}>
             {label}
           </h2>
           <p className="text-xl font-semibold">{top.title}</p>
           <p className="text-sm text-muted-foreground">{top.detail}</p>
         </div>
-      </div>
-      {/* Named for the thing it resumes, not just for the verb. The rail's cards
-          are links wrapping their whole card, so each one reads out what it goes
-          back to. This action is a button beside the title, and read on its own it
-          was "Open setup" with no setup named, so a screen reader listing the
-          page's links (which is how many people navigate one) had the page's most
-          important control saying the least. The visible words open the label, so
-          voice control still reaches it by what is written on it. */}
-      <Link
-        to={top.to}
-        aria-label={`${action}: ${top.title}`}
-        className={cn(buttonVariants(), "shrink-0")}
-      >
-        <Play className="size-4" aria-hidden />
-        {action}
+        {/* Inert. The card around it is the link. `title` so a pointer user who
+            wants the words can still get them. */}
+        <span
+          aria-hidden
+          title={action}
+          className={cn(buttonVariants({ size: "icon" }), "shrink-0")}
+        >
+          <Play className="size-4" />
+        </span>
       </Link>
     </section>
   );

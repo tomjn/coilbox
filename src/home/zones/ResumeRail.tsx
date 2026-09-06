@@ -163,9 +163,22 @@ export const RAIL_DIM_CLASS = "text-muted-foreground";
  * lines a fixed 16rem card pushed onto a second row, growing back to the tool
  * cards' 16rem cap whenever the line has the room, so a wide page looks as it
  * did before.
+ *
+ * ## The padding is paired with the hero's
+ *
+ * `p-2.5` here and `p-4` on the Continue hero put both cards at the same height
+ * on one line. They are different cards with different contents, so that is an
+ * agreement between two numbers rather than something either one computes: at
+ * `p-3` and `p-5` the row measured 101px and 105px and the hero stood proud of
+ * its neighbours.
+ *
+ * The row aligns at `items-start` and must keep doing so (#1074), so this cannot
+ * be left to `stretch`. Measured in the running app rather than worked out on
+ * paper, and worth measuring again rather than adjusting by eye if either card
+ * gains or loses a line.
  */
 export const RAIL_CARD_CLASS =
-  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-3 text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:max-w-64 sm:grow sm:basis-40 " +
+  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-2.5 text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:max-w-64 sm:grow sm:basis-40 " +
   CARD_FOCUS_CLASS;
 
 /**
