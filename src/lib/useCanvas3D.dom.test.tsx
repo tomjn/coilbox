@@ -20,9 +20,14 @@ import { describe, expect, it, vi } from "vitest";
 
 /** Just the part of three the hook touches. */
 const drawn = vi.fn();
+/** One call per renderer three was asked to make. */
+const made = vi.fn();
 vi.mock("three", () => ({
   WebGLRenderer: class {
     domElement = document.createElement("canvas");
+    constructor() {
+      made();
+    }
     setPixelRatio() {}
     setSize() {}
     dispose() {}
@@ -69,11 +74,32 @@ function Harness() {
   return <Viewport out={out} />;
 }
 
+/** A view with nothing to draw yet, the way a map preview is before its
+ *  sources have resolved. */
+function Gated({ ready }: { ready: boolean }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  useCanvas3D(
+    hostRef,
+    () => ({ render: () => {}, resize: () => {}, dispose: () => {} }),
+    [],
+    ready,
+  );
+  return <div ref={hostRef} />;
+}
+
 describe("useCanvas3D", () => {
   it("draws nothing once the canvas is gone", () => {
     const view = render(<Harness />);
     drawn.mockClear();
     view.unmount();
     expect(drawn).not.toHaveBeenCalled();
+  });
+
+  it("makes no renderer until there is something to build", () => {
+    made.mockClear();
+    const view = render(<Gated ready={false} />);
+    expect(made).not.toHaveBeenCalled();
+    view.rerender(<Gated ready={true} />);
+    expect(made).toHaveBeenCalledTimes(1);
   });
 });

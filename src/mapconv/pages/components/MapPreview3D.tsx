@@ -1207,6 +1207,9 @@ uniform vec2 wPlane;`,
       clearAir,
       reduceMotion,
     ],
+    // Nothing to build until the sources have resolved and the map has a size,
+    // so no renderer is made for the steps before that.
+    !!srcs && worldWidth > 0 && worldHeight > 0,
   );
 
   // Spring's water plane sits at world height 0, so water is only visible where

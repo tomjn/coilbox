@@ -8,13 +8,20 @@
 //! skylobby does), then honour the game's `validais.lua` whitelist over the lot.
 
 use crate::ffi::Unitsync;
+use crate::infocache;
 use crate::model::{SkirmishAi, SkirmishAiOutput};
 use regex::Regex;
 use std::path::Path;
 
 /// Load unitsync, list native skirmish AIs, and (when `game_archive` is given)
 /// the game's Lua AIs, in one `Init` session.
-pub fn render(lib: &str, game_archive: Option<&str>) -> SkirmishAiOutput {
+///
+/// Disk-cached under `cache_dir`, keyed on the engine library's and the game
+/// archive's file identity. Mounting a game to read its `LuaAI.lua` is the
+/// whole cost of this mode, twenty seconds on a cold archive cache, and the
+/// answer only moves when the engine or the game does. Only a read with no
+/// errors is written, so a failure is retried rather than remembered.
+pub fn render(lib: &str, game_archive: Option<&str>, cache_dir: Option<&Path>) -> SkirmishAiOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -26,6 +33,15 @@ pub fn render(lib: &str, game_archive: Option<&str>) -> SkirmishAiOutput {
     };
     us.init(false, 0);
     let mut errors = us.drain_errors();
+
+    let key = infocache::skirmish_key(&us, Path::new(lib), game_archive);
+    let cache = cache_dir.zip(key.as_deref());
+    if let Some((dir, key)) = cache {
+        if let Some(hit) = infocache::read::<SkirmishAiOutput>(dir, key) {
+            us.uninit();
+            return hit;
+        }
+    }
 
     let native_count = us.skirmish_ai_count().max(0);
     let mut ais: Vec<SkirmishAi> = (0..native_count)
@@ -58,7 +74,13 @@ pub fn render(lib: &str, game_archive: Option<&str>) -> SkirmishAiOutput {
     errors.extend(us.drain_errors());
     us.uninit();
 
-    SkirmishAiOutput { ais, errors }
+    let out = SkirmishAiOutput { ais, errors };
+    if let Some((dir, key)) = cache {
+        if out.errors.is_empty() {
+            infocache::write(dir, key, &out);
+        }
+    }
+    out
 }
 
 /// Build a Lua-AI entry from a `LuaAI.lua` declaration. The `name` doubles as the

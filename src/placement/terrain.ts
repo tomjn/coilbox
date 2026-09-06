@@ -53,6 +53,14 @@ export interface HeightGrid {
  *
  * The words are little endian on disk, which is what a `Uint16Array` over the
  * buffer reads on every platform coilbox ships on.
+ *
+ * `words` is not enumerable. The grid travels as a prop to the map surface,
+ * and React's development build diffs a component's props on every commit for
+ * its performance timeline, walking any object it does not recognise key by
+ * key. A typed array is one it does not recognise, so the half a million words
+ * of a large map were being visited one at a time, two seconds on the main
+ * thread before the scene could draw. A key the walk cannot see costs nothing,
+ * and every reader here reaches the words by name.
  */
 export function heightGrid(
   bytes: ArrayBuffer,
@@ -61,7 +69,12 @@ export function heightGrid(
 ): HeightGrid | null {
   if (width <= 0 || height <= 0) return null;
   if (bytes.byteLength !== width * height * 2) return null;
-  return { width, height, words: new Uint16Array(bytes) };
+  const grid = { width, height } as HeightGrid;
+  Object.defineProperty(grid, "words", {
+    value: new Uint16Array(bytes),
+    enumerable: false,
+  });
+  return grid;
 }
 
 /** Fetch the worker's raw height grid, or `null` if it will not read. Tens of

@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import type { MapScene3D } from "@/lib/mapScene";
 import type { Placement } from "./placements";
-import { createUnitsLayer } from "./unitsLayer";
+import { createUnitsLayer, type UnitsLayerDeps } from "./unitsLayer";
 
 /** Enough of a scene to hang objects off. Nothing here renders. */
 function scene(): MapScene3D {
@@ -26,7 +26,7 @@ function scene(): MapScene3D {
 
 /** A layer drawing marker boxes: no unit has a model, so nothing is read off
  *  disk and every draw still takes the async path a real one does. */
-function layer() {
+function layer(over: Partial<UnitsLayerDeps> = {}) {
   return createUnitsLayer({
     handle: scene(),
     field: { width: 1, height: 1, samples: Float32Array.of(0) },
@@ -35,8 +35,9 @@ function layer() {
     minHeight: 0,
     maxHeight: 0,
     objectName: () => undefined,
-    loadModel: () => Promise.reject(new Error("no models in a test")),
+    loadModels: () => Promise.reject(new Error("no models in a test")),
     teamColor: () => [1, 1, 1],
+    ...over,
   });
 }
 
@@ -52,6 +53,62 @@ function building(index: number): Placement {
     facing: 0,
   };
 }
+
+describe("a units layer's model reads", () => {
+  it("asks for every fresh unit type's model in one read", async () => {
+    const asked: string[][] = [];
+    const drawn = layer({
+      objectName: (def) => `${def}.s3o`,
+      loadModels: (objects) => {
+        asked.push(objects);
+        return Promise.resolve(
+          new Map(objects.map((object) => [object, null])),
+        );
+      },
+    });
+    await drawn.draw([
+      building(0),
+      building(1),
+      { ...building(2), key: "base:pf1#2", def: "armwin" },
+    ]);
+    expect(asked).toEqual([["armsolar.s3o", "armwin.s3o"]]);
+  });
+
+  it("counts each unit type as it stands up", async () => {
+    const progress: [number, number][] = [];
+    const drawn = layer({
+      objectName: (def) => `${def}.s3o`,
+      loadModels: (objects) =>
+        Promise.resolve(new Map(objects.map((object) => [object, null]))),
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+    await drawn.draw([
+      building(0),
+      { ...building(1), key: "base:pf1#1", def: "armwin" },
+    ]);
+    expect(progress).toEqual([
+      [0, 2],
+      [1, 2],
+      [2, 2],
+    ]);
+  });
+
+  it("asks nothing for a unit type it has already built", async () => {
+    let asks = 0;
+    const drawn = layer({
+      objectName: (def) => `${def}.s3o`,
+      loadModels: (objects) => {
+        asks++;
+        return Promise.resolve(
+          new Map(objects.map((object) => [object, null])),
+        );
+      },
+    });
+    await drawn.draw([building(0)]);
+    await drawn.draw([building(0), building(1)]);
+    expect(asks).toBe(1);
+  });
+});
 
 describe("a units layer's redraws", () => {
   it("has no object for a unit whose model it has not read yet", async () => {

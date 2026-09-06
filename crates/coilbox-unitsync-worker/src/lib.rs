@@ -1294,9 +1294,12 @@ impl UnitScriptArgs {
 
 /// `--skirmish-ais`: list native skirmish AIs, plus `game`'s Lua AIs when a
 /// game is given. `game` is optional, the bare flag lists native AIs alone.
+/// `cache_dir` is the optional on-disk info-blob cache directory, the one
+/// `--game` takes.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SkirmishAisArgs {
     pub game: Option<String>,
+    pub cache_dir: Option<String>,
 }
 
 impl SkirmishAisArgs {
@@ -1311,6 +1314,10 @@ impl SkirmishAisArgs {
             args.push("--game".to_string());
             args.push(game.to_string());
         }
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
         args
     }
 
@@ -1320,13 +1327,16 @@ impl SkirmishAisArgs {
     /// unrelated flags, which are skipped rather than rejected.
     pub fn from_args(args: &[String]) -> Result<Self, String> {
         let mut game = None;
+        let mut cache_dir = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
-            if a == "--game" {
-                game = it.next().cloned();
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
             }
         }
-        Ok(SkirmishAisArgs { game })
+        Ok(SkirmishAisArgs { game, cache_dir })
     }
 }
 
@@ -2480,6 +2490,7 @@ mod tests {
     fn skirmish_ais_with_a_game_round_trips_through_to_args_and_from_args() {
         let original = SkirmishAisArgs {
             game: Some("BAR.sdd".into()),
+            cache_dir: Some("/cache".into()),
         };
         let recovered = SkirmishAisArgs::from_args(&original.to_args()).expect("valid argv");
         assert_eq!(recovered, original);
@@ -2489,9 +2500,13 @@ mod tests {
     /// to round trip as `None` rather than as an empty string.
     #[test]
     fn skirmish_ais_with_no_game_omits_the_flag_and_round_trips_none() {
-        let original = SkirmishAisArgs { game: None };
+        let original = SkirmishAisArgs {
+            game: None,
+            cache_dir: None,
+        };
         let a = original.to_args();
         assert!(!a.contains(&"--game".to_string()));
+        assert!(!a.contains(&"--cache-dir".to_string()));
         let recovered = SkirmishAisArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, original);
     }
@@ -2504,6 +2519,7 @@ mod tests {
     fn skirmish_ais_with_an_empty_game_omits_the_flag() {
         let a = SkirmishAisArgs {
             game: Some(String::new()),
+            cache_dir: None,
         }
         .to_args();
         assert!(!a.contains(&"--game".to_string()));
@@ -2513,6 +2529,7 @@ mod tests {
     fn skirmish_ais_dispatches_to_args_to_its_variant() {
         let a = SkirmishAisArgs {
             game: Some("BAR.sdd".into()),
+            cache_dir: None,
         };
         assert_eq!(Mode::SkirmishAis(a.clone()).to_args(), a.to_args());
     }

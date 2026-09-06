@@ -1209,7 +1209,8 @@ async fn unitsync_map_skybox(engine_path: String, data_dir: String, map_name: St
 /// `game_archive` is given. Returns `{ ais: [{ shortName, version?, name?,
 /// description?, kind }], errors }`.
 #[tauri::command]
-async fn unitsync_skirmish_ais(
+async fn unitsync_skirmish_ais<R: Runtime>(
+    app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     game_archive: Option<String>,
@@ -1218,10 +1219,12 @@ async fn unitsync_skirmish_ais(
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_skirmish_ai_args(
         &libpath.to_string_lossy(),
         &data_dir,
         game_archive.as_deref(),
+        cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, SCAN_TIMEOUT, "skirmish ais", None).await
