@@ -272,24 +272,28 @@ interface Props {
     raw: RawGeometry | null;
     project: LegoProject;
   };
-  /** Every selected piece, oldest first. One is the ordinary case. */
-  selectedIds: string[];
-  /** `additive` is a Shift or Cmd click: add this piece to the selection
-   *  rather than replacing it. */
-  onSelect: (pieceId: string | null, additive: boolean) => void;
-  /** Committed when a drag ends, not on every frame of it. */
-  onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
-  /** The same, for a set: every piece's new transform in one edit, so a group
-   *  drag is one undo step rather than one per piece. */
-  onTransformMany: (changes: Map<string, PieceTransform>) => void;
-  /**
-   * The piece to highlight as hovered regardless of where the pointer is, e.g.
-   * because the sidebar's tree row for it is hovered instead of the canvas.
-   */
-  hoveredId?: string | null;
-  /** Told whenever the piece under the pointer in this view changes, so the
-   *  sidebar tree can highlight the matching row. */
-  onHover?: (pieceId: string | null) => void;
+  /** Which pieces are picked, and what a click, a drag or a hover does. */
+  selection: {
+    /** Every selected piece, oldest first. One is the ordinary case. */
+    selectedIds: string[];
+    /** `additive` is a Shift or Cmd click: add this piece to the selection
+     *  rather than replacing it. */
+    onSelect: (pieceId: string | null, additive: boolean) => void;
+    /** Committed when a drag ends, not on every frame of it. */
+    onTransform: (pieceId: string, change: Partial<LegoPiece>) => void;
+    /** The same, for a set: every piece's new transform in one edit, so a
+     *  group drag is one undo step rather than one per piece. */
+    onTransformMany: (changes: Map<string, PieceTransform>) => void;
+    /**
+     * The piece to highlight as hovered regardless of where the pointer is,
+     * e.g. because the sidebar's tree row for it is hovered instead of the
+     * canvas.
+     */
+    hoveredId?: string | null;
+    /** Told whenever the piece under the pointer in this view changes, so the
+     *  sidebar tree can highlight the matching row. */
+    onHover?: (pieceId: string | null) => void;
+  };
   /**
    * Handed a function that draws a frame and returns the canvas, rather than
    * the canvas itself. WebGL discards its drawing buffer once the frame is
@@ -399,12 +403,7 @@ interface Props {
 
 export function ModelViewport({
   document,
-  selectedIds,
-  onSelect,
-  onTransform,
-  onTransformMany,
-  hoveredId,
-  onHover,
+  selection,
   onReady,
   playing = false,
   scriptTimeline = null,
@@ -433,6 +432,14 @@ export function ModelViewport({
   onAimChange,
 }: Props) {
   const { pack, raw, project } = document;
+  const {
+    selectedIds,
+    onSelect,
+    onTransform,
+    onTransformMany,
+    hoveredId,
+    onHover,
+  } = selection;
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.

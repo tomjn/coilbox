@@ -887,12 +887,14 @@ function Builder({ id }: { id: string | undefined }) {
 
               <ModelViewport
                 document={{ pack, raw, project: draft }}
-                selectedIds={selectedIds}
-                onSelect={selectPiece}
-                onTransform={transformPiece}
-                onTransformMany={transformPieces}
-                hoveredId={hoveredId}
-                onHover={setHoveredId}
+                selection={{
+                  selectedIds,
+                  onSelect: selectPiece,
+                  onTransform: transformPiece,
+                  onTransformMany: transformPieces,
+                  hoveredId,
+                  onHover: setHoveredId,
+                }}
                 playing={playing}
                 scriptTimeline={scriptTimeline}
                 scriptPaused={scriptPaused}
