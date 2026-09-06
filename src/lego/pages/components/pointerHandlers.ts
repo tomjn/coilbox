@@ -22,8 +22,10 @@ import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
  * for the same reason this file's handlers do, so splitting them here as well
  * would only move the sharing problem rather than remove it.
  *
- * Returns a function that removes the listeners this attaches, mirroring
- * what the caller's own `dispose` did before the split.
+ * Returns a function that removes every listener this attaches, including
+ * the face-drag ones: an earlier version of this dispose, both before and
+ * straight after the split, mirrored the caller's own `dispose` and missed
+ * those four. See #2544.
  */
 export function attachPointerHandlers(state: SceneState): () => void {
   const { renderer, camera, root } = state;
@@ -163,6 +165,10 @@ export function attachPointerHandlers(state: SceneState): () => void {
 
   return () => {
     cancelAnimationFrame(hoverFrame);
+    renderer.domElement.removeEventListener("pointerdown", onFaceDown);
+    renderer.domElement.removeEventListener("pointermove", onFaceMove);
+    renderer.domElement.removeEventListener("pointerup", onFaceUp);
+    renderer.domElement.removeEventListener("pointercancel", onFaceUp);
     renderer.domElement.removeEventListener("pointerdown", onPointerDown);
     renderer.domElement.removeEventListener("pointerup", onPointerUp);
     renderer.domElement.removeEventListener("pointermove", onPointerMove);
