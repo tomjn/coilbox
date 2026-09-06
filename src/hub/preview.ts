@@ -16,9 +16,10 @@
  *
  * The counterpart on the website is `components/ItemPreview.tsx` and
  * `lib/gallery/*` in tomjn/coilbox-hub, which had to vendor coilbox's galaxy
- * generator and mirror its validation to do this. Here both are the originals:
- * `parseConquestChallengeSettings` and `generateGalaxy` are the same functions
- * the app generates a real galaxy with, so a preview cannot drift from it.
+ * and run generators and mirror their validation to do this. Here all four are
+ * the originals: `parseConquestChallengeSettings` and `generateGalaxy`,
+ * `parseWarpathChallengeSettings` and `generateRun`, are the same functions the
+ * app generates a real galaxy or run with, so a preview cannot drift from it.
  */
 
 import { BUILD_SQUARE, facedFootprint } from "@/blueprint/footprint";
@@ -36,6 +37,12 @@ import { generateGalaxy } from "@/conquest/generate";
 import { type GalaxyDoc, NEUTRAL, type NodePos } from "@/conquest/model";
 import type { Container } from "@/container/container";
 import { type Participant, RANDOM_SIDE, type Rgb } from "@/play/participants";
+import {
+  optionsFromChallenge as optionsFromWarpathChallenge,
+  parseWarpathChallengeSettings,
+} from "@/runlite/challenge";
+import { type GenRunMap, generateRun } from "@/runlite/generate";
+import type { RogueliteRun, RunNodeType } from "@/runlite/model";
 import { RENDER_BLEED_SQUARES } from "./assets/vocabulary";
 
 /** A labelled fact, ready to draw. Values are strings because a layout name is
@@ -83,6 +90,22 @@ export interface GalaxyShape {
   factionColors: string[];
 }
 
+/** One stop on a rebuilt warpath run, positioned in a unit square. */
+export interface RunStep {
+  id: string;
+  x: number;
+  y: number;
+  type: RunNodeType;
+}
+
+export interface RunShape {
+  steps: RunStep[];
+  /** Routes forward, as index pairs into {@link RunShape.steps}. */
+  routes: [number, number][];
+  /** Columns from start to boss, which is how long the run is. */
+  columns: number;
+}
+
 /** One building, as a rectangle inside the box below. Build squares throughout,
  * measured from the top left of the box. */
 export interface BlueprintSquare {
@@ -122,7 +145,12 @@ export interface SetupPackContents {
 export type HubPreview =
   | { kind: "preset"; teams: PresetTeam[]; playing: number }
   | ({ kind: "setup-pack" } & SetupPackContents)
-  | { kind: "challenge"; galaxy: GalaxyShape | null; stats: PreviewStat[] }
+  | {
+      kind: "challenge";
+      galaxy: GalaxyShape | null;
+      run: RunShape | null;
+      stats: PreviewStat[];
+    }
   | { kind: "scenario"; stats: PreviewStat[]; map: string | null }
   | {
       kind: "blueprint";
@@ -275,9 +303,8 @@ function gameNames(payload: Record<string, unknown>): string[] {
 }
 
 /**
- * A conquest or warpath challenge. A conquest one is drawn, because the galaxy
- * is the thing somebody would recognise. A warpath one has numbers and no
- * picture, so it gets the numbers.
+ * A conquest or warpath challenge. Both are drawn now, because both have a
+ * shape somebody would recognise: a conquest's galaxy, or a warpath's run.
  */
 function challengePreview(payload: Record<string, unknown>): HubPreview | null {
   const settings = payload.settings as Record<string, unknown> | undefined;
@@ -289,6 +316,7 @@ function challengePreview(payload: Record<string, unknown>): HubPreview | null {
     return {
       kind: "challenge",
       galaxy: rebuildGalaxy(parsed),
+      run: null,
       stats: [
         { label: "Systems", value: String(parsed.nodeCount) },
         // `factionCount` is the enemy count. The app's own wizard calls it
@@ -310,7 +338,10 @@ function challengePreview(payload: Record<string, unknown>): HubPreview | null {
     if (typeof settings.ascension === "number" && settings.ascension > 0) {
       stats.push({ label: "Ascension", value: String(settings.ascension) });
     }
-    return stats.length > 0 ? { kind: "challenge", galaxy: null, stats } : null;
+    const run = rebuildRun(settings);
+    return stats.length > 0 || run
+      ? { kind: "challenge", galaxy: null, run, stats }
+      : null;
   }
 
   return null;
@@ -336,6 +367,84 @@ function rebuildGalaxy(
   } catch {
     return null;
   }
+}
+
+/**
+ * The generator reads a map name for every battle node and has no
+ * empty-pool fallback, so it needs one candidate to hand. Which map is passed
+ * never reaches the shape - a battle node's map name is not read by
+ * {@link runShapeOf}, only its position and kind - so an empty placeholder
+ * costs the same single random draw as a real map pool would.
+ */
+const PLACEHOLDER_RUN_MAPS: GenRunMap[] = [{ name: "" }];
+
+/**
+ * Rebuild the run a warpath challenge would generate, or null if it cannot be
+ * rebuilt.
+ *
+ * Mirrors {@link rebuildGalaxy}: the run is baked from `optionsFromChallenge`
+ * with one placeholder map and no build graph, so the seed produces the same
+ * shape on every machine regardless of what maps or games happen to be
+ * installed. What is deliberately not rebuilt is anything inside a node - the
+ * map a battle is fought on, the units a reward offers, a shop's wares -
+ * because those come from installed content this function is never given.
+ *
+ * Null is the ordinary answer for a conquest challenge, for a payload from a
+ * newer coilbox whose settings no longer parse, and for a seed the generator
+ * refuses. The caller falls back to the numbers it can read straight off the
+ * payload, so a challenge shows less rather than nothing.
+ */
+function rebuildRun(settings: Record<string, unknown>): RunShape | null {
+  const parsed = parseWarpathChallengeSettings(settings);
+  if (!parsed) return null;
+  try {
+    const run = generateRun(
+      optionsFromWarpathChallenge(parsed, { maps: PLACEHOLDER_RUN_MAPS }),
+    );
+    return run.nodes.length > 0 ? runShapeOf(run) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Lay the columns out left to right, each one centred on the middle.
+ *
+ * Spacing is set by the busiest column rather than by each column's own
+ * count, so a column of two is not stretched to the same height as a column
+ * of four. Rows stay in line across the map, the way a route map reads.
+ */
+function runShapeOf(run: RogueliteRun): RunShape {
+  const columns = Math.max(...run.nodes.map((n) => n.col)) + 1;
+  const perColumn = new Map<number, number>();
+  for (const node of run.nodes) {
+    perColumn.set(node.col, (perColumn.get(node.col) ?? 0) + 1);
+  }
+  const busiest = Math.max(...perColumn.values());
+  const gap = 1 / busiest;
+
+  const index = new Map(run.nodes.map((node, i) => [node.id, i]));
+  const steps: RunStep[] = run.nodes.map((node) => {
+    const count = perColumn.get(node.col) ?? 1;
+    return {
+      id: node.id,
+      x: columns > 1 ? node.col / (columns - 1) : 0.5,
+      y: 0.5 + (node.row - (count - 1) / 2) * gap,
+      type: node.type,
+    };
+  });
+
+  return {
+    steps,
+    routes: run.edges.flatMap(([from, to]) => {
+      const a = index.get(from);
+      const b = index.get(to);
+      return a === undefined || b === undefined
+        ? []
+        : [[a, b] as [number, number]];
+    }),
+    columns,
+  };
 }
 
 /** Scatter positions are 2D and real-star ones are 3D light years. Both are

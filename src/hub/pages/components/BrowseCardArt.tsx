@@ -22,16 +22,18 @@ import {
   type BlueprintShape,
   type GalaxyShape,
   type HubPreview,
+  type RunShape,
   readPreview,
 } from "../../preview";
-import { Galaxy } from "./ItemPreview";
+import { Galaxy, RunMap } from "./ItemPreview";
 
 /**
  * The art slot on a hub browse card (issue #2559). Nine cards of title, badge
  * and chips read as one undifferentiated block, so every card gets a picture,
  * filled in the order the issue sets out: a map picture, then a blueprint's own
- * layout, then a conquest challenge's own galaxy (issue #2598), then a tinted
- * plate carrying the kind glyph everything else already has in its badge.
+ * layout, then a conquest challenge's own galaxy (issue #2598), then a warpath
+ * challenge's own run (issue #2599), then a tinted plate carrying the kind
+ * glyph everything else already has in its badge.
  *
  * The slot is a fixed `aspect-video` box regardless of which fills it, so a
  * picture that resolves after the grid first paints - a minimap render, a
@@ -59,6 +61,8 @@ export function BrowseCardArt({ item }: { item: HubItem }) {
         <BlueprintArt item={item} />
       ) : item.kind === "challenge" && item.mode === "conquest" ? (
         <ConquestArt item={item} />
+      ) : item.kind === "challenge" && item.mode === "warpath" ? (
+        <WarpathArt item={item} />
       ) : item.kind === "scenario" ? (
         <ScenarioArt item={item} />
       ) : (
@@ -154,6 +158,32 @@ function ConquestArt({ item }: { item: HubItem }) {
   return (
     <div className="flex size-full items-center justify-center p-2">
       <Galaxy shape={galaxy} className="size-full" />
+    </div>
+  );
+}
+
+/**
+ * A warpath challenge's run, read off the same container the item page
+ * fetches for `ItemPreview.tsx` - there is no image stored anywhere for a
+ * challenge, only the settings its run is regenerated from. Drawn with the
+ * same `RunMap` component the item page uses, with its legend left off: seven
+ * swatches under an already card-sized drawing would be smaller than anyone
+ * could read.
+ *
+ * While the container has not arrived yet, or turned out not to be a warpath
+ * challenge with a run to draw after all, the slot falls back to
+ * {@link KindArt} - the same box, same size, so the fetch landing does not
+ * reflow the card.
+ */
+function WarpathArt({ item }: { item: HubItem }) {
+  const hubUrl = useHubUrl();
+  const run = useWarpathCardRun(hubUrl, item.id);
+
+  if (!run) return <KindArt item={item} />;
+
+  return (
+    <div className="flex size-full items-center justify-center p-2">
+      <RunMap shape={run} className="size-full" legend={false} />
     </div>
   );
 }
@@ -339,6 +369,60 @@ function useConquestCardGalaxy(
   }, [hubUrl, id, key]);
 
   return galaxy;
+}
+
+/** Read one warpath challenge's run off its container - null too when the
+ * container did not turn out to hold a run to draw (a challenge `preview.ts`
+ * could not rebuild). See {@link fetchItemPreview}. */
+async function fetchWarpathRun(
+  hubUrl: string,
+  id: string,
+): Promise<RunShape | null> {
+  const preview = await fetchItemPreview(hubUrl, id);
+  return preview?.kind === "challenge" ? preview.run : null;
+}
+
+/** Session cache of resolved runs, keyed by `hubUrl::id`, so paging away from
+ * a challenge card and back does not repeat its container fetch. Holds `null`
+ * for "asked and got nothing to draw", which is itself worth remembering
+ * rather than asking again on every remount. */
+const warpathRunCache = new Map<string, RunShape | null>();
+/** Open reads, so two mounts of the same card (StrictMode, or a duplicate id on
+ * the page) share one fetch rather than opening two. */
+const warpathRunPending = new Map<string, Promise<RunShape | null>>();
+
+/** `undefined` while nothing has answered yet, otherwise the cached answer -
+ * `null` included, for "asked and there is nothing to draw". Both fall back to
+ * {@link KindArt} in the caller, so the distinction is only ever used here to
+ * decide whether to fetch. */
+function useWarpathCardRun(
+  hubUrl: string,
+  id: string,
+): RunShape | null | undefined {
+  const key = `${hubUrl}::${id}`;
+  const [run, setRun] = useState<RunShape | null | undefined>(() =>
+    warpathRunCache.get(key),
+  );
+
+  useEffect(() => {
+    const cached = warpathRunCache.get(key);
+    if (cached !== undefined) {
+      setRun(cached);
+      return;
+    }
+    let cancelled = false;
+    shareInFlight(warpathRunPending, key, () =>
+      fetchWarpathRun(hubUrl, id),
+    ).then((result) => {
+      warpathRunCache.set(key, result);
+      if (!cancelled) setRun(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hubUrl, id, key]);
+
+  return run;
 }
 
 /** Read one scenario's map name off its container - null too when the
