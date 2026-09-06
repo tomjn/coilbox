@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { MapPin } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useFieldText } from "@/lib/useFieldText";
 import type { Placement } from "@/placement/placements";
@@ -310,6 +310,11 @@ export function UnitsNote({
   drawing: boolean;
 }) {
   if (units.placed === 0) return null;
+  // Said while the game's units or their models are still being read, in
+  // place of a verdict on what could not be drawn: nothing is missing until
+  // the read has finished.
+  const reading =
+    units.load.unitDefs === "loading" || units.load.models.state === "loading";
 
   const problem = units.gameMissing
     ? `${gameName || "The scenario's game"} is not installed, so nothing can be drawn with its models.`
@@ -320,14 +325,20 @@ export function UnitsNote({
   return (
     // The corner is the surface's, which stacks this above the view controls.
     <>
-      {problem && (
+      {problem && !reading && (
         <p className="rounded bg-amber-950/70 px-2 py-1 text-[11px] text-amber-200 backdrop-blur">
           {problem}
         </p>
       )}
-      <p className="rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-        {drawing ? "drawing " : ""}
-        {units.placed} unit{units.placed === 1 ? "" : "s"}
+      <p className="flex items-center gap-1 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
+        {reading || drawing ? (
+          <>
+            <Loader2 className="size-3 animate-spin" />
+            Reading units
+          </>
+        ) : (
+          `${units.placed} unit${units.placed === 1 ? "" : "s"}`
+        )}
       </p>
     </>
   );

@@ -74,6 +74,25 @@ describe("a units layer's model reads", () => {
     expect(asked).toEqual([["armsolar.s3o", "armwin.s3o"]]);
   });
 
+  it("counts each unit type as it stands up", async () => {
+    const progress: [number, number][] = [];
+    const drawn = layer({
+      objectName: (def) => `${def}.s3o`,
+      loadModels: (objects) =>
+        Promise.resolve(new Map(objects.map((object) => [object, null]))),
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+    await drawn.draw([
+      building(0),
+      { ...building(1), key: "base:pf1#1", def: "armwin" },
+    ]);
+    expect(progress).toEqual([
+      [0, 2],
+      [1, 2],
+      [2, 2],
+    ]);
+  });
+
   it("asks nothing for a unit type it has already built", async () => {
     let asks = 0;
     const drawn = layer({

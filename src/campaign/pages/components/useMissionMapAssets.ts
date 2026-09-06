@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { StageState } from "@/placement/mapLoad";
 import { type HeightGrid, readHeightGrid } from "@/placement/terrain";
 import {
   useUnitsyncHeightField,
@@ -95,7 +96,32 @@ export function useMissionMapAssets(
   const width = heightmap.data?.width;
   const height = heightmap.data?.height;
 
+  // Each read as a stage of the scene filling in, for the indicator over it.
+  // Asked for at all means loading until it answers, so the first render says
+  // so rather than waiting for an effect to.
+  const asked = !!enginePath && !!dataDir && !!mapName;
+  const stage = (url: unknown, error: unknown): StageState =>
+    !asked ? "idle" : url ? "done" : error ? "failed" : "loading";
+  const load = {
+    minimap: stage(minimap.url, minimap.error),
+    heightPicture: stage(heightmap.url, heightmap.error),
+    exactHeights: (!asked || !exactHeights
+      ? "idle"
+      : !wordsSettled
+        ? "loading"
+        : heights.grid
+          ? "done"
+          : "failed") as StageState,
+    skybox: (!asked
+      ? "idle"
+      : skybox.loading
+        ? "loading"
+        : "done") as StageState,
+  };
+
   return {
+    /** How far each read has got, for the indicator over the scene. */
+    load,
     enginePath,
     dataDir,
     /**

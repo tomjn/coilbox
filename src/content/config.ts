@@ -1781,20 +1781,24 @@ export function useUnitsyncMapSkybox(
   mapName?: string,
 ) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!enginePath || !dataDir || !mapName) {
       setDataUrl(null);
+      setLoading(false);
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
     const cached = skyboxCache.get(key);
     if (cached) {
       setDataUrl(cached.dataUrl ?? null);
+      setLoading(false);
       return;
     }
     let cancelled = false;
     setDataUrl(null);
+    setLoading(true);
     shareInFlight(skyboxPending, key, () =>
       unitsyncMapSkybox({ enginePath, dataDir, mapName }),
     )
@@ -1804,13 +1808,16 @@ export function useUnitsyncMapSkybox(
         setDataUrl(res.dataUrl ?? null);
       })
       // A skybox is optional; a failed read just leaves the flat sky colour.
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [enginePath, dataDir, mapName]);
 
-  return { dataUrl };
+  return { dataUrl, loading };
 }
 
 /* -------------------------------------------------------------------------- *

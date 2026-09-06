@@ -24,6 +24,7 @@ import {
 } from "@/lib/scenarioEditing/editing";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import type { LayoutChoice } from "@/lib/scenarioEditing/layoutPlacing";
+import { MapLoadIndicator } from "@/placement/MapLoadIndicator";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import { dragKeys, placementKey } from "@/placement/placements";
 import {
@@ -369,7 +370,11 @@ export const ScenarioMapScene = forwardRef<
     scenario,
     placements: units.placements,
     ground: units.ground,
-    settled: units.settled,
+    // Settled for a verdict once the units the footprints are checked against
+    // have been read too, not only the ones the models are drawn from: they
+    // are two reads of one dataset, and a note that the game's units have not
+    // been read was showing over units already standing on the map.
+    settled: units.settled && !gameUnits.loading,
     gameUnits: gameUnits.units,
     snap,
     pickedGroup,
@@ -951,12 +956,15 @@ export const ScenarioMapScene = forwardRef<
         />
       }
       note={
-        <MapFootnotes
-          scenario={scenario}
-          units={units}
-          footprints={footprints}
-          waterless={waterless}
-        />
+        <>
+          <MapLoadIndicator load={{ ...assets.load, ...units.load }} />
+          <MapFootnotes
+            scenario={scenario}
+            units={units}
+            footprints={footprints}
+            waterless={waterless}
+          />
+        </>
       }
       // What the hands do here, which is the mode's own line as much as it is
       // the camera's (issue #2285). What the left button does on bare ground is

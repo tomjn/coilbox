@@ -101,6 +101,9 @@ export interface UnitsLayerDeps {
   /** Whether motion is wanted, read at draw time because it is a preference
    *  somebody can change while the editor is open (issue #1716). */
   motion?: () => boolean;
+  /** How far a pass has got: unit types stood up so far, out of the ones it
+   *  is building. Said once at the start and once per type after that. */
+  onProgress?: (done: number, total: number) => void;
 }
 
 /** What one pass of drawing found it could not draw. */
@@ -473,6 +476,8 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
       if (prototypes.has(`${object}|${colour.getHexString()}`)) continue;
       wanted.add(object);
     }
+    let stood = 0;
+    deps.onProgress?.(stood, batches.size);
     let models: Map<string, UnitModelResult | null> = new Map();
     if (wanted.size > 0) {
       try {
@@ -509,6 +514,8 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
           });
           objects.set(placement.key, instance);
         }
+        stood++;
+        deps.onProgress?.(stood, batches.size);
         handle.render();
       }),
     );
