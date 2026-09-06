@@ -33,7 +33,19 @@ import { cn } from "@/lib/utils";
  * A locally installed name will not always match what the hub stores, so
  * whatever is typed can still be sent: the last row offers it verbatim. The
  * list is a shortcut into the box, never the only way in.
+ *
+ * `options` carries a `value` (what gets sent to the hub) alongside a
+ * `label` (what the reader sees), rather than one string doing both: the
+ * game filter's value is the hub's version-independent `game_key`, and
+ * showing that in the box would read as "SF" rather than "SplinterFaction"
+ * (issue #2587). The map filter has no such split and just uses the same
+ * string for both.
  */
+export interface ComboOption {
+  value: string;
+  label: string;
+}
+
 export function FilterCombobox({
   value,
   onCommit,
@@ -44,7 +56,7 @@ export function FilterCombobox({
 }: {
   value: string;
   onCommit: (value: string) => void;
-  options: string[];
+  options: ComboOption[];
   placeholder: string;
   ariaLabel: string;
   className?: string;
@@ -58,11 +70,15 @@ export function FilterCombobox({
     if (next.trim() !== value.trim()) onCommit(next);
   }
 
+  // The trigger shows the chosen option's label, falling back to the raw
+  // value for one typed by hand rather than picked from the list.
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
+
   const typed = search.trim();
   // Only worth offering when it is not already one of the rows below it.
   const offerTyped =
     typed !== "" &&
-    !options.some((o) => o.toLowerCase() === typed.toLowerCase());
+    !options.some((o) => o.label.toLowerCase() === typed.toLowerCase());
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -76,7 +92,7 @@ export function FilterCombobox({
           className={cn("justify-between font-normal", className)}
         >
           <span className={cn("truncate", !value && "text-muted-foreground")}>
-            {value || placeholder}
+            {selectedLabel || placeholder}
           </span>
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
@@ -116,17 +132,17 @@ export function FilterCombobox({
             <CommandGroup heading="Installed">
               {options.map((option) => (
                 <CommandItem
-                  key={option}
-                  value={option}
-                  onSelect={() => commit(option)}
+                  key={option.value}
+                  value={option.label}
+                  onSelect={() => commit(option.value)}
                 >
                   <Check
                     className={cn(
                       "mr-2 size-4",
-                      option === value ? "opacity-100" : "opacity-0",
+                      option.value === value ? "opacity-100" : "opacity-0",
                     )}
                   />
-                  {option}
+                  {option.label}
                 </CommandItem>
               ))}
             </CommandGroup>

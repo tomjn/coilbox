@@ -20,6 +20,7 @@ function item(id: string, game: string | null): HubItem {
     title: id,
     description: "",
     game_name: game,
+    game_key: null,
     map_name: null,
     tags: [],
     author_name: "somebody",
