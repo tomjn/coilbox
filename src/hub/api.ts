@@ -62,6 +62,11 @@ export interface HubItem {
   title: string;
   description: string;
   game_name: string | null;
+  /** The version-independent key the hub filters `game` by, e.g. "BA" or "SF".
+   * Null when the hub could not derive one, which means no game filter can
+   * ever reach this item (issue #2587). Never send `game_name` as a filter
+   * value: it is a display string and the server matches nothing against it. */
+  game_key: string | null;
   map_name: string | null;
   tags: string[];
   author_name: string;

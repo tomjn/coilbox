@@ -175,27 +175,62 @@ export default function BrowsePage() {
   // Games and maps installed locally, for the game/map filter suggestions. The
   // same scan the Games and Maps pages already run and cache, so opening this
   // page is a cache hit whenever the app's startup warm-up has already primed
-  // the default engine. A game's/map's `name` (from modinfo/mapinfo) is already
-  // "Name version", the same shape the hub stores its own values in.
+  // the default engine.
+  //
+  // A game's local `name` is the archive name, "Name version" (e.g.
+  // "SplinterFaction 0.1.80"). That is NOT the shape the hub stores its own
+  // values in: the hub filters `game` by `game_key`, a version-independent
+  // modinfo shortname such as "SF" (issue #2587). The matching local field is
+  // `info.shortname`, not `name` - the same field `container/shortnames.ts`
+  // reads to carry a game's identity across a build. The dropdown below is
+  // keyed on it, with `info.name` (also version-free) as the label, so every
+  // installed version of a game collapses to the one option that actually
+  // returns results, and a game whose modinfo has no shortname is left off the
+  // list rather than offered as a dead end.
   const { selected: scanTarget } = useScanTargetSelection();
   const { data: scanData } = useUnitsyncScan(
     scanTarget?.enginePath,
     scanTarget?.rootPath,
   );
-  const installedGames = useMemo(
-    () =>
-      [...new Set((scanData?.games ?? []).map((g) => g.name))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [scanData],
-  );
+  const gameOptions = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const g of scanData?.games ?? []) {
+      const key = g.info?.shortname?.trim();
+      if (!key) continue;
+      if (!byKey.has(key)) byKey.set(key, g.info?.name?.trim() || key);
+    }
+    return [...byKey.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [scanData]);
   const installedMaps = useMemo(
     () =>
-      [...new Set((scanData?.maps ?? []).map((m) => m.name))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
+      [...new Set((scanData?.maps ?? []).map((m) => m.name))]
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({ value: name, label: name })),
     [scanData],
   );
+
+  // What to call the active game filter's value on its token, below: the
+  // dropdown's own label when it is one of the installed games, otherwise the
+  // `game_name` of a loaded item that carries this key - a card's game chip
+  // sets the filter to `item.game_key` but a human reads `item.game_name`, so
+  // the token has to look the same value up again rather than print the key
+  // it was actually set to (issue #2587). Falls back to the bare key only
+  // when neither source has heard of it.
+  const installedGameLabel = useMemo(
+    () => new Map(gameOptions.map((o) => [o.value, o.label])),
+    [gameOptions],
+  );
+  const gameFilterLabel = useMemo(() => {
+    const key = filters.game;
+    if (!key) return null;
+    return (
+      installedGameLabel.get(key) ??
+      page?.items.find((it) => it.game_key === key)?.game_name ??
+      key
+    );
+  }, [filters.game, installedGameLabel, page]);
 
   const active = useMemo(
     () => CLICKABLE.filter((f) => filters[f.key]?.trim()),
@@ -287,7 +322,7 @@ export default function BrowsePage() {
             <FilterCombobox
               value={filters.game ?? ""}
               onCommit={(v) => setFilter("game", v)}
-              options={installedGames}
+              options={gameOptions}
               placeholder="Game"
               ariaLabel="Filter by game"
               className="h-9 w-36"
@@ -375,7 +410,7 @@ export default function BrowsePage() {
                 className="h-7 gap-1.5 text-xs"
                 onClick={() => setFilter(f.key, "")}
               >
-                {f.label}: {filters[f.key]}
+                {f.label}: {f.key === "game" ? gameFilterLabel : filters[f.key]}
                 <X className="size-3" aria-hidden />
                 <span className="sr-only">Clear this filter</span>
               </Button>
@@ -510,13 +545,17 @@ export default function BrowsePage() {
                       </div>
                       <div className="relative z-10 flex flex-wrap gap-1.5 text-xs">
                         {item.game_name &&
-                          (pinnedMatcher ? (
+                          (pinnedMatcher || !item.game_key ? (
+                            // No `game_key` means no filter value could ever
+                            // reach this item (issue #2587), so the chip is
+                            // shown but not pressable rather than a button
+                            // that empties the grid the way `game_name` did.
                             <span className={CHIP_CLASS}>{item.game_name}</span>
                           ) : (
                             <FilterChip
                               label={item.game_name}
                               onClick={() =>
-                                setFilter("game", item.game_name ?? "")
+                                setFilter("game", item.game_key ?? "")
                               }
                             />
                           ))}
