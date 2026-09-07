@@ -50,7 +50,13 @@ let mockDefs: UnitDefsResult = {
 };
 let mockStatus = "ready";
 /** The curated dataset the page joins for names, keyed by internal def key. */
-let mockDataset: { name: string; fullName?: string }[] = [];
+let mockDataset: {
+  name: string;
+  fullName?: string;
+  buildOptions?: string[];
+}[] = [];
+/** The game's sides, which the build menu panel reads to name a faction. */
+let mockSides: { name: string; startUnit: string }[] = [];
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -66,7 +72,12 @@ vi.mock("@/content/config", () => ({
     reload: () => {},
     loading: false,
   }),
+  // Both read by the unit picker the build menu panel adds through, and the
+  // first by the panel itself, to say which faction a row belongs to.
+  useUnitsyncGameInfo: () => ({ info: { sides: mockSides }, loading: false }),
+  useUnitsyncUnitBuildpics: () => null,
 }));
+vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
 
 /** The custom parameter consumer index, which most tests leave empty. */
 let mockConsumers: CustomParamsResult | null = null;
@@ -153,10 +164,18 @@ const ARMAAK: Record<string, unknown> = {
   objectname: "Units/ARMAAK.s3o",
 };
 
+/** A factory, which is the only kind of unit a build menu belongs to. */
+const ARMLAB: Record<string, unknown> = {
+  name: "armlab",
+  humanName: "Bot Lab",
+  builder: true,
+  buildoptions: ["armpw", "armrock", "armham"],
+};
+
 function show(
   units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
   entry = `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
-  dataset: { name: string; fullName?: string }[] = [
+  dataset: { name: string; fullName?: string; buildOptions?: string[] }[] = [
     { name: "armcom", fullName: "Commander" },
   ],
 ) {
@@ -189,6 +208,7 @@ afterEach(() => {
   cleanup();
   mockStatus = "ready";
   mockDataset = [];
+  mockSides = [];
   mockConsumers = null;
   mockConsumersByArchive = {};
 });
@@ -764,6 +784,181 @@ describe("UnitPage", () => {
       await waitFor(() => expect(listRow("armcom4")).toBeUndefined());
       expect(screen.queryByText(/unit added/)).toBeNull();
       expect(screen.getByText("Pick a unit to see its fields.")).toBeTruthy();
+    });
+  });
+
+  /**
+   * Issue #1274: a unit nothing can build is not in the game, so the roster of
+   * what a factory offers is where a mod is actually made. This drives the panel
+   * end to end, because the interesting part is the wiring: an edit here has to
+   * reach the build menu store and stay out of the override set.
+   */
+  describe("editing a build menu", () => {
+    const entry = `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armlab`;
+    const DATASET = [
+      { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
+      { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
+      { name: "armpw", fullName: "Peewee" },
+      { name: "armrock", fullName: "Rocko" },
+      { name: "armham", fullName: "Hammer" },
+      { name: "corcom", fullName: "Core Commander", buildOptions: ["corak"] },
+      { name: "corak", fullName: "The Can" },
+    ];
+    const SIDES = [
+      { name: "Arm", startUnit: "armcom" },
+      { name: "Core", startUnit: "corcom" },
+    ];
+
+    const openLab = () => {
+      mockSides = SIDES;
+      return show({ armlab: ARMLAB, armcom: ARMCOM }, entry, DATASET);
+    };
+
+    /**
+     * Pick a unit out of the add picker's popover.
+     *
+     * Scoped to the popover on purpose: the browser on the left of the page
+     * lists every unit too, so a name looked up across the whole document
+     * finds two buttons and neither of them is the one being pressed.
+     */
+    const addFromPicker = async (name: RegExp) => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Add a unit to this menu/ }),
+      );
+      const popover = await waitFor(() => {
+        const found = document.querySelector('[data-slot="popover-content"]');
+        if (!found) throw new Error("the picker did not open");
+        return found as HTMLElement;
+      });
+      fireEvent.click(within(popover).getByRole("button", { name }));
+    };
+
+    /** The build menu's rows, in the order they are drawn. */
+    const rows = () =>
+      screen
+        .getAllByRole("listitem")
+        .filter((li) => li.querySelector("button[aria-label^='Move ']"))
+        .map((li) => li.textContent ?? "");
+
+    it("shows the builder's list in the order the game declares it", () => {
+      openLab();
+      expect(rows().map((r) => r.replace(/\D+/g, "").slice(0, 1))).toEqual([
+        "1",
+        "2",
+        "3",
+      ]);
+      expect(rows()[0]).toContain("Peewee");
+      expect(rows()[1]).toContain("Rocko");
+      expect(rows()[2]).toContain("Hammer");
+    });
+
+    /**
+     * The raw JSON row this used to be. `buildoptions` has an editor of its own
+     * now, and two ways to read the same list is one too many.
+     */
+    it("draws no raw buildoptions field alongside the roster", () => {
+      openLab();
+      expect(screen.queryByText("buildoptions")).toBeNull();
+    });
+
+    it("reorders with the arrow buttons", () => {
+      openLab();
+      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+      expect(rows()[0]).toContain("Rocko");
+      expect(rows()[1]).toContain("Peewee");
+      fireEvent.click(screen.getByLabelText("Move Hammer up"));
+      expect(rows()[1]).toContain("Hammer");
+      expect(rows()[2]).toContain("Peewee");
+    });
+
+    it("takes a unit off the menu and offers it back", () => {
+      openLab();
+      fireEvent.click(
+        screen.getByLabelText("Remove Rocko from this build menu"),
+      );
+      expect(rows()).toHaveLength(2);
+      expect(rows().join(" ")).not.toContain("Rocko");
+      // Not gone from the game, and not disabled: it is offered back.
+      const back = screen.getByTitle("Put Rocko back on this menu");
+      fireEvent.click(back);
+      expect(rows()).toHaveLength(3);
+    });
+
+    /**
+     * The single most common real edit: give one side another side's unit. The
+     * picker covers the whole game rather than this builder's own faction, and
+     * the row that lands says which faction it came from.
+     */
+    it("adds another faction's unit and says whose it is", async () => {
+      openLab();
+      await addFromPicker(/The Can/);
+      await waitFor(() => expect(rows()).toHaveLength(4));
+      expect(rows()[3]).toContain("The Can");
+      expect(rows()[3]).toContain("Core");
+      expect(rows()[3]).toContain("added");
+    });
+
+    /** The join between #1272 and #1274: a copy is only a unit once something
+     *  can build it. */
+    it("adds a unit the project copied", async () => {
+      openLab();
+      screen.getByRole("button", { name: /Copy unit/ }).click();
+      const keyBox = (await screen.findByLabelText(
+        /Internal name/,
+      )) as HTMLInputElement;
+      fireEvent.change(keyBox, { target: { value: "armlab2" } });
+      fireEvent.change(screen.getByLabelText(/Name in game/), {
+        target: { value: "Bot Lab II" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /^Add unit/ }));
+      await waitFor(() =>
+        expect(screen.queryByLabelText(/Internal name/)).toBeNull(),
+      );
+
+      // The copy is open now, so go back to the lab and put the copy on it.
+      fireEvent.click(
+        screen.getAllByRole("button").find((b) => {
+          const text = b.textContent ?? "";
+          return text.includes("armlab") && !text.includes("armlab2");
+        }) as HTMLElement,
+      );
+      await addFromPicker(/Bot Lab II/);
+      await waitFor(() =>
+        expect(rows().some((r) => r.includes("armlab2"))).toBe(true),
+      );
+      expect(rows().find((r) => r.includes("armlab2"))).toContain("yours");
+    });
+
+    /**
+     * The point of holding these apart from the overrides. A build menu edit is
+     * a change to a list the game still owns, so it is counted as one and it
+     * writes nothing into the sparse override set the field rows read.
+     */
+    it("is counted as a build menu edit, not as a field change", () => {
+      openLab();
+      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+      expect(screen.getByText("1 build menu edit")).toBeTruthy();
+      expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+      // The per-unit override reset is what the override set drives, and it is
+      // still absent after a reorder.
+      expect(screen.queryByRole("button", { name: /Reset \d+ change/ })).toBe(
+        null,
+      );
+    });
+
+    it("puts the menu back with one press", () => {
+      openLab();
+      fireEvent.click(
+        screen.getByLabelText("Remove Rocko from this build menu"),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Reset menu/ }));
+      expect(rows()).toHaveLength(3);
+      expect(screen.queryByText(/build menu edit/)).toBeNull();
+    });
+
+    it("shows no build menu for a unit that builds nothing", () => {
+      show();
+      expect(screen.queryByText("Build menu")).toBeNull();
     });
   });
 });

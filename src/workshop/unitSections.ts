@@ -575,6 +575,17 @@ export function presentPaths(
   return out;
 }
 
+/**
+ * Lowercased paths the field list never draws, because the page has a better
+ * editor for them above it.
+ *
+ * `buildoptions` is an ordered list of units, and the page gives it a roster
+ * with add, remove and reorder on it (issue #1274). Left in the field list as
+ * well it would be a second, worse way to say the same thing: a read-only blob
+ * of JSON beside a control that already shows the same list in order.
+ */
+const OWN_EDITOR = new Set(["buildoptions"]);
+
 /** Which view of the field list the page is showing. */
 export type FieldView = "relevant" | "all";
 
@@ -719,6 +730,7 @@ function pathsForView(
       paths.set(key, path);
     }
   }
+  for (const path of OWN_EDITOR) paths.delete(path);
   return [...paths.values()];
 }
 
