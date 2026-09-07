@@ -71,6 +71,7 @@ These are hidden unless **Advanced mode** is on (Settings > General). They're mo
 | animation        | COB tools   | `#/animation/cob`      | `animation.cob`        |
 | unit builder     | Models      | `#/lego`               | `lego.units`           |
 | unit builder     | Lego Parts  | `#/lego/parts`         | `lego.parts`           |
+| workshop         | Unit tweaks | `#/workshop`           | `workshop.units`       |
 
 (Mapping Tools and animation also add a few external-link items, wiki/tool guides, that open in the browser rather than routing in-app.)
 
