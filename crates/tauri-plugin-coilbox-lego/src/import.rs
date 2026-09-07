@@ -34,7 +34,7 @@
 //! vertices. The directory is UTF-8 JSON, an array of
 //! `{ id, vFirst, vCount, iFirst, iCount, bbox }`.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -103,7 +103,8 @@ pub struct Imported {
     /// works out what is missing.
     pub missing_textures: Vec<String>,
     /// `.3do` child pieces dropped as dead duplicates of an earlier sibling.
-    /// Always 0 for an `.s3o`. See `is_dead_duplicate` for the exact rule.
+    /// Always 0 for an `.s3o`. See `coilbox_3do_convert::is_dead_duplicate`
+    /// for the exact rule.
     pub dropped_pieces: usize,
 }
 
@@ -126,10 +127,21 @@ pub fn import(model: &coilbox_s3o::Model) -> Result<Imported, String> {
 /// keeps one batch per distinct texture a piece uses. After the packing there
 /// is only one texture, so there is only one batch, and a lego piece draws one
 /// mesh.
+///
+/// The conversion itself is `coilbox_3do_convert::to_s3o`, and what comes back
+/// from it is imported the way anybody else's `.s3o` is. That is deliberate: a
+/// game converted in one run and a single unit opened here go through the same
+/// code, so the two cannot drift into disagreeing about which way a face is
+/// wound or where on the sheet its tile is. The texture name it is given is
+/// thrown away, since this import stores the sheet it just drew rather than
+/// naming a file in a game.
 pub fn import_3do(model: &coilbox_3do::Model, rects: &Rects) -> Result<Imported, String> {
-    let mut state = Walk::default();
-    let root = walk_3do(&model.root, rects, &mut state);
-    finish(root, state)
+    let converted = coilbox_3do_convert::to_s3o(model, rects, "")?;
+    let mut imported = import(&converted.model)?;
+    imported.palette_faces = converted.palette_faces;
+    imported.missing_textures = converted.missing_textures;
+    imported.dropped_pieces = converted.dropped_pieces;
+    Ok(imported)
 }
 
 /// Flatten a `.glb` into the same blob, with each node's rotation and scale
@@ -405,177 +417,7 @@ fn walk(piece: &coilbox_s3o::Piece, state: &mut Walk) -> ImportPiece {
 }
 
 /// Where each of a `.3do`'s tiles ended up on the packed sheet.
-pub type Rects = BTreeMap<String, crate::atlas3do::Rect>;
-
-/// The corners a `.3do` face takes on its tile.
-///
-/// The format stores no texture coordinates at all: a face is stretched over
-/// the whole of the tile it names. Faces with more than four corners wrap,
-/// which is what the engine's own quad-oriented mapping does.
-const CORNER_UV: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
-
-/// Flatten one `.3do` piece into a single mesh.
-///
-/// Every corner of every face becomes its own vertex. It has to: the format
-/// shares a vertex between faces that name different tiles, and a shared vertex
-/// can only carry one texture coordinate.
-fn walk_3do(piece: &coilbox_3do::Piece, rects: &Rects, state: &mut Walk) -> ImportPiece {
-    let id = format!("m{}", state.next);
-    state.next += 1;
-
-    let v_first = state.vertices.len() / FLOATS_PER_VERTEX;
-    let i_first = state.indices.len();
-    let mut min = [f32::INFINITY; 3];
-    let mut max = [f32::NEG_INFINITY; 3];
-    let mut vertices = 0usize;
-
-    for prim in &piece.primitives {
-        let rect = match &prim.texture {
-            // A name that is present but empty resolves to nothing, so it is
-            // the flat-colour case in everything but how the file stores it.
-            coilbox_3do::Texture::Name(name) if !name.is_empty() => {
-                match rects.get(name.as_str()) {
-                    Some(rect) => *rect,
-                    None => {
-                        state.missing.insert(name.clone());
-                        state.palette_faces += 1;
-                        rects[crate::atlas3do::PALETTE_TILE]
-                    }
-                }
-            }
-            // A resolved entry got its own tile, coloured from
-            // `palette.pal`, under this same name, before packing (see
-            // `lib.rs`'s `palette_tiles`). One nothing could resolve, because
-            // there was no palette beside the model or the entry named is
-            // outside the 256 it holds, falls back to the fallback tile.
-            coilbox_3do::Texture::Palette(entry) => {
-                match rects.get(&crate::atlas3do::palette_tile_name(*entry)) {
-                    Some(rect) => *rect,
-                    None => {
-                        state.palette_faces += 1;
-                        rects[crate::atlas3do::PALETTE_TILE]
-                    }
-                }
-            }
-            _ => {
-                state.palette_faces += 1;
-                rects[crate::atlas3do::PALETTE_TILE]
-            }
-        };
-
-        let base = vertices as u32;
-        for (corner, &index) in prim.indices.iter().enumerate() {
-            let Some(pos) = piece.vertices.get(index as usize).copied() else {
-                continue;
-            };
-            let normal = prim
-                .vertex_normals
-                .get(corner)
-                .copied()
-                .unwrap_or(prim.normal);
-            let [u, v] = CORNER_UV[corner % 4];
-            for axis in 0..3 {
-                min[axis] = min[axis].min(pos[axis]);
-                max[axis] = max[axis].max(pos[axis]);
-            }
-            state.vertices.extend_from_slice(&pos);
-            state.vertices.extend_from_slice(&normal);
-            state.vertices.extend_from_slice(&rect.at(u, v));
-            vertices += 1;
-        }
-        // A face of any corner count is a fan around its first corner. The
-        // reader has already dropped everything with fewer than three.
-        //
-        // Wound backwards, because the engine derives a `.3do` face normal as
-        // the negative of the usual right-handed cross product. Winding the fan
-        // forwards would make the side the normals point at the back face, and
-        // every lit face would come out dark.
-        for i in 1..prim.indices.len().saturating_sub(1) {
-            state
-                .indices
-                .extend_from_slice(&[base, base + i as u32 + 1, base + i as u32]);
-        }
-    }
-
-    let mesh_id = if vertices == 0 {
-        None
-    } else {
-        state.directory.push(MeshEntry {
-            id: id.clone(),
-            v_first,
-            v_count: vertices,
-            i_first,
-            i_count: state.indices.len() - i_first,
-            bbox: Bbox { min, max },
-        });
-        Some(id)
-    };
-
-    ImportPiece {
-        name: piece.name.clone(),
-        offset: piece.offset,
-        mesh_id,
-        children: piece
-            .children
-            .iter()
-            .enumerate()
-            .filter_map(|(i, child)| {
-                if is_dead_duplicate(child, &piece.children[..i]) {
-                    state.dropped_pieces += 1;
-                    None
-                } else {
-                    Some(walk_3do(child, rects, state))
-                }
-            })
-            .collect(),
-    }
-}
-
-/// Whether `candidate` is an inert duplicate of one of the sibling pieces
-/// that came before it in the file.
-///
-/// The comparison is the piece's name, not its position or vertex data. Real
-/// `.3do`s reuse identical geometry deliberately: a unit's script shows one of
-/// two same-shaped pieces at a time to fake a flicker (BA's `cortitan` and
-/// `corhurc` both carry a `thrusta1`/`thrusta2` pair this way), or gives one
-/// point two jobs under two names (`armatl`'s `flare`/`bubbles` share a
-/// position because the same point serves as both a muzzle flash and an
-/// underwater trail origin). Both are exact copies of a sibling by position
-/// and vertices, and both are pieces the model still needs. Dropping either
-/// would be exactly the "removing real geometry" mistake this pass exists to
-/// avoid.
-///
-/// A repeated *name* is different: `S3DModel::FindPiece` in the engine's
-/// `3DModel.cpp` resolves a piece name to the first match in file order, so a
-/// later sibling sharing an earlier one's name can never be the one a unit
-/// script or weapon definition reaches by that name. Nothing that depends on
-/// addressing it by name could ever have worked, so removing it changes
-/// nothing the engine could have shown anybody.
-///
-/// That is also why the candidate must draw nothing (`primitives` empty) and
-/// root nothing (`children` empty) before it is dropped: a same-named piece
-/// that has faces of its own still renders them, because rendering walks the
-/// tree rather than looking pieces up by name, and a same-named piece with
-/// children would take its whole subtree with it. `.3do` piece names are
-/// lower-cased on read, so the comparison needs no further normalising.
-///
-/// Measured against the `.3do`s in Balanced Annihilation v15.9.8, Basically
-/// OTA 1.7 beta 10.1 and XTA 9.65 (2,042 files, 12,306 pieces): 14 sibling
-/// pairs share identical position and vertex data, and every one of them is a
-/// legitimate reuse like the two above, not junk. Exactly 2 pieces, in
-/// `ARM_T1_HOV_Constructor.3do` and its XTA equivalent, share a name with an
-/// empty, childless earlier sibling (both called `beam`, under `nanogun`) and
-/// are caught by this rule.
-fn is_dead_duplicate(
-    candidate: &coilbox_3do::Piece,
-    earlier_siblings: &[coilbox_3do::Piece],
-) -> bool {
-    candidate.children.is_empty()
-        && candidate.primitives.is_empty()
-        && earlier_siblings
-            .iter()
-            .any(|sibling| sibling.name == candidate.name)
-}
+pub type Rects = coilbox_3do_convert::Rects;
 
 #[cfg(test)]
 mod tests {
@@ -900,7 +742,7 @@ mod tests {
 
     mod three_do {
         use super::*;
-        use crate::atlas3do::{self, Rect};
+        use coilbox_3do_convert::{self as atlas3do, Rect};
 
         fn rects() -> Rects {
             let mut out = Rects::new();

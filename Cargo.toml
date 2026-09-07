@@ -6,6 +6,7 @@ members = [
   "crates/coilbox-proc",
   "crates/coilbox-s3o",
   "crates/coilbox-3do",
+  "crates/coilbox-3do-convert",
   "crates/coilbox-lobby-protocol",
   "crates/coilbox-tachyon-protocol",
   "crates/coilbox-zerok-protocol",
