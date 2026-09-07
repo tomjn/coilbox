@@ -98,6 +98,56 @@ describe("buildS3o", () => {
     ).toEqual(["gun"]);
   });
 
+  it("writes the doc's own normalised names by default, for a script to address (#2613)", () => {
+    const doc = project([
+      { id: "hull", name: "hull", originalName: "Hull", parentId: "root" },
+    ]);
+
+    const build = buildS3o(doc, pack(), null, TEXTURES);
+
+    expect(build?.root.children[0]?.name).toBe("hull");
+  });
+
+  it("writes back a real shipped name a save would otherwise rename (#2613)", () => {
+    // The other half of the proof in rawImport.test.ts: `mercury.3do`'s left
+    // gun barrel is really called `leftgun-barrel` in the file
+    // balanced_annihilation-v15.9.8.sdz ships, which `projectFromImport`
+    // records as this piece's `originalName`. "Save model" has to write that
+    // back, hyphen and all, not `leftgun_barrel`.
+    const doc = project([
+      {
+        id: "hull",
+        name: "leftgun_barrel",
+        originalName: "leftgun-barrel",
+        parentId: "root",
+      },
+    ]);
+
+    const build = buildS3o(doc, pack(), null, TEXTURES, {
+      useOriginalNames: true,
+    });
+
+    expect(build?.root.children[0]?.name).toBe("leftgun-barrel");
+  });
+
+  it("writes a piece's preserved original name when asked, for a save with no script (#2613)", () => {
+    const doc = project([
+      { id: "hull", name: "hull", originalName: "Hull", parentId: "root" },
+      // No original recorded: it was never renamed by normalising, so the doc
+      // name is the file's own name already.
+      { id: "gun", name: "gun", parentId: "hull" },
+    ]);
+
+    const build = buildS3o(doc, pack(), null, TEXTURES, {
+      useOriginalNames: true,
+    });
+
+    expect(build?.root.children[0]?.name).toBe("Hull");
+    expect(child(build?.root as S3oPiece, "Hull").children[0]?.name).toBe(
+      "gun",
+    );
+  });
+
   it("bakes rotation into the vertices and leaves the offset a translation", () => {
     const doc = project([
       {

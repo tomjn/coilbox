@@ -157,6 +157,18 @@ export function buildS3o(
   pack: LoadedPack,
   raw: RawGeometry | null,
   textures: { texture1: string; texture2?: string },
+  options?: {
+    /**
+     * Write each piece's `originalName` in place of its normalised `name`,
+     * when it has one. Only right for a build with no script alongside it:
+     * `SaveModelPopover` sets this, since a piece's normalised name is what a
+     * script's `piece(...)` calls address, in a script this build has none of.
+     * A full export and a test run leave this unset, because their script
+     * does exist and does address pieces by `name`. See
+     * `LegoPiece.originalName` (#2613).
+     */
+    useOriginalNames?: boolean;
+  },
 ): S3oBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
   const { pieces, world } = bakedPieces(project, pack, raw);
@@ -177,7 +189,12 @@ export function buildS3o(
     mid: project.mid ?? measured.mid,
     texture1: textures.texture1,
     texture2: textures.texture2 ?? "",
-    root: assemble(project, pieces, project.rootPieceId),
+    root: assemble(
+      project,
+      pieces,
+      project.rootPieceId,
+      options?.useOriginalNames ?? false,
+    ),
   };
 }
 
@@ -185,16 +202,18 @@ function assemble(
   project: LegoProject,
   pieces: Map<string, BakedPiece>,
   pieceId: string,
+  useOriginalNames: boolean,
 ): S3oPiece {
   const baked = pieces.get(pieceId) as BakedPiece;
+  const piece = pieceById(project, pieceId);
   return {
-    name: baked.name,
+    name: useOriginalNames ? (piece?.originalName ?? baked.name) : baked.name,
     primitiveType: 0,
     offset: baked.offset,
     vertices: baked.vertices,
     indices: baked.indices,
     children: childrenOf(project, pieceId).map((child) =>
-      assemble(project, pieces, child.id),
+      assemble(project, pieces, child.id, useOriginalNames),
     ),
   };
 }

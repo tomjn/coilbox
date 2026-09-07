@@ -607,11 +607,14 @@ function Builder({ id }: { id: string | undefined }) {
     if (!selectedId) return;
     edit((project) => ({
       ...project,
-      pieces: project.pieces.map((piece) =>
-        piece.id === selectedId
-          ? { ...piece, name: normalisePieceName(name) }
-          : piece,
-      ),
+      pieces: project.pieces.map((piece) => {
+        if (piece.id !== selectedId) return piece;
+        // A deliberate rename overrides whatever name the file it was
+        // imported from used, so that preserved original stops applying: see
+        // `LegoPiece.originalName` (#2613).
+        const { originalName: _dropped, ...rest } = piece;
+        return { ...rest, name: normalisePieceName(name) };
+      }),
     }));
   }
 

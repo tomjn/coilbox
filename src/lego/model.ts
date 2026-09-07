@@ -222,6 +222,21 @@ export interface LegoPiece {
   id: string;
   /** Lower case, unique, and safe as a Lua local, because scripts use it as one. */
   name: string;
+  /**
+   * The name this piece carried in the file it was imported from, before
+   * `uniquePieceName` normalised that into `name`. Present only while the two
+   * differ and nobody has touched the name since: `renameSelected` drops it the
+   * moment a piece is renamed in the builder, and `insertCompound` drops it for
+   * a piece pasted, duplicated or dropped in from the library, since neither is
+   * the piece the file shipped any more.
+   *
+   * `SaveModelPopover`'s "Save model" writes this back in place of `name` when
+   * it is set, so saving with no edits reproduces the file's own piece names
+   * (#2613) instead of the normalised, deduplicated ones #873 introduced for
+   * script generation. A full export and a test run write `name` regardless,
+   * because the script they build addresses a piece by that name, not this one.
+   */
+  originalName?: string;
   parentId: string | null;
   /** Null for an empty piece: a hierarchy node, flare, aim point or emitter. */
   partId: string | null;
@@ -736,6 +751,9 @@ function parsePiece(raw: unknown): LegoPiece | null {
   return {
     id: p.id,
     name: p.name,
+    ...(typeof p.originalName === "string" && p.originalName !== ""
+      ? { originalName: p.originalName }
+      : {}),
     parentId: typeof p.parentId === "string" ? p.parentId : null,
     partId: typeof p.partId === "string" ? p.partId : null,
     ...(typeof p.meshId === "string" && p.meshId !== ""

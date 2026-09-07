@@ -55,6 +55,11 @@ export interface RawImport {
  * from the names for exactly that reason: they come from the file's own walk
  * order, so renaming a piece later cannot move the geometry under it.
  *
+ * The name the file actually had is kept too, on `LegoPiece.originalName`,
+ * so normalising it is a display and scripting concern rather than a
+ * destructive edit: "Save model" writes the original back rather than the
+ * normalised name a script needs (#2613).
+ *
  * `radius`, `height` and `mid` are pinned from the file rather than recomputed,
  * so a re-export writes the header the model came in with. A format with no
  * header sends null for all three and none is pinned, which leaves the builder
@@ -94,6 +99,11 @@ export function projectFromImport(
     pieces.push({
       id,
       name,
+      // Kept so a save with no edits can write the file's own name back
+      // instead of the normalised one: see `LegoPiece.originalName` (#2613).
+      // Absent when the two already agree, which is most pieces most of the
+      // time.
+      ...(piece.name !== name ? { originalName: piece.name } : {}),
       parentId,
       // Never a part. An imported mesh is not something the parts library has,
       // and letting the two share a field would let one resolve as the other.
