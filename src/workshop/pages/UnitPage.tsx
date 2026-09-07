@@ -34,7 +34,7 @@ import {
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import {
-  Diagnostics,
+  DiagnosticsButton,
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
@@ -213,6 +213,19 @@ export default function UnitPage() {
                 .join(", ")}
             </span>
           )}
+          {/* What unitsync said while reading this game's defs. It used to be a
+            panel below everything else, which on a page that claims the window
+            height and scrolls its two panes inside it meant a strip of the
+            bottom edge gone for the session (issue #2667). Only once a game is
+            picked: with none there is no read to report on. */}
+          {game && status !== "error" && (
+            <DiagnosticsButton
+              errors={defs?.unitErrors ?? []}
+              checking={status !== "ready"}
+              title={`Diagnostics for ${game.name}`}
+              description="What unitsync said while reading this game's unit definitions."
+            />
+          )}
         </div>
       </header>
 
@@ -358,10 +371,6 @@ export default function UnitPage() {
             </div>
           )}
         </div>
-      )}
-
-      {defs && defs.unitErrors.length > 0 && (
-        <Diagnostics errors={defs.unitErrors} />
       )}
     </div>
   );

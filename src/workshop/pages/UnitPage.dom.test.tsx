@@ -107,11 +107,12 @@ function show(
   dataset: { name: string; fullName?: string }[] = [
     { name: "armcom", fullName: "Commander" },
   ],
+  unitErrors: string[] = [],
 ) {
   mockDefs = {
     units,
     weaponDefs: {},
-    unitErrors: [],
+    unitErrors,
     errors: [],
     checksum: "abc",
   };
@@ -214,6 +215,48 @@ describe("UnitPage", () => {
     mockStatus = "loading";
     show();
     expect(screen.getByText(/Reading every unit definition/)).toBeTruthy();
+  });
+
+  /**
+   * Issue #2667. These used to be an amber panel below the two panes, on a page
+   * that gives those panes the whole window height, so it never scrolled away.
+   * Now it is a button in the header, present in all three states the read can
+   * be in for the reason the scenario editor's problems button is (issue #2272).
+   */
+  describe("the diagnostics button", () => {
+    const errors = [
+      "could not read units/armcom.lua",
+      "unknown key in units/armaak.lua",
+    ];
+
+    it("is disabled and says Checking while the defs are still being read", () => {
+      mockStatus = "loading";
+      show();
+      const button = screen.getByRole("button", { name: /Checking/ });
+      expect(button.hasAttribute("disabled")).toBe(true);
+    });
+
+    it("says No problems, enabled, once the read lands with nothing to report", () => {
+      show();
+      const button = screen.getByRole("button", { name: /No problems/ });
+      expect(button.hasAttribute("disabled")).toBe(false);
+    });
+
+    it("counts what unitsync said without putting any of it on the page", async () => {
+      show({ armcom: ARMCOM }, undefined, undefined, errors);
+      expect(screen.queryByText(errors[0])).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: /2 diagnostics/ }));
+
+      expect(await screen.findByText(errors[0])).toBeTruthy();
+      expect(screen.getByText(errors[1])).toBeTruthy();
+    });
+
+    it("says nothing about a read that has not happened, with no game picked", () => {
+      show({ armcom: ARMCOM }, "/workshop");
+      expect(screen.queryByRole("button", { name: /No problems/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Checking/ })).toBeNull();
+    });
   });
 
   it("groups a field under the heading its section belongs to", () => {
