@@ -954,6 +954,56 @@ export const contentWidgetRemove = defineCommand<
   { removed: string[] }
 >("coilbox-content", "content_widget_remove");
 
+/** What one install of a batch `.3do` conversion (issue #2622) did. */
+export interface Install3doOutcome {
+  /** How many files were copied from the conversion's output into the game. */
+  filesCopied: number;
+  /** Original `.3do` files moved aside, as their path inside the game. */
+  originalsMovedAside: string[];
+  /** Models an earlier install already moved aside, left untouched. */
+  alreadyInstalled: string[];
+  /** A converted model whose original `.3do` could not be found. */
+  missingOriginal: string[];
+  /** Unit definitions that spelled `.3do` in `objectname` and had it stripped. */
+  unitDefsPatched: string[];
+}
+
+/**
+ * Install a batch `.3do` conversion's output into the `.sdd` game it came
+ * from: copy the converted models and sheets in, move the original `.3do`
+ * files they replace aside (not delete - the engine tries `.3do` before
+ * `.s3o` for an extensionless `objectname`, so the original has to go before
+ * the conversion has any effect), and strip the extension from a unit
+ * definition that names one directly. Refuses anything that is not a `.sdd`:
+ * a `.sdz`/`.sd7` is one packed file with no sound way to rewrite it in place.
+ */
+export const contentInstall3doConversion = defineCommand<
+  { gameDir: string; outDir: string },
+  Install3doOutcome
+>("coilbox-content", "content_install_3do_conversion");
+
+/** What one undo of a batch `.3do` install restored. */
+export interface Undo3doInstallOutcome {
+  /** Every file the install touched, restored from its backup. */
+  restored: string[];
+}
+
+/** Reverse every change an earlier {@link contentInstall3doConversion} made. */
+export const contentUndo3doInstall = defineCommand<
+  { gameDir: string },
+  Undo3doInstallOutcome
+>("coilbox-content", "content_undo_3do_install");
+
+/**
+ * How many backups an earlier `.3do` install left under a game, so the
+ * frontend can offer undo even in a freshly opened drawer that never ran the
+ * install itself this session.
+ */
+export const content3doInstallStatus = defineCommand<
+  { gameDir: string },
+  { backups: number }
+>("coilbox-content", "content_3do_install_status");
+
 /**
  * Write text to a path the caller picked, knowing nothing about what is in it:
  * a serialised keymap, or a game's own `blueprints.json`. Reading runs through

@@ -17,6 +17,7 @@ mod caches;
 mod container_file;
 mod demo;
 mod engine;
+mod install3do;
 mod keybinds;
 mod metrics;
 mod model;
@@ -950,6 +951,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             widget::content_widget_status,
             widget::content_widget_install,
             widget::content_widget_remove,
+            install3do::content_install_3do_conversion,
+            install3do::content_undo_3do_install,
+            install3do::content_3do_install_status,
             rapid_pool::content_warm_rapid_pool,
             rapid_pool::content_prune_rapid_pool,
             caches::content_reclaim_caches,

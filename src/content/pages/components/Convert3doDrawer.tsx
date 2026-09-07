@@ -1,17 +1,31 @@
 import { Button } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen } from "lucide-react";
-import { useRef, useState } from "react";
+import { FolderOpen, Loader2, Undo2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
+import { notify } from "@/notify/notify";
 import {
   type Convert3doGroup,
   type Convert3doProgress,
   type Convert3doResult,
+  content3doInstallStatus,
+  contentInstall3doConversion,
   contentOpenPath,
+  contentUndo3doInstall,
+  type Install3doOutcome,
   unitsyncCancel,
   unitsyncConvert3do,
 } from "../../bindings";
+import { invalidateArchiveTree } from "../../config";
+
+const msg = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);
 
 /**
  * Convert every `.3do` in one game to `.s3o` (issue #2573).
@@ -31,6 +45,7 @@ export function Convert3doDrawer({
   dataDir,
   archive,
   models,
+  gameDir = null,
 }: {
   enginePath: string;
   dataDir: string;
@@ -38,6 +53,13 @@ export function Convert3doDrawer({
   /** How many `.3do` files the archive listing found, so the drawer can say
    * what it is about to do before it starts. */
   models: number;
+  /**
+   * The game's on-disk `.sdd` folder, so the report can offer to install the
+   * conversion into it (issue #2622). `null` for a packed `.sdz`/`.sd7`: a
+   * packed archive is one file, and there is no sound way to rewrite one of
+   * those in place, so installing is refused rather than offered.
+   */
+  gameDir?: string | null;
 }) {
   const [outDir, setOutDir] = useState<string | null>(null);
   const [progress, setProgress] = useState<Convert3doProgress | null>(null);
@@ -161,7 +183,16 @@ export function Convert3doDrawer({
         </p>
       )}
 
-      {result && <Report result={result} onOpen={setOutDir} />}
+      {result && (
+        <Report
+          result={result}
+          onOpen={setOutDir}
+          gameDir={gameDir}
+          enginePath={enginePath}
+          dataDir={dataDir}
+          archive={archive}
+        />
+      )}
     </div>
   );
 }
@@ -170,9 +201,17 @@ export function Convert3doDrawer({
 function Report({
   result,
   onOpen,
+  gameDir,
+  enginePath,
+  dataDir,
+  archive,
 }: {
   result: Convert3doResult;
   onOpen: (dir: string) => void;
+  gameDir: string | null;
+  enginePath: string;
+  dataDir: string;
+  archive: string;
 }) {
   const unreadable = Object.entries(result.unreadable);
   return (
@@ -205,11 +244,21 @@ function Report({
       </p>
 
       <p className="text-xs text-muted-foreground">
-        Copy the output over the game to use it, and remove the original{" "}
-        <code>.3do</code> files. The engine tries <code>.3do</code> before{" "}
-        <code>.s3o</code> for a unit whose <code>objectname</code> has no
-        extension, so it keeps loading the old models while both are there.
+        Copying the output over the game is not enough on its own: the engine
+        tries <code>.3do</code> before <code>.s3o</code> for a unit whose{" "}
+        <code>objectname</code> has no extension, so it keeps loading the old
+        models while both are there. The original <code>.3do</code> files have
+        to go, and any unit definition that spells <code>.3do</code> in its{" "}
+        <code>objectname</code> has to lose it too.
       </p>
+
+      <InstallPanel
+        gameDir={gameDir}
+        outDir={result.outDir}
+        enginePath={enginePath}
+        dataDir={dataDir}
+        archive={archive}
+      />
 
       {result.errors.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs text-destructive">
@@ -232,6 +281,211 @@ function Report({
       {result.groups.map((group) => (
         <GroupReport key={group.folder} group={group} />
       ))}
+    </div>
+  );
+}
+
+/**
+ * Install a conversion's output into the game it came from (issue #2622), or
+ * say why not.
+ *
+ * `gameDir` is `null` for a packed `.sdz`/`.sd7`: a packed archive is one
+ * file, and there is no sound way to rewrite one of those in place, so
+ * installing is refused here rather than half-done. The Rust side refuses
+ * the same thing independently, this is only the reason shown before the
+ * button is ever pressed.
+ *
+ * Checks {@link content3doInstallStatus} on mount so "Undo" is offered even in
+ * a freshly opened drawer that never ran the install itself this session: the
+ * backups an install writes outlive the component.
+ */
+function InstallPanel({
+  gameDir,
+  outDir,
+  enginePath,
+  dataDir,
+  archive,
+}: {
+  gameDir: string | null;
+  outDir: string;
+  enginePath: string;
+  dataDir: string;
+  archive: string;
+}) {
+  const [backups, setBackups] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [outcome, setOutcome] = useState<Install3doOutcome | null>(null);
+  const [restored, setRestored] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!gameDir) return;
+    content3doInstallStatus({ gameDir })
+      .then((res) => setBackups(res.backups))
+      .catch(() => {});
+  }, [gameDir]);
+
+  const refreshTree = () => invalidateArchiveTree(enginePath, dataDir, archive);
+
+  const install = async () => {
+    if (!gameDir) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await contentInstall3doConversion({ gameDir, outDir });
+      setOutcome(res);
+      setRestored(null);
+      setConfirmOpen(false);
+      refreshTree();
+      const status = await content3doInstallStatus({ gameDir }).catch(
+        () => null,
+      );
+      if (status) setBackups(status.backups);
+      void notify({
+        title: `Installed the conversion into ${archive}.`,
+        level: "success",
+      });
+    } catch (e) {
+      setError(msg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const undo = async () => {
+    if (!gameDir) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await contentUndo3doInstall({ gameDir });
+      setRestored(res.restored.length);
+      setOutcome(null);
+      setBackups(0);
+      refreshTree();
+      void notify({
+        title: `Restored ${archive}'s original models and unit definitions.`,
+        level: "success",
+      });
+    } catch (e) {
+      setError(msg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!gameDir) {
+    return (
+      <p className="rounded-md border border-border/50 bg-muted/40 p-2 text-xs text-muted-foreground">
+        {archive} is a packed archive, so coilbox cannot install into it
+        directly. Copy the output folder over the game yourself, remove the
+        original <code>.3do</code> files, and fix any unit definition that
+        spells <code>.3do</code> in its <code>objectname</code>. Or extract the
+        game to a <code>.sdd</code> copy first and run this again from there.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border/50 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Install writes the converted files into {archive}, moves each original{" "}
+          <code>.3do</code> aside rather than deleting it, and fixes any unit
+          definition that names one. Reversible with Undo, for as long as the
+          moved-aside originals are still there.
+        </p>
+        <div className="flex shrink-0 gap-2">
+          {!!backups && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={busy}
+              onClick={undo}
+            >
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Undo2 className="size-4" />
+              )}
+              Undo
+            </Button>
+          )}
+          <Popover open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5"
+                disabled={busy}
+              >
+                {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                Install into game
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="flex w-80 flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-medium">
+                  Install this conversion?
+                </h3>
+                <p className="break-words text-xs text-muted-foreground">
+                  This copies the converted models and textures into {archive},
+                  and moves every original <code>.3do</code> they replace aside
+                  so the conversion actually takes effect. It does not delete
+                  anything, and Undo puts it all back.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmOpen(false)}
+                  disabled={busy}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={install}
+                  disabled={busy}
+                >
+                  Install
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {outcome && (
+        <p className="text-xs text-muted-foreground">
+          Moved {outcome.originalsMovedAside.length} original{" "}
+          {outcome.originalsMovedAside.length === 1 ? "model" : "models"} aside
+          {outcome.unitDefsPatched.length > 0
+            ? ` and fixed ${outcome.unitDefsPatched.length} unit ${outcome.unitDefsPatched.length === 1 ? "definition" : "definitions"} that named a .3do extension`
+            : ""}
+          .
+          {outcome.alreadyInstalled.length > 0
+            ? ` ${outcome.alreadyInstalled.length} ${outcome.alreadyInstalled.length === 1 ? "model was" : "models were"} already installed.`
+            : ""}
+          {outcome.missingOriginal.length > 0
+            ? ` ${outcome.missingOriginal.length} converted ${outcome.missingOriginal.length === 1 ? "model has" : "models have"} no original .3do to replace: ${outcome.missingOriginal.join(", ")}.`
+            : ""}
+        </p>
+      )}
+
+      {restored !== null && (
+        <p className="text-xs text-muted-foreground">
+          Restored {restored} {restored === 1 ? "file" : "files"} to how they
+          were before the install.
+        </p>
+      )}
     </div>
   );
 }

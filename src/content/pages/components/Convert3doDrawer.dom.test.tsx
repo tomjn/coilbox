@@ -18,6 +18,9 @@ import type { Convert3doResult } from "../../bindings";
 
 const convert = vi.fn();
 const openDialog = vi.fn();
+const install = vi.fn();
+const undoInstall = vi.fn();
+const installStatus = vi.fn();
 
 // A real `Channel` registers a callback with the Tauri IPC bridge, which is not
 // here. The drawer only ever assigns `onmessage`, so a plain object is enough.
@@ -31,6 +34,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: (...args: unknown[]) => openDialog(...args),
 }));
 
+vi.mock("@/notify/notify", () => ({ notify: async () => {} }));
+
 vi.mock("../../bindings", async () => {
   const actual =
     await vi.importActual<Record<string, unknown>>("../../bindings");
@@ -39,6 +44,9 @@ vi.mock("../../bindings", async () => {
     contentOpenPath: vi.fn(async () => ({})),
     unitsyncCancel: vi.fn(async () => ({})),
     unitsyncConvert3do: (args: unknown) => convert(args),
+    contentInstall3doConversion: (args: unknown) => install(args),
+    contentUndo3doInstall: (args: unknown) => undoInstall(args),
+    content3doInstallStatus: (args: unknown) => installStatus(args),
   };
 });
 
@@ -75,21 +83,23 @@ const RESULT: Convert3doResult = {
   ],
 };
 
-function drawer() {
+function drawer(gameDir: string | null = null) {
   return render(
     <Convert3doDrawer
       enginePath="/engines/105"
       dataDir="/data"
       archive="ba.sdz"
       models={6}
+      gameDir={gameDir}
     />,
   );
 }
 
-async function runIt() {
+async function runIt(gameDir: string | null = null, installBackups = 0) {
   openDialog.mockResolvedValue("/out");
   convert.mockResolvedValue(RESULT);
-  drawer();
+  installStatus.mockResolvedValue({ backups: installBackups });
+  drawer(gameDir);
   fireEvent.click(screen.getByRole("button", { name: /choose folder/i }));
   await waitFor(() => screen.getByText("/out"));
   fireEvent.click(screen.getByRole("button", { name: /convert models/i }));
@@ -176,8 +186,75 @@ describe("Convert3doDrawer", () => {
   it("says the original .3do files have to go", async () => {
     await runIt();
 
-    expect(screen.getByText(/remove the original/i).textContent).toMatch(
-      /tries .3do before .s3o/,
+    expect(
+      screen.getByText(/copying the output over the game/i).textContent,
+    ).toMatch(/tries .3do before .s3o/);
+  });
+
+  /// A packed archive is one file: coilbox cannot install into it directly,
+  /// and the drawer refuses explicitly rather than offering a button that
+  /// could only fail (issue #2622 point 3).
+  it("refuses to install into a packed archive", async () => {
+    await runIt();
+
+    expect(screen.getByText(/ba.sdz is a packed archive/i).textContent).toMatch(
+      /cannot install into it directly/i,
     );
+    expect(
+      screen.queryByRole("button", { name: /install into game/i }),
+    ).toBeNull();
+  });
+
+  /// A `.sdd` game offers install, confirmed rather than run straight away
+  /// since it rewrites the player's own game files (issue #2622).
+  it("installs into a .sdd game after confirming, and reports what moved", async () => {
+    install.mockResolvedValue({
+      filesCopied: 3,
+      originalsMovedAside: ["objects3d/armcom.3do", "objects3d/armdrag.3do"],
+      alreadyInstalled: [],
+      missingOriginal: [],
+      unitDefsPatched: ["units/armdrag.lua"],
+    });
+    await runIt("/games/ba.sdd");
+
+    expect(
+      screen.queryByRole("button", { name: /install into game/i }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /install into game/i }));
+    // The confirm popover, not the install call itself, until it is answered.
+    expect(install).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /^install$/i }));
+
+    await waitFor(() => expect(install).toHaveBeenCalled());
+    expect(install.mock.calls[0][0]).toEqual({
+      gameDir: "/games/ba.sdd",
+      outDir: "/out",
+    });
+    await waitFor(() => screen.getByText(/moved 2 original models aside/i));
+    expect(
+      screen.getByText(/fixed 1 unit definition that named a \.3do/i),
+    ).toBeTruthy();
+  });
+
+  /// Undo is offered from backups a previous session left, not only right
+  /// after an install this session ran.
+  it("offers undo when a game already carries backups from an earlier install", async () => {
+    await runIt("/games/ba.sdd", 3);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /undo/i })).toBeTruthy(),
+    );
+
+    undoInstall.mockResolvedValue({
+      restored: ["objects3d/armcom.3do", "units/armdrag.lua"],
+    });
+    fireEvent.click(screen.getByRole("button", { name: /undo/i }));
+
+    await waitFor(() =>
+      expect(undoInstall).toHaveBeenCalledWith({
+        gameDir: "/games/ba.sdd",
+      }),
+    );
+    await waitFor(() => screen.getByText(/restored 2 files/i));
   });
 });

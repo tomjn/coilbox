@@ -174,6 +174,7 @@ export default function ArchiveDetailPage() {
                         dataDir={selected.rootPath}
                         archive={archive.name}
                         models={legacyModels}
+                        gameDir={isSdd(archive) ? onDiskPath : null}
                       />
                     ),
                   })
