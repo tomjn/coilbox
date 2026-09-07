@@ -39,6 +39,7 @@ mod skirmishai;
 mod smf;
 mod texture;
 mod typemap;
+mod unitdefs;
 mod unitmodel;
 mod unitmodels;
 mod unitrender;
@@ -152,6 +153,11 @@ struct Args {
     /// fields live once in `coilbox_unitsync_worker::UnitDatasetArgs`, shared
     /// with the sidecar plugin that builds this flag's argv (issue #2448).
     unit_dataset: Option<Mode>,
+    /// `--unit-defs`: read every key a game declares for every unit, for the
+    /// unit editor. Its fields live once in
+    /// `coilbox_unitsync_worker::UnitDefsArgs`, shared with the sidecar plugin
+    /// that builds this flag's argv (issue #2448).
+    unit_defs: Option<Mode>,
     /// `--unit-model`: read one unit's model out of a game, named by the
     /// unitdef `objectname`. Its fields live once in
     /// `coilbox_unitsync_worker::UnitModelArgs`, shared with the sidecar
@@ -421,6 +427,18 @@ fn run() -> i32 {
             || dataset::render(&args.lib, &mode.game, cache_dir),
             print_ok,
             || dataset::emit_error("worker panicked while reading unit dataset".into()),
+        );
+    }
+
+    // Unit defs: read every key one game declares for every unit, in one Init,
+    // disk-cached on the game's sync checksum. Checked before the --game
+    // game-detail mode because it also keys off --game.
+    if let Some(Mode::UnitDefs(mode)) = &args.unit_defs {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return run_mode(
+            || unitdefs::render(&args.lib, &mode.game, cache_dir),
+            print_ok,
+            || unitdefs::emit_error("worker panicked while reading unit defs".into()),
         );
     }
 
@@ -896,6 +914,10 @@ fn parse_args() -> Result<Args, String> {
     // collected into locals here for its own use: `Mode::UnitDataset`'s
     // `from_args` below re-scans `raw` for those (issue #2448).
     let mut unit_dataset_flag = false;
+    // `--unit-defs`' own fields (game, cache directory) are not collected into
+    // locals here for its own use: `Mode::UnitDefs`'s `from_args` below
+    // re-scans `raw` for those (issue #2448).
+    let mut unit_defs_flag = false;
     // `--unit-model`'s own fields (game, object, cache directory) are not
     // collected into locals here for its own use: `Mode::UnitModel`'s
     // `from_args` below re-scans `raw` for those (issue #2448).
@@ -994,6 +1016,7 @@ fn parse_args() -> Result<Args, String> {
             "--game-headers" => game_headers_flag = true,
             "--unit-buildpics" => unit_buildpics_flag = true,
             "--unit-dataset" => unit_dataset_flag = true,
+            "--unit-defs" => unit_defs_flag = true,
             "--unit-model" => unit_model_flag = true,
             "--unit-script" => unit_script_flag = true,
             "--unit-models" => unit_models_flag = true,
@@ -1174,6 +1197,13 @@ fn parse_args() -> Result<Args, String> {
         unit_dataset: if unit_dataset_flag {
             Some(Mode::UnitDataset(
                 coilbox_unitsync_worker::UnitDatasetArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        unit_defs: if unit_defs_flag {
+            Some(Mode::UnitDefs(
+                coilbox_unitsync_worker::UnitDefsArgs::from_args(&raw)?,
             ))
         } else {
             None
@@ -1428,6 +1458,16 @@ fn absolutize(args: &mut Args) {
     // separately from `raw` in `parse_args`, so it needs the same treatment.
     // `--game` is a unitsync name, not a path, so it is left alone.
     if let Some(Mode::UnitDataset(mode)) = args.unit_dataset.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::UnitDefs` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment. `--game` is a
+    // unitsync name, not a path, so it is left alone.
+    if let Some(Mode::UnitDefs(mode)) = args.unit_defs.as_mut() {
         if let Some(dir) = &mut mode.cache_dir {
             if let Some(abs) = absolute_path(dir) {
                 *dir = abs;
@@ -1885,6 +1925,7 @@ mod tests {
             game_headers: None,
             unit_buildpics: None,
             unit_dataset: None,
+            unit_defs: None,
             unit_model: None,
             unit_models: None,
             convert_3do: None,

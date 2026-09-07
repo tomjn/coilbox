@@ -505,20 +505,7 @@ pub(crate) fn resolve(
         let _ = us.drain_errors();
     }
 
-    // Prefer the full primary-mod sync checksum (archive + all dependencies) —
-    // the value joiners verify against — over the single-archive
-    // `GetArchiveChecksum`, which many engine builds leave 0 for a game's primary
-    // archive. Look the mod up by index (games are "primary mods" in unitsync),
-    // falling back to the single-archive checksum on builds that lack
-    // `GetPrimaryModChecksum`. (Copied from `game::render` so cache-gating matches.)
-    let mod_index =
-        (0..us.mod_count()).find(|&i| us.mod_archive(i).as_deref() == Some(game_archive));
-    let checksum = mod_index
-        .and_then(|i| us.mod_checksum(i))
-        .or_else(|| us.archive_checksum(game_archive))
-        // A zero CRC means "unknown", so omit it rather than show a misleading 0.
-        .filter(|&c| c != 0)
-        .map(|c| format!("{c:08x}"));
+    let checksum = primary_mod_checksum(us, game_archive);
 
     errors.extend(us.drain_errors());
     us.remove_all_archives();
@@ -534,6 +521,29 @@ pub(crate) fn resolve(
         }
     }
     out
+}
+
+/// A game's sync checksum as a hex string, or `None` when this engine build
+/// will not say.
+///
+/// Prefer the full primary-mod checksum (archive + all dependencies), the value
+/// joiners verify against, over the single-archive `GetArchiveChecksum`, which
+/// many engine builds leave 0 for a game's primary archive. Games are "primary
+/// mods" in unitsync, so the mod is looked up by index first, falling back to
+/// the single-archive checksum on builds that lack `GetPrimaryModChecksum`.
+///
+/// Reads out of the archive scanner's own cache, which `Init` populates, so it
+/// costs no archive read and can be called before the archive set is mounted.
+/// `unitdefs::resolve` relies on that to key its cache on the checksum.
+pub(crate) fn primary_mod_checksum(us: &Unitsync, game_archive: &str) -> Option<String> {
+    let mod_index =
+        (0..us.mod_count()).find(|&i| us.mod_archive(i).as_deref() == Some(game_archive));
+    mod_index
+        .and_then(|i| us.mod_checksum(i))
+        .or_else(|| us.archive_checksum(game_archive))
+        // A zero CRC means "unknown", so omit it rather than show a misleading 0.
+        .filter(|&c| c != 0)
+        .map(|c| format!("{c:08x}"))
 }
 
 /// Whether a read is an answer, and so worth remembering.

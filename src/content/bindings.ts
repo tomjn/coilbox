@@ -1333,6 +1333,61 @@ export const unitsyncUnitDataset = defineCommand<
   UnitDatasetResult
 >("coilbox-unitsync", "unitsync_unit_dataset");
 
+/**
+ * Every key a game declares for every unit, read out of the game's own def
+ * pipeline (issue #1269).
+ *
+ * {@link UnitDatasetResult} is the curated read: the fields a tech tree and an
+ * encyclopedia page were built around. This is the whole table and is typed
+ * nowhere, because a unit editor has to offer the keys nobody curated and a
+ * game's `customparams` mean whatever that game's own Lua says they mean.
+ *
+ * Everything here is what the game says. A tweak a player makes is a separate,
+ * sparse set of overrides held against these values, so nothing user-supplied
+ * ever belongs in this object.
+ */
+export interface UnitDefsResult {
+  /**
+   * Every unit, keyed by its lowercased def key, which is the key
+   * {@link UnitDatasetEntry.name} carries so the two join.
+   *
+   * Each value is the unitdef table as the game left it, including its
+   * `customparams`, its `buildoptions`, and the `weapondefs` a game that
+   * declares its weapons inside the unit puts there. A Lua table whose keys are
+   * exactly 1..n arrives as an array and every other table as an object. A
+   * value the worker could not represent arrives as null, which says the game
+   * declared the key and it could not be read. An absent key says the game
+   * declared nothing, and the two must not be conflated.
+   */
+  units: Record<string, Record<string, unknown>>;
+  /**
+   * The game's shared weapondef table, keyed by lowercased weapondef name. A
+   * unitdef's `weapons` list names entries here, and a game that hoists its
+   * weapons out of the unit keeps them nowhere else.
+   */
+  weaponDefs: Record<string, Record<string, unknown>>;
+  /**
+   * The units the game's own def loader could not read, in its own words. The
+   * loader runs each unit file separately and logs the ones that raise, so a
+   * broken unit costs that unit and not the scan. Without this the unit would
+   * simply be absent, with nothing to say whether the game ships it.
+   */
+  unitErrors: string[];
+  checksum?: string;
+  errors: string[];
+}
+
+/**
+ * Load every key a game declares for every unit. Lazy, since it mounts the
+ * game's archive set, and megabytes of JSON on a full game, so a caller wanting
+ * only names and build options should use {@link unitsyncUnitDataset} instead.
+ * `gameArchive` is the primary archive name.
+ */
+export const unitsyncUnitDefs = defineCommand<
+  { enginePath: string; dataDir: string; gameArchive: string },
+  UnitDefsResult
+>("coilbox-unitsync", "unitsync_unit_defs");
+
 /** One drawable batch inside a piece: an indexed triangle list whose corners all
  *  sample the same texture. */
 export interface UnitModelGroup {

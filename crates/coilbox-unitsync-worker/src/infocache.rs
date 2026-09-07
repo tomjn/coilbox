@@ -60,6 +60,28 @@ pub fn dataset_key(us: &Unitsync, game_archive: &str) -> Option<String> {
     identity(&Path::new(&dir).join(game_archive), "unitdataset")
 }
 
+/// Cache identity for a game's full unit definitions: the game's sync checksum,
+/// in the `unitdefs` namespace (issue #1269).
+///
+/// The one key here that is not file identity, and deliberately so. A full def
+/// read walks the game's whole dependency chain, so a changed dependency
+/// changes the answer while the primary archive's size and mtime sit still, and
+/// file identity would keep handing back the old defs for ever. The sync
+/// checksum is the value the engine already computes over the archive plus
+/// every dependency, so it is the identity this dataset actually has.
+///
+/// The caller has no key at all when the checksum is unknown, which is the
+/// right outcome: nothing is remembered rather than something remembered under
+/// an identity that cannot change.
+pub fn unitdefs_key(game_archive: &str, checksum: &str) -> String {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    INFO_CACHE_VERSION.hash(&mut h);
+    "unitdefs".hash(&mut h);
+    game_archive.hash(&mut h);
+    checksum.hash(&mut h);
+    format!("u{:016x}", h.finish())
+}
+
 /// Cache identity for a map's info blob: its own archive's path + size + mtime,
 /// falling back to the map's versioned name when that path won't resolve.
 ///
@@ -207,6 +229,19 @@ mod tests {
         assert_ne!(game, dataset);
         assert_ne!(map, dataset);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_new_game_checksum_is_a_new_unitdefs_key() {
+        let before = unitdefs_key("BAR.sdd", "deadbeef");
+        let after = unitdefs_key("BAR.sdd", "cafef00d");
+        assert_ne!(before, after, "a game update has to miss the cache");
+        assert_eq!(before, unitdefs_key("BAR.sdd", "deadbeef"));
+        assert_ne!(
+            before,
+            unitdefs_key("XTA.sdz", "deadbeef"),
+            "two games that hash the same must not share an entry"
+        );
     }
 
     #[test]
