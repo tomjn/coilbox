@@ -1,12 +1,14 @@
-import { Button } from "@picoframe/frame";
+import { Button, Drawer } from "@picoframe/frame";
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   ChevronRight,
   Inbox,
+  Loader2,
   TriangleAlert,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -26,6 +28,19 @@ export function ErrorBanner({ message }: { message: string }) {
   );
 }
 
+/** What unitsync said, one line each, wherever the lines are being shown. */
+function DiagnosticsLines({ errors }: { errors: string[] }) {
+  return (
+    <ul className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
+      {errors.map((e) => (
+        <li key={e} className="break-words">
+          {e}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Collapsible list of non-fatal unitsync diagnostics from a scan. */
 export function Diagnostics({ errors }: { errors: string[] }) {
   return (
@@ -35,16 +50,90 @@ export function Diagnostics({ errors }: { errors: string[] }) {
         unitsync reported {errors.length} diagnostic
         {errors.length === 1 ? "" : "s"}
       </CollapsibleTrigger>
-      <CollapsibleContent>
-        <ul className="mt-2 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
-          {errors.map((e) => (
-            <li key={e} className="break-words">
-              {e}
-            </li>
-          ))}
-        </ul>
+      <CollapsibleContent className="mt-2">
+        <DiagnosticsLines errors={errors} />
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/**
+ * The same diagnostics as a button that opens a drawer, for a page that cannot
+ * spare a strip of its bottom edge (issue #2667). The panel above is right where
+ * the content flows and the reader scrolls past it. It is wrong on a page that
+ * claims the window height and scrolls its panes internally, because there the
+ * panel never leaves and collapsing it gives no height back.
+ *
+ * The scenario editor's problems button is the model, down to being present in
+ * all three states the read can be in: a button that only appears when something
+ * is wrong looks exactly like one for a game nobody has read yet (issue #2272).
+ *
+ * Two colours rather than the editor's three. The editor turns destructive when
+ * a problem stops the mission launching, and unitsync carries no such split: a
+ * diagnostic is a line of text, with nothing in it to say whether the thing it
+ * names still worked. So this is amber whenever there is anything to read and
+ * muted otherwise, rather than sorting the lines by a severity they do not have.
+ */
+export function DiagnosticsButton({
+  errors,
+  checking,
+  title,
+  description,
+}: {
+  errors: string[];
+  /** The read is still going, so the count is not known yet. */
+  checking: boolean;
+  title: string;
+  description: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const count = errors.length;
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={checking}
+        className={
+          count > 0
+            ? "text-amber-700 dark:text-amber-400"
+            : "text-muted-foreground"
+        }
+        onClick={() => setOpen(true)}
+      >
+        {checking ? (
+          <Loader2 className="size-4 motion-safe:animate-spin" />
+        ) : count > 0 ? (
+          <TriangleAlert className="size-4" />
+        ) : (
+          <Check className="size-4" />
+        )}
+        {checking
+          ? "Checking…"
+          : count > 0
+            ? `${count} diagnostic${count === 1 ? "" : "s"}`
+            : "No problems"}
+      </Button>
+      {/* Controlled, for the reason the scenario editor's is: the frame's own
+        drawer snapshots its content when it opens. These lines are fixed once
+        the read lands, but a retry or a change of game replaces them, and this
+        drawer stays open across both. */}
+      <Drawer
+        open={open}
+        onOpenChange={setOpen}
+        title={title}
+        description={description}
+        width="32rem"
+      >
+        {count > 0 ? (
+          <DiagnosticsLines errors={errors} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            unitsync read everything it was asked for without complaining.
+          </p>
+        )}
+      </Drawer>
+    </>
   );
 }
 
