@@ -441,10 +441,13 @@ export default function UnitPage() {
                     </span>
                   )}
                   {unitDisabled && (
-                    <span className="text-xs text-muted-foreground">
-                      Disabled: it comes off every build menu in the game when
-                      this is compiled. The definition is kept, so switching it
-                      back on puts it back exactly where it was.
+                    // Capped, or the sentence sets the width of the column it
+                    // is in and pushes the controls beside it onto their own
+                    // row for as long as the unit is switched off.
+                    <span className="max-w-prose text-xs text-muted-foreground">
+                      Disabled: it comes off every build menu when this is
+                      compiled. The definition is kept, so switching it back on
+                      restores it.
                     </span>
                   )}
                 </div>

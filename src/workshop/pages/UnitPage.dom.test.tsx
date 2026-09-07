@@ -1037,7 +1037,7 @@ describe("UnitPage", () => {
 
       expect(screen.getByText("1 unit disabled")).toBeTruthy();
       expect(
-        screen.getByText(/comes off every build menu in the game/),
+        screen.getByText(/comes off every build menu when this is compiled/),
       ).toBeTruthy();
     });
 
@@ -1048,7 +1048,7 @@ describe("UnitPage", () => {
       fireEvent.click(toggle());
       expect(screen.queryByText(/unit disabled/)).toBeNull();
       expect(
-        screen.queryByText(/comes off every build menu in the game/),
+        screen.queryByText(/comes off every build menu when this is compiled/),
       ).toBeNull();
     });
 
