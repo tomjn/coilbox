@@ -20,6 +20,7 @@ import { gunzipSync } from "fflate";
 import * as THREE from "three";
 
 import { legoGeometryUrl } from "../lib/assetUrl";
+import { computeSmoothedNormals, fixUv, hasMeshFix } from "./meshFix";
 import type { LegoPiece } from "./model";
 
 const BLOB_MAGIC = "CBLEGO\0\0";
@@ -188,12 +189,126 @@ export function getMeshGeometry(
   return geometry;
 }
 
+/**
+ * Geometry with a piece's own UV and normal fixes from `meshFix.ts` baked in.
+ *
+ * Keyed by piece id rather than mesh id: two pieces can name the same mesh (a
+ * duplicate keeps the original's `meshId`), and each carries its own fixes, so
+ * mutating the mesh's shared, interleaved buffer would leak a fix from one
+ * piece onto every other piece pointing at it. A piece with no fix at all
+ * skips this and shares `getMeshGeometry`'s own cache, same as before this
+ * existed.
+ *
+ * Cached against the piece's fix fields, so dragging a slider elsewhere in
+ * the builder does not recompute a mesh's normals on every sync.
+ */
+const fixedGeometryCache = new WeakMap<
+  RawGeometry,
+  Map<string, { sig: string; geometry: THREE.BufferGeometry }>
+>();
+
+/** A cache key for a piece's own fix fields, so a change to any of them
+ *  invalidates the cached geometry built from the one before it. */
+function fixSignature(piece: LegoPiece): string {
+  return `${piece.uvFlip ?? false}|${piece.uvMirror ?? false}|${piece.normalsAngle ?? ""}`;
+}
+
+/** The geometry a piece draws, after whichever of its own fixes apply. Null
+ *  for a piece with no mesh or one the sidecar does not hold. */
+export function getFixedPieceGeometry(
+  raw: RawGeometry,
+  piece: LegoPiece,
+): THREE.BufferGeometry | null {
+  if (!piece.meshId) return null;
+  if (!hasMeshFix(piece)) return getMeshGeometry(raw, piece.meshId);
+
+  const mesh = raw.byId.get(piece.meshId);
+  if (!mesh) return null;
+
+  const sig = fixSignature(piece);
+  let cache = fixedGeometryCache.get(raw);
+  if (!cache) {
+    cache = new Map();
+    fixedGeometryCache.set(raw, cache);
+  }
+  const cached = cache.get(piece.id);
+  if (cached && cached.sig === sig) return cached.geometry;
+  cached?.geometry.dispose();
+
+  // Standalone attributes, local to this piece alone, rather than a slice of
+  // the shared interleaved buffer: the whole point of keying this on the
+  // piece is that its fix must never touch what another piece reads.
+  const position = new Float32Array(mesh.vCount * 3);
+  const uv = new Float32Array(mesh.vCount * 2);
+  for (let i = 0; i < mesh.vCount; i++) {
+    const at = (mesh.vFirst + i) * FLOATS_PER_VERTEX;
+    position[i * 3] = raw.vertices[at];
+    position[i * 3 + 1] = raw.vertices[at + 1];
+    position[i * 3 + 2] = raw.vertices[at + 2];
+    const [u, v] = fixUv(raw.vertices[at + 6], raw.vertices[at + 7], piece);
+    uv[i * 2] = u;
+    uv[i * 2 + 1] = v;
+  }
+
+  let normal: Float32Array;
+  if (piece.normalsAngle !== undefined) {
+    normal = computeSmoothedNormals(
+      raw.vertices,
+      raw.indices,
+      mesh.vFirst,
+      mesh.vCount,
+      mesh.iFirst,
+      mesh.iCount,
+      piece.normalsAngle,
+    );
+  } else {
+    normal = new Float32Array(mesh.vCount * 3);
+    for (let i = 0; i < mesh.vCount; i++) {
+      const at = (mesh.vFirst + i) * FLOATS_PER_VERTEX;
+      normal[i * 3] = raw.vertices[at + 3];
+      normal[i * 3 + 1] = raw.vertices[at + 4];
+      normal[i * 3 + 2] = raw.vertices[at + 5];
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(position, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+
+  // Local to this standalone buffer, unlike `getMeshGeometry`'s, which adds
+  // `vFirst` to address the shared one: these indices are already the raw
+  // mesh's own local numbering (see `computeSmoothedNormals`'s own note on
+  // the same point), and this buffer holds nothing but this mesh's vertices.
+  const indices = new Uint32Array(mesh.iCount);
+  for (let i = 0; i < mesh.iCount; i++) {
+    indices[i] = raw.indices[mesh.iFirst + i];
+  }
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+
+  geometry.boundingBox = new THREE.Box3(
+    new THREE.Vector3(...mesh.bbox.min),
+    new THREE.Vector3(...mesh.bbox.max),
+  );
+  geometry.boundingSphere = new THREE.Sphere();
+  geometry.boundingBox.getBoundingSphere(geometry.boundingSphere);
+
+  cache.set(piece.id, { sig, geometry });
+  return geometry;
+}
+
 /** Free every geometry built from an imported unit. Call on teardown. */
 export function disposeRawGeometry(raw: RawGeometry): void {
   const cache = geometryCache.get(raw);
-  if (!cache) return;
-  for (const geometry of cache.values()) geometry.dispose();
-  cache.clear();
+  if (cache) {
+    for (const geometry of cache.values()) geometry.dispose();
+    cache.clear();
+  }
+  const fixedCache = fixedGeometryCache.get(raw);
+  if (fixedCache) {
+    for (const entry of fixedCache.values()) entry.geometry.dispose();
+    fixedCache.clear();
+  }
 }
 
 /**

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { LegoPiece } from "./model";
 import {
+  getFixedPieceGeometry,
+  getMeshGeometry,
   parseRawGeometry,
   pieceMesh,
   type RawMesh,
@@ -122,6 +124,50 @@ describe("pieceMesh", () => {
     expect(pieceMesh(raw, piece({}))).toBeNull();
     expect(pieceMesh(null, piece({ meshId: "m1" }))).toBeNull();
     expect(pieceMesh(raw, piece({ meshId: "m9" }))).toBeNull();
+  });
+});
+
+describe("getFixedPieceGeometry", () => {
+  const raw = parseRawGeometry(blob([MESH], VERTICES, [0, 1, 0]));
+
+  it("is the same shared geometry getMeshGeometry gives out, for a piece with no fix", () => {
+    const shared = getMeshGeometry(raw, "m1");
+    expect(getFixedPieceGeometry(raw, piece({ meshId: "m1" }))).toBe(shared);
+  });
+
+  it("is null for a piece with no mesh", () => {
+    expect(getFixedPieceGeometry(raw, piece({ uvFlip: true }))).toBeNull();
+  });
+
+  it("flips v without touching the shared geometry's own uv", () => {
+    const shared = getMeshGeometry(raw, "m1");
+    const fixed = getFixedPieceGeometry(
+      raw,
+      piece({ meshId: "m1", uvFlip: true }),
+    );
+
+    expect(fixed).not.toBeNull();
+    expect(fixed?.getAttribute("uv").getY(0)).toBeCloseTo(1 - 0.5, 5);
+    // The shared buffer is exactly what the blob wrote, untouched.
+    expect(shared?.getAttribute("uv").getY(0)).toBeCloseTo(0.5, 5);
+  });
+
+  it("reuses the cached geometry until the fix itself changes", () => {
+    const first = getFixedPieceGeometry(
+      raw,
+      piece({ meshId: "m1", uvFlip: true }),
+    );
+    const same = getFixedPieceGeometry(
+      raw,
+      piece({ meshId: "m1", uvFlip: true }),
+    );
+    const changed = getFixedPieceGeometry(
+      raw,
+      piece({ meshId: "m1", uvFlip: true, uvMirror: true }),
+    );
+
+    expect(same).toBe(first);
+    expect(changed).not.toBe(first);
   });
 });
 

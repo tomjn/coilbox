@@ -15,7 +15,7 @@ import type { PieceTransform } from "../../groupTransform";
 import type { LegoCollisionVolume, LegoPiece, LegoProject } from "../../model";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
-import { getMeshGeometry, type RawGeometry } from "../../rawGeometry";
+import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
 import type { Vec3 } from "../../snapping";
 import type { CollisionFaceDrag } from "./collisionHandles";
 
@@ -260,7 +260,7 @@ function pieceGeometry(
   raw: RawGeometry | null,
   piece: LegoPiece,
 ): THREE.BufferGeometry | null {
-  if (raw && piece.meshId) return getMeshGeometry(raw, piece.meshId);
+  if (raw && piece.meshId) return getFixedPieceGeometry(raw, piece);
   return piece.partId ? getPartGeometry(pack, piece.partId) : null;
 }
 
