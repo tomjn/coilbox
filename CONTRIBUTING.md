@@ -67,7 +67,7 @@ Two gotchas when adding Rust plugin commands:
 Prefer picoframe's components over native elements or hand-rolled ones:
 
 - Import `Button`, `Input`, and `cn` directly from `@picoframe/frame`.
-- Everything else (`select`, `checkbox`, `textarea`, `switch`, `dialog`, `tooltip`, …) comes from the `@picoframe` shadcn registry: `npx shadcn@latest add @picoframe/<name>` copies the source component into `src/components/ui/`.
+- Everything else (`select`, `checkbox`, `textarea`, `switch`, `dialog`, `tooltip`, …) comes from the `@picoframe` shadcn registry: `bunx shadcn@latest add @picoframe/<name>` copies the source component into `src/components/ui/`.
 
 Don't reach for native `<select>` / `<input type=checkbox>` / `<textarea>`.
 
