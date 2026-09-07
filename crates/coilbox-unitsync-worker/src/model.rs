@@ -631,7 +631,7 @@ pub struct UnitDatasetEntry {
     pub mobile: bool,
     /// The unitdef's `objectname`: the model file the engine draws this unit
     /// with, resolved against `objects3d/`. Often carries no extension, in which
-    /// case the engine tries `.s3o` then `.3do`. Absent for a unit that names no
+    /// case the engine tries `.3do` then `.s3o`. Absent for a unit that names no
     /// model at all.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object_name: Option<String>,

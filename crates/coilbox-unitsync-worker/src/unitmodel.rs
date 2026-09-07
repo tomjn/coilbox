@@ -636,8 +636,10 @@ fn do3_piece(
 ///
 /// The field is written however the game's author felt like: `"ARMCOM"`,
 /// `"arm_commander.s3o"`, or a path with a subfolder and Windows separators. A
-/// name with no extension means the engine tries `.s3o` first and `.3do` after,
-/// which is the order tried here.
+/// name with no extension means the engine tries `.3do` first and `.s3o` after:
+/// `CModelLoader::FindModelPath` in `rts/Rendering/Models/IModelParser.cpp`
+/// walks `parsers` in registration order, and `RegisterModelFormats` registers
+/// `3do` before `s3o`. That is the order tried here.
 ///
 /// A caller that already holds a member path, the archive browser previewing the
 /// file somebody clicked (issue #698), gets that member and not a namesake: a
@@ -657,7 +659,7 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     let candidates: Vec<String> = if want.ends_with(".s3o") || want.ends_with(".3do") {
         vec![want]
     } else {
-        vec![format!("{want}.s3o"), format!("{want}.3do")]
+        vec![format!("{want}.3do"), format!("{want}.s3o")]
     };
     // The declared folder first, then the same name anywhere, which catches the
     // games that put models under their own subfolders.
@@ -944,21 +946,25 @@ mod tests {
             .collect()
     }
 
+    /// `CModelLoader::FindModelPath` (`rts/Rendering/Models/IModelParser.cpp`)
+    /// walks `parsers` in registration order, and `RegisterModelFormats`
+    /// registers `3do` before `s3o`, so a name that resolves to both is drawn
+    /// by the engine as a `.3do`.
     #[test]
-    fn objectname_without_extension_prefers_s3o() {
+    fn objectname_without_extension_prefers_3do() {
         let list = listing(&["Objects3D/armcom.s3o", "Objects3D/armcom.3do"]);
         assert_eq!(
             find_model(&list, "ARMCOM").as_deref(),
-            Some("Objects3D/armcom.s3o")
+            Some("Objects3D/armcom.3do")
         );
     }
 
     #[test]
-    fn objectname_without_extension_falls_back_to_3do() {
-        let list = listing(&["Objects3D/ARMCOM.3do"]);
+    fn objectname_without_extension_falls_back_to_s3o() {
+        let list = listing(&["Objects3D/ARMCOM.s3o"]);
         assert_eq!(
             find_model(&list, "ARMCOM").as_deref(),
-            Some("Objects3D/ARMCOM.3do")
+            Some("Objects3D/ARMCOM.s3o")
         );
     }
 
