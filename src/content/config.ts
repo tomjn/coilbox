@@ -1332,6 +1332,21 @@ export function useUnitsyncArchiveTree(
   return { tree, loading };
 }
 
+/**
+ * Drop one archive's cached member tree, so the next {@link useUnitsyncArchiveTree}
+ * re-lists it from disk. Called after a `.3do` install (issue #2622) changes
+ * which files the archive holds: without this the tree pane on the archive
+ * detail page would go on showing the `.3do` files the install just moved
+ * aside and hiding the `.s3o` files it just wrote.
+ */
+export function invalidateArchiveTree(
+  enginePath: string,
+  dataDir: string,
+  archive: string,
+): void {
+  archiveTreeCache.delete(`${dataDir}::${enginePath}::${archive}`);
+}
+
 /** Session cache of member previews, keyed by `dataDir::enginePath::archive::file`. */
 const archiveFileCache = new Map<string, ArchiveFileResult>();
 
