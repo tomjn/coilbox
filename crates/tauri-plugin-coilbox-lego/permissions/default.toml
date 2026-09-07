@@ -10,6 +10,7 @@ permissions = [
   "allow-lego-open-path",
   "allow-lego-packs",
   "allow-lego-read-s3o",
+  "allow-lego-save-s3o",
   "allow-lego-import-s3o",
   "allow-lego-read-3do",
   "allow-lego-import-3do",
