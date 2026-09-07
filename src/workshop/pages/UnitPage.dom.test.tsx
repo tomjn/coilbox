@@ -960,5 +960,18 @@ describe("UnitPage", () => {
       show();
       expect(screen.queryByText("Build menu")).toBeNull();
     });
+
+    /** Otherwise the only way back to your own work is to remember where it
+     *  was, which is the argument the browser's other marks were added on. */
+    it("marks the builder in the browser", () => {
+      openLab();
+      const row = () =>
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armlab"));
+      expect(row()?.textContent).not.toContain("menu");
+      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+      expect(row()?.textContent).toContain("menu");
+    });
   });
 });

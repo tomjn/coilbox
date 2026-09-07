@@ -370,6 +370,7 @@ export default function UnitPage() {
             selected={unitKey}
             overrides={overrides}
             clones={clones}
+            menus={menus}
             nameOf={nameOf}
             onSelect={(key) => select({ unit: key })}
           />
