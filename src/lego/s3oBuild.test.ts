@@ -580,4 +580,78 @@ describe("baking an imported unit", () => {
       round(child(build?.root as S3oPiece, "hull").vertices[1].normal),
     ).toEqual([0, 1, 0]);
   });
+
+  it("flips v and mirrors u on export, even with no other transform", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+        uvFlip: true,
+        uvMirror: true,
+      },
+    ]);
+
+    const build = buildS3o(doc, pack(), raw(), TEXTURES);
+
+    // raw()'s middle vertex carries uv [0.5, 0]. Flipped and mirrored, that
+    // becomes [1-0.5, 1-0] = [0.5, 1].
+    expect(child(build?.root as S3oPiece, "hull").vertices[1].uv).toEqual([
+      0.5, 1,
+    ]);
+    // The position is untouched: a UV fix never moves geometry.
+    expect(child(build?.root as S3oPiece, "hull").vertices[1].pos).toEqual([
+      0, 2, 0,
+    ]);
+  });
+
+  it("draws with recalculated normals instead of the source model's own", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+        normalsAngle: 63,
+      },
+    ]);
+
+    // The three vertices lie at (0,0,0), (0,2,0) and (0,2,2): a triangle flat
+    // in the YZ plane, whose true face normal is along X. rawWithNormal
+    // deliberately declares the wrong one, [0, 1, 0], so a recalculation that
+    // actually reads the geometry rather than the stored value has to come
+    // back close to [1, 0, 0] instead.
+    const build = buildS3o(doc, pack(), rawWithNormal([0, 1, 0]), TEXTURES);
+
+    const recalculated = round(
+      child(build?.root as S3oPiece, "hull").vertices[0].normal,
+    );
+    expect(recalculated).not.toEqual([0, 1, 0]);
+    expect(Math.abs(recalculated[0])).toBe(1);
+  });
+
+  it("is never verbatim for a piece carrying a fix, even with no rotation or scale", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+        uvFlip: true,
+      },
+    ]);
+
+    // A fixed piece with the identity transform still goes through the
+    // general path: its position comes out numerically the same, but its UV
+    // is the flipped one rather than a byte-for-byte copy of the source.
+    const build = buildS3o(doc, pack(), raw(), TEXTURES);
+    const hull = child(build?.root as S3oPiece, "hull");
+
+    expect(hull.vertices[1].pos).toEqual([0, 2, 0]);
+    expect(hull.vertices[1].uv).toEqual([0.5, 1]);
+  });
 });
