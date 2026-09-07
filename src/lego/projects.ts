@@ -150,6 +150,15 @@ export async function hasThumbnail(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * A saved project straight from the session cache, or `undefined` when the list
+ * has not loaded yet. For non-React callers that need a best-effort name now,
+ * chiefly the breadcrumb resolver, which only has the route's id.
+ */
+export function getCachedProject(id: string): LegoProject | undefined {
+  return store.getCached()?.projects.find((p) => p.id === id);
+}
+
 /** Every saved unit, newest first. */
 export function useLegoProjects() {
   const { data, loading, error } = store.useStore();

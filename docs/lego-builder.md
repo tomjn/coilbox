@@ -2,7 +2,7 @@
 
 Assemble a Recoil or Spring unit out of pre-textured parts, animate it from a preset, and write it into a game. No modelling, no UV work: every part in a pack shares one texture, so anything you build from them is already mapped.
 
-The builder is a modding tool, so it is hidden until you turn on **Advanced mode** in Settings > General. It then appears in the sidebar as **unit builder**, with **Units** for what you have built and **Lego Parts** for what you can build from.
+The builder is a modding tool, so it is hidden until you turn on **Advanced mode** in Settings > General. It then appears in the sidebar as **unit builder**, with **Models** for what you have built and **Lego Parts** for what you can build from.
 
 ![The unit builder: a unit on a marked ground plane, tool buttons down the left, the piece tree and the selected piece's settings on the right, and the parts strip along the bottom.](/screenshots/lego-builder.png)
 

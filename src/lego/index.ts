@@ -1,7 +1,8 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Blocks, Boxes, Code2 } from "lucide-react";
+import { Boxes, Code2, ToyBrick } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { getCachedProject } from "./projects";
 
 /**
  * The unit builder: assemble Spring/Recoil units from a library of pre-textured
@@ -21,7 +22,7 @@ const legoPlugin: FramePlugin = {
       items: [
         {
           id: "lego.units",
-          label: "Units",
+          label: "Models",
           to: "/lego",
           end: true,
           order: 0,
@@ -33,7 +34,7 @@ const legoPlugin: FramePlugin = {
           label: "Lego Parts",
           to: "/lego/parts",
           order: 1,
-          icon: Blocks,
+          icon: ToyBrick,
           useVisible: useAdvancedMode,
         },
         // External references, home launcher only (sidebar: false), opened in
@@ -81,7 +82,7 @@ const legoPlugin: FramePlugin = {
     {
       path: "lego",
       lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
-      crumb: "Units",
+      crumb: "Models",
     },
     {
       path: "lego/parts",
@@ -89,16 +90,19 @@ const legoPlugin: FramePlugin = {
       crumb: "Lego Parts",
     },
     {
-      // Before the unit route so the two are read in the order they are
+      // Before the model route so the two are read in the order they are
       // written, though a static segment outranks a dynamic one either way.
       path: "lego/open",
       lazy: gateAdvanced(() => import("./pages/OpenFromArchivePage")),
       crumb: "Open a model",
     },
     {
+      // The route param is an opaque uuid, so the crumb resolves the model's
+      // name from the session cache, falling back when the list has not loaded.
       path: "lego/:id",
       lazy: gateAdvanced(() => import("./pages/BuilderPage")),
-      crumb: "Unit",
+      crumb: (c) =>
+        (c.params.id && getCachedProject(c.params.id)?.name) || "Model",
     },
   ],
   settings: [],
