@@ -7,6 +7,7 @@ import {
   overrideCount,
   overrideValue,
   readPath,
+  resolvedDef,
   sameValue,
   setOverride,
   type UnitOverrides,
@@ -178,6 +179,43 @@ describe("clearOverride", () => {
     const overrides: UnitOverrides = { armcom: { health: 5000 } };
     expect(clearOverride(overrides, "armcom", "metalCost")).toBe(overrides);
     expect(clearOverride(overrides, "corcom", "health")).toBe(overrides);
+  });
+});
+
+describe("resolvedDef", () => {
+  it("writes each edit into a copy and leaves the rest alone", () => {
+    const out = resolvedDef(def, {
+      health: 5000,
+      "weapons.1.name": "bigger",
+      "collisionVolume.scales": [1, 2, 3],
+    });
+    expect(out.health).toBe(5000);
+    expect(out.weapons).toEqual([
+      { name: "disintegrator" },
+      { name: "bigger" },
+    ]);
+    expect(out.metalCost).toBe(1200);
+    expect(readPath(out, "collisionVolume.scales")).toEqual([1, 2, 3]);
+  });
+
+  it("creates a path the definition does not have", () => {
+    const out = resolvedDef({}, { sonarDistance: 400, "weapons.0.name": "x" });
+    expect(out.sonarDistance).toBe(400);
+    expect(out.weapons).toEqual([{ name: "x" }]);
+  });
+
+  it("never reaches back into the definition it read", () => {
+    const out = resolvedDef(def, { health: 5000 });
+    (out.weapons as { name: string }[])[0].name = "nothing";
+    (out.collisionVolume as { scales: number[] }).scales[0] = 99;
+    expect(def.health).toBe(3000);
+    expect(readPath(def, "weapons.0.name")).toBe("disintegrator");
+    expect(readPath(def, "collisionVolume.scales")).toEqual([30, 40, 30]);
+  });
+
+  it("is the definition itself when nothing was edited", () => {
+    expect(resolvedDef(def, undefined)).toEqual(def);
+    expect(resolvedDef(undefined, undefined)).toEqual({});
   });
 });
 

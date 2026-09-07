@@ -144,6 +144,7 @@ function SettlingInput({
 export function UnitFieldRow({
   row,
   note,
+  inheritedLabel = "Game value",
   onChange,
   onReset,
 }: {
@@ -152,6 +153,9 @@ export function UnitFieldRow({
    *  (issue #2661). Absent for every other field, and for a custom parameter
    *  whose scan has not come back. */
   note?: ConsumerNote;
+  /** What the value under an edit is. The game's, unless the unit is one the
+   *  project added, in which case the game never had an opinion about it. */
+  inheritedLabel?: string;
   onChange: (value: unknown) => void;
   onReset: () => void;
 }) {
@@ -219,7 +223,7 @@ export function UnitFieldRow({
         )}
         {overridden && (
           <span className="truncate text-[10px] text-muted-foreground">
-            {row.present ? "Game value" : "Engine default"}:{" "}
+            {row.present ? inheritedLabel : "Engine default"}:{" "}
             {display(row.inherited)}
           </span>
         )}

@@ -8,9 +8,14 @@
  *
  * A unit the project has edited is marked, because otherwise the only way to
  * find your own work again is to remember where you left it.
+ *
+ * A unit the project added is marked too, and sorted in among the game's own
+ * rather than kept in a list of its own (issue #1272). It is a unit: it belongs
+ * where its name puts it, and the mark is there to say whose it is.
  */
 import { cn, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
+import type { UnitClones } from "../../clones";
 import type { UnitOverrides } from "../../overrides";
 
 /**
@@ -24,12 +29,15 @@ export function UnitList({
   units,
   selected,
   overrides,
+  clones,
   nameOf,
   onSelect,
 }: {
+  /** The game's units with the project's own already in among them. */
   units: Record<string, Record<string, unknown>>;
   selected: string;
   overrides: UnitOverrides;
+  clones: UnitClones;
   /** What to call a unit, resolved by the page against the curated dataset. */
   nameOf: (key: string, def: Record<string, unknown>) => string;
   onSelect: (key: string) => void;
@@ -74,6 +82,7 @@ export function UnitList({
         <ul className="flex max-h-[60vh] min-h-0 flex-col gap-0.5 overflow-y-auto rounded-lg border border-border/50 p-1 lg:max-h-none lg:flex-1">
           {rows.map((u) => {
             const edits = Object.keys(overrides[u.key] ?? {}).length;
+            const clone = clones[u.key];
             return (
               <li key={u.key}>
                 <button
@@ -91,14 +100,28 @@ export function UnitList({
                       {u.key}
                     </span>
                   </span>
-                  {edits > 0 && (
-                    <span
-                      className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
-                      title={`${edits} field${edits === 1 ? "" : "s"} changed`}
-                    >
-                      {edits}
-                    </span>
-                  )}
+                  <span className="flex shrink-0 items-center gap-1">
+                    {clone && (
+                      <span
+                        className="rounded-full border border-border px-1.5 text-[10px] font-medium text-muted-foreground"
+                        title={
+                          clone.replacesGameUnit
+                            ? `Your copy of ${clone.source}, standing in for the game's own`
+                            : `A unit you added, copied from ${clone.source}`
+                        }
+                      >
+                        {clone.replacesGameUnit ? "replaced" : "added"}
+                      </span>
+                    )}
+                    {edits > 0 && (
+                      <span
+                        className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
+                        title={`${edits} field${edits === 1 ? "" : "s"} changed`}
+                      >
+                        {edits}
+                      </span>
+                    )}
+                  </span>
                 </button>
               </li>
             );

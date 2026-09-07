@@ -24,6 +24,7 @@ import { UnitFieldRow } from "./UnitFieldRow";
 export function UnitFieldGroups({
   view,
   consumers,
+  inheritedLabel,
   onChange,
   onReset,
 }: {
@@ -31,6 +32,9 @@ export function UnitFieldGroups({
   /** The game's custom parameter consumer index, or `null` while it is still
    *  being read. Only custom parameter rows use it (issue #2661). */
   consumers: CustomParamsResult | null;
+  /** What to call the value underneath an edit, for a unit whose definition is
+   *  not the game's. */
+  inheritedLabel?: string;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
 }) {
@@ -74,6 +78,7 @@ export function UnitFieldGroups({
                       key={row.path}
                       row={row}
                       note={consumerNote(row.path, consumers) ?? undefined}
+                      inheritedLabel={inheritedLabel}
                       onChange={(value) => onChange(row, value)}
                       onReset={() => onReset(row)}
                     />

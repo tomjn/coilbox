@@ -92,6 +92,56 @@ export function readPath(
   return current;
 }
 
+/**
+ * Write a dotted path into a table, creating whatever it has to pass through,
+ * and taking a numeric step to mean an array the way {@link readPath} does.
+ *
+ * Mutates, so it is private to this module: the two callers below both build a
+ * copy first, and an exported mutator over a def table is the one thing the
+ * sparse model cannot survive.
+ */
+function writePath(
+  table: Record<string, unknown>,
+  path: string,
+  value: unknown,
+): void {
+  const steps = path.split(".");
+  let current: Record<string, unknown> = table;
+  for (const [index, step] of steps.slice(0, -1).entries()) {
+    const next = current[step];
+    if (next !== null && typeof next === "object") {
+      current = next as Record<string, unknown>;
+      continue;
+    }
+    const created = /^\d+$/.test(steps[index + 1]) ? [] : {};
+    current[step] = created;
+    current = created as Record<string, unknown>;
+  }
+  current[steps[steps.length - 1]] = value;
+}
+
+/**
+ * One unit's definition as the project has it: the table underneath with the
+ * user's edits written in.
+ *
+ * The page never renders this. A field row reads the base value and the edit
+ * separately, because it has to show both. This is for the moments where the
+ * unit has to exist as one whole table, which so far means cloning it
+ * (issue #1272) and, later, emitting it.
+ *
+ * The copy is deep, so nothing here can reach back into the game's own def
+ * table, which is shared and cached for the session.
+ */
+export function resolvedDef(
+  def: Record<string, unknown> | undefined,
+  patch: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const out = structuredClone(def ?? {});
+  for (const [path, value] of Object.entries(patch ?? {}))
+    writePath(out, path, structuredClone(value));
+  return out;
+}
+
 /** Whether the user has said something about this field. */
 export function fieldState(
   overrides: UnitOverrides,

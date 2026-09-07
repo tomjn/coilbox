@@ -16,6 +16,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -387,5 +388,214 @@ describe("UnitPage", () => {
     expect(
       within(row as HTMLElement).getByTitle("1 field changed"),
     ).toBeTruthy();
+  });
+
+  /**
+   * Issue #1272: the interesting tweak is a new unit rather than a changed
+   * number, and a new unit is a copy of an old one.
+   */
+  describe("copying a unit", () => {
+    const openForm = async () => {
+      screen.getByRole("button", { name: /Copy unit/ }).click();
+      return (await screen.findByLabelText(
+        /Internal name/,
+      )) as HTMLInputElement;
+    };
+
+    const copy = async (key: string, displayName: string) => {
+      const keyBox = await openForm();
+      fireEvent.change(keyBox, { target: { value: key } });
+      fireEvent.change(screen.getByLabelText(/Name in game/), {
+        target: { value: displayName },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: /^(Add unit|Replace )/ }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByLabelText(/Internal name/)).toBeNull(),
+      );
+    };
+
+    const listRow = (key: string) =>
+      screen
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes(key) && b.tagName === "BUTTON");
+
+    it("adds the copy to the browser and opens it, with the source's values", async () => {
+      show();
+      await copy("armcom4", "Overlord");
+
+      // Selected, named what it was called, and keyed by its new internal name.
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "Overlord",
+      );
+      expect(healthBox().value).toBe("3000");
+      expect(screen.getByLabelText("Metal cost")).toHaveProperty(
+        "value",
+        "1200",
+      );
+      expect(screen.getByText("1 unit added")).toBeTruthy();
+
+      // In the same list as the game's own units, marked as one of ours.
+      const row = listRow("armcom4");
+      expect(row?.textContent).toContain("Overlord");
+      expect(
+        within(row as HTMLElement).getByTitle(
+          "A unit you added, copied from armcom",
+        ),
+      ).toBeTruthy();
+    });
+
+    it("lets the copy be edited like any other unit", async () => {
+      show();
+      await copy("armcom4", "Overlord");
+      type(healthBox(), "9000");
+      expect(healthBox().value).toBe("9000");
+      // The value it was copied with is still on screen, said as what it is.
+      expect(screen.getByText(/Copied value: 3000/)).toBeTruthy();
+      expect(screen.getByText("1 change, 1 unit added")).toBeTruthy();
+
+      // And the unit it came from is untouched.
+      fireEvent.click(listRow("armcom") as HTMLElement);
+      expect(healthBox().value).toBe("3000");
+    });
+
+    /**
+     * The property `overrides.test.ts` guards, from the page's end: a copy is a
+     * whole definition and must not arrive as an override of every field.
+     */
+    it("records no changes at all for the copy itself", async () => {
+      show();
+      await copy("armcom4", "Overlord");
+      expect(screen.queryByText(/\d+ changes?/)).toBeNull();
+      expect(screen.queryByLabelText(/^Reset .* to the inherited value$/)) //
+        .toBeNull();
+    });
+
+    /**
+     * A copy carries the source's `customParams`, and the scan is keyed on the
+     * parameter rather than on the unit, so a copy's parameters have the same
+     * answer the original's did. Neither #1272 nor #2661 could test this on its
+     * own, since one landed without the other.
+     */
+    it("keeps a copy's custom parameters one row each, with their notes", async () => {
+      mockConsumers = {
+        params: {
+          canareaattack: {
+            sites: [
+              {
+                file: "luarules/gadgets/unit_areaattack.lua",
+                reads: 1,
+                writes: 0,
+              },
+            ],
+            files: 1,
+          },
+        },
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      show({ armcom: { ...ARMCOM, customParams: { canareaattack: "1" } } });
+      await copy("armcom4", "Overlord");
+
+      // On the copy, not on the unit it came from.
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "Overlord",
+      );
+      expect(screen.getByLabelText("canareaattack")).toHaveProperty(
+        "value",
+        "1",
+      );
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).toContain(
+        "luarules/gadgets/unit_areaattack.lua",
+      );
+    });
+
+    it("copies the unit as the project has it, edits included", async () => {
+      show();
+      type(healthBox(), "5000");
+      await copy("armcom4", "Overlord");
+      expect(healthBox().value).toBe("5000");
+      // One change, against the game's armcom, and one unit added. The copy's
+      // own 5000 is part of what it is rather than an edit to it.
+      expect(screen.getByText("1 change, 1 unit added")).toBeTruthy();
+    });
+
+    it("says when a name would replace one of the game's units, before it does", async () => {
+      show();
+      const keyBox = await openForm();
+      fireEvent.change(keyBox, { target: { value: "armcom" } });
+      expect(screen.getByText(/is already the game's/).textContent).toContain(
+        "Commander",
+      );
+      expect(
+        screen.getByRole("button", { name: "Replace armcom" }),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Add unit" })).toBeNull();
+
+      // And says the other thing for a name nothing is using.
+      fireEvent.change(keyBox, { target: { value: "armcom4" } });
+      expect(screen.getByText(/Adds armcom4 as a new unit/)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Add unit" })).toBeTruthy();
+    });
+
+    it("refuses a name one of your own copies already has", async () => {
+      show();
+      await copy("armcom4", "Overlord");
+      const keyBox = await openForm();
+      fireEvent.change(keyBox, { target: { value: "armcom4" } });
+      expect(
+        screen.getByText(/You have already added a unit called armcom4/),
+      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Add unit" })).toHaveProperty(
+        "disabled",
+        true,
+      );
+    });
+
+    /**
+     * A replacement is named by the person who made it, not by the game's own
+     * name for the unit it stands in for. Beyond All Reason names no unit in
+     * its defs, so that name comes from the curated dataset, and it must not
+     * reach a unit the dataset has never seen.
+     */
+    it("names a replacement from what it was given", async () => {
+      show({ armaak: ARMAAK }, `/workshop?game=${GAME.name}&unit=armaak`, [
+        { name: "armaak", fullName: "Archangel" },
+      ]);
+      await copy("armaak", "Archangel II");
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "Archangel II",
+      );
+      const row = listRow("armaak");
+      expect(row?.textContent).toContain("Archangel II");
+      expect(
+        within(row as HTMLElement).getByTitle(
+          "Your copy of armaak, standing in for the game's own",
+        ),
+      ).toBeTruthy();
+      // One unit in the list, not the game's and yours side by side.
+      expect(screen.getByText("1 unit")).toBeTruthy();
+    });
+
+    it("takes one back out again", async () => {
+      show();
+      await copy("armcom4", "Overlord");
+      fireEvent.click(screen.getByRole("button", { name: /Delete/ }));
+      const confirm = await waitFor(() => {
+        const [, inPopover] = screen.getAllByRole("button", {
+          name: /^Delete$/,
+        });
+        if (!inPopover) throw new Error("no delete confirmation");
+        return inPopover;
+      });
+      fireEvent.click(confirm);
+      await waitFor(() => expect(listRow("armcom4")).toBeUndefined());
+      expect(screen.queryByText(/unit added/)).toBeNull();
+      expect(screen.getByText("Pick a unit to see its fields.")).toBeTruthy();
+    });
   });
 });

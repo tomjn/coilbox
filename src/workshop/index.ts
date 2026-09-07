@@ -6,9 +6,9 @@ import { gateAdvanced, useAdvancedMode } from "../general/advanced";
  * The workshop: changing what a game's units are, rather than what they look
  * like.
  *
- * v0.1 is the unit page. A tweak is held in the page for as long as it is open
- * and saved nowhere, which is issue #1282's job. Cloning a unit, build menus and
- * asset pickers follow.
+ * v0.1 is the unit page: change a unit's numbers, and copy a unit to add one of
+ * your own. A tweak is held in the page for as long as it is open and saved
+ * nowhere, which is issue #1282's job. Build menus and asset pickers follow.
  */
 const workshopPlugin: FramePlugin = {
   id: "workshop",
