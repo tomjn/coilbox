@@ -12,6 +12,7 @@
 
 import * as THREE from "three";
 
+import { computeSmoothedNormals, fixUv, hasMeshFix } from "./meshFix";
 import {
   childrenOf,
   type LegoPiece,
@@ -278,6 +279,22 @@ function bakeGeometry(
   // flares and aim points.
   if (!source) return { vertices: [], indices: [] };
 
+  // Recalculating is a whole-mesh operation, so it happens once here rather
+  // than per vertex below. Absent `normalsAngle` costs nothing: the loop reads
+  // straight off `source.vertices` instead.
+  const recalculated =
+    piece.normalsAngle !== undefined
+      ? computeSmoothedNormals(
+          source.vertices,
+          source.indices,
+          source.vFirst,
+          source.vCount,
+          source.iFirst,
+          source.iCount,
+          piece.normalsAngle,
+        )
+      : null;
+
   const normalMatrix = new THREE.Matrix3().copy(linear).invert().transpose();
   const point = new THREE.Vector3();
   const normal = new THREE.Vector3();
@@ -290,9 +307,12 @@ function bakeGeometry(
   // position, but `.normalize()` does not: plenty of shipped models carry
   // normals that are not quite unit length, and renormalising one changes its
   // bytes for no reason. A piece opened, saved and never touched has to come
-  // back bit for bit, so its geometry is copied rather than recomputed.
+  // back bit for bit, so its geometry is copied rather than recomputed. A
+  // piece carrying a fix from `meshFix.ts` is never verbatim: its UVs or
+  // normals have to be recomputed even when its transform is the identity.
   const verbatim =
     piece.meshId !== undefined &&
+    !hasMeshFix(piece) &&
     isIdentity(linear) &&
     pivot[0] === 0 &&
     pivot[1] === 0 &&
@@ -326,17 +346,22 @@ function bakeGeometry(
       .applyMatrix3(linear);
     normal
       .set(
-        source.vertices[at + 3],
-        source.vertices[at + 4],
-        source.vertices[at + 5],
+        recalculated ? recalculated[i * 3] : source.vertices[at + 3],
+        recalculated ? recalculated[i * 3 + 1] : source.vertices[at + 4],
+        recalculated ? recalculated[i * 3 + 2] : source.vertices[at + 5],
       )
       .applyMatrix3(normalMatrix)
       .normalize();
+    const [u, v] = fixUv(
+      source.vertices[at + 6],
+      source.vertices[at + 7],
+      piece,
+    );
 
     vertices.push({
       pos: [point.x, point.y, point.z],
       normal: [normal.x, normal.y, normal.z],
-      uv: [source.vertices[at + 6], source.vertices[at + 7]],
+      uv: [u, v],
     });
     world.push(point.clone().add(translation));
   }
