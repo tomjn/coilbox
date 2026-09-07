@@ -42,6 +42,8 @@ let mockDefs: UnitDefsResult = {
   checksum: "abc",
 };
 let mockStatus = "ready";
+/** The curated dataset the page joins for names, keyed by internal def key. */
+let mockDataset: { name: string; fullName?: string }[] = [];
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -50,6 +52,12 @@ vi.mock("@/content/config", () => ({
     loading: false,
     error: null,
     run: () => {},
+  }),
+  useUnitsyncUnitDataset: () => ({
+    dataset: { units: mockDataset, errors: [] },
+    status: "ready",
+    reload: () => {},
+    loading: false,
   }),
 }));
 
@@ -77,9 +85,23 @@ const ARMCOM: Record<string, unknown> = {
   somethingOnlyThisGameReads: "yes",
 };
 
+/**
+ * A unit as Beyond All Reason writes it: no `name`, no `humanName` and no
+ * `description` anywhere in the def, so the only thing that can name it is the
+ * curated dataset.
+ */
+const ARMAAK: Record<string, unknown> = {
+  health: 1000,
+  metalcost: 300,
+  objectname: "Units/ARMAAK.s3o",
+};
+
 function show(
   units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
   entry = `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+  dataset: { name: string; fullName?: string }[] = [
+    { name: "armcom", fullName: "Commander" },
+  ],
 ) {
   mockDefs = {
     units,
@@ -88,6 +110,7 @@ function show(
     errors: [],
     checksum: "abc",
   };
+  mockDataset = dataset;
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <Routes>
@@ -108,6 +131,7 @@ const type = (input: HTMLInputElement, value: string) => {
 afterEach(() => {
   cleanup();
   mockStatus = "ready";
+  mockDataset = [];
 });
 
 describe("UnitPage", () => {
@@ -116,6 +140,58 @@ describe("UnitPage", () => {
     expect(screen.getAllByText("Commander").length).toBeGreaterThan(0);
     expect(healthBox().value).toBe("3000");
     expect(screen.getByLabelText("Metal cost")).toHaveProperty("value", "1200");
+  });
+
+  /**
+   * The defect a screenshot of BAR caught: every row read `armaak` twice, once
+   * as the title and once as the key beneath it. BAR writes no name of any kind
+   * in a unit def, so the name has to come from the read that can answer for it.
+   */
+  describe("naming a unit whose def carries no name", () => {
+    const entry = `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`;
+
+    it("takes the name from the curated dataset", () => {
+      show({ armaak: ARMAAK }, entry, [
+        { name: "armaak", fullName: "Archangel" },
+      ]);
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "Archangel",
+      );
+      const row = screen
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes("armaak"));
+      expect(row?.textContent).toBe("Archangelarmaak");
+    });
+
+    it("keeps the internal key on its own line rather than replacing it", () => {
+      show({ armaak: ARMAAK }, entry, [
+        { name: "armaak", fullName: "Archangel" },
+      ]);
+      // Both are on screen, and they are not the same line twice.
+      expect(screen.getAllByText("armaak").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Archangel").length).toBeGreaterThan(0);
+    });
+
+    it("shows the key rather than inventing a name when nothing can name it", () => {
+      show({ armaak: ARMAAK }, entry, []);
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "armaak",
+      );
+    });
+
+    it("does not treat a dataset row that only repeats the key as a name", () => {
+      show({ armaak: ARMAAK }, entry, [{ name: "armaak" }]);
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "armaak",
+      );
+    });
+
+    it("falls back to the def for a game that does write a name there", () => {
+      show({ armaak: { ...ARMAAK, humanname: "Archangel" } }, entry, []);
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "Archangel",
+      );
+    });
   });
 
   it("asks for a unit before showing any fields", () => {

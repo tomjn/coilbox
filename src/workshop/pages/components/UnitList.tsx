@@ -1,22 +1,17 @@
 /**
  * The searchable list of every unit in the selected game (issue #1270).
  *
- * A game's def table is keyed by the lowercased def key, which is what the rest
- * of coilbox joins on, so that is what the list is keyed and searched by along
- * with whatever name the def carries for a person to read. A unit the project
- * has edited is marked, because otherwise the only way to find your own work
- * again is to remember where you left it.
+ * Two lines a row: the name a person reads, and under it the internal key. The
+ * key earns its place rather than being debug output, because it is what every
+ * other part of coilbox joins on and what a tweak will be written against, so
+ * somebody working here needs to be able to see it and search by it.
+ *
+ * A unit the project has edited is marked, because otherwise the only way to
+ * find your own work again is to remember where you left it.
  */
 import { cn, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import type { UnitOverrides } from "../../overrides";
-
-/** What a unit is called, falling back through the names a def may carry to its
- *  own key, which every unit has. */
-export function unitLabel(key: string, def: Record<string, unknown>): string {
-  const human = def.humanName ?? def.name;
-  return typeof human === "string" && human.trim() ? human : key;
-}
 
 /**
  * How many rows are drawn before the list stops and asks for a search term.
@@ -29,11 +24,14 @@ export function UnitList({
   units,
   selected,
   overrides,
+  nameOf,
   onSelect,
 }: {
   units: Record<string, Record<string, unknown>>;
   selected: string;
   overrides: UnitOverrides;
+  /** What to call a unit, resolved by the page against the curated dataset. */
+  nameOf: (key: string, def: Record<string, unknown>) => string;
   onSelect: (key: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -41,9 +39,9 @@ export function UnitList({
   const all = useMemo(
     () =>
       Object.entries(units)
-        .map(([key, def]) => ({ key, label: unitLabel(key, def) }))
+        .map(([key, def]) => ({ key, label: nameOf(key, def) }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [units],
+    [units, nameOf],
   );
 
   const needle = query.trim().toLowerCase();
@@ -54,22 +52,26 @@ export function UnitList({
     : all;
   const rows = matches.slice(0, RENDER_CAP);
 
+  // The search box and the count are fixed at the top and bottom of the column
+  // and only the rows scroll, so the count still answers "of how many" after
+  // you have scrolled past 500 of them. Below `lg` the two panes stack and the
+  // page scrolls as one, so the column is capped rather than stretched.
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 flex-col gap-2 lg:h-full">
       <Input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search units…"
         aria-label="Search units"
-        className="h-9"
+        className="h-9 shrink-0"
       />
       {matches.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No unit matches "{query.trim()}".
         </p>
       ) : (
-        <ul className="flex max-h-[70vh] flex-col gap-0.5 overflow-y-auto rounded-lg border border-border/50 p-1">
+        <ul className="flex max-h-[60vh] min-h-0 flex-col gap-0.5 overflow-y-auto rounded-lg border border-border/50 p-1 lg:max-h-none lg:flex-1">
           {rows.map((u) => {
             const edits = Object.keys(overrides[u.key] ?? {}).length;
             return (
@@ -103,7 +105,7 @@ export function UnitList({
           })}
         </ul>
       )}
-      <p className="text-xs text-muted-foreground">
+      <p className="shrink-0 text-xs text-muted-foreground">
         {matches.length > rows.length
           ? `Showing the first ${rows.length} of ${matches.length}. Search to narrow it.`
           : `${matches.length} unit${matches.length === 1 ? "" : "s"}`}
