@@ -105,6 +105,7 @@ import { PieceTree } from "./components/PieceTree";
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { SetPanel } from "./components/SetPanel";
 import { TestDrawer } from "./components/TestDrawer";
+import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
 import { TransformFields } from "./components/TransformFields";
 
@@ -154,7 +155,7 @@ function Builder({ id }: { id: string | undefined }) {
   const [stripOpen, setStripOpen] = usePanelOpen("strip");
   const [asideOpen, setAsideOpen] = usePanelOpen("aside");
   const [aside, setAside] = useState<
-    "pieces" | "animation" | "collision" | "aim"
+    "pieces" | "animation" | "collision" | "aim" | "texture"
   >("pieces");
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -1174,9 +1175,28 @@ function Builder({ id }: { id: string | undefined }) {
                 >
                   Aim
                 </Button>
+                {/* Only for a unit imported whole: a parts-pack unit draws
+                  with a shared atlas rather than its own two textures, and
+                  there is nothing here for it to build. See #2574. */}
+                {imported ? (
+                  <Button
+                    size="sm"
+                    variant={aside === "texture" ? "default" : "outline"}
+                    onClick={() => setAside("texture")}
+                    aria-pressed={aside === "texture"}
+                  >
+                    Texture
+                  </Button>
+                ) : null}
               </ButtonGroup>
 
-              {aside === "aim" ? (
+              {aside === "texture" && imported ? (
+                <TextureBuilderPanel
+                  imported={imported}
+                  unitName={draft.unitName}
+                  onChange={changeTextures}
+                />
+              ) : aside === "aim" ? (
                 <AimPointPanel
                   project={draft}
                   pack={pack}

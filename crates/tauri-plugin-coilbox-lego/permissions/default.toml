@@ -17,6 +17,8 @@ permissions = [
   "allow-lego-texture-import",
   "allow-lego-texture-png",
   "allow-lego-texture-prune",
+  "allow-lego-texture-compose-colour",
+  "allow-lego-texture-compose-shading",
   "allow-lego-export",
   "allow-lego-export-glb",
   "allow-lego-export-obj",

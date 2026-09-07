@@ -391,6 +391,49 @@ export const legoTexturePrune = defineCommand<
 >("coilbox-lego", "lego_texture_prune");
 
 /**
+ * A texture the composer just built, back from the store. Shaped like
+ * `store_sheet`'s own result: no `source`, because the bytes are pixels
+ * coilbox composed out of the caller's own layers rather than a file it read,
+ * so there is nothing on disk to refresh it from.
+ */
+export interface ComposedTexture {
+  key: string;
+  name: string;
+  source: null;
+}
+
+/**
+ * Build an s3o's first texture from a separate colour picture and an optional
+ * team-colour mask, in the channel layout the engine reads: RGB colour, alpha
+ * the mask. See `coilbox_texture::compose_texture1` for the proof.
+ */
+export const legoTextureComposeColour = defineCommand<
+  { colour: string; mask: string | null; name: string },
+  ComposedTexture
+>("coilbox-lego", "lego_texture_compose_colour");
+
+/**
+ * Build an s3o's second texture from separate glow and reflectivity maps, red
+ * and green respectively, blue unused. Neither input carries the one-bit
+ * visibility cutout the engine also reads from this texture, so `existing` is
+ * the unit's current second texture by its store key: its alpha survives into
+ * the result where the sizes allow it, rather than the cutout being flattened
+ * to fully visible. `null` when the unit has no second texture yet, which
+ * writes fully visible because there is then no cutout to lose. See
+ * `coilbox_texture::compose_texture2` for the exact rule. At least one of
+ * `glow` and `reflectivity` is required.
+ */
+export const legoTextureComposeShading = defineCommand<
+  {
+    glow: string | null;
+    reflectivity: string | null;
+    existing: string | null;
+    name: string;
+  },
+  ComposedTexture
+>("coilbox-lego", "lego_texture_compose_shading");
+
+/**
  * Play a unit's own script and report where its pieces are on every frame.
  *
  * `pieces` is the unit's piece names, which is what `piece("name")` resolves
