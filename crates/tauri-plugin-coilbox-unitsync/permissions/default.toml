@@ -14,6 +14,7 @@ permissions = [
   "allow-unitsync-unit-buildpics",
   "allow-unitsync-faction-logos",
   "allow-unitsync-unit-dataset",
+  "allow-unitsync-unit-defs",
   "allow-unitsync-unit-model",
   "allow-unitsync-unit-models",
   "allow-unitsync-unit-script",

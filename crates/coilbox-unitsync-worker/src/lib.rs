@@ -55,6 +55,7 @@ pub enum Mode {
     UnitBuildpics(UnitBuildpicsArgs),
     FactionLogos(FactionLogosArgs),
     UnitDataset(UnitDatasetArgs),
+    UnitDefs(UnitDefsArgs),
     UnitModel(UnitModelArgs),
     UnitScript(UnitScriptArgs),
     SkirmishAis(SkirmishAisArgs),
@@ -93,6 +94,7 @@ impl Mode {
             Mode::UnitBuildpics(args) => args.to_args(),
             Mode::FactionLogos(args) => args.to_args(),
             Mode::UnitDataset(args) => args.to_args(),
+            Mode::UnitDefs(args) => args.to_args(),
             Mode::UnitModel(args) => args.to_args(),
             Mode::UnitScript(args) => args.to_args(),
             Mode::SkirmishAis(args) => args.to_args(),
@@ -1245,6 +1247,57 @@ impl UnitDatasetArgs {
             }
         }
         Ok(UnitDatasetArgs {
+            game: game.unwrap_or_default(),
+            cache_dir,
+        })
+    }
+}
+
+/// `--unit-defs`: read every key `game` declares for every unit, disk-cached
+/// under `cache_dir` on the game's sync checksum (issue #1269).
+///
+/// Same two fields as [`UnitDatasetArgs`] and deliberately a separate mode
+/// rather than a flag on it. The two answer different questions, cost different
+/// amounts, and are cached on different identities, so a caller that wants the
+/// tech tree should never pay for the whole def table.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct UnitDefsArgs {
+    pub game: String,
+    pub cache_dir: Option<String>,
+}
+
+impl UnitDefsArgs {
+    /// Build the flags for `--unit-defs` mode: the flag itself, the game whose
+    /// unit definitions these are, and the optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--unit-defs".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--unit-defs` invocation from a worker argv. As with the other
+    /// modes' `from_args` functions, `args` may be exactly what
+    /// [`UnitDefsArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(UnitDefsArgs {
             game: game.unwrap_or_default(),
             cache_dir,
         })
@@ -2493,6 +2546,35 @@ mod tests {
     fn unit_dataset_dispatches_to_args_to_its_variant() {
         let a = unit_dataset_args();
         assert_eq!(Mode::UnitDataset(a.clone()).to_args(), a.to_args());
+    }
+
+    fn unit_defs_args() -> UnitDefsArgs {
+        UnitDefsArgs {
+            game: "BAR.sdd".into(),
+            cache_dir: Some("/cache/unitdefs".into()),
+        }
+    }
+
+    #[test]
+    fn unit_defs_round_trips_through_to_args_and_from_args() {
+        let original = unit_defs_args();
+        let recovered = UnitDefsArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn unit_defs_dispatches_to_args_to_its_variant() {
+        let a = unit_defs_args();
+        assert_eq!(Mode::UnitDefs(a.clone()).to_args(), a.to_args());
+    }
+
+    /// The two modes take the same fields, so the flag that names them apart is
+    /// the only thing keeping a unit-defs argv from running the cheaper read.
+    #[test]
+    fn unit_defs_and_unit_dataset_are_told_apart_by_their_own_flag() {
+        let defs = unit_defs_args().to_args();
+        assert!(defs.contains(&"--unit-defs".to_string()));
+        assert!(!defs.contains(&"--unit-dataset".to_string()));
     }
 
     fn unit_model_args() -> UnitModelArgs {

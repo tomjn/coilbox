@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_unit_buildpics",
     "unitsync_faction_logos",
     "unitsync_unit_dataset",
+    "unitsync_unit_defs",
     "unitsync_unit_model",
     "unitsync_unit_models",
     "unitsync_unit_script",
