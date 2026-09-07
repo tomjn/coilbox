@@ -16,7 +16,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import type { UnitModelResult } from "../../bindings";
-import { buildModel } from "../../unitModel";
+import { buildModel, missingTextures } from "../../unitModel";
 
 /** One caveat, in a sentence. */
 export function Note({ children }: { children: React.ReactNode }) {
@@ -43,7 +43,7 @@ export function ModelNotes({
   model: UnitModelResult;
   archive: string;
 }) {
-  const missing = model.textures.filter((t) => !t.file && !t.teamColour);
+  const missing = missingTextures(model);
   const teamColour = model.textures.filter((t) => t.teamColour);
 
   return (

@@ -42,7 +42,7 @@ import {
 } from "../../../content/config";
 import { UnitPickerButton } from "../../../content/pages/components/UnitPicker";
 import { unitLabel } from "../../../content/unitChoices";
-import { countTriangles } from "../../../content/unitModel";
+import { countTriangles, missingTextures } from "../../../content/unitModel";
 import { withoutGeneratedGames } from "../../../lib/generatedGames";
 import { usePreferredTarget } from "../../../play/config";
 
@@ -261,7 +261,7 @@ function Note({
     );
   }
 
-  const missing = model.textures.filter((t) => !t.file && !t.teamColour);
+  const missing = missingTextures(model);
   return (
     <>
       <Text>

@@ -53,6 +53,24 @@ function paletteHex(texture: UnitModelTexture | undefined): number | undefined {
   return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
 }
 
+/**
+ * A texture the model named that nothing gave a real answer for: no file in
+ * the archive, not a team-colour region (the viewer paints those itself), and
+ * not a palette entry that resolved to a real colour (`paletteColour` set).
+ *
+ * `!file` alone is not "missing": a resolved palette entry has no file either,
+ * on purpose, since nothing in the archive backs it and its colour came
+ * straight out of `palette.pal` instead. Shared so every panel that reports
+ * "these textures are missing" uses the one rule for what that means, rather
+ * than each copying the check and drifting when a new no-file-but-fine case is
+ * added (issue #2570).
+ */
+export function missingTextures(model: UnitModelResult): UnitModelTexture[] {
+  return model.textures.filter(
+    (t) => !t.file && !t.teamColour && !t.paletteColour,
+  );
+}
+
 /** How the model is put together, for a caller that draws many copies of it. */
 export interface BuildModelOptions {
   /**
