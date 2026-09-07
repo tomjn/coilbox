@@ -5651,6 +5651,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-lego"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "coilbox-3do",
  "coilbox-portable",
  "coilbox-s3o",

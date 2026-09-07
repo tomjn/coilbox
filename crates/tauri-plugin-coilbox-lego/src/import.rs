@@ -132,6 +132,169 @@ pub fn import_3do(model: &coilbox_3do::Model, rects: &Rects) -> Result<Imported,
     finish(root, state)
 }
 
+/// Flatten a `.glb` into the same blob, with each node's rotation and scale
+/// baked into its own vertices.
+///
+/// A glTF node carries a full transform and an `.s3o` piece carries a
+/// translation and nothing else, so the rest of it has to go somewhere. It goes
+/// into the vertices, which is what `bakedPieces` in `src/lego/s3oBuild.ts` does
+/// on the way out and what Upspring does on save. Doing it here rather than
+/// putting a rotation on the document's piece keeps an imported `.glb` exactly
+/// the shape an imported `.s3o` is: geometry at a translation, with nothing left
+/// to inherit.
+pub fn import_glb(model: &crate::glb::Model) -> Result<Imported, String> {
+    let mut state = Walk {
+        // Strips and fans were turned into triangles by the reader, and the
+        // count means the same thing here as it does for an `.s3o`.
+        converted: model.converted,
+        ..Walk::default()
+    };
+    let root = walk_glb(&model.root, &crate::glb::IDENTITY, [0.0; 3], &mut state);
+    finish(root, state)
+}
+
+/// Flatten one `.glb` node, and everything under it, into the blob.
+fn walk_glb(
+    node: &crate::glb::Node,
+    parent_world: &[f32; 16],
+    parent_translation: [f32; 3],
+    state: &mut Walk,
+) -> ImportPiece {
+    let id = format!("m{}", state.next);
+    state.next += 1;
+
+    let world = crate::glb::multiply(parent_world, &node.matrix);
+    let translation = [world[12], world[13], world[14]];
+    // The rotation and scale without the translation, which is what the
+    // vertices are baked with and why the offset below is a plain subtraction.
+    let linear = linear_part(&world);
+
+    let mut mesh_id = None;
+    if let Some(mesh) = &node.mesh {
+        let v_first = state.vertices.len() / FLOATS_PER_VERTEX;
+        let i_first = state.indices.len();
+        let mut min = [f32::INFINITY; 3];
+        let mut max = [f32::NEG_INFINITY; 3];
+
+        // A normal goes through the inverse transpose, because a non-uniform
+        // scale skews it if the matrix is applied to it directly.
+        let normal_matrix = inverse_transpose(&linear);
+        let plain = linear == IDENTITY_LINEAR;
+        for (i, position) in mesh.positions.iter().enumerate() {
+            let pos = apply(&linear, *position);
+            // A mesh under an untransformed node is copied rather than
+            // recomputed. Renormalising a normal that is not quite unit length
+            // changes bytes for no reason, the same call `bakeGeometry` makes.
+            let normal = if plain {
+                mesh.normals[i]
+            } else {
+                normalise(apply(&normal_matrix, mesh.normals[i]))
+            };
+            for axis in 0..3 {
+                min[axis] = min[axis].min(pos[axis]);
+                max[axis] = max[axis].max(pos[axis]);
+            }
+            state.vertices.extend_from_slice(&pos);
+            state.vertices.extend_from_slice(&normal);
+            state.vertices.extend_from_slice(&mesh.uvs[i]);
+        }
+
+        // A mirroring transform turns every triangle inside out, so the winding
+        // is reversed to match. Without it the piece is drawn back to front and
+        // lit from inside.
+        if determinant(&linear) < 0.0 {
+            for face in mesh.indices.chunks(3) {
+                match face {
+                    [a, b, c] => state.indices.extend_from_slice(&[*a, *c, *b]),
+                    rest => state.indices.extend_from_slice(rest),
+                }
+            }
+        } else {
+            state.indices.extend_from_slice(&mesh.indices);
+        }
+
+        state.directory.push(MeshEntry {
+            id: id.clone(),
+            v_first,
+            v_count: mesh.positions.len(),
+            i_first,
+            i_count: mesh.indices.len(),
+            bbox: Bbox { min, max },
+        });
+        mesh_id = Some(id);
+    }
+
+    ImportPiece {
+        name: node.name.clone(),
+        offset: [
+            translation[0] - parent_translation[0],
+            translation[1] - parent_translation[1],
+            translation[2] - parent_translation[2],
+        ],
+        mesh_id,
+        children: node
+            .children
+            .iter()
+            .map(|child| walk_glb(child, &world, translation, state))
+            .collect(),
+    }
+}
+
+/// The 3x3 identity, column-major, as [`linear_part`] returns one.
+const IDENTITY_LINEAR: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+
+/// A 4x4's rotation and scale without its translation, column-major.
+fn linear_part(m: &[f32; 16]) -> [f32; 9] {
+    [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]]
+}
+
+fn apply(m: &[f32; 9], v: [f32; 3]) -> [f32; 3] {
+    [
+        m[0] * v[0] + m[3] * v[1] + m[6] * v[2],
+        m[1] * v[0] + m[4] * v[1] + m[7] * v[2],
+        m[2] * v[0] + m[5] * v[1] + m[8] * v[2],
+    ]
+}
+
+fn determinant(m: &[f32; 9]) -> f32 {
+    m[0] * (m[4] * m[8] - m[7] * m[5]) - m[3] * (m[1] * m[8] - m[7] * m[2])
+        + m[6] * (m[1] * m[5] - m[4] * m[2])
+}
+
+/// The matrix a normal goes through, which is the inverse transpose of the one
+/// a position goes through. A singular matrix has no inverse, and a node scaled
+/// flat to nothing is the only way to get one, so its normals are left as they
+/// are rather than turned into infinities.
+fn inverse_transpose(m: &[f32; 9]) -> [f32; 9] {
+    let det = determinant(m);
+    if det.abs() < f32::EPSILON {
+        return *m;
+    }
+    let inv = 1.0 / det;
+    // The adjugate, transposed back, is the inverse transpose in one step: this
+    // is the cofactor matrix scaled by 1/det.
+    [
+        (m[4] * m[8] - m[5] * m[7]) * inv,
+        (m[5] * m[6] - m[3] * m[8]) * inv,
+        (m[3] * m[7] - m[4] * m[6]) * inv,
+        (m[2] * m[7] - m[1] * m[8]) * inv,
+        (m[0] * m[8] - m[2] * m[6]) * inv,
+        (m[1] * m[6] - m[0] * m[7]) * inv,
+        (m[1] * m[5] - m[2] * m[4]) * inv,
+        (m[2] * m[3] - m[0] * m[5]) * inv,
+        (m[0] * m[4] - m[1] * m[3]) * inv,
+    ]
+}
+
+fn normalise(v: [f32; 3]) -> [f32; 3] {
+    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if length > 0.0 {
+        [v[0] / length, v[1] / length, v[2] / length]
+    } else {
+        v
+    }
+}
+
 /// Pack a finished walk into the gzipped sidecar.
 fn finish(root: ImportPiece, state: Walk) -> Result<Imported, String> {
     let mut blob = Vec::with_capacity(
@@ -543,6 +706,193 @@ mod tests {
             directory.contains("\"max\":[1.0,2.0,3.0]"),
             "got: {directory}"
         );
+    }
+
+    // ------------------------------------------------------------- glb
+
+    mod binary_gltf {
+        use super::*;
+        use crate::glb;
+
+        fn mesh() -> glb::Mesh {
+            glb::Mesh {
+                positions: vec![[1.0, 2.0, 3.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+                normals: vec![[0.0, 1.0, 0.0]; 3],
+                uvs: vec![[0.0, 0.0]; 3],
+                indices: vec![0, 1, 2],
+            }
+        }
+
+        fn node(name: &str, matrix: [f32; 16], mesh: Option<glb::Mesh>) -> glb::Node {
+            glb::Node {
+                name: name.to_string(),
+                matrix,
+                mesh,
+                children: Vec::new(),
+            }
+        }
+
+        fn model(root: glb::Node) -> glb::Model {
+            glb::Model {
+                root,
+                image: None,
+                missing_image: None,
+                skipped: 0,
+                converted: 0,
+                flat_shaded: 0,
+                images_used: 0,
+                invented_root: false,
+            }
+        }
+
+        /// A matrix that scales then translates, column-major the way glTF and
+        /// this both store one.
+        fn scale_and_move(scale: [f32; 3], at: [f32; 3]) -> [f32; 16] {
+            [
+                scale[0], 0.0, 0.0, 0.0, //
+                0.0, scale[1], 0.0, 0.0, //
+                0.0, 0.0, scale[2], 0.0, //
+                at[0], at[1], at[2], 1.0,
+            ]
+        }
+
+        /// The vertex block, three positions then three normals then two UVs
+        /// per vertex, as the frontend reads it.
+        fn vertex(blob: &[u8], index: usize, component: usize) -> f32 {
+            f32_at(
+                blob,
+                BLOB_HEADER_SIZE + (index * FLOATS_PER_VERTEX + component) * 4,
+            )
+        }
+
+        /// The whole point of the bake: an `.s3o` piece holds a translation and
+        /// nothing else, so a node's scale has to end up in its vertices while
+        /// its translation stays an offset.
+        #[test]
+        fn bakes_a_nodes_scale_into_its_vertices_and_keeps_its_translation() {
+            let out = import_glb(&model(node(
+                "body",
+                scale_and_move([2.0, 2.0, 2.0], [10.0, 0.0, 0.0]),
+                Some(mesh()),
+            )))
+            .expect("import");
+            let blob = inflate(&out.blob);
+
+            assert_eq!(out.root.offset, [10.0, 0.0, 0.0]);
+            assert_eq!(
+                [
+                    vertex(&blob, 0, 0),
+                    vertex(&blob, 0, 1),
+                    vertex(&blob, 0, 2)
+                ],
+                [2.0, 4.0, 6.0]
+            );
+        }
+
+        /// A child's offset is from its parent, and the parent's own transform
+        /// is what its children sit inside. Getting this wrong puts every piece
+        /// of a rotated subtree somewhere else.
+        #[test]
+        fn measures_a_childs_offset_inside_its_turned_parent() {
+            // Half a turn about y, which is a rotation this can write out by
+            // hand and check without trusting a quaternion.
+            let half_turn = [
+                -1.0, 0.0, 0.0, 0.0, //
+                0.0, 1.0, 0.0, 0.0, //
+                0.0, 0.0, -1.0, 0.0, //
+                10.0, 0.0, 0.0, 1.0,
+            ];
+            let mut root = node("base", half_turn, None);
+            root.children.push(node(
+                "barrel",
+                scale_and_move([1.0; 3], [0.0, 0.0, 4.0]),
+                Some(mesh()),
+            ));
+            let out = import_glb(&model(root)).expect("import");
+
+            assert_eq!(out.root.offset, [10.0, 0.0, 0.0]);
+            assert_eq!(out.root.mesh_id, None);
+            // The child sits four along its parent's z, and its parent faces
+            // the other way, so it lands four back along the world's.
+            assert_eq!(out.root.children[0].offset, [0.0, 0.0, -4.0]);
+        }
+
+        /// A mirroring transform turns every triangle inside out. Without the
+        /// flip the piece is drawn back to front and lit from inside, which is
+        /// the failure that looks fine in a viewport and wrong in the game.
+        #[test]
+        fn reverses_the_winding_under_a_mirroring_scale() {
+            let out = import_glb(&model(node(
+                "body",
+                scale_and_move([-1.0, 1.0, 1.0], [0.0; 3]),
+                Some(mesh()),
+            )))
+            .expect("import");
+            let blob = inflate(&out.blob);
+            let at = u32_at(&blob, 24) as usize;
+            let indices: Vec<u32> = (0..3).map(|i| u32_at(&blob, at + i * 4)).collect();
+
+            assert_eq!(indices, vec![0, 2, 1]);
+        }
+
+        /// A normal goes through the inverse transpose, not the matrix itself.
+        /// Applied directly, a non-uniform scale skews it and the piece lights
+        /// wrongly everywhere it is not flat.
+        #[test]
+        fn sends_a_normal_through_the_inverse_transpose() {
+            let mut mesh = mesh();
+            mesh.normals = vec![[1.0, 1.0, 0.0]; 3];
+            let out = import_glb(&model(node(
+                "body",
+                scale_and_move([2.0, 1.0, 1.0], [0.0; 3]),
+                Some(mesh),
+            )))
+            .expect("import");
+            let blob = inflate(&out.blob);
+
+            // Halved along x by the inverse, then renormalised: (0.5, 1, 0)
+            // over its own length. Applying the matrix itself would have
+            // doubled x instead, giving 0.894 and 0.447.
+            let length: f32 = (0.25f32 + 1.0).sqrt();
+            assert!((vertex(&blob, 0, 3) - 0.5 / length).abs() < 1e-6);
+            assert!((vertex(&blob, 0, 4) - 1.0 / length).abs() < 1e-6);
+        }
+
+        /// A mesh under an untransformed node is copied rather than recomputed,
+        /// the same call `bakeGeometry` makes: renormalising a normal that is
+        /// not quite unit length changes bytes for no reason.
+        #[test]
+        fn copies_an_untransformed_mesh_verbatim() {
+            let mut mesh = mesh();
+            mesh.normals = vec![[0.0, 0.5, 0.0]; 3];
+            let out = import_glb(&model(node("body", glb::IDENTITY, Some(mesh)))).expect("import");
+            let blob = inflate(&out.blob);
+
+            assert_eq!(vertex(&blob, 0, 4), 0.5);
+        }
+
+        /// The end to end shape: a real container comes out as the same blob
+        /// and tree an `.s3o` import produces, so nothing downstream has to
+        /// know which format the unit came in through.
+        #[test]
+        fn a_read_file_produces_the_same_blob_an_s3o_import_does() {
+            let model = glb::read(
+                &crate::glb::tests::two_pieces(),
+                std::path::Path::new("/tmp/unit.glb"),
+            )
+            .expect("read");
+            let out = import_glb(&model).expect("import");
+            let blob = inflate(&out.blob);
+
+            assert_eq!(&blob[0..8], BLOB_MAGIC);
+            assert_eq!(u32_at(&blob, 8), BLOB_VERSION);
+            assert_eq!(out.meshes, 1);
+            assert_eq!(out.triangles, 1);
+            assert_eq!(out.root.name, "base");
+            assert_eq!(out.root.mesh_id, None);
+            assert_eq!(out.root.children[0].mesh_id.as_deref(), Some("m1"));
+            assert_eq!(out.root.children[0].offset, [1.0, 2.0, 3.0]);
+        }
     }
 
     // ------------------------------------------------------------- 3do

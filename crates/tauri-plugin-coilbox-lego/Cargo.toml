@@ -43,6 +43,10 @@ image = { workspace = true, features = [
 # two Blender exports decode whatever the store holds and write a PNG. The same
 # decode the unitsync worker's build pics go through (issue #715).
 coilbox-texture = { path = "../coilbox-texture" }
+# A `.glb` is allowed to spell a picture out as a `data:` URI instead of putting
+# it in the binary chunk. Already in the lock file: `coilbox-texture` uses the
+# same crate to write one.
+base64 = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

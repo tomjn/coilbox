@@ -22,6 +22,7 @@
 
 mod atlas3do;
 mod geometry;
+mod glb;
 mod import;
 mod texture;
 
@@ -890,6 +891,127 @@ async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String
     }
 }
 
+/// The largest `.glb` worth reading.
+///
+/// Larger than [`MAX_MODEL_BYTES`] because a `.glb` carries its pictures inside
+/// itself where an `.s3o` names them, and the store's own cap on one texture is
+/// 128 MiB (`texture::MAX_TEXTURE_BYTES`). This is that plus room for the
+/// geometry beside it, and still small enough that a mistaken pick cannot fill
+/// the disk.
+const MAX_GLB_BYTES: u64 = 256 * 1024 * 1024;
+
+/// `lego_import_glb` imports a binary glTF as raw geometry, keeping its tree.
+///
+/// The way back from Blender. Coilbox writes a unit as a `.glb` so it can be
+/// finished there, and this reads one in, so a unit exported, edited and
+/// imported again keeps its pieces rather than arriving as one flat lump. What
+/// it produces is the same shape as an imported `.s3o` in every respect: the
+/// same geometry sidecar, the same tree of names and offsets, the same texture
+/// store. Nothing downstream needs to know which format a unit came in through.
+///
+/// Two things a `.glb` cannot carry, and both are said out loud rather than
+/// guessed at. A glTF node has a full transform where an `.s3o` piece has a
+/// translation, so the rotation and scale are baked into the vertices (see
+/// `import::import_glb`). And a glTF material has one picture where an `.s3o`
+/// has two, so the second texture, the one holding glow, shine and the cut-out
+/// that decides whether a pixel is drawn at all, is not in the file and the
+/// unit imports without one.
+#[tauri::command]
+async fn lego_import_glb<R: Runtime>(app: AppHandle<R>, path: String, id: String) -> CliResult {
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    let file = PathBuf::from(&path);
+    let size = match std::fs::metadata(&file) {
+        Ok(meta) => meta.len(),
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    if size > MAX_GLB_BYTES {
+        return CliResult::err(format!(
+            "{path} is {size} bytes, which is far larger than any unit model"
+        ));
+    }
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let model = match glb::read(&bytes, &file) {
+        Ok(model) => model,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let imported = match import::import_glb(&model) {
+        Ok(imported) => imported,
+        Err(e) => return CliResult::err(e),
+    };
+    if imported.meshes == 0 {
+        return CliResult::err(format!(
+            "{path} has no geometry in it, so there is nothing to import."
+        ));
+    }
+
+    let base = match lego_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    let geometry = base.join("geometry");
+    if let Err(e) = std::fs::create_dir_all(&geometry) {
+        return CliResult::err(format!("could not create the geometry folder: {e}"));
+    }
+    if let Err(e) = std::fs::write(geometry.join(format!("{id}.bin.gz")), &imported.blob) {
+        return CliResult::err(format!("could not store the geometry: {e}"));
+    }
+
+    // A picture that could not be decoded is reported the way a missing one is:
+    // the model still opens, and it names what it wanted so somebody can point
+    // it at the file themselves.
+    let mut missing = model.missing_image.clone();
+    let mut team_mask = false;
+    let texture = match &model.image {
+        Some(image) => match store_glb_image(&base.join("textures"), image) {
+            Ok((value, has_mask)) => {
+                team_mask = has_mask;
+                value
+            }
+            Err(problem) => {
+                missing = Some(format!("{} ({problem})", image.name));
+                json!({ "key": null, "name": image.name, "source": null })
+            }
+        },
+        None => json!({
+            "key": null,
+            "name": missing.clone().unwrap_or_default(),
+            "source": serde_json::Value::Null,
+        }),
+    };
+
+    let out = json!({
+        // No header to pin. An `.s3o` ships a collision sphere its author set,
+        // and re-exporting must not quietly change it. A `.glb` has never held
+        // one, so the builder measures it like a unit built out of parts.
+        "radius": serde_json::Value::Null,
+        "height": serde_json::Value::Null,
+        "mid": serde_json::Value::Null,
+        "root": imported.root,
+        "texture": texture,
+        "texture2": json!({ "key": null, "name": "", "source": null }),
+        "meshes": imported.meshes,
+        "vertices": imported.vertices,
+        "triangles": imported.triangles,
+        "converted": imported.converted,
+        "bytes": imported.blob.len(),
+        "skipped": model.skipped,
+        "flatShaded": model.flat_shaded,
+        "imagesUsed": model.images_used,
+        "inventedRoot": model.invented_root,
+        "teamMask": team_mask,
+        "missingImage": missing,
+    });
+    match serde_json::to_value(out) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not describe {path}: {e}")),
+    }
+}
+
 /// Read every tile a `.3do` names off the disk beside it.
 ///
 /// Answers the tiles it found and how many the model asked for, so the import
@@ -1003,6 +1125,58 @@ fn extension_of(path: &Path) -> String {
         .and_then(|e| e.to_str())
         .unwrap_or_default()
         .to_lowercase()
+}
+
+/// Which format a picture out of a `.glb` is in.
+///
+/// By its own first bytes rather than by a name, because an embedded image has
+/// no file name at all. glTF allows PNG and JPEG and nothing else, and both say
+/// what they are in their first three bytes.
+fn sniff_image(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(PNG_MAGIC) {
+        return Some("png");
+    }
+    if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Some("jpg");
+    }
+    None
+}
+
+/// A `.glb`'s picture, put in the store as the texture the unit is painted
+/// with.
+///
+/// The alpha is the whole of the work here, and getting it wrong is invisible
+/// in coilbox and glaring in the game. An `.s3o` reads the first texture's
+/// alpha as the team-colour mask, `mix(texColor1.rgb, teamCol.rgb,
+/// texColor1.a)`, so a fully opaque picture means "paint every pixel of this
+/// unit in the player's colour" and the texture stops being drawn at all.
+///
+/// A picture out of a `.glb` is fully opaque nearly every time, because a glTF
+/// material's base colour is a picture and its alpha is transparency. Coilbox's
+/// own `.glb` export drops the alpha outright, since `GLTFExporter` puts the
+/// image through a premultiplied canvas that would eat the colour under it (see
+/// `texture::TextureRole::Colour`). So an all-opaque picture is written to alpha
+/// zero, which is no team colour anywhere and the unit's own colours kept. That
+/// is the same call `set_team_mask` makes for a `.3do` tile, for the same
+/// reason.
+///
+/// A picture that does carry varying alpha was authored that way, and is kept
+/// exactly as it is. Answers whether it was.
+fn store_glb_image(dir: &Path, image: &glb::Image) -> Result<(serde_json::Value, bool), String> {
+    let ext = sniff_image(&image.bytes).ok_or_else(|| {
+        "the picture inside this .glb is in neither of the two formats glTF allows, PNG and JPEG"
+            .to_string()
+    })?;
+    let mut decoded = coilbox_texture::decode(ext, &image.bytes)
+        .ok_or_else(|| format!("the .{ext} picture inside this .glb could not be decoded"))?;
+
+    let has_mask = decoded.pixels().any(|pixel| pixel.0[3] != 255);
+    if !has_mask {
+        for pixel in decoded.pixels_mut() {
+            pixel.0[3] = 0;
+        }
+    }
+    Ok((store_sheet(dir, &decoded, &image.name)?, has_mask))
 }
 
 /// Put a sheet this import drew into the texture store.
@@ -1816,6 +1990,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_import_s3o,
             lego_read_3do,
             lego_import_3do,
+            lego_import_glb,
             lego_texture_import,
             lego_texture_png,
             lego_texture_prune,
