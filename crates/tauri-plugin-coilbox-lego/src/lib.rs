@@ -1105,6 +1105,89 @@ async fn lego_texture_prune<R: Runtime>(app: AppHandle<R>, keep: Vec<String>) ->
     CliResult::ok(json!({ "removed": texture::prune(&dir, &keep) }))
 }
 
+/// Read a texture off disk and decode it, for the texture composer below.
+/// Reuses the same decoder every stored texture goes through, so a `.dds`
+/// layer works exactly as a `.png` one does.
+fn read_texture(path: &str) -> Result<image::RgbaImage, String> {
+    let path = Path::new(path);
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("could not read {}: {e}", path.display()))?;
+    coilbox_texture::decode(&extension_of(path), &bytes)
+        .ok_or_else(|| format!("coilbox cannot decode {}", path.display()))
+}
+
+/// `lego_texture_compose_colour` builds an `.s3o`'s first texture from a
+/// separate colour picture and team-colour mask, and puts the result in the
+/// store.
+///
+/// The channel layout is `coilbox_texture::compose_texture1`'s, confirmed
+/// against the engine's own model shader. `name` is the file name to record
+/// against the result, which is what the export and the game folder end up
+/// calling it: the frontend decides that, since it already knows the unit's
+/// existing texture name and this crate stays out of the document schema.
+#[tauri::command]
+async fn lego_texture_compose_colour<R: Runtime>(
+    app: AppHandle<R>,
+    colour: String,
+    mask: Option<String>,
+    name: String,
+) -> CliResult {
+    let colour_img = match read_texture(&colour) {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let mask_img = match mask.as_deref().map(read_texture).transpose() {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let composed = match coilbox_texture::compose_texture1(&colour_img, mask_img.as_ref()) {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let dir = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    match store_sheet(&dir, &composed, &name) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `lego_texture_compose_shading` builds an `.s3o`'s second texture from
+/// separate glow and reflectivity maps, the other half of the same composer.
+/// See `coilbox_texture::compose_texture2` for the channel layout and what an
+/// existing visibility cutout loses when this replaces it.
+#[tauri::command]
+async fn lego_texture_compose_shading<R: Runtime>(
+    app: AppHandle<R>,
+    glow: Option<String>,
+    reflectivity: Option<String>,
+    name: String,
+) -> CliResult {
+    let glow_img = match glow.as_deref().map(read_texture).transpose() {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let reflectivity_img = match reflectivity.as_deref().map(read_texture).transpose() {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let composed =
+        match coilbox_texture::compose_texture2(glow_img.as_ref(), reflectivity_img.as_ref()) {
+            Ok(img) => img,
+            Err(e) => return CliResult::err(e),
+        };
+    let dir = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    match store_sheet(&dir, &composed, &name) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// A texture to place out of the shared store, for a unit imported from
 /// somebody else's model rather than built out of the parts pack.
 #[derive(Deserialize)]
@@ -1712,6 +1795,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_texture_import,
             lego_texture_png,
             lego_texture_prune,
+            lego_texture_compose_colour,
+            lego_texture_compose_shading,
             lego_export,
             lego_export_glb,
             lego_export_obj,
@@ -2018,5 +2103,38 @@ mod tests {
         assert!(!valid_pack_folder("../legoparts"));
         assert!(!valid_pack_folder("nested/pack"));
         assert!(!valid_pack_folder(""));
+    }
+
+    /// `read_texture` is the composer's file-reading half: a real file on disk
+    /// decodes to the same pixels it was written with, by extension rather than
+    /// by sniffing, the same as every other reader in this crate.
+    #[test]
+    fn read_texture_decodes_a_real_file_by_its_extension() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("colour.png");
+        let img = image::RgbaImage::from_pixel(2, 2, image::Rgba([10, 20, 30, 255]));
+        let png = coilbox_texture::encode_png(&img).expect("encode");
+        std::fs::write(&path, png).expect("write");
+
+        let decoded = read_texture(path.to_str().expect("utf8 path")).expect("should decode");
+
+        assert_eq!(decoded.get_pixel(0, 0).0, [10, 20, 30, 255]);
+    }
+
+    #[test]
+    fn read_texture_names_the_file_when_it_is_missing() {
+        let err = read_texture("/no/such/file.png").expect_err("should refuse");
+        assert!(err.contains("file.png"), "got: {err}");
+    }
+
+    #[test]
+    fn read_texture_names_the_file_when_it_cannot_be_decoded() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("not-really.png");
+        std::fs::write(&path, b"not a png").expect("write");
+
+        let err = read_texture(path.to_str().expect("utf8 path")).expect_err("should refuse");
+
+        assert!(err.contains("not-really.png"), "got: {err}");
     }
 }
