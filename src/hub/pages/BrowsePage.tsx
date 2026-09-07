@@ -22,9 +22,11 @@ import {
 } from "react";
 import { Link, useNavigate } from "react-router";
 import { CoilboxGlyph } from "@/components/CoilboxGlyph";
+import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
@@ -44,6 +46,7 @@ import {
   type HubFilters,
   type HubItem,
   type HubKind,
+  type HubSort,
   kindLabelPlural,
   kindsPlural,
 } from "../api";
@@ -106,15 +109,29 @@ import { ShareMenu } from "./components/ShareMenu";
  * trip, so typing a word should not be eight of them. */
 const SEARCH_DEBOUNCE_MS = 400;
 
-/** The filters set by clicking a card, in the order the chips appear. */
-const CLICKABLE = [
+/** The single-value filters set by clicking a card's game or map chip. */
+const SINGLE_CLICKABLE = [
   { key: "game", label: "Game" },
   { key: "map", label: "Map" },
+] as const;
+
+type SingleClickableKey = (typeof SINGLE_CLICKABLE)[number]["key"];
+
+/** The filters that carry several values at once (issue #2595), set by
+ * clicking an author or tag chip on more than one card. */
+const MULTI_CLICKABLE = [
   { key: "author", label: "By" },
   { key: "tag", label: "Tag" },
 ] as const;
 
-type ClickableKey = (typeof CLICKABLE)[number]["key"];
+type MultiClickableKey = (typeof MULTI_CLICKABLE)[number]["key"];
+
+/** The two orders the hub accepts (issue #2595). Newest first is the
+ * server's own default, so it needs no separate "unset" option here. */
+const SORT_OPTIONS: { value: HubSort; label: string }[] = [
+  { value: "newest", label: "Newest first" },
+  { value: "title", label: "Title" },
+];
 
 /** The tail of an item id, to tell two same-titled cards apart. Short enough to
  * sit next to a title without competing with it, and always different for two
@@ -229,8 +246,33 @@ export default function BrowsePage() {
    * it is what re-runs the fetch, so there is no second reason to re-run it. */
   const retry = useCallback(() => setFilters((f) => ({ ...f })), []);
 
-  const setFilter = useCallback((key: ClickableKey | "kind", value: string) => {
+  const setFilter = useCallback((key: SingleClickableKey, value: string) => {
     setFilters((f) => ({ ...f, [key]: value, page: 1 }));
+  }, []);
+
+  /** Adds or removes one value from a multi-select filter (issue #2595):
+   * pressing an author or tag chip already in the filter drops it, and
+   * pressing one not yet in it adds to what is there rather than replacing
+   * it, which is the second half of issue #2568. The same function removes
+   * one filter token among several, leaving the rest in place. */
+  const toggleMultiFilter = useCallback(
+    (key: MultiClickableKey | "kind", value: string) => {
+      setFilters((f) => {
+        const current = f[key] ?? [];
+        const next = current.includes(value)
+          ? current.filter((v) => v !== value)
+          : [...current, value];
+        return { ...f, [key]: next.length > 0 ? next : undefined, page: 1 };
+      });
+    },
+    [],
+  );
+
+  /** Every kind filter cleared at once: what pressing "All" does (see the
+   * comment on the kind chips below for why "All" is not itself one of the
+   * multi-select values). */
+  const clearKindFilter = useCallback(() => {
+    setFilters((f) => ({ ...f, kind: undefined, page: 1 }));
   }, []);
 
   /** Sets the page and brings the results back into view (issue #2567).
@@ -315,8 +357,8 @@ export default function BrowsePage() {
     );
   }, [filters.game, installedGameLabel, page]);
 
-  const active = useMemo(
-    () => CLICKABLE.filter((f) => filters[f.key]?.trim()),
+  const activeSingle = useMemo(
+    () => SINGLE_CLICKABLE.filter((f) => filters[f.key]?.trim()),
     [filters],
   );
 
@@ -336,11 +378,18 @@ export default function BrowsePage() {
     );
   }, [page]);
 
-  // Kind and search count towards "a filter is active" alongside the four
-  // clickable ones, even though they get their own token shape below (a
-  // toggle group and a text box, not a value set by clicking a card).
+  // Kind and search count towards "a filter is active" alongside game and
+  // map, even though they get their own token shape below (a toggle group
+  // and a text box, not a value set by clicking a card). Kind, author and
+  // tag can each carry several values (issue #2595), so every value gets its
+  // own token below and its own place in this count, rather than the
+  // filter's presence counting once regardless of how many values it holds.
   const activeCount =
-    active.length + (filters.kind ? 1 : 0) + (filters.q?.trim() ? 1 : 0);
+    activeSingle.length +
+    (filters.kind?.length ?? 0) +
+    (filters.author?.length ?? 0) +
+    (filters.tag?.length ?? 0) +
+    (filters.q?.trim() ? 1 : 0);
   const filtersActive = activeCount > 0;
 
   /** Empties the search box along with clearing `q`, so the debounce effect
@@ -437,6 +486,22 @@ export default function BrowsePage() {
               ariaLabel="Filter by map"
               className="h-9 w-36"
             />
+            {/* Newest first and by title (issue #2595): the two orders the
+              hub API accepts and the two the original issue #2567 asked
+              for. */}
+            <OptionSelect
+              value={filters.sort ?? "newest"}
+              onValueChange={(v) =>
+                setFilters((f) => ({
+                  ...f,
+                  sort: v === "newest" ? undefined : (v as HubSort),
+                  page: 1,
+                }))
+              }
+              options={SORT_OPTIONS}
+              ariaLabel="Sort"
+              className="h-9 w-36"
+            />
           </div>
           {/* The kind chips get a row of their own (issue #1795). Sharing one
             with the search box and the two comboboxes, they reached the right
@@ -446,26 +511,49 @@ export default function BrowsePage() {
             chips wrap here rather than scrolling, so every kind is on screen
             at every width. */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Kind moved from single-select to multi-select (issue #2595),
+              which changes what "All" can mean. `ToggleGroup type="multiple"`
+              renders as `role="toolbar"` holding independently pressed
+              buttons (each `aria-pressed`), not `role="radiogroup"` with
+              `role="radio"` items the way `type="single"` did - there is no
+              longer one exclusive choice for "All" to be one radio among.
+              Putting an "All" chip inside that toolbar would let it be
+              pressed at the same time as, say, Presets, which is a
+              contradiction: "all kinds" and "just presets" cannot both be
+              true. So "All" sits outside the toolbar as its own toggle,
+              standing for "no kind filter" rather than for a value in the
+              set. It reads as pressed exactly when no kind is selected, and
+              pressing it clears the kind filter. Pressing it again while it
+              is already the active state does nothing, since there is
+              nothing narrower for "clear the filter" to undo. */}
+            <Toggle
+              variant="outline"
+              size="sm"
+              pressed={!filters.kind?.length}
+              onPressedChange={(pressed) => {
+                if (pressed) clearKindFilter();
+              }}
+              aria-label="All kinds"
+              className="w-auto min-w-0 shrink-0 px-3 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+            >
+              All
+            </Toggle>
             <ToggleGroup
-              type="single"
+              type="multiple"
               variant="outline"
               size="sm"
               spacing={1}
-              // "" (no kind filter) is represented by its own "all" chip below,
-              // rather than by no chip being lit, so the group's state is always
-              // one of the radios and clearing it is pressing a specific one
-              // (issue #2566).
-              value={filters.kind || "all"}
-              onValueChange={(v) => setFilter("kind", v === "all" ? "" : v)}
+              value={filters.kind ?? []}
+              onValueChange={(v) =>
+                setFilters((f) => ({
+                  ...f,
+                  kind: v.length > 0 ? v : undefined,
+                  page: 1,
+                }))
+              }
               aria-label="Kind"
               className="flex-wrap"
             >
-              <ToggleGroupItem
-                value="all"
-                className="data-[state=on]:border-primary data-[state=on]:bg-primary/10"
-              >
-                All
-              </ToggleGroupItem>
               {HUB_KINDS.map((kind) => (
                 <ToggleGroupItem
                   key={kind}
@@ -501,19 +589,23 @@ export default function BrowsePage() {
           </div>
           {filtersActive && (
             <div className="flex flex-wrap items-center gap-2">
-              {filters.kind && (
+              {/* One token per selected kind (issue #2595), rather than one
+                token for the filter as a whole, so removing "Presets" while
+                "Blueprints" is also selected leaves Blueprints in place. */}
+              {(filters.kind ?? []).map((kind) => (
                 <Button
+                  key={kind}
                   variant="outline"
                   size="sm"
                   className="h-7 gap-1.5 text-xs"
-                  onClick={() => setFilter("kind", "")}
+                  onClick={() => toggleMultiFilter("kind", kind)}
                 >
-                  Kind: {kindLabelPlural(filters.kind as HubKind)}
+                  Kind: {kindLabelPlural(kind as HubKind)}
                   <X className="size-3" aria-hidden />
                   <span className="sr-only">Clear this filter</span>
                 </Button>
-              )}
-              {active.map((f) => (
+              ))}
+              {activeSingle.map((f) => (
                 <Button
                   key={f.key}
                   variant="outline"
@@ -527,6 +619,24 @@ export default function BrowsePage() {
                   <span className="sr-only">Clear this filter</span>
                 </Button>
               ))}
+              {/* Likewise one token per author and per tag, so a second
+                author or tag chip (issue #2568's deferred half) adds a
+                filter that can be taken back off on its own. */}
+              {MULTI_CLICKABLE.map((f) =>
+                (filters[f.key] ?? []).map((value) => (
+                  <Button
+                    key={`${f.key}-${value}`}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => toggleMultiFilter(f.key, value)}
+                  >
+                    {f.label}: {value}
+                    <X className="size-3" aria-hidden />
+                    <span className="sr-only">Clear this filter</span>
+                  </Button>
+                )),
+              )}
               {!!filters.q?.trim() && (
                 <Button
                   variant="outline"
@@ -709,7 +819,7 @@ export default function BrowsePage() {
                             label={`by ${item.author_name}`}
                             filterValue={item.author_name}
                             onClick={() =>
-                              setFilter("author", item.author_name)
+                              toggleMultiFilter("author", item.author_name)
                             }
                           />
                           {item.tags.map((tag) => (
@@ -717,7 +827,7 @@ export default function BrowsePage() {
                               key={tag}
                               label={`#${tag}`}
                               filterValue={`#${tag}`}
-                              onClick={() => setFilter("tag", tag)}
+                              onClick={() => toggleMultiFilter("tag", tag)}
                             />
                           ))}
                         </div>

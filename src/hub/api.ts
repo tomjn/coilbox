@@ -86,20 +86,34 @@ export interface HubItemsPage {
   items: HubItem[];
 }
 
+/** How the hub orders a listing. `newest` is the default and what the hub has
+ * always done, so it is left off the query string rather than sent explicitly
+ * - the same "blank means don't send it" rule the other filters follow. */
+export type HubSort = "newest" | "title";
+
 /**
  * Everything the API will accept. Anything else is a 400, so this list is the
  * whole of it: there is no room for a client-side filter the server has not been
  * told about.
+ *
+ * `kind`, `author` and `tag` take several values, sent as a repeated query
+ * parameter and OR'd together by the hub (e.g. `kind=preset&kind=blueprint`).
+ * `game`, `map`, `q` and `sort` take exactly one: the hub 400s on a second
+ * `game` or `sort`, worded as "game takes one value, not several", so these
+ * stay plain strings rather than arrays and there is no way to construct a
+ * request that repeats one.
  */
 export interface HubFilters {
-  /** One of {@link HUB_KINDS}, or blank for all of them. Typed loosely because
-   * an unknown kind is the server's 400 to give, not something to model here. */
-  kind?: string;
+  /** Zero or more of {@link HUB_KINDS}. Typed as `string[]` rather than
+   * `HubKind[]` because an unknown kind is the server's 400 to give, not
+   * something to model here. */
+  kind?: string[];
   game?: string;
   map?: string;
-  tag?: string;
-  author?: string;
+  tag?: string[];
+  author?: string[];
   q?: string;
+  sort?: HubSort;
   page?: number;
 }
 
@@ -108,8 +122,12 @@ export type HubResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: string };
 
-/** The filters that are plain strings, in the order they go on the query string. */
-const TEXT_FILTERS = ["kind", "game", "map", "tag", "author", "q"] as const;
+/** The filters that take exactly one value, in the order they go on the query
+ * string. */
+const TEXT_FILTERS = ["game", "map", "q"] as const;
+
+/** The filters that take several values, sent as a repeated parameter. */
+const MULTI_FILTERS = ["kind", "author", "tag"] as const;
 
 /**
  * Join a path onto the configured base. Concatenated rather than resolved
@@ -127,6 +145,13 @@ export function hubItemsUrl(base: string, filters: HubFilters = {}): string {
     const value = filters[key]?.trim();
     if (value) url.searchParams.set(key, value);
   }
+  for (const key of MULTI_FILTERS) {
+    for (const value of filters[key] ?? []) {
+      const trimmed = value.trim();
+      if (trimmed) url.searchParams.append(key, trimmed);
+    }
+  }
+  if (filters.sort) url.searchParams.set("sort", filters.sort);
   if (filters.page && filters.page > 1) {
     url.searchParams.set("page", String(filters.page));
   }
