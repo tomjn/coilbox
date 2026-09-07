@@ -35,6 +35,12 @@ const GAME = {
   primaryArchive: { name: "testgame.sdd" },
 };
 
+/** A second, unrelated game that happens to name a unit the same thing. */
+const GAME_2 = {
+  name: "Test Game 2",
+  primaryArchive: { name: "testgame2.sdd" },
+};
+
 let mockDefs: UnitDefsResult = {
   units: {},
   weaponDefs: {},
@@ -49,7 +55,7 @@ let mockDataset: { name: string; fullName?: string }[] = [];
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
   useUnitsyncScan: () => ({
-    data: { games: [GAME], maps: [] },
+    data: { games: [GAME, GAME_2], maps: [] },
     loading: false,
     error: null,
     run: () => {},
@@ -70,6 +76,35 @@ vi.mock("../config", () => ({
     reload: () => {},
     loading: mockStatus === "loading",
   }),
+}));
+
+// A plain <select>, the same stand-in `BrowsePage.dom.test.tsx` uses: the real
+// picker is a Radix popover with pointer-capture behaviour happy-dom does not
+// implement, and switching games is the one test here that needs to drive it.
+vi.mock("@/components/OptionSelect", () => ({
+  OptionSelect: ({
+    value,
+    onValueChange,
+    options,
+    ariaLabel,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    ariaLabel?: string;
+  }) => (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  ),
 }));
 
 const { default: UnitPage } = await import("./UnitPage");
@@ -314,6 +349,51 @@ describe("UnitPage", () => {
     expect(
       within(row as HTMLElement).getByTitle("1 field changed"),
     ).toBeTruthy();
+  });
+
+  /**
+   * Issue #2664: an edit is a patch against one game's own unit table, so it
+   * must say nothing about another game's unit of the same name, even though
+   * both games are open in the same page across the switch.
+   */
+  describe("switching games", () => {
+    it("does not carry an edit from one game onto another game's unit of the same name", () => {
+      show();
+      type(healthBox(), "5000");
+      expect(screen.getByText("1 change")).toBeTruthy();
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("3000");
+      expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+    });
+
+    it("keeps the edit for when the first game is picked again", () => {
+      show();
+      type(healthBox(), "5000");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("5000");
+      expect(screen.getByText("1 change")).toBeTruthy();
+    });
   });
 
   /**
