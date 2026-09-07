@@ -33,6 +33,7 @@ const GROUP_DESCRIPTIONS: Readonly<Record<string, string>> = {
   uberstress: "Run engine stress tests and compare the results.",
   mapconv: "Compile and decompile maps.",
   lego: "Assemble units from parts and inspect s3o models.",
+  workshop: "Change what a game's units cost, carry and can do.",
   animation: "Convert BOS to Lua, and work with COB scripts.",
   settings: "Engine options, appearance, accounts, and everything else.",
 };

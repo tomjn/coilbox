@@ -20,6 +20,7 @@ import runlitePlugin from "./runlite";
 import scenarioPlugin from "./scenario";
 import uberstressPlugin from "./uberstress";
 import updaterPlugin from "./updater";
+import workshopPlugin from "./workshop";
 // picoframe:imports-end
 
 /** The app's plugin list. `picoframe add <plugin>` edits this file. */
@@ -32,6 +33,7 @@ export const plugins: FramePlugin[] = [
   mapconvPlugin,
   animationPlugin,
   legoPlugin,
+  workshopPlugin,
   contentPlugin,
   playPlugin,
   campaignPlugin,
