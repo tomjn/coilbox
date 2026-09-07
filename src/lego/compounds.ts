@@ -204,7 +204,12 @@ export function insertCompound(
         ? parent
         : (remap.get(piece.parentId as string) ?? parent);
     if (under === parent) rootPieceIds.push(id);
-    return { ...piece, id, name, parentId: under };
+    // A piece landing here through duplicate, paste or a library drop is not
+    // the piece a file shipped any more, so any preserved original name goes
+    // with the piece it was lifted from rather than the copy: see
+    // `LegoPiece.originalName` (#2613).
+    const { originalName: _dropped, ...rest } = piece;
+    return { ...rest, id, name, parentId: under };
   });
 
   return {

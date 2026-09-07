@@ -45,10 +45,19 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
 
   function build() {
     const textures = importedTextures(imported);
-    const model = buildS3o(project, pack, raw, {
-      texture1: textures.texture1,
-      texture2: textures.texture2,
-    });
+    const model = buildS3o(
+      project,
+      pack,
+      raw,
+      {
+        texture1: textures.texture1,
+        texture2: textures.texture2,
+      },
+      // No script is written alongside this file, so nothing needs a piece's
+      // normalised name to still resolve: write the name the file came in
+      // with instead, when a piece still has one (#2613).
+      { useOriginalNames: true },
+    );
     if (!model) throw new Error("This unit has no root piece.");
     return model;
   }

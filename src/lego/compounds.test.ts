@@ -266,6 +266,28 @@ describe("insertCompound", () => {
     ).toHaveLength(1);
   });
 
+  it("drops a preserved original name: the inserted piece is not the file's any more (#2613)", () => {
+    const withOriginal = subtreeAsCompound(
+      project([
+        { id: "hull", name: "hull", originalName: "Hull", parentId: "root" },
+      ]),
+      "hull",
+      { id: "c2", now: "2026-07-28T00:00:00Z", newId: counter("o") },
+    ) as LegoProject;
+    const host = project([]);
+
+    const { project: after, rootPieceIds } = insertCompound(
+      host,
+      withOriginal,
+      "root",
+      counter("i"),
+    );
+
+    expect(
+      after.pieces.find((piece) => piece.id === rootPieceIds[0])?.originalName,
+    ).toBeUndefined();
+  });
+
   it("keeps the compound's own hierarchy", () => {
     const host = project([]);
 

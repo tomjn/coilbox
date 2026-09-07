@@ -281,6 +281,14 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
   });
 
+  it("round-trips a piece's preserved original name (#2613)", () => {
+    const doc = project([
+      piece("root", null),
+      { ...piece("a", "root", "beacon_1"), originalName: "Beacon_1" },
+    ]);
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
   it("round-trips a piece's own collision volume (#1842)", () => {
     const doc = project([
       piece("root", null),

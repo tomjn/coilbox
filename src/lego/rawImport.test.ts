@@ -87,6 +87,39 @@ describe("projectFromImport", () => {
     expect(project.pieces[1].parentId).toBe("p0");
   });
 
+  it("keeps a real shipped piece name a save would otherwise silently rename (#2613)", () => {
+    // Balanced Annihilation's armcom.3do and BOTA's own Commander are the
+    // usual specimens, but their piece names are already lower case and
+    // underscore-safe. `mercury.3do`'s left gun turret is a real one that
+    // is not: `coilbox_3do::read` (crates/coilbox-3do), pointed at the file
+    // extracted from balanced_annihilation-v15.9.8.sdz, reads its piece as
+    // literally `leftgun-barrel`, hyphen included, and coilbox-3do's own
+    // reader is the only place a `.3do`'s case is normalised, so this is
+    // exactly what reaches `projectFromImport`.
+    const { project } = build({
+      root: piece("groundplate", null, [
+        piece("turret", null, [piece("leftgun-barrel", "m1")]),
+      ]),
+    });
+
+    const barrel = project.pieces.find((p) => p.name === "leftgun_barrel");
+    expect(barrel?.originalName).toBe("leftgun-barrel");
+  });
+
+  it("keeps a piece's own name for a save with no edits, only where normalising changed it (#2613)", () => {
+    const { project } = build({
+      root: piece("Base Plate", null, [
+        piece("hull", "m1"),
+        piece("Hull", "m2"),
+      ]),
+    });
+
+    expect(project.pieces[0].originalName).toBe("Base Plate");
+    expect(project.pieces[1].originalName).toBeUndefined();
+    // "Hull" normalises and dedupes to "hull2", so both differ from the file.
+    expect(project.pieces[2].originalName).toBe("Hull");
+  });
+
   it("puts geometry on a mesh key and never on a part", () => {
     const { project } = build();
 
