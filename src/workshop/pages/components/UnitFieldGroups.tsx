@@ -21,10 +21,14 @@ import { UnitFieldRow } from "./UnitFieldRow";
 
 export function UnitFieldGroups({
   view,
+  inheritedLabel,
   onChange,
   onReset,
 }: {
   view: UnitFieldView;
+  /** What to call the value underneath an edit, for a unit whose definition is
+   *  not the game's. */
+  inheritedLabel?: string;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
 }) {
@@ -67,6 +71,7 @@ export function UnitFieldGroups({
                     <UnitFieldRow
                       key={row.path}
                       row={row}
+                      inheritedLabel={inheritedLabel}
                       onChange={(value) => onChange(row, value)}
                       onReset={() => onReset(row)}
                     />

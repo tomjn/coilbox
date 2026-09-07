@@ -138,10 +138,14 @@ function SettlingInput({
  */
 export function UnitFieldRow({
   row,
+  inheritedLabel = "Game value",
   onChange,
   onReset,
 }: {
   row: FieldRow;
+  /** What the value under an edit is. The game's, unless the unit is one the
+   *  project added, in which case the game never had an opinion about it. */
+  inheritedLabel?: string;
   onChange: (value: unknown) => void;
   onReset: () => void;
 }) {
@@ -199,7 +203,7 @@ export function UnitFieldRow({
         )}
         {overridden && (
           <span className="truncate text-[10px] text-muted-foreground">
-            {row.present ? "Game value" : "Engine default"}:{" "}
+            {row.present ? inheritedLabel : "Engine default"}:{" "}
             {display(row.inherited)}
           </span>
         )}
