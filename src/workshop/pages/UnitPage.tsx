@@ -21,6 +21,10 @@
  * reason `clones.ts` gives, and joined onto the game's table for everything
  * else: one browser, one field list, one way to edit a field (issue #1272).
  *
+ * A builder's build menu is held apart again, for the reason `buildMenus.ts`
+ * gives: it is an ordered list the game still owns, so it is recorded as what
+ * the user did to it rather than as the list that came out (issue #1274).
+ *
  * Both the clones and the overrides are kept per game, keyed by the same
  * `gameName` the `?game=` param and the picker already use to say which game
  * is open. An override is a patch against one game's own unit table, so it
@@ -45,6 +49,17 @@ import {
   SkeletonList,
 } from "@/content/pages/components/states";
 import {
+  addToBuildMenu,
+  applyBuildMenu,
+  type BuildMenus,
+  buildMenuOpCount,
+  buildOptionsOf,
+  clearBuildMenu,
+  isBuilder,
+  moveInBuildMenu,
+  removeFromBuildMenu,
+} from "../buildMenus";
+import {
   addClone,
   deriveClone,
   removeClone,
@@ -61,6 +76,7 @@ import {
 } from "../overrides";
 import { unitDisplayName } from "../unitName";
 import { type FieldView, unitFieldView } from "../unitSections";
+import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import { UnitList } from "./components/UnitList";
@@ -69,6 +85,7 @@ import { UnitList } from "./components/UnitList";
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
 const NO_CLONES: UnitClones = {};
 const NO_OVERRIDES: UnitOverrides = {};
+const NO_MENUS: BuildMenus = {};
 
 export default function UnitPage() {
   const [params, setParams] = useSearchParams();
@@ -133,6 +150,27 @@ export default function UnitPage() {
       }),
     [gameName],
   );
+  // Kept per game as well, and for a reason of its own on top of #2664's: a
+  // build menu names units out of one game's table, so an operation over it says
+  // nothing at all under another game.
+  const [menusByGame, setMenusByGame] = useState<Record<string, BuildMenus>>(
+    {},
+  );
+  const menus = menusByGame[gameName] ?? NO_MENUS;
+  const updateMenus = useCallback(
+    (update: (current: BuildMenus) => BuildMenus) =>
+      setMenusByGame((all) => {
+        const next = update(all[gameName] ?? {});
+        if (Object.keys(next).length === 0) {
+          if (!Object.hasOwn(all, gameName)) return all;
+          const { [gameName]: _dropped, ...rest } = all;
+          return rest;
+        }
+        return { ...all, [gameName]: next };
+      }),
+    [gameName],
+  );
+
   const [view, setView] = useState<FieldView>("relevant");
   // Kept per game. A copy of a unit is a whole definition taken out of one
   // game's table, so it has no meaning under another game, and the browser
@@ -166,6 +204,32 @@ export default function UnitPage() {
     [unit, overrides, unitKey, view],
   );
 
+  // What the build menu picker offers: the game's own dataset, with the
+  // project's units in among it rather than in a list of their own, which is
+  // what makes a copied unit addable at all (issue #1272 into #1274). A copy
+  // standing in for a game unit takes that unit's entry, the same way it takes
+  // its place in the def table.
+  const pickerUnits = useMemo(() => {
+    const byName = new Map(
+      (dataset?.units ?? []).map((u) => [u.name.toLowerCase(), u]),
+    );
+    for (const clone of Object.values(clones)) {
+      byName.set(clone.key, {
+        name: clone.key,
+        fullName: unitDisplayName(clone.key, clone.def, undefined),
+        buildOptions: buildOptionsOf(clone.def),
+      });
+    }
+    return [...byName.values()];
+  }, [dataset, clones]);
+
+  const inheritedMenu = useMemo(() => buildOptionsOf(unit), [unit]);
+  const menuOps = menus[unitKey];
+  const currentMenu = useMemo(
+    () => applyBuildMenu(inheritedMenu, menuOps ?? []),
+    [inheritedMenu, menuOps],
+  );
+
   // Replaces rather than pushes, so backing out of the page does not walk
   // through every unit that was looked at on the way.
   const select = (next: Record<string, string>) => {
@@ -180,6 +244,8 @@ export default function UnitPage() {
   const edits = overrideCount(overrides);
   const unitEdits = Object.keys(overrides[unitKey] ?? {}).length;
   const addedCount = Object.keys(clones).length;
+  const menuEdits = buildMenuOpCount(menus);
+  const anythingChanged = edits > 0 || addedCount > 0 || menuEdits > 0;
 
   /** Copy the selected unit, as the project has it, under a new name. */
   const createClone = (key: string, displayName: string, replaces: boolean) => {
@@ -219,7 +285,8 @@ export default function UnitPage() {
           <p className="text-xs text-muted-foreground">
             Change a unit's numbers. Only the fields you change are recorded, so
             the rest still follow the game when it updates. Copy a unit to add
-            one of your own.
+            one of your own, and put it on a builder's menu so something can
+            build it.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -232,12 +299,14 @@ export default function UnitPage() {
             onValueChange={(name) => select({ game: name, unit: "" })}
             options={games.map((g) => ({ value: g.name, label: g.name }))}
           />
-          {(edits > 0 || addedCount > 0) && (
+          {anythingChanged && (
             <span className="text-xs text-muted-foreground">
               {[
                 edits > 0 && `${edits} change${edits === 1 ? "" : "s"}`,
                 addedCount > 0 &&
                   `${addedCount} unit${addedCount === 1 ? "" : "s"} added`,
+                menuEdits > 0 &&
+                  `${menuEdits} build menu edit${menuEdits === 1 ? "" : "s"}`,
               ]
                 .filter(Boolean)
                 .join(", ")}
@@ -246,7 +315,7 @@ export default function UnitPage() {
         </div>
       </header>
 
-      {(edits > 0 || addedCount > 0) && (
+      {anythingChanged && (
         <Alert>
           <AlertTitle>These changes are not saved anywhere yet</AlertTitle>
           <AlertDescription>
@@ -301,6 +370,7 @@ export default function UnitPage() {
             selected={unitKey}
             overrides={overrides}
             clones={clones}
+            menus={menus}
             nameOf={nameOf}
             onSelect={(key) => select({ unit: key })}
           />
@@ -372,7 +442,47 @@ export default function UnitPage() {
                 </div>
               </div>
 
-              <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+              <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+                {isBuilder(unit) && (
+                  <BuildMenuPanel
+                    builderKey={unitKey}
+                    builderName={nameOf(unitKey, unit)}
+                    inherited={inheritedMenu}
+                    menu={currentMenu}
+                    edited={(menuOps?.length ?? 0) > 0}
+                    units={pickerUnits}
+                    clones={clones}
+                    nameOf={(key) => nameOf(key, units[key])}
+                    gameName={game.name}
+                    gameArchive={game.primaryArchive.name}
+                    enginePath={selected?.enginePath}
+                    dataDir={selected?.rootPath}
+                    onAdd={(target) =>
+                      updateMenus((m) =>
+                        addToBuildMenu(m, unitKey, target, inheritedMenu),
+                      )
+                    }
+                    onRemove={(target) =>
+                      updateMenus((m) =>
+                        removeFromBuildMenu(m, unitKey, target, inheritedMenu),
+                      )
+                    }
+                    onMove={(target, delta) =>
+                      updateMenus((m) =>
+                        moveInBuildMenu(
+                          m,
+                          unitKey,
+                          target,
+                          delta,
+                          inheritedMenu,
+                        ),
+                      )
+                    }
+                    onReset={() =>
+                      updateMenus((m) => clearBuildMenu(m, unitKey))
+                    }
+                  />
+                )}
                 <UnitFieldGroups
                   view={fields}
                   consumers={consumers}

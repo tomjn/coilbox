@@ -12,9 +12,15 @@
  * A unit the project added is marked too, and sorted in among the game's own
  * rather than kept in a list of its own (issue #1272). It is a unit: it belongs
  * where its name puts it, and the mark is there to say whose it is.
+ *
+ * A builder whose build menu the project changes is marked as well, for the
+ * same reason a changed field is (issue #1274). It is a separate mark, because
+ * it is a separate kind of edit: a changed number and a changed roster are not
+ * the same thing and the counts must not be added together.
  */
 import { cn, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
+import type { BuildMenus } from "../../buildMenus";
 import type { UnitClones } from "../../clones";
 import type { UnitOverrides } from "../../overrides";
 
@@ -30,6 +36,7 @@ export function UnitList({
   selected,
   overrides,
   clones,
+  menus,
   nameOf,
   onSelect,
 }: {
@@ -38,6 +45,8 @@ export function UnitList({
   selected: string;
   overrides: UnitOverrides;
   clones: UnitClones;
+  /** The build menus the project changes, keyed by builder (issue #1274). */
+  menus: BuildMenus;
   /** What to call a unit, resolved by the page against the curated dataset. */
   nameOf: (key: string, def: Record<string, unknown>) => string;
   onSelect: (key: string) => void;
@@ -83,6 +92,7 @@ export function UnitList({
           {rows.map((u) => {
             const edits = Object.keys(overrides[u.key] ?? {}).length;
             const clone = clones[u.key];
+            const menuEdits = menus[u.key]?.length ?? 0;
             return (
               <li key={u.key}>
                 <button
@@ -111,6 +121,14 @@ export function UnitList({
                         }
                       >
                         {clone.replacesGameUnit ? "replaced" : "added"}
+                      </span>
+                    )}
+                    {menuEdits > 0 && (
+                      <span
+                        className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
+                        title={`Build menu changed, ${menuEdits} edit${menuEdits === 1 ? "" : "s"}`}
+                      >
+                        menu
                       </span>
                     )}
                     {edits > 0 && (
