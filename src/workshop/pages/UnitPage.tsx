@@ -20,6 +20,12 @@
  * The units the project adds are held apart from the edits it makes, for the
  * reason `clones.ts` gives, and joined onto the game's table for everything
  * else: one browser, one field list, one way to edit a field (issue #1272).
+ *
+ * Both the clones and the overrides are kept per game, keyed by the same
+ * `gameName` the `?game=` param and the picker already use to say which game
+ * is open. An override is a patch against one game's own unit table, so it
+ * means nothing under another game that happens to share a unit's internal
+ * name, and picking a different game must not carry it over (issue #2664).
  */
 import { Button } from "@picoframe/frame";
 import { RotateCcw } from "lucide-react";
@@ -62,6 +68,7 @@ import { UnitList } from "./components/UnitList";
 /** Stable empties, so a page with neither does not re-derive on every render. */
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
 const NO_CLONES: UnitClones = {};
+const NO_OVERRIDES: UnitOverrides = {};
 
 export default function UnitPage() {
   const [params, setParams] = useSearchParams();
@@ -95,14 +102,37 @@ export default function UnitPage() {
   // What each custom parameter means, which is only ever "whatever this game's
   // Lua does with it". Runs alongside the defs rather than after them: nothing
   // on the page waits for it, and a row whose scan has not landed simply has no
-  // note yet.
+  // note yet. Keyed by the game's own archive name inside the hook, so it
+  // switches with `game` the same way `defs` does.
   const { consumers } = useCustomParams(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
   );
 
-  const [overrides, setOverrides] = useState<UnitOverrides>({});
+  // Kept per game, for the same reason clones are (issue #2664): an edit is a
+  // patch against one game's own table, and has nothing to say about another
+  // game's unit of the same name.
+  const [overridesByGame, setOverridesByGame] = useState<
+    Record<string, UnitOverrides>
+  >({});
+  const overrides = overridesByGame[gameName] ?? NO_OVERRIDES;
+  const updateOverrides = useCallback(
+    (update: (current: UnitOverrides) => UnitOverrides) =>
+      setOverridesByGame((all) => {
+        const next = update(all[gameName] ?? {});
+        // A game left with no overrides drops out entirely, the same way one
+        // unit does inside `clearOverride`: an empty table standing in for
+        // "nothing changed" is the sparseness guarantee leaking one level up.
+        if (Object.keys(next).length === 0) {
+          if (!Object.hasOwn(all, gameName)) return all;
+          const { [gameName]: _dropped, ...rest } = all;
+          return rest;
+        }
+        return { ...all, [gameName]: next };
+      }),
+    [gameName],
+  );
   const [view, setView] = useState<FieldView>("relevant");
   // Kept per game. A copy of a unit is a whole definition taken out of one
   // game's table, so it has no meaning under another game, and the browser
@@ -173,7 +203,7 @@ export default function UnitPage() {
   /** Take one of ours back out, edits and all: nothing else refers to it. */
   const deleteClone = () => {
     updateClones((current) => removeClone(current, unitKey));
-    setOverrides((o) => clearUnit(o, unitKey));
+    updateOverrides((o) => clearUnit(o, unitKey));
     select({ unit: "" });
   };
 
@@ -328,7 +358,9 @@ export default function UnitPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setOverrides((o) => clearUnit(o, unitKey))}
+                      onClick={() =>
+                        updateOverrides((o) => clearUnit(o, unitKey))
+                      }
                     >
                       <RotateCcw className="size-3.5" />
                       Reset {unitEdits} change{unitEdits === 1 ? "" : "s"}
@@ -359,12 +391,12 @@ export default function UnitPage() {
                   consumers={consumers}
                   inheritedLabel={clone ? "Copied value" : undefined}
                   onChange={(row, value) =>
-                    setOverrides((o) =>
+                    updateOverrides((o) =>
                       setOverride(o, unitKey, row.path, value, row.inherited),
                     )
                   }
                   onReset={(row) =>
-                    setOverrides((o) => clearOverride(o, unitKey, row.path))
+                    updateOverrides((o) => clearOverride(o, unitKey, row.path))
                   }
                 />
               </div>

@@ -35,6 +35,12 @@ const GAME = {
   primaryArchive: { name: "testgame.sdd" },
 };
 
+/** A second, unrelated game that happens to name a unit the same thing. */
+const GAME_2 = {
+  name: "Test Game 2",
+  primaryArchive: { name: "testgame2.sdd" },
+};
+
 let mockDefs: UnitDefsResult = {
   units: {},
   weaponDefs: {},
@@ -49,7 +55,7 @@ let mockDataset: { name: string; fullName?: string }[] = [];
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
   useUnitsyncScan: () => ({
-    data: { games: [GAME], maps: [] },
+    data: { games: [GAME, GAME_2], maps: [] },
     loading: false,
     error: null,
     run: () => {},
@@ -64,6 +70,13 @@ vi.mock("@/content/config", () => ({
 
 /** The custom parameter consumer index, which most tests leave empty. */
 let mockConsumers: CustomParamsResult | null = null;
+/**
+ * A per-game answer, for the one test that needs `useCustomParams` to switch
+ * with the game the same way the real hook does (issue #2664 and #2661
+ * composing): empty everywhere else, so every other test's single flat
+ * `mockConsumers` still answers for whichever game is open.
+ */
+let mockConsumersByArchive: Record<string, CustomParamsResult | null> = {};
 
 vi.mock("../config", () => ({
   useUnitDefs: () => ({
@@ -73,7 +86,46 @@ vi.mock("../config", () => ({
     reload: () => {},
     loading: mockStatus === "loading",
   }),
-  useCustomParams: () => ({ consumers: mockConsumers, loading: false }),
+  useCustomParams: (
+    _enginePath?: string,
+    _dataDir?: string,
+    gameArchive?: string,
+  ) => ({
+    consumers:
+      gameArchive && Object.hasOwn(mockConsumersByArchive, gameArchive)
+        ? mockConsumersByArchive[gameArchive]
+        : mockConsumers,
+    loading: false,
+  }),
+}));
+
+// A plain <select>, the same stand-in `BrowsePage.dom.test.tsx` uses: the real
+// picker is a Radix popover with pointer-capture behaviour happy-dom does not
+// implement, and switching games is the one test here that needs to drive it.
+vi.mock("@/components/OptionSelect", () => ({
+  OptionSelect: ({
+    value,
+    onValueChange,
+    options,
+    ariaLabel,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    ariaLabel?: string;
+  }) => (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  ),
 }));
 
 const { default: UnitPage } = await import("./UnitPage");
@@ -139,6 +191,7 @@ afterEach(() => {
   mockStatus = "ready";
   mockDataset = [];
   mockConsumers = null;
+  mockConsumersByArchive = {};
 });
 
 describe("UnitPage", () => {
@@ -431,6 +484,121 @@ describe("UnitPage", () => {
     expect(
       within(row as HTMLElement).getByTitle("1 field changed"),
     ).toBeTruthy();
+  });
+
+  /**
+   * Issue #2664: an edit is a patch against one game's own unit table, so it
+   * must say nothing about another game's unit of the same name, even though
+   * both games are open in the same page across the switch.
+   */
+  describe("switching games", () => {
+    it("does not carry an edit from one game onto another game's unit of the same name", () => {
+      show();
+      type(healthBox(), "5000");
+      expect(screen.getByText("1 change")).toBeTruthy();
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("3000");
+      expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+    });
+
+    it("keeps the edit for when the first game is picked again", () => {
+      show();
+      type(healthBox(), "5000");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("5000");
+      expect(screen.getByText("1 change")).toBeTruthy();
+    });
+
+    /**
+     * Issues #2664 and #2661 both scope a game's own read out of a flat map,
+     * and neither could prove the other switches correctly on its own: the
+     * consumer scan is keyed per game the same way overrides now are, so an
+     * edit and a consumer note must change together rather than one lagging
+     * behind the other.
+     */
+    it("switches the custom parameter rows and their consumer notes with the game", () => {
+      mockConsumersByArchive[GAME.primaryArchive.name] = {
+        params: {
+          canareaattack: {
+            sites: [
+              {
+                file: "luarules/gadgets/unit_areaattack.lua",
+                reads: 1,
+                writes: 0,
+              },
+            ],
+            files: 1,
+          },
+        },
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      mockConsumersByArchive[GAME_2.primaryArchive.name] = {
+        params: {},
+        wholeTableFiles: 3,
+        filesScanned: 200,
+        truncated: false,
+        errors: [],
+      };
+      show({ armcom: { ...ARMCOM, customParams: { canareaattack: "1" } } });
+      type(healthBox(), "5000");
+      expect(
+        screen.getByText("Custom parameters").closest("div")?.textContent,
+      ).toContain("luarules/gadgets/unit_areaattack.lua");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("3000");
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).not.toContain(
+        "luarules/gadgets/unit_areaattack.lua",
+      );
+      expect(custom?.textContent).toContain("3 files read the whole");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("5000");
+      expect(
+        screen.getByText("Custom parameters").closest("div")?.textContent,
+      ).toContain("luarules/gadgets/unit_areaattack.lua");
+    });
   });
 
   /**
