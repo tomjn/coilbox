@@ -28,7 +28,7 @@ pub use atlas::{
     PALETTE_TILE, PALETTE_TILE_SIDE,
 };
 pub use convert::{is_dead_duplicate, to_s3o, Converted, Rects};
-pub use sheet::{Sheet, SheetTile, SHEET_KIND, SHEET_VERSION};
+pub use sheet::{Sheet, SheetTile, SHEET_DIR, SHEET_KIND, SHEET_VERSION};
 
 /// The tiles a model's flat-colour faces need: a fallback grey always, plus one
 /// small tile per distinct palette entry the model names that `palette`
@@ -137,6 +137,7 @@ mod tests {
             radius: 1.0,
             height: 1.0,
             mid: [0.0; 3],
+            base_plate_faces: 0,
             root: coilbox_3do::Piece {
                 name: "body".into(),
                 offset: [0.0; 3],

@@ -142,6 +142,11 @@ pub struct Model {
     /// Middle of the bounding box, relative to the origin, which sits on the
     /// ground plane.
     pub mid: [f32; 3],
+    /// Faces dropped as base plates: a large flat quad facing straight down,
+    /// which is the footprint a Total Annihilation era exporter left for the
+    /// selection box rather than real geometry. See `is_base_plate` in
+    /// `read.rs` for the exact rule.
+    pub base_plate_faces: usize,
     pub root: Piece,
 }
 

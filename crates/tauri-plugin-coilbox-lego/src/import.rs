@@ -106,6 +106,11 @@ pub struct Imported {
     /// Always 0 for an `.s3o`. See `coilbox_3do_convert::is_dead_duplicate`
     /// for the exact rule.
     pub dropped_pieces: usize,
+    /// `.3do` faces dropped as base plates: a large flat quad facing straight
+    /// down, which is the footprint a Total Annihilation era exporter left
+    /// for the selection box rather than real geometry. Always 0 for an
+    /// `.s3o` or a `.glb`.
+    pub base_plate_faces: usize,
 }
 
 /// Flatten a model into a geometry blob and the tree that indexes it.
@@ -141,6 +146,7 @@ pub fn import_3do(model: &coilbox_3do::Model, rects: &Rects) -> Result<Imported,
     imported.palette_faces = converted.palette_faces;
     imported.missing_textures = converted.missing_textures;
     imported.dropped_pieces = converted.dropped_pieces;
+    imported.base_plate_faces = converted.base_plate_faces;
     Ok(imported)
 }
 
@@ -356,6 +362,7 @@ fn finish(root: ImportPiece, state: Walk) -> Result<Imported, String> {
             palette_faces: state.palette_faces,
             missing_textures: state.missing.into_iter().collect(),
             dropped_pieces: state.dropped_pieces,
+            base_plate_faces: 0,
         })
         .map_err(|e| format!("could not pack the geometry: {e}"))
 }
@@ -797,6 +804,7 @@ mod tests {
                 radius: 1.0,
                 height: 2.0,
                 mid: [0.0, 1.0, 0.0],
+                base_plate_faces: 0,
                 root,
             }
         }
@@ -883,6 +891,20 @@ mod tests {
 
             assert_eq!(out.palette_faces, 1);
             assert_eq!(out.triangles, 1);
+        }
+
+        /// The reader already dropped these before conversion ever sees the
+        /// model, so this is a passthrough: the count still has to survive
+        /// the trip through `to_s3o` and into `Imported` for the import
+        /// summary to show it.
+        #[test]
+        fn carries_the_readers_base_plate_count_through_to_the_summary() {
+            let mut model = model3(piece3("body", vec![textured(vec![0, 1, 2])]));
+            model.base_plate_faces = 2;
+
+            let out = import_3do(&model, &rects()).expect("import");
+
+            assert_eq!(out.base_plate_faces, 2);
         }
 
         /// The specimen this exists for: a palette entry the caller did

@@ -101,7 +101,8 @@ pub fn read(buf: &[u8]) -> Result<Model, Error> {
     }
 
     let mut seen = HashSet::new();
-    let (root, sibling) = read_object(buf, 0, 0, &mut seen, true)?;
+    let mut base_plate_faces = 0;
+    let (root, sibling) = read_object(buf, 0, 0, &mut seen, true, &mut base_plate_faces)?;
     if sibling != 0 {
         return Err(Error::RootHasSibling);
     }
@@ -115,6 +116,7 @@ pub fn read(buf: &[u8]) -> Result<Model, Error> {
             (max[1] + min[1]) * 0.5,
             (max[2] + min[2]) * 0.5,
         ],
+        base_plate_faces,
         root,
     })
 }
@@ -128,6 +130,7 @@ fn read_object(
     depth: usize,
     seen: &mut HashSet<usize>,
     is_root: bool,
+    base_plate_faces: &mut usize,
 ) -> Result<(Piece, usize), Error> {
     if depth >= MAX_DEPTH {
         return Err(Error::TooDeep);
@@ -183,6 +186,7 @@ fn read_object(
             is_root.then_some(selection),
             &vertices,
             &name,
+            base_plate_faces,
         )?
     } else {
         Vec::new()
@@ -192,7 +196,7 @@ fn read_object(
     let mut children = Vec::new();
     let mut at = child;
     while at != 0 {
-        let (piece, next) = read_object(buf, at, depth + 1, seen, false)?;
+        let (piece, next) = read_object(buf, at, depth + 1, seen, false, base_plate_faces)?;
         children.push(piece);
         at = next;
     }
@@ -231,6 +235,7 @@ fn read_primitives(
     selection: Option<i32>,
     vertices: &[[f32; 3]],
     piece: &str,
+    base_plate_faces: &mut usize,
 ) -> Result<Vec<Primitive>, Error> {
     let mut out: Vec<Primitive> = Vec::with_capacity(count);
     // Duplicate faces with different textures are how 3do models animate. The
@@ -299,6 +304,7 @@ fn read_primitives(
         // Some models carry several base plates, which are selection faces the
         // exporter left behind rather than geometry.
         if is_base_plate(&primitive, vertices) {
+            *base_plate_faces += 1;
             continue;
         }
 

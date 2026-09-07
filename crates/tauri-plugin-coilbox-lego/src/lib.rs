@@ -792,6 +792,13 @@ async fn lego_read_3do(path: String) -> CliResult {
 /// The sheet is written into the shared texture store like any other imported
 /// texture, so nothing downstream knows this unit was converted.
 ///
+/// A sheet a batch conversion (issue #2573) already left beside the model is
+/// reused instead of packing a second one, found the same way as the palette
+/// (see `texture::find_sheet_records_beside_model` and
+/// `find_reusable_sheet`), so a unit opened here after converting its whole
+/// game shares the one texture the rest of the game does rather than binding
+/// a texture of its own (issue #2623).
+///
 /// A face names no texture at all when the format gives it a flat colour from
 /// the Total Annihilation palette instead: `unittextures/tatex/palette.pal`,
 /// found the same way a `.3do`'s ordinary tiles are (see
@@ -829,11 +836,36 @@ async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String
         .and_then(|p| std::fs::read(p).ok())
         .and_then(|bytes| coilbox_3do::read_palette(&bytes));
     tiles.extend(atlas3do::palette_tiles(&model, palette.as_ref()));
-    let packed = match atlas3do::pack(&tiles) {
-        Ok(packed) => packed,
-        Err(e) => return CliResult::err(format!("could not build a texture for {path}: {e}")),
+    let held: Vec<&str> = tiles.iter().map(|t| t.name.as_str()).collect();
+
+    // A sheet a batch conversion (issue #2573) already left beside this model
+    // is reused rather than packing a second one, so a unit opened here after
+    // converting its whole game shares the one texture the rest of the game
+    // does (issue #2623). Only when it holds every tile this model needs: a
+    // sheet missing one is left alone and a fresh sheet is packed exactly as
+    // before, the same fallback the batch itself takes on its own second run.
+    let (rects, image, sheet_name, reused_sheet) = match find_reusable_sheet(&file, &held) {
+        Some((rects, image, name)) => (rects, image, name, true),
+        None => {
+            let packed = match atlas3do::pack(&tiles) {
+                Ok(packed) => packed,
+                Err(e) => {
+                    return CliResult::err(format!("could not build a texture for {path}: {e}"))
+                }
+            };
+            // Named after the unit rather than after anything in the file,
+            // because the sheet did not exist until now and nothing else is
+            // going to want it.
+            let name = format!(
+                "{}.png",
+                file.file_stem()
+                    .map_or("model", |s| s.to_str().unwrap_or("model"))
+            );
+            (packed.rects, packed.image, name, false)
+        }
     };
-    let imported = match import::import_3do(&model, &packed.rects) {
+
+    let imported = match import::import_3do(&model, &rects) {
         Ok(imported) => imported,
         Err(e) => return CliResult::err(e),
     };
@@ -855,14 +887,7 @@ async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String
         return CliResult::err(format!("could not store the geometry: {e}"));
     }
 
-    // Named after the unit rather than after anything in the file, because the
-    // sheet did not exist until now and nothing else is going to want it.
-    let sheet_name = format!(
-        "{}.png",
-        file.file_stem()
-            .map_or("model", |s| s.to_str().unwrap_or("model"))
-    );
-    let texture = match store_sheet(&base.join("textures"), &packed.image, &sheet_name) {
+    let texture = match store_sheet(&base.join("textures"), &image, &sheet_name) {
         Ok(value) => value,
         Err(e) => return CliResult::err(e),
     };
@@ -882,7 +907,9 @@ async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String
         "paletteFaces": imported.palette_faces,
         "missingTextures": imported.missing_textures,
         "droppedPieces": imported.dropped_pieces,
+        "basePlateFaces": imported.base_plate_faces,
         "tiles": wanted,
+        "sheetReused": reused_sheet,
     });
     match serde_json::to_value(out) {
         Ok(value) => CliResult::ok(value),
@@ -1043,6 +1070,52 @@ fn read_tiles(model_file: &Path, model: &coilbox_3do::Model) -> (Vec<atlas3do::T
         })
         .collect();
     (tiles, wanted)
+}
+
+/// A sheet record left beside `model_file` by a batch conversion (issue
+/// #2573) that already holds every tile in `held`, decoded and named, or
+/// `None` if there is nothing to reuse.
+///
+/// Every candidate `find_sheet_records_beside_model` finds is tried in turn,
+/// because a game with more than one faction leaves more than one record and
+/// only the caller knows which tiles this particular model needs. A record
+/// that does not cover `held` is not this model's sheet (issue #2623's second
+/// question) and is skipped rather than reused half-mapped.
+///
+/// A record whose picture is missing, or whose picture no longer decodes to
+/// the square size the record itself says it packed, is stale (issue #2623's
+/// third question): something repacked or replaced the sheet without
+/// rewriting this record, or the record survived a picture that did not. Both
+/// are skipped the same way a missing tile is, rather than importing a unit
+/// mapped onto coordinates that no longer point at what they used to.
+fn find_reusable_sheet(
+    model_file: &Path,
+    held: &[&str],
+) -> Option<(atlas3do::Rects, image::RgbaImage, String)> {
+    for record_path in texture::find_sheet_records_beside_model(model_file) {
+        let Ok(bytes) = std::fs::read(&record_path) else {
+            continue;
+        };
+        let Ok(sheet) = atlas3do::Sheet::read(&bytes) else {
+            continue;
+        };
+        if !sheet.covers(held.iter().copied()) {
+            continue;
+        }
+        let image_path = record_path.with_file_name(&sheet.image);
+        let Ok(image_bytes) = std::fs::read(&image_path) else {
+            continue;
+        };
+        let Some(decoded) = coilbox_texture::decode(&extension_of(&image_path), &image_bytes)
+        else {
+            continue;
+        };
+        if decoded.width() != sheet.side || decoded.height() != sheet.side {
+            continue;
+        }
+        return Some((sheet.rects(), decoded, sheet.image.clone()));
+    }
+    None
 }
 
 /// Put the team-colour mask an `.s3o` expects into a tile's alpha.
@@ -1984,6 +2057,129 @@ mod team_mask_tests {
         set_team_mask(&mut image, true);
 
         assert_eq!(image.get_pixel(0, 0).0[3], 255);
+    }
+}
+
+#[cfg(test)]
+mod find_reusable_sheet_tests {
+    use super::*;
+
+    fn tile(name: &str, side: u32) -> atlas3do::Tile {
+        atlas3do::Tile {
+            name: name.to_string(),
+            image: image::RgbaImage::from_pixel(side, side, image::Rgba([9, 9, 9, 255])),
+        }
+    }
+
+    /// Lays out `<dir>/objects3d/arm/armcom.3do` beside `<dir>/unittextures/3do/`
+    /// holding a real packed sheet and its record, the same shape a batch
+    /// conversion (issue #2573) leaves. Returns the model path and the packed
+    /// image dimensions.
+    fn game_with_a_batch_sheet(dir: &Path, sheet_tiles: &[atlas3do::Tile]) -> (PathBuf, u32) {
+        std::fs::create_dir_all(dir.join("objects3d/arm")).expect("dirs");
+        let sheets = dir.join("unittextures/3do");
+        std::fs::create_dir_all(&sheets).expect("dirs");
+
+        let packed = atlas3do::pack(sheet_tiles).expect("pack");
+        let side = packed.image.width();
+        let png = coilbox_texture::encode_png(&packed.image).expect("encode");
+        std::fs::write(sheets.join("objects3d-arm.png"), &png).expect("write png");
+        let record = atlas3do::Sheet::of(&packed, "objects3d-arm.png")
+            .write()
+            .expect("write record");
+        std::fs::write(sheets.join("objects3d-arm.json"), &record).expect("write json");
+
+        (dir.join("objects3d/arm/armcom.3do"), side)
+    }
+
+    /// The specimen this exists for: a game batch converted with #2573, then
+    /// one of its units opened here, gets the same sheet the rest of the game
+    /// was painted with rather than a second one of its own.
+    #[test]
+    fn reuses_a_sheet_that_covers_every_tile_the_model_holds() {
+        let dir = tempfile::tempdir().expect("temp");
+        let (model, side) = game_with_a_batch_sheet(
+            dir.path(),
+            &[tile("arm2", 32), tile(atlas3do::PALETTE_TILE, 8)],
+        );
+
+        let (rects, image, name) =
+            find_reusable_sheet(&model, &["arm2", atlas3do::PALETTE_TILE]).expect("reused");
+
+        assert!(rects.contains_key("arm2"));
+        assert_eq!(image.width(), side);
+        assert_eq!(name, "objects3d-arm.png");
+    }
+
+    /// The batch caps a sheet at 2048 and can leave a tile off it (issue
+    /// #2623's second question). A model asking for one the record does not
+    /// have is not this model's sheet, and nothing here decides that by
+    /// guessing: it is exactly `Sheet::covers`.
+    #[test]
+    fn does_not_reuse_a_sheet_missing_a_tile_the_model_needs() {
+        let dir = tempfile::tempdir().expect("temp");
+        let (model, _side) = game_with_a_batch_sheet(
+            dir.path(),
+            &[tile("arm2", 32), tile(atlas3do::PALETTE_TILE, 8)],
+        );
+
+        let reused = find_reusable_sheet(&model, &["arm2", "arm3", atlas3do::PALETTE_TILE]);
+
+        assert!(reused.is_none());
+    }
+
+    /// The third question: a record surviving a picture that did not (or one
+    /// repacked to a different size without rewriting its record) is stale,
+    /// and importing against it would map the model onto coordinates that no
+    /// longer point at what they used to. Detected here by the one thing a
+    /// record and its picture both say independently: the sheet's side.
+    #[test]
+    fn does_not_reuse_a_record_whose_picture_no_longer_matches_its_own_size() {
+        let dir = tempfile::tempdir().expect("temp");
+        let (model, _side) = game_with_a_batch_sheet(
+            dir.path(),
+            &[tile("arm2", 32), tile(atlas3do::PALETTE_TILE, 8)],
+        );
+        // Something replaced the picture with a different size after the
+        // record was written, without touching the record.
+        let smaller = image::RgbaImage::from_pixel(4, 4, image::Rgba([1, 2, 3, 255]));
+        let png = coilbox_texture::encode_png(&smaller).expect("encode");
+        std::fs::write(dir.path().join("unittextures/3do/objects3d-arm.png"), &png)
+            .expect("overwrite");
+
+        let reused = find_reusable_sheet(&model, &["arm2", atlas3do::PALETTE_TILE]);
+
+        assert!(reused.is_none());
+    }
+
+    /// A record whose picture has simply gone is the same problem as one that
+    /// changed size: nothing here can be trusted to still describe a real
+    /// file.
+    #[test]
+    fn does_not_reuse_a_record_whose_picture_is_missing() {
+        let dir = tempfile::tempdir().expect("temp");
+        let (model, _side) = game_with_a_batch_sheet(
+            dir.path(),
+            &[tile("arm2", 32), tile(atlas3do::PALETTE_TILE, 8)],
+        );
+        std::fs::remove_file(dir.path().join("unittextures/3do/objects3d-arm.png"))
+            .expect("remove");
+
+        let reused = find_reusable_sheet(&model, &["arm2", atlas3do::PALETTE_TILE]);
+
+        assert!(reused.is_none());
+    }
+
+    /// No batch ever ran here, which is every model today: nothing to find,
+    /// and the caller's existing fallback (pack a sheet of its own) is
+    /// unchanged.
+    #[test]
+    fn finds_nothing_to_reuse_when_no_batch_ever_ran() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+        let model = dir.path().join("objects3d/armcom.3do");
+
+        assert!(find_reusable_sheet(&model, &["arm2"]).is_none());
     }
 }
 

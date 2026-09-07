@@ -339,9 +339,15 @@ function glbTextureNotes(result: GlbImport): string[] {
 function conversionNotes(result: ThreeDoImport): string[] {
   const notes: string[] = [];
   const found = result.tiles - result.missingTextures.length;
-  notes.push(
-    `Its ${result.tiles} texture tiles have been packed into one sheet and every face given coordinates onto it, which is what makes it an ordinary unit that exports as an .s3o.`,
-  );
+  if (result.sheetReused) {
+    notes.push(
+      "Its texture tiles are already on a sheet a batch conversion of this game left behind, and this unit has been mapped onto that sheet rather than getting one of its own.",
+    );
+  } else {
+    notes.push(
+      `Its ${result.tiles} texture tiles have been packed into one sheet and every face given coordinates onto it, which is what makes it an ordinary unit that exports as an .s3o.`,
+    );
+  }
   if (result.missingTextures.length > 0) {
     notes.push(
       `${found} of ${result.tiles} were found. Nothing in the game matched ${result.missingTextures.join(", ")}, so the faces using them are drawn plain.`,
@@ -355,6 +361,11 @@ function conversionNotes(result: ThreeDoImport): string[] {
   if (result.droppedPieces > 0) {
     notes.push(
       `${result.droppedPieces} empty child ${result.droppedPieces === 1 ? "piece" : "pieces"} shared an earlier sibling's name and drew nothing, so nothing could ever have addressed ${result.droppedPieces === 1 ? "it" : "them"} by that name. ${result.droppedPieces === 1 ? "It has" : "They have"} been left out.`,
+    );
+  }
+  if (result.basePlateFaces > 0) {
+    notes.push(
+      `${result.basePlateFaces} base-plate ${result.basePlateFaces === 1 ? "face" : "faces"}, a flat panel some exporters left facing straight down to mark the selection box rather than real geometry, ${result.basePlateFaces === 1 ? "has" : "have"} been dropped.`,
     );
   }
   return notes;

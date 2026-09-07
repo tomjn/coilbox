@@ -60,10 +60,10 @@ use crate::unitmodel::{
 };
 
 /// Where the sheets go inside the output, under `unittextures/` so an `.s3o`'s
-/// texture name resolves to them. A folder of their own rather than loose in
-/// `unittextures/`, so an overlay dropped over a real game cannot land a sheet
-/// on top of one of the game's own textures.
-const SHEET_DIR: &str = "3do";
+/// texture name resolves to them. Shared with `coilbox_3do_convert`, whose
+/// [`Sheet`](coilbox_3do_convert::Sheet) record a single model import (issue
+/// #2623) reads back from this same folder to reuse a sheet this run wrote.
+use coilbox_3do_convert::SHEET_DIR;
 
 /// One converted game.
 #[derive(Debug, Default, Serialize)]
