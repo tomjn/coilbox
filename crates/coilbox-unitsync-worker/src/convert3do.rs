@@ -129,10 +129,6 @@ pub struct Group {
     /// Faces drawn in the same flat grey for the second reason: the tile they
     /// named is not on the sheet. `missing_textures` says which tiles.
     pub missing_texture_faces: usize,
-    /// And for the third: the file gives the face no texture name at all.
-    /// Nothing is wrong with these, and they are counted apart so the palette
-    /// number above means only what it says.
-    pub untextured_faces: usize,
     pub vertices: usize,
     pub triangles: usize,
     /// Child pieces dropped as inert same-named duplicates. See
@@ -430,16 +426,25 @@ fn convert_group(
     });
 
     // Every tile name the folder asks for, and where it is in the archive.
+    // `wanted` stays keyed by the raw name (`load_tile` needs it unchanged to
+    // compute the engine's `00` suffix), but a name reported below is renamed
+    // first: an empty one is not a texture nobody names, it is "00" (issue
+    // #2610), and the report should never print a blank.
     let mut tiles: Vec<coilbox_3do_convert::Tile> = Vec::new();
     for (name, uses) in &wanted {
+        let reported = if name.is_empty() {
+            coilbox_3do::EMPTY_TEXTURE_NAME
+        } else {
+            name.as_str()
+        };
         match load_tile(us, handle, list, teamtex, name) {
             Ok(tile) => tiles.push(tile),
             Err(None) => {
-                group.missing_textures.insert(name.clone(), *uses);
+                group.missing_textures.insert(reported.to_string(), *uses);
             }
             Err(Some(member)) => {
                 group.undecodable_textures.insert(
-                    name.clone(),
+                    reported.to_string(),
                     Undecodable {
                         member,
                         wanted_by: *uses,
@@ -510,6 +515,14 @@ fn convert_group(
             .into_iter()
             .find(|name| group.tiles_that_did_not_fit.contains(name))
         {
+            // `tiles_that_did_not_fit` stays raw-keyed above, for the match
+            // against `tile_names`'s own raw output. Renamed here, since this
+            // is the point it turns into a message somebody reads.
+            let missing = if missing.is_empty() {
+                coilbox_3do::EMPTY_TEXTURE_NAME
+            } else {
+                missing.as_str()
+            };
             group
                 .did_not_fit
                 .push(format!("{short} (needs {missing}, which did not fit)"));
@@ -537,9 +550,7 @@ fn convert_group(
         group.triangles += converted.triangles;
         group.dropped_pieces += converted.dropped_pieces;
         group.missing_texture_faces += converted.missing_texture_faces;
-        group.untextured_faces += converted.untextured_faces;
-        let unresolved =
-            converted.palette_faces - converted.missing_texture_faces - converted.untextured_faces;
+        let unresolved = converted.palette_faces - converted.missing_texture_faces;
         if unresolved > 0 {
             group.palette_faces += unresolved;
             group.palette_models.push(short);
@@ -608,9 +619,9 @@ fn load_tile(
     name: &str,
 ) -> Result<coilbox_3do_convert::Tile, Option<String>> {
     let want = name.trim().replace('\\', "/").to_lowercase();
-    if want.is_empty() {
-        return Err(None);
-    }
+    // `teamtex` never holds an empty entry (`read_teamtex` filters blank
+    // lines), so an empty `want` always falls through to the suffix rule
+    // below, the same as the engine (issue #2610).
     if teamtex.contains(&want) {
         return Ok(coilbox_3do_convert::Tile {
             name: name.to_string(),

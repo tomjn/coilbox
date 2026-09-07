@@ -35,6 +35,22 @@ pub const VERSION: i32 = 1;
 /// File coordinates are integers in 1/65536ths of an engine unit.
 pub const SCALE: f32 = 1.0 / 65536.0;
 
+/// What to report a [`Texture::Name`] as when the string it carries is empty.
+///
+/// An empty name is not "no name": `S3DOPiece::GetTexture`
+/// (`rts/Rendering/Models/3DOParser.cpp`) resolves it exactly like any other,
+/// appending `00` unless the name is in the game's `teamtex.txt`, which it
+/// never can be (`teamtex.txt` holds no blank lines), so it always becomes
+/// this (issue #2610).
+///
+/// A resolver still needs the true empty string, not this constant, to
+/// compute that suffix and to match a map a caller already built keyed by the
+/// raw name: substituting `"00"` before resolving would look up `"0000"`
+/// instead. Use this only where a name is about to be reported to a caller,
+/// such as a texture list, a missing-texture report or an import summary,
+/// after resolution has already run.
+pub const EMPTY_TEXTURE_NAME: &str = "00";
+
 /// How a face is coloured.
 ///
 /// Unlike `.s3o`, texturing is per face and there is no UV: a face is stretched

@@ -68,7 +68,6 @@ const RESULT: Convert3doResult = {
       paletteFaces: 7,
       paletteModels: ["armcom.3do"],
       missingTextureFaces: 2,
-      untexturedFaces: 816,
       vertices: 316362,
       triangles: 157800,
       droppedPieces: 1,
@@ -150,19 +149,16 @@ describe("Convert3doDrawer", () => {
     expect(screen.getByText(/unittextures\/tatex\/oddtile00.tga/)).toBeTruthy();
   });
 
-  /// The palette line means "entries that could not be resolved", and the 816
-  /// faces the file names no texture for at all are not palette failures.
-  it("counts the three reasons a face comes out flat grey separately", async () => {
+  /// The palette line means "entries that could not be resolved", which is a
+  /// different reason from a named tile simply being missing from the sheet.
+  it("counts the two reasons a face comes out flat grey separately", async () => {
     await runIt();
 
     expect(
       screen.getByText(/7 faces took a palette colour nothing could resolve/i),
     ).toBeTruthy();
     expect(
-      screen.getByText(/2 faces are flat because their tile is/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/816 because the file names no texture/i),
+      screen.getByText(/2 faces are flat because their tile is missing/i),
     ).toBeTruthy();
   });
 

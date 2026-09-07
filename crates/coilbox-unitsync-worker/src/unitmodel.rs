@@ -213,7 +213,38 @@ pub(crate) fn read_model(
     for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
         resolve_texture(us, handle, list, &format, teamtex, cache, tex);
     }
+    rename_empty_textures(&mut out);
     out
+}
+
+/// Rewrite an empty `.3do` texture name to `coilbox_3do::EMPTY_TEXTURE_NAME`
+/// once resolution has already run.
+///
+/// [`resolve_texture`] needs the true empty string to compute the engine's
+/// `00` suffix (issue #2610), so this runs after it rather than before.
+/// `ModelGroup::texture` and `ModelTexture::name` are the same key by
+/// contract, so both are rewritten together: leaving one blank and the other
+/// `"00"` would break the viewer's own lookup between them.
+fn rename_empty_textures(out: &mut UnitModelOutput) {
+    for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
+        if tex.name.is_empty() {
+            tex.name = coilbox_3do::EMPTY_TEXTURE_NAME.to_string();
+        }
+    }
+    if let Some(root) = &mut out.root {
+        rename_empty_group_textures(root);
+    }
+}
+
+fn rename_empty_group_textures(piece: &mut ModelPiece) {
+    for group in &mut piece.groups {
+        if group.texture.as_deref() == Some("") {
+            group.texture = Some(coilbox_3do::EMPTY_TEXTURE_NAME.to_string());
+        }
+    }
+    for child in &mut piece.children {
+        rename_empty_group_textures(child);
+    }
 }
 
 /// What a render of `object_name` is taken of, as a digest, plus the archive
@@ -557,9 +588,13 @@ fn do3_piece(
 
     for prim in &piece.primitives {
         let key = match &prim.texture {
-            // A name that is present but empty resolves to nothing, so it is
-            // the flat-colour case in everything but how the file stores it.
-            coilbox_3do::Texture::Name(n) if !n.is_empty() => {
+            // Any name, empty included, resolves against `unittextures/tatex/`
+            // the same way: the engine's `S3DOPiece::GetTexture`
+            // (`rts/Rendering/Models/3DOParser.cpp`) appends `00` to whatever
+            // the file gives and an empty name is not in `teamtex.txt` either,
+            // so it becomes `"00"` and looks up real artwork rather than
+            // drawing plain (issue #2610).
+            coilbox_3do::Texture::Name(n) => {
                 if !names.iter().any(|k| k == n) {
                     names.push(n.clone());
                 }
@@ -583,10 +618,6 @@ fn do3_piece(
                     None
                 }
             },
-            _ => {
-                *palette_faces += 1;
-                None
-            }
         };
         let group = batches.entry(key.clone()).or_insert_with(|| ModelGroup {
             texture: key,
@@ -636,8 +667,10 @@ fn do3_piece(
 ///
 /// The field is written however the game's author felt like: `"ARMCOM"`,
 /// `"arm_commander.s3o"`, or a path with a subfolder and Windows separators. A
-/// name with no extension means the engine tries `.s3o` first and `.3do` after,
-/// which is the order tried here.
+/// name with no extension means the engine tries `.3do` first and `.s3o` after:
+/// `CModelLoader::FindModelPath` in `rts/Rendering/Models/IModelParser.cpp`
+/// walks `parsers` in registration order, and `RegisterModelFormats` registers
+/// `3do` before `s3o`. That is the order tried here.
 ///
 /// A caller that already holds a member path, the archive browser previewing the
 /// file somebody clicked (issue #698), gets that member and not a namesake: a
@@ -657,7 +690,7 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     let candidates: Vec<String> = if want.ends_with(".s3o") || want.ends_with(".3do") {
         vec![want]
     } else {
-        vec![format!("{want}.s3o"), format!("{want}.3do")]
+        vec![format!("{want}.3do"), format!("{want}.s3o")]
     };
     // The declared folder first, then the same name anywhere, which catches the
     // games that put models under their own subfolders.
@@ -822,6 +855,9 @@ fn to_webview_format(ext: &str, bytes: &[u8], keep_alpha: bool) -> Option<Vec<u8
 /// An `.s3o` names a file, extension included, under `unittextures/`. A `.3do`
 /// names an entry in the atlas the engine packs out of `unittextures/tatex/`,
 /// with no extension and with `00` appended unless the name is in `teamtex.txt`.
+/// That suffix rule applies to an empty name too (issue #2610): the engine
+/// does not treat it specially, so it becomes `"00"` and resolves to real
+/// artwork, e.g. Balanced Annihilation's `unittextures/tatex/00.bmp`.
 fn locate_texture(
     list: &[(String, String)],
     format: &str,
@@ -829,17 +865,19 @@ fn locate_texture(
     name: &str,
 ) -> Option<String> {
     let want = name.trim().replace('\\', "/").to_lowercase();
-    if want.is_empty() {
-        return None;
-    }
     if format == "3do" {
         // A name in `teamtex.txt` is a team-colour region, not artwork. The
         // file behind it is a flat magenta placeholder the engine paints over
         // with the player's colour, so there is nothing here worth reading.
+        // `teamtex` never holds an empty entry (`read_teamtex` filters blank
+        // lines), so an empty `want` always falls through to the suffix rule.
         if teamtex.contains(&want) {
             return None;
         }
         return find_with_ext(list, TATEX_DIR, &format!("{want}00"));
+    }
+    if want.is_empty() {
+        return None;
     }
     // Named with its extension, which is the normal case.
     if let Some(hit) = find_member(list, &format!("{S3O_TEXTURE_DIR}/{want}")) {
@@ -944,21 +982,25 @@ mod tests {
             .collect()
     }
 
+    /// `CModelLoader::FindModelPath` (`rts/Rendering/Models/IModelParser.cpp`)
+    /// walks `parsers` in registration order, and `RegisterModelFormats`
+    /// registers `3do` before `s3o`, so a name that resolves to both is drawn
+    /// by the engine as a `.3do`.
     #[test]
-    fn objectname_without_extension_prefers_s3o() {
+    fn objectname_without_extension_prefers_3do() {
         let list = listing(&["Objects3D/armcom.s3o", "Objects3D/armcom.3do"]);
         assert_eq!(
             find_model(&list, "ARMCOM").as_deref(),
-            Some("Objects3D/armcom.s3o")
+            Some("Objects3D/armcom.3do")
         );
     }
 
     #[test]
-    fn objectname_without_extension_falls_back_to_3do() {
-        let list = listing(&["Objects3D/ARMCOM.3do"]);
+    fn objectname_without_extension_falls_back_to_s3o() {
+        let list = listing(&["Objects3D/ARMCOM.s3o"]);
         assert_eq!(
             find_model(&list, "ARMCOM").as_deref(),
-            Some("Objects3D/ARMCOM.3do")
+            Some("Objects3D/ARMCOM.s3o")
         );
     }
 
@@ -1333,6 +1375,15 @@ mod tests {
         }
     }
 
+    fn named_face(name: &str) -> coilbox_3do::Primitive {
+        coilbox_3do::Primitive {
+            indices: vec![0, 1, 2],
+            texture: coilbox_3do::Texture::Name(name.into()),
+            normal: [0.0, 1.0, 0.0],
+            vertex_normals: vec![[0.0, 1.0, 0.0]; 3],
+        }
+    }
+
     fn a_piece(primitives: Vec<coilbox_3do::Primitive>) -> coilbox_3do::Piece {
         coilbox_3do::Piece {
             name: "body".into(),
@@ -1407,6 +1458,56 @@ mod tests {
         let group = &out.root.expect("root").groups[0];
         assert_eq!(group.texture, None);
         assert!(out.textures.is_empty());
+    }
+
+    /// A face naming an empty string is not the same as one naming nothing at
+    /// all (issue #2610): it gets its own texture entry and batch, same as a
+    /// real name would, rather than falling into the untextured (`None`)
+    /// group above.
+    #[test]
+    fn an_empty_named_face_gets_its_own_texture_entry() {
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: a_piece(vec![named_face("")]),
+        };
+
+        let out = from_3do("objects3d/armcom.3do", &model, None);
+
+        assert_eq!(out.palette_faces, 0);
+        let group = &out.root.expect("root").groups[0];
+        assert_eq!(group.texture.as_deref(), Some(""));
+        assert_eq!(out.textures.len(), 1);
+        assert_eq!(out.textures[0].name, "");
+    }
+
+    /// Once resolution has run, an empty name is reported as `"00"`, the name
+    /// it actually resolves to, rather than the blank the file stores
+    /// (issue #2610). `ModelGroup::texture` is rewritten alongside
+    /// `ModelTexture::name` so the viewer's own lookup between the two still
+    /// lines up.
+    #[test]
+    fn rename_empty_textures_turns_a_blank_name_into_00() {
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: a_piece(vec![named_face(""), named_face("arm2")]),
+        };
+        let mut out = from_3do("objects3d/armcom.3do", &model, None);
+
+        rename_empty_textures(&mut out);
+
+        assert!(
+            out.textures.iter().all(|t| !t.name.is_empty()),
+            "no texture name should ever be reported blank"
+        );
+        assert!(out.textures.iter().any(|t| t.name == "00"));
+        assert!(out.textures.iter().any(|t| t.name == "arm2"));
+        let groups = &out.root.expect("root").groups;
+        assert!(groups.iter().any(|g| g.texture.as_deref() == Some("00")));
+        assert!(groups.iter().any(|g| g.texture.as_deref() == Some("arm2")));
     }
 
     /// Two faces naming the same entry share one material rather than one

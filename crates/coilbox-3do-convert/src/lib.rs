@@ -91,14 +91,17 @@ pub fn palette_entries(model: &coilbox_3do::Model) -> Vec<i32> {
 }
 
 /// Every distinct tile name `model`'s faces ask for, in the order they first
-/// appear. Empty names are not names: the format spells a flat-colour face that
-/// way as often as it leaves the name out altogether.
+/// appear. An empty name is still a name (issue #2610): the engine resolves it
+/// exactly like any other, appending `00` and looking it up as real artwork, so
+/// it is collected here the same way. The format's actual "no texture" case is
+/// a `Texture::Palette` entry, a distinct field this function does not read at
+/// all.
 pub fn tile_names(model: &coilbox_3do::Model) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for piece in model.root.walk() {
         for prim in &piece.primitives {
             if let coilbox_3do::Texture::Name(name) = &prim.texture {
-                if !name.is_empty() && !out.iter().any(|held| held == name) {
+                if !out.iter().any(|held| held == name) {
                     out.push(name.clone());
                 }
             }
@@ -263,11 +266,20 @@ mod tests {
     fn names_every_tile_once_in_the_order_it_first_appears() {
         let model = model_with(vec![
             named_face("arm2"),
-            named_face(""),
             named_face("arm1"),
             named_face("arm2"),
         ]);
 
         assert_eq!(tile_names(&model), vec!["arm2", "arm1"]);
+    }
+
+    /// An empty name is a name the engine resolves to `"00"`, not the format's
+    /// "no texture" case, so it is collected the same as any other (issue
+    /// #2610).
+    #[test]
+    fn an_empty_name_is_still_a_name() {
+        let model = model_with(vec![named_face("arm2"), named_face("")]);
+
+        assert_eq!(tile_names(&model), vec!["arm2".to_string(), String::new()]);
     }
 }
