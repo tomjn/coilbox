@@ -122,6 +122,9 @@ pub struct Model {
     /// whose transform gets baked into their vertices, and counting them is
     /// what lets the import say so only when it happened.
     pub transformed: usize,
+    /// Doubled pieces folded back into one, left by every `.glb` coilbox
+    /// 1.12.0 or earlier wrote. See [`fold_doubled_meshes`].
+    pub folded: usize,
 }
 
 /// Read a `.glb`, or say what is wrong with it.
@@ -145,7 +148,7 @@ pub fn read(bytes: &[u8], path: &Path) -> Result<Model, String> {
         materials: BTreeSet::new(),
     };
 
-    let (root, invented_root) = if let [only] = roots.as_slice() {
+    let (mut root, invented_root) = if let [only] = roots.as_slice() {
         (state.node(*only, &mut Vec::new())?, false)
     } else {
         let mut children = Vec::with_capacity(roots.len());
@@ -163,6 +166,7 @@ pub fn read(bytes: &[u8], path: &Path) -> Result<Model, String> {
             true,
         )
     };
+    let folded = fold_doubled_meshes(&mut root);
 
     let materials = state.materials.clone();
     let (image, missing_image, images_used) = base_colour(&doc, bin, path, &materials);
@@ -176,7 +180,90 @@ pub fn read(bytes: &[u8], path: &Path) -> Result<Model, String> {
         images_used,
         invented_root,
         transformed: state.transformed,
+        folded,
     })
+}
+
+/// Fold back the doubling every `.glb` coilbox 1.12.0 or earlier wrote.
+/// `buildGlbScene` in `src/lego/exportGlb.ts` used to give a piece with
+/// geometry a `THREE.Group` holding a same-named `THREE.Mesh`, rather than
+/// the single node it is now (#2576), so `GLTFExporter` wrote it as two glTF
+/// nodes and a five piece unit came back in as nine (#2619). This walks the
+/// tree bottom up and, wherever it finds that exact shape, folds the pair
+/// back into the one piece it was, returning how many it folded so the import
+/// can say so.
+///
+/// The rule is deliberately narrow, because a hand-authored model can share
+/// part of the shape by chance and this must never cost a real piece:
+///
+/// - the parent itself draws nothing. A piece the buggy exporter wrapped
+///   never did either. A node that already has its own mesh is left alone
+///   regardless of what its children look like.
+/// - exactly one of the parent's children carries a mesh, has no children of
+///   its own, and its local transform is exactly the identity: not close to
+///   it, exactly, because the buggy exporter never set a position, rotation
+///   or scale on the inner mesh at all. A second candidate, or one that
+///   moved even slightly, is not this bug's shape.
+/// - that child's name is the parent's own name, either exactly, which is
+///   what a file read straight out of coilbox carries, or with a Blender
+///   `.001`-style dedup suffix, which is what the same pair turns into after
+///   an old file has been round-tripped through Blender: Blender's object
+///   namespace collides on any two objects sharing a name regardless of
+///   their type, so the empty and the mesh coilbox wrote under one name
+///   import as two objects, the second renamed on the way in, and stay that
+///   way on the way back out.
+///
+/// A parent with real sibling pieces alongside the doubled mesh still folds:
+/// the buggy exporter added a piece's own mesh before its children, so a
+/// piece with both geometry and sub-pieces carried the same doubling, just
+/// not as the parent's only child.
+fn fold_doubled_meshes(node: &mut Node) -> usize {
+    let mut folded = 0;
+    for child in &mut node.children {
+        folded += fold_doubled_meshes(child);
+    }
+
+    if node.mesh.is_some() {
+        return folded;
+    }
+    let mut candidates = node
+        .children
+        .iter()
+        .enumerate()
+        .filter(|(_, child)| is_doubled_mesh_child(&node.name, child));
+    let only = candidates.next().map(|(i, _)| i);
+    if only.is_none() || candidates.next().is_some() {
+        return folded;
+    }
+    let doubled = node.children.remove(only.unwrap());
+    node.mesh = doubled.mesh;
+    folded + 1
+}
+
+/// Whether `child` is the doubled mesh the exporter bug would have left under
+/// `parent_name`. See [`fold_doubled_meshes`] for the reasoning behind each
+/// part of the check.
+fn is_doubled_mesh_child(parent_name: &str, child: &Node) -> bool {
+    child.mesh.is_some()
+        && child.children.is_empty()
+        && child.matrix == IDENTITY
+        && names_match_after_blender(parent_name, &child.name)
+}
+
+/// Whether `child_name` is `parent_name`, either exactly or with the
+/// `.NNN` dedup suffix Blender appends to the second object it imports under
+/// a name already taken.
+fn names_match_after_blender(parent_name: &str, child_name: &str) -> bool {
+    if parent_name == child_name {
+        return true;
+    }
+    let Some(suffix) = child_name.strip_prefix(parent_name) else {
+        return false;
+    };
+    let Some(digits) = suffix.strip_prefix('.') else {
+        return false;
+    };
+    digits.len() == 3 && digits.bytes().all(|b| b.is_ascii_digit())
 }
 
 /// The file's own name without its extension, for naming a root it does not
@@ -1437,5 +1524,248 @@ pub(crate) mod tests {
     fn converts_a_triangle_strip_keeping_every_faces_winding() {
         assert_eq!(from_strip(&[0, 1, 2, 3]), vec![0, 1, 2, 1, 3, 2]);
         assert_eq!(from_fan(&[0, 1, 2, 3]), vec![0, 1, 2, 0, 2, 3]);
+    }
+
+    // ------------------------------------------------------- doubled meshes
+
+    /// A document shaped exactly the way `buildGlbScene` wrote one before
+    /// #2576: `base` holding `hull`, an empty at [1,2,3] whose only child is
+    /// another node also called `hull`, at the identity transform, carrying
+    /// the mesh. `hull` in turn holds `gun` the same way, at [0,4,0]. Built by
+    /// hand rather than exported, because the exporter that wrote this shape
+    /// is gone: this is what `git show 1ccfac9f^:src/lego/exportGlb.ts`
+    /// produced, transcribed directly rather than run.
+    fn doubled_two_pieces() -> Vec<u8> {
+        let (bin, views, accessors) = triangle();
+        let doc = json!({
+            "asset": { "version": "2.0" },
+            "scene": 0,
+            "scenes": [{ "nodes": [0] }],
+            "nodes": [
+                { "name": "base", "children": [1] },
+                { "name": "hull", "translation": [1.0, 2.0, 3.0], "children": [2, 3] },
+                { "name": "hull", "mesh": 0 },
+                { "name": "gun", "translation": [0.0, 4.0, 0.0], "children": [4] },
+                { "name": "gun", "mesh": 0 },
+            ],
+            "meshes": [{ "primitives": [{
+                "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 },
+                "indices": 3,
+            }] }],
+            "accessors": accessors,
+            "bufferViews": views,
+            "buffers": [{ "byteLength": bin.len() }],
+        });
+        container(&doc, &bin)
+    }
+
+    /// The whole point of #2619: a file shaped exactly like every `.glb`
+    /// coilbox 1.12.0 or earlier wrote gives back the five-node, two-piece
+    /// tree it was exported from, not the nine-node doubled one the file
+    /// actually holds.
+    #[test]
+    fn folds_the_doubling_a_pre_1_12_1_export_left() {
+        let model = read_bytes(&doubled_two_pieces()).expect("read");
+
+        assert_eq!(model.folded, 2);
+        assert_eq!(model.root.name, "base");
+        assert!(model.root.mesh.is_none());
+
+        let hull = &model.root.children[0];
+        assert_eq!(hull.name, "hull");
+        assert_eq!(
+            [hull.matrix[12], hull.matrix[13], hull.matrix[14]],
+            [1.0, 2.0, 3.0]
+        );
+        assert_eq!(hull.mesh.as_ref().expect("hull mesh").indices.len(), 3);
+        // The doubled mesh node is gone from the tree entirely, not left
+        // behind as an empty sibling.
+        assert_eq!(hull.children.len(), 1);
+
+        let gun = &hull.children[0];
+        assert_eq!(gun.name, "gun");
+        assert_eq!(
+            [gun.matrix[12], gun.matrix[13], gun.matrix[14]],
+            [0.0, 4.0, 0.0]
+        );
+        assert!(gun.mesh.is_some());
+        assert!(gun.children.is_empty());
+    }
+
+    /// The same file, after a trip through Blender: Blender's object
+    /// namespace collides on name regardless of type, so the second object
+    /// under each doubled name, always the mesh, comes back renamed to
+    /// `.001`. The parent empty keeps the bare name. A rule that only matched
+    /// identical names would never fire here, which is the case #2619 itself
+    /// says matters most.
+    #[test]
+    fn folds_the_doubling_after_a_blender_round_trip_renamed_it() {
+        let (bin, views, accessors) = triangle();
+        let doc = json!({
+            "asset": { "version": "2.0" },
+            "scenes": [{ "nodes": [0] }],
+            "nodes": [
+                { "name": "hull", "translation": [1.0, 2.0, 3.0], "children": [1] },
+                { "name": "hull.001", "mesh": 0 },
+            ],
+            "meshes": [{ "primitives": [{
+                "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 },
+                "indices": 3,
+            }] }],
+            "accessors": accessors,
+            "bufferViews": views,
+            "buffers": [{ "byteLength": bin.len() }],
+        });
+        let model = read_bytes(&container(&doc, &bin)).expect("read");
+
+        assert_eq!(model.folded, 1);
+        assert_eq!(model.root.name, "hull");
+        assert!(model.root.mesh.is_some());
+        assert!(model.root.children.is_empty());
+    }
+
+    /// A hand authored empty-plus-mesh pair under two unrelated names must
+    /// never fold: the child's name is the one thing a unit script might
+    /// still address, and there is no exporter bug to blame for it looking
+    /// like this.
+    #[test]
+    fn does_not_fold_an_identity_child_with_a_different_name() {
+        let (bin, views, accessors) = triangle();
+        let doc = json!({
+            "asset": { "version": "2.0" },
+            "scenes": [{ "nodes": [0] }],
+            "nodes": [
+                { "name": "root", "children": [1] },
+                { "name": "detail", "mesh": 0 },
+            ],
+            "meshes": [{ "primitives": [{
+                "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 },
+                "indices": 3,
+            }] }],
+            "accessors": accessors,
+            "bufferViews": views,
+            "buffers": [{ "byteLength": bin.len() }],
+        });
+        let model = read_bytes(&container(&doc, &bin)).expect("read");
+
+        assert_eq!(model.folded, 0);
+        assert!(model.root.mesh.is_none());
+        assert_eq!(model.root.children.len(), 1);
+        assert_eq!(model.root.children[0].name, "detail");
+    }
+
+    /// A same-named child that has moved even slightly is not the exporter
+    /// bug's shape: the buggy exporter never set a position, rotation or
+    /// scale on the inner mesh at all.
+    #[test]
+    fn does_not_fold_a_same_named_child_that_is_not_at_the_identity() {
+        let (bin, views, accessors) = triangle();
+        let doc = json!({
+            "asset": { "version": "2.0" },
+            "scenes": [{ "nodes": [0] }],
+            "nodes": [
+                { "name": "hull", "children": [1] },
+                { "name": "hull", "mesh": 0, "translation": [0.1, 0.0, 0.0] },
+            ],
+            "meshes": [{ "primitives": [{
+                "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 },
+                "indices": 3,
+            }] }],
+            "accessors": accessors,
+            "bufferViews": views,
+            "buffers": [{ "byteLength": bin.len() }],
+        });
+        let model = read_bytes(&container(&doc, &bin)).expect("read");
+
+        assert_eq!(model.folded, 0);
+        assert!(model.root.mesh.is_none());
+        assert_eq!(model.root.children.len(), 1);
+    }
+
+    /// A same-named identity child that itself has children is not a doubled
+    /// mesh: folding it would take a real subtree along for the ride.
+    #[test]
+    fn does_not_fold_a_same_named_child_that_has_children_of_its_own() {
+        let (bin, views, accessors) = triangle();
+        let doc = json!({
+            "asset": { "version": "2.0" },
+            "scenes": [{ "nodes": [0] }],
+            "nodes": [
+                { "name": "hull", "children": [1] },
+                { "name": "hull", "mesh": 0, "children": [2] },
+                { "name": "detail" },
+            ],
+            "meshes": [{ "primitives": [{
+                "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 },
+                "indices": 3,
+            }] }],
+            "accessors": accessors,
+            "bufferViews": views,
+            "buffers": [{ "byteLength": bin.len() }],
+        });
+        let model = read_bytes(&container(&doc, &bin)).expect("read");
+
+        assert_eq!(model.folded, 0);
+        assert!(model.root.mesh.is_none());
+        assert_eq!(model.root.children.len(), 1);
+        assert_eq!(model.root.children[0].name, "hull");
+        assert!(model.root.children[0].mesh.is_some());
+    }
+
+    /// Two identity, leaf, same-named candidates under one parent is
+    /// ambiguous rather than a doubled mesh: the exporter bug only ever left
+    /// one, so a second candidate means this is not that shape.
+    #[test]
+    fn does_not_fold_when_more_than_one_candidate_matches() {
+        let (bin, views, accessors) = triangle();
+        let doc = json!({
+            "asset": { "version": "2.0" },
+            "scenes": [{ "nodes": [0] }],
+            "nodes": [
+                { "name": "hull", "children": [1, 2] },
+                { "name": "hull", "mesh": 0 },
+                { "name": "hull", "mesh": 0 },
+            ],
+            "meshes": [{ "primitives": [{
+                "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 },
+                "indices": 3,
+            }] }],
+            "accessors": accessors,
+            "bufferViews": views,
+            "buffers": [{ "byteLength": bin.len() }],
+        });
+        let model = read_bytes(&container(&doc, &bin)).expect("read");
+
+        assert_eq!(model.folded, 0);
+        assert!(model.root.mesh.is_none());
+        assert_eq!(model.root.children.len(), 2);
+    }
+
+    /// A node that already draws its own mesh is left alone regardless of
+    /// what its children look like: the exporter bug always left the parent
+    /// empty.
+    #[test]
+    fn does_not_fold_into_a_parent_that_already_has_a_mesh() {
+        let (bin, views, accessors) = triangle();
+        let doc = json!({
+            "asset": { "version": "2.0" },
+            "scenes": [{ "nodes": [0] }],
+            "nodes": [
+                { "name": "hull", "mesh": 0, "children": [1] },
+                { "name": "hull", "mesh": 0 },
+            ],
+            "meshes": [{ "primitives": [{
+                "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 },
+                "indices": 3,
+            }] }],
+            "accessors": accessors,
+            "bufferViews": views,
+            "buffers": [{ "byteLength": bin.len() }],
+        });
+        let model = read_bytes(&container(&doc, &bin)).expect("read");
+
+        assert_eq!(model.folded, 0);
+        assert!(model.root.mesh.is_some());
+        assert_eq!(model.root.children.len(), 1);
     }
 }

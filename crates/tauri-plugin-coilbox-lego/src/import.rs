@@ -592,6 +592,7 @@ mod tests {
                 images_used: 0,
                 invented_root: false,
                 transformed: 0,
+                folded: 0,
             }
         }
 
