@@ -22,7 +22,7 @@ use sidecar::{
     build_lua_args, build_lua_repl_args, build_map_info_args, build_map_meta_args,
     build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
     build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args,
-    build_unit_model_args, build_unit_models_args, build_unit_render_args,
+    build_unit_defs_args, build_unit_model_args, build_unit_models_args, build_unit_render_args,
     build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
@@ -778,6 +778,33 @@ async fn unitsync_unit_dataset<R: Runtime>(
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await
+}
+
+/// `unitsync_unit_defs`: load one game's archives and read every key it
+/// declares for every unit, out of the game's own def pipeline (issue #1269).
+/// The read the unit editor works against, where `unitsync_unit_dataset` above
+/// is the curated read a tech tree wants. Disk-cached on the game's sync
+/// checksum, so a game update invalidates it.
+#[tauri::command]
+async fn unitsync_unit_defs<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+) -> CliResult {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_unit_defs_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit defs", None).await
 }
 
 /// `unitsync_map_info` — load one map's archive set to read its options + any
@@ -1614,6 +1641,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_unit_buildpics,
             unitsync_faction_logos,
             unitsync_unit_dataset,
+            unitsync_unit_defs,
             unitsync_unit_model,
             unitsync_unit_models,
             unitsync_unit_script,
