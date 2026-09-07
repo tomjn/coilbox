@@ -17,13 +17,14 @@ use coilbox_unitsync_worker::RenderSource;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_config_set_args, build_convert_3do_args, build_faction_logos_args,
-    build_game_args, build_game_headers_args, build_height_field_args, build_heightmap_args,
-    build_lua_args, build_lua_repl_args, build_map_info_args, build_map_meta_args,
-    build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
-    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args,
-    build_unit_defs_args, build_unit_model_args, build_unit_models_args, build_unit_render_args,
-    build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
+    build_config_args, build_config_set_args, build_convert_3do_args, build_custom_params_args,
+    build_faction_logos_args, build_game_args, build_game_headers_args, build_height_field_args,
+    build_heightmap_args, build_lua_args, build_lua_repl_args, build_map_info_args,
+    build_map_meta_args, build_map_skybox_args, build_metalmap_args, build_minimap_args,
+    build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_unit_dataset_args, build_unit_defs_args, build_unit_model_args, build_unit_models_args,
+    build_unit_render_args, build_unit_render_keys_args, build_unit_script_args, find_unitsync,
+    resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::{BufRead, Read};
@@ -805,6 +806,35 @@ async fn unitsync_unit_defs<R: Runtime>(
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, SCAN_TIMEOUT, "unit defs", None).await
+}
+
+/// `unitsync_custom_params`: load one game's archives and index which of its own
+/// Lua files name each custom parameter (issue #2661).
+///
+/// The engine ignores custom parameters completely, so `unitsync_unit_defs`
+/// above can say a unit carries `techlevel` and nothing about what it does. This
+/// is the other half: a text search over the game's Lua for the file that reads
+/// it. Disk-cached on the game's sync checksum, so a game update invalidates it.
+#[tauri::command]
+async fn unitsync_custom_params<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+) -> CliResult {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_custom_params_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "custom parameters", None).await
 }
 
 /// `unitsync_map_info` — load one map's archive set to read its options + any
@@ -1642,6 +1672,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_faction_logos,
             unitsync_unit_dataset,
             unitsync_unit_defs,
+            unitsync_custom_params,
             unitsync_unit_model,
             unitsync_unit_models,
             unitsync_unit_script,

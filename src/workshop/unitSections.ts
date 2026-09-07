@@ -412,9 +412,9 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
         ],
       },
       {
-        // A table the engine reads whole and never looks inside, so it draws as
-        // one raw row here. Issue #2661 gives it an editor that knows which
-        // gadget reads which key.
+        // A table the engine reads whole and never looks inside, so every key
+        // in it means whatever this game's own Lua decides. One row per key,
+        // each carrying the file that reads it (issue #2661).
         id: "customParams",
         label: "Custom parameters",
         paths: ["customParams"],
@@ -517,6 +517,30 @@ function isRegistryContainer(path: string): boolean {
   return REGISTRY_PATHS_LOWER.some((known) => known.startsWith(prefix));
 }
 
+/**
+ * Whether a path is a `customParams` table.
+ *
+ * The one open table whose keys are walked into rather than shown as one blob
+ * of JSON. Every other open table is engine machinery a game fills in a shape
+ * the engine defines, while a custom parameter is a key that exists only
+ * because the game's own Lua reads it, so each one is a field in its own right
+ * and issue #2661 has something to say about each one separately.
+ */
+const isCustomParamsTable = (path: string) =>
+  matchKey(path).split(".").at(-1) === "customparams";
+
+/** The section id the `customParams` spec above declares, so a key inside the
+ *  table lands beside it rather than in the fallback section for keys the
+ *  registry has never heard of. */
+const CUSTOM_PARAMS_SECTION = "customParams";
+
+/** Whether a path names something inside a `customParams` table. */
+const isCustomParamKey = (path: string) => {
+  const parts = matchKey(path).split(".");
+  const at = parts.indexOf("customparams");
+  return at >= 0 && at < parts.length - 1;
+};
+
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
@@ -527,7 +551,9 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * The walk stops as soon as there is nothing useful below: at a table the
  * engine reads whole, at a value that is not a table, and at a table the
  * registry says nothing about, which becomes a single raw row rather than
- * however many rows a game's own nested data happens to contain.
+ * however many rows a game's own nested data happens to contain. A
+ * `customParams` table is the exception, for the reason {@link
+ * isCustomParamsTable} gives.
  */
 export function presentPaths(
   def: Record<string, unknown> | undefined,
@@ -536,8 +562,8 @@ export function presentPaths(
   const walk = (path: string, value: unknown) => {
     if (
       isPlainObject(value) &&
-      !isOpenTable(path) &&
-      isRegistryContainer(path)
+      (isCustomParamsTable(path) ||
+        (!isOpenTable(path) && isRegistryContainer(path)))
     ) {
       for (const key of Object.keys(value)) walk(`${path}.${key}`, value[key]);
       return;
@@ -668,6 +694,12 @@ function buildRow(
  * from. Array indices are deliberately left alone here, unlike in {@link
  * matchKey}: three weapon mounts are three fields, and folding their indices
  * into `*` would collapse them into one row.
+ *
+ * A registry key the def has already walked into is left out of the "all" view
+ * as well, on top of the statically known containers. `customParams` is a leaf
+ * to the registry and a table with rows of its own here, so without this a unit
+ * that declares two custom parameters would show both of them and then the
+ * whole table again as one blob of JSON.
  */
 function pathsForView(
   view: FieldView,
@@ -677,12 +709,16 @@ function pathsForView(
   const paths = new Map<string, string>();
   for (const path of [...present, ...overridden])
     paths.set(path.toLowerCase(), path);
-  if (view === "all")
+  if (view === "all") {
+    const walkedInto = [...paths.keys()];
     for (const path of REGISTRY_PATHS) {
       if (path.includes("*") || CONTAINER_PATHS.has(path)) continue;
       const key = path.toLowerCase();
-      if (!paths.has(key)) paths.set(key, path);
+      if (paths.has(key)) continue;
+      if (walkedInto.some((below) => below.startsWith(`${key}.`))) continue;
+      paths.set(key, path);
     }
+  }
   return [...paths.values()];
 }
 
@@ -707,11 +743,12 @@ export function unitFieldView(
   const bySection = new Map<string, FieldRow[]>();
   for (const path of paths) {
     const canonical = canonicalPath(path);
-    const section =
-      SECTION_OF_PATH.get(canonical) ??
-      (CANONICAL.has(canonical.toLowerCase())
-        ? UNPLACED_SECTION.id
-        : GAME_SECTION.id);
+    const section = isCustomParamKey(path)
+      ? CUSTOM_PARAMS_SECTION
+      : (SECTION_OF_PATH.get(canonical) ??
+        (CANONICAL.has(canonical.toLowerCase())
+          ? UNPLACED_SECTION.id
+          : GAME_SECTION.id));
     const row = buildRow(path, def, overrides, unitKey, presentSet);
     const rows = bySection.get(section);
     if (rows) rows.push(row);

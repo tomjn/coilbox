@@ -16,16 +16,22 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import type { CustomParamsResult } from "@/content/bindings";
+import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
 import { UnitFieldRow } from "./UnitFieldRow";
 
 export function UnitFieldGroups({
   view,
+  consumers,
   inheritedLabel,
   onChange,
   onReset,
 }: {
   view: UnitFieldView;
+  /** The game's custom parameter consumer index, or `null` while it is still
+   *  being read. Only custom parameter rows use it (issue #2661). */
+  consumers: CustomParamsResult | null;
   /** What to call the value underneath an edit, for a unit whose definition is
    *  not the game's. */
   inheritedLabel?: string;
@@ -71,6 +77,7 @@ export function UnitFieldGroups({
                     <UnitFieldRow
                       key={row.path}
                       row={row}
+                      note={consumerNote(row.path, consumers) ?? undefined}
                       inheritedLabel={inheritedLabel}
                       onChange={(value) => onChange(row, value)}
                       onReset={() => onReset(row)}

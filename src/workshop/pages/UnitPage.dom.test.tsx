@@ -21,7 +21,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { UnitDefsResult } from "@/content/bindings";
+import type { CustomParamsResult, UnitDefsResult } from "@/content/bindings";
 
 const SELECTED = {
   enginePath: "/engines/105",
@@ -68,6 +68,16 @@ vi.mock("@/content/config", () => ({
   }),
 }));
 
+/** The custom parameter consumer index, which most tests leave empty. */
+let mockConsumers: CustomParamsResult | null = null;
+/**
+ * A per-game answer, for the one test that needs `useCustomParams` to switch
+ * with the game the same way the real hook does (issue #2664 and #2661
+ * composing): empty everywhere else, so every other test's single flat
+ * `mockConsumers` still answers for whichever game is open.
+ */
+let mockConsumersByArchive: Record<string, CustomParamsResult | null> = {};
+
 vi.mock("../config", () => ({
   useUnitDefs: () => ({
     defs: mockDefs,
@@ -75,6 +85,17 @@ vi.mock("../config", () => ({
     error: null,
     reload: () => {},
     loading: mockStatus === "loading",
+  }),
+  useCustomParams: (
+    _enginePath?: string,
+    _dataDir?: string,
+    gameArchive?: string,
+  ) => ({
+    consumers:
+      gameArchive && Object.hasOwn(mockConsumersByArchive, gameArchive)
+        ? mockConsumersByArchive[gameArchive]
+        : mockConsumers,
+    loading: false,
   }),
 }));
 
@@ -168,6 +189,8 @@ afterEach(() => {
   cleanup();
   mockStatus = "ready";
   mockDataset = [];
+  mockConsumers = null;
+  mockConsumersByArchive = {};
 });
 
 describe("UnitPage", () => {
@@ -260,6 +283,75 @@ describe("UnitPage", () => {
       "value",
       "yes",
     );
+  });
+
+  /**
+   * Issue #2661. The engine ignores a custom parameter completely, so a row
+   * reading `canareaattack: true` says nothing at all on its own. The file that
+   * reads it is the whole answer, and the page has to reach the scan for it.
+   */
+  describe("custom parameters", () => {
+    const withParams = () =>
+      show({
+        armcom: { ...ARMCOM, customParams: { canareaattack: "1" } },
+      });
+
+    it("names the one file that reads a parameter", () => {
+      mockConsumers = {
+        params: {
+          canareaattack: {
+            sites: [
+              {
+                file: "luarules/gadgets/unit_areaattack.lua",
+                reads: 1,
+                writes: 0,
+              },
+            ],
+            files: 1,
+          },
+        },
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      withParams();
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).toContain("Read by");
+      expect(custom?.textContent).toContain(
+        "luarules/gadgets/unit_areaattack.lua",
+      );
+    });
+
+    /// A parameter nothing names is not the same as one nothing uses, and the
+    /// difference is the files that read the table whole.
+    it("says how many files read the table whole when nothing names the key", () => {
+      mockConsumers = {
+        params: {},
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      withParams();
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).toContain(
+        "No file in this game names this parameter.",
+      );
+      expect(custom?.textContent).toContain("9 files read the whole");
+    });
+
+    /// The scan runs alongside the defs and the page never waits on it, so a
+    /// row before it lands is a row with no note rather than a spinner.
+    it("draws the row with no note before the scan lands", () => {
+      mockConsumers = null;
+      withParams();
+      expect(screen.getByLabelText("canareaattack")).toHaveProperty(
+        "value",
+        "1",
+      );
+      expect(screen.queryByText(/Read by/)).toBeNull();
+    });
   });
 
   it("marks an edited field, keeps the game's value in view, and resets it", () => {
@@ -394,6 +486,72 @@ describe("UnitPage", () => {
       expect(healthBox().value).toBe("5000");
       expect(screen.getByText("1 change")).toBeTruthy();
     });
+
+    /**
+     * Issues #2664 and #2661 both scope a game's own read out of a flat map,
+     * and neither could prove the other switches correctly on its own: the
+     * consumer scan is keyed per game the same way overrides now are, so an
+     * edit and a consumer note must change together rather than one lagging
+     * behind the other.
+     */
+    it("switches the custom parameter rows and their consumer notes with the game", () => {
+      mockConsumersByArchive[GAME.primaryArchive.name] = {
+        params: {
+          canareaattack: {
+            sites: [
+              { file: "luarules/gadgets/unit_areaattack.lua", reads: 1, writes: 0 },
+            ],
+            files: 1,
+          },
+        },
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      mockConsumersByArchive[GAME_2.primaryArchive.name] = {
+        params: {},
+        wholeTableFiles: 3,
+        filesScanned: 200,
+        truncated: false,
+        errors: [],
+      };
+      show({ armcom: { ...ARMCOM, customParams: { canareaattack: "1" } } });
+      type(healthBox(), "5000");
+      expect(
+        screen.getByText("Custom parameters").closest("div")?.textContent,
+      ).toContain("luarules/gadgets/unit_areaattack.lua");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("3000");
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).not.toContain(
+        "luarules/gadgets/unit_areaattack.lua",
+      );
+      expect(custom?.textContent).toContain("3 files read the whole");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME.name },
+      });
+      fireEvent.click(
+        screen
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
+      );
+
+      expect(healthBox().value).toBe("5000");
+      expect(
+        screen.getByText("Custom parameters").closest("div")?.textContent,
+      ).toContain("luarules/gadgets/unit_areaattack.lua");
+    });
   });
 
   /**
@@ -476,6 +634,48 @@ describe("UnitPage", () => {
       expect(screen.queryByText(/\d+ changes?/)).toBeNull();
       expect(screen.queryByLabelText(/^Reset .* to the inherited value$/)) //
         .toBeNull();
+    });
+
+    /**
+     * A copy carries the source's `customParams`, and the scan is keyed on the
+     * parameter rather than on the unit, so a copy's parameters have the same
+     * answer the original's did. Neither #1272 nor #2661 could test this on its
+     * own, since one landed without the other.
+     */
+    it("keeps a copy's custom parameters one row each, with their notes", async () => {
+      mockConsumers = {
+        params: {
+          canareaattack: {
+            sites: [
+              {
+                file: "luarules/gadgets/unit_areaattack.lua",
+                reads: 1,
+                writes: 0,
+              },
+            ],
+            files: 1,
+          },
+        },
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      show({ armcom: { ...ARMCOM, customParams: { canareaattack: "1" } } });
+      await copy("armcom4", "Overlord");
+
+      // On the copy, not on the unit it came from.
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        "Overlord",
+      );
+      expect(screen.getByLabelText("canareaattack")).toHaveProperty(
+        "value",
+        "1",
+      );
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).toContain(
+        "luarules/gadgets/unit_areaattack.lua",
+      );
     });
 
     it("copies the unit as the project has it, edits included", async () => {

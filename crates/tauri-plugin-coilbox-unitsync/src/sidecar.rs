@@ -221,6 +221,29 @@ pub fn build_unit_defs_args(
     args
 }
 
+/// Build args for `--custom-params` mode: the game whose Lua to index for
+/// custom parameter consumers, plus the optional on-disk info-blob cache dir.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::CustomParamsArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode takes
+/// and `Mode::to_args` does not include (issue #2448).
+pub fn build_custom_params_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::CustomParams(coilbox_unitsync_worker::CustomParamsArgs {
+            game: game.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
+    args
+}
+
 /// Build args for `--unit-model` mode: the game whose archive holds the model,
 /// the unitdef `objectname` naming it, plus the directory extracted textures are
 /// cached in (and served from).
@@ -1538,6 +1561,38 @@ mod tests {
         assert!(without.contains(&"--unit-defs".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
         let recovered = UnitDefsArgs::from_args(&without).expect("valid argv");
+        assert_eq!(recovered.cache_dir, None);
+    }
+
+    /// What `build_custom_params_args` writes, the worker's own `from_args`
+    /// reads back whole. Three modes now take exactly this pair of fields, so
+    /// this also pins the flag that tells them apart (issue #2661).
+    #[test]
+    fn build_custom_params_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::CustomParamsArgs;
+
+        let a = build_custom_params_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            Some("/cache/info"),
+        );
+        assert!(a.contains(&"--custom-params".to_string()));
+        assert!(!a.contains(&"--unit-defs".to_string()));
+        assert!(!a.contains(&"--unit-dataset".to_string()));
+        let recovered = CustomParamsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            CustomParamsArgs {
+                game: "BAR.sdd".into(),
+                cache_dir: Some("/cache/info".into()),
+            }
+        );
+
+        let without = build_custom_params_args("/eng/libunitsync.so", "/data", "BAR.sdd", None);
+        assert!(without.contains(&"--custom-params".to_string()));
+        assert!(!without.iter().any(|x| x == "--cache-dir"));
+        let recovered = CustomParamsArgs::from_args(&without).expect("valid argv");
         assert_eq!(recovered.cache_dir, None);
     }
 

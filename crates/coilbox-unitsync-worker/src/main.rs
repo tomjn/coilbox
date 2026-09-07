@@ -18,6 +18,7 @@ mod assetencode;
 mod buildpic;
 mod config;
 mod convert3do;
+mod customparams;
 mod dataset;
 mod factionlogo;
 mod ffi;
@@ -158,6 +159,11 @@ struct Args {
     /// `coilbox_unitsync_worker::UnitDefsArgs`, shared with the sidecar plugin
     /// that builds this flag's argv (issue #2448).
     unit_defs: Option<Mode>,
+    /// `--custom-params`: index which of a game's own Lua files name each
+    /// custom parameter, for the unit editor's custom parameter rows. Its
+    /// fields live once in `coilbox_unitsync_worker::CustomParamsArgs`, shared
+    /// with the sidecar plugin that builds this flag's argv (issue #2448).
+    custom_params: Option<Mode>,
     /// `--unit-model`: read one unit's model out of a game, named by the
     /// unitdef `objectname`. Its fields live once in
     /// `coilbox_unitsync_worker::UnitModelArgs`, shared with the sidecar
@@ -439,6 +445,18 @@ fn run() -> i32 {
             || unitdefs::render(&args.lib, &mode.game, cache_dir),
             print_ok,
             || unitdefs::emit_error("worker panicked while reading unit defs".into()),
+        );
+    }
+
+    // Custom params: index which of a game's Lua files name each custom
+    // parameter, in one Init, disk-cached on the game's sync checksum. Checked
+    // before the --game game-detail mode because it also keys off --game.
+    if let Some(Mode::CustomParams(mode)) = &args.custom_params {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return run_mode(
+            || customparams::render(&args.lib, &mode.game, cache_dir),
+            print_ok,
+            || customparams::emit_error("worker panicked while scanning custom parameters".into()),
         );
     }
 
@@ -918,6 +936,10 @@ fn parse_args() -> Result<Args, String> {
     // locals here for its own use: `Mode::UnitDefs`'s `from_args` below
     // re-scans `raw` for those (issue #2448).
     let mut unit_defs_flag = false;
+    // `--custom-params`' own fields (game, cache directory) are not collected
+    // into locals here for its own use: `Mode::CustomParams`'s `from_args`
+    // below re-scans `raw` for those (issue #2448).
+    let mut custom_params_flag = false;
     // `--unit-model`'s own fields (game, object, cache directory) are not
     // collected into locals here for its own use: `Mode::UnitModel`'s
     // `from_args` below re-scans `raw` for those (issue #2448).
@@ -1017,6 +1039,7 @@ fn parse_args() -> Result<Args, String> {
             "--unit-buildpics" => unit_buildpics_flag = true,
             "--unit-dataset" => unit_dataset_flag = true,
             "--unit-defs" => unit_defs_flag = true,
+            "--custom-params" => custom_params_flag = true,
             "--unit-model" => unit_model_flag = true,
             "--unit-script" => unit_script_flag = true,
             "--unit-models" => unit_models_flag = true,
@@ -1204,6 +1227,13 @@ fn parse_args() -> Result<Args, String> {
         unit_defs: if unit_defs_flag {
             Some(Mode::UnitDefs(
                 coilbox_unitsync_worker::UnitDefsArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        custom_params: if custom_params_flag {
+            Some(Mode::CustomParams(
+                coilbox_unitsync_worker::CustomParamsArgs::from_args(&raw)?,
             ))
         } else {
             None
@@ -1468,6 +1498,16 @@ fn absolutize(args: &mut Args) {
     // from `raw` in `parse_args`, so it needs the same treatment. `--game` is a
     // unitsync name, not a path, so it is left alone.
     if let Some(Mode::UnitDefs(mode)) = args.unit_defs.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::CustomParams` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment. `--game` is a
+    // unitsync name, not a path, so it is left alone.
+    if let Some(Mode::CustomParams(mode)) = args.custom_params.as_mut() {
         if let Some(dir) = &mut mode.cache_dir {
             if let Some(abs) = absolute_path(dir) {
                 *dir = abs;
@@ -1926,6 +1966,7 @@ mod tests {
             unit_buildpics: None,
             unit_dataset: None,
             unit_defs: None,
+            custom_params: None,
             unit_model: None,
             unit_models: None,
             convert_3do: None,
