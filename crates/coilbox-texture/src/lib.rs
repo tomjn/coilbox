@@ -218,17 +218,27 @@ pub fn compose_texture1(
 /// not read by that shader and is written 0.
 ///
 /// Alpha is the one-bit visibility cutout the same shader thresholds at 0.5
-/// (`ModelFragProgGL4.glsl:97`). Neither `glow` nor `reflectivity` supplies
-/// one, so it is always written 255: fully visible. A unit whose existing
-/// second texture cuts geometry away with that channel loses the cutout when
-/// its shading map is rebuilt this way.
+/// (`ModelFragProgGL4.glsl:97`), and neither `glow` nor `reflectivity` supplies
+/// one. `existing` is how a cutout survives a rebuild instead: its alpha
+/// channel is carried into the result pixel for pixel. `existing` is the
+/// unit's current second texture, when it has one. With none, alpha is 255
+/// everywhere, which is correct because there is no cutout to lose.
 ///
-/// Each input's red channel is read, on the same greyscale assumption as
-/// [`compose_texture1`]'s mask. At least one of `glow` and `reflectivity` has
-/// to be given, and given both, they have to be the same size.
+/// `existing` not matching the composed size is refused only when it would
+/// actually lose something: if every one of its pixels is already fully
+/// visible, there is no cutout to carry and the mismatch is silently fine, the
+/// same result as if there were no `existing` at all. That keeps the common
+/// case, a unit with no cutout, from ever seeing a message about one. A real
+/// cutout at a mismatched size is refused rather than misapplied at the wrong
+/// coordinates, which would silently cut away the wrong pixels.
+///
+/// Each of `glow` and `reflectivity`'s red channel is read, on the same
+/// greyscale assumption as [`compose_texture1`]'s mask. At least one of the
+/// two has to be given, and given both, they have to be the same size.
 pub fn compose_texture2(
     glow: Option<&image::RgbaImage>,
     reflectivity: Option<&image::RgbaImage>,
+    existing: Option<&image::RgbaImage>,
 ) -> Result<image::RgbaImage, String> {
     let (width, height) = match (glow, reflectivity) {
         (Some(g), Some(r)) if g.dimensions() != r.dimensions() => {
@@ -244,12 +254,30 @@ pub fn compose_texture2(
         (None, Some(r)) => r.dimensions(),
         (None, None) => return Err("choose a glow map, a reflectivity map, or both".to_string()),
     };
+
+    let is_fully_visible = |img: &image::RgbaImage| img.pixels().all(|p| p.0[3] == 255);
+    let alpha_source = match existing {
+        None => None,
+        Some(existing) if existing.dimensions() == (width, height) => Some(existing),
+        Some(existing) if is_fully_visible(existing) => None,
+        Some(existing) => {
+            return Err(format!(
+                "the existing shading map is {}x{} and has a visibility cutout, but the new one would be {}x{}; make the glow and reflectivity layers this size to keep the cutout",
+                existing.width(),
+                existing.height(),
+                width,
+                height,
+            ));
+        }
+    };
+
     let mut out = image::RgbaImage::new(width, height);
     for y in 0..height {
         for x in 0..width {
             let r = glow.map_or(0, |g| g.get_pixel(x, y).0[0]);
             let g = reflectivity.map_or(0, |m| m.get_pixel(x, y).0[0]);
-            out.put_pixel(x, y, image::Rgba([r, g, 0, 255]));
+            let a = alpha_source.map_or(255, |existing| existing.get_pixel(x, y).0[3]);
+            out.put_pixel(x, y, image::Rgba([r, g, 0, a]));
         }
     }
     Ok(out)
@@ -695,12 +723,13 @@ mod tests {
     }
 
     /// Glow becomes red, reflectivity becomes green, blue is 0 and alpha is
-    /// fully opaque because neither input supplies a cutout mask.
+    /// fully opaque because there is no `existing` texture to carry a cutout
+    /// from.
     #[test]
     fn compose_texture2_places_glow_and_reflectivity_in_red_and_green() {
         let glow = grey(2, 2, 100);
         let reflect = grey(2, 2, 50);
-        let out = compose_texture2(Some(&glow), Some(&reflect)).expect("should compose");
+        let out = compose_texture2(Some(&glow), Some(&reflect), None).expect("should compose");
         assert_eq!(out.get_pixel(0, 0).0, [100, 50, 0, 255]);
     }
 
@@ -709,18 +738,18 @@ mod tests {
     #[test]
     fn compose_texture2_defaults_a_missing_side_to_zero() {
         let glow = grey(2, 2, 100);
-        let out = compose_texture2(Some(&glow), None).expect("should compose");
+        let out = compose_texture2(Some(&glow), None, None).expect("should compose");
         assert_eq!(out.get_pixel(0, 0).0, [100, 0, 0, 255]);
 
         let reflect = grey(2, 2, 50);
-        let out = compose_texture2(None, Some(&reflect)).expect("should compose");
+        let out = compose_texture2(None, Some(&reflect), None).expect("should compose");
         assert_eq!(out.get_pixel(0, 0).0, [0, 50, 0, 255]);
     }
 
     /// Neither input is an error, since there is nothing to build.
     #[test]
     fn compose_texture2_refuses_when_both_are_missing() {
-        assert!(compose_texture2(None, None).is_err());
+        assert!(compose_texture2(None, None, None).is_err());
     }
 
     /// Mismatched glow and reflectivity are refused rather than resampled.
@@ -728,8 +757,54 @@ mod tests {
     fn compose_texture2_refuses_mismatched_inputs() {
         let glow = grey(2, 2, 100);
         let reflect = grey(3, 3, 50);
-        let err = compose_texture2(Some(&glow), Some(&reflect)).expect_err("should refuse");
+        let err = compose_texture2(Some(&glow), Some(&reflect), None).expect_err("should refuse");
         assert!(err.contains("2x2"), "got: {err}");
         assert!(err.contains("3x3"), "got: {err}");
+    }
+
+    /// The specimen this all exists for: a unit whose second texture cuts a
+    /// hole in the model keeps that hole through a rebuild, because `existing`
+    /// carries its alpha into the new pixels rather than the rebuild flattening
+    /// it to fully visible.
+    #[test]
+    fn compose_texture2_carries_an_existing_cutout_over() {
+        let glow = grey(2, 2, 100);
+        let reflect = grey(2, 2, 50);
+        let mut existing = image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 0, 0, 255]));
+        existing.put_pixel(1, 1, image::Rgba([0, 0, 0, 0]));
+
+        let out =
+            compose_texture2(Some(&glow), Some(&reflect), Some(&existing)).expect("should compose");
+
+        assert_eq!(out.get_pixel(0, 0).0, [100, 50, 0, 255]);
+        assert_eq!(out.get_pixel(1, 1).0, [100, 50, 0, 0]);
+    }
+
+    /// A unit with no cutout at all, the common case, is unaffected by
+    /// `existing` even when it is a different size from the map being built:
+    /// there is nothing in it to lose, so no error and no message.
+    #[test]
+    fn compose_texture2_ignores_a_mismatched_existing_texture_with_no_cutout() {
+        let glow = grey(2, 2, 100);
+        let existing = image::RgbaImage::from_pixel(8, 8, image::Rgba([9, 9, 9, 255]));
+
+        let out =
+            compose_texture2(Some(&glow), None, Some(&existing)).expect("should still compose");
+
+        assert_eq!(out.get_pixel(0, 0).0, [100, 0, 0, 255]);
+    }
+
+    /// A real cutout at a mismatched size is refused rather than applied at
+    /// the wrong coordinates, which would silently cut away the wrong pixels.
+    #[test]
+    fn compose_texture2_refuses_a_mismatched_existing_texture_with_a_real_cutout() {
+        let glow = grey(2, 2, 100);
+        let mut existing = image::RgbaImage::from_pixel(4, 4, image::Rgba([0, 0, 0, 255]));
+        existing.put_pixel(0, 0, image::Rgba([0, 0, 0, 0]));
+
+        let err = compose_texture2(Some(&glow), None, Some(&existing)).expect_err("should refuse");
+
+        assert!(err.contains("4x4"), "got: {err}");
+        assert!(err.contains("2x2"), "got: {err}");
     }
 }

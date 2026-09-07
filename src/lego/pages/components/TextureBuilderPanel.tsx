@@ -104,6 +104,7 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
       const stored = await legoTextureComposeShading({
         glow,
         reflectivity,
+        existing: imported.texture2?.key ?? null,
         name,
       });
       onChange({
@@ -143,6 +144,7 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
         />
         <PickRow
           label="Team-colour mask (greyscale, optional)"
+          note="Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
           path={mask}
           onChoose={() => void pick("Choose a team-colour mask", setMask)}
           onClear={() => setMask(null)}
@@ -169,11 +171,13 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
       <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
         <span className="text-sm font-medium">Shading map</span>
         <p className="text-xs text-muted-foreground">
-          Glow into red, reflectivity into green. Blue is not read by the engine
-          and alpha is always written fully opaque, since neither map here
-          supplies the one-bit cutout the engine also reads from this texture: a
-          unit whose current one hides geometry with that channel loses the
-          cutout when this replaces it. This is{" "}
+          Glow into red, reflectivity into green. Blue is not read by the
+          engine. Neither map here supplies alpha, the one-bit visibility cutout
+          the engine also reads from this texture, so if this unit already has
+          one, its existing cutout carries over into the result rather than
+          being erased. A cutout that cannot be carried over, because the new
+          size does not match it, is refused rather than guessed at. With no
+          existing texture, alpha is written fully opaque. This is{" "}
           <code>
             {imported.texture2?.name ?? imported.missingTexture2 ?? "texture2"}
           </code>
@@ -181,12 +185,14 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
         </p>
         <PickRow
           label="Glow (greyscale, optional)"
+          note="Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
           path={glow}
           onChoose={() => void pick("Choose a glow map", setGlow)}
           onClear={() => setGlow(null)}
         />
         <PickRow
           label="Reflectivity (greyscale, optional)"
+          note="Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
           path={reflectivity}
           onChoose={() =>
             void pick("Choose a reflectivity map", setReflectivity)
@@ -219,11 +225,15 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
 /** One layer to choose, with what was chosen and a way to clear it. */
 function PickRow({
   label,
+  note,
   path,
   onChoose,
   onClear,
 }: {
   label: string;
+  /** A short rule about the file itself, shown under the picker rather than
+   *  only in a doc comment nobody choosing a file will read. */
+  note?: string;
   path: string | null;
   onChoose: () => void;
   onClear: () => void;
@@ -253,6 +263,9 @@ function PickRow({
           </Button>
         ) : null}
       </div>
+      {note ? (
+        <span className="text-[11px] text-muted-foreground">{note}</span>
+      ) : null}
     </div>
   );
 }

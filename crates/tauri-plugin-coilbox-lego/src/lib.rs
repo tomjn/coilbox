@@ -1154,17 +1154,34 @@ async fn lego_texture_compose_colour<R: Runtime>(
     }
 }
 
+/// Read a texture already in the store by its key and decode it, for carrying
+/// an existing shading map's cutout into a rebuilt one. Goes through
+/// `stored_texture_source` for the same key validation every other reader of
+/// the store uses, rather than trusting a key handed across the IPC boundary.
+fn read_stored_texture(dir: &Path, key: &str) -> Result<image::RgbaImage, String> {
+    let path = stored_texture_source(dir, key)?;
+    read_texture(path.to_str().ok_or("the store holds a non-UTF-8 path")?)
+}
+
 /// `lego_texture_compose_shading` builds an `.s3o`'s second texture from
 /// separate glow and reflectivity maps, the other half of the same composer.
-/// See `coilbox_texture::compose_texture2` for the channel layout and what an
-/// existing visibility cutout loses when this replaces it.
+///
+/// `existing` is the unit's current second texture, by its store key, so a
+/// visibility cutout it carries survives the rebuild: see
+/// `coilbox_texture::compose_texture2` for how and when that is possible.
+/// `None` when the unit has no second texture yet.
 #[tauri::command]
 async fn lego_texture_compose_shading<R: Runtime>(
     app: AppHandle<R>,
     glow: Option<String>,
     reflectivity: Option<String>,
+    existing: Option<String>,
     name: String,
 ) -> CliResult {
+    let dir = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
     let glow_img = match glow.as_deref().map(read_texture).transpose() {
         Ok(img) => img,
         Err(e) => return CliResult::err(e),
@@ -1173,13 +1190,20 @@ async fn lego_texture_compose_shading<R: Runtime>(
         Ok(img) => img,
         Err(e) => return CliResult::err(e),
     };
-    let composed =
-        match coilbox_texture::compose_texture2(glow_img.as_ref(), reflectivity_img.as_ref()) {
-            Ok(img) => img,
-            Err(e) => return CliResult::err(e),
-        };
-    let dir = match lego_dir(&app) {
-        Ok(dir) => dir.join("textures"),
+    let existing_img = match existing
+        .as_deref()
+        .map(|key| read_stored_texture(&dir, key))
+        .transpose()
+    {
+        Ok(img) => img,
+        Err(e) => return CliResult::err(e),
+    };
+    let composed = match coilbox_texture::compose_texture2(
+        glow_img.as_ref(),
+        reflectivity_img.as_ref(),
+        existing_img.as_ref(),
+    ) {
+        Ok(img) => img,
         Err(e) => return CliResult::err(e),
     };
     match store_sheet(&dir, &composed, &name) {
@@ -2136,5 +2160,29 @@ mod tests {
         let err = read_texture(path.to_str().expect("utf8 path")).expect_err("should refuse");
 
         assert!(err.contains("not-really.png"), "got: {err}");
+    }
+
+    /// `read_stored_texture` is `lego_texture_compose_shading`'s way of loading
+    /// a unit's current second texture to carry its cutout forward: a real key
+    /// in the store decodes the same as any other texture.
+    #[test]
+    fn read_stored_texture_decodes_a_key_already_in_the_store() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let img = image::RgbaImage::from_pixel(2, 2, image::Rgba([1, 2, 3, 0]));
+        let png = coilbox_texture::encode_png(&img).expect("encode");
+        std::fs::write(dir.path().join("existing.png"), &png).expect("write");
+
+        let decoded = read_stored_texture(dir.path(), "existing.png").expect("should decode");
+
+        assert_eq!(decoded.get_pixel(0, 0).0, [1, 2, 3, 0]);
+    }
+
+    /// A key that is not a bare file name, the same shape `stored_texture_source`
+    /// already refuses everywhere else, is refused here too rather than being
+    /// joined onto the store directory unchecked.
+    #[test]
+    fn read_stored_texture_refuses_a_key_that_is_not_a_bare_file_name() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        assert!(read_stored_texture(dir.path(), "../elsewhere.png").is_err());
     }
 }

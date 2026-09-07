@@ -414,13 +414,22 @@ export const legoTextureComposeColour = defineCommand<
 
 /**
  * Build an s3o's second texture from separate glow and reflectivity maps, red
- * and green respectively, blue unused and alpha always fully opaque since
- * neither input supplies the one-bit visibility cutout the engine also reads
- * there. See `coilbox_texture::compose_texture2` for the proof. At least one
- * of `glow` and `reflectivity` is required.
+ * and green respectively, blue unused. Neither input carries the one-bit
+ * visibility cutout the engine also reads from this texture, so `existing` is
+ * the unit's current second texture by its store key: its alpha survives into
+ * the result where the sizes allow it, rather than the cutout being flattened
+ * to fully visible. `null` when the unit has no second texture yet, which
+ * writes fully visible because there is then no cutout to lose. See
+ * `coilbox_texture::compose_texture2` for the exact rule. At least one of
+ * `glow` and `reflectivity` is required.
  */
 export const legoTextureComposeShading = defineCommand<
-  { glow: string | null; reflectivity: string | null; name: string },
+  {
+    glow: string | null;
+    reflectivity: string | null;
+    existing: string | null;
+    name: string;
+  },
   ComposedTexture
 >("coilbox-lego", "lego_texture_compose_shading");
 
