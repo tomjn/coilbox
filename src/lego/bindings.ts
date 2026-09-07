@@ -331,6 +331,11 @@ export interface ThreeDoImport extends S3oImport {
    *  drew and rooted nothing of their own, so nothing could ever have reached
    *  them by that name. See `is_dead_duplicate` in the Rust import. */
   droppedPieces: number;
+  /** Faces dropped as base plates: a large flat quad facing straight down,
+   *  which is the footprint a Total Annihilation era exporter left for the
+   *  selection box rather than real geometry. Nothing is wrong with the
+   *  model, these are simply not drawn. */
+  basePlateFaces: number;
   /** How many distinct tiles the model names, so the panel can say how many of
    *  them were found. */
   tiles: number;

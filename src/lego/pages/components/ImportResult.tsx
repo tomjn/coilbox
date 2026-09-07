@@ -357,6 +357,11 @@ function conversionNotes(result: ThreeDoImport): string[] {
       `${result.droppedPieces} empty child ${result.droppedPieces === 1 ? "piece" : "pieces"} shared an earlier sibling's name and drew nothing, so nothing could ever have addressed ${result.droppedPieces === 1 ? "it" : "them"} by that name. ${result.droppedPieces === 1 ? "It has" : "They have"} been left out.`,
     );
   }
+  if (result.basePlateFaces > 0) {
+    notes.push(
+      `${result.basePlateFaces} base-plate ${result.basePlateFaces === 1 ? "face" : "faces"}, a flat panel some exporters left facing straight down to mark the selection box rather than real geometry, ${result.basePlateFaces === 1 ? "has" : "have"} been dropped.`,
+    );
+  }
   return notes;
 }
 

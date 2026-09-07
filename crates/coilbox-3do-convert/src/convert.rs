@@ -44,6 +44,10 @@ pub struct Converted {
     /// Child pieces dropped as dead duplicates of an earlier sibling. See
     /// [`is_dead_duplicate`] for the exact rule.
     pub dropped_pieces: usize,
+    /// Faces the reader already dropped as base plates, carried through
+    /// unchanged from [`coilbox_3do::Model::base_plate_faces`] for a caller
+    /// reporting on the whole conversion.
+    pub base_plate_faces: usize,
     /// Vertices and triangles written, for a caller reporting what it did.
     pub vertices: usize,
     pub triangles: usize,
@@ -103,6 +107,7 @@ pub fn to_s3o(
         missing_texture_faces: state.missing_texture_faces,
         missing_textures: state.missing.into_iter().collect(),
         dropped_pieces: state.dropped_pieces,
+        base_plate_faces: model.base_plate_faces,
         vertices: state.vertices,
         triangles: state.triangles,
     })
@@ -358,6 +363,7 @@ mod tests {
             radius: 1.5,
             height: 2.0,
             mid: [0.0, 1.0, 0.0],
+            base_plate_faces: 0,
             root,
         }
     }
@@ -550,6 +556,19 @@ mod tests {
         assert_eq!(out.palette_faces, 1);
         assert_eq!(out.missing_texture_faces, 1);
         assert_eq!(out.triangles, 1);
+    }
+
+    /// The reader already dropped these before this ever sees the model, so
+    /// there is nothing to count here: the figure is carried straight through
+    /// for a caller reporting on the whole conversion.
+    #[test]
+    fn carries_the_readers_base_plate_count_through_untouched() {
+        let mut model = model3(piece3("body", vec![textured(vec![0, 1, 2])]));
+        model.base_plate_faces = 3;
+
+        let out = to_s3o(&model, &rects(), "a.png").expect("convert");
+
+        assert_eq!(out.base_plate_faces, 3);
     }
 
     /// A sheet with no fallback tile is a caller mistake, and it is named

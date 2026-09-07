@@ -117,6 +117,9 @@ fn drops_the_root_selection_face_only() {
     let model = read(&file.bytes).expect("parses");
     assert!(model.root.primitives.is_empty());
     assert_eq!(model.root.children[0].primitives.len(), 1);
+    // Dropped as the root's selection face, not as a base plate: the two
+    // reasons a face never reaches the model are counted apart.
+    assert_eq!(model.base_plate_faces, 0);
 }
 
 #[test]
@@ -162,6 +165,9 @@ fn drops_faces_the_engine_never_draws() {
         "a base plate and a two-corner face both have to go, got {:?}",
         model.root.primitives
     );
+    // Only the base plate is counted: the two-corner face is dropped for
+    // being too few corners to be a face at all, not for being a plate.
+    assert_eq!(model.base_plate_faces, 1);
 }
 
 #[test]

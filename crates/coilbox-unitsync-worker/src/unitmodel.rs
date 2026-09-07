@@ -1422,6 +1422,7 @@ mod tests {
             radius: 1.0,
             height: 1.0,
             mid: [0.0; 3],
+            base_plate_faces: 0,
             root: a_piece(vec![palette_face(3)]),
         };
 
@@ -1449,6 +1450,7 @@ mod tests {
             radius: 1.0,
             height: 1.0,
             mid: [0.0; 3],
+            base_plate_faces: 0,
             root: a_piece(vec![palette_face(9)]),
         };
 
@@ -1470,6 +1472,7 @@ mod tests {
             radius: 1.0,
             height: 1.0,
             mid: [0.0; 3],
+            base_plate_faces: 0,
             root: a_piece(vec![named_face("")]),
         };
 
@@ -1493,6 +1496,7 @@ mod tests {
             radius: 1.0,
             height: 1.0,
             mid: [0.0; 3],
+            base_plate_faces: 0,
             root: a_piece(vec![named_face(""), named_face("arm2")]),
         };
         let mut out = from_3do("objects3d/armcom.3do", &model, None);
@@ -1519,6 +1523,7 @@ mod tests {
             radius: 1.0,
             height: 1.0,
             mid: [0.0; 3],
+            base_plate_faces: 0,
             root: a_piece(vec![palette_face(3), palette_face(3)]),
         };
 

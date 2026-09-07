@@ -137,6 +137,7 @@ mod tests {
             radius: 1.0,
             height: 1.0,
             mid: [0.0; 3],
+            base_plate_faces: 0,
             root: coilbox_3do::Piece {
                 name: "body".into(),
                 offset: [0.0; 3],

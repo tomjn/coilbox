@@ -882,6 +882,7 @@ async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String
         "paletteFaces": imported.palette_faces,
         "missingTextures": imported.missing_textures,
         "droppedPieces": imported.dropped_pieces,
+        "basePlateFaces": imported.base_plate_faces,
         "tiles": wanted,
     });
     match serde_json::to_value(out) {
