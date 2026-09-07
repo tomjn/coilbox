@@ -63,6 +63,10 @@ coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
 # dependency-free and read-only here.
 coilbox-s3o = { path = "../coilbox-s3o" }
 coilbox-3do = { path = "../coilbox-3do" }
+# Turning a whole game's `.3do` roster into `.s3o` (issue #2573). The packer and
+# the geometry rules are shared with the unit builder's single model import, so
+# a unit converted here and the same unit opened there cannot disagree.
+coilbox-3do-convert = { path = "../coilbox-3do-convert" }
 
 [dev-dependencies]
 # Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a

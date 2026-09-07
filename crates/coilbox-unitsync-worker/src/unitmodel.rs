@@ -42,11 +42,11 @@ pub(crate) const CACHE_VERSION: u32 = 3;
 
 /// Models are a few megabytes at most: the largest in the games checked is a
 /// 3.2 MiB `.s3o`. Bound the read anyway.
-const MODEL_READ_CAP: usize = 64 * 1024 * 1024;
+pub(crate) const MODEL_READ_CAP: usize = 64 * 1024 * 1024;
 
 /// Textures go up to Splinter Faction's 64 MiB shared atlas. Anything past this
 /// is not a unit texture.
-const TEXTURE_READ_CAP: usize = 128 * 1024 * 1024;
+pub(crate) const TEXTURE_READ_CAP: usize = 128 * 1024 * 1024;
 
 /// How many bytes of texture a batch keeps between its models (issue #1676).
 ///
@@ -60,14 +60,14 @@ const TEXTURE_READ_CAP: usize = 128 * 1024 * 1024;
 const TEXTURE_CACHE_BUDGET: usize = 256 * 1024 * 1024;
 
 /// Where the engine looks for a unitdef's `objectname`.
-const MODEL_DIR: &str = "objects3d";
+pub(crate) const MODEL_DIR: &str = "objects3d";
 
 /// Where an `.s3o` header's texture name resolves against.
 const S3O_TEXTURE_DIR: &str = "unittextures";
 
 /// Where a `.3do` face's texture name resolves against, and where the list of
 /// names that skip the `00` suffix lives.
-const TATEX_DIR: &str = "unittextures/tatex";
+pub(crate) const TATEX_DIR: &str = "unittextures/tatex";
 const TEAMTEX_LIST: &str = "unittextures/tatex/teamtex.txt";
 
 /// Where the Total Annihilation palette lives: 256 4-byte entries the engine
@@ -852,7 +852,7 @@ fn locate_texture(
 }
 
 /// Find `<dir>/<stem>.<ext>` for the first extension that exists.
-fn find_with_ext(list: &[(String, String)], dir: &str, stem: &str) -> Option<String> {
+pub(crate) fn find_with_ext(list: &[(String, String)], dir: &str, stem: &str) -> Option<String> {
     TEXTURE_EXTS
         .iter()
         .find_map(|ext| find_member(list, &format!("{dir}/{stem}.{ext}")))
@@ -860,7 +860,7 @@ fn find_with_ext(list: &[(String, String)], dir: &str, stem: &str) -> Option<Str
 
 /// Find an archive member whose path equals or ends with `/<target_lc>`
 /// (case-insensitive). Mirrors the build-pic and sidepic resolvers.
-fn find_member(list: &[(String, String)], target_lc: &str) -> Option<String> {
+pub(crate) fn find_member(list: &[(String, String)], target_lc: &str) -> Option<String> {
     let suffix = format!("/{target_lc}");
     list.iter()
         .find(|(lower, _)| lower == target_lc || lower.ends_with(&suffix))

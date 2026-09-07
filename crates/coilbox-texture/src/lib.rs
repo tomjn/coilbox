@@ -24,7 +24,7 @@ pub fn decode(ext: &str, bytes: &[u8]) -> Option<image::RgbaImage> {
         "dds" => decode_dds(bytes),
         "png" => load_rgba(bytes, image::ImageFormat::Png),
         "jpg" | "jpeg" => load_rgba(bytes, image::ImageFormat::Jpeg),
-        "tga" => load_rgba(bytes, image::ImageFormat::Tga),
+        "tga" => decode_tga(bytes),
         "bmp" => load_rgba(bytes, image::ImageFormat::Bmp),
         "gif" => load_rgba(bytes, image::ImageFormat::Gif),
         "tif" | "tiff" => decode_tiff(bytes),
@@ -55,6 +55,36 @@ fn load_rgba(bytes: &[u8], format: image::ImageFormat) -> Option<image::RgbaImag
             .ok()?
             .to_rgba8(),
     )
+}
+
+/// Decode a TGA, ignoring an attribute-bit count a colour-mapped file has no
+/// business carrying.
+///
+/// Balanced Annihilation's `unittextures/tatex/camoc0200.tga` is 8-bit
+/// colour-mapped with a 24-bit colour map, and its image descriptor claims 8
+/// attribute bits. An indexed pixel has no channels to put them in and the
+/// colour map has no alpha in it either, so the count describes nothing. The
+/// `image` crate takes it at its word, works out a colour type of `Unknown(8)`
+/// and refuses the file. Eleven `.3do` models in that game are painted with it,
+/// and every one of them came out with a grey camouflage patch and a note
+/// saying the texture was missing, when the texture was there all along.
+///
+/// So a file that failed and is colour-mapped is offered once more with the
+/// attribute count cleared. Nothing that decodes today goes down this path: it
+/// is only reached after the ordinary decode has already failed.
+fn decode_tga(bytes: &[u8]) -> Option<image::RgbaImage> {
+    if let Some(image) = load_rgba(bytes, image::ImageFormat::Tga) {
+        return Some(image);
+    }
+    // Byte 1 is the colour map type and byte 17 the image descriptor, whose low
+    // four bits are the attribute-bit count. Both are in the fixed 18-byte
+    // header, so a file too short to hold one is not a TGA to begin with.
+    if bytes.len() < 18 || bytes[1] != 1 || bytes[17] & 0x0f == 0 {
+        return None;
+    }
+    let mut retry = bytes.to_vec();
+    retry[17] &= 0xf0;
+    load_rgba(&retry, image::ImageFormat::Tga)
 }
 
 /// Decode a TIFF, reading a fourth sample the file declines to name as alpha.
@@ -406,6 +436,56 @@ fn bc_format(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One 2 by 1 uncompressed 8-bit colour-mapped TGA with a 24-bit colour
+    /// map: red then green. `attribute_bits` goes in the image descriptor's low
+    /// four bits, which is where Balanced Annihilation's `camoc0200.tga` claims
+    /// eight of them on pixels that have no channels to hold any.
+    fn indexed_tga(attribute_bits: u8) -> Vec<u8> {
+        let mut raw = vec![0u8; 18];
+        raw[1] = 1; // there is a colour map
+        raw[2] = 1; // uncompressed, colour-mapped
+        raw[5] = 2; // two entries in it
+        raw[7] = 24; // three bytes each
+        raw[12] = 2; // width
+        raw[14] = 1; // height
+        raw[16] = 8; // one byte a pixel, an index
+        raw[17] = attribute_bits;
+        raw.extend_from_slice(&[0, 0, 0xff]); // BGR: red
+        raw.extend_from_slice(&[0, 0xff, 0]); // BGR: green
+        raw.extend_from_slice(&[0, 1]);
+        raw
+    }
+
+    /// The specimen: eleven of Balanced Annihilation's `.3do` models are
+    /// painted with a colour-mapped TGA whose descriptor claims eight attribute
+    /// bits, and every one of them came out with a grey patch and a note saying
+    /// the texture was missing.
+    #[test]
+    fn decodes_a_colour_mapped_tga_whose_descriptor_claims_attribute_bits() {
+        let img = decode("tga", &indexed_tga(8)).expect("the retry decodes it");
+
+        assert_eq!(img.dimensions(), (2, 1));
+        assert_eq!(img.get_pixel(0, 0).0, [0xff, 0, 0, 255]);
+        assert_eq!(img.get_pixel(1, 0).0, [0, 0xff, 0, 255]);
+    }
+
+    /// The ordinary file takes the ordinary path and comes out the same, so the
+    /// retry above changes nothing that already worked.
+    #[test]
+    fn a_colour_mapped_tga_with_an_honest_descriptor_is_unaffected() {
+        let img = decode("tga", &indexed_tga(0)).expect("decodes");
+
+        assert_eq!(img.get_pixel(0, 0).0, [0xff, 0, 0, 255]);
+    }
+
+    /// Bytes that are not a TGA at all are still refused rather than retried
+    /// into something.
+    #[test]
+    fn bytes_that_are_not_a_tga_are_still_refused() {
+        assert!(decode("tga", b"nowhere near a tga").is_none());
+        assert!(decode("tga", &[]).is_none());
+    }
 
     /// A 2x2 RGBA PNG built in-memory decodes back to a 2x2 RgbaImage.
     #[test]

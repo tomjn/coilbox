@@ -37,6 +37,7 @@
 pub enum Mode {
     UnitRender(UnitRenderArgs),
     UnitModels(UnitModelsArgs),
+    Convert3do(Convert3doArgs),
     UnitRenderKeys(UnitRenderKeysArgs),
     /// `--config`: read the curated set of engine settings. No fields of its
     /// own beyond the flag, so this is a unit variant rather than an empty
@@ -77,6 +78,7 @@ impl Mode {
         match self {
             Mode::UnitRender(args) => args.to_args(),
             Mode::UnitModels(args) => args.to_args(),
+            Mode::Convert3do(args) => args.to_args(),
             Mode::UnitRenderKeys(args) => args.to_args(),
             Mode::Config => vec!["--config".to_string()],
             Mode::ConfigSet(args) => args.to_args(),
@@ -388,6 +390,62 @@ impl UnitModelsArgs {
             game: game.unwrap_or_default(),
             units_file,
             cache_dir,
+        })
+    }
+}
+
+/// `--convert-3do`: turn every `.3do` in a game into an `.s3o`, one sheet per
+/// model folder, in one mount (issue #2573).
+///
+/// The output folder is the whole point of the mode, so it is required rather
+/// than optional, the same rule `--unit-models` puts on its cache directory and
+/// for the same reason: there is nothing to report without somewhere to write.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Convert3doArgs {
+    pub game: String,
+    /// Where the converted models, their sheets and the sheets' records are
+    /// written. Required.
+    pub out_dir: String,
+}
+
+impl Convert3doArgs {
+    pub fn to_args(&self) -> Vec<String> {
+        vec![
+            "--convert-3do".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--out-dir".to_string(),
+            self.out_dir.clone(),
+        ]
+    }
+
+    /// Recover a `--convert-3do` invocation from a worker argv. As with the
+    /// others here, `args` may be exactly what [`Convert3doArgs::to_args`]
+    /// returns or a full process argv carrying unrelated flags, which are
+    /// skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut out_dir = None;
+
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--out-dir" => out_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+
+        let Some(out_dir) = out_dir else {
+            return Err("--convert-3do needs --out-dir <directory>".into());
+        };
+        if game.as_deref().unwrap_or_default().trim().is_empty() {
+            return Err("--convert-3do needs --game <archive>".into());
+        }
+
+        Ok(Convert3doArgs {
+            game: game.unwrap_or_default(),
+            out_dir,
         })
     }
 }
