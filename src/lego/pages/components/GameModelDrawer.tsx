@@ -1,5 +1,5 @@
 /**
- * Open a unit into the builder by choosing a game and then a unit.
+ * Open a model into the builder by choosing a game and then a model.
  *
  * The file dialog asks for a path, and somebody working on a game knows the unit
  * as "Commander" rather than as `objects3d/armcom.s3o` (#1817). Two tiers answer
@@ -249,7 +249,7 @@ export function GameModelDrawer({
               </Button>
             ) : null}
             <DialogPrimitive.Title className="flex-1 truncate text-base font-semibold">
-              {game ? game.name : "Open a unit from a game"}
+              {game ? game.name : "Open a model from a game"}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label="Close">
@@ -309,8 +309,8 @@ export function GameModelDrawer({
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search this game's units"
-                  aria-label="Search this game's units"
+                  placeholder="Search this game's models"
+                  aria-label="Search this game's models"
                   className="h-8 pl-8"
                 />
               </div>
@@ -377,7 +377,7 @@ function GameList({
   if (games.length === 0) {
     return (
       <p className="px-5 py-4 text-xs text-muted-foreground">
-        No games are installed, so there is nothing to open a unit out of. Add
+        No games are installed, so there is nothing to open a model out of. Add
         one under Content.
       </p>
     );

@@ -205,7 +205,7 @@ async function readThreeDo(options: {
   return {
     state: "imported",
     refused:
-      "It was not made here: This is a .3do, the older model format. Coilbox has never written one, so it cannot be a unit coming home, and it has been converted instead.",
+      "It was not made here: This is a .3do, the older model format. Coilbox has never written one, so it cannot be a model coming home, and it has been converted instead.",
     notes: conversionNotes(result),
     imported: projectFromImport(result, {
       id,
@@ -252,7 +252,7 @@ async function readGlb(options: {
   return {
     state: "imported",
     refused:
-      "A .glb is what coilbox writes for Blender, and no Spring engine reads one, so it is never a unit coming home as parts. Its objects have been read as pieces exactly as they stand.",
+      "A .glb is what coilbox writes for Blender, and no Spring engine reads one, so it is never a model coming home as parts. Its objects have been read as pieces exactly as they stand.",
     notes: glbNotes(result),
     textureNotes: glbTextureNotes(result),
     textureFrom:
@@ -298,7 +298,7 @@ function glbNotes(result: GlbImport): string[] {
   }
   if (result.flatShaded > 0) {
     notes.push(
-      `${result.flatShaded} ${result.flatShaded === 1 ? "mesh came" : "meshes came"} with no normals, so they have been worked out from the faces. Fix them under Fix UVs and normals if the unit lights oddly.`,
+      `${result.flatShaded} ${result.flatShaded === 1 ? "mesh came" : "meshes came"} with no normals, so they have been worked out from the faces. Fix them under Fix UVs and normals if the model lights oddly.`,
     );
   }
   if (result.skipped > 0) {
@@ -320,16 +320,16 @@ function glbTextureNotes(result: GlbImport): string[] {
   const notes: string[] = [];
   if (result.imagesUsed > 1) {
     notes.push(
-      `The file paints with ${result.imagesUsed} pictures and a Spring unit has one texture, so the first was taken and the rest were left. Pieces mapped onto one of the others will draw the wrong thing.`,
+      `The file paints with ${result.imagesUsed} pictures and a Spring model has one texture, so the first was taken and the rest were left. Pieces mapped onto one of the others will draw the wrong thing.`,
     );
   }
   if (result.texture.key && !result.teamMask) {
     notes.push(
-      "Its picture is fully opaque. An .s3o reads that picture's alpha as the team-colour mask, and fully opaque means every pixel of the unit is painted in the player's colour, so the alpha has been written to nothing instead: the unit keeps its own colours and has no team-colour markings. The .glb export drops the mask on the way out, so this is what a coilbox unit that has been to Blender and back looks like. Point the unit at the game's own texture on the Texture tab to get the markings back.",
+      "Its picture is fully opaque. An .s3o reads that picture's alpha as the team-colour mask, and fully opaque means every pixel of the model is painted in the player's colour, so the alpha has been written to nothing instead: the model keeps its own colours and has no team-colour markings. The .glb export drops the mask on the way out, so this is what a coilbox model that has been to Blender and back looks like. Point the model at the game's own texture on the Texture tab to get the markings back.",
     );
   }
   notes.push(
-    "A .glb has one picture where an .s3o has two. The second is the shading map, holding glow in red, shine in green and in alpha the cut-out that decides whether a pixel is drawn at all, and it is not in this file. The unit opens without one.",
+    "A .glb has one picture where an .s3o has two. The second is the shading map, holding glow in red, shine in green and in alpha the cut-out that decides whether a pixel is drawn at all, and it is not in this file. The model opens without one.",
   );
   return notes;
 }
@@ -346,11 +346,11 @@ function conversionNotes(result: ThreeDoImport): string[] {
   const found = result.tiles - result.missingTextures.length;
   if (result.sheetReused) {
     notes.push(
-      "Its texture tiles are already on a sheet a batch conversion of this game left behind, and this unit has been mapped onto that sheet rather than getting one of its own.",
+      "Its texture tiles are already on a sheet a batch conversion of this game left behind, and this model has been mapped onto that sheet rather than getting one of its own.",
     );
   } else {
     notes.push(
-      `Its ${result.tiles} texture tiles have been packed into one sheet and every face given coordinates onto it, which is what makes it an ordinary unit that exports as an .s3o.`,
+      `Its ${result.tiles} texture tiles have been packed into one sheet and every face given coordinates onto it, which is what makes it an ordinary model that exports as an .s3o.`,
     );
   }
   if (result.missingTextures.length > 0) {
@@ -432,7 +432,7 @@ function Recovered({
     <>
       <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
         <span className="text-sm font-medium">
-          This unit came out of coilbox
+          This model came out of coilbox
         </span>
         <p className="text-xs text-muted-foreground">
           {stage.recovery.project.pieces.length} pieces.{" "}
@@ -448,7 +448,7 @@ function Recovered({
           The model names <code>{stage.texture}</code>.{" "}
           {stage.named
             ? `That is the ${stage.named.packId} pack's atlas.`
-            : "No installed pack ships that texture, so confirm which atlas this unit samples."}
+            : "No installed pack ships that texture, so confirm which atlas this model samples."}
         </p>
         {stage.atlases.length > 1 ? (
           <Select
@@ -513,7 +513,7 @@ function Imported({
         <p className="text-xs text-muted-foreground">
           {project.pieces.length} pieces, {meshes} of them with geometry.{" "}
           {vertices.toLocaleString()} vertices and {triangles.toLocaleString()}{" "}
-          triangles, stored beside the unit as{" "}
+          triangles, stored beside the model as{" "}
           {Math.max(1, Math.round(bytes / 1024)).toLocaleString()} KiB.
         </p>
         {(stage.notes ?? []).map((note) => (
