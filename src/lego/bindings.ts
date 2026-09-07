@@ -299,9 +299,11 @@ export const legoImportS3o = defineCommand<
 
 /** What one import of a `.3do` produced, on top of what any import produces. */
 export interface ThreeDoImport extends S3oImport {
-  /** Faces the format gives a flat palette colour rather than a texture. The
-   *  palette is embedded in the engine rather than shipped in the archive, so
-   *  they are drawn plain and counted. */
+  /** Faces named no texture at all and whose Total Annihilation palette entry
+   *  (`unittextures/tatex/palette.pal`) could not be resolved, because the file
+   *  was not found beside the model or the entry named is outside the 256 it
+   *  holds. Drawn plain and counted. A face whose entry did resolve is drawn in
+   *  its real colour and is not counted here. */
   paletteFaces: number;
   /** Tiles the model asked for that nothing on disk matched. Their faces are
    *  drawn plain, and naming them is how anybody works out what is missing. */

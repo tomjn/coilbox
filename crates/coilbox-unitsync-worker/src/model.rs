@@ -729,8 +729,9 @@ pub struct UnitDatasetOutput {
 #[serde(rename_all = "camelCase")]
 pub struct ModelGroup {
     /// Which entry of [`UnitModelOutput::textures`] this batch samples. `None`
-    /// for a `.3do` face the format gives a flat palette colour rather than a
-    /// texture.
+    /// for a `.3do` face that named no texture at all and whose Total
+    /// Annihilation palette entry could not be resolved to a real colour
+    /// either.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub texture: Option<String>,
     /// x, y, z per vertex.
@@ -773,6 +774,13 @@ pub struct ModelTexture {
     /// flat magenta placeholder, so it is not read and the viewer picks a colour
     /// instead. Nobody has ever seen a magenta commander in a game.
     pub team_colour: bool,
+    /// A `.3do` face named no texture at all and named this entry of the Total
+    /// Annihilation palette instead (`unittextures/tatex/palette.pal`). `name`
+    /// is a synthetic key rather than anything the model file stores, one per
+    /// palette entry the model actually uses, so two faces sharing an entry
+    /// share a material and two different entries never do.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub palette_colour: Option<[u8; 3]>,
 }
 
 /// Output of `--unit-model`: one unit's model, read out of a game archive and
@@ -799,9 +807,12 @@ pub struct UnitModelOutput {
     /// (issue #1910).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub texture2: Option<ModelTexture>,
-    /// Faces a `.3do` draws in a flat colour from the Total Annihilation
-    /// palette, which is engine-embedded and not in the archive. They are drawn
-    /// plain grey, so the count is reported rather than hidden.
+    /// Faces a `.3do` names no texture for and whose Total Annihilation palette
+    /// entry this could not resolve to a real colour, because
+    /// `unittextures/tatex/palette.pal` was not found in the archive or the
+    /// entry named is outside the 256 the file holds. Drawn plain grey, so the
+    /// count is reported rather than hidden. A face whose entry did resolve is
+    /// drawn in its real colour and is not counted here.
     pub palette_faces: u32,
     pub errors: Vec<String>,
 }

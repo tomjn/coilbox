@@ -179,6 +179,38 @@ pub fn find_tile_beside_model(model: &Path, name: &str) -> Option<Tile> {
         .or_else(|| find_in(beside, &want).map(|hit| tile(hit, true)))
 }
 
+/// The file name of the Total Annihilation palette a `.3do` face names an
+/// entry of instead of a texture.
+const PALETTE_FILE: &str = "palette.pal";
+
+/// The palette beside a staged or loose model, if it is there.
+///
+/// The same search as [`find_tile_beside_model`], because the file lives next
+/// to the tiles it colours: `unittextures/tatex/` first, which is where every
+/// installed game keeps it, then the plain `unittextures/` folder, then beside
+/// the model itself, which is where a staged extraction (`gameImport.ts`'s
+/// `stageTextures`) puts everything it unpacked out of a packed archive.
+///
+/// Not finding it is not fatal. A model whose faces name a palette entry are
+/// then drawn plain, and the import says how many.
+pub fn find_palette_beside_model(model: &Path) -> Option<PathBuf> {
+    let mut dir = model.parent();
+    while let Some(here) = dir {
+        if let Some(textures) = child_dir(here, TEXTURE_DIR) {
+            for folder in [child_dir(&textures, TATEX_DIR), Some(textures.clone())]
+                .into_iter()
+                .flatten()
+            {
+                if let Some(hit) = find_in(&folder, PALETTE_FILE) {
+                    return Some(hit);
+                }
+            }
+        }
+        dir = here.parent();
+    }
+    find_in(model.parent()?, PALETTE_FILE)
+}
+
 /// One of a `.3do`'s tiles, found on disk.
 pub struct Tile {
     pub path: PathBuf,
@@ -421,6 +453,44 @@ mod tests {
         let found = find_tile_beside_model(&model, "arm2").expect("found");
 
         assert!(found.team_colour);
+    }
+
+    #[test]
+    fn finds_the_palette_in_tatex_beside_the_model() {
+        let dir = tempfile::tempdir().expect("temp");
+        let tatex = dir.path().join("unittextures/tatex");
+        std::fs::create_dir_all(&tatex).expect("dirs");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+        std::fs::write(tatex.join("palette.pal"), [0u8; 1024]).expect("write");
+
+        let model = dir.path().join("objects3d/armcom.3do");
+        let found = find_palette_beside_model(&model).expect("found");
+
+        assert!(found.ends_with("palette.pal"));
+    }
+
+    /// A staged extraction (`gameImport.ts`) unpacks a named texture flat
+    /// under `unittextures/`, not under `tatex/`, so the fallback folder has
+    /// to be checked too.
+    #[test]
+    fn finds_the_palette_in_a_flat_unittextures_folder() {
+        let dir = tempfile::tempdir().expect("temp");
+        let textures = dir.path().join("unittextures");
+        std::fs::create_dir_all(&textures).expect("dirs");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+        std::fs::write(textures.join("palette.pal"), [0u8; 1024]).expect("write");
+
+        let model = dir.path().join("objects3d/armcom.3do");
+        assert!(find_palette_beside_model(&model).is_some());
+    }
+
+    #[test]
+    fn has_no_palette_to_find_when_nothing_is_there() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+
+        let model = dir.path().join("objects3d/armcom.3do");
+        assert!(find_palette_beside_model(&model).is_none());
     }
 
     #[test]

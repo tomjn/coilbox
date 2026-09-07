@@ -29,7 +29,9 @@ vi.mock("@/lib/springTexture", () => ({
   },
 }));
 
-const { buildModel, prepareTextureAtlas } = await import("./unitModel");
+const { buildModel, missingTextures, prepareTextureAtlas } = await import(
+  "./unitModel"
+);
 type UnitTextureAtlas = NonNullable<
   Awaited<ReturnType<typeof prepareTextureAtlas>>
 >;
@@ -283,6 +285,38 @@ function uvsOf(mesh: THREE.Mesh): number[] {
   return [...(mesh.geometry.getAttribute("uv").array as Float32Array)];
 }
 
+describe("missingTextures", () => {
+  /**
+   * The bug this guards: a resolved palette entry has no `file`, on purpose,
+   * because nothing in the archive backs it. Reporting it as missing tells the
+   * user the opposite of what happened (issue #2570).
+   */
+  it("does not report a resolved palette entry as missing", () => {
+    const resolved = model({
+      textures: [{ ...texture("/palette/3"), paletteColour: [10, 20, 30] }],
+    });
+    expect(missingTextures(resolved)).toHaveLength(0);
+  });
+
+  it("does not report a team-colour region as missing", () => {
+    const team = model({
+      textures: [{ ...texture("logo"), teamColour: true }],
+    });
+    expect(missingTextures(team)).toHaveLength(0);
+  });
+
+  it("does not report a texture that resolved to a file as missing", () => {
+    expect(missingTextures(model())).toHaveLength(0);
+  });
+
+  it("still reports a texture with no file, no team colour and no palette colour", () => {
+    const unresolved = texture("skin.dds");
+    expect(missingTextures(model({ textures: [unresolved] }))).toEqual([
+      unresolved,
+    ]);
+  });
+});
+
 describe("prepareTextureAtlas", () => {
   /** An `.s3o` names one texture for the whole model, so it is already down to
    *  one material and a sheet would only copy that texture. */
@@ -422,6 +456,46 @@ describe("buildModel materials", () => {
     const built = buildModel(mixed, undefined, { merge: true });
     expect(meshes(built.object)).toHaveLength(2);
     expect(triangles(built.object)).toBe(3);
+    built.dispose();
+  });
+
+  /** The specimen this issue is about: a resolved palette entry draws in its
+   *  own colour rather than the generic untextured grey. */
+  it("draws a resolved palette entry in its real colour", () => {
+    const withPalette = twoPieces3do({
+      root: {
+        name: "base",
+        offset: [0, 0, 0],
+        groups: [face("/palette/3", 0)],
+        children: [],
+      },
+      textures: [{ ...texture("/palette/3"), paletteColour: [10, 20, 30] }],
+    });
+    const built = buildModel(withPalette, undefined, { merge: true });
+    const [mesh] = meshes(built.object);
+    const material = mesh.material as THREE.MeshStandardMaterial;
+    expect(material.color.equals(new THREE.Color(0x0a141e))).toBe(true);
+    built.dispose();
+  });
+
+  /** Two different entries are two different colours, so they must stay two
+   *  different materials rather than collapsing onto one, the way two
+   *  team-colour names collapse onto the one stand-in colour above. */
+  it("draws two different palette entries as two different materials", () => {
+    const twoColours = twoPieces3do({
+      root: {
+        name: "base",
+        offset: [0, 0, 0],
+        groups: [face("/palette/3", 0), face("/palette/9", 2)],
+        children: [],
+      },
+      textures: [
+        { ...texture("/palette/3"), paletteColour: [10, 20, 30] },
+        { ...texture("/palette/9"), paletteColour: [200, 5, 5] },
+      ],
+    });
+    const built = buildModel(twoColours, undefined, { merge: true });
+    expect(meshes(built.object)).toHaveLength(2);
     built.dispose();
   });
 });

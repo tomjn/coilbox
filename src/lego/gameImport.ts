@@ -174,6 +174,21 @@ export async function stageModel(
   return { path, staged };
 }
 
+/** Where the Total Annihilation palette lives in every installed game: the
+ *  file `unittextures/tatex/palette.pal` a `.3do` face names an entry of
+ *  instead of a texture (`find_palette_beside_model` in the Rust import). */
+const PALETTE_MEMBER = "unittextures/tatex/palette.pal";
+
+/** The archive member holding the palette, if this archive has one. */
+export function paletteMember(files: ArchiveFileEntry[]): string | null {
+  const suffix = `/${PALETTE_MEMBER}`;
+  const hit = files.find((file) => {
+    const path = file.path.replace(/\\/g, "/").toLowerCase();
+    return path === PALETTE_MEMBER || path.endsWith(suffix);
+  });
+  return hit?.path ?? null;
+}
+
 /**
  * Unpack the textures a staged model's header names, beside it.
  *
@@ -184,6 +199,11 @@ export async function stageModel(
  * A texture the archive does not hold is not an error. The import already
  * reports a named-but-missing texture and offers to point at one, which is the
  * same answer a loose game with a missing file gives.
+ *
+ * A `.3do` also gets the Total Annihilation palette staged beside it, the same
+ * way its named tiles are, so a palette face draws in its real colour rather
+ * than plain grey (issue #2570). `picked.member` says whether this is a `.3do`
+ * rather than a parameter of its own, because every caller already has it.
  */
 export async function stageTextures(
   target: UnitsyncTarget,
@@ -205,6 +225,17 @@ export async function stageTextures(
     );
     await extract(target, picked.archive, member, dest);
   }
+
+  if (!picked.member.toLowerCase().endsWith(".3do")) return;
+  const palette = paletteMember(files);
+  if (!palette) return;
+  const dest = await join(
+    staged.staged,
+    "unittextures",
+    "tatex",
+    "palette.pal",
+  );
+  await extract(target, picked.archive, palette, dest);
 }
 
 /** The file name to unpack a member under, keeping its own name so the imported

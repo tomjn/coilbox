@@ -70,6 +70,17 @@ const S3O_TEXTURE_DIR: &str = "unittextures";
 const TATEX_DIR: &str = "unittextures/tatex";
 const TEAMTEX_LIST: &str = "unittextures/tatex/teamtex.txt";
 
+/// Where the Total Annihilation palette lives: 256 4-byte entries the engine
+/// reads via `CTAPalette::Init` (`rts/Rendering/Textures/TAPalette.cpp`) and
+/// looks up per `.3do` face that names no texture. See
+/// [`coilbox_3do::read_palette`] for the exact byte layout.
+const PALETTE_FILE: &str = "unittextures/tatex/palette.pal";
+
+/// Comfortably more than the 1024 bytes a real palette is, so a slightly
+/// oversized file still reads whole rather than truncating into
+/// [`coilbox_3do::read_palette`] returning `None`.
+const PALETTE_READ_CAP: usize = 8192;
+
 /// Extensions probed for a texture named without one. Ordered by how often the
 /// installed games use them for unit art.
 const TEXTURE_EXTS: &[&str] = &["dds", "tga", "png", "bmp", "jpg", "jpeg"];
@@ -141,6 +152,7 @@ pub fn render(
         .collect();
 
     let teamtex = read_teamtex(&us, handle, &list);
+    let palette = read_palette(&us);
     let key_base = cache_key_base(&us, game_archive);
     let cache = cache_dir.zip(key_base.as_deref());
     let mut out = read_model(
@@ -148,6 +160,7 @@ pub fn render(
         handle,
         &list,
         &teamtex,
+        palette.as_ref(),
         cache,
         game_archive,
         object_name,
@@ -169,18 +182,20 @@ pub fn render(
 /// are properties of the archive, not of a model, so a batch (issue #1684) pays
 /// for them once. `game_archive` is only used to say which archive a model is
 /// missing from.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn read_model(
     us: &Unitsync,
     handle: i32,
     list: &[(String, String)],
     teamtex: &[String],
+    palette: Option<&coilbox_3do::Palette>,
     cache: Option<(&Path, &str)>,
     game_archive: &str,
     object_name: &str,
 ) -> UnitModelOutput {
     let mut out = match find_model(list, object_name) {
         Some(path) => match us.read_archive_member(handle, &path, MODEL_READ_CAP) {
-            Some((_, bytes)) => build(&path, &bytes),
+            Some((_, bytes)) => build(&path, &bytes, palette),
             None => UnitModelOutput {
                 errors: vec![format!("could not read {path} out of {game_archive}")],
                 ..Default::default()
@@ -223,10 +238,19 @@ pub(crate) fn source_digest(
     object_name: &str,
 ) -> Result<(String, String), String> {
     let teamtex = read_teamtex(us, handle, list);
+    let palette = read_palette(us);
     // One model, so nothing is shared with a next one and the cache is thrown
     // away with the call.
     let mut cache = TextureCache::new(TEXTURE_CACHE_BUDGET);
-    source_digest_with(us, handle, list, &teamtex, &mut cache, object_name)
+    source_digest_with(
+        us,
+        handle,
+        list,
+        &teamtex,
+        palette.as_ref(),
+        &mut cache,
+        object_name,
+    )
 }
 
 /// Texture bytes held between the models of one batch, in least recently used
@@ -313,6 +337,7 @@ pub(crate) fn digest_reader<'a>(
     list: &'a [(String, String)],
 ) -> impl Fn(&str) -> Result<(String, String), String> + 'a {
     let teamtex = read_teamtex(us, handle, list);
+    let palette = read_palette(us);
     let cache = RefCell::new(TextureCache::new(TEXTURE_CACHE_BUDGET));
     move |object_name| {
         source_digest_with(
@@ -320,19 +345,22 @@ pub(crate) fn digest_reader<'a>(
             handle,
             list,
             &teamtex,
+            palette.as_ref(),
             &mut cache.borrow_mut(),
             object_name,
         )
     }
 }
 
-/// [`source_digest`] against a `teamtex.txt` the caller has already read, and a
-/// texture cache the caller decides the lifetime of.
+/// [`source_digest`] against a `teamtex.txt` and palette the caller has already
+/// read, and a texture cache the caller decides the lifetime of.
+#[allow(clippy::too_many_arguments)]
 fn source_digest_with(
     us: &Unitsync,
     handle: i32,
     list: &[(String, String)],
     teamtex: &[String],
+    palette: Option<&coilbox_3do::Palette>,
     cache: &mut TextureCache,
     object_name: &str,
 ) -> Result<(String, String), String> {
@@ -342,7 +370,7 @@ fn source_digest_with(
         .read_archive_member(handle, &path, MODEL_READ_CAP)
         .ok_or_else(|| format!("could not read {path}"))?;
 
-    let flattened = build(&path, &model_bytes);
+    let flattened = build(&path, &model_bytes, palette);
     let format = flattened.format.clone();
 
     // Ordered by member path so the digest does not depend on the order the
@@ -353,8 +381,13 @@ fn source_digest_with(
         .iter()
         .chain(flattened.texture2.iter())
         // A `.3do` team-colour region is a name the engine paints rather than a
-        // file, so there is nothing in the archive to hash for it.
-        .filter(|tex| !(format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase())))
+        // file, and a resolved palette entry is a colour read out of the
+        // archive's palette table rather than a texture member, so there is
+        // nothing under either name to hash.
+        .filter(|tex| {
+            tex.palette_colour.is_none()
+                && !(format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase()))
+        })
         .filter_map(|tex| locate_texture(list, &format, teamtex, &tex.name))
         .collect();
     members.sort();
@@ -378,10 +411,10 @@ fn source_digest_with(
 }
 
 /// Parse `bytes` by the extension of `path` and flatten the result.
-fn build(path: &str, bytes: &[u8]) -> UnitModelOutput {
+fn build(path: &str, bytes: &[u8], palette: Option<&coilbox_3do::Palette>) -> UnitModelOutput {
     if path.to_lowercase().ends_with(".3do") {
         match coilbox_3do::read(bytes) {
-            Ok(m) => from_3do(path, &m),
+            Ok(m) => from_3do(path, &m, palette),
             Err(e) => UnitModelOutput {
                 errors: vec![format!("could not read {path}: {e}")],
                 ..Default::default()
@@ -470,10 +503,21 @@ fn s3o_piece(piece: &coilbox_s3o::Piece, texture: Option<&str>) -> ModelPiece {
 /// becomes one batch per distinct texture, and each face's corners are expanded
 /// rather than shared: two faces meeting at a corner have different normals for
 /// it, and under different textures they cannot share a vertex at all.
-fn from_3do(path: &str, model: &coilbox_3do::Model) -> UnitModelOutput {
+fn from_3do(
+    path: &str,
+    model: &coilbox_3do::Model,
+    palette: Option<&coilbox_3do::Palette>,
+) -> UnitModelOutput {
     let mut names: Vec<String> = Vec::new();
     let mut palette_faces = 0u32;
-    let root = do3_piece(&model.root, &mut names, &mut palette_faces);
+    let mut palette_colours: BTreeMap<String, [u8; 3]> = BTreeMap::new();
+    let root = do3_piece(
+        &model.root,
+        &mut names,
+        &mut palette_faces,
+        &mut palette_colours,
+        palette,
+    );
     UnitModelOutput {
         format: "3do".into(),
         path: path.to_string(),
@@ -483,9 +527,13 @@ fn from_3do(path: &str, model: &coilbox_3do::Model) -> UnitModelOutput {
         root: Some(root),
         textures: names
             .into_iter()
-            .map(|name| ModelTexture {
-                name,
-                ..Default::default()
+            .map(|name| {
+                let palette_colour = palette_colours.get(&name).copied();
+                ModelTexture {
+                    name,
+                    palette_colour,
+                    ..Default::default()
+                }
             })
             .collect(),
         // A `.3do` has no second texture: its team-colour regions are named
@@ -500,6 +548,8 @@ fn do3_piece(
     piece: &coilbox_3do::Piece,
     names: &mut Vec<String>,
     palette_faces: &mut u32,
+    palette_colours: &mut BTreeMap<String, [u8; 3]>,
+    palette: Option<&coilbox_3do::Palette>,
 ) -> ModelPiece {
     // Ordered so a piece's batches come out in a stable order, and so the
     // untextured batch (the `None` key) is always first.
@@ -515,6 +565,24 @@ fn do3_piece(
                 }
                 Some(n.clone())
             }
+            // A palette entry that resolves gets its own synthetic name, one
+            // per entry the model actually uses, so it draws in its real
+            // colour rather than the plain grey an unresolved face falls back
+            // to below.
+            coilbox_3do::Texture::Palette(n) => match resolve_palette_entry(palette, *n) {
+                Some(rgb) => {
+                    let name = palette_tile_name(*n);
+                    if !names.iter().any(|k| k == &name) {
+                        names.push(name.clone());
+                    }
+                    palette_colours.insert(name.clone(), rgb);
+                    Some(name)
+                }
+                None => {
+                    *palette_faces += 1;
+                    None
+                }
+            },
             _ => {
                 *palette_faces += 1;
                 None
@@ -557,7 +625,7 @@ fn do3_piece(
         children: piece
             .children
             .iter()
-            .map(|c| do3_piece(c, names, palette_faces))
+            .map(|c| do3_piece(c, names, palette_faces, palette_colours, palette))
             .collect(),
     }
 }
@@ -630,6 +698,42 @@ pub(crate) fn read_teamtex(us: &Unitsync, handle: i32, list: &[(String, String)]
         .collect()
 }
 
+/// Read and parse `unittextures/tatex/palette.pal`: the colour a `.3do` face
+/// takes when it names no texture at all, indexed by the entry the file gives.
+///
+/// Through [`Unitsync::read_vfs_file`] rather than [`Unitsync::read_archive_member`]
+/// on the opened handle, because the file is not necessarily the game's own.
+/// Balanced Annihilation, for one, ships its own `teamtex.txt` and its own full
+/// `tatex` tile set but not `palette.pal`, and still draws it correctly because
+/// the engine finds it in `springcontent.sdz`. The single-archive API this
+/// module reads everything else through only sees one archive's own contents,
+/// so a lookup through it would miss and every palette face would fall back to
+/// grey.
+///
+/// A property of the archive rather than of a model, so a batch reads it once
+/// for the whole list, the same as [`read_teamtex`]. `None` when nothing
+/// answers to the name, or answers with fewer than the 256 entries the engine
+/// expects: a face naming an entry is then drawn plain rather than guessed at.
+pub(crate) fn read_palette(us: &Unitsync) -> Option<coilbox_3do::Palette> {
+    let bytes = us.read_vfs_file(PALETTE_FILE, PALETTE_READ_CAP)?;
+    coilbox_3do::read_palette(&bytes)
+}
+
+/// The colour a resolved [`coilbox_3do::Texture::Palette`] entry means, or
+/// `None` when there is no palette table or the entry falls outside it.
+fn resolve_palette_entry(palette: Option<&coilbox_3do::Palette>, entry: i32) -> Option<[u8; 3]> {
+    let index = usize::try_from(entry).ok()?;
+    palette?.get(index).copied()
+}
+
+/// The synthetic [`ModelTexture::name`] a resolved palette entry is filed
+/// under. Distinct for every entry a model actually uses, so two different
+/// colours never collapse onto one material, and safe from colliding with a
+/// real `.3do` texture name, which the format stores with no path separator.
+fn palette_tile_name(entry: i32) -> String {
+    format!("/palette/{entry}")
+}
+
 /// Resolve one texture name to an archive member, and copy its bytes into the
 /// cache dir under a name the asset protocol can serve. Leaves `tex.file` empty
 /// when nothing matches, which the viewer reports rather than drawing a mesh
@@ -643,6 +747,12 @@ fn resolve_texture(
     cache: Option<(&Path, &str)>,
     tex: &mut ModelTexture,
 ) {
+    // A resolved palette entry was already given its colour when the model was
+    // flattened, straight out of the archive's own palette table rather than
+    // this lookup, so there is no archive member to find for it here.
+    if tex.palette_colour.is_some() {
+        return;
+    }
     if format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase()) {
         tex.team_colour = true;
         return;
@@ -1204,5 +1314,116 @@ mod tests {
         let name = cache_file_name("abc123", "unittextures/skin.d:ds", "d:ds");
         assert!(name.ends_with(".bin"), "got: {name}");
         assert!(!name.contains(':'), "got: {name}");
+    }
+
+    // ------------------------------------------------------- palette
+
+    fn a_palette() -> coilbox_3do::Palette {
+        let mut palette = [[0u8; 3]; 256];
+        palette[3] = [10, 20, 30];
+        palette
+    }
+
+    fn palette_face(entry: i32) -> coilbox_3do::Primitive {
+        coilbox_3do::Primitive {
+            indices: vec![0, 1, 2],
+            texture: coilbox_3do::Texture::Palette(entry),
+            normal: [0.0, 1.0, 0.0],
+            vertex_normals: vec![[0.0, 1.0, 0.0]; 3],
+        }
+    }
+
+    fn a_piece(primitives: Vec<coilbox_3do::Primitive>) -> coilbox_3do::Piece {
+        coilbox_3do::Piece {
+            name: "body".into(),
+            offset: [0.0, 0.0, 0.0],
+            vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0]],
+            primitives,
+            children: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn resolve_palette_entry_reads_the_table_by_index() {
+        let palette = a_palette();
+        assert_eq!(resolve_palette_entry(Some(&palette), 3), Some([10, 20, 30]));
+    }
+
+    #[test]
+    fn resolve_palette_entry_refuses_a_negative_or_out_of_range_index() {
+        let palette = a_palette();
+        assert_eq!(resolve_palette_entry(Some(&palette), -1), None);
+        assert_eq!(resolve_palette_entry(Some(&palette), 256), None);
+    }
+
+    #[test]
+    fn resolve_palette_entry_refuses_with_no_table_at_all() {
+        assert_eq!(resolve_palette_entry(None, 3), None);
+    }
+
+    /// The specimen this issue is about: a face naming a palette entry the
+    /// table holds draws in that entry's colour, batched under its own
+    /// synthetic texture rather than the grey placeholder.
+    #[test]
+    fn a_resolved_palette_face_is_drawn_in_its_own_colour_and_not_counted() {
+        let palette = a_palette();
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: a_piece(vec![palette_face(3)]),
+        };
+
+        let out = from_3do("objects3d/armcom.3do", &model, Some(&palette));
+
+        assert_eq!(out.palette_faces, 0);
+        let group = &out.root.expect("root").groups[0];
+        assert_eq!(group.texture.as_deref(), Some("/palette/3"));
+        let texture = out
+            .textures
+            .iter()
+            .find(|t| t.name == "/palette/3")
+            .expect("the resolved entry is in the texture list");
+        assert_eq!(texture.palette_colour, Some([10, 20, 30]));
+        assert!(texture.source.is_empty(), "nothing in the archive backs it");
+    }
+
+    /// An index the table does not have, either because there is no
+    /// `palette.pal` in the archive or the file names an entry past 255, is
+    /// still drawn plain and still counted, exactly as an untextured face
+    /// always has been.
+    #[test]
+    fn an_unresolved_palette_face_falls_back_to_the_grey_placeholder_and_is_counted() {
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: a_piece(vec![palette_face(9)]),
+        };
+
+        let out = from_3do("objects3d/armcom.3do", &model, None);
+
+        assert_eq!(out.palette_faces, 1);
+        let group = &out.root.expect("root").groups[0];
+        assert_eq!(group.texture, None);
+        assert!(out.textures.is_empty());
+    }
+
+    /// Two faces naming the same entry share one material rather than one
+    /// each, the same way two faces naming the same real texture do.
+    #[test]
+    fn two_faces_sharing_a_palette_entry_share_one_texture() {
+        let palette = a_palette();
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: a_piece(vec![palette_face(3), palette_face(3)]),
+        };
+
+        let out = from_3do("objects3d/armcom.3do", &model, Some(&palette));
+
+        assert_eq!(out.textures.len(), 1);
+        assert_eq!(out.root.expect("root").groups.len(), 1);
     }
 }

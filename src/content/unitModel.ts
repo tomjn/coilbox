@@ -24,17 +24,52 @@ import {
 import { onTextureArrived } from "@/lib/textureArrival";
 import type { AtlasPlace, AtlasSource } from "@/lib/textureAtlas";
 import { atlasPlace, drawAtlas, packTiles, placeUvs } from "@/lib/textureAtlas";
-import type { UnitModelPiece, UnitModelResult } from "./bindings";
+import type {
+  UnitModelPiece,
+  UnitModelResult,
+  UnitModelTexture,
+} from "./bindings";
 
 /**
  * What a face with no texture is drawn in.
  *
  * A `.3do` face can name a Total Annihilation palette entry instead of a
- * texture. The palette is compiled into the engine rather than shipped in the
- * archive, so there is nothing to read: those faces are drawn plain, and the
- * viewer says how many there were rather than quietly miscolouring them.
+ * texture, and the worker resolves that to a real colour (`paletteHex`) when
+ * it can. This is only left for the entries it could not: no
+ * `unittextures/tatex/palette.pal` in the archive, or an index outside the 256
+ * it holds. Those are drawn plain, and the viewer says how many there were
+ * rather than quietly miscolouring them.
  */
 const UNTEXTURED = 0x9aa0a6;
+
+/**
+ * A resolved Total Annihilation palette entry, as the hex number
+ * `MeshStandardMaterial.color` already takes everywhere else in this file, or
+ * `undefined` for a texture with none.
+ */
+function paletteHex(texture: UnitModelTexture | undefined): number | undefined {
+  const rgb = texture?.paletteColour;
+  if (!rgb) return undefined;
+  return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+}
+
+/**
+ * A texture the model named that nothing gave a real answer for: no file in
+ * the archive, not a team-colour region (the viewer paints those itself), and
+ * not a palette entry that resolved to a real colour (`paletteColour` set).
+ *
+ * `!file` alone is not "missing": a resolved palette entry has no file either,
+ * on purpose, since nothing in the archive backs it and its colour came
+ * straight out of `palette.pal` instead. Shared so every panel that reports
+ * "these textures are missing" uses the one rule for what that means, rather
+ * than each copying the check and drifting when a new no-file-but-fine case is
+ * added (issue #2570).
+ */
+export function missingTextures(model: UnitModelResult): UnitModelTexture[] {
+  return model.textures.filter(
+    (t) => !t.file && !t.teamColour && !t.paletteColour,
+  );
+}
 
 /** How the model is put together, for a caller that draws many copies of it. */
 export interface BuildModelOptions {
@@ -302,6 +337,8 @@ export function buildModel(
     if (placeFor(name)) return ATLAS_KEY;
     const texture = model.textures.find((t) => t.name === name);
     if (texture?.file) return texture.file;
+    const hex = paletteHex(texture);
+    if (hex !== undefined) return ` palette:${hex}`;
     return texture?.teamColour ? " team" : " plain";
   };
 
@@ -324,9 +361,12 @@ export function buildModel(
     }
     const texture = model.textures.find((t) => t.name === name);
     const file = texture?.file;
+    const hex = paletteHex(texture);
     const material = new THREE.MeshStandardMaterial({
       map: file ? modelTexture(file) : null,
-      color: file ? 0xffffff : texture?.teamColour ? teamColour : UNTEXTURED,
+      color: file
+        ? 0xffffff
+        : (hex ?? (texture?.teamColour ? teamColour : UNTEXTURED)),
       roughness: 0.75,
       metalness: 0.05,
       side: THREE.DoubleSide,

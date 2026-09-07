@@ -91,9 +91,12 @@ pub struct Imported {
     /// Pieces whose index list was quads or a strip rather than triangles, so
     /// the import can say it converted them rather than doing it silently.
     pub converted: usize,
-    /// Faces a `.3do` draws in a flat palette colour rather than a texture.
-    /// The palette is embedded in the engine rather than shipped in the
-    /// archive, so they are drawn plain and counted rather than guessed at.
+    /// Faces a `.3do` names no texture for and whose Total Annihilation
+    /// palette entry (`unittextures/tatex/palette.pal`) this could not
+    /// resolve, because the file was not found beside the model or the entry
+    /// named is outside the 256 it holds. They are drawn plain and counted
+    /// rather than guessed at. A face whose entry did resolve is drawn in its
+    /// real colour and is not counted here.
     pub palette_faces: usize,
     /// Texture names the model asks for that nothing on disk matched. Their
     /// faces are drawn plain, and saying which ones is the only way anybody
@@ -272,6 +275,20 @@ fn walk_3do(piece: &coilbox_3do::Piece, rects: &Rects, state: &mut Walk) -> Impo
                     Some(rect) => *rect,
                     None => {
                         state.missing.insert(name.clone());
+                        state.palette_faces += 1;
+                        rects[crate::atlas3do::PALETTE_TILE]
+                    }
+                }
+            }
+            // A resolved entry got its own tile, coloured from
+            // `palette.pal`, under this same name, before packing (see
+            // `lib.rs`'s `palette_tiles`). One nothing could resolve, because
+            // there was no palette beside the model or the entry named is
+            // outside the 256 it holds, falls back to the fallback tile.
+            coilbox_3do::Texture::Palette(entry) => {
+                match rects.get(&crate::atlas3do::palette_tile_name(*entry)) {
+                    Some(rect) => *rect,
+                    None => {
                         state.palette_faces += 1;
                         rects[crate::atlas3do::PALETTE_TILE]
                     }
@@ -656,10 +673,12 @@ mod tests {
             assert_eq!(uvs, vec![[0.0, 0.0], [0.5, 0.0], [0.5, 0.5], [0.0, 0.5]]);
         }
 
-        /// The Total Annihilation palette is embedded in the engine rather than
-        /// shipped in the archive, so there is no colour to look up.
+        /// A palette entry `rects` holds no tile for, because the caller found
+        /// no `palette.pal` beside the model or the entry is outside the 256
+        /// it holds, is drawn plain and counted, the same as a named texture
+        /// nothing on disk matched.
         #[test]
-        fn draws_a_flat_coloured_face_plain_and_counts_it() {
+        fn draws_an_unresolved_palette_face_plain_and_counts_it() {
             let out = import_3do(
                 &model3(piece3(
                     "body",
@@ -671,6 +690,36 @@ mod tests {
 
             assert_eq!(out.palette_faces, 1);
             assert_eq!(out.triangles, 1);
+        }
+
+        /// The specimen this exists for: a palette entry the caller did
+        /// resolve to a colour gets its own tile under `rects`, drawn like any
+        /// other texture and not counted as a face that came out plain.
+        #[test]
+        fn draws_a_resolved_palette_face_in_its_own_tile() {
+            let mut rects = rects();
+            rects.insert(
+                atlas3do::palette_tile_name(3),
+                Rect {
+                    u0: 0.25,
+                    v0: 0.25,
+                    u1: 0.75,
+                    v1: 0.75,
+                },
+            );
+            let out = import_3do(
+                &model3(piece3(
+                    "body",
+                    vec![face(vec![0, 1, 2, 3], coilbox_3do::Texture::Palette(3))],
+                )),
+                &rects,
+            )
+            .expect("import");
+
+            assert_eq!(out.palette_faces, 0);
+            let blob = inflate(&out.blob);
+            let at = BLOB_HEADER_SIZE + FLOATS_PER_VERTEX * 4 + 24;
+            assert_eq!([f32_at(&blob, at), f32_at(&blob, at + 4)], [0.75, 0.25]);
         }
 
         /// Naming which tile is missing is the only way anybody works out what

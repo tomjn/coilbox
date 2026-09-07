@@ -230,7 +230,7 @@ function conversionNotes(result: ThreeDoImport): string[] {
   }
   if (result.paletteFaces > 0) {
     notes.push(
-      `${result.paletteFaces} ${result.paletteFaces === 1 ? "face is" : "faces are"} drawn in a flat colour from the Total Annihilation palette rather than a texture. The palette lives in the engine rather than in the game, so those are drawn plain grey.`,
+      `${result.paletteFaces} ${result.paletteFaces === 1 ? "face names" : "faces name"} a Total Annihilation palette entry this import could not resolve to a colour, because there was no palette.pal beside the model or the entry is outside the 256 it holds, so ${result.paletteFaces === 1 ? "it is" : "they are"} drawn plain grey.`,
     );
   }
   if (result.droppedPieces > 0) {

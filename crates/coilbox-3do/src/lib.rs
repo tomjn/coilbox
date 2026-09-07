@@ -84,6 +84,37 @@ pub struct Piece {
     pub children: Vec<Piece>,
 }
 
+/// The 256-entry Total Annihilation palette a [`Texture::Palette`] indexes
+/// into: RGB per entry, in file order.
+pub type Palette = [[u8; 3]; 256];
+
+/// Parse `unittextures/tatex/palette.pal`'s bytes into the table
+/// [`Texture::Palette`]'s index looks up.
+///
+/// `None` for anything shorter than 256 entries of 4 bytes, which is either not
+/// this file or a truncated read. There is no partial answer worth giving back.
+/// A file longer than that, which none of the games checked ship, is read for
+/// its first 256 entries and no further.
+///
+/// Matches `CTAPalette::Init` (`rts/Rendering/Textures/TAPalette.cpp` in
+/// RecoilEngine): four bytes an entry, and the fourth is discarded rather than
+/// read as alpha (`CTAPalette::Init` overwrites it to 255 immediately after the
+/// read). `C3DOTextureHandler::LoadTexFiles`
+/// (`rts/Rendering/Textures/3DOTextureHandler.cpp`) then builds one dummy
+/// texture an entry, `ta_color<N>`, from this table's RGB with alpha forced to
+/// zero, so a palette face never takes the player's colour.
+pub fn read_palette(bytes: &[u8]) -> Option<Palette> {
+    if bytes.len() < 256 * 4 {
+        return None;
+    }
+    let mut out = [[0u8; 3]; 256];
+    let (chunks, _) = bytes.as_chunks::<4>();
+    for (entry, chunk) in out.iter_mut().zip(chunks) {
+        *entry = [chunk[0], chunk[1], chunk[2]];
+    }
+    Some(out)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Model {
     /// Radius of the sphere around the whole model, measured from `mid`. The
@@ -110,5 +141,44 @@ impl Piece {
             }
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod palette_tests {
+    use super::read_palette;
+
+    /// Three whole entries: opaque red, a colour whose stored alpha is not 255,
+    /// and black. The middle one is what proves the fourth byte is ignored
+    /// rather than kept as alpha.
+    fn bytes() -> Vec<u8> {
+        let mut out = vec![0xff, 0, 0, 0xff];
+        out.extend_from_slice(&[0, 0xff, 0, 0x42]);
+        out.extend_from_slice(&[0, 0, 0, 0]);
+        out.resize(256 * 4, 0);
+        out
+    }
+
+    #[test]
+    fn reads_rgb_and_drops_the_stored_alpha_byte() {
+        let palette = read_palette(&bytes()).expect("256 entries");
+
+        assert_eq!(palette[0], [0xff, 0, 0]);
+        assert_eq!(palette[1], [0, 0xff, 0]);
+        assert_eq!(palette[2], [0, 0, 0]);
+    }
+
+    #[test]
+    fn refuses_anything_shorter_than_256_entries() {
+        assert_eq!(read_palette(&bytes()[..1023]), None);
+        assert_eq!(read_palette(&[]), None);
+    }
+
+    #[test]
+    fn reads_only_the_first_256_entries_of_a_longer_file() {
+        let mut long = bytes();
+        long.extend_from_slice(&[9, 9, 9, 9]);
+
+        assert_eq!(read_palette(&long), read_palette(&bytes()));
     }
 }
