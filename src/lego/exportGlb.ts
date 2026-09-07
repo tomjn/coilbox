@@ -29,7 +29,7 @@ import { type BakedPiece, bakedPieces } from "./s3oBuild";
  * The baked piece tree as a `THREE.Object3D` graph, with no material
  * assigned. Pure and DOM-free, so it can be tested on its own.
  *
- * One node per piece, and that is load bearing rather than tidy. A piece with
+ * One node per piece, and that matters rather than being tidiness. A piece with
  * geometry is a `THREE.Mesh` carrying its children directly, not a `Group` with
  * a `Mesh` inside it: `GLTFExporter` writes an `Object3D` per node, so nesting
  * the mesh gave every piece with geometry two nodes in the file under one name.
