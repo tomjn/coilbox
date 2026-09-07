@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Blocks, TriangleAlert } from "lucide-react";
+import { ToyBrick, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { usePartFilter } from "../filter";
@@ -57,11 +57,12 @@ export default function PartsPage() {
     <div className="flex h-full flex-col">
       <header className="border-b border-border px-6 py-4">
         <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
-          <Blocks size={18} /> Lego Parts
+          <ToyBrick size={18} /> Lego Parts
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          The pieces units are assembled from. Every one is already mapped to
-          the same texture, so a unit built from them needs no UV work.
+          The pieces a model can be assembled from. Every one is already mapped
+          to the same texture, so a model built entirely from them needs no UV
+          work.
         </p>
       </header>
 

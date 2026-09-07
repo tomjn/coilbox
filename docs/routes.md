@@ -69,7 +69,7 @@ These are hidden unless **Advanced mode** is on (Settings > General). They're mo
 | Mapping Tools    | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    |
 | animation        | BOS → Lua   | `#/animation`          | `animation.bos2lua`    |
 | animation        | COB tools   | `#/animation/cob`      | `animation.cob`        |
-| unit builder     | Units       | `#/lego`               | `lego.units`           |
+| unit builder     | Models      | `#/lego`               | `lego.units`           |
 | unit builder     | Lego Parts  | `#/lego/parts`         | `lego.parts`           |
 
 (Mapping Tools and animation also add a few external-link items, wiki/tool guides, that open in the browser rather than routing in-app.)

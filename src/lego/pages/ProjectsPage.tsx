@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import {
   Blocks,
+  Boxes,
   FileUp,
   ImageOff,
   Package,
@@ -41,26 +42,26 @@ interface Renaming {
 }
 
 /**
- * The units you have built.
+ * The models you have built.
  *
  * Creating one needs the parts pack, because a project records which pack it
  * was built against. Without a pack there is nothing to build from, so the page
- * says so rather than making an empty unit that cannot be opened.
+ * says so rather than making an empty model that cannot be opened.
  *
- * A unit is bound to one atlas, since that is all an s3o can name, so the atlas
- * is chosen here when there is more than one installed. It can still be changed
- * while editing: the parts are the same in every atlas, so switching costs
- * nothing.
+ * A model is bound to one atlas, since that is all an s3o can name, so the
+ * atlas is chosen here when there is more than one installed. It can still be
+ * changed while editing: the parts are the same in every atlas, so switching
+ * costs nothing.
  *
- * A unit can also come from somebody else's model rather than being started
- * empty, either by choosing a game and then a unit in it (`GameModelDrawer`) or
- * by pointing at a file (`ImportDrawer`). Both cover a project recovered from an
- * export and a model imported whole as raw geometry.
+ * A model can also come from somebody else's file rather than being started
+ * empty, either by choosing a game and then a model in it (`GameModelDrawer`)
+ * or by pointing at a file (`ImportDrawer`). Both cover a project recovered
+ * from an export and a model imported whole as raw geometry.
  *
- * Those arrive in sections rather than in one list, because a unit you built and
- * a unit you opened look alike in a list and neither says where it came from
- * (#1819). The sections only appear once there is something to separate, so
- * somebody who has never opened a model sees the page exactly as it was.
+ * Those arrive in sections rather than in one list, because a model you built
+ * and a model you opened look alike in a list and neither says where it came
+ * from (#1819). The sections only appear once there is something to separate,
+ * so somebody who has never opened a model sees the page exactly as it was.
  */
 export default function ProjectsPage() {
   const { projects, loading, error } = useLegoProjects();
@@ -100,7 +101,7 @@ export default function ProjectsPage() {
       const project = newProject({
         id: crypto.randomUUID(),
         rootPieceId: crypto.randomUUID(),
-        name: `Unit ${projects.length + 1}`,
+        name: `Model ${projects.length + 1}`,
         packId: pack.manifest.id,
         packVersion: pack.manifest.version,
         // Left off for the base pack's atlas, so a unit built with one atlas
@@ -112,7 +113,7 @@ export default function ProjectsPage() {
       navigate(`/lego/${project.id}`);
     } catch (e) {
       setProblem(
-        `Could not start a unit: ${e instanceof Error ? e.message : String(e)}`,
+        `Could not start a model: ${e instanceof Error ? e.message : String(e)}`,
       );
     } finally {
       setBusy(false);
@@ -135,7 +136,7 @@ export default function ProjectsPage() {
       navigate(`/lego/${project.id}`);
     } catch (e) {
       setProblem(
-        `Could not save the unit: ${e instanceof Error ? e.message : String(e)}`,
+        `Could not save the model: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }
@@ -292,10 +293,9 @@ export default function ProjectsPage() {
         className="border-b border-border px-6 py-4"
         title={
           <>
-            <Blocks size={18} /> Units
+            <Boxes size={18} /> Models
           </>
         }
-        description="Units assembled from lego parts. Every part shares one texture, so a unit built here needs no UV work."
         actions={
           <>
             {/* Only when there is something to choose between. With one atlas
@@ -326,7 +326,7 @@ export default function ProjectsPage() {
               <FileUp size={16} /> Open a model
             </Button>
             <Button onClick={create} disabled={busy}>
-              <Plus size={16} /> New unit
+              <Plus size={16} /> New model
             </Button>
           </>
         }
@@ -355,18 +355,18 @@ export default function ProjectsPage() {
       ) : null}
       {error ? (
         <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">
-          Could not read your saved units: {error}
+          Could not read your saved models: {error}
         </p>
       ) : null}
 
       {loading ? (
         <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-          Reading your saved units.
+          Reading your saved models.
         </p>
       ) : projects.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <Blocks className="text-muted-foreground" size={28} />
-          <h2 className="text-base font-medium">No units yet</h2>
+          <h2 className="text-base font-medium">No models yet</h2>
           <p className="max-w-prose text-sm text-muted-foreground">
             Start one, then drop parts into it. Browse what is available under
             Lego Parts.
