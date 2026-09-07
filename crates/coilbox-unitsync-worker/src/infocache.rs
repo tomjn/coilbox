@@ -74,12 +74,29 @@ pub fn dataset_key(us: &Unitsync, game_archive: &str) -> Option<String> {
 /// right outcome: nothing is remembered rather than something remembered under
 /// an identity that cannot change.
 pub fn unitdefs_key(game_archive: &str, checksum: &str) -> String {
+    checksum_key(game_archive, checksum, "unitdefs", 'u')
+}
+
+/// Cache identity for a game's custom parameter consumer index: the game's sync
+/// checksum, in the `customparams` namespace (issue #2661).
+///
+/// Keyed like the unit defs above and for the same reason. The scan reads every
+/// Lua file the game's archive set mounts, so a changed dependency changes the
+/// answer while the primary archive's size and mtime sit still.
+pub fn custom_params_key(game_archive: &str, checksum: &str) -> String {
+    checksum_key(game_archive, checksum, "customparams", 'c')
+}
+
+/// The shared body of the checksum-keyed identities above: the cache version,
+/// the namespace, the archive and the checksum, behind a one-letter prefix that
+/// keeps them apart from the file-identity keys.
+fn checksum_key(game_archive: &str, checksum: &str, kind: &str, prefix: char) -> String {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     INFO_CACHE_VERSION.hash(&mut h);
-    "unitdefs".hash(&mut h);
+    kind.hash(&mut h);
     game_archive.hash(&mut h);
     checksum.hash(&mut h);
-    format!("u{:016x}", h.finish())
+    format!("{prefix}{:016x}", h.finish())
 }
 
 /// Cache identity for a map's info blob: its own archive's path + size + mtime,
@@ -241,6 +258,21 @@ mod tests {
             before,
             unitdefs_key("XTA.sdz", "deadbeef"),
             "two games that hash the same must not share an entry"
+        );
+    }
+
+    #[test]
+    fn a_new_game_checksum_is_a_new_custom_params_key() {
+        let before = custom_params_key("BAR.sdd", "deadbeef");
+        assert_ne!(
+            before,
+            custom_params_key("BAR.sdd", "cafef00d"),
+            "a game update has to rescan its Lua"
+        );
+        assert_ne!(
+            before,
+            unitdefs_key("BAR.sdd", "deadbeef"),
+            "the defs and the consumer index must not share an entry"
         );
     }
 

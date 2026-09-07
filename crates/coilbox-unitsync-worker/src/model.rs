@@ -770,6 +770,65 @@ pub struct UnitDefsOutput {
     pub errors: Vec<String>,
 }
 
+/// One Lua file that names a custom parameter, and how it names it.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CustomParamSite {
+    /// VFS path inside the game's archives, e.g.
+    /// `luarules/gadgets/unit_paralyze_damage_multiplier.lua`.
+    pub file: String,
+    /// How many times the file reads the parameter.
+    pub reads: u32,
+    /// How many times the file assigns to it. A game's own def post-processing
+    /// writes parameters onto units, and the file that sets one answers "what
+    /// is this?" as well as one that acts on it, so the two are counted apart
+    /// rather than merged.
+    pub writes: u32,
+}
+
+/// Which of a game's Lua files name one custom parameter.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CustomParamConsumers {
+    /// The files, most mentions first. Capped, so this may be shorter than
+    /// [`CustomParamConsumers::files`].
+    pub sites: Vec<CustomParamSite>,
+    /// How many files name the parameter in total, including any the cap left
+    /// out. A parameter named in one file has an answer, and one named in forty
+    /// does not, so the count is what a reader needs before the list.
+    pub files: u32,
+}
+
+/// Output of the `--custom-params` mode: which of a game's own Lua files name
+/// each custom parameter (issue #2661).
+///
+/// The engine ignores custom parameters completely, so their meaning lives only
+/// in the game's Lua. This is a text search over that Lua, keyed by lowercased
+/// parameter name, which is the casing both the def table and the engine's own
+/// `customParams` table use. Unit and weapon parameters share one index,
+/// because a read names a key and not the kind of def it came off.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CustomParamsOutput {
+    /// Parameter name, lowercased, to the files that name it.
+    pub params: std::collections::BTreeMap<String, CustomParamConsumers>,
+    /// How many files read `customParams` without naming a key: passing the
+    /// whole table on, or building it. Those files read parameters this cannot
+    /// attribute, so a parameter with no named consumer is "nothing names this,
+    /// and N files read the table whole" rather than "nothing reads this".
+    pub whole_table_files: u32,
+    /// How many Lua files were read.
+    pub files_scanned: u32,
+    /// Whether a cap stopped the walk before it had seen the whole archive, so
+    /// an absent answer may be this rather than the game.
+    pub truncated: bool,
+    /// Sync checksum (from GetPrimaryModChecksum), over the archive plus every
+    /// dependency. Also this scan's cache key.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// One drawable batch inside a piece: an indexed triangle list whose corners all
 /// sample the same texture. An `.s3o` piece is always one batch, because the
 /// format binds one texture per model. A `.3do` piece is one batch per distinct

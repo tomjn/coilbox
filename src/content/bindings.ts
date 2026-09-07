@@ -1388,6 +1388,67 @@ export const unitsyncUnitDefs = defineCommand<
   UnitDefsResult
 >("coilbox-unitsync", "unitsync_unit_defs");
 
+/** One Lua file in a game's archives that names a custom parameter. */
+export interface CustomParamSite {
+  /** Path inside the game's archives, e.g.
+   *  `luarules/gadgets/unit_paralyze_damage_multiplier.lua`. */
+  file: string;
+  /** How many times the file reads the parameter. */
+  reads: number;
+  /** How many times it assigns to it. A game's own def post-processing writes
+   *  parameters onto units, and the file that sets one answers "what is this?"
+   *  as well as one that acts on it. */
+  writes: number;
+}
+
+/** Which of a game's Lua files name one custom parameter. */
+export interface CustomParamConsumers {
+  /** The files, most mentions first. Capped by the worker, so this may be
+   *  shorter than {@link CustomParamConsumers.files}. */
+  sites: CustomParamSite[];
+  /** How many files name it in total. A parameter named in one file has an
+   *  answer and one named in forty does not, so the count comes before the
+   *  list. */
+  files: number;
+}
+
+/**
+ * Which of a game's own Lua files name each custom parameter (issue #2661).
+ *
+ * The engine ignores custom parameters completely, so {@link UnitDefsResult}
+ * can say a unit carries `techlevel` and nothing about what it means. Only the
+ * game's Lua gives it one, and this is a text search over that Lua for the file
+ * that reads it.
+ */
+export interface CustomParamsResult {
+  /** Parameter name, lowercased, to the files that name it. Lowercase because
+   *  that is the casing both the def table and the engine's own `customParams`
+   *  table use, so this joins to a def key without either side guessing. */
+  params: Record<string, CustomParamConsumers>;
+  /** How many files read `customParams` without naming a key: passing the whole
+   *  table on, or building it. Those read parameters the scan cannot attribute,
+   *  so a parameter with no named consumer is "nothing names this, and N files
+   *  read the table whole" rather than "nothing reads this". */
+  wholeTableFiles: number;
+  /** How many Lua files were read. */
+  filesScanned: number;
+  /** Whether a cap stopped the walk early, so an absent answer may be that
+   *  rather than the game. */
+  truncated: boolean;
+  checksum?: string;
+  errors: string[];
+}
+
+/**
+ * Index a game's Lua for the files that name each custom parameter. Lazy, since
+ * it mounts the game's archive set and reads every `.lua` in it, and disk-cached
+ * on the game's sync checksum. `gameArchive` is the primary archive name.
+ */
+export const unitsyncCustomParams = defineCommand<
+  { enginePath: string; dataDir: string; gameArchive: string },
+  CustomParamsResult
+>("coilbox-unitsync", "unitsync_custom_params");
+
 /** One drawable batch inside a piece: an indexed triangle list whose corners all
  *  sample the same texture. */
 export interface UnitModelGroup {

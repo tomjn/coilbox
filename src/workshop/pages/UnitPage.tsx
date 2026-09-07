@@ -45,7 +45,7 @@ import {
   type UnitClones,
   unitsWithClones,
 } from "../clones";
-import { useUnitDefs } from "../config";
+import { useCustomParams, useUnitDefs } from "../config";
 import {
   clearOverride,
   clearUnit,
@@ -90,6 +90,16 @@ export default function UnitPage() {
   const named = useMemo(
     () => new Map((dataset?.units ?? []).map((u) => [u.name, u])),
     [dataset],
+  );
+
+  // What each custom parameter means, which is only ever "whatever this game's
+  // Lua does with it". Runs alongside the defs rather than after them: nothing
+  // on the page waits for it, and a row whose scan has not landed simply has no
+  // note yet.
+  const { consumers } = useCustomParams(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
   );
 
   const [overrides, setOverrides] = useState<UnitOverrides>({});
@@ -333,6 +343,7 @@ export default function UnitPage() {
               <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
                 <UnitFieldGroups
                   view={fields}
+                  consumers={consumers}
                   inheritedLabel={clone ? "Copied value" : undefined}
                   onChange={(row, value) =>
                     setOverrides((o) =>
