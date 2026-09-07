@@ -19,10 +19,13 @@
 //! blends in whichever tile was packed next to it and every face is fringed
 //! with the wrong colour.
 //!
-//! Faces the format gives a flat palette colour rather than a texture get a
-//! tile of their own. The Total Annihilation palette is embedded in the engine
-//! rather than shipped in the archive, so there is no colour to look up, and
-//! the honest answer is one plain tile and a count of the faces that took it.
+//! Faces the format gives a flat palette colour rather than a texture also get
+//! a tile of their own: the caller reads `unittextures/tatex/palette.pal` (see
+//! `texture::find_palette_beside_model`) and hands this module one small tile
+//! per entry a model actually uses, coloured straight from that file. An entry
+//! nothing could resolve, because there is no `palette.pal` beside the model or
+//! the face names an index outside the 256 it holds, falls back to a plain
+//! [`PALETTE_TILE`], and the caller counts those.
 
 use std::collections::BTreeMap;
 
@@ -40,20 +43,29 @@ const BORDER: u32 = 1;
 const MIN_SIDE: u32 = 64;
 const MAX_SIDE: u32 = 2048;
 
-/// What the flat-colour tile is drawn in.
+/// What the fallback flat-colour tile is drawn in, for a palette entry nothing
+/// could resolve.
 ///
-/// Mid grey rather than a guess at the palette. A face drawn in a colour
-/// coilbox does not have is better plainly wrong than confidently wrong, and
-/// the count says how many took it.
+/// Mid grey rather than a guess at the colour. A face drawn in a colour coilbox
+/// does not have is better plainly wrong than confidently wrong, and the count
+/// the caller keeps says how many took it.
 ///
 /// Alpha zero, because on an `.s3o` the first texture's alpha is the
 /// team-colour mask rather than transparency. A palette face is not a region
-/// the player's colour belongs on.
-const PALETTE_GREY: [u8; 4] = [128, 128, 128, 0];
+/// the player's colour belongs on, resolved or not.
+pub(crate) const PALETTE_GREY: [u8; 4] = [128, 128, 128, 0];
 
-/// The name the flat-colour tile is filed under, which no `.3do` texture name
-/// can collide with: the format stores names without a path separator.
+/// The name the fallback flat-colour tile is filed under, which no `.3do`
+/// texture name can collide with: the format stores names without a path
+/// separator.
 pub const PALETTE_TILE: &str = "/palette";
+
+/// The name a resolved palette entry's own tile is filed under, distinct for
+/// every entry a model actually uses so two different colours never collapse
+/// onto one tile, and safe from the same collision [`PALETTE_TILE`] is.
+pub fn palette_tile_name(entry: i32) -> String {
+    format!("/palette/{entry}")
+}
 
 /// Where one tile sits on the sheet, as texture coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -95,20 +107,10 @@ pub struct Packed {
 /// The sheet grows by doubling until everything fits, so a small unit gets a
 /// small sheet.
 ///
-/// A flat-colour tile is added whenever `palette` is set, so a model with faces
-/// the format gives a colour rather than a texture has somewhere for them to
-/// sample from.
-pub fn pack(mut tiles: Vec<Tile>, palette: bool) -> Result<Packed, String> {
-    if palette {
-        let mut tile = RgbaImage::new(8, 8);
-        for pixel in tile.pixels_mut() {
-            *pixel = image::Rgba(PALETTE_GREY);
-        }
-        tiles.push(Tile {
-            name: PALETTE_TILE.to_string(),
-            image: tile,
-        });
-    }
+/// A flat-colour tile the format gives a face rather than a texture is just
+/// another [`Tile`] by the time it reaches here: the caller builds it, named
+/// [`PALETTE_TILE`] or [`palette_tile_name`], before packing.
+pub fn pack(mut tiles: Vec<Tile>) -> Result<Packed, String> {
     if tiles.is_empty() {
         return Err("this model names no textures at all".into());
     }
@@ -239,7 +241,7 @@ mod tests {
     fn measures_rows_from_the_bottom_the_way_a_texture_is_sampled() {
         // One small tile on a sheet with room to spare, so it packs at the top
         // and the difference between the two conventions is unmissable.
-        let packed = pack(vec![tile("a", 8, 10)], false).unwrap();
+        let packed = pack(vec![tile("a", 8, 10)]).unwrap();
         let a = packed.rects["a"];
 
         assert!(a.v0 > 0.9, "the top of a tile packed at the top: {a:?}");
@@ -248,7 +250,7 @@ mod tests {
 
     #[test]
     fn puts_every_tile_somewhere() {
-        let packed = pack(vec![tile("a", 32, 10), tile("b", 32, 20)], false).unwrap();
+        let packed = pack(vec![tile("a", 32, 10), tile("b", 32, 20)]).unwrap();
 
         assert!(packed.rects.contains_key("a"));
         assert!(packed.rects.contains_key("b"));
@@ -258,7 +260,7 @@ mod tests {
     /// textures are.
     #[test]
     fn makes_a_square_power_of_two_sheet() {
-        let packed = pack(vec![tile("a", 32, 10)], false).unwrap();
+        let packed = pack(vec![tile("a", 32, 10)]).unwrap();
 
         assert_eq!(packed.image.width(), packed.image.height());
         assert!(packed.image.width().is_power_of_two());
@@ -269,7 +271,7 @@ mod tests {
         let many: Vec<Tile> = (0..20)
             .map(|i| tile(&format!("t{i}"), 64, i as u8))
             .collect();
-        let packed = pack(many, false).unwrap();
+        let packed = pack(many).unwrap();
 
         assert!(packed.image.width() >= 256, "{}", packed.image.width());
         assert_eq!(packed.rects.len(), 20);
@@ -278,10 +280,11 @@ mod tests {
     /// Two tiles overlapping would draw one unit's face with another's paint.
     #[test]
     fn never_overlaps_two_tiles() {
-        let packed = pack(
-            vec![tile("a", 32, 10), tile("b", 16, 20), tile("c", 32, 30)],
-            false,
-        )
+        let packed = pack(vec![
+            tile("a", 32, 10),
+            tile("b", 16, 20),
+            tile("c", 32, 30),
+        ])
         .unwrap();
 
         let side = packed.image.width() as f32;
@@ -309,7 +312,7 @@ mod tests {
     /// neighbour, and every face comes out fringed with the wrong colour.
     #[test]
     fn surrounds_each_tile_with_its_own_edge_pixels() {
-        let packed = pack(vec![tile("a", 8, 10), tile("b", 8, 200)], false).unwrap();
+        let packed = pack(vec![tile("a", 8, 10), tile("b", 8, 200)]).unwrap();
 
         let side = packed.image.width() as f32;
         let a = packed.rects["a"];
@@ -320,23 +323,40 @@ mod tests {
         assert_eq!(packed.image.get_pixel(x, y).0, [10, 10, 10, 255]);
     }
 
+    /// The caller builds a palette entry's tile the same way it builds a real
+    /// one, so packing one is nothing special: it lands in `rects` under
+    /// whatever name it was given.
     #[test]
-    fn adds_a_tile_for_faces_drawn_in_a_flat_colour() {
-        let packed = pack(vec![tile("a", 32, 10)], true).unwrap();
+    fn packs_a_flat_colour_tile_like_any_other() {
+        let packed = pack(vec![
+            tile("a", 32, 10),
+            Tile {
+                name: PALETTE_TILE.to_string(),
+                image: RgbaImage::from_pixel(8, 8, image::Rgba(PALETTE_GREY)),
+            },
+        ])
+        .unwrap();
 
         assert!(packed.rects.contains_key(PALETTE_TILE));
     }
 
+    /// Distinct for every entry, so two different colours never share a tile.
+    #[test]
+    fn palette_tile_name_is_distinct_per_entry() {
+        assert_ne!(palette_tile_name(3), palette_tile_name(9));
+        assert_eq!(palette_tile_name(3), palette_tile_name(3));
+    }
+
     #[test]
     fn refuses_a_model_that_names_no_textures() {
-        assert!(pack(Vec::new(), false).is_err());
+        assert!(pack(Vec::new()).is_err());
     }
 
     /// A face takes the tile's own corners, so the coordinates it gets have to
     /// stay inside the tile.
     #[test]
     fn maps_a_face_corner_inside_its_own_tile() {
-        let packed = pack(vec![tile("a", 32, 10), tile("b", 32, 20)], false).unwrap();
+        let packed = pack(vec![tile("a", 32, 10), tile("b", 32, 20)]).unwrap();
         let a = packed.rects["a"];
 
         // Either way round for `v`, because rows are counted from the bottom

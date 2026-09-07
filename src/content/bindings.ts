@@ -1286,7 +1286,8 @@ export const unitsyncUnitDataset = defineCommand<
  *  sample the same texture. */
 export interface UnitModelGroup {
   /** Which {@link UnitModelResult.textures} entry this batch samples. Absent for
-   *  a `.3do` face the format gives a flat palette colour instead. */
+   *  a `.3do` face that named no texture at all and whose Total Annihilation
+   *  palette entry could not be resolved to a real colour either. */
   texture?: string;
   /** x, y, z per vertex. */
   positions: number[];
@@ -1319,6 +1320,11 @@ export interface UnitModelTexture {
   /** A `.3do` region the engine paints in the player's colour. The file behind
    *  it is a flat magenta placeholder, so the viewer picks a colour instead. */
   teamColour: boolean;
+  /** A `.3do` face named no texture at all and named this entry of the Total
+   *  Annihilation palette (`unittextures/tatex/palette.pal`) instead. `name` is
+   *  a synthetic key, one per palette entry the model actually uses, rather
+   *  than anything the model file stores. */
+  paletteColour?: [number, number, number];
 }
 
 export interface UnitModelResult {
@@ -1337,8 +1343,11 @@ export interface UnitModelResult {
    *  what the channels mean, since the name that tried the latter said team mask
    *  and the team-colour mask is the first texture's alpha (issue #1910). */
   texture2?: UnitModelTexture;
-  /** Faces a `.3do` draws in a flat palette colour, which is engine-embedded and
-   *  not in the archive. Drawn plain grey, so the count is worth showing. */
+  /** Faces a `.3do` names no texture for and whose Total Annihilation palette
+   *  entry could not be resolved, because `unittextures/tatex/palette.pal` was
+   *  not found in the archive or the entry named is outside the 256 it holds.
+   *  Drawn plain grey, so the count is worth showing. A face whose entry did
+   *  resolve is drawn in its real colour and is not counted here. */
   paletteFaces: number;
   errors: string[];
 }

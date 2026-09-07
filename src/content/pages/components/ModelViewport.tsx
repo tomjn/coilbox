@@ -31,8 +31,9 @@ export function Note({ children }: { children: React.ReactNode }) {
  * What is on screen but not right, and why.
  *
  * Every one of these is a difference between what the engine draws and what this
- * draws, and each has a different owner: a team colour is the player's, a missing
- * texture is the archive's, and the Total Annihilation palette is the engine's.
+ * draws: a team colour is the player's, a missing texture is the archive's, and a
+ * palette face with nothing to resolve it (no `palette.pal` in the archive, or an
+ * index outside the 256 it holds) is the same kind of gap as a missing texture.
  * Saying nothing would leave a grey or blue unit looking like a bug in coilbox.
  */
 export function ModelNotes({
@@ -67,9 +68,10 @@ export function ModelNotes({
       )}
       {model.paletteFaces > 0 && (
         <Note>
-          {model.paletteFaces.toLocaleString()} faces are a flat colour from the
-          Total Annihilation palette, which the engine holds rather than the
-          archive. They are drawn plain grey.
+          {model.paletteFaces.toLocaleString()}{" "}
+          {model.paletteFaces === 1 ? "face names" : "faces name"} a Total
+          Annihilation palette entry this could not resolve to a colour, so{" "}
+          {model.paletteFaces === 1 ? "it is" : "they are"} drawn plain grey.
         </Note>
       )}
       {model.errors.length > 0 && <Note>{model.errors.join(". ")}</Note>}

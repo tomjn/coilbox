@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { modelSource, textureMember } from "./gameImport";
+import { modelSource, paletteMember, textureMember } from "./gameImport";
 
 const files = [
   { path: "unittextures/ARMCOM.png", size: 1 },
@@ -117,5 +117,25 @@ describe("textureMember", () => {
 
   it("has nothing to find for a header naming no texture", () => {
     expect(textureMember(files, "   ", model)).toBeNull();
+  });
+});
+
+describe("paletteMember", () => {
+  it("finds the palette wherever it sits in the archive listing", () => {
+    expect(
+      paletteMember([{ path: "unittextures/tatex/PALETTE.PAL", size: 1024 }]),
+    ).toBe("unittextures/tatex/PALETTE.PAL");
+  });
+
+  it("finds it under a nested archive root", () => {
+    expect(
+      paletteMember([
+        { path: "base/game/unittextures/tatex/palette.pal", size: 1024 },
+      ]),
+    ).toBe("base/game/unittextures/tatex/palette.pal");
+  });
+
+  it("has nothing to find when the archive holds no palette", () => {
+    expect(paletteMember(files)).toBeNull();
   });
 });

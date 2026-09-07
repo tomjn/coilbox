@@ -757,12 +757,14 @@ async fn lego_read_3do(path: String) -> CliResult {
 /// The sheet is written into the shared texture store like any other imported
 /// texture, so nothing downstream knows this unit was converted.
 ///
-/// A tile nothing on disk matched, and a face the format gives a flat palette
-/// colour rather than a texture, are both drawn plain and counted. The Total
-/// Annihilation palette is embedded in the engine rather than shipped in the
-/// archive, so there is no colour to look up for the second kind. A child
-/// piece left dead by an era-of-export naming slip (see
-/// `import::is_dead_duplicate`) is dropped from the tree and counted too.
+/// A face names no texture at all when the format gives it a flat colour from
+/// the Total Annihilation palette instead: `unittextures/tatex/palette.pal`,
+/// found the same way a `.3do`'s ordinary tiles are (see
+/// `texture::find_palette_beside_model`), colours it for real. A tile nothing
+/// on disk matched, and a palette entry the file was not found or did not
+/// have, are both drawn plain and counted. A child piece left dead by an
+/// era-of-export naming slip (see `import::is_dead_duplicate`) is dropped from
+/// the tree and counted too.
 #[tauri::command]
 async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String) -> CliResult {
     if !valid_id(&id) {
@@ -787,8 +789,12 @@ async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String
         Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
     };
 
-    let (tiles, wanted) = read_tiles(&file, &model);
-    let packed = match atlas3do::pack(tiles, true) {
+    let (mut tiles, wanted) = read_tiles(&file, &model);
+    let palette = texture::find_palette_beside_model(&file)
+        .and_then(|p| std::fs::read(p).ok())
+        .and_then(|bytes| coilbox_3do::read_palette(&bytes));
+    tiles.extend(palette_tiles(&model, palette.as_ref()));
+    let packed = match atlas3do::pack(tiles) {
         Ok(packed) => packed,
         Err(e) => return CliResult::err(format!("could not build a texture for {path}: {e}")),
     };
@@ -877,6 +883,61 @@ fn read_tiles(model_file: &Path, model: &coilbox_3do::Model) -> (Vec<atlas3do::T
         })
         .collect();
     (tiles, wanted)
+}
+
+/// The tiles a `.3do`'s palette faces need: a fallback grey always, plus one
+/// small tile per distinct entry the model actually names that `palette`
+/// resolves.
+///
+/// The fallback is unconditional, matching `import::walk_3do`'s indexing into
+/// it: a model with no palette faces at all still gets one, unused, which
+/// costs eight by eight pixels of sheet space and is simpler than threading
+/// "does this model even have any" through both functions.
+///
+/// Alpha zero on every tile here, resolved or not, the same as
+/// `set_team_mask` gives an ordinary one: on an `.s3o` the first texture's
+/// alpha is the team-colour mask, and a palette face is not a region the
+/// player's colour belongs on (`C3DOTextureHandler::LoadTexFiles`,
+/// `rts/Rendering/Textures/3DOTextureHandler.cpp`, forces the same channel to
+/// zero for its own `ta_color<N>` dummy textures).
+fn palette_tiles(
+    model: &coilbox_3do::Model,
+    palette: Option<&coilbox_3do::Palette>,
+) -> Vec<atlas3do::Tile> {
+    let mut grey = image::RgbaImage::new(8, 8);
+    for pixel in grey.pixels_mut() {
+        *pixel = image::Rgba(atlas3do::PALETTE_GREY);
+    }
+    let mut tiles = vec![atlas3do::Tile {
+        name: atlas3do::PALETTE_TILE.to_string(),
+        image: grey,
+    }];
+
+    let mut entries: Vec<i32> = Vec::new();
+    for piece in model.root.walk() {
+        for prim in &piece.primitives {
+            if let coilbox_3do::Texture::Palette(entry) = prim.texture {
+                if !entries.contains(&entry) {
+                    entries.push(entry);
+                }
+            }
+        }
+    }
+
+    for entry in entries {
+        let Some(rgb) = usize::try_from(entry)
+            .ok()
+            .and_then(|i| palette.and_then(|p| p.get(i)).copied())
+        else {
+            continue;
+        };
+        let image = image::RgbaImage::from_pixel(8, 8, image::Rgba([rgb[0], rgb[1], rgb[2], 0]));
+        tiles.push(atlas3do::Tile {
+            name: atlas3do::palette_tile_name(entry),
+            image,
+        });
+    }
+    tiles
 }
 
 /// Put the team-colour mask an `.s3o` expects into a tile's alpha.
@@ -1661,6 +1722,85 @@ mod team_mask_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn palette_face(entry: i32) -> coilbox_3do::Primitive {
+        coilbox_3do::Primitive {
+            indices: vec![0, 1, 2],
+            texture: coilbox_3do::Texture::Palette(entry),
+            normal: [0.0, 1.0, 0.0],
+            vertex_normals: vec![[0.0, 1.0, 0.0]; 3],
+        }
+    }
+
+    fn model_with(primitives: Vec<coilbox_3do::Primitive>) -> coilbox_3do::Model {
+        coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: coilbox_3do::Piece {
+                name: "body".into(),
+                offset: [0.0; 3],
+                vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0]],
+                primitives,
+                children: Vec::new(),
+            },
+        }
+    }
+
+    fn a_palette() -> coilbox_3do::Palette {
+        let mut palette = [[0u8; 3]; 256];
+        palette[3] = [10, 20, 30];
+        palette
+    }
+
+    /// The fallback grey is always there, even for a model with no palette
+    /// faces at all, matching `import::walk_3do`'s unconditional indexing into
+    /// it.
+    #[test]
+    fn always_carries_the_fallback_tile() {
+        let tiles = palette_tiles(&model_with(Vec::new()), None);
+
+        assert!(tiles.iter().any(|t| t.name == atlas3do::PALETTE_TILE));
+        assert_eq!(tiles.len(), 1);
+    }
+
+    /// The specimen this exists for: an entry the table has gets its own tile,
+    /// alpha zero, coloured straight from the palette.
+    #[test]
+    fn adds_a_tile_for_every_resolved_entry_a_model_names() {
+        let palette = a_palette();
+        let tiles = palette_tiles(&model_with(vec![palette_face(3)]), Some(&palette));
+
+        let entry = tiles
+            .iter()
+            .find(|t| t.name == atlas3do::palette_tile_name(3))
+            .expect("entry 3 got its own tile");
+        assert_eq!(entry.image.get_pixel(0, 0).0, [10, 20, 30, 0]);
+    }
+
+    /// An entry the table does not have, or with no table at all, gets no tile
+    /// of its own: the fallback carries it instead.
+    #[test]
+    fn adds_no_tile_for_an_entry_nothing_resolves() {
+        let tiles = palette_tiles(&model_with(vec![palette_face(9)]), None);
+
+        assert_eq!(tiles.len(), 1);
+        assert!(!tiles
+            .iter()
+            .any(|t| t.name == atlas3do::palette_tile_name(9)));
+    }
+
+    /// Two faces naming the same entry get one tile, not two.
+    #[test]
+    fn one_tile_per_distinct_entry_a_model_uses() {
+        let palette = a_palette();
+        let tiles = palette_tiles(
+            &model_with(vec![palette_face(3), palette_face(3)]),
+            Some(&palette),
+        );
+
+        assert_eq!(tiles.len(), 2);
+    }
 
     #[test]
     fn only_the_two_known_kinds_resolve_to_a_folder() {

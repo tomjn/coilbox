@@ -60,6 +60,7 @@ type OpenArchiveFileFn = unsafe extern "C" fn(c_int, *const c_char) -> c_int; //
 type FindFilesFn = unsafe extern "C" fn(c_int, c_int, *mut c_char, *mut c_int) -> c_int; // FindFilesArchive
 type ReadFileFn = unsafe extern "C" fn(c_int, c_int, *mut u8, c_int) -> c_int; // ReadArchiveFile
 type FindFilesVfsFn = unsafe extern "C" fn(c_int, *mut c_char, c_int) -> c_int; // FindFilesVFS(idx, buf, size)
+type ReadVfsFileFn = unsafe extern "C" fn(c_int, *mut u8, c_int) -> c_int; // ReadFileVFS(file, buf, numBytes)
 
 /// A map's visual appearance, parsed from `mapinfo.lua` (see [`Unitsync::map_appearance`]).
 /// Colours are `[r, g, b]` in 0..1. Any field the map omits is `None`.
@@ -216,6 +217,16 @@ pub struct Unitsync {
     read_archive_file_fn: Option<ReadFileFn>,
     close_archive_file_fn: Option<VoidByIntIntFn>,
     size_archive_file_fn: Option<IntByIntIntFn>,
+    // The merged-VFS equivalent of the four above: reads follow a mounted
+    // game's dependency chain (`AddAllArchives`) the way `CFileHandler` does,
+    // rather than one archive's own contents. Needed for anything the engine
+    // itself reads out of a shared dependency, such as
+    // `unittextures/tatex/palette.pal` living in `springcontent.sdz` rather
+    // than in the game (issue #2570).
+    open_file_vfs_fn: Option<IntByStrFn>,
+    close_file_vfs_fn: Option<VoidByIntFn>,
+    read_file_vfs_fn: Option<ReadVfsFileFn>,
+    file_size_vfs_fn: Option<IntByIntFn>,
     // sides / units (require a game's archives to be added first)
     add_all_archives_fn: Option<StrArgVoidFn>,
     remove_all_archives_fn: Option<VoidFn>,
@@ -343,6 +354,10 @@ impl Unitsync {
             read_archive_file_fn: opt(&lib, b"ReadArchiveFile\0"),
             close_archive_file_fn: opt(&lib, b"CloseArchiveFile\0"),
             size_archive_file_fn: opt(&lib, b"SizeArchiveFile\0"),
+            open_file_vfs_fn: opt(&lib, b"OpenFileVFS\0"),
+            close_file_vfs_fn: opt(&lib, b"CloseFileVFS\0"),
+            read_file_vfs_fn: opt(&lib, b"ReadFileVFS\0"),
+            file_size_vfs_fn: opt(&lib, b"FileSizeVFS\0"),
             add_all_archives_fn: opt(&lib, b"AddAllArchives\0"),
             remove_all_archives_fn: opt(&lib, b"RemoveAllArchives\0"),
             side_count_fn: opt(&lib, b"GetSideCount\0"),
@@ -865,6 +880,44 @@ impl Unitsync {
             unsafe { close(archive, fh) }
         }
         Some((real, buf))
+    }
+
+    /// Read `name` through the merged VFS `AddAllArchives` builds, capped at
+    /// `cap` bytes, or `None` if the build lacks the symbols or nothing
+    /// answers to that name.
+    ///
+    /// The general-VFS counterpart to [`Unitsync::read_archive_member`]: that
+    /// reads one already-opened archive's own contents, while this follows the
+    /// mounted game's whole dependency chain the way the engine's own
+    /// `CFileHandler` does. Needed for a file a game leans on the engine to
+    /// provide rather than shipping itself: Balanced Annihilation, for
+    /// instance, ships its own `unittextures/tatex/teamtex.txt` and its own
+    /// full `tatex` tile set but not `palette.pal`, which the engine still
+    /// resolves out of `springcontent.sdz`.
+    pub fn read_vfs_file(&self, name: &str, cap: usize) -> Option<Vec<u8>> {
+        let open = self.open_file_vfs_fn?;
+        let size_fn = self.file_size_vfs_fn?;
+        let read = self.read_file_vfs_fn?;
+        let c = CString::new(name).ok()?;
+        let fh = unsafe { open(c.as_ptr()) };
+        if fh == 0 {
+            return None;
+        }
+        let real = unsafe { size_fn(fh) }.max(0) as usize;
+        let to_read = real.min(cap);
+        let mut buf = vec![0u8; to_read];
+        let mut got = 0usize;
+        if to_read > 0 {
+            let n = unsafe { read(fh, buf.as_mut_ptr(), to_read as c_int) };
+            if n > 0 {
+                got = (n as usize).min(to_read);
+            }
+        }
+        buf.truncate(got);
+        if let Some(close) = self.close_file_vfs_fn {
+            unsafe { close(fh) }
+        }
+        Some(buf)
     }
 
     // ---- sides / units (after a game's archives are added) ----------------
