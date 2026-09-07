@@ -78,7 +78,7 @@ describe("computeSmoothedNormals", () => {
     );
     const indices = new Uint32Array([0, 2, 1, 0, 3, 2]);
 
-    const normals = computeSmoothedNormals(
+    const { normals, vertexCount } = computeSmoothedNormals(
       vertices,
       indices,
       0,
@@ -88,6 +88,8 @@ describe("computeSmoothedNormals", () => {
       DEFAULT_SMOOTHING_ANGLE_DEG,
     );
 
+    // Every face already agrees with every other, so nothing is split.
+    expect(vertexCount).toBe(4);
     for (let v = 0; v < 4; v++) {
       expect(normals[v * 3]).toBeCloseTo(0, 5);
       expect(normals[v * 3 + 1]).toBeCloseTo(1, 5);
@@ -95,7 +97,7 @@ describe("computeSmoothedNormals", () => {
     }
   });
 
-  it("keeps a sharp fold close to each side's own face normal", () => {
+  it("keeps a sharp fold close to each side's own face normal, by splitting the shared edge", () => {
     // Two triangles sharing the edge 0-1 (along X) but folded 90 degrees
     // apart. The one completed by vertex 2 faces +Y, the one completed by
     // vertex 3 faces +Z. A tight smoothing angle should not blend them.
@@ -109,7 +111,7 @@ describe("computeSmoothedNormals", () => {
     );
     const indices = new Uint32Array([0, 2, 1, 0, 1, 3]);
 
-    const normals = computeSmoothedNormals(
+    const split = computeSmoothedNormals(
       vertices,
       indices,
       0,
@@ -122,7 +124,59 @@ describe("computeSmoothedNormals", () => {
     // Vertex 2 only ever touches the +Y face, vertex 3 only the +Z one, so
     // both should read as close to that face's own flat normal, not the
     // averaged diagonal the shared edge 0-1 falls back to.
-    expect(normals[2 * 3 + 1]).toBeCloseTo(1, 4);
-    expect(normals[3 * 3 + 2]).toBeCloseTo(1, 4);
+    expect(split.normals[2 * 3 + 1]).toBeCloseTo(1, 4);
+    expect(split.normals[3 * 3 + 2]).toBeCloseTo(1, 4);
+
+    // Vertices 0 and 1 sit on the fold itself and each touch both faces, so
+    // each is split in two: one id keeping the +Y face's normal, a new one
+    // past the original count carrying the +Z face's.
+    expect(split.vertexCount).toBe(6);
+    expect(Array.from(split.splitFrom)).toEqual([0, 1]);
+    expect(split.normals[0 * 3 + 1]).toBeCloseTo(1, 4); // vertex 0, +Y face
+    expect(split.normals[4 * 3 + 2]).toBeCloseTo(1, 4); // split of 0, +Z face
+    expect(split.normals[1 * 3 + 1]).toBeCloseTo(1, 4); // vertex 1, +Y face
+    expect(split.normals[5 * 3 + 2]).toBeCloseTo(1, 4); // split of 1, +Z face
+
+    // The +Y face (0,2,1) keeps its original corners. The +Z face (0,1,3)
+    // has its 0 and 1 corners moved onto the two new split vertices.
+    expect(Array.from(split.indices)).toEqual([0, 2, 1, 4, 5, 3]);
+  });
+
+  it("does not split a vertex whose faces all agree, even with several of them", () => {
+    // A fan of four triangles around vertex 0, all nearly coplanar, sharing
+    // the edge 0-1 only pairwise adjacent to each other in sequence.
+    const vertices = new Float32Array(
+      [
+        vertex([0, 0, 0]),
+        vertex([1, 0, 0]),
+        vertex([1, 0, 1]),
+        vertex([0, 0, 1]),
+        vertex([-1, 0, 0]),
+      ].flat(),
+    );
+    const indices = new Uint32Array([
+      0,
+      1,
+      2, //
+      0,
+      2,
+      3, //
+      0,
+      3,
+      4, //
+    ]);
+
+    const split = computeSmoothedNormals(
+      vertices,
+      indices,
+      0,
+      5,
+      0,
+      9,
+      DEFAULT_SMOOTHING_ANGLE_DEG,
+    );
+
+    expect(split.vertexCount).toBe(5);
+    expect(split.splitFrom.length).toBe(0);
   });
 });

@@ -281,6 +281,11 @@ async function readGlb(options: {
  */
 function glbNotes(result: GlbImport): string[] {
   const notes: string[] = [];
+  if (result.folded > 0) {
+    notes.push(
+      `${result.folded} ${result.folded === 1 ? "piece" : "pieces"} came in as an empty holding a same-named mesh, the shape every .glb coilbox 1.12.0 or earlier wrote for a piece with geometry, so ${result.folded === 1 ? "it has" : "they have"} been folded back into one piece each. That is why the count below may read lower than Blender showed.`,
+    );
+  }
   if (result.inventedRoot) {
     notes.push(
       "The file had several objects at its top level and a Spring model has exactly one root piece, so a root has been added to hold them. Rename it to whatever the unit's script should call it.",

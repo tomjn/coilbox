@@ -337,9 +337,19 @@ function bakeGeometry(
     pivot[1] === 0 &&
     pivot[2] === 0;
 
+  // A hard edge recalculating splits gives this piece more vertices than the
+  // source mesh has, each a copy of the vertex it was split from carrying
+  // only its own group's normal. `verbatim` never applies here: it requires
+  // no fix at all, and a split only ever happens under `recalculated`.
+  const vertexCount = recalculated ? recalculated.vertexCount : source.vCount;
+
   const vertices: S3oVertex[] = [];
-  for (let i = 0; i < source.vCount; i++) {
-    const at = (source.vFirst + i) * FLOATS_PER_VERTEX;
+  for (let i = 0; i < vertexCount; i++) {
+    const local =
+      recalculated && i >= source.vCount
+        ? recalculated.splitFrom[i - source.vCount]
+        : i;
+    const at = (source.vFirst + local) * FLOATS_PER_VERTEX;
     if (verbatim) {
       const vx = source.vertices[at];
       const vy = source.vertices[at + 1];
@@ -365,9 +375,13 @@ function bakeGeometry(
       .applyMatrix3(linear);
     normal
       .set(
-        recalculated ? recalculated[i * 3] : source.vertices[at + 3],
-        recalculated ? recalculated[i * 3 + 1] : source.vertices[at + 4],
-        recalculated ? recalculated[i * 3 + 2] : source.vertices[at + 5],
+        recalculated ? recalculated.normals[i * 3] : source.vertices[at + 3],
+        recalculated
+          ? recalculated.normals[i * 3 + 1]
+          : source.vertices[at + 4],
+        recalculated
+          ? recalculated.normals[i * 3 + 2]
+          : source.vertices[at + 5],
       )
       .applyMatrix3(normalMatrix)
       .normalize();
@@ -387,7 +401,11 @@ function bakeGeometry(
 
   const indices: number[] = [];
   for (let i = 0; i < source.iCount; i++) {
-    indices.push(source.indices[source.iFirst + i]);
+    indices.push(
+      recalculated
+        ? recalculated.indices[i]
+        : source.indices[source.iFirst + i],
+    );
   }
   if (linear.determinant() < 0) {
     for (let i = 0; i + 2 < indices.length; i += 3) {

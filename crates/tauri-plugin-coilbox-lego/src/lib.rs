@@ -1030,6 +1030,7 @@ async fn lego_import_glb<R: Runtime>(app: AppHandle<R>, path: String, id: String
         "imagesUsed": model.images_used,
         "inventedRoot": model.invented_root,
         "transformed": model.transformed,
+        "folded": model.folded,
         "teamMask": team_mask,
         "missingImage": missing,
     });

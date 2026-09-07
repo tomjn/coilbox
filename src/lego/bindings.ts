@@ -392,6 +392,11 @@ export interface GlbImport extends S3oImport {
   /** Objects carrying a rotation or a scale, which an `.s3o` piece cannot, so
    *  theirs was baked into their own vertices. */
   transformed: number;
+  /** Doubled pieces folded back into one: every `.glb` coilbox 1.12.0 or
+   *  earlier wrote gave a piece with geometry two nodes under the same name,
+   *  an empty holding a same-named mesh, and this is how many of that exact
+   *  shape were folded back rather than kept as two pieces. */
+  folded: number;
   /** Whether the picture that came out of the file carries alpha, which an
    *  `.s3o` reads as the team-colour mask. False means it was fully opaque and
    *  the mask was written to nothing, since fully opaque means the engine paints

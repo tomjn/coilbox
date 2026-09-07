@@ -235,13 +235,33 @@ export function getFixedPieceGeometry(
   if (cached && cached.sig === sig) return cached.geometry;
   cached?.geometry.dispose();
 
+  // Recalculating first, since a hard edge can split a vertex and every
+  // array below has to be sized for the split count rather than `vCount`.
+  const split =
+    piece.normalsAngle !== undefined
+      ? computeSmoothedNormals(
+          raw.vertices,
+          raw.indices,
+          mesh.vFirst,
+          mesh.vCount,
+          mesh.iFirst,
+          mesh.iCount,
+          piece.normalsAngle,
+        )
+      : null;
+  const vertexCount = split ? split.vertexCount : mesh.vCount;
+
   // Standalone attributes, local to this piece alone, rather than a slice of
   // the shared interleaved buffer: the whole point of keying this on the
-  // piece is that its fix must never touch what another piece reads.
-  const position = new Float32Array(mesh.vCount * 3);
-  const uv = new Float32Array(mesh.vCount * 2);
-  for (let i = 0; i < mesh.vCount; i++) {
-    const at = (mesh.vFirst + i) * FLOATS_PER_VERTEX;
+  // piece is that its fix must never touch what another piece reads. A
+  // split vertex past `mesh.vCount` copies the position and UV of the
+  // vertex it was split from and carries only a different normal.
+  const position = new Float32Array(vertexCount * 3);
+  const uv = new Float32Array(vertexCount * 2);
+  for (let i = 0; i < vertexCount; i++) {
+    const local =
+      split && i >= mesh.vCount ? split.splitFrom[i - mesh.vCount] : i;
+    const at = (mesh.vFirst + local) * FLOATS_PER_VERTEX;
     position[i * 3] = raw.vertices[at];
     position[i * 3 + 1] = raw.vertices[at + 1];
     position[i * 3 + 2] = raw.vertices[at + 2];
@@ -251,16 +271,8 @@ export function getFixedPieceGeometry(
   }
 
   let normal: Float32Array;
-  if (piece.normalsAngle !== undefined) {
-    normal = computeSmoothedNormals(
-      raw.vertices,
-      raw.indices,
-      mesh.vFirst,
-      mesh.vCount,
-      mesh.iFirst,
-      mesh.iCount,
-      piece.normalsAngle,
-    );
+  if (split) {
+    normal = split.normals;
   } else {
     normal = new Float32Array(mesh.vCount * 3);
     for (let i = 0; i < mesh.vCount; i++) {
@@ -282,7 +294,7 @@ export function getFixedPieceGeometry(
   // the same point), and this buffer holds nothing but this mesh's vertices.
   const indices = new Uint32Array(mesh.iCount);
   for (let i = 0; i < mesh.iCount; i++) {
-    indices[i] = raw.indices[mesh.iFirst + i];
+    indices[i] = split ? split.indices[i] : raw.indices[mesh.iFirst + i];
   }
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
