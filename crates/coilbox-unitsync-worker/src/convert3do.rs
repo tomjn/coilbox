@@ -430,16 +430,25 @@ fn convert_group(
     });
 
     // Every tile name the folder asks for, and where it is in the archive.
+    // `wanted` stays keyed by the raw name (`load_tile` needs it unchanged to
+    // compute the engine's `00` suffix), but a name reported below is renamed
+    // first: an empty one is not a texture nobody names, it is "00" (issue
+    // #2610), and the report should never print a blank.
     let mut tiles: Vec<coilbox_3do_convert::Tile> = Vec::new();
     for (name, uses) in &wanted {
+        let reported = if name.is_empty() {
+            coilbox_3do::EMPTY_TEXTURE_NAME
+        } else {
+            name.as_str()
+        };
         match load_tile(us, handle, list, teamtex, name) {
             Ok(tile) => tiles.push(tile),
             Err(None) => {
-                group.missing_textures.insert(name.clone(), *uses);
+                group.missing_textures.insert(reported.to_string(), *uses);
             }
             Err(Some(member)) => {
                 group.undecodable_textures.insert(
-                    name.clone(),
+                    reported.to_string(),
                     Undecodable {
                         member,
                         wanted_by: *uses,
@@ -510,6 +519,14 @@ fn convert_group(
             .into_iter()
             .find(|name| group.tiles_that_did_not_fit.contains(name))
         {
+            // `tiles_that_did_not_fit` stays raw-keyed above, for the match
+            // against `tile_names`'s own raw output. Renamed here, since this
+            // is the point it turns into a message somebody reads.
+            let missing = if missing.is_empty() {
+                coilbox_3do::EMPTY_TEXTURE_NAME
+            } else {
+                missing.as_str()
+            };
             group
                 .did_not_fit
                 .push(format!("{short} (needs {missing}, which did not fit)"));

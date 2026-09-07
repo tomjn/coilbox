@@ -37,14 +37,11 @@ pub struct Converted {
     /// not the same thing to fix. One means a texture is missing from the game
     /// or from the sheet. The other means the palette itself did not resolve.
     pub missing_texture_faces: usize,
-    /// Always zero. #2570 added this for a face whose `Texture::Name` is an
-    /// empty string, on the theory that the format has a third way of saying
-    /// "no texture" distinct from a palette entry. #2610 found that theory
-    /// wrong: the engine resolves an empty name exactly like any other,
-    /// appending `00` and looking it up as real artwork, so [`rect_for`] now
-    /// routes it through the same path as `"arm2"` or any other name. Kept
-    /// rather than removed because callers across the worker and the frontend
-    /// still read it.
+    /// And how many came out plain because the file gives the face no texture
+    /// name at all, which is neither a palette entry that failed to resolve nor
+    /// a tile that went missing. Nothing is wrong with these: the format simply
+    /// has a third way of saying "no texture", and a caller reporting on a
+    /// palette should not be counting them as palette failures.
     pub untextured_faces: usize,
     /// Tile names the model asks for that the sheet does not hold. Their faces
     /// are drawn plain, and saying which ones is the only way anybody works out
@@ -230,11 +227,18 @@ fn rect_for(prim: &coilbox_3do::Primitive, state: &mut Walk) -> Rect {
         // appends `00` to whatever the file gives before resolving it, and an
         // empty name is not in `teamtex.txt` either, so it becomes `"00"`
         // exactly like any other name (issue #2610). The sheet the caller
-        // packed is keyed by this same raw name, empty string included.
+        // packed is keyed by this same raw name, empty string included, so
+        // the lookup below stays on the raw name. Only what gets reported
+        // back as missing is renamed, once resolution is done with it.
         coilbox_3do::Texture::Name(name) => match state.rects.get(name.as_str()) {
             Some(rect) => *rect,
             None => {
-                state.missing.insert(name.clone());
+                let reported = if name.is_empty() {
+                    coilbox_3do::EMPTY_TEXTURE_NAME
+                } else {
+                    name.as_str()
+                };
+                state.missing.insert(reported.to_string());
                 state.palette_faces += 1;
                 state.missing_texture_faces += 1;
                 fallback
@@ -504,7 +508,13 @@ mod tests {
         assert_eq!(out.palette_faces, 1);
         assert_eq!(out.missing_texture_faces, 1);
         assert_eq!(out.untextured_faces, 0);
-        assert_eq!(out.missing_textures, vec![String::new()]);
+        // Reported as the name it resolves to, not the blank the file stores
+        // (issue #2610): a caller listing missing textures should never print
+        // an empty string.
+        assert_eq!(
+            out.missing_textures,
+            vec![coilbox_3do::EMPTY_TEXTURE_NAME.to_string()]
+        );
     }
 
     /// A palette entry the caller did resolve to a colour gets its own tile,

@@ -213,7 +213,38 @@ pub(crate) fn read_model(
     for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
         resolve_texture(us, handle, list, &format, teamtex, cache, tex);
     }
+    rename_empty_textures(&mut out);
     out
+}
+
+/// Rewrite an empty `.3do` texture name to `coilbox_3do::EMPTY_TEXTURE_NAME`
+/// once resolution has already run.
+///
+/// [`resolve_texture`] needs the true empty string to compute the engine's
+/// `00` suffix (issue #2610), so this runs after it rather than before.
+/// `ModelGroup::texture` and `ModelTexture::name` are the same key by
+/// contract, so both are rewritten together: leaving one blank and the other
+/// `"00"` would break the viewer's own lookup between them.
+fn rename_empty_textures(out: &mut UnitModelOutput) {
+    for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
+        if tex.name.is_empty() {
+            tex.name = coilbox_3do::EMPTY_TEXTURE_NAME.to_string();
+        }
+    }
+    if let Some(root) = &mut out.root {
+        rename_empty_group_textures(root);
+    }
+}
+
+fn rename_empty_group_textures(piece: &mut ModelPiece) {
+    for group in &mut piece.groups {
+        if group.texture.as_deref() == Some("") {
+            group.texture = Some(coilbox_3do::EMPTY_TEXTURE_NAME.to_string());
+        }
+    }
+    for child in &mut piece.children {
+        rename_empty_group_textures(child);
+    }
 }
 
 /// What a render of `object_name` is taken of, as a digest, plus the archive
@@ -1344,6 +1375,15 @@ mod tests {
         }
     }
 
+    fn named_face(name: &str) -> coilbox_3do::Primitive {
+        coilbox_3do::Primitive {
+            indices: vec![0, 1, 2],
+            texture: coilbox_3do::Texture::Name(name.into()),
+            normal: [0.0, 1.0, 0.0],
+            vertex_normals: vec![[0.0, 1.0, 0.0]; 3],
+        }
+    }
+
     fn a_piece(primitives: Vec<coilbox_3do::Primitive>) -> coilbox_3do::Piece {
         coilbox_3do::Piece {
             name: "body".into(),
@@ -1418,6 +1458,56 @@ mod tests {
         let group = &out.root.expect("root").groups[0];
         assert_eq!(group.texture, None);
         assert!(out.textures.is_empty());
+    }
+
+    /// A face naming an empty string is not the same as one naming nothing at
+    /// all (issue #2610): it gets its own texture entry and batch, same as a
+    /// real name would, rather than falling into the untextured (`None`)
+    /// group above.
+    #[test]
+    fn an_empty_named_face_gets_its_own_texture_entry() {
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: a_piece(vec![named_face("")]),
+        };
+
+        let out = from_3do("objects3d/armcom.3do", &model, None);
+
+        assert_eq!(out.palette_faces, 0);
+        let group = &out.root.expect("root").groups[0];
+        assert_eq!(group.texture.as_deref(), Some(""));
+        assert_eq!(out.textures.len(), 1);
+        assert_eq!(out.textures[0].name, "");
+    }
+
+    /// Once resolution has run, an empty name is reported as `"00"`, the name
+    /// it actually resolves to, rather than the blank the file stores
+    /// (issue #2610). `ModelGroup::texture` is rewritten alongside
+    /// `ModelTexture::name` so the viewer's own lookup between the two still
+    /// lines up.
+    #[test]
+    fn rename_empty_textures_turns_a_blank_name_into_00() {
+        let model = coilbox_3do::Model {
+            radius: 1.0,
+            height: 1.0,
+            mid: [0.0; 3],
+            root: a_piece(vec![named_face(""), named_face("arm2")]),
+        };
+        let mut out = from_3do("objects3d/armcom.3do", &model, None);
+
+        rename_empty_textures(&mut out);
+
+        assert!(
+            out.textures.iter().all(|t| !t.name.is_empty()),
+            "no texture name should ever be reported blank"
+        );
+        assert!(out.textures.iter().any(|t| t.name == "00"));
+        assert!(out.textures.iter().any(|t| t.name == "arm2"));
+        let groups = &out.root.expect("root").groups;
+        assert!(groups.iter().any(|g| g.texture.as_deref() == Some("00")));
+        assert!(groups.iter().any(|g| g.texture.as_deref() == Some("arm2")));
     }
 
     /// Two faces naming the same entry share one material rather than one
