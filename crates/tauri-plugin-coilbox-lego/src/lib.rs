@@ -750,7 +750,9 @@ async fn lego_import_s3o<R: Runtime>(app: AppHandle<R>, path: String, id: String
 /// Both spellings of each name come back. The engine appends `00` to a `.3do`
 /// texture name unless it is listed in the game's `teamtex.txt`, so a face
 /// naming `arm2` is drawn with `arm200`, and whichever the archive holds is the
-/// one worth unpacking.
+/// one worth unpacking. A face can also name an empty string rather than
+/// naming nothing at all (issue #2610), and the engine treats that the same
+/// way: it becomes `"00"`, so that candidate is asked for too.
 #[tauri::command]
 async fn lego_read_3do(path: String) -> CliResult {
     let bytes = match std::fs::read(&path) {
@@ -767,9 +769,6 @@ async fn lego_read_3do(path: String) -> CliResult {
             let coilbox_3do::Texture::Name(name) = &prim.texture else {
                 continue;
             };
-            if name.is_empty() {
-                continue;
-            }
             for candidate in [format!("{name}00"), name.clone()] {
                 if !names.contains(&candidate) {
                     names.push(candidate);
@@ -1016,13 +1015,16 @@ async fn lego_import_glb<R: Runtime>(app: AppHandle<R>, path: String, id: String
 /// Read every tile a `.3do` names off the disk beside it.
 ///
 /// Answers the tiles it found and how many the model asked for, so the import
-/// can say "22 of 25" rather than leaving a silently patchy unit.
+/// can say "22 of 25" rather than leaving a silently patchy unit. A face
+/// naming an empty string is one of those names, not a face that names
+/// nothing at all (issue #2610): the engine resolves it to `"00"` the same as
+/// any other name, so it is asked for here the same way.
 fn read_tiles(model_file: &Path, model: &coilbox_3do::Model) -> (Vec<atlas3do::Tile>, usize) {
     let mut names: Vec<String> = Vec::new();
     for piece in model.root.walk() {
         for prim in &piece.primitives {
             if let coilbox_3do::Texture::Name(name) = &prim.texture {
-                if !name.is_empty() && !names.iter().any(|held| held == name) {
+                if !names.iter().any(|held| held == name) {
                     names.push(name.clone());
                 }
             }

@@ -139,6 +139,13 @@ pub fn find_beside_model(model: &Path, name: &str) -> Option<PathBuf> {
 /// `unittextures/tatex/teamtex.txt`, which is a region the engine paints in the
 /// player's colour and which is stored under the bare name.
 ///
+/// A face can also name an empty string rather than naming nothing at all
+/// (issue #2610). The engine does not special-case that: an empty name is not
+/// in `teamtex.txt` either, so it becomes `"00"` the same as any other name,
+/// and resolves to a real file, e.g. Balanced Annihilation's
+/// `unittextures/tatex/00.bmp`. So this takes an empty `name` exactly like a
+/// full one rather than bailing out early.
+///
 /// Rather than read that list, both spellings are tried, and which one matched
 /// is the answer to whether this is a team-colour region. That is the same
 /// question `teamtex.txt` answers, because being in that list is exactly what
@@ -149,9 +156,6 @@ pub fn find_beside_model(model: &Path, name: &str) -> Option<PathBuf> {
 pub fn find_tile_beside_model(model: &Path, name: &str) -> Option<Tile> {
     let want = name.trim().replace('\\', "/");
     let want = want.rsplit('/').next()?.to_lowercase();
-    if want.is_empty() {
-        return None;
-    }
     let suffixed = format!("{want}00");
     let tile = |path: PathBuf, team_colour: bool| Tile { path, team_colour };
 

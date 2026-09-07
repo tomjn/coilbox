@@ -37,11 +37,14 @@ pub struct Converted {
     /// not the same thing to fix. One means a texture is missing from the game
     /// or from the sheet. The other means the palette itself did not resolve.
     pub missing_texture_faces: usize,
-    /// And how many came out plain because the file gives the face no texture
-    /// name at all, which is neither a palette entry that failed to resolve nor
-    /// a tile that went missing. Nothing is wrong with these: the format simply
-    /// has a third way of saying "no texture", and a caller reporting on a
-    /// palette should not be counting them as palette failures.
+    /// Always zero. #2570 added this for a face whose `Texture::Name` is an
+    /// empty string, on the theory that the format has a third way of saying
+    /// "no texture" distinct from a palette entry. #2610 found that theory
+    /// wrong: the engine resolves an empty name exactly like any other,
+    /// appending `00` and looking it up as real artwork, so [`rect_for`] now
+    /// routes it through the same path as `"arm2"` or any other name. Kept
+    /// rather than removed because callers across the worker and the frontend
+    /// still read it.
     pub untextured_faces: usize,
     /// Tile names the model asks for that the sheet does not hold. Their faces
     /// are drawn plain, and saying which ones is the only way anybody works out
@@ -222,19 +225,21 @@ fn corners_of(source: &coilbox_3do::Piece, prim: &coilbox_3do::Primitive) -> Opt
 fn rect_for(prim: &coilbox_3do::Primitive, state: &mut Walk) -> Rect {
     let fallback = state.rects[atlas::PALETTE_TILE];
     match &prim.texture {
-        // A name that is present but empty resolves to nothing, so it is the
-        // flat-colour case in everything but how the file stores it.
-        coilbox_3do::Texture::Name(name) if !name.is_empty() => {
-            match state.rects.get(name.as_str()) {
-                Some(rect) => *rect,
-                None => {
-                    state.missing.insert(name.clone());
-                    state.palette_faces += 1;
-                    state.missing_texture_faces += 1;
-                    fallback
-                }
+        // Any name, empty included, is looked up the same way. The engine's
+        // `S3DOPiece::GetTexture` (`rts/Rendering/Models/3DOParser.cpp`)
+        // appends `00` to whatever the file gives before resolving it, and an
+        // empty name is not in `teamtex.txt` either, so it becomes `"00"`
+        // exactly like any other name (issue #2610). The sheet the caller
+        // packed is keyed by this same raw name, empty string included.
+        coilbox_3do::Texture::Name(name) => match state.rects.get(name.as_str()) {
+            Some(rect) => *rect,
+            None => {
+                state.missing.insert(name.clone());
+                state.palette_faces += 1;
+                state.missing_texture_faces += 1;
+                fallback
             }
-        }
+        },
         // A resolved entry got its own tile, coloured from `palette.pal`, under
         // this same name, before packing. One nothing could resolve, because
         // there was no palette to read or the entry named is outside the 256 it
@@ -247,11 +252,6 @@ fn rect_for(prim: &coilbox_3do::Primitive, state: &mut Walk) -> Rect {
                     fallback
                 }
             }
-        }
-        _ => {
-            state.palette_faces += 1;
-            state.untextured_faces += 1;
-            fallback
         }
     }
 }
@@ -449,11 +449,50 @@ mod tests {
         assert_eq!(out.triangles, 1);
     }
 
-    /// The third way the format says "no texture": a name that is there and
-    /// empty. It comes out in the same flat grey, and counting it as a palette
-    /// entry that failed would blame the palette for something it never saw.
+    /// A `.3do` face can name an empty string rather than naming nothing at
+    /// all (issue #2610). `S3DOPiece::GetTexture`
+    /// (`rts/Rendering/Models/3DOParser.cpp`) does not special-case that: an
+    /// empty name is not in `teamtex.txt` either, so it becomes `"00"` and
+    /// resolves to real artwork exactly like `"arm2"` does above. So a sheet
+    /// that holds a tile for the empty name draws it, plain, not the flat grey
+    /// fallback.
     #[test]
-    fn counts_a_face_with_an_empty_name_apart_from_a_palette_failure() {
+    fn an_empty_name_resolves_to_its_tile_when_the_sheet_has_one() {
+        let mut rects = rects();
+        rects.insert(
+            String::new(),
+            Rect {
+                u0: 0.5,
+                v0: 0.0,
+                u1: 1.0,
+                v1: 0.5,
+            },
+        );
+        let out = to_s3o(
+            &model3(piece3(
+                "body",
+                vec![face(
+                    vec![0, 1, 2, 3],
+                    coilbox_3do::Texture::Name(String::new()),
+                )],
+            )),
+            &rects,
+            "a.png",
+        )
+        .expect("convert");
+
+        assert_eq!(out.palette_faces, 0);
+        assert_eq!(out.untextured_faces, 0);
+        let uvs: Vec<[f32; 2]> = out.model.root.vertices.iter().map(|v| v.uv).collect();
+        assert_eq!(uvs, vec![[0.5, 0.0], [1.0, 0.0], [1.0, 0.5], [0.5, 0.5]]);
+    }
+
+    /// The same empty name, but the sheet has no tile for it (the game the
+    /// model came from has no `unittextures/tatex/00.bmp`): it is a missing
+    /// texture like any other missing name, not the format's own way of
+    /// saying "no texture".
+    #[test]
+    fn an_empty_name_missing_from_the_sheet_counts_as_a_missing_texture() {
         let out = convert(piece3(
             "body",
             vec![face(
@@ -463,9 +502,9 @@ mod tests {
         ));
 
         assert_eq!(out.palette_faces, 1);
-        assert_eq!(out.untextured_faces, 1);
-        assert_eq!(out.missing_texture_faces, 0);
-        assert!(out.missing_textures.is_empty());
+        assert_eq!(out.missing_texture_faces, 1);
+        assert_eq!(out.untextured_faces, 0);
+        assert_eq!(out.missing_textures, vec![String::new()]);
     }
 
     /// A palette entry the caller did resolve to a colour gets its own tile,

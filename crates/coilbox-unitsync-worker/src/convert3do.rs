@@ -608,9 +608,9 @@ fn load_tile(
     name: &str,
 ) -> Result<coilbox_3do_convert::Tile, Option<String>> {
     let want = name.trim().replace('\\', "/").to_lowercase();
-    if want.is_empty() {
-        return Err(None);
-    }
+    // `teamtex` never holds an empty entry (`read_teamtex` filters blank
+    // lines), so an empty `want` always falls through to the suffix rule
+    // below, the same as the engine (issue #2610).
     if teamtex.contains(&want) {
         return Ok(coilbox_3do_convert::Tile {
             name: name.to_string(),
