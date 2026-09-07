@@ -25,6 +25,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::atlas::{Packed, Placement, Rect};
 
+/// Where a sheet and its record are written inside `unittextures/`, so both the
+/// batch conversion (`coilbox-unitsync-worker`'s `--convert-3do`, issue #2573)
+/// and a single model import (issue #2623) agree on the one place to look.
+/// `unittextures/<SHEET_DIR>/<stem>.png` and its `.json` record beside it, a
+/// folder of its own rather than loose in `unittextures/` so an overlay
+/// dropped over a real game cannot land a sheet on top of one of the game's
+/// own textures.
+pub const SHEET_DIR: &str = "3do";
+
 /// What the file says it is, so a JSON file that is not one of these is refused
 /// by name rather than by a missing field.
 pub const SHEET_KIND: &str = "coilbox-3do-atlas";

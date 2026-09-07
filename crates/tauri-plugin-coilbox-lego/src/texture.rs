@@ -215,6 +215,42 @@ pub fn find_palette_beside_model(model: &Path) -> Option<PathBuf> {
     find_in(model.parent()?, PALETTE_FILE)
 }
 
+/// The sheet records a batch conversion (`coilbox-unitsync-worker`'s
+/// `--convert-3do`, issue #2573) left beside `model`, if any.
+///
+/// The same search as [`find_palette_beside_model`], because the batch writes
+/// its sheets into the game folder the same way everything else here expects
+/// a texture to live: `unittextures/<SHEET_DIR>/*.json`. A batch run against a
+/// folder unrelated to `model` leaves nothing to find here, and the caller
+/// packs a sheet of its own exactly as it did before this existed (issue
+/// #2623).
+///
+/// Sorted by file name, which is deterministic rather than meaningful: which
+/// one actually fits `model` is for the caller to decide, by checking which
+/// record's tiles cover what the model asks for.
+pub fn find_sheet_records_beside_model(model: &Path) -> Vec<PathBuf> {
+    let mut dir = model.parent();
+    while let Some(here) = dir {
+        if let Some(textures) = child_dir(here, TEXTURE_DIR) {
+            if let Some(sheets) = child_dir(&textures, coilbox_3do_convert::SHEET_DIR) {
+                let mut records: Vec<PathBuf> = std::fs::read_dir(&sheets)
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .map(|entry| entry.path())
+                    .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+                    .collect();
+                if !records.is_empty() {
+                    records.sort();
+                    return records;
+                }
+            }
+        }
+        dir = here.parent();
+    }
+    Vec::new()
+}
+
 /// One of a `.3do`'s tiles, found on disk.
 pub struct Tile {
     pub path: PathBuf,
@@ -495,6 +531,58 @@ mod tests {
 
         let model = dir.path().join("objects3d/armcom.3do");
         assert!(find_palette_beside_model(&model).is_none());
+    }
+
+    /// The same walk as the palette, into the folder a batch conversion writes
+    /// its sheets under, and one record found means a game converted with
+    /// #2573 has something for a later single import to reuse.
+    #[test]
+    fn finds_a_sheet_record_a_batch_conversion_left_beside_the_model() {
+        let dir = tempfile::tempdir().expect("temp");
+        let sheets = dir.path().join("unittextures/3do");
+        std::fs::create_dir_all(&sheets).expect("dirs");
+        std::fs::create_dir_all(dir.path().join("objects3d/arm")).expect("dirs");
+        std::fs::write(sheets.join("objects3d-arm.json"), b"{}").expect("write");
+
+        let model = dir.path().join("objects3d/arm/armcom.3do");
+        let found = find_sheet_records_beside_model(&model);
+
+        assert_eq!(found, vec![sheets.join("objects3d-arm.json")]);
+    }
+
+    /// A batch groups models by folder, so a game with more than one faction
+    /// leaves more than one record. Every one comes back, sorted, and it is
+    /// for the caller to work out which actually covers a given model.
+    #[test]
+    fn finds_every_sheet_record_when_a_batch_wrote_several() {
+        let dir = tempfile::tempdir().expect("temp");
+        let sheets = dir.path().join("unittextures/3do");
+        std::fs::create_dir_all(&sheets).expect("dirs");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+        std::fs::write(sheets.join("objects3d.json"), b"{}").expect("write");
+        std::fs::write(sheets.join("objects3d-arm.json"), b"{}").expect("write");
+        // Not a record: the sheet's own picture sits beside its JSON.
+        std::fs::write(sheets.join("objects3d.png"), b"not json").expect("write");
+
+        let model = dir.path().join("objects3d/armcom.3do");
+        let found = find_sheet_records_beside_model(&model);
+
+        assert_eq!(
+            found,
+            vec![
+                sheets.join("objects3d-arm.json"),
+                sheets.join("objects3d.json"),
+            ]
+        );
+    }
+
+    #[test]
+    fn finds_no_sheet_record_when_no_batch_ever_ran_here() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+
+        let model = dir.path().join("objects3d/armcom.3do");
+        assert!(find_sheet_records_beside_model(&model).is_empty());
     }
 
     #[test]

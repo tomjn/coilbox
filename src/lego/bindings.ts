@@ -339,6 +339,11 @@ export interface ThreeDoImport extends S3oImport {
   /** How many distinct tiles the model names, so the panel can say how many of
    *  them were found. */
   tiles: number;
+  /** Whether this unit's texture is a sheet a batch conversion (issue #2573)
+   *  already left beside the model, rather than one packed just for this
+   *  import. True means it shares the same texture the rest of that game's
+   *  converted units do. */
+  sheetReused: boolean;
 }
 
 /**
