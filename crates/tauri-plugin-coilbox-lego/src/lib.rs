@@ -1003,6 +1003,7 @@ async fn lego_import_glb<R: Runtime>(app: AppHandle<R>, path: String, id: String
         "flatShaded": model.flat_shaded,
         "imagesUsed": model.images_used,
         "inventedRoot": model.invented_root,
+        "transformed": model.transformed,
         "teamMask": team_mask,
         "missingImage": missing,
     });
@@ -2036,6 +2037,82 @@ mod team_mask_tests {
         set_team_mask(&mut image, true);
 
         assert_eq!(image.get_pixel(0, 0).0[3], 255);
+    }
+}
+
+#[cfg(test)]
+mod glb_picture {
+    use super::*;
+
+    fn png(alpha: u8) -> Vec<u8> {
+        let img = image::RgbaImage::from_pixel(4, 4, image::Rgba([10, 20, 30, alpha]));
+        coilbox_texture::encode_png(&img).expect("encode")
+    }
+
+    fn stored(dir: &Path, bytes: Vec<u8>) -> (image::RgbaImage, bool) {
+        let (value, has_mask) = store_glb_image(
+            dir,
+            &glb::Image {
+                bytes,
+                name: "skin.png".into(),
+            },
+        )
+        .expect("store");
+        let key = value["key"].as_str().expect("key").to_string();
+        let written = std::fs::read(dir.join(&key)).expect("read back");
+        (
+            coilbox_texture::decode("png", &written).expect("decode"),
+            has_mask,
+        )
+    }
+
+    /// The defect this rule exists to stop, and it is invisible here and
+    /// glaring in the game. An `.s3o` reads the first texture's alpha as the
+    /// team-colour mask, so a fully opaque picture means every pixel of the
+    /// unit is painted in the player's colour and the texture stops being
+    /// drawn. Coilbox's own `.glb` export writes an RGB PNG with no alpha at
+    /// all, so this is what a round trip hands back every time.
+    #[test]
+    fn writes_an_opaque_picture_to_no_team_colour_at_all() {
+        let dir = tempfile::tempdir().expect("temp");
+        let (image, has_mask) = stored(dir.path(), png(255));
+
+        assert!(!has_mask);
+        assert!(image.pixels().all(|pixel| pixel.0[3] == 0));
+        // The colours are its own, untouched.
+        assert_eq!(image.get_pixel(0, 0).0[0..3], [10, 20, 30]);
+    }
+
+    /// A picture that does carry varying alpha was authored that way, and
+    /// zeroing it would be throwing away the mask rather than not inventing
+    /// one.
+    #[test]
+    fn keeps_a_picture_that_carries_a_real_mask() {
+        let dir = tempfile::tempdir().expect("temp");
+        let mut img = image::RgbaImage::from_pixel(4, 4, image::Rgba([10, 20, 30, 0]));
+        img.put_pixel(1, 1, image::Rgba([9, 9, 9, 255]));
+        let (image, has_mask) = stored(dir.path(), coilbox_texture::encode_png(&img).expect("png"));
+
+        assert!(has_mask);
+        assert_eq!(image.get_pixel(1, 1).0[3], 255);
+        assert_eq!(image.get_pixel(0, 0).0[3], 0);
+    }
+
+    /// glTF allows PNG and JPEG. Anything else is a file this cannot open, and
+    /// saying so beats an untextured unit with no explanation.
+    #[test]
+    fn refuses_a_picture_in_neither_format_gltf_allows() {
+        let dir = tempfile::tempdir().expect("temp");
+        let problem = store_glb_image(
+            dir.path(),
+            &glb::Image {
+                bytes: b"not a picture".to_vec(),
+                name: "skin.png".into(),
+            },
+        )
+        .expect_err("refused");
+
+        assert!(problem.contains("PNG and JPEG"), "got: {problem}");
     }
 }
 

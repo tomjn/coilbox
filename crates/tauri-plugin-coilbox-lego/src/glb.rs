@@ -117,6 +117,11 @@ pub struct Model {
     /// Whether the file's scene had several root nodes and one was invented to
     /// hold them, since a Spring model has exactly one root piece.
     pub invented_root: bool,
+    /// Objects carrying a rotation or a scale, as against a plain position. An
+    /// `.s3o` piece holds a position and nothing else, so these are the ones
+    /// whose transform gets baked into their vertices, and counting them is
+    /// what lets the import say so only when it happened.
+    pub transformed: usize,
 }
 
 /// Read a `.glb`, or say what is wrong with it.
@@ -136,6 +141,7 @@ pub fn read(bytes: &[u8], path: &Path) -> Result<Model, String> {
         skipped: 0,
         converted: 0,
         flat_shaded: 0,
+        transformed: 0,
         materials: BTreeSet::new(),
     };
 
@@ -169,6 +175,7 @@ pub fn read(bytes: &[u8], path: &Path) -> Result<Model, String> {
         flat_shaded: state.flat_shaded,
         images_used,
         invented_root,
+        transformed: state.transformed,
     })
 }
 
@@ -314,6 +321,7 @@ struct Read<'a> {
     skipped: usize,
     converted: usize,
     flat_shaded: usize,
+    transformed: usize,
     /// Every material any mesh in the tree draws with, for finding the picture.
     materials: BTreeSet<usize>,
 }
@@ -343,11 +351,22 @@ impl Read<'_> {
         }
         seen.pop();
 
+        let matrix = node_matrix(node);
+        // The linear part only. A plain position is exactly what an `.s3o`
+        // piece already holds, so it is not something that had to be baked.
+        if [
+            matrix[0], matrix[1], matrix[2], matrix[4], matrix[5], matrix[6], matrix[8], matrix[9],
+            matrix[10],
+        ] != [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        {
+            self.transformed += 1;
+        }
+
         Ok(Node {
             // An unnamed node is legal. The document normalises and uniques
             // every name anyway, so an empty one becomes `piece` there.
             name: node.name.clone().unwrap_or_default(),
-            matrix: node_matrix(node),
+            matrix,
             mesh,
             children,
         })
@@ -1366,6 +1385,50 @@ pub(crate) mod tests {
             beside(Path::new("/a/b/unit.glb"), "tex%20tures/skin.png"),
             Some(PathBuf::from("/a/b/tex tures/skin.png")),
         );
+    }
+
+    /// The whole point of the feature, and the one thing neither half's own
+    /// tests could say on their own: coilbox reads what coilbox writes.
+    ///
+    /// `tests/exported.glb` is real `GLTFExporter` output, written by
+    /// `src/lego/exportGlb.dom.test.ts` every time the frontend suite runs. If
+    /// that exporter changes shape, this is what notices.
+    #[test]
+    fn opens_the_file_coilboxs_own_exporter_writes() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/exported.glb");
+        let bytes = std::fs::read(&path).expect("the fixture, written by exportGlb.dom.test.ts");
+        let model = read(&bytes, &path).expect("read");
+
+        // One node per piece, which is why `buildGlbScene` makes a piece with
+        // geometry a mesh rather than a group holding one. Wrapped, every such
+        // piece arrived twice under the same name.
+        assert!(!model.invented_root);
+        assert_eq!(model.root.name, "base");
+        assert!(model.root.mesh.is_none());
+
+        let hull = &model.root.children[0];
+        assert_eq!(hull.name, "hull");
+        assert_eq!(
+            [hull.matrix[12], hull.matrix[13], hull.matrix[14]],
+            [1.0, 2.0, 3.0]
+        );
+        assert_eq!(hull.mesh.as_ref().expect("hull mesh").indices.len(), 3);
+
+        let gun = &hull.children[0];
+        assert_eq!(gun.name, "gun");
+        assert_eq!(
+            [gun.matrix[12], gun.matrix[13], gun.matrix[14]],
+            [0.0, 4.0, 0.0]
+        );
+        assert!(gun.children.is_empty());
+
+        // Axes and winding are untouched on the way out, so they come back
+        // untouched: these are the pack part's own third vertex and first
+        // normal, in the order `exportGlb.dom.test.ts` writes them.
+        let hull_mesh = hull.mesh.as_ref().expect("hull mesh");
+        assert_eq!(hull_mesh.positions[2], [0.0, 0.0, 1.0]);
+        assert_eq!(hull_mesh.normals[0], [0.0, 1.0, 0.0]);
+        assert_eq!(hull_mesh.uvs[2], [0.0, 1.0]);
     }
 
     /// A strip is wound alternately, so converting one without flipping every

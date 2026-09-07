@@ -742,6 +742,7 @@ mod tests {
                 flat_shaded: 0,
                 images_used: 0,
                 invented_root: false,
+                transformed: 0,
             }
         }
 
