@@ -56,7 +56,10 @@ export interface RawImport {
  * order, so renaming a piece later cannot move the geometry under it.
  *
  * `radius`, `height` and `mid` are pinned from the file rather than recomputed,
- * so a re-export writes the header the model came in with.
+ * so a re-export writes the header the model came in with. A format with no
+ * header sends null for all three and none is pinned, which leaves the builder
+ * measuring the unit as it goes, the same as a unit built out of parts. A `.glb`
+ * is the one that does: it has never held a collision sphere to preserve.
  */
 export function projectFromImport(
   result: S3oImport,
@@ -133,9 +136,9 @@ export function projectFromImport(
       updatedAt: options.now,
       rootPieceId,
       pieces,
-      radius: result.radius,
-      height: result.height,
-      mid: result.mid,
+      ...(result.radius !== null ? { radius: result.radius } : {}),
+      ...(result.height !== null ? { height: result.height } : {}),
+      ...(result.mid !== null ? { mid: result.mid } : {}),
     },
     meshes: result.meshes,
     vertices: result.vertices,
