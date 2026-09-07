@@ -499,7 +499,11 @@ describe("UnitPage", () => {
         params: {
           canareaattack: {
             sites: [
-              { file: "luarules/gadgets/unit_areaattack.lua", reads: 1, writes: 0 },
+              {
+                file: "luarules/gadgets/unit_areaattack.lua",
+                reads: 1,
+                writes: 0,
+              },
             ],
             files: 1,
           },
