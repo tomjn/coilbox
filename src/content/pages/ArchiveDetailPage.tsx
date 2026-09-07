@@ -1,9 +1,10 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
-import { ArrowLeft, FolderOpen, Terminal } from "lucide-react";
+import { ArrowLeft, Boxes, FolderOpen, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
+import { nextDrawerKey } from "@/general/drawerKey";
 import { formatBytes } from "@/lib/format";
 import { modelFormatFor } from "../archiveModel";
 import {
@@ -21,6 +22,7 @@ import { isDeletableArchive, isSdd } from "../format";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { ArchiveTree } from "./components/ArchiveTree";
 import { ArchiveTypeBadge, PrimaryBadge } from "./components/ArchiveTypeBadge";
+import { Convert3doDrawer } from "./components/Convert3doDrawer";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { FilePreview } from "./components/FilePreview";
 import { LuaConsoleDrawer } from "./components/LuaConsoleDrawer";
@@ -82,6 +84,11 @@ export default function ArchiveDetailPage() {
       : [];
 
   const onDiskPath = tree?.archivePath ?? archive.path;
+  // The batch conversion is only worth offering for an archive that has
+  // something to convert, so the listing decides rather than the archive kind:
+  // a game with an all-`.s3o` roster has nothing to do here.
+  const legacyModels =
+    tree?.files.filter((f) => /^objects3d\/.+\.3do$/i.test(f.path)).length ?? 0;
   const linked =
     archive.kind === "game" && archive.gameName
       ? {
@@ -150,6 +157,31 @@ export default function ArchiveDetailPage() {
           {archive.primary && <PrimaryBadge />}
           <ArchiveTypeBadge kind={archive.kind} />
           <div className="ml-auto flex shrink-0 gap-2">
+            {selected?.enginePath && selected?.rootPath && legacyModels > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() =>
+                  drawer.open({
+                    title: "Convert .3do models",
+                    description: `Turn ${archive.name}'s ${legacyModels} legacy models into .s3o, one shared texture per folder.`,
+                    width: "44rem",
+                    content: (
+                      <Convert3doDrawer
+                        key={nextDrawerKey()}
+                        enginePath={selected.enginePath}
+                        dataDir={selected.rootPath}
+                        archive={archive.name}
+                        models={legacyModels}
+                      />
+                    ),
+                  })
+                }
+              >
+                <Boxes className="size-4" /> Convert models
+              </Button>
+            )}
             {selected?.enginePath && selected?.rootPath && (
               <Button
                 size="sm"

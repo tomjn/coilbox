@@ -17,16 +17,16 @@ use coilbox_unitsync_worker::RenderSource;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_config_set_args, build_faction_logos_args, build_game_args,
-    build_game_headers_args, build_height_field_args, build_heightmap_args, build_lua_args,
-    build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
-    build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
-    build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args,
-    build_unit_models_args, build_unit_render_args, build_unit_render_keys_args,
-    build_unit_script_args, find_unitsync, resolve_sidecar,
+    build_config_args, build_config_set_args, build_convert_3do_args, build_faction_logos_args,
+    build_game_args, build_game_headers_args, build_height_field_args, build_heightmap_args,
+    build_lua_args, build_lua_repl_args, build_map_info_args, build_map_meta_args,
+    build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
+    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args,
+    build_unit_model_args, build_unit_models_args, build_unit_render_args,
+    build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -227,6 +227,115 @@ fn run_worker_blocking(
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     let out_handle = std::thread::spawn(move || read_to_string(stdout));
+    let err_handle = std::thread::spawn(move || read_to_string(stderr));
+
+    let start = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(st)) => break st,
+            Ok(None) => {
+                if cancel.as_ref().is_some_and(|c| c.load(Ordering::Relaxed)) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("unitsync {what} cancelled"));
+                }
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(fmt_timeout(&what, timeout));
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(e) => return Err(format!("error waiting for unitsync worker: {e}")),
+        }
+    };
+
+    let out = out_handle.join().unwrap_or_default();
+    let err = err_handle.join().unwrap_or_default();
+
+    #[cfg(debug_assertions)]
+    if !err.trim().is_empty() {
+        eprintln!("[unitsync-worker stderr] {}", err.trim());
+    }
+
+    if out.trim().is_empty() {
+        let code = status
+            .code()
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "terminated by signal".into());
+        let detail = err.trim();
+        return Err(format!(
+            "unitsync worker produced no output (exit {code}){}",
+            if detail.is_empty() {
+                String::new()
+            } else {
+                format!(": {detail}")
+            }
+        ));
+    }
+    Ok(out)
+}
+
+/// Run the worker, forwarding the progress lines it prints as it goes and
+/// keeping the last line as the result.
+///
+/// The other modes here answer in one JSON blob at the end, which is fine when
+/// the end is a second away. Converting a game's models is 720 files on
+/// Balanced Annihilation, and a window that sits still for the length of that
+/// is a window nobody can tell from a hung one. So `--convert-3do` prints a
+/// line per model as it works, this reads them a line at a time rather than
+/// waiting for the pipe to close, and each one goes straight to the webview.
+///
+/// A progress line is a JSON object with a `progress` key and the result is a
+/// JSON object without one, so telling them apart needs no sentinel prefix and
+/// no second stream. The last line that is not progress is the result, which
+/// means a worker that printed nothing at all is an error rather than an empty
+/// success.
+fn run_worker_streaming(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: String,
+    cancel: Option<Arc<AtomicBool>>,
+    on_progress: tauri::ipc::Channel<serde_json::Value>,
+) -> Result<String, String> {
+    let mut cmd = coilbox_proc::command(&bin);
+    cmd.args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (k, v) in &envs {
+        cmd.env(k, v);
+    }
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("failed to start unitsync worker: {e}"))?;
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let out_handle = std::thread::spawn(move || {
+        let mut result = String::new();
+        let Some(stdout) = stdout else { return result };
+        for line in std::io::BufReader::new(stdout)
+            .lines()
+            .map_while(Result::ok)
+        {
+            if line.trim().is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<serde_json::Value>(&line) {
+                Ok(value) if value.get("progress").is_some() => {
+                    let _ = on_progress.send(value["progress"].clone());
+                }
+                // Anything else is the result, or a line from a worker that
+                // died mid-write. Keeping the last one either way means a
+                // partial line cannot be mistaken for the answer.
+                _ => result = line,
+            }
+        }
+        result
+    });
     let err_handle = std::thread::spawn(move || read_to_string(stderr));
 
     let start = Instant::now();
@@ -1411,6 +1520,64 @@ async fn unitsync_archive_extract(
     run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive extract", None).await
 }
 
+/// A whole game's worth of models. Balanced Annihilation is 720 and takes three
+/// seconds on this machine, Metal Factions is 1532 and takes seven, but a game
+/// nobody has looked at could ship far more. Generous, and cancellation is the
+/// real stop.
+const CONVERT_TIMEOUT: Duration = Duration::from_secs(1800);
+
+/// `unitsync_convert_3do`: turn every `.3do` in a game into an `.s3o`, one
+/// shared texture per model folder, into a folder the caller picked (issue
+/// #2573).
+///
+/// Progress goes down `on_progress` as the run works rather than arriving with
+/// the answer, and `op_id` is the handle `unitsync_cancel` stops it by. A
+/// cancelled run leaves whatever it had already written, which is said out loud
+/// in the UI rather than tidied away behind the user's back: the files are the
+/// point of the run, and half a conversion is still worth having.
+#[tauri::command]
+async fn unitsync_convert_3do(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    out_dir: String,
+    op_id: Option<String>,
+    on_progress: tauri::ipc::Channel<serde_json::Value>,
+) -> CliResult {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let args = build_convert_3do_args(&libpath.to_string_lossy(), &data_dir, &archive, &out_dir);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let cancel = op_id.as_deref().map(register_cancel);
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_worker_streaming(
+            bin,
+            args,
+            envs,
+            CONVERT_TIMEOUT,
+            "3do conversion".to_string(),
+            cancel,
+            on_progress,
+        )
+    })
+    .await;
+    if let Some(id) = op_id.as_deref() {
+        unregister_cancel(id);
+    }
+
+    match result {
+        Ok(Ok(stdout)) => match serde_json::from_str::<serde_json::Value>(&stdout) {
+            Ok(value) => CliResult::ok(value),
+            Err(e) => CliResult::err(format!("could not parse unitsync output: {e}")),
+        },
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("3do conversion task failed: {e}")),
+    }
+}
+
 /// `unitsync_cancel` — signal the scan/thumbnail worker registered under `op_id`
 /// to stop. No-op if the id is unknown (already finished).
 #[tauri::command]
@@ -1467,6 +1634,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_lua_exec,
             unitsync_lua_repl_exec,
             unitsync_archive_extract,
+            unitsync_convert_3do,
             unitsync_cancel
         ])
         .build()
