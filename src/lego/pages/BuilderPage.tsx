@@ -5,12 +5,14 @@ import {
   ChevronUp,
   Copy,
   FlipHorizontal2,
+  FlipVertical2,
   PanelRightClose,
   PanelRightOpen,
   Plus,
   Redo,
   Rocket,
   Save,
+  Sparkles,
   Undo,
   Upload,
 } from "lucide-react";
@@ -51,6 +53,7 @@ import {
   type PieceTransform,
   transformRoots,
 } from "../groupTransform";
+import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
 import {
   descendantIds,
@@ -172,6 +175,11 @@ function Builder({ id }: { id: string | undefined }) {
   const [scriptFrame, setScriptFrame] = useState(0);
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
+  /** What the next "Recalculate normals" click uses, for an imported unit.
+   *  Starts on the engine's own smoothing rule. A preference for the session
+   *  rather than something the unit carries, until it is applied to a piece
+   *  and stored there as `normalsAngle`. */
+  const [normalsAngle, setNormalsAngle] = useState(DEFAULT_SMOOTHING_ANGLE_DEG);
   /** Shared between the viewport and the tree, so hovering a piece in either
    *  highlights it in the other. */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -532,6 +540,47 @@ function Builder({ id }: { id: string | undefined }) {
     setSelectedId(copy.pieceId);
   }
 
+  /**
+   * Flip or mirror the UVs of geometry pieces this fix reaches: the selected
+   * piece alone, or every geometry piece in the unit. A part from the pack is
+   * skipped either way, since it arrives mapped and has nothing to fix. See
+   * `meshFix.ts`.
+   *
+   * Toggles rather than sets, so a second click on the same scope undoes the
+   * first without a trip to the undo button, and a "whole model" pass on a
+   * freshly imported unit (where every flag starts unset) still lands every
+   * piece on the same, flipped state in one step.
+   */
+  function fixSelectedUv(kind: "flip" | "mirror", scope: "piece" | "model") {
+    edit((project) => {
+      let changed = false;
+      const pieces = project.pieces.map((piece) => {
+        if (piece.meshId === undefined) return piece;
+        if (scope === "piece" && piece.id !== selectedId) return piece;
+        changed = true;
+        return kind === "flip"
+          ? { ...piece, uvFlip: !piece.uvFlip }
+          : { ...piece, uvMirror: !piece.uvMirror };
+      });
+      return changed ? { ...project, pieces } : project;
+    });
+  }
+
+  /** Recompute normals, at the angle the panel's own field currently holds,
+   *  for the selected piece alone or for every geometry piece in the unit. */
+  function recalcSelectedNormals(scope: "piece" | "model") {
+    edit((project) => {
+      let changed = false;
+      const pieces = project.pieces.map((piece) => {
+        if (piece.meshId === undefined) return piece;
+        if (scope === "piece" && piece.id !== selectedId) return piece;
+        changed = true;
+        return { ...piece, normalsAngle };
+      });
+      return changed ? { ...project, pieces } : project;
+    });
+  }
+
   useEditShortcuts({
     remove: removeSelected,
     undo: doc.undo,
@@ -668,6 +717,12 @@ function Builder({ id }: { id: string | undefined }) {
   const selectedPart = selected?.partId
     ? (pack.byId.get(selected.partId) ?? null)
     : null;
+  // Whether "whole model" flip, mirror and recalculate normals have anything
+  // to reach: an imported unit with every geometry piece deleted has none,
+  // same as a unit built out of parts.
+  const hasImportedGeometry = draft.pieces.some(
+    (piece) => piece.meshId !== undefined,
+  );
 
   return (
     // The side panel collapses for the same reason the parts drawer does: a
@@ -1310,6 +1365,113 @@ function Builder({ id }: { id: string | undefined }) {
                             under this piece with it. A copy is how one leg
                             becomes the other.
                           </p>
+                        </div>
+                      ) : null}
+
+                      {/* Only for a unit imported whole: a part from the pack
+                        arrives mapped, so there is nothing here for it to fix,
+                        and this whole section would be a question with no
+                        honest answer for it. See #2575. */}
+                      {imported ? (
+                        <div className="mt-2">
+                          <span className="text-xs text-muted-foreground">
+                            Fix UVs and normals
+                          </span>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            For a model imported from somewhere else, whose UVs
+                            or lighting arrived wrong.
+                          </p>
+                          <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1.5">
+                            <span />
+                            <span className="text-center text-[10px] uppercase text-muted-foreground">
+                              This piece
+                            </span>
+                            <span className="text-center text-[10px] uppercase text-muted-foreground">
+                              Whole model
+                            </span>
+
+                            <span className="flex items-center gap-1 text-xs">
+                              <FlipVertical2 size={12} /> Flip UVs
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!canFixMesh(selected)}
+                              onClick={() => fixSelectedUv("flip", "piece")}
+                            >
+                              Flip
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!hasImportedGeometry}
+                              onClick={() => fixSelectedUv("flip", "model")}
+                            >
+                              Flip
+                            </Button>
+
+                            <span className="flex items-center gap-1 text-xs">
+                              <FlipHorizontal2 size={12} /> Mirror UVs
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!canFixMesh(selected)}
+                              onClick={() => fixSelectedUv("mirror", "piece")}
+                            >
+                              Mirror
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!hasImportedGeometry}
+                              onClick={() => fixSelectedUv("mirror", "model")}
+                            >
+                              Mirror
+                            </Button>
+
+                            <span className="flex items-center gap-1 text-xs">
+                              <Sparkles size={12} /> Recalc normals
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!canFixMesh(selected)}
+                              onClick={() => recalcSelectedNormals("piece")}
+                            >
+                              Fix
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!hasImportedGeometry}
+                              onClick={() => recalcSelectedNormals("model")}
+                            >
+                              Fix
+                            </Button>
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <label
+                              htmlFor="lego-normals-angle"
+                              className="text-xs text-muted-foreground"
+                            >
+                              Smoothing angle
+                            </label>
+                            <Input
+                              id="lego-normals-angle"
+                              inputMode="decimal"
+                              value={String(normalsAngle)}
+                              onChange={(event) => {
+                                const value = Number(event.target.value);
+                                if (Number.isFinite(value))
+                                  setNormalsAngle(value);
+                              }}
+                              className="h-6 w-16 text-right"
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              degrees, for the next recalculation
+                            </span>
+                          </div>
                         </div>
                       ) : null}
 
