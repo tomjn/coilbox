@@ -56,6 +56,7 @@ pub enum Mode {
     FactionLogos(FactionLogosArgs),
     UnitDataset(UnitDatasetArgs),
     UnitDefs(UnitDefsArgs),
+    CustomParams(CustomParamsArgs),
     UnitModel(UnitModelArgs),
     UnitScript(UnitScriptArgs),
     SkirmishAis(SkirmishAisArgs),
@@ -95,6 +96,7 @@ impl Mode {
             Mode::FactionLogos(args) => args.to_args(),
             Mode::UnitDataset(args) => args.to_args(),
             Mode::UnitDefs(args) => args.to_args(),
+            Mode::CustomParams(args) => args.to_args(),
             Mode::UnitModel(args) => args.to_args(),
             Mode::UnitScript(args) => args.to_args(),
             Mode::SkirmishAis(args) => args.to_args(),
@@ -1298,6 +1300,57 @@ impl UnitDefsArgs {
             }
         }
         Ok(UnitDefsArgs {
+            game: game.unwrap_or_default(),
+            cache_dir,
+        })
+    }
+}
+
+/// `--custom-params`: index which of `game`'s own Lua files name each custom
+/// parameter, disk-cached under `cache_dir` on the game's sync checksum (issue
+/// #2661).
+///
+/// The same two fields `--unit-defs` takes, and a separate mode for the same
+/// reason: this reads the game's Lua rather than running its defs, costs a
+/// different amount, and answers a different question.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct CustomParamsArgs {
+    pub game: String,
+    pub cache_dir: Option<String>,
+}
+
+impl CustomParamsArgs {
+    /// Build the flags for `--custom-params` mode: the flag itself, the game
+    /// whose Lua is scanned, and the optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--custom-params".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--custom-params` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`CustomParamsArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(CustomParamsArgs {
             game: game.unwrap_or_default(),
             cache_dir,
         })
@@ -2575,6 +2628,37 @@ mod tests {
         let defs = unit_defs_args().to_args();
         assert!(defs.contains(&"--unit-defs".to_string()));
         assert!(!defs.contains(&"--unit-dataset".to_string()));
+    }
+
+    fn custom_params_args() -> CustomParamsArgs {
+        CustomParamsArgs {
+            game: "BAR.sdd".into(),
+            cache_dir: Some("/cache/info".into()),
+        }
+    }
+
+    #[test]
+    fn custom_params_round_trips_through_to_args_and_from_args() {
+        let original = custom_params_args();
+        let recovered = CustomParamsArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn custom_params_dispatches_to_args_to_its_variant() {
+        let a = custom_params_args();
+        assert_eq!(Mode::CustomParams(a.clone()).to_args(), a.to_args());
+    }
+
+    /// Three modes now take exactly `--game` plus `--cache-dir`, so the flag
+    /// naming each one apart is all that keeps a custom-params argv from
+    /// running a def read instead.
+    #[test]
+    fn custom_params_is_told_apart_from_the_def_reads_by_its_own_flag() {
+        let args = custom_params_args().to_args();
+        assert!(args.contains(&"--custom-params".to_string()));
+        assert!(!args.contains(&"--unit-defs".to_string()));
+        assert!(!args.contains(&"--unit-dataset".to_string()));
     }
 
     fn unit_model_args() -> UnitModelArgs {
