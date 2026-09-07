@@ -8,6 +8,7 @@ import {
   pngName,
   projectFromImport,
   texturesInUse,
+  writableSource,
 } from "./rawImport";
 
 function piece(
@@ -269,5 +270,39 @@ describe("texturesInUse", () => {
     expect(texturesInUse([one, two]).sort()).toEqual(["aa11.dds", "bb22.dds"]);
     // A unit built out of parts names none.
     expect(texturesInUse([{ ...one, imported: undefined }])).toEqual([]);
+  });
+});
+
+describe("writableSource", () => {
+  it("is the source itself for a file opened by hand", () => {
+    expect(writableSource({ source: "/home/user/tank.s3o" })).toBe(
+      "/home/user/tank.s3o",
+    );
+  });
+
+  it("is the source for a model picked out of a loose .sdd", () => {
+    expect(
+      writableSource({
+        source: "/games/Example.sdd/objects3d/tank.s3o",
+        game: {
+          name: "Example",
+          archive: "Example.sdd",
+          member: "objects3d/tank.s3o",
+        },
+      }),
+    ).toBe("/games/Example.sdd/objects3d/tank.s3o");
+  });
+
+  it("is null for a model picked out of a packed archive", () => {
+    expect(
+      writableSource({
+        source: "Example.sdz/objects3d/tank.s3o",
+        game: {
+          name: "Example",
+          archive: "Example.sdz",
+          member: "objects3d/tank.s3o",
+        },
+      }),
+    ).toBeNull();
   });
 });

@@ -592,6 +592,41 @@ async fn lego_read_s3o(path: String) -> CliResult {
     }
 }
 
+/// `lego_save_s3o` writes a model alone to an exact path, and nothing else.
+///
+/// The counterpart to `lego_read_s3o`, for a unit opened to fix one thing and
+/// save it back: over the file it was opened from, or to a path the user
+/// chose. Unlike `lego_export`, which builds a whole unit into a game folder
+/// and writes a definition, a script and a collision file beside it, this
+/// writes the one file and stops.
+#[tauri::command]
+async fn lego_save_s3o(path: String, model: ExportModel) -> CliResult {
+    let file = PathBuf::from(&path);
+    if !file.is_absolute() {
+        return CliResult::err(format!("not an absolute path: {path}"));
+    }
+    let bytes = match coilbox_s3o::write(&coilbox_s3o::Model {
+        radius: model.radius,
+        height: model.height,
+        mid: model.mid,
+        texture1: model.texture1,
+        texture2: model.texture2,
+        root: model.root.into(),
+    }) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not build the model: {e}")),
+    };
+    if let Some(parent) = file.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            return CliResult::err(format!("could not create {}: {e}", parent.display()));
+        }
+    }
+    if let Err(e) = std::fs::write(&file, &bytes) {
+        return CliResult::err(format!("could not write {}: {e}", file.display()));
+    }
+    CliResult::ok(json!({ "path": file.to_string_lossy() }))
+}
+
 /// A texture the model header names, once the import has looked for it.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1670,6 +1705,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_open_path,
             lego_packs,
             lego_read_s3o,
+            lego_save_s3o,
             lego_import_s3o,
             lego_read_3do,
             lego_import_3do,

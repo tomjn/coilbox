@@ -22,6 +22,7 @@ import type {
   StoredTextureRef,
 } from "./bindings";
 import {
+  isLooseArchive,
   LEGO_SCHEMA_VERSION,
   type LegoImported,
   type LegoImportedGame,
@@ -186,6 +187,22 @@ export function storedTexture(texture: {
 /** Whether a unit was imported whole rather than built out of the parts pack. */
 export function isImported(project: LegoProject): boolean {
   return project.imported !== undefined;
+}
+
+/**
+ * The real, writable path an imported unit's `.s3o` can be saved back over, or
+ * null when there is none.
+ *
+ * `source` is a real path for a file opened by hand and for one picked out of
+ * a loose `.sdd`, since either names a file on disk. For one picked out of a
+ * packed archive it is a description of where the model sits, built by
+ * appending the member to the archive's own name, and there is no file at
+ * that address to open let alone overwrite (#1903 makes the same call for a
+ * texture's own `source`).
+ */
+export function writableSource(imported: LegoImported): string | null {
+  if (!imported.game) return imported.source;
+  return isLooseArchive(imported.game.archive) ? imported.source : null;
 }
 
 /**

@@ -99,6 +99,7 @@ import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
+import { SaveModelPopover } from "./components/SaveModelPopover";
 import { SetPanel } from "./components/SetPanel";
 import { TestDrawer } from "./components/TestDrawer";
 import { TexturePicker } from "./components/TexturePicker";
@@ -828,6 +829,17 @@ function Builder({ id }: { id: string | undefined }) {
                           Test in game
                         </TooltipContent>
                       </Tooltip>
+                      {/* Only a unit that came from a file has a model to save
+                        back to. One built out of parts has no such file, and
+                        Export is the only way it ever leaves the builder. */}
+                      {imported ? (
+                        <SaveModelPopover
+                          project={draft}
+                          imported={imported}
+                          pack={pack}
+                          raw={raw}
+                        />
+                      ) : null}
                       {/* The one filled button here, as it was the one filled
                         button before: without its label, colour is what still
                         says this is the thing you are working towards. */}

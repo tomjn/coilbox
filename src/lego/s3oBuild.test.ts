@@ -499,4 +499,85 @@ describe("baking an imported unit", () => {
 
     expect(child(build?.root as S3oPiece, "hull").vertices).toEqual([]);
   });
+
+  /** One triangle carrying `normal` on every vertex, whatever its length. */
+  function rawWithNormal(normal: [number, number, number]): RawGeometry {
+    return {
+      byId: new Map([
+        [
+          "m1",
+          {
+            id: "m1",
+            vFirst: 0,
+            vCount: 3,
+            iFirst: 0,
+            iCount: 3,
+            bbox: { min: [0, 0, 0], max: [0, 2, 2] },
+          },
+        ],
+      ]),
+      // x, y, z, nx, ny, nz, u, v
+      vertices: new Float32Array([
+        0,
+        0,
+        0,
+        ...normal,
+        0,
+        0,
+        0,
+        2,
+        0,
+        ...normal,
+        0.5,
+        0,
+        0,
+        2,
+        2,
+        ...normal,
+        0.5,
+        0.5,
+      ]),
+      indices: new Uint32Array([0, 1, 2]),
+    };
+  }
+
+  it("keeps a mesh's own normals exactly when the piece is untouched, even when they are not unit length", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+      },
+    ]);
+
+    // Plenty of shipped models carry normals that are not quite unit length.
+    // A piece opened and saved with no edits has to come back bit for bit,
+    // so this must not be renormalised away.
+    const build = buildS3o(doc, pack(), rawWithNormal([0, 2, 0]), TEXTURES);
+
+    expect(child(build?.root as S3oPiece, "hull").vertices[1].normal).toEqual([
+      0, 2, 0,
+    ]);
+  });
+
+  it("still normalises a mesh's normals once the piece is rotated or scaled", () => {
+    const doc = project([
+      {
+        id: "hull",
+        name: "hull",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+        scale: [1, 3, 1],
+      },
+    ]);
+
+    const build = buildS3o(doc, pack(), rawWithNormal([0, 2, 0]), TEXTURES);
+
+    expect(
+      round(child(build?.root as S3oPiece, "hull").vertices[1].normal),
+    ).toEqual([0, 1, 0]);
+  });
 });
