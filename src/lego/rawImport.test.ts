@@ -114,6 +114,21 @@ describe("projectFromImport", () => {
     expect(project.mid).toEqual([0, 3, 0]);
   });
 
+  /**
+   * A `.glb` has no header to pin, and sends null for all three. Pinning a
+   * measured number would leave the unit carrying a collision sphere that
+   * stops matching it the moment a piece moves, where leaving all three unset
+   * has the builder measure it as it goes, the same as a unit built out of
+   * parts.
+   */
+  it("pins nothing for a format with no header to take one from", () => {
+    const { project } = build({ radius: null, height: null, mid: null });
+
+    expect(project.radius).toBeUndefined();
+    expect(project.height).toBeUndefined();
+    expect(project.mid).toBeUndefined();
+  });
+
   it("records both textures and where they were read from", () => {
     const { project } = build();
 

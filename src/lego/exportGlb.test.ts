@@ -99,18 +99,27 @@ describe("buildGlbScene", () => {
     expect([arm.position.x, arm.position.y, arm.position.z]).toEqual([5, 0, 0]);
   });
 
-  it("gives a piece with geometry a mesh sized to its part", () => {
-    const doc = project([{ id: "hull", name: "hull", parentId: "root" }]);
+  /**
+   * The piece itself is the mesh, not a group with a mesh inside it.
+   * `GLTFExporter` writes a node per `Object3D`, so nesting one gave every
+   * piece with geometry two nodes in the file and doubled the tree on the way
+   * back in (#2576).
+   */
+  it("gives a piece with geometry one node, which is the mesh", () => {
+    const doc = project([
+      { id: "hull", name: "hull", parentId: "root" },
+      { id: "gun", name: "gun", parentId: "hull" },
+    ]);
 
     const scene = buildGlbScene(doc, pack(), null);
-    const hull = find(scene as THREE.Group, "hull");
-    const mesh = hull.children.find(
-      (child): child is THREE.Mesh => child instanceof THREE.Mesh,
-    );
+    const hull = find(scene as THREE.Object3D, "hull");
 
-    expect(mesh).toBeDefined();
-    expect(mesh?.geometry.getAttribute("position").count).toBe(3);
-    expect(mesh?.geometry.getIndex()?.count).toBe(3);
+    expect(hull).toBeInstanceOf(THREE.Mesh);
+    const mesh = hull as THREE.Mesh;
+    expect(mesh.geometry.getAttribute("position").count).toBe(3);
+    expect(mesh.geometry.getIndex()?.count).toBe(3);
+    // Its child hangs off it directly rather than off a wrapper.
+    expect(hull.children.map((child) => child.name)).toEqual(["gun"]);
   });
 
   it("gives an empty piece no mesh, but keeps it in the tree", () => {
@@ -119,11 +128,10 @@ describe("buildGlbScene", () => {
     ]);
 
     const scene = buildGlbScene(doc, pack(), null);
-    const flare = find(scene as THREE.Group, "flare");
+    const flare = find(scene as THREE.Object3D, "flare");
 
-    expect(flare.children.some((child) => child instanceof THREE.Mesh)).toBe(
-      false,
-    );
+    expect(flare).not.toBeInstanceOf(THREE.Mesh);
+    expect(flare.children).toEqual([]);
   });
 
   it("returns null when the project has no root piece", () => {

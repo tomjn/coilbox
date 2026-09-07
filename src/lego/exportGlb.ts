@@ -2,10 +2,11 @@
  * A unit as a binary glTF (`.glb`), for taking a build into Blender either to
  * check it against the `.s3o` or to finish it by hand.
  *
- * The scene mirrors the piece hierarchy one to one, a `THREE.Group` per piece
- * carrying the piece's baked offset and, when it has geometry, a mesh: the
- * same tree `buildS3o` writes, so `GLTFExporter`'s own node walk preserves it
- * rather than flattening it. Three.js and glTF share the s3o writer's
+ * The scene mirrors the piece hierarchy one to one, one node per piece carrying
+ * the piece's baked offset and its geometry: the same tree `buildS3o` writes, so
+ * `GLTFExporter`'s own node walk preserves it rather than flattening it, and
+ * reading the file back gives the piece tree it left with (`glb.rs` on the Rust
+ * side, and `lego_import_glb`). Three.js and glTF share the s3o writer's
  * convention (right-handed, Y up, front faces winding counter-clockwise), so
  * nothing here negates an axis or reorders a face: the baked vertices that go
  * into the `.s3o` go into the `.glb` unchanged.
@@ -27,28 +28,34 @@ import { type BakedPiece, bakedPieces } from "./s3oBuild";
 /**
  * The baked piece tree as a `THREE.Object3D` graph, with no material
  * assigned. Pure and DOM-free, so it can be tested on its own.
+ *
+ * One node per piece, and that matters rather than being tidiness. A piece with
+ * geometry is a `THREE.Mesh` carrying its children directly, not a `Group` with
+ * a `Mesh` inside it: `GLTFExporter` writes an `Object3D` per node, so nesting
+ * the mesh gave every piece with geometry two nodes in the file under one name.
+ * Blender showed the doubling, and importing the file again turned a five piece
+ * unit into a nine piece one (#2576).
  */
 export function buildGlbScene(
   project: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null,
-): THREE.Group | null {
+): THREE.Object3D | null {
   if (!pieceById(project, project.rootPieceId)) return null;
   const { pieces } = bakedPieces(project, pack, raw);
 
-  const build = (pieceId: string): THREE.Group | null => {
+  const build = (pieceId: string): THREE.Object3D | null => {
     const baked = pieces.get(pieceId);
     if (!baked) return null;
 
-    const node = new THREE.Group();
+    // An empty piece is not a mistake: it is how a model carries hierarchy,
+    // flares and aim points, and glTF carries one the same way.
+    const node =
+      baked.vertices.length > 0
+        ? new THREE.Mesh(bakedGeometry(baked))
+        : new THREE.Group();
     node.name = baked.name;
     node.position.set(...baked.offset);
-
-    if (baked.vertices.length > 0) {
-      const mesh = new THREE.Mesh(bakedGeometry(baked));
-      mesh.name = baked.name;
-      node.add(mesh);
-    }
 
     for (const child of childrenOf(project, pieceId)) {
       const childNode = build(child.id);

@@ -26,7 +26,9 @@ import {
 import { basename } from "@/lib/helpers";
 import type { LegoAtlas } from "../../atlas";
 import {
+  type GlbImport,
   legoImport3do,
+  legoImportGlb,
   legoImportS3o,
   legoRead3do,
   legoReadS3o,
@@ -67,20 +69,29 @@ export type ImportStage =
       state: "imported";
       imported: RawImport;
       /** Why the file could not be taken apart into parts, which is the
-       *  ordinary case and worth saying plainly. */
+       *  ordinary case and worth saying plainly. A whole sentence, because what
+       *  makes an `.s3o` not one of ours is a different statement from what
+       *  makes a `.3do` or a `.glb` not one. */
       refused: string;
-      /** What a conversion had to do or could not do, for a `.3do`. Empty for
-       *  an `.s3o`, which is read rather than converted. */
+      /** What a conversion had to do or could not do, for a `.3do` or a `.glb`.
+       *  Empty for an `.s3o`, which is read rather than converted. */
       notes?: string[];
+      /** More about the texture, under the texture heading. A `.glb` carries
+       *  one picture where an `.s3o` names two, and what it does not carry is
+       *  worth saying where somebody is reading about what it does. */
+      textureNotes?: string[];
+      /** Why the stored texture has no file behind it to refresh from, when the
+       *  reason is not the usual one of a packed archive holding no path. */
+      textureFrom?: string;
     };
 
 /**
  * The file's own name, which is what an opened unit is called by default.
- * The last path segment (see `@/lib/basename`) with a trailing `.s3o`
+ * The last path segment (see `@/lib/basename`) with a trailing `.s3o` or `.glb`
  * stripped, since that's redundant on a name shown next to "Imported".
  */
 function baseName(path: string): string {
-  return basename(path).replace(/\.s3o$/i, "");
+  return basename(path).replace(/\.(s3o|glb)$/i, "");
 }
 
 /**
@@ -111,6 +122,7 @@ export async function readModel(options: {
 }): Promise<ImportStage> {
   const { path } = options;
   if (/\.3do$/i.test(path)) return readThreeDo(options);
+  if (/\.glb$/i.test(path)) return readGlb(options);
 
   const [model, pack] = await Promise.all([legoReadS3o({ path }), loadPack()]);
   const name = options.name ?? baseName(path);
@@ -144,7 +156,7 @@ export async function readModel(options: {
   const result = await legoImportS3o({ path, id });
   return {
     state: "imported",
-    refused: recovery.problem,
+    refused: `It was not made here: ${recovery.problem}`,
     imported: projectFromImport(result, {
       id,
       source: options.source ?? path,
@@ -193,7 +205,7 @@ async function readThreeDo(options: {
   return {
     state: "imported",
     refused:
-      "This is a .3do, the older model format. Coilbox has never written one, so it cannot be a unit coming home, and it has been converted instead.",
+      "It was not made here: This is a .3do, the older model format. Coilbox has never written one, so it cannot be a unit coming home, and it has been converted instead.",
     notes: conversionNotes(result),
     imported: projectFromImport(result, {
       id,
@@ -208,6 +220,113 @@ async function readThreeDo(options: {
       newId: () => crypto.randomUUID(),
     }),
   };
+}
+
+/**
+ * The same again, for a `.glb`.
+ *
+ * The way back from Blender, and the other end of `exportGlb.ts`. No recovery
+ * step and no textures to put beside the file first: coilbox writes a `.glb` for
+ * Blender and no Spring engine reads one, so it can never be a unit coming home
+ * as parts, and a `.glb` carries its picture inside itself.
+ *
+ * Nothing here is `.glb` specific past the command it calls. What comes back is
+ * the same shape an `.s3o` import gives, so the unit that opens is an ordinary
+ * imported unit with a texture panel and no parts library.
+ */
+async function readGlb(options: {
+  path: string;
+  name?: string;
+  unitName?: string;
+  source?: string;
+  game?: LegoImportedGame;
+  unpacked?: boolean;
+}): Promise<ImportStage> {
+  const { path } = options;
+  const pack = await loadPack();
+  const name = options.name ?? baseName(path);
+  const unitName = normalisePieceName(options.unitName ?? name);
+  const id = crypto.randomUUID();
+  const result = await legoImportGlb({ path, id });
+
+  return {
+    state: "imported",
+    refused:
+      "A .glb is what coilbox writes for Blender, and no Spring engine reads one, so it is never a unit coming home as parts. Its objects have been read as pieces exactly as they stand.",
+    notes: glbNotes(result),
+    textureNotes: glbTextureNotes(result),
+    textureFrom:
+      "It came out of the .glb itself rather than off a file, so there is nothing behind it to refresh from.",
+    imported: projectFromImport(result, {
+      id,
+      source: options.source ?? path,
+      ...(options.game ? { game: options.game } : {}),
+      ...(options.unpacked ? { unpacked: true } : {}),
+      name,
+      unitName,
+      packId: pack.manifest.id,
+      packVersion: pack.manifest.version,
+      now: new Date().toISOString(),
+      newId: () => crypto.randomUUID(),
+    }),
+  };
+}
+
+/**
+ * What reading a `.glb` had to do, in the cases worth knowing about.
+ *
+ * A file that came through with nothing to say says nothing. Each of these is a
+ * difference between what glTF can hold and what a Spring model can, and each
+ * would otherwise look like the import losing something.
+ */
+function glbNotes(result: GlbImport): string[] {
+  const notes: string[] = [];
+  if (result.inventedRoot) {
+    notes.push(
+      "The file had several objects at its top level and a Spring model has exactly one root piece, so a root has been added to hold them. Rename it to whatever the unit's script should call it.",
+    );
+  }
+  if (result.transformed > 0) {
+    notes.push(
+      `${result.transformed} ${result.transformed === 1 ? "object carries" : "objects carry"} a rotation or a scale, which an .s3o piece cannot, so ${result.transformed === 1 ? "it has" : "they have"} been baked into the vertices. That is what the export does on the way out anyway, and it is what Upspring does on save.`,
+    );
+  }
+  if (result.flatShaded > 0) {
+    notes.push(
+      `${result.flatShaded} ${result.flatShaded === 1 ? "mesh came" : "meshes came"} with no normals, so they have been worked out from the faces. Fix them under Fix UVs and normals if the unit lights oddly.`,
+    );
+  }
+  if (result.skipped > 0) {
+    notes.push(
+      `${result.skipped} ${result.skipped === 1 ? "part of the file draws" : "parts of the file draw"} points or lines, which a Spring model has no way to hold, so ${result.skipped === 1 ? "it has" : "they have"} been left out.`,
+    );
+  }
+  return notes;
+}
+
+/**
+ * What a `.glb` could not carry about the unit's textures.
+ *
+ * Both of these are losses that look fine here and wrong in the game, which is
+ * exactly the kind worth spelling out at the moment somebody is deciding whether
+ * to open the file.
+ */
+function glbTextureNotes(result: GlbImport): string[] {
+  const notes: string[] = [];
+  if (result.imagesUsed > 1) {
+    notes.push(
+      `The file paints with ${result.imagesUsed} pictures and a Spring unit has one texture, so the first was taken and the rest were left. Pieces mapped onto one of the others will draw the wrong thing.`,
+    );
+  }
+  if (result.texture.key && !result.teamMask) {
+    notes.push(
+      "Its picture is fully opaque. An .s3o reads that picture's alpha as the team-colour mask, and fully opaque means every pixel of the unit is painted in the player's colour, so the alpha has been written to nothing instead: the unit keeps its own colours and has no team-colour markings. The .glb export drops the mask on the way out, so this is what a coilbox unit that has been to Blender and back looks like. Point the unit at the game's own texture on the Texture tab to get the markings back.",
+    );
+  }
+  notes.push(
+    "A .glb has one picture where an .s3o has two. The second is the shading map, holding glow in red, shine in green and in alpha the cut-out that decides whether a pixel is drawn at all, and it is not in this file. The unit opens without one.",
+  );
+  return notes;
 }
 
 /**
@@ -405,7 +524,7 @@ function Imported({
             goes away. You can point it at a different file later
             {imported.texture.source
               ? ", or refresh it after editing it elsewhere."
-              : ". There is no file behind this one to refresh from, because a packed archive holds no path to hand back."}
+              : `. ${stage.textureFrom ?? "There is no file behind this one to refresh from, because a packed archive holds no path to hand back."}`}
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
@@ -427,6 +546,11 @@ function Imported({
             but the export will have no glow or shine to write out.
           </p>
         ) : null}
+        {(stage.textureNotes ?? []).map((note) => (
+          <p key={note} className="text-xs text-muted-foreground">
+            {note}
+          </p>
+        ))}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -441,9 +565,7 @@ function Imported({
           sample the wrong image. The parts library and the atlas picker are
           hidden for this unit for that reason.
         </p>
-        <p className="text-xs text-muted-foreground">
-          It was not made here: {stage.refused}
-        </p>
+        <p className="text-xs text-muted-foreground">{stage.refused}</p>
       </div>
 
       <div className="border-t border-border/60 pt-4">

@@ -276,11 +276,19 @@ export interface ImportedTexture {
   source: string | null;
 }
 
-/** What one import produced. */
+/**
+ * What one import produced.
+ *
+ * The three header fields are null for a format that has no header to take them
+ * from, which is a `.glb`. An `.s3o` ships a collision sphere its author set and
+ * the project pins it, so re-exporting the unit cannot quietly hand it a
+ * different one. A `.glb` has never held one, so the builder measures the unit
+ * as it goes, exactly as it does for a unit built out of parts.
+ */
 export interface S3oImport {
-  radius: number;
-  height: number;
-  mid: [number, number, number];
+  radius: number | null;
+  height: number | null;
+  mid: [number, number, number] | null;
   root: ImportedPiece;
   texture: ImportedTexture;
   /** The second texture the header names, under the header's own name for it:
@@ -356,6 +364,50 @@ export const legoImport3do = defineCommand<
   { path: string; id: string },
   ThreeDoImport
 >("coilbox-lego", "lego_import_3do");
+
+/** What one import of a `.glb` produced, on top of what any import produces. */
+export interface GlbImport extends S3oImport {
+  /** Parts of the file that draw points or lines, which a Spring model has no
+   *  way to hold, and which were left out. */
+  skipped: number;
+  /** Meshes the file carried no normals for, whose normals were worked out from
+   *  the faces. glTF says a reader does this rather than refusing. */
+  flatShaded: number;
+  /** How many distinct pictures the file's materials paint with. A Spring unit
+   *  has one texture, so anything above one means the first was taken. */
+  imagesUsed: number;
+  /** Whether the file had several objects at its top level and a root was added
+   *  to hold them, since a Spring model has exactly one root piece. */
+  inventedRoot: boolean;
+  /** Objects carrying a rotation or a scale, which an `.s3o` piece cannot, so
+   *  theirs was baked into their own vertices. */
+  transformed: number;
+  /** Whether the picture that came out of the file carries alpha, which an
+   *  `.s3o` reads as the team-colour mask. False means it was fully opaque and
+   *  the mask was written to nothing, since fully opaque means the engine paints
+   *  every pixel of the unit in the player's colour. */
+  teamMask: boolean;
+  /** The picture the file names that could not be read, when there is one. */
+  missingImage: string | null;
+}
+
+/**
+ * Import a binary glTF as raw geometry, keeping its object tree as the piece
+ * tree.
+ *
+ * The way back from Blender, and the other end of `exportGlb.ts`. What it
+ * produces is the same shape an imported `.s3o` is, down to the geometry
+ * sidecar, so nothing past this point knows which format a unit came in
+ * through.
+ *
+ * A `.glb` carries one picture where an `.s3o` names two, and its objects carry
+ * a full transform where an `.s3o` piece carries a position. Both gaps are
+ * reported rather than papered over: see the fields above.
+ */
+export const legoImportGlb = defineCommand<
+  { path: string; id: string },
+  GlbImport
+>("coilbox-lego", "lego_import_glb");
 
 /**
  * Put a texture in the shared store, for changing which one a unit draws with

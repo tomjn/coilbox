@@ -3,8 +3,9 @@
  *
  * The oldest way in and still the only one that reaches a model outside a game
  * coilbox can see: a loose export, a file somebody sent you, a model half way
- * out of a modelling tool. {@link GameModelDrawer} is the other way, for a model
- * that is inside a game, where a path is the wrong thing to be asked for.
+ * out of a modelling tool, a `.glb` on its way back from Blender.
+ * {@link GameModelDrawer} is the other way, for a model that is inside a game,
+ * where a path is the wrong thing to be asked for.
  *
  * What a read turns into, and how it is reported, is `ImportResult.tsx` and is
  * the same for both.
@@ -39,7 +40,7 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
     const picked = await open({
       multiple: false,
       title: "Choose a model",
-      filters: [{ name: "Spring model", extensions: ["s3o", "3do"] }],
+      filters: [{ name: "Model", extensions: ["s3o", "3do", "glb"] }],
     });
     if (typeof picked !== "string") return;
 
@@ -88,6 +89,14 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
                 an older game's units are drawn with. That one is converted
                 rather than read: its texture tiles are packed into one sheet so
                 it exports as an ordinary <code>.s3o</code>.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                A <code>.glb</code> is the way back from Blender. Export a unit
+                as one, finish it there, and open it again: its objects come
+                back as the piece tree rather than as one flat lump, which is
+                what an <code>.obj</code> would give. Keep Blender's own{" "}
+                <em>+Y Up</em> setting on both the import and the export, since
+                that is the axis convention coilbox writes.
               </p>
               <Button variant="outline" size="sm" onClick={() => void choose()}>
                 <FileUp className="size-4" /> Choose a model
