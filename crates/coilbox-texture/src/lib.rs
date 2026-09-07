@@ -165,6 +165,96 @@ pub fn encode_rgb_png(img: &image::RgbImage) -> Option<Vec<u8>> {
     Some(png)
 }
 
+/// Build an `.s3o`'s first texture from a colour picture and an optional
+/// team-colour mask, matching the channel layout the engine reads: RGB colour,
+/// alpha the team-colour mask. Confirmed against
+/// `ModelFragProgGL4.glsl:101`, `mix(texColor1.rgb, teamCol.rgb,
+/// texColor1.a)`: alpha is how much of the player's colour shows through, so
+/// with no mask it is written 0 everywhere, "draw the colour, no team colour".
+///
+/// `mask`'s red channel becomes the alpha, on the assumption it is greyscale
+/// (red, green and blue equal). A colour image passed here has only its red
+/// channel read rather than being converted to luminance, so the result is
+/// well defined but is not what a colour picture "looks like" in grey.
+///
+/// An error names both sizes when `mask` does not match `colour`. Neither side
+/// is resampled: a caller composing textures by hand wants to know its layers
+/// do not line up, not to have one silently squashed to fit the other.
+pub fn compose_texture1(
+    colour: &image::RgbaImage,
+    mask: Option<&image::RgbaImage>,
+) -> Result<image::RgbaImage, String> {
+    if let Some(mask) = mask {
+        if mask.dimensions() != colour.dimensions() {
+            return Err(format!(
+                "the team-colour mask is {}x{} and the colour picture is {}x{}; they have to be the same size",
+                mask.width(),
+                mask.height(),
+                colour.width(),
+                colour.height(),
+            ));
+        }
+    }
+    let mut out = colour.clone();
+    match mask {
+        Some(mask) => {
+            for (px, m) in out.pixels_mut().zip(mask.pixels()) {
+                px.0[3] = m.0[0];
+            }
+        }
+        None => {
+            for px in out.pixels_mut() {
+                px.0[3] = 0;
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Build an `.s3o`'s second texture from greyscale glow and reflectivity maps,
+/// matching the channel layout `S3OTextureHandler.cpp:38` documents and the
+/// model shader reads: red self-illumination (`ModelFragProgGL4.glsl:129`,
+/// `light += texColor2.rrr`), green reflectivity (lines 122 and 128). Blue is
+/// not read by that shader and is written 0.
+///
+/// Alpha is the one-bit visibility cutout the same shader thresholds at 0.5
+/// (`ModelFragProgGL4.glsl:97`). Neither `glow` nor `reflectivity` supplies
+/// one, so it is always written 255: fully visible. A unit whose existing
+/// second texture cuts geometry away with that channel loses the cutout when
+/// its shading map is rebuilt this way.
+///
+/// Each input's red channel is read, on the same greyscale assumption as
+/// [`compose_texture1`]'s mask. At least one of `glow` and `reflectivity` has
+/// to be given, and given both, they have to be the same size.
+pub fn compose_texture2(
+    glow: Option<&image::RgbaImage>,
+    reflectivity: Option<&image::RgbaImage>,
+) -> Result<image::RgbaImage, String> {
+    let (width, height) = match (glow, reflectivity) {
+        (Some(g), Some(r)) if g.dimensions() != r.dimensions() => {
+            return Err(format!(
+                "glow is {}x{} and reflectivity is {}x{}; they have to be the same size",
+                g.width(),
+                g.height(),
+                r.width(),
+                r.height(),
+            ));
+        }
+        (Some(g), _) => g.dimensions(),
+        (None, Some(r)) => r.dimensions(),
+        (None, None) => return Err("choose a glow map, a reflectivity map, or both".to_string()),
+    };
+    let mut out = image::RgbaImage::new(width, height);
+    for y in 0..height {
+        for x in 0..width {
+            let r = glow.map_or(0, |g| g.get_pixel(x, y).0[0]);
+            let g = reflectivity.map_or(0, |m| m.get_pixel(x, y).0[0]);
+            out.put_pixel(x, y, image::Rgba([r, g, 0, 255]));
+        }
+    }
+    Ok(out)
+}
+
 /// Wrap PNG bytes in a base64 `data:` URL, for a caller with nowhere to put a
 /// file.
 pub fn png_data_url(png: &[u8]) -> String {
@@ -568,5 +658,78 @@ mod tests {
         assert_eq!(png[25], 2);
         let back = decode("png", &png).expect("should decode");
         assert_eq!(back.get_pixel(0, 0).0, [200, 100, 50, 255]);
+    }
+
+    fn grey(w: u32, h: u32, value: u8) -> image::RgbaImage {
+        image::RgbaImage::from_pixel(w, h, image::Rgba([value, value, value, 255]))
+    }
+
+    /// With no mask, the colour comes through untouched and alpha is 0: no
+    /// team colour, matching the shader's `mix(rgb, teamCol, 0)`.
+    #[test]
+    fn compose_texture1_with_no_mask_is_the_colour_with_zero_alpha() {
+        let colour = image::RgbaImage::from_pixel(2, 2, image::Rgba([10, 20, 30, 255]));
+        let out = compose_texture1(&colour, None).expect("should compose");
+        assert_eq!(out.get_pixel(0, 0).0, [10, 20, 30, 0]);
+    }
+
+    /// The mask's red channel becomes texture1's alpha, and its own colour is
+    /// discarded.
+    #[test]
+    fn compose_texture1_writes_the_masks_red_channel_into_alpha() {
+        let colour = image::RgbaImage::from_pixel(2, 2, image::Rgba([10, 20, 30, 255]));
+        let mask = grey(2, 2, 200);
+        let out = compose_texture1(&colour, Some(&mask)).expect("should compose");
+        assert_eq!(out.get_pixel(0, 0).0, [10, 20, 30, 200]);
+    }
+
+    /// A mask the wrong size is refused rather than resampled, and the message
+    /// names both sizes.
+    #[test]
+    fn compose_texture1_refuses_a_mismatched_mask() {
+        let colour = image::RgbaImage::from_pixel(4, 4, image::Rgba([0, 0, 0, 255]));
+        let mask = grey(2, 2, 128);
+        let err = compose_texture1(&colour, Some(&mask)).expect_err("should refuse");
+        assert!(err.contains("2x2"), "got: {err}");
+        assert!(err.contains("4x4"), "got: {err}");
+    }
+
+    /// Glow becomes red, reflectivity becomes green, blue is 0 and alpha is
+    /// fully opaque because neither input supplies a cutout mask.
+    #[test]
+    fn compose_texture2_places_glow_and_reflectivity_in_red_and_green() {
+        let glow = grey(2, 2, 100);
+        let reflect = grey(2, 2, 50);
+        let out = compose_texture2(Some(&glow), Some(&reflect)).expect("should compose");
+        assert_eq!(out.get_pixel(0, 0).0, [100, 50, 0, 255]);
+    }
+
+    /// A missing side defaults to a 0 channel rather than refusing outright, so
+    /// a unit with only one of the two maps still gets a texture.
+    #[test]
+    fn compose_texture2_defaults_a_missing_side_to_zero() {
+        let glow = grey(2, 2, 100);
+        let out = compose_texture2(Some(&glow), None).expect("should compose");
+        assert_eq!(out.get_pixel(0, 0).0, [100, 0, 0, 255]);
+
+        let reflect = grey(2, 2, 50);
+        let out = compose_texture2(None, Some(&reflect)).expect("should compose");
+        assert_eq!(out.get_pixel(0, 0).0, [0, 50, 0, 255]);
+    }
+
+    /// Neither input is an error, since there is nothing to build.
+    #[test]
+    fn compose_texture2_refuses_when_both_are_missing() {
+        assert!(compose_texture2(None, None).is_err());
+    }
+
+    /// Mismatched glow and reflectivity are refused rather than resampled.
+    #[test]
+    fn compose_texture2_refuses_mismatched_inputs() {
+        let glow = grey(2, 2, 100);
+        let reflect = grey(3, 3, 50);
+        let err = compose_texture2(Some(&glow), Some(&reflect)).expect_err("should refuse");
+        assert!(err.contains("2x2"), "got: {err}");
+        assert!(err.contains("3x3"), "got: {err}");
     }
 }
