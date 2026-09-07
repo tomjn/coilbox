@@ -257,6 +257,14 @@ function bakePiece(
  * model, and both are the same 32-byte vertex record in an interleaved buffer
  * with its own index run, so the bake is the same arithmetic either way.
  */
+/** The 3x3 identity, column-major, as `THREE.Matrix3.elements` stores one. */
+const IDENTITY_ELEMENTS = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+/** Whether a piece's accumulated rotation and scale do nothing at all. */
+function isIdentity(linear: THREE.Matrix3): boolean {
+  return linear.elements.every((value, i) => value === IDENTITY_ELEMENTS[i]);
+}
+
 function bakeGeometry(
   pack: LoadedPack,
   raw: RawGeometry | null,
@@ -276,10 +284,39 @@ function bakeGeometry(
   // The origin is the point the piece turns about, so the geometry moves to
   // sit around it rather than the other way round.
   const pivot = piece.pivot ?? [0, 0, 0];
+  // A mesh copied verbatim out of somebody else's model, left untouched by the
+  // builder, has nothing to bake: no rotation, no scale, no pivot. Rebuilding
+  // its vertices through the matrix below would still land on the same
+  // position, but `.normalize()` does not: plenty of shipped models carry
+  // normals that are not quite unit length, and renormalising one changes its
+  // bytes for no reason. A piece opened, saved and never touched has to come
+  // back bit for bit, so its geometry is copied rather than recomputed.
+  const verbatim =
+    piece.meshId !== undefined &&
+    isIdentity(linear) &&
+    pivot[0] === 0 &&
+    pivot[1] === 0 &&
+    pivot[2] === 0;
 
   const vertices: S3oVertex[] = [];
   for (let i = 0; i < source.vCount; i++) {
     const at = (source.vFirst + i) * FLOATS_PER_VERTEX;
+    if (verbatim) {
+      const vx = source.vertices[at];
+      const vy = source.vertices[at + 1];
+      const vz = source.vertices[at + 2];
+      vertices.push({
+        pos: [vx, vy, vz],
+        normal: [
+          source.vertices[at + 3],
+          source.vertices[at + 4],
+          source.vertices[at + 5],
+        ],
+        uv: [source.vertices[at + 6], source.vertices[at + 7]],
+      });
+      world.push(new THREE.Vector3(vx, vy, vz).add(translation));
+      continue;
+    }
     point
       .set(
         source.vertices[at] - pivot[0],
