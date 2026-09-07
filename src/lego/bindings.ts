@@ -246,6 +246,17 @@ export const legoReadS3o = defineCommand<{ path: string }, S3oModel>(
   "lego_read_s3o",
 );
 
+/**
+ * Write a unit's model alone to an exact path, and nothing else: no
+ * definition, no script, no collision file. For a unit opened to fix one
+ * thing and save it back, over the file it came from or to a chosen path.
+ * `path` must be absolute.
+ */
+export const legoSaveS3o = defineCommand<
+  { path: string; model: S3oBuild },
+  { path: string }
+>("coilbox-lego", "lego_save_s3o");
+
 /** One piece of an imported model. The vertices are in the sidecar, not here. */
 export interface ImportedPiece {
   name: string;
