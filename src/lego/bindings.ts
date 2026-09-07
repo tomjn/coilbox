@@ -306,6 +306,10 @@ export interface ThreeDoImport extends S3oImport {
   /** Tiles the model asked for that nothing on disk matched. Their faces are
    *  drawn plain, and naming them is how anybody works out what is missing. */
   missingTextures: string[];
+  /** Child pieces dropped because they shared an earlier sibling's name and
+   *  drew and rooted nothing of their own, so nothing could ever have reached
+   *  them by that name. See `is_dead_duplicate` in the Rust import. */
+  droppedPieces: number;
   /** How many distinct tiles the model names, so the panel can say how many of
    *  them were found. */
   tiles: number;

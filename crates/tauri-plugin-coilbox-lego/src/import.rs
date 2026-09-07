@@ -99,6 +99,9 @@ pub struct Imported {
     /// faces are drawn plain, and saying which ones is the only way anybody
     /// works out what is missing.
     pub missing_textures: Vec<String>,
+    /// `.3do` child pieces dropped as dead duplicates of an earlier sibling.
+    /// Always 0 for an `.s3o`. See `is_dead_duplicate` for the exact rule.
+    pub dropped_pieces: usize,
 }
 
 /// Flatten a model into a geometry blob and the tree that indexes it.
@@ -174,6 +177,7 @@ fn finish(root: ImportPiece, state: Walk) -> Result<Imported, String> {
             converted: state.converted,
             palette_faces: state.palette_faces,
             missing_textures: state.missing.into_iter().collect(),
+            dropped_pieces: state.dropped_pieces,
         })
         .map_err(|e| format!("could not pack the geometry: {e}"))
 }
@@ -187,6 +191,7 @@ struct Walk {
     next: usize,
     palette_faces: usize,
     missing: BTreeSet<String>,
+    dropped_pieces: usize,
 }
 
 fn walk(piece: &coilbox_s3o::Piece, state: &mut Walk) -> ImportPiece {
@@ -333,9 +338,63 @@ fn walk_3do(piece: &coilbox_3do::Piece, rects: &Rects, state: &mut Walk) -> Impo
         children: piece
             .children
             .iter()
-            .map(|child| walk_3do(child, rects, state))
+            .enumerate()
+            .filter_map(|(i, child)| {
+                if is_dead_duplicate(child, &piece.children[..i]) {
+                    state.dropped_pieces += 1;
+                    None
+                } else {
+                    Some(walk_3do(child, rects, state))
+                }
+            })
             .collect(),
     }
+}
+
+/// Whether `candidate` is an inert duplicate of one of the sibling pieces
+/// that came before it in the file.
+///
+/// The comparison is the piece's name, not its position or vertex data. Real
+/// `.3do`s reuse identical geometry deliberately: a unit's script shows one of
+/// two same-shaped pieces at a time to fake a flicker (BA's `cortitan` and
+/// `corhurc` both carry a `thrusta1`/`thrusta2` pair this way), or gives one
+/// point two jobs under two names (`armatl`'s `flare`/`bubbles` share a
+/// position because the same point serves as both a muzzle flash and an
+/// underwater trail origin). Both are exact copies of a sibling by position
+/// and vertices, and both are pieces the model still needs. Dropping either
+/// would be exactly the "removing real geometry" mistake this pass exists to
+/// avoid.
+///
+/// A repeated *name* is different: `S3DModel::FindPiece` in the engine's
+/// `3DModel.cpp` resolves a piece name to the first match in file order, so a
+/// later sibling sharing an earlier one's name can never be the one a unit
+/// script or weapon definition reaches by that name. Nothing that depends on
+/// addressing it by name could ever have worked, so removing it changes
+/// nothing the engine could have shown anybody.
+///
+/// That is also why the candidate must draw nothing (`primitives` empty) and
+/// root nothing (`children` empty) before it is dropped: a same-named piece
+/// that has faces of its own still renders them, because rendering walks the
+/// tree rather than looking pieces up by name, and a same-named piece with
+/// children would take its whole subtree with it. `.3do` piece names are
+/// lower-cased on read, so the comparison needs no further normalising.
+///
+/// Measured against the `.3do`s in Balanced Annihilation v15.9.8, Basically
+/// OTA 1.7 beta 10.1 and XTA 9.65 (2,042 files, 12,306 pieces): 14 sibling
+/// pairs share identical position and vertex data, and every one of them is a
+/// legitimate reuse like the two above, not junk. Exactly 2 pieces, in
+/// `ARM_T1_HOV_Constructor.3do` and its XTA equivalent, share a name with an
+/// empty, childless earlier sibling (both called `beam`, under `nanogun`) and
+/// are caught by this rule.
+fn is_dead_duplicate(
+    candidate: &coilbox_3do::Piece,
+    earlier_siblings: &[coilbox_3do::Piece],
+) -> bool {
+    candidate.children.is_empty()
+        && candidate.primitives.is_empty()
+        && earlier_siblings
+            .iter()
+            .any(|sibling| sibling.name == candidate.name)
 }
 
 #[cfg(test)]
@@ -646,6 +705,68 @@ mod tests {
             assert_eq!(out.root.mesh_id, None);
             assert_eq!(out.root.children[0].mesh_id.as_deref(), Some("m1"));
             assert_eq!(out.meshes, 1);
+        }
+
+        /// The real specimen this rule was written for: `ARM_T1_HOV_Constructor`
+        /// (Basically OTA) and its XTA equivalent both carry a `nanogun` piece
+        /// with two empty children both called `beam`. The engine can only ever
+        /// reach the first by that name, so the second is inert clutter.
+        #[test]
+        fn drops_a_later_sibling_that_shares_an_earlier_ones_name() {
+            let mut root = piece3("nanogun", Vec::new());
+            root.children.push(piece3("beam", Vec::new()));
+            root.children.push(piece3("beam", Vec::new()));
+            let out = import_3do(&model3(root), &rects()).expect("import");
+
+            assert_eq!(out.root.children.len(), 1);
+            assert_eq!(out.dropped_pieces, 1);
+        }
+
+        /// A same-named piece that still has faces of its own is not dropped:
+        /// removing it would remove geometry the tree walk still renders, since
+        /// rendering does not go by name.
+        #[test]
+        fn keeps_a_same_named_sibling_that_has_faces() {
+            let mut root = piece3("base", Vec::new());
+            root.children
+                .push(piece3("flare", vec![textured(vec![0, 1, 2])]));
+            root.children
+                .push(piece3("flare", vec![textured(vec![0, 1, 2])]));
+            let out = import_3do(&model3(root), &rects()).expect("import");
+
+            assert_eq!(out.root.children.len(), 2);
+            assert_eq!(out.dropped_pieces, 0);
+        }
+
+        /// A same-named piece that roots children is not dropped: dropping it
+        /// would take its whole subtree with it.
+        #[test]
+        fn keeps_a_same_named_sibling_that_has_children() {
+            let mut root = piece3("base", Vec::new());
+            let mut has_child = piece3("mount", Vec::new());
+            has_child.children.push(piece3("barrel", Vec::new()));
+            root.children.push(piece3("mount", Vec::new()));
+            root.children.push(has_child);
+            let out = import_3do(&model3(root), &rects()).expect("import");
+
+            assert_eq!(out.root.children.len(), 2);
+            assert_eq!(out.dropped_pieces, 0);
+        }
+
+        /// Identical position and vertex data under two different names is not
+        /// junk: BA's `cortitan` and `corhurc` both toggle a `thrusta1`/
+        /// `thrusta2` pair to fake a flicker, and `armatl` gives one point two
+        /// jobs as `flare` and `bubbles`. Neither is reachable-but-shadowed the
+        /// way a same-named duplicate is, so both are kept.
+        #[test]
+        fn keeps_distinctly_named_siblings_with_identical_geometry() {
+            let mut root = piece3("base", Vec::new());
+            root.children.push(piece3("thrusta1", Vec::new()));
+            root.children.push(piece3("thrusta2", Vec::new()));
+            let out = import_3do(&model3(root), &rects()).expect("import");
+
+            assert_eq!(out.root.children.len(), 2);
+            assert_eq!(out.dropped_pieces, 0);
         }
     }
 }

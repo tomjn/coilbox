@@ -760,7 +760,9 @@ async fn lego_read_3do(path: String) -> CliResult {
 /// A tile nothing on disk matched, and a face the format gives a flat palette
 /// colour rather than a texture, are both drawn plain and counted. The Total
 /// Annihilation palette is embedded in the engine rather than shipped in the
-/// archive, so there is no colour to look up for the second kind.
+/// archive, so there is no colour to look up for the second kind. A child
+/// piece left dead by an era-of-export naming slip (see
+/// `import::is_dead_duplicate`) is dropped from the tree and counted too.
 #[tauri::command]
 async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String) -> CliResult {
     if !valid_id(&id) {
@@ -838,6 +840,7 @@ async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String
         "bytes": imported.blob.len(),
         "paletteFaces": imported.palette_faces,
         "missingTextures": imported.missing_textures,
+        "droppedPieces": imported.dropped_pieces,
         "tiles": wanted,
     });
     match serde_json::to_value(out) {

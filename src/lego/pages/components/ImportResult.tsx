@@ -233,6 +233,11 @@ function conversionNotes(result: ThreeDoImport): string[] {
       `${result.paletteFaces} ${result.paletteFaces === 1 ? "face is" : "faces are"} drawn in a flat colour from the Total Annihilation palette rather than a texture. The palette lives in the engine rather than in the game, so those are drawn plain grey.`,
     );
   }
+  if (result.droppedPieces > 0) {
+    notes.push(
+      `${result.droppedPieces} empty child ${result.droppedPieces === 1 ? "piece" : "pieces"} shared an earlier sibling's name and drew nothing, so nothing could ever have addressed ${result.droppedPieces === 1 ? "it" : "them"} by that name. ${result.droppedPieces === 1 ? "It has" : "They have"} been left out.`,
+    );
+  }
   return notes;
 }
 
