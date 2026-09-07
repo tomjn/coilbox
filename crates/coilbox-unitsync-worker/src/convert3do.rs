@@ -232,8 +232,8 @@ fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutpu
     let teamtex = read_teamtex(us, handle, &list);
     let palette = read_palette(us);
 
-    let groups = group_models(&list);
-    out.models_found = groups.values().map(Vec::len).sum();
+    let groups = plan(&list);
+    out.models_found = groups.iter().map(|g| g.members.len()).sum();
     report(Progress {
         phase: "scan",
         done: 0,
@@ -243,15 +243,16 @@ fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutpu
     });
 
     let mut done = 0usize;
-    for (folder, members) in &groups {
+    for group in &groups {
         match convert_group(
             us,
             handle,
             &list,
             &teamtex,
             palette.as_ref(),
-            folder,
-            members,
+            &group.folder,
+            &group.stem,
+            &group.members,
             out_dir,
             &mut done,
             out.models_found,
@@ -269,6 +270,34 @@ fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path) -> Convert3doOutpu
     out.errors.extend(us.drain_errors());
     us.remove_all_archives();
     out
+}
+
+/// One folder of models and the sheet they will share.
+struct Planned {
+    /// The first path segment below `objects3d/`, empty for the top level.
+    folder: String,
+    /// What the sheet is filed under, unique across the run.
+    stem: String,
+    members: Vec<String>,
+}
+
+/// What the run is about to do: every folder of models, and the name its sheet
+/// goes under.
+///
+/// The naming happens here rather than inside the loop because telling two
+/// folders apart is a question about the whole set of them, and a folder
+/// considered on its own has nothing to be told apart from.
+fn plan(list: &[(String, String)]) -> Vec<Planned> {
+    let groups = group_models(list);
+    let mut names = sheet_names(groups.keys().cloned());
+    groups
+        .into_iter()
+        .map(|(folder, members)| Planned {
+            stem: names.remove(&folder).unwrap_or_else(|| sheet_stem(&folder)),
+            folder,
+            members,
+        })
+        .collect()
 }
 
 /// Every `.3do` under `objects3d/`, keyed by the folder whose models share a
@@ -356,15 +385,13 @@ fn convert_group(
     teamtex: &[String],
     palette: Option<&coilbox_3do::Palette>,
     folder: &str,
+    stem: &str,
     members: &[String],
     out_dir: &Path,
     done: &mut usize,
     total: usize,
     unreadable: &mut BTreeMap<String, String>,
 ) -> Result<Group, String> {
-    let stem = sheet_names([folder.to_string()])
-        .remove(folder)
-        .unwrap_or_else(|| sheet_stem(folder));
     let mut group = Group {
         folder: if folder.is_empty() {
             MODEL_DIR.to_string()
@@ -767,12 +794,39 @@ mod tests {
 
     /// Two folders that sanitise to one name would write one sheet twice, and
     /// half the models would be painted with the other half's tiles.
+    ///
+    /// Against the plan the run actually uses rather than against the naming
+    /// helper on its own. A helper that dedupes correctly and a caller that
+    /// asks it about one folder at a time is exactly how this goes wrong
+    /// without anything failing.
     #[test]
-    fn tells_two_folders_apart_when_their_names_sanitise_the_same() {
-        let names = sheet_names(["a b".to_string(), "a_b".to_string()]);
+    fn gives_two_folders_different_sheets_when_their_names_sanitise_the_same() {
+        let planned = plan(&listing(&[
+            "objects3d/a b/one.3do",
+            "objects3d/a_b/two.3do",
+            "objects3d/top.3do",
+        ]));
 
-        assert_eq!(names.len(), 2);
-        assert_ne!(names["a b"], names["a_b"]);
+        let stems: Vec<&str> = planned.iter().map(|g| g.stem.as_str()).collect();
+        assert_eq!(stems.len(), 3);
+        let unique: BTreeSet<&str> = stems.iter().copied().collect();
+        assert_eq!(unique.len(), 3, "{stems:?}");
+        assert!(stems.contains(&"objects3d"), "{stems:?}");
+    }
+
+    /// Every model in the archive is in exactly one folder's plan, so nothing
+    /// is converted twice and nothing is dropped before the run starts.
+    #[test]
+    fn the_plan_covers_every_model_once() {
+        let planned = plan(&listing(&[
+            "objects3d/top.3do",
+            "objects3d/arm/one.3do",
+            "objects3d/arm/two.3do",
+        ]));
+
+        let all: Vec<&String> = planned.iter().flat_map(|g| g.members.iter()).collect();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all.iter().collect::<BTreeSet<_>>().len(), 3);
     }
 
     #[test]
