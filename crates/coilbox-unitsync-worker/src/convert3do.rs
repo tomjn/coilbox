@@ -129,10 +129,6 @@ pub struct Group {
     /// Faces drawn in the same flat grey for the second reason: the tile they
     /// named is not on the sheet. `missing_textures` says which tiles.
     pub missing_texture_faces: usize,
-    /// And for the third: the file gives the face no texture name at all.
-    /// Nothing is wrong with these, and they are counted apart so the palette
-    /// number above means only what it says.
-    pub untextured_faces: usize,
     pub vertices: usize,
     pub triangles: usize,
     /// Child pieces dropped as inert same-named duplicates. See
@@ -554,9 +550,7 @@ fn convert_group(
         group.triangles += converted.triangles;
         group.dropped_pieces += converted.dropped_pieces;
         group.missing_texture_faces += converted.missing_texture_faces;
-        group.untextured_faces += converted.untextured_faces;
-        let unresolved =
-            converted.palette_faces - converted.missing_texture_faces - converted.untextured_faces;
+        let unresolved = converted.palette_faces - converted.missing_texture_faces;
         if unresolved > 0 {
             group.palette_faces += unresolved;
             group.palette_models.push(short);

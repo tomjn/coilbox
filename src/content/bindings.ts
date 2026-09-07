@@ -2441,8 +2441,6 @@ export interface Convert3doGroup {
   paletteModels: string[];
   /** Faces drawn flat grey because their named tile is not on the sheet. */
   missingTextureFaces: number;
-  /** Faces the file gives no texture name at all. Nothing is wrong with these. */
-  untexturedFaces: number;
   vertices: number;
   triangles: number;
   droppedPieces: number;

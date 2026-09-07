@@ -37,12 +37,6 @@ pub struct Converted {
     /// not the same thing to fix. One means a texture is missing from the game
     /// or from the sheet. The other means the palette itself did not resolve.
     pub missing_texture_faces: usize,
-    /// And how many came out plain because the file gives the face no texture
-    /// name at all, which is neither a palette entry that failed to resolve nor
-    /// a tile that went missing. Nothing is wrong with these: the format simply
-    /// has a third way of saying "no texture", and a caller reporting on a
-    /// palette should not be counting them as palette failures.
-    pub untextured_faces: usize,
     /// Tile names the model asks for that the sheet does not hold. Their faces
     /// are drawn plain, and saying which ones is the only way anybody works out
     /// what is missing.
@@ -89,7 +83,6 @@ pub fn to_s3o(
         rects,
         palette_faces: 0,
         missing_texture_faces: 0,
-        untextured_faces: 0,
         missing: BTreeSet::new(),
         dropped_pieces: 0,
         vertices: 0,
@@ -108,7 +101,6 @@ pub fn to_s3o(
         },
         palette_faces: state.palette_faces,
         missing_texture_faces: state.missing_texture_faces,
-        untextured_faces: state.untextured_faces,
         missing_textures: state.missing.into_iter().collect(),
         dropped_pieces: state.dropped_pieces,
         vertices: state.vertices,
@@ -127,7 +119,6 @@ struct Walk<'a> {
     rects: &'a Rects,
     palette_faces: usize,
     missing_texture_faces: usize,
-    untextured_faces: usize,
     missing: BTreeSet<String>,
     dropped_pieces: usize,
     vertices: usize,
@@ -449,7 +440,6 @@ mod tests {
         // Nothing was missing from the sheet, and the face did name a palette
         // entry: that entry is what did not resolve.
         assert_eq!(out.missing_texture_faces, 0);
-        assert_eq!(out.untextured_faces, 0);
         assert_eq!(out.triangles, 1);
     }
 
@@ -486,7 +476,6 @@ mod tests {
         .expect("convert");
 
         assert_eq!(out.palette_faces, 0);
-        assert_eq!(out.untextured_faces, 0);
         let uvs: Vec<[f32; 2]> = out.model.root.vertices.iter().map(|v| v.uv).collect();
         assert_eq!(uvs, vec![[0.5, 0.0], [1.0, 0.0], [1.0, 0.5], [0.5, 0.5]]);
     }
@@ -507,7 +496,6 @@ mod tests {
 
         assert_eq!(out.palette_faces, 1);
         assert_eq!(out.missing_texture_faces, 1);
-        assert_eq!(out.untextured_faces, 0);
         // Reported as the name it resolves to, not the blank the file stores
         // (issue #2610): a caller listing missing textures should never print
         // an empty string.

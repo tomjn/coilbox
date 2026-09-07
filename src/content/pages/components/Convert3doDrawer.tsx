@@ -291,8 +291,7 @@ function GroupReport({ group }: { group: Convert3doGroup }) {
           ? `, across ${group.paletteModels.length} models`
           : ""}
         . {group.missingTextureFaces} faces are flat because their tile is
-        missing, and {group.untexturedFaces} because the file names no texture
-        for them at all.
+        missing.
         {group.droppedPieces > 0
           ? ` ${group.droppedPieces} inert same-named pieces were dropped.`
           : ""}
