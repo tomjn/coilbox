@@ -1,0 +1,18 @@
+[package]
+name = "coilbox-3do-convert"
+version = "0.0.0"
+description = "Turns a Total Annihilation `.3do` into a Spring `.s3o`: packs the tiles it names into one sheet, gives every face real coordinates onto it, and records where each tile landed so a later conversion can share the sheet."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# The two model formats this sits between. Both are dependency-free readers, and
+# `coilbox-s3o` carries the writer this hands its output to.
+coilbox-3do = { path = "../coilbox-3do" }
+coilbox-s3o = { path = "../coilbox-s3o" }
+# The sheet is drawn pixel by pixel. No format features: a caller decodes its own
+# tiles and encodes the finished sheet, so nothing here reads or writes a file.
+image = { workspace = true }
+# The sidecar that records where every tile landed.
+serde = { workspace = true }
+serde_json = { workspace = true }

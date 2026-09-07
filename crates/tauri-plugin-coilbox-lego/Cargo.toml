@@ -20,6 +20,11 @@ coilbox-portable = { path = "../coilbox-portable" }
 coilbox-s3o = { path = "../coilbox-s3o" }
 # The older model format, which most of an older game's roster is drawn with.
 coilbox-3do = { path = "../coilbox-3do" }
+# Opening one of those is a conversion rather than a read: the tiles it names go
+# onto one sheet and every face gets coordinates onto it. Shared with the batch
+# conversion in the unitsync worker, so a unit opened here and the same unit
+# converted with its whole game come out of one implementation.
+coilbox-3do-convert = { path = "../coilbox-3do-convert" }
 # Playing a unit's own script in the viewport: the runtime lives beside the
 # config evaluator, in the crate that already carries Lua.
 coilbox-springlua = { path = "../coilbox-springlua" }

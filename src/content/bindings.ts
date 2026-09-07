@@ -1,4 +1,5 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { Channel } from "@tauri-apps/api/core";
 
 /**
  * Typed bindings to `plugin:coilbox-content|*` (crate `tauri-plugin-coilbox-content`,
@@ -2394,3 +2395,89 @@ export const unitsyncArchiveExtract = defineCommand<
   },
   ArchiveExtractResult
 >("coilbox-unitsync", "unitsync_archive_extract");
+
+/** One line the 3do conversion prints as it works. */
+export interface Convert3doProgress {
+  /** `scan` once the models have been counted, `atlas` while a folder's sheet
+   * is being built, `model` per model converted. */
+  phase: "scan" | "atlas" | "model";
+  done: number;
+  total: number;
+  /** The archive folder being worked on, empty during the scan. */
+  folder: string;
+  /** The archive member being converted, empty outside the `model` phase. */
+  member: string;
+}
+
+/** A tile the archive holds that coilbox could not decode. */
+export interface Convert3doUndecodable {
+  member: string;
+  wantedBy: number;
+}
+
+/** One model folder's sheet, and what happened to the models sharing it. */
+export interface Convert3doGroup {
+  folder: string;
+  /** The sheet's path inside the output folder. */
+  atlas: string;
+  /** And the name the converted models give it, resolved under `unittextures/`. */
+  texture1: string;
+  atlasSide: number;
+  /** True when an earlier run's sheet was kept, which is what stops a repack
+   * moving every tile out from under the models it already wrote. */
+  reusedAtlas: boolean;
+  tilesPacked: number;
+  /** Tiles that would not fit on a sheet the size cap allows. */
+  tilesThatDidNotFit: string[];
+  /** Tile names nothing in the archive matched, and how many models wanted each. */
+  missingTextures: Record<string, number>;
+  /** Tile names the archive holds that would not decode. */
+  undecodableTextures: Record<string, Convert3doUndecodable>;
+  modelsWritten: number;
+  /** Models left unconverted because a tile they name did not fit. */
+  didNotFit: string[];
+  /** Faces drawn flat grey because their palette entry resolved to nothing. */
+  paletteFaces: number;
+  paletteModels: string[];
+  /** Faces drawn flat grey because their named tile is not on the sheet. */
+  missingTextureFaces: number;
+  /** Faces the file gives no texture name at all. Nothing is wrong with these. */
+  untexturedFaces: number;
+  vertices: number;
+  triangles: number;
+  droppedPieces: number;
+}
+
+export interface Convert3doResult {
+  outDir: string;
+  groups: Convert3doGroup[];
+  /** Models the reader refused, by archive member, with what it said. Apart from
+   * the ones that did not fit: this is a file coilbox cannot read, and that is a
+   * file it read fine and had nowhere to paint. */
+  unreadable: Record<string, string>;
+  modelsFound: number;
+  modelsWritten: number;
+  errors: string[];
+}
+
+/**
+ * Turn every `.3do` in a game into an `.s3o`, one shared texture per folder
+ * under `objects3d/`, written into `outDir` (issue #2573).
+ *
+ * Progress arrives on `onProgress` as the run works rather than with the
+ * answer, because a game is hundreds of models and a window that sits still is
+ * a window nobody can tell from a hung one. `opId` is the handle
+ * `unitsyncCancel` stops it by, and a cancelled run keeps whatever it had
+ * already written.
+ */
+export const unitsyncConvert3do = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    archive: string;
+    outDir: string;
+    opId?: string;
+    onProgress: Channel<Convert3doProgress>;
+  },
+  Convert3doResult
+>("coilbox-unitsync", "unitsync_convert_3do");

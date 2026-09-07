@@ -20,12 +20,15 @@
 //! with the wrong colour.
 //!
 //! Faces the format gives a flat palette colour rather than a texture also get
-//! a tile of their own: the caller reads `unittextures/tatex/palette.pal` (see
-//! `texture::find_palette_beside_model`) and hands this module one small tile
-//! per entry a model actually uses, coloured straight from that file. An entry
-//! nothing could resolve, because there is no `palette.pal` beside the model or
-//! the face names an index outside the 256 it holds, falls back to a plain
-//! [`PALETTE_TILE`], and the caller counts those.
+//! a tile of their own: the caller reads `unittextures/tatex/palette.pal` and
+//! hands this module one small tile per entry a model actually uses, coloured
+//! straight from that file. An entry nothing could resolve, because there is no
+//! `palette.pal` to be found or the face names an index outside the 256 it
+//! holds, falls back to a plain [`PALETTE_TILE`], and the caller counts those.
+//!
+//! One sheet does not have to be one model. A batch conversion packs every tile
+//! a whole folder of models names into a single sheet, so the game binds one
+//! texture for the lot, and [`crate::Sheet`] records where each tile landed.
 
 use std::collections::BTreeMap;
 
@@ -33,7 +36,7 @@ use image::RgbaImage;
 
 /// Pixels of edge-copy around every tile. One is enough: a bilinear filter
 /// reaches half a texel past the edge, and the coordinates are inset by that.
-const BORDER: u32 = 1;
+pub const BORDER: u32 = 1;
 
 /// The smallest sheet worth making, and the largest.
 ///
@@ -41,7 +44,12 @@ const BORDER: u32 = 1;
 /// than the largest: Balanced Annihilation's heaviest model names 25 tiles, and
 /// TA tiles are 32 or 64 pixels square.
 const MIN_SIDE: u32 = 64;
-const MAX_SIDE: u32 = 2048;
+pub const MAX_SIDE: u32 = 2048;
+
+/// What the fallback flat-colour tile is drawn in, for a palette entry nothing
+/// could resolve. Also the side of every flat-colour tile, resolved or not,
+/// which is a size rather than a shape: nothing is drawn on one.
+pub const PALETTE_TILE_SIDE: u32 = 8;
 
 /// What the fallback flat-colour tile is drawn in, for a palette entry nothing
 /// could resolve.
@@ -53,7 +61,7 @@ const MAX_SIDE: u32 = 2048;
 /// Alpha zero, because on an `.s3o` the first texture's alpha is the
 /// team-colour mask rather than transparency. A palette face is not a region
 /// the player's colour belongs on, resolved or not.
-pub(crate) const PALETTE_GREY: [u8; 4] = [128, 128, 128, 0];
+pub const PALETTE_GREY: [u8; 4] = [128, 128, 128, 0];
 
 /// The name the fallback flat-colour tile is filed under, which no `.3do`
 /// texture name can collide with: the format stores names without a path
@@ -86,6 +94,44 @@ impl Rect {
             self.v0 + (self.v1 - self.v0) * v,
         ]
     }
+
+    /// The coordinates a tile at `left, top` and `width` by `height` pixels
+    /// hands to a face, on a sheet `side` pixels square.
+    ///
+    /// The one place the two conventions this sheet is drawn under are written
+    /// down, so a caller reading a [`crate::Sheet`] back off disk cannot arrive
+    /// at coordinates half a texel or a whole flip away from the ones
+    /// [`pack`] handed out.
+    ///
+    /// Half a texel in from each edge, which is where a filter samples the
+    /// outermost pixel's centre rather than the boundary between two.
+    ///
+    /// Rows counted from the bottom, because that is how a texture is sampled:
+    /// the engine flips every texture to OpenGL's order on load and three does
+    /// the same for anything it decodes, so `v` of one is the top row of the
+    /// file. Measuring from the top instead points every face at the empty
+    /// space below the packed tiles and the whole unit draws black.
+    pub fn for_tile(left: u32, top: u32, width: u32, height: u32, side: u32) -> Self {
+        let scale = side as f32;
+        let row = |y: f32| 1.0 - y / scale;
+        Self {
+            u0: (left as f32 + 0.5) / scale,
+            v0: row(top as f32 + 0.5),
+            u1: (left as f32 + width as f32 - 0.5) / scale,
+            v1: row(top as f32 + height as f32 - 0.5),
+        }
+    }
+}
+
+/// Where one tile sits on the sheet, in pixels, not counting the border drawn
+/// around it. What the sidecar records, and what [`Rect::for_tile`] turns into
+/// the coordinates a face uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Placement {
+    pub left: u32,
+    pub top: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 /// One tile to pack: its name and its pixels.
@@ -98,6 +144,12 @@ pub struct Packed {
     pub image: RgbaImage,
     /// Where each tile ended up, by name.
     pub rects: BTreeMap<String, Rect>,
+    /// The same answer in pixels, which is what the sidecar records. Kept
+    /// beside `rects` rather than derived from it, because going back from
+    /// coordinates to pixels means undoing a half-texel inset and a flip and
+    /// rounding the result, and a sheet whose tiles have moved by a pixel draws
+    /// every unit fringed.
+    pub placements: BTreeMap<String, Placement>,
 }
 
 /// Pack `tiles` into one square sheet.
@@ -110,14 +162,19 @@ pub struct Packed {
 /// A flat-colour tile the format gives a face rather than a texture is just
 /// another [`Tile`] by the time it reaches here: the caller builds it, named
 /// [`PALETTE_TILE`] or [`palette_tile_name`], before packing.
-pub fn pack(mut tiles: Vec<Tile>) -> Result<Packed, String> {
+///
+/// Borrows rather than takes, because a batch that overflows the cap drops a
+/// tile and tries the rest again, and a packer that ate its argument would
+/// leave it nothing to try with.
+pub fn pack(tiles: &[Tile]) -> Result<Packed, String> {
     if tiles.is_empty() {
         return Err("this model names no textures at all".into());
     }
 
     // Tallest first, which is what makes a shelf packer tight rather than
     // leaving a band of dead space above every short tile on a shelf.
-    tiles.sort_by(|a, b| {
+    let mut order: Vec<&Tile> = tiles.iter().collect();
+    order.sort_by(|a, b| {
         b.image
             .height()
             .cmp(&a.image.height())
@@ -126,13 +183,13 @@ pub fn pack(mut tiles: Vec<Tile>) -> Result<Packed, String> {
 
     let mut side = MIN_SIDE;
     loop {
-        if let Some(placed) = try_pack(&tiles, side) {
-            return Ok(draw(&tiles, &placed, side));
+        if let Some(placed) = try_pack(&order, side) {
+            return Ok(draw(&order, &placed, side));
         }
         if side >= MAX_SIDE {
             return Err(format!(
-                "this model's {} textures do not fit on a {MAX_SIDE} pixel sheet",
-                tiles.len()
+                "{} textures do not fit on a {MAX_SIDE} pixel sheet",
+                order.len()
             ));
         }
         side *= 2;
@@ -144,7 +201,7 @@ pub fn pack(mut tiles: Vec<Tile>) -> Result<Packed, String> {
 /// A shelf packer: fill a row left to right, and start a new row below when the
 /// next tile does not fit. Tiles are near enough all one size in a `.3do`, so
 /// the cleverer packers buy nothing here.
-fn try_pack(tiles: &[Tile], side: u32) -> Option<Vec<(u32, u32)>> {
+fn try_pack(tiles: &[&Tile], side: u32) -> Option<Vec<(u32, u32)>> {
     let mut placed = Vec::with_capacity(tiles.len());
     let (mut x, mut y, mut shelf) = (0u32, 0u32, 0u32);
     for tile in tiles {
@@ -170,10 +227,10 @@ fn try_pack(tiles: &[Tile], side: u32) -> Option<Vec<(u32, u32)>> {
 
 /// Draw the tiles onto the sheet, each with its border, and work out the
 /// coordinates each one hands to a face.
-fn draw(tiles: &[Tile], placed: &[(u32, u32)], side: u32) -> Packed {
+fn draw(tiles: &[&Tile], placed: &[(u32, u32)], side: u32) -> Packed {
     let mut sheet = RgbaImage::new(side, side);
     let mut rects = BTreeMap::new();
-    let scale = side as f32;
+    let mut placements = BTreeMap::new();
 
     for (tile, &(left, top)) in tiles.iter().zip(placed) {
         let (width, height) = (tile.image.width(), tile.image.height());
@@ -188,23 +245,20 @@ fn draw(tiles: &[Tile], placed: &[(u32, u32)], side: u32) -> Packed {
                 sheet.put_pixel(left - BORDER + x, top - BORDER + y, pixel);
             }
         }
-        // Half a texel in from each edge, which is where a filter samples the
-        // outermost pixel's centre rather than the boundary between two.
-        //
-        // Rows counted from the bottom, because that is how a texture is
-        // sampled: the engine flips every texture to OpenGL's order on load and
-        // three does the same for anything it decodes, so `v` of one is the top
-        // row of the file. Measuring from the top instead points every face at
-        // the empty space below the packed tiles and the whole unit draws
-        // black.
-        let row = |y: f32| 1.0 - y / scale;
+        // Both conventions the coordinates are drawn under live in
+        // `Rect::for_tile`, so a caller reading the sidecar back arrives at the
+        // same numbers rather than at its own reading of them.
         rects.insert(
             tile.name.clone(),
-            Rect {
-                u0: (left as f32 + 0.5) / scale,
-                v0: row(top as f32 + 0.5),
-                u1: (left as f32 + width as f32 - 0.5) / scale,
-                v1: row(top as f32 + height as f32 - 0.5),
+            Rect::for_tile(left, top, width, height, side),
+        );
+        placements.insert(
+            tile.name.clone(),
+            Placement {
+                left,
+                top,
+                width,
+                height,
             },
         );
     }
@@ -212,6 +266,7 @@ fn draw(tiles: &[Tile], placed: &[(u32, u32)], side: u32) -> Packed {
     Packed {
         image: sheet,
         rects,
+        placements,
     }
 }
 
@@ -241,7 +296,7 @@ mod tests {
     fn measures_rows_from_the_bottom_the_way_a_texture_is_sampled() {
         // One small tile on a sheet with room to spare, so it packs at the top
         // and the difference between the two conventions is unmissable.
-        let packed = pack(vec![tile("a", 8, 10)]).unwrap();
+        let packed = pack(&[tile("a", 8, 10)]).unwrap();
         let a = packed.rects["a"];
 
         assert!(a.v0 > 0.9, "the top of a tile packed at the top: {a:?}");
@@ -250,7 +305,7 @@ mod tests {
 
     #[test]
     fn puts_every_tile_somewhere() {
-        let packed = pack(vec![tile("a", 32, 10), tile("b", 32, 20)]).unwrap();
+        let packed = pack(&[tile("a", 32, 10), tile("b", 32, 20)]).unwrap();
 
         assert!(packed.rects.contains_key("a"));
         assert!(packed.rects.contains_key("b"));
@@ -260,7 +315,7 @@ mod tests {
     /// textures are.
     #[test]
     fn makes_a_square_power_of_two_sheet() {
-        let packed = pack(vec![tile("a", 32, 10)]).unwrap();
+        let packed = pack(&[tile("a", 32, 10)]).unwrap();
 
         assert_eq!(packed.image.width(), packed.image.height());
         assert!(packed.image.width().is_power_of_two());
@@ -271,7 +326,7 @@ mod tests {
         let many: Vec<Tile> = (0..20)
             .map(|i| tile(&format!("t{i}"), 64, i as u8))
             .collect();
-        let packed = pack(many).unwrap();
+        let packed = pack(&many).unwrap();
 
         assert!(packed.image.width() >= 256, "{}", packed.image.width());
         assert_eq!(packed.rects.len(), 20);
@@ -280,12 +335,7 @@ mod tests {
     /// Two tiles overlapping would draw one unit's face with another's paint.
     #[test]
     fn never_overlaps_two_tiles() {
-        let packed = pack(vec![
-            tile("a", 32, 10),
-            tile("b", 16, 20),
-            tile("c", 32, 30),
-        ])
-        .unwrap();
+        let packed = pack(&[tile("a", 32, 10), tile("b", 16, 20), tile("c", 32, 30)]).unwrap();
 
         let side = packed.image.width() as f32;
         let boxes: Vec<[f32; 4]> = packed
@@ -312,7 +362,7 @@ mod tests {
     /// neighbour, and every face comes out fringed with the wrong colour.
     #[test]
     fn surrounds_each_tile_with_its_own_edge_pixels() {
-        let packed = pack(vec![tile("a", 8, 10), tile("b", 8, 200)]).unwrap();
+        let packed = pack(&[tile("a", 8, 10), tile("b", 8, 200)]).unwrap();
 
         let side = packed.image.width() as f32;
         let a = packed.rects["a"];
@@ -328,7 +378,7 @@ mod tests {
     /// whatever name it was given.
     #[test]
     fn packs_a_flat_colour_tile_like_any_other() {
-        let packed = pack(vec![
+        let packed = pack(&[
             tile("a", 32, 10),
             Tile {
                 name: PALETTE_TILE.to_string(),
@@ -349,14 +399,14 @@ mod tests {
 
     #[test]
     fn refuses_a_model_that_names_no_textures() {
-        assert!(pack(Vec::new()).is_err());
+        assert!(pack(&[]).is_err());
     }
 
     /// A face takes the tile's own corners, so the coordinates it gets have to
     /// stay inside the tile.
     #[test]
     fn maps_a_face_corner_inside_its_own_tile() {
-        let packed = pack(vec![tile("a", 32, 10), tile("b", 32, 20)]).unwrap();
+        let packed = pack(&[tile("a", 32, 10), tile("b", 32, 20)]).unwrap();
         let a = packed.rects["a"];
 
         // Either way round for `v`, because rows are counted from the bottom

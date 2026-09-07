@@ -17,6 +17,7 @@ mod archive;
 mod assetencode;
 mod buildpic;
 mod config;
+mod convert3do;
 mod dataset;
 mod factionlogo;
 mod ffi;
@@ -164,6 +165,12 @@ struct Args {
     /// once in `coilbox_unitsync_worker::UnitModelsArgs`, shared with the
     /// sidecar plugin that builds this flag's argv (issue #2448).
     unit_models: Option<Mode>,
+    /// `--convert-3do`: turn every `.3do` in a game into an `.s3o`, one sheet
+    /// per model folder, writing them all into `--out-dir`. Its fields and the
+    /// rule that both the game and the output folder are required live once in
+    /// `coilbox_unitsync_worker::Convert3doArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv.
+    convert_3do: Option<Mode>,
     /// `--unit-script`: find and read a unit's animation script inside a
     /// game, following the unit script framework's own resolution order. Its
     /// fields live once in `coilbox_unitsync_worker::UnitScriptArgs`, shared
@@ -460,6 +467,19 @@ fn run() -> i32 {
             || unitmodels::render(&args.lib, &mode.game, &objects, Path::new(&mode.cache_dir)),
             print_ok,
             || unitmodels::emit_error("worker panicked while reading unit models".into()),
+        );
+    }
+
+    // Convert 3do: turn a whole game's `.3do` models into `.s3o`, one sheet per
+    // model folder (issue #2573). Keys off --game, so it is checked before the
+    // --game modes. Progress lines go out on stdout as the run goes, ahead of
+    // the final JSON, which is why this mode prints rather than returning
+    // everything at the end.
+    if let Some(Mode::Convert3do(mode)) = &args.convert_3do {
+        return run_mode(
+            || convert3do::render(&args.lib, &mode.game, Path::new(&mode.out_dir)),
+            print_ok,
+            || convert3do::emit_error("worker panicked while converting .3do models".into()),
         );
     }
 
@@ -889,6 +909,7 @@ fn parse_args() -> Result<Args, String> {
     // `from_args` below re-scans `raw` for those, the single place that
     // mode's fields and cross field rule are defined (issue #2448).
     let mut unit_models_flag = false;
+    let mut convert_3do_flag = false;
     // `--unit-render`'s own flags (angle, footprint, pixels, dimensions, render
     // source) are not collected into locals here: `Mode::UnitRender`'s
     // `from_args` below re-scans `raw` for those, which is the single place
@@ -976,6 +997,10 @@ fn parse_args() -> Result<Args, String> {
             "--unit-model" => unit_model_flag = true,
             "--unit-script" => unit_script_flag = true,
             "--unit-models" => unit_models_flag = true,
+            "--convert-3do" => convert_3do_flag = true,
+            "--out-dir" => {
+                it.next();
+            }
             "--unit-render" => unit_render_flag = true,
             // Consumed by `Mode::UnitRender`'s `from_args` below, not stored here.
             "--model-digest" | "--source-member" | "--source-archive" | "--angle" => {
@@ -1174,6 +1199,13 @@ fn parse_args() -> Result<Args, String> {
         } else {
             None
         },
+        convert_3do: if convert_3do_flag {
+            Some(Mode::Convert3do(
+                coilbox_unitsync_worker::Convert3doArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
         unit_render: if unit_render_flag {
             Some(Mode::UnitRender(
                 coilbox_unitsync_worker::UnitRenderArgs::from_args(&raw)?,
@@ -1261,6 +1293,13 @@ fn absolutize(args: &mut Args) {
         }
         if let Some(abs) = absolute_path(&mode.cache_dir) {
             mode.cache_dir = abs;
+        }
+    }
+    // `Mode::Convert3do` holds its own copy of `--out-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment.
+    if let Some(Mode::Convert3do(mode)) = args.convert_3do.as_mut() {
+        if let Some(abs) = absolute_path(&mode.out_dir) {
+            mode.out_dir = abs;
         }
     }
     // `Mode::UnitRenderKeys` holds its own copy of `--units-file`, read
@@ -1848,6 +1887,7 @@ mod tests {
             unit_dataset: None,
             unit_model: None,
             unit_models: None,
+            convert_3do: None,
             unit_render: None,
             unit_render_keys: None,
             unit_script: None,

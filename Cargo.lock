@@ -632,6 +632,17 @@ name = "coilbox-3do"
 version = "0.0.0"
 
 [[package]]
+name = "coilbox-3do-convert"
+version = "0.0.0"
+dependencies = [
+ "coilbox-3do",
+ "coilbox-s3o",
+ "image 0.25.10",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "coilbox-assets"
 version = "0.0.0"
 dependencies = [
@@ -768,6 +779,7 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "coilbox-3do",
+ "coilbox-3do-convert",
  "coilbox-assets",
  "coilbox-map-catalog",
  "coilbox-s3o",
@@ -5653,6 +5665,7 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "coilbox-3do",
+ "coilbox-3do-convert",
  "coilbox-portable",
  "coilbox-s3o",
  "coilbox-springlua",

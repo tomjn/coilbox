@@ -273,6 +273,21 @@ pub fn build_unit_models_args(
     args
 }
 
+/// Build args for `--convert-3do` mode: the game whose `.3do` models are being
+/// turned into `.s3o`, and the folder the results go in.
+///
+/// The mode's own fields and its rule that both are required live in the
+/// worker's `Convert3doArgs`, so this cannot send an argv the worker refuses.
+pub fn build_convert_3do_args(lib: &str, datadir: &str, game: &str, out_dir: &str) -> Vec<String> {
+    let mode = coilbox_unitsync_worker::Mode::Convert3do(coilbox_unitsync_worker::Convert3doArgs {
+        game: game.into(),
+        out_dir: out_dir.into(),
+    });
+    let mut args = build_args(lib, datadir);
+    args.extend(mode.to_args());
+    args
+}
+
 /// Build args for `--unit-render` mode: the unit whose render this is, the frame
 /// it was taken in, the file the pixels are in, and where the encoded asset goes.
 ///
@@ -1517,6 +1532,20 @@ mod tests {
                 unit: "armcom".into(),
             }
         );
+    }
+
+    /// The same round trip the modes below get: what this writes, the worker's
+    /// own parser reads back whole.
+    #[test]
+    fn build_convert_3do_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::Convert3doArgs;
+
+        let args = build_convert_3do_args("/lib.so", "/data", "BA.sdz", "/out");
+        let recovered = Convert3doArgs::from_args(&args).expect("the worker parses it back");
+
+        assert_eq!(recovered.game, "BA.sdz");
+        assert_eq!(recovered.out_dir, "/out");
+        assert!(args.contains(&"--convert-3do".to_string()));
     }
 
     /// The whole point of sharing `UnitModelsArgs` with the worker: what
