@@ -259,6 +259,23 @@ export interface LegoPiece {
    * where every piece starts.
    */
   collision?: LegoPieceCollision;
+  /**
+   * Flip this piece's own UVs vertically (`v -> 1-v`), for a mesh imported
+   * upside down. Only meaningful on a piece with a `meshId`: a part's UVs are
+   * correct by construction, so this is never offered for one. See
+   * `meshFix.ts`, which every reader of a piece's geometry goes through.
+   */
+  uvFlip?: boolean;
+  /** Mirror this piece's own UVs horizontally (`u -> 1-u`). Same restriction
+   *  as `uvFlip`. */
+  uvMirror?: boolean;
+  /**
+   * Recompute this piece's vertex normals from its own geometry, smoothing
+   * across faces within this many degrees of each other, rather than drawing
+   * with whichever normals the source model shipped. Absent means the
+   * imported normals, unmodified. See `meshFix.ts`.
+   */
+  normalsAngle?: number;
 }
 
 export interface LegoProject {
@@ -746,6 +763,11 @@ function parsePiece(raw: unknown): LegoPiece | null {
             .map(parseAnchor)
             .filter((a): a is LegoAnchor => a !== null),
         }
+      : {}),
+    ...(p.uvFlip === true ? { uvFlip: true } : {}),
+    ...(p.uvMirror === true ? { uvMirror: true } : {}),
+    ...(typeof p.normalsAngle === "number" && Number.isFinite(p.normalsAngle)
+      ? { normalsAngle: p.normalsAngle }
       : {}),
   };
 }
