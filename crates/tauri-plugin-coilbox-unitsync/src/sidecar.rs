@@ -767,7 +767,6 @@ pub fn build_archive_extract_args(
         })
         .to_args(),
     );
-    args.push(dest.into());
     args
 }
 
@@ -1254,6 +1253,87 @@ mod tests {
                 extract: Some("/out/x.smd".into()),
             }
         );
+    }
+
+    /// `ArchiveArgs::from_args` above only proves the fields it knows about
+    /// round trip. It cannot catch a stray extra token sitting after them in
+    /// the argv, because it never looks at the whole argv, only at the flags
+    /// it recognises. `build_archive_extract_args` once carried exactly such a
+    /// token: `--extract` moved into `ArchiveArgs`'s typed contract, but a
+    /// hand written `args.push(dest.into())` from before the move stayed
+    /// behind, so every extract argv carried the destination twice. The
+    /// worker's own top-level `parse_args` in `main.rs`, which does look at
+    /// the whole argv, rejected the second copy as `unknown argument: ...`
+    /// and the archive-to-builder open flow failed outright once a sidecar
+    /// binary built after the move went in.
+    ///
+    /// So this spawns the real compiled worker with a real argv from each
+    /// `build_archive_*_args` and checks its own parser accepts it, rather
+    /// than re-deriving the fields and asking a lenient helper if they match.
+    /// A fake `--lib` still fails, but past parsing, on trying to load it,
+    /// which is a different, later error and is exactly the distinction that
+    /// matters here.
+    #[test]
+    fn build_archive_args_are_argv_the_worker_s_own_parser_accepts() {
+        use std::process::Command;
+
+        // `CARGO_BIN_EXE_` only names binaries in the package being tested,
+        // and `sidecar` is a private module so this cannot be an integration
+        // test in this crate either: `build_archive_*_args` would not be
+        // reachable from outside it. Found the same way
+        // `tauri-plugin-coilbox-multiplayer`'s `agent_binary` finds a sidecar
+        // that lives in a different package: test binaries sit in
+        // `target/<profile>/deps`, ordinary binaries one level up.
+        let worker = {
+            let mut path = std::env::current_exe().expect("a test binary knows where it is");
+            path.pop();
+            if path.ends_with("deps") {
+                path.pop();
+            }
+            path.push(format!(
+                "coilbox-unitsync-worker{}",
+                std::env::consts::EXE_SUFFIX
+            ));
+            assert!(
+                path.exists(),
+                "no worker at {}. Build it first with `cargo build -p coilbox-unitsync-worker`",
+                path.display()
+            );
+            path
+        };
+        let run = |args: Vec<String>| {
+            let output = Command::new(&worker)
+                .args(&args)
+                .output()
+                .expect("run the worker binary");
+            String::from_utf8(output.stdout).expect("utf8 stdout")
+        };
+
+        let cases = [
+            build_archive_tree_args("/no/such/libunitsync.so", "/tmp", "Map.sd7"),
+            build_archive_file_args("/no/such/libunitsync.so", "/tmp", "Map.sd7", "maps/x.smd"),
+            build_archive_extract_args(
+                "/no/such/libunitsync.so",
+                "/tmp",
+                "Map.sd7",
+                "maps/x.smd",
+                "/tmp/x.smd",
+            ),
+        ];
+        for args in cases {
+            let stdout = run(args.clone());
+            assert!(
+                !stdout.contains("unknown argument"),
+                "worker rejected an argv build_archive_*_args produced: {args:?} -> {stdout}"
+            );
+            // Confirms the process actually ran its parser rather than the
+            // assertion above passing on an empty or crashed stdout: it
+            // still fails, just later, on the fake library path.
+            assert!(
+                stdout.contains("failed to load"),
+                "expected a library-load failure past parsing, got: {stdout}"
+            );
+        }
     }
 
     #[test]
