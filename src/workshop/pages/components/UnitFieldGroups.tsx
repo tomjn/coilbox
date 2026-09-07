@@ -16,15 +16,21 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import type { CustomParamsResult } from "@/content/bindings";
+import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
 import { UnitFieldRow } from "./UnitFieldRow";
 
 export function UnitFieldGroups({
   view,
+  consumers,
   onChange,
   onReset,
 }: {
   view: UnitFieldView;
+  /** The game's custom parameter consumer index, or `null` while it is still
+   *  being read. Only custom parameter rows use it (issue #2661). */
+  consumers: CustomParamsResult | null;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
 }) {
@@ -67,6 +73,7 @@ export function UnitFieldGroups({
                     <UnitFieldRow
                       key={row.path}
                       row={row}
+                      note={consumerNote(row.path, consumers) ?? undefined}
                       onChange={(value) => onChange(row, value)}
                       onReset={() => onReset(row)}
                     />

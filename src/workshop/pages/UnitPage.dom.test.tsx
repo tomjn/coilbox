@@ -20,7 +20,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { UnitDefsResult } from "@/content/bindings";
+import type { CustomParamsResult, UnitDefsResult } from "@/content/bindings";
 
 const SELECTED = {
   enginePath: "/engines/105",
@@ -61,6 +61,9 @@ vi.mock("@/content/config", () => ({
   }),
 }));
 
+/** The custom parameter consumer index, which most tests leave empty. */
+let mockConsumers: CustomParamsResult | null = null;
+
 vi.mock("../config", () => ({
   useUnitDefs: () => ({
     defs: mockDefs,
@@ -69,6 +72,7 @@ vi.mock("../config", () => ({
     reload: () => {},
     loading: mockStatus === "loading",
   }),
+  useCustomParams: () => ({ consumers: mockConsumers, loading: false }),
 }));
 
 const { default: UnitPage } = await import("./UnitPage");
@@ -132,6 +136,7 @@ afterEach(() => {
   cleanup();
   mockStatus = "ready";
   mockDataset = [];
+  mockConsumers = null;
 });
 
 describe("UnitPage", () => {
@@ -224,6 +229,75 @@ describe("UnitPage", () => {
       "value",
       "yes",
     );
+  });
+
+  /**
+   * Issue #2661. The engine ignores a custom parameter completely, so a row
+   * reading `canareaattack: true` says nothing at all on its own. The file that
+   * reads it is the whole answer, and the page has to reach the scan for it.
+   */
+  describe("custom parameters", () => {
+    const withParams = () =>
+      show({
+        armcom: { ...ARMCOM, customParams: { canareaattack: "1" } },
+      });
+
+    it("names the one file that reads a parameter", () => {
+      mockConsumers = {
+        params: {
+          canareaattack: {
+            sites: [
+              {
+                file: "luarules/gadgets/unit_areaattack.lua",
+                reads: 1,
+                writes: 0,
+              },
+            ],
+            files: 1,
+          },
+        },
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      withParams();
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).toContain("Read by");
+      expect(custom?.textContent).toContain(
+        "luarules/gadgets/unit_areaattack.lua",
+      );
+    });
+
+    /// A parameter nothing names is not the same as one nothing uses, and the
+    /// difference is the files that read the table whole.
+    it("says how many files read the table whole when nothing names the key", () => {
+      mockConsumers = {
+        params: {},
+        wholeTableFiles: 9,
+        filesScanned: 957,
+        truncated: false,
+        errors: [],
+      };
+      withParams();
+      const custom = screen.getByText("Custom parameters").closest("div");
+      expect(custom?.textContent).toContain(
+        "No file in this game names this parameter.",
+      );
+      expect(custom?.textContent).toContain("9 files read the whole");
+    });
+
+    /// The scan runs alongside the defs and the page never waits on it, so a
+    /// row before it lands is a row with no note rather than a spinner.
+    it("draws the row with no note before the scan lands", () => {
+      mockConsumers = null;
+      withParams();
+      expect(screen.getByLabelText("canareaattack")).toHaveProperty(
+        "value",
+        "1",
+      );
+      expect(screen.queryByText(/Read by/)).toBeNull();
+    });
   });
 
   it("marks an edited field, keeps the game's value in view, and resets it", () => {

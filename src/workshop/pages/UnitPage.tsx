@@ -34,7 +34,7 @@ import {
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
-import { useUnitDefs } from "../config";
+import { useCustomParams, useUnitDefs } from "../config";
 import {
   clearOverride,
   clearUnit,
@@ -79,6 +79,16 @@ export default function UnitPage() {
     (key: string, def: Record<string, unknown> | undefined) =>
       unitDisplayName(key, def, named.get(key)),
     [named],
+  );
+
+  // What each custom parameter means, which is only ever "whatever this game's
+  // Lua does with it". Runs alongside the defs rather than after them: nothing
+  // on the page waits for it, and a row whose scan has not landed simply has no
+  // note yet.
+  const { consumers } = useCustomParams(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
   );
 
   const [overrides, setOverrides] = useState<UnitOverrides>({});
@@ -240,6 +250,7 @@ export default function UnitPage() {
               <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
                 <UnitFieldGroups
                   view={fields}
+                  consumers={consumers}
                   onChange={(row, value) =>
                     setOverrides((o) =>
                       setOverride(o, unitKey, row.path, value, row.inherited),

@@ -19,7 +19,12 @@
  * is here rather than beside the binding.
  */
 import { useCallback, useEffect, useState } from "react";
-import { type UnitDefsResult, unitsyncUnitDefs } from "@/content/bindings";
+import {
+  type CustomParamsResult,
+  type UnitDefsResult,
+  unitsyncCustomParams,
+  unitsyncUnitDefs,
+} from "@/content/bindings";
 import { shareInFlight } from "@/content/inFlight";
 
 /** How the read is going, in the vocabulary `content/config.ts` already uses. */
@@ -116,4 +121,81 @@ export function useUnitDefs(
   }, [enginePath, dataDir, gameArchive, nonce]);
 
   return { defs, status, error, reload, loading: status === "loading" };
+}
+
+/**
+ * Which of a game's Lua files name each custom parameter, kept per game for the
+ * session (issue #2661).
+ *
+ * A `Map` rather than the single slot the def table gets above, because this is
+ * the small read: Beyond All Reason's index is 57,348 bytes, measured by running
+ * the worker's `--custom-params` mode against it on 7 September 2026, next to
+ * over a megabyte of defs. Keeping five games' indexes alive costs less than one
+ * game's defs.
+ *
+ * Nothing here is required for the page to work. A parameter with no consumer
+ * found and a parameter whose scan has not come back yet are both a row with no
+ * note on it, so the page never waits on this.
+ */
+const consumerCache = new Map<string, CustomParamsResult>();
+const consumerPending = new Map<string, Promise<CustomParamsResult>>();
+
+export function useCustomParams(
+  enginePath?: string,
+  dataDir?: string,
+  gameArchive?: string,
+) {
+  const [result, setResult] = useState<CustomParamsResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !gameArchive) {
+      setResult(null);
+      setLoading(false);
+      return;
+    }
+    const key = cacheKey(enginePath, dataDir, gameArchive);
+    const hit = consumerCache.get(key);
+    if (hit) {
+      setResult(hit);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setResult(null);
+    setLoading(true);
+    shareInFlight(consumerPending, key, () =>
+      unitsyncCustomParams({ enginePath, dataDir, gameArchive }),
+    )
+      .then((res) => {
+        // A worker that predates `--custom-params` answers with the scan
+        // envelope and its reason, so `params` is read defensively rather than
+        // walked into, the same way `useUnitDefs` reads `units`.
+        const filled: CustomParamsResult = {
+          ...res,
+          params: res.params ?? {},
+          errors: res.errors ?? [],
+        };
+        // Only a scan the worker could checksum is kept, mirroring its own disk
+        // cache, so a failed read stays retryable rather than sticking for the
+        // session.
+        if (res.checksum) consumerCache.set(key, filled);
+        if (cancelled) return;
+        setResult(filled);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Swallowed on purpose. This is a note alongside a field, and a page
+        // that could otherwise be edited must not turn into an error because
+        // the note could not be fetched.
+        setResult(null);
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, gameArchive]);
+
+  return { consumers: result, loading };
 }

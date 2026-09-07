@@ -13,6 +13,10 @@
  * reads a number, and the control has to fit what is actually there. Anything
  * that is not a scalar or a list of numbers draws as a raw key and value row,
  * which is also what a key only the game declares gets when its value is a table.
+ *
+ * A custom parameter also carries a note naming the Lua file that reads it
+ * (issue #2661), which for most of them is the only thing on the page that says
+ * what the value does.
  */
 import { Button, cn, Input } from "@picoframe/frame";
 import { RotateCcw } from "lucide-react";
@@ -22,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
 import { HelpTip } from "@/mapconv/pages/components/Help";
+import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldRow } from "../../unitSections";
 
 /** Which editor a value gets, or none. */
@@ -138,10 +143,15 @@ function SettlingInput({
  */
 export function UnitFieldRow({
   row,
+  note,
   onChange,
   onReset,
 }: {
   row: FieldRow;
+  /** What the game's own Lua says about this field, for a custom parameter
+   *  (issue #2661). Absent for every other field, and for a custom parameter
+   *  whose scan has not come back. */
+  note?: ConsumerNote;
   onChange: (value: unknown) => void;
   onReset: () => void;
 }) {
@@ -196,6 +206,16 @@ export function UnitFieldRow({
             ariaLabel={row.label}
             onCommit={onChange}
           />
+        )}
+        {note && (
+          <span className="flex flex-wrap items-baseline gap-x-1.5 text-[10px] text-muted-foreground">
+            {note.text}
+            {note.files.map((file) => (
+              <code key={file} className="break-all font-mono">
+                {file}
+              </code>
+            ))}
+          </span>
         )}
         {overridden && (
           <span className="truncate text-[10px] text-muted-foreground">

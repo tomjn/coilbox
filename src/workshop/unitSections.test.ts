@@ -96,10 +96,19 @@ describe("presentPaths", () => {
     expect(presentPaths(armcom)).not.toContain("collisionVolume.scales.0");
   });
 
-  it("stops at a table the engine reads whole", () => {
+  /// Issue #2661: every other open table is engine machinery a game fills in a
+  /// shape the engine defines, so one row for the whole table is the honest
+  /// view. A custom parameter only exists because a gadget reads that one key,
+  /// so each is a field of its own with its own consumer.
+  it("walks into customParams and stops at every other open table", () => {
     const paths = presentPaths(armcom);
-    expect(paths).toContain("customParams");
-    expect(paths).not.toContain("customParams.model_author");
+    expect(paths).toContain("customParams.model_author");
+    expect(paths).not.toContain("customParams");
+
+    const withSfx = presentPaths({
+      SFXTypes: { explosiongenerators: { "1": "custom:BLAST" } },
+    });
+    expect(withSfx).toEqual(["SFXTypes.explosiongenerators"]);
   });
 
   it("keeps a key only the game declares", () => {
@@ -284,10 +293,30 @@ describe("unitFieldView", () => {
       expect(rows?.[1].label).toBe("onlyTargetCategory (weapon 1)");
     });
 
-    it("stops at an open table however the game spells it", () => {
+    it("walks into customParams however the game spells it", () => {
       const paths = presentPaths(lowercased);
-      expect(paths).toContain("customparams");
-      expect(paths).not.toContain("customparams.iscommander");
+      expect(paths).toContain("customparams.iscommander");
+      expect(paths).not.toContain("customparams");
+    });
+
+    /// The row has to land beside the other custom parameters rather than in
+    /// the fallback section for keys the registry has never heard of, which is
+    /// where an unqualified lookup would put it (issue #2661).
+    it("puts a custom parameter in the custom parameters section", () => {
+      const sections = unitFieldView(
+        lowercased,
+        {},
+        "armcom",
+        "relevant",
+      ).groups.flatMap((g) => g.sections);
+      const custom = sections.find((s) => s.id === "customParams");
+      expect(custom?.rows.map((r) => r.path)).toEqual([
+        "customparams.iscommander",
+      ]);
+      const fallback = sections.find((s) => s.id === "game")?.rows ?? [];
+      expect(
+        fallback.map((r) => r.path).filter((p) => p.includes("customparams")),
+      ).toEqual([]);
     });
   });
 
