@@ -721,6 +721,55 @@ pub struct UnitDatasetOutput {
     pub errors: Vec<String>,
 }
 
+/// Output of the lazy `--unit-defs` mode: every key the game declares for every
+/// unit, read out of the game's own def pipeline (issue #1269).
+///
+/// `UnitDatasetOutput` above is the curated read: a fixed set of fields a tech
+/// tree and an encyclopedia page need. This is the whole table, typed nowhere,
+/// because an editor has to offer the keys nobody curated and a game's own
+/// `customparams` mean whatever that game's Lua says they mean.
+///
+/// Everything here is what the game says, and only that. A tweak a player makes
+/// is a separate, sparse set of overrides held against these values (issue
+/// #1271), so nothing user-supplied ever belongs in this struct.
+///
+/// One document for the whole game rather than a record per unit: the def
+/// pipeline builds every unit in one pass, post-processing scripts read across
+/// units while it does, and there is no cheaper way to read one unit than to
+/// read them all. The cache is keyed on the game's sync checksum, which is one
+/// identity for the whole set, and matches.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UnitDefsOutput {
+    /// Every unit, keyed by its lowercased def key, which is the key
+    /// [`UnitDatasetEntry::name`] carries so the two join.
+    ///
+    /// Each value is the unitdef table as the game left it, including its
+    /// `customparams`, its `buildoptions`, and the `weapondefs` a game that
+    /// declares its weapons inside the unit puts there. A Lua table whose keys
+    /// are exactly 1..n arrives as an array and every other table as an object.
+    /// A value that is not a number, string, boolean or table arrives as null,
+    /// which says the game declared the key and this could not read it. An
+    /// absent key says the game declared nothing.
+    pub units: serde_json::Map<String, serde_json::Value>,
+    /// The game's shared weapondef table, keyed by lowercased weapondef name.
+    /// A unitdef's `weapons` list names entries here, and a game that hoists
+    /// its weapons out of the unit keeps them nowhere else.
+    pub weapon_defs: serde_json::Map<String, serde_json::Value>,
+    /// The units the game's own def loader could not read, in its own words.
+    ///
+    /// The loader runs each unit file under `pcall` and logs the ones that
+    /// raise, so a broken unit costs that unit and not the scan. Without this
+    /// the unit would simply be absent, with nothing to say whether the game
+    /// ships it.
+    pub unit_errors: Vec<String>,
+    /// Sync checksum (from GetPrimaryModChecksum), over the archive plus every
+    /// dependency. Also this dataset's cache key.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// One drawable batch inside a piece: an indexed triangle list whose corners all
 /// sample the same texture. An `.s3o` piece is always one batch, because the
 /// format binds one texture per model. A `.3do` piece is one batch per distinct
