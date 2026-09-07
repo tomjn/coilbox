@@ -16,6 +16,10 @@
  * and the curated dataset gives the name a person reads, which is not in the
  * def for every game (see `unitName.ts`). The join is the one #1269 keyed its
  * output for.
+ *
+ * The units the project adds are held apart from the edits it makes, for the
+ * reason `clones.ts` gives, and joined onto the game's table for everything
+ * else: one browser, one field list, one way to edit a field (issue #1272).
  */
 import { Button } from "@picoframe/frame";
 import { RotateCcw } from "lucide-react";
@@ -34,6 +38,13 @@ import {
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
+import {
+  addClone,
+  deriveClone,
+  removeClone,
+  type UnitClones,
+  unitsWithClones,
+} from "../clones";
 import { useUnitDefs } from "../config";
 import {
   clearOverride,
@@ -44,8 +55,13 @@ import {
 } from "../overrides";
 import { unitDisplayName } from "../unitName";
 import { type FieldView, unitFieldView } from "../unitSections";
+import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import { UnitList } from "./components/UnitList";
+
+/** Stable empties, so a page with neither does not re-derive on every render. */
+const NO_UNITS: Record<string, Record<string, unknown>> = {};
+const NO_CLONES: UnitClones = {};
 
 export default function UnitPage() {
   const [params, setParams] = useSearchParams();
@@ -75,16 +91,36 @@ export default function UnitPage() {
     () => new Map((dataset?.units ?? []).map((u) => [u.name, u])),
     [dataset],
   );
-  const nameOf = useCallback(
-    (key: string, def: Record<string, unknown> | undefined) =>
-      unitDisplayName(key, def, named.get(key)),
-    [named],
-  );
 
   const [overrides, setOverrides] = useState<UnitOverrides>({});
   const [view, setView] = useState<FieldView>("relevant");
+  // Kept per game. A copy of a unit is a whole definition taken out of one
+  // game's table, so it has no meaning under another game, and the browser
+  // would be showing units that game has never heard of.
+  const [added, setAdded] = useState<Record<string, UnitClones>>({});
+  const clones = added[gameName] ?? NO_CLONES;
+  const updateClones = useCallback(
+    (update: (current: UnitClones) => UnitClones) =>
+      setAdded((all) => ({ ...all, [gameName]: update(all[gameName] ?? {}) })),
+    [gameName],
+  );
 
-  const unit = defs?.units[unitKey];
+  // The curated dataset describes the game's units, so it is not asked about
+  // one of ours: a copy that stands in for `armcom` would otherwise be handed
+  // the game's name for `armcom` and show it instead of the one it was given.
+  const nameOf = useCallback(
+    (key: string, def: Record<string, unknown> | undefined) =>
+      unitDisplayName(key, def, clones[key] ? undefined : named.get(key)),
+    [named, clones],
+  );
+
+  const gameUnits = defs?.units ?? NO_UNITS;
+  const units = useMemo(
+    () => unitsWithClones(gameUnits, clones),
+    [gameUnits, clones],
+  );
+  const unit = units[unitKey];
+  const clone = clones[unitKey];
   const fields = useMemo(
     () => unitFieldView(unit, overrides, unitKey, view),
     [unit, overrides, unitKey, view],
@@ -103,6 +139,33 @@ export default function UnitPage() {
 
   const edits = overrideCount(overrides);
   const unitEdits = Object.keys(overrides[unitKey] ?? {}).length;
+  const addedCount = Object.keys(clones).length;
+
+  /** Copy the selected unit, as the project has it, under a new name. */
+  const createClone = (key: string, displayName: string, replaces: boolean) => {
+    if (!unit) return;
+    updateClones((current) =>
+      addClone(
+        current,
+        deriveClone({
+          key,
+          source: unitKey,
+          sourceDef: unit,
+          patch: overrides[unitKey],
+          displayName,
+          replacesGameUnit: replaces,
+        }),
+      ),
+    );
+    select({ unit: key });
+  };
+
+  /** Take one of ours back out, edits and all: nothing else refers to it. */
+  const deleteClone = () => {
+    updateClones((current) => removeClone(current, unitKey));
+    setOverrides((o) => clearUnit(o, unitKey));
+    select({ unit: "" });
+  };
 
   // `h-full` against the frame's own scroll container, so from `lg` up the two
   // panes each take the height that is left and scroll themselves rather than
@@ -115,7 +178,8 @@ export default function UnitPage() {
           <h1 className="text-lg font-semibold">Unit tweaks</h1>
           <p className="text-xs text-muted-foreground">
             Change a unit's numbers. Only the fields you change are recorded, so
-            the rest still follow the game when it updates.
+            the rest still follow the game when it updates. Copy a unit to add
+            one of your own.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -128,15 +192,21 @@ export default function UnitPage() {
             onValueChange={(name) => select({ game: name, unit: "" })}
             options={games.map((g) => ({ value: g.name, label: g.name }))}
           />
-          {edits > 0 && (
+          {(edits > 0 || addedCount > 0) && (
             <span className="text-xs text-muted-foreground">
-              {edits} change{edits === 1 ? "" : "s"}
+              {[
+                edits > 0 && `${edits} change${edits === 1 ? "" : "s"}`,
+                addedCount > 0 &&
+                  `${addedCount} unit${addedCount === 1 ? "" : "s"} added`,
+              ]
+                .filter(Boolean)
+                .join(", ")}
             </span>
           )}
         </div>
       </header>
 
-      {edits > 0 && (
+      {(edits > 0 || addedCount > 0) && (
         <Alert>
           <AlertTitle>These changes are not saved anywhere yet</AlertTitle>
           <AlertDescription>
@@ -187,9 +257,10 @@ export default function UnitPage() {
       ) : (
         <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <UnitList
-            units={defs.units}
+            units={units}
             selected={unitKey}
             overrides={overrides}
+            clones={clones}
             nameOf={nameOf}
             onSelect={(key) => select({ unit: key })}
           />
@@ -206,8 +277,30 @@ export default function UnitPage() {
                   <span className="font-mono text-xs text-muted-foreground">
                     {unitKey}
                   </span>
+                  {clone && (
+                    <span className="text-xs text-muted-foreground">
+                      {clone.replacesGameUnit
+                        ? `Yours, copied from ${clone.source}, in place of the game's own`
+                        : `Yours, copied from ${clone.source}`}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <CloneUnitButton
+                    sourceKey={unitKey}
+                    sourceName={nameOf(unitKey, unit)}
+                    gameUnits={gameUnits}
+                    clones={clones}
+                    nameOf={nameOf}
+                    onCreate={createClone}
+                  />
+                  {clone && (
+                    <DeleteCloneButton
+                      name={nameOf(unitKey, unit)}
+                      edits={unitEdits}
+                      onDelete={deleteClone}
+                    />
+                  )}
                   {unitEdits > 0 && (
                     <Button
                       variant="outline"
@@ -240,6 +333,7 @@ export default function UnitPage() {
               <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
                 <UnitFieldGroups
                   view={fields}
+                  inheritedLabel={clone ? "Copied value" : undefined}
                   onChange={(row, value) =>
                     setOverrides((o) =>
                       setOverride(o, unitKey, row.path, value, row.inherited),
