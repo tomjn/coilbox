@@ -8,7 +8,7 @@
  *
  * A mission can be thousands of lines, and mounting a DOM row per line for
  * all of them is exactly the cost the issue calls out, so only the lines in
- * view (plus a small buffer) are ever rendered - see `missionLuaVirtualize.ts`
+ * view (plus a small buffer) are ever rendered - see `rowVirtualize.ts`
  * for the windowing math this reads from a real, measured container height.
  */
 
@@ -20,10 +20,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { scrollTopForRow, visibleRowWindow } from "@/lib/rowVirtualize";
 import { splitLineSegments } from "./missionLuaLineSegments";
 import type { LuaMatch } from "./missionLuaSearch";
 import type { LuaTokenLine } from "./missionLuaTokens";
-import { scrollTopForLine, visibleLineWindow } from "./missionLuaVirtualize";
 
 /** Pixels per line. Fixed, and applied to every row via inline style, so the
  *  windowing math above and the actual layout never disagree about it. */
@@ -69,7 +69,7 @@ export const MissionLuaCode = forwardRef<
       scrollToLine(line: number) {
         const el = containerRef.current;
         if (!el) return;
-        const top = scrollTopForLine(
+        const top = scrollTopForRow(
           line,
           lines.length,
           viewportHeight,
@@ -94,7 +94,7 @@ export const MissionLuaCode = forwardRef<
     return map;
   }, [matches]);
 
-  const { start, end } = visibleLineWindow(
+  const { start, end } = visibleRowWindow(
     scrollTop,
     viewportHeight,
     lines.length,
