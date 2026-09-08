@@ -21,6 +21,7 @@ const COMMANDS: &[&str] = &[
     "lego_texture_compose_colour",
     "lego_texture_compose_shading",
     "lego_export",
+    "lego_game_language",
     "lego_export_glb",
     "lego_export_obj",
     "lego_scratch_game",

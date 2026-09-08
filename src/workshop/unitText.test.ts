@@ -3,6 +3,7 @@ import { setOverride, type UnitOverrides } from "./overrides";
 import {
   clearUnitText,
   clearUnitTexts,
+  languageNamesUnits,
   nameEdit,
   setUnitText,
   textEditCount,
@@ -60,6 +61,40 @@ describe("textHome", () => {
   it("is the def as soon as one unit names itself", () => {
     const withClone = { armaak: bar, mytank: { humanName: "My Tank" } };
     expect(textHome(withClone, barLanguage)).toBe("def");
+  });
+});
+
+/**
+ * The half of the answer the lego builder's export drawer can ask (issue
+ * #2683). It has a folder off a picker rather than a scanned game, so the
+ * localisation file is the only thing it can open, and `textHome` has to be
+ * able to hand that half over rather than have a second copy of it written.
+ */
+describe("languageNamesUnits", () => {
+  it("is true for a game that names its units in the file", () => {
+    expect(languageNamesUnits(barLanguage)).toBe(true);
+  });
+
+  it("is false for a game with no file, and for an empty one", () => {
+    expect(languageNamesUnits(undefined)).toBe(false);
+    expect(languageNamesUnits({ names: {} })).toBe(false);
+  });
+
+  /**
+   * Descriptions alone do not make a language home. A game naming its units in
+   * their definitions and describing them in a file would lose its names if it
+   * did.
+   */
+  it("is false for a file that describes units without naming them", () => {
+    expect(languageNamesUnits({ descriptions: { armaak: "Turret" } })).toBe(
+      false,
+    );
+  });
+
+  it("agrees with textHome on the game whose defs say nothing", () => {
+    expect(languageNamesUnits(barLanguage)).toBe(
+      textHome({ armaak: bar }, barLanguage) === "language",
+    );
   });
 });
 

@@ -437,6 +437,177 @@ fn keep_existing(target: &Path, scratch: bool) -> bool {
     target.exists() && !scratch
 }
 
+/// Where a game keeps the words a player reads, when it keeps them outside its
+/// unit definitions. Beyond All Reason's path, and the one the unitsync worker
+/// reads a game's names out of.
+const GAME_LANGUAGE_FILE: &str = "language/en/units.json";
+
+/// Coilbox's own file beside it, holding the names of the units coilbox put in
+/// this folder and nothing else (issue #2683).
+///
+/// A file of our own rather than a patch to the game's. Beyond All Reason's
+/// `modules/i18n/i18n.lua` loads every `*.json` under `language/<code>/` with
+/// `VFS.DirList` and merges them into one table, so a second file is read
+/// exactly as the first is, and the game's own file is never opened, never
+/// reparsed and never rewritten.
+///
+/// The name sorts before `units.json`, which is the order the merge happens in,
+/// so a key the game also declares is the game's rather than ours. Nothing
+/// relies on that: [`write_unit_text`] is only ever asked to write a key the
+/// caller has already checked the game does not use.
+const COILBOX_LANGUAGE_FILE: &str = "language/en/coilbox.json";
+
+/// Generous next to Beyond All Reason's own 80 KB file, and still a bound on a
+/// game that ships something enormous under that name. The unitsync worker caps
+/// its read of the same file at the same size.
+const LANGUAGE_CAP: usize = 4 * 1024 * 1024;
+
+/// Read one `units.json`-shaped file into its two tables.
+///
+/// The shape is `{"units": {"names": {...}, "descriptions": {...}}}`, matching
+/// the worker's `text_from_language_json`. Keys are lowercased, because a unit
+/// def key is, and blanks are dropped: a name that is only whitespace is a unit
+/// nobody named.
+///
+/// `Ok(None)` for a file that is not there, which is every game that names its
+/// units in their definitions. `Err` for one that is there and will not read,
+/// because that is the case where guessing does harm: the caller is about to
+/// decide whether to strip the name out of a unit definition.
+fn read_language_file(path: &Path) -> Result<Option<LanguageTables>, String> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("could not read {}: {e}", path.display()))?;
+    if bytes.len() > LANGUAGE_CAP {
+        return Err(format!(
+            "{} is {} bytes, larger than coilbox will read",
+            path.display(),
+            bytes.len()
+        ));
+    }
+    let text = String::from_utf8_lossy(&bytes);
+    let value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| format!("{} will not parse as JSON: {e}", path.display()))?;
+    let units = value.get("units").and_then(serde_json::Value::as_object);
+    Ok(Some(LanguageTables {
+        names: language_table(units, "names"),
+        descriptions: language_table(units, "descriptions"),
+    }))
+}
+
+/// One table of def key to string out of a `units` object.
+fn language_table(
+    units: Option<&serde_json::Map<String, serde_json::Value>>,
+    section: &str,
+) -> HashMap<String, String> {
+    let Some(Some(table)) = units.map(|u| u.get(section).and_then(|v| v.as_object())) else {
+        return HashMap::new();
+    };
+    table
+        .iter()
+        .filter_map(|(key, value)| {
+            let text = value.as_str()?.trim();
+            (!text.is_empty()).then(|| (key.to_lowercase(), text.to_string()))
+        })
+        .collect()
+}
+
+/// What a `units.json`-shaped file says.
+struct LanguageTables {
+    names: HashMap<String, String>,
+    descriptions: HashMap<String, String>,
+}
+
+/// A built unit's name and the line under it, for a game that reads neither
+/// from the unit definition.
+#[derive(Deserialize)]
+struct UnitText {
+    name: String,
+    description: String,
+}
+
+/// Put one unit's name and description into coilbox's own language file.
+///
+/// Every key in that file is coilbox's, because coilbox is the only thing that
+/// writes it, so this can rewrite the whole file without having to prove
+/// anything about who put what in it. Keys belonging to other units exported
+/// into the same folder are read back and kept, which is the only reason it
+/// reads before writing at all.
+///
+/// A file that will not parse stops the write and is reported. It was ours, but
+/// something has happened to it, and the alternative is throwing away whatever
+/// that something was.
+fn write_unit_text(root: &Path, unit_name: &str, text: &UnitText) -> Result<String, String> {
+    let path = root.join(COILBOX_LANGUAGE_FILE);
+    let existing = read_language_file(&path)?.unwrap_or(LanguageTables {
+        names: HashMap::new(),
+        descriptions: HashMap::new(),
+    });
+
+    let mut names = existing.names;
+    let mut descriptions = existing.descriptions;
+    names.insert(unit_name.to_string(), text.name.clone());
+    descriptions.insert(unit_name.to_string(), text.description.clone());
+
+    // Sorted, so a re-export of one unit is a one-line diff in a game folder
+    // somebody keeps under version control rather than a reshuffle.
+    let as_object = |table: HashMap<String, String>| {
+        let mut sorted: Vec<_> = table.into_iter().collect();
+        sorted.sort();
+        sorted
+            .into_iter()
+            .map(|(k, v)| (k, serde_json::Value::String(v)))
+            .collect::<serde_json::Map<_, _>>()
+    };
+    let document = json!({
+        "units": {
+            "names": as_object(names),
+            "descriptions": as_object(descriptions),
+        }
+    });
+    let mut body = serde_json::to_string_pretty(&document)
+        .map_err(|e| format!("could not build {}: {e}", path.display()))?;
+    body.push('\n');
+
+    let dir = path.parent().ok_or("the game folder has no parent")?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    std::fs::write(&path, &body).map_err(|e| format!("could not write {}: {e}", path.display()))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// `lego_game_language` reads a game folder's own `language/en/units.json`.
+///
+/// The export drawer asks this before it builds anything, because the answer
+/// decides where a unit's name goes (issue #2683). A game whose units are named
+/// there does not read a `name` in the definition at all: Beyond All Reason
+/// builds every label from `Spring.I18N('units.names.' .. unitDefName)` and
+/// falls back to the key rather than to the def.
+///
+/// `present` is false for a folder with no such file, which is every game that
+/// names its units in their definitions and is the answer for the great
+/// majority of games.
+#[tauri::command]
+async fn lego_game_language(dir: String) -> CliResult {
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+    match read_language_file(&root.join(GAME_LANGUAGE_FILE)) {
+        Ok(None) => CliResult::ok(json!({
+            "present": false,
+            "names": json!({}),
+            "descriptions": json!({}),
+        })),
+        Ok(Some(tables)) => CliResult::ok(json!({
+            "present": true,
+            "names": tables.names,
+            "descriptions": tables.descriptions,
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 #[derive(Deserialize)]
 struct ExportVertex {
     pos: [f32; 3],
@@ -1470,6 +1641,11 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
 /// and then left alone: a re-export never overwrites one that is already there
 /// (see [`keep_existing`]). Only the model and the per-piece collision file are
 /// rewritten every time, because those are the files the builder alone owns.
+///
+/// `text` is the unit's name and description for a game that reads neither from
+/// the definition, and goes to [`COILBOX_LANGUAGE_FILE`]. `None` for a game
+/// that names its units in their definitions, where the words are already in
+/// the `unit_def` above and nothing here has anything to add.
 // Each argument is one field of the IPC payload, so grouping them would only
 // move the width into a struct the frontend then has to nest.
 #[allow(clippy::too_many_arguments)]
@@ -1482,6 +1658,7 @@ async fn lego_export<R: Runtime>(
     script: Option<String>,
     piece_collision: Option<String>,
     unit_def: Option<String>,
+    text: Option<UnitText>,
     model: ExportModel,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
@@ -1653,9 +1830,22 @@ async fn lego_export<R: Runtime>(
         }
     }
 
+    // The name and the line under it, for a game that reads neither from the
+    // definition (issue #2683). Coilbox's own file, so unlike the definition it
+    // is rewritten every export: the words come from the project, and a project
+    // renamed between two exports has to reach the game under the new name.
+    let mut language_path = None;
+    if let Some(text) = text {
+        match write_unit_text(&root, &unit_name, &text) {
+            Ok(path) => language_path = Some(path),
+            Err(e) => return CliResult::err(e),
+        }
+    }
+
     CliResult::ok(json!({
         "model": model_path.to_string_lossy(),
         "texture": texture_path,
+        "language": language_path,
         "textureKept": texture_kept,
         "textures": stored_paths,
         "texturesKept": stored_kept,
@@ -2019,6 +2209,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_texture_compose_colour,
             lego_texture_compose_shading,
             lego_export,
+            lego_game_language,
             lego_export_glb,
             lego_export_obj,
             lego_scratch_game,
@@ -2386,6 +2577,141 @@ mod tests {
         // The scratch game has nothing worth keeping, so it is always rewritten.
         assert!(!keep_existing(&existing, true));
         assert!(!keep_existing(&missing, true));
+    }
+
+    /// Beyond All Reason's own file, trimmed to the parts anything reads. The
+    /// spacing and the key order are deliberately not what coilbox writes, so a
+    /// test comparing it before and after has something to catch.
+    const GAME_UNITS_JSON: &str = "{\n\t\"units\": {\n\t\t\"factions\": {\"arm\": \"Armada\"},\n\t\t\"names\": {\"corcom\": \"Cortex Commander\", \"armcom\": \"Armada Commander\"},\n\t\t\"descriptions\": {\"armcom\": \"Commander\"}\n\t}\n}\n";
+
+    fn language_game(files: &[(&str, &str)]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for (path, body) in files {
+            let target = dir.path().join(path);
+            std::fs::create_dir_all(target.parent().expect("parent")).expect("mkdir");
+            std::fs::write(&target, body).expect("write");
+        }
+        dir
+    }
+
+    fn text(name: &str, description: &str) -> UnitText {
+        UnitText {
+            name: name.to_string(),
+            description: description.to_string(),
+        }
+    }
+
+    /// The rule the whole of #2683 rests on: coilbox writes a file of its own
+    /// and the game's is not opened for writing at all.
+    #[test]
+    fn the_games_own_language_file_survives_byte_for_byte() {
+        let dir = language_game(&[(GAME_LANGUAGE_FILE, GAME_UNITS_JSON)]);
+        let before = std::fs::read(dir.path().join(GAME_LANGUAGE_FILE)).expect("read");
+
+        write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("write");
+
+        let after = std::fs::read(dir.path().join(GAME_LANGUAGE_FILE)).expect("read");
+        assert_eq!(before, after);
+        assert!(dir.path().join(COILBOX_LANGUAGE_FILE).is_file());
+    }
+
+    #[test]
+    fn a_unit_lands_under_the_key_the_game_looks_it_up_by() {
+        let dir = language_game(&[]);
+        write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("write");
+
+        let written = read_language_file(&dir.path().join(COILBOX_LANGUAGE_FILE))
+            .expect("read")
+            .expect("present");
+        assert_eq!(
+            written.names.get("skyfort").map(String::as_str),
+            Some("Sky Fortress")
+        );
+        assert_eq!(
+            written.descriptions.get("skyfort").map(String::as_str),
+            Some("It flies")
+        );
+    }
+
+    /// One game folder takes exports from as many projects as you like, so a
+    /// second unit adds a key rather than replacing the file.
+    #[test]
+    fn a_second_unit_keeps_the_first_ones_name() {
+        let dir = language_game(&[]);
+        write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("first");
+        write_unit_text(dir.path(), "digger", &text("Digger", "It digs")).expect("second");
+
+        let written = read_language_file(&dir.path().join(COILBOX_LANGUAGE_FILE))
+            .expect("read")
+            .expect("present");
+        assert_eq!(written.names.len(), 2);
+        assert_eq!(
+            written.names.get("skyfort").map(String::as_str),
+            Some("Sky Fortress")
+        );
+        assert_eq!(
+            written.names.get("digger").map(String::as_str),
+            Some("Digger")
+        );
+    }
+
+    /// Re-exporting the same unit under a new project name has to reach the
+    /// game, so this one file is rewritten rather than kept the way the unit
+    /// definition beside it is.
+    #[test]
+    fn re_exporting_replaces_that_units_own_name() {
+        let dir = language_game(&[]);
+        write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("first");
+        write_unit_text(dir.path(), "skyfort", &text("Sky Fort", "Renamed")).expect("second");
+
+        let written = read_language_file(&dir.path().join(COILBOX_LANGUAGE_FILE))
+            .expect("read")
+            .expect("present");
+        assert_eq!(
+            written.names.get("skyfort").map(String::as_str),
+            Some("Sky Fort")
+        );
+        assert_eq!(written.names.len(), 1);
+    }
+
+    /// Report rather than silently modify. The file is coilbox's, but something
+    /// has happened to it, and overwriting would throw that something away.
+    #[test]
+    fn a_language_file_that_will_not_parse_stops_the_write() {
+        let dir = language_game(&[(COILBOX_LANGUAGE_FILE, "{ this is not json")]);
+        let error = write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies"))
+            .expect_err("should refuse");
+        assert!(error.contains("will not parse"), "{error}");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(COILBOX_LANGUAGE_FILE)).expect("read"),
+            "{ this is not json"
+        );
+    }
+
+    /// A game with no such file is a game that names its units in their
+    /// definitions, which is most of them, and gets no language write at all.
+    #[test]
+    fn a_folder_with_no_language_file_reads_as_absent() {
+        let dir = language_game(&[]);
+        assert!(read_language_file(&dir.path().join(GAME_LANGUAGE_FILE))
+            .expect("read")
+            .is_none());
+    }
+
+    #[test]
+    fn a_games_names_come_back_lowercased_and_blanks_are_dropped() {
+        let dir = language_game(&[(
+            GAME_LANGUAGE_FILE,
+            r#"{"units":{"names":{"ARMCOM":"Armada Commander","corcom":"   "}}}"#,
+        )]);
+        let tables = read_language_file(&dir.path().join(GAME_LANGUAGE_FILE))
+            .expect("read")
+            .expect("present");
+        assert_eq!(
+            tables.names.get("armcom").map(String::as_str),
+            Some("Armada Commander")
+        );
+        assert!(!tables.names.contains_key("corcom"));
     }
 
     #[test]

@@ -177,7 +177,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         // Measured rather than taken off the build: a build's `mid` is the
         // header's, which is the aim point, and the definition is derived from
         // the bounding box.
-        unitDef: buildUnitDef(project, unitBounds(project, pack, raw)),
+        // A definition home, always. The scratch game is coilbox's own, built
+        // fresh here, and it has no localisation file to read a name out of.
+        unitDef: buildUnitDef(project, unitBounds(project, pack, raw), "def"),
+        text: null,
         model,
       });
 

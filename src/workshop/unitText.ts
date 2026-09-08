@@ -76,10 +76,30 @@ export function textHome(
   units: Record<string, Record<string, unknown>>,
   language: LanguageText | undefined,
 ): TextHome {
-  if (Object.keys(language?.names ?? {}).length === 0) return "def";
+  if (!languageNamesUnits(language)) return "def";
   for (const [key, def] of Object.entries(units))
     if (unitDisplayName(key, def, undefined) !== key) return "def";
   return "language";
+}
+
+/**
+ * Whether a game's localisation file is where its units are named.
+ *
+ * The first half of {@link textHome}, and the whole of the answer where the
+ * game's unit table cannot be read. The lego builder's export drawer is that
+ * case: it is handed a folder off a picker rather than a game somebody has
+ * scanned, so it can open the one file and nothing else (issue #2683).
+ *
+ * Enough on its own there. The file, its path and the `units.names` shape are
+ * all Beyond All Reason's, so a folder holding one is a game descended from the
+ * lineage whose widgets read it, and `textHome`'s second half exists to catch a
+ * game whose own units are named in their definitions despite shipping the
+ * file. Coilbox has never met one.
+ */
+export function languageNamesUnits(
+  language: LanguageText | undefined,
+): boolean {
+  return Object.keys(language?.names ?? {}).length > 0;
 }
 
 /** One of the two fields, in whichever state the project has left it. */

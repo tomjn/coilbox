@@ -114,11 +114,22 @@ export const legoExport = defineCommand<
     pieceCollision: string;
     /** Written only when the game has no unit definition for it yet. */
     unitDef: string | null;
+    /**
+     * The unit's name and description, for a game that reads neither from the
+     * definition (issue #2683). Goes into `language/en/coilbox.json`, which is
+     * coilbox's own file beside the game's `units.json` and never that file.
+     *
+     * Null for a game that names its units in their definitions, where the
+     * words are already in `unitDef` and there is nothing to add.
+     */
+    text: { name: string; description: string } | null;
     model: S3oBuild;
   },
   {
     model: string;
     texture: string | null;
+    /** `language/en/coilbox.json`, when `text` was sent. */
+    language: string | null;
     script: string | null;
     /** True when a script was already there and was left as it was. */
     scriptKept: boolean;
@@ -134,6 +145,24 @@ export const legoExport = defineCommand<
     texturesKept: string[];
   }
 >("coilbox-lego", "lego_export");
+
+/**
+ * Read a game folder's own `language/en/units.json`, the file Beyond All Reason
+ * names every one of its units in.
+ *
+ * The export drawer asks before it builds anything, because the answer decides
+ * where this unit's name goes (issue #2683). `present` is false for a folder
+ * with no such file, which is every game that names its units in their
+ * definitions.
+ */
+export const legoGameLanguage = defineCommand<
+  { dir: string },
+  {
+    present: boolean;
+    names: Record<string, string>;
+    descriptions: Record<string, string>;
+  }
+>("coilbox-lego", "lego_game_language");
 
 /**
  * A texture for a Blender export to decode out of the store.

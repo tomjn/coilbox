@@ -29,10 +29,15 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  LANGUAGE_UNITS_FILE,
+  languageNamesUnits,
+  type TextHome,
+} from "@/workshop/unitText";
 import { atlasUrl, exportTextureName, unitAtlas } from "../../atlas";
 import {
   type BlenderTextureRef,
@@ -40,6 +45,7 @@ import {
   legoExport,
   legoExportGlb,
   legoExportObj,
+  legoGameLanguage,
   legoOpenPath,
   legoTexturePng,
 } from "../../bindings";
@@ -55,7 +61,7 @@ import {
 import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
-import { buildUnitDef, legoUnitDef } from "../../unitDef";
+import { buildUnitDef, legoUnitDef, unitWords } from "../../unitDef";
 
 interface Props {
   open: boolean;
@@ -100,7 +106,24 @@ type Result =
        *  went through. Reported rather than thrown: the `.s3o` is already on
        *  disk by then and is the half the engine reads. */
       blenderProblem: string | null;
+      /** `language/en/coilbox.json`, for a game named out of one. */
+      language: string | null;
     }
+  | { state: "failed"; message: string };
+
+/**
+ * Where the chosen folder's game keeps the words a player reads (issue #2683).
+ *
+ * Read off the folder rather than off a game scan, because the export drawer is
+ * given a directory by a picker and there may be no scanned game behind it at
+ * all. That is enough: the one file it opens is the whole of the answer, for
+ * the reason `languageNamesUnits` gives.
+ */
+type GameText =
+  | { state: "unread" }
+  | { state: "reading" }
+  | { state: "read"; home: TextHome; names: Record<string, string> }
+  /** The file is there and will not read, so the home cannot be answered. */
   | { state: "failed"; message: string };
 
 /**
@@ -136,6 +159,49 @@ export function ExportDrawer({
   const [withGlb, setWithGlb] = useState(project.exportGlb === true);
   const [withObj, setWithObj] = useState(project.exportObj === true);
   const [result, setResult] = useState<Result>({ state: "idle" });
+  const [gameText, setGameText] = useState<GameText>({ state: "unread" });
+
+  // Asked of the folder as soon as there is one, so the drawer can say where
+  // this unit's name is going before anybody presses the button rather than
+  // only in the list of what was written.
+  const readGameText = useCallback(async (folder: string) => {
+    if (!folder) {
+      setGameText({ state: "unread" });
+      return;
+    }
+    setGameText({ state: "reading" });
+    try {
+      const language = await legoGameLanguage({ dir: folder });
+      setGameText({
+        state: "read",
+        home: languageNamesUnits(language) ? "language" : "def",
+        names: language.names,
+      });
+    } catch (error) {
+      setGameText({
+        state: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void readGameText(dir);
+  }, [isOpen, dir, readGameText]);
+
+  // A folder whose game could not be asked is treated as one that names its
+  // units in their definitions, which is what every export did before #2683 and
+  // is the answer for the great majority of games. The drawer says so, because
+  // the one game it is wrong for is the one this whole thing is about.
+  const home: TextHome = gameText.state === "read" ? gameText.home : "def";
+  // A name the game itself declares is the game's. Export already keeps that
+  // unit's own `units/<name>.lua` rather than overwriting it, so writing our
+  // name over the game's would rename a unit that was never ours.
+  const gameNamesThisUnit =
+    gameText.state === "read" &&
+    Object.hasOwn(gameText.names, project.unitName.toLowerCase());
+  const writesLanguage = home === "language" && !gameNamesThisUnit;
 
   // Whichever atlas the unit samples, installed or not. The s3o names it
   // either way, so an atlas installed later puts a re-export right without the
@@ -183,7 +249,7 @@ export function ExportDrawer({
     // box. Derived once here because two things read it: the Lua file the engine
     // loads, and the receipt the workshop turns into a unit (issue #2651).
     const bounds = unitBounds(project, pack, raw);
-    const def = legoUnitDef(project, bounds);
+    const def = legoUnitDef(project, bounds, home);
     try {
       const exported = await legoExport({
         dir,
@@ -208,7 +274,11 @@ export function ExportDrawer({
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
-        unitDef: buildUnitDef(project, bounds),
+        unitDef: buildUnitDef(project, bounds, home),
+        // Where the name goes for a game that will not read one in the
+        // definition. Coilbox's own file beside the game's, never the game's
+        // (issue #2683).
+        text: writesLanguage ? unitWords(project) : null,
         model,
       });
 
@@ -364,6 +434,52 @@ export function ExportDrawer({
                 give a model to. It is written once and then left alone, so hand
                 edits survive a re-export.
               </p>
+            </div>
+
+            {/* Named before the export because it is the one thing here whose
+                destination depends on the game rather than on the unit, and
+                because the wrong answer is invisible in coilbox and wrong only
+                in the game (issue #2683). */}
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">This unit's name</span>
+              {gameText.state === "reading" ? (
+                <p className="text-xs text-muted-foreground">
+                  Reading what this game names its units in.
+                </p>
+              ) : gameText.state === "failed" ? (
+                <p className="text-xs text-destructive">
+                  This game has a <code>{LANGUAGE_UNITS_FILE}</code> that will
+                  not read, so coilbox cannot tell where it names its units:{" "}
+                  {gameText.message}. The name goes into the definition, which
+                  is where most games read it. If the game reads names out of
+                  that file instead, this unit will show as{" "}
+                  <code>units.names.{project.unitName}</code> until the file is
+                  fixed.
+                </p>
+              ) : writesLanguage ? (
+                <p className="text-xs text-muted-foreground">
+                  This game names its units in{" "}
+                  <code>{LANGUAGE_UNITS_FILE}</code> rather than in their
+                  definitions, so <strong>{project.name}</strong> goes into{" "}
+                  <code>language/en/coilbox.json</code> beside it. That is
+                  coilbox's own file, holding the names of the units coilbox put
+                  in this folder and nothing else. The game's own file is never
+                  opened for writing.
+                </p>
+              ) : gameNamesThisUnit ? (
+                <p className="text-xs text-muted-foreground">
+                  This game already names a unit <code>{project.unitName}</code>{" "}
+                  in <code>{LANGUAGE_UNITS_FILE}</code>, so coilbox writes no
+                  name for it. That unit's definition is the game's own and is
+                  left alone too.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  <strong>{project.name}</strong> goes into the definition, as{" "}
+                  <code>name</code> and <code>description</code>, which is where
+                  the engine and nearly every game read it.
+                </p>
+              )}
             </div>
 
             <div className="flex items-start gap-2">
@@ -592,6 +708,9 @@ export function ExportDrawer({
                     The unit definition was already there and has been left
                     alone.
                   </p>
+                ) : null}
+                {result.language ? (
+                  <code className="break-all">{result.language}</code>
                 ) : null}
                 {result.glb ? (
                   <code className="break-all">{result.glb}</code>

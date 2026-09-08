@@ -21,6 +21,7 @@ permissions = [
   "allow-lego-texture-compose-colour",
   "allow-lego-texture-compose-shading",
   "allow-lego-export",
+  "allow-lego-game-language",
   "allow-lego-export-glb",
   "allow-lego-export-obj",
   "allow-lego-scratch-game",
