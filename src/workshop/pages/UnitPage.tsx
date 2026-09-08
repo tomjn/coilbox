@@ -166,6 +166,7 @@ import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
 import { DeliveryRoutesButton } from "./components/DeliveryRoutesButton";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
+import { PlayLocallyButton } from "./components/PlayLocallyButton";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import type { FieldChoices } from "./components/UnitFieldRow";
@@ -929,6 +930,11 @@ export default function UnitPage() {
                 Lua
               </Button>
             )}
+            {/* One button that plays the project on your own machine (issue
+              #1278). The workshop stops being write only here: everything
+              before this point edits a project, and this is the first thing
+              that lets you find out whether the edits were right. */}
+            {project && <PlayLocallyButton project={project} />}
             {project && (
               <Button
                 variant="outline"

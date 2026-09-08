@@ -4,8 +4,10 @@ import {
   isGeneratedGame,
   isMutatorArchive,
   isScratchArchive,
+  isWorkshopMutatorArchive,
   MUTATOR_FOLDER,
   SCRATCH_FOLDER,
+  WORKSHOP_MUTATOR_FOLDER,
   withoutGeneratedGames,
 } from "./generatedGames";
 
@@ -36,18 +38,37 @@ describe("isMutatorArchive", () => {
   });
 });
 
+describe("isWorkshopMutatorArchive", () => {
+  it("recognises the workshop's local test mutator, whatever its casing", () => {
+    expect(isWorkshopMutatorArchive(WORKSHOP_MUTATOR_FOLDER)).toBe(true);
+    expect(isWorkshopMutatorArchive("Coilbox-Workshop-Test.sdd")).toBe(true);
+  });
+
+  it("never mistakes another archive for it", () => {
+    expect(isWorkshopMutatorArchive("ba1211.sdz")).toBe(false);
+    expect(isWorkshopMutatorArchive(SCRATCH_FOLDER)).toBe(false);
+    expect(isWorkshopMutatorArchive(MUTATOR_FOLDER)).toBe(false);
+  });
+});
+
 describe("generatedGameNote", () => {
-  it("knows both of coilbox's own games, and tells them apart", () => {
+  it("knows every one of coilbox's own games, and tells them apart", () => {
     const scratch = generatedGameNote(SCRATCH_FOLDER);
     const mutator = generatedGameNote(MUTATOR_FOLDER);
+    const workshop = generatedGameNote(WORKSHOP_MUTATOR_FOLDER);
 
     expect(scratch).toContain("unit");
     expect(mutator).toContain("scenario");
-    expect(scratch).not.toBe(mutator);
+    expect(workshop).toContain("workshop");
+    expect(new Set([scratch, mutator, workshop]).size).toBe(3);
   });
 
-  it("says how to be rid of either, since that is the whole undo", () => {
-    for (const name of [SCRATCH_FOLDER, MUTATOR_FOLDER]) {
+  it("says how to be rid of any of them, since that is the whole undo", () => {
+    for (const name of [
+      SCRATCH_FOLDER,
+      MUTATOR_FOLDER,
+      WORKSHOP_MUTATOR_FOLDER,
+    ]) {
       expect(generatedGameNote(name)).toContain("Deleting its folder undoes");
     }
   });
@@ -59,11 +80,12 @@ describe("generatedGameNote", () => {
 });
 
 describe("withoutGeneratedGames", () => {
-  it("takes both of coilbox's own out of a scanned list at once", () => {
+  it("takes every one of coilbox's own out of a scanned list at once", () => {
     const games = [
       game("ba1211.sdz"),
       game(SCRATCH_FOLDER),
       game(MUTATOR_FOLDER),
+      game(WORKSHOP_MUTATOR_FOLDER),
       game("evolutionrts.sdz"),
     ];
 

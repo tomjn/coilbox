@@ -51,6 +51,12 @@ export interface CompiledMod {
   files: CompiledFile[];
   /** What the compiler could not do, and what to watch in what it did. */
   notes: string[];
+  /**
+   * Every edit as one `do ... end` block, for Beyond All Reason's bare
+   * `tweakdefs` mod option on a local skirmish launch (issue #1278). `null`
+   * when there is nothing to tweak. See `localBar.ts`.
+   */
+  barTweakdefs: string | null;
 }
 
 export const workshopCompile = defineCommand<

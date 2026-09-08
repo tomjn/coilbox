@@ -1,17 +1,20 @@
 /**
  * The games coilbox writes for itself.
  *
- * Two flows need a game the engine can launch that the player never installed.
- * The unit builder tests a built unit in one (`src/lego/scratchGame.ts`), and a
- * scenario is tested in one when the real game cannot play missions
- * (`src/scenario/mutator.ts`). Both are loose `.sdd` folders under the content
- * root's `games/`, so unitsync scans them and reports them as games like any
- * other, and every game list picks them up.
+ * Three flows need a game the engine can launch that the player never
+ * installed. The unit builder tests a built unit in one
+ * (`src/lego/scratchGame.ts`), a scenario is tested in one when the real game
+ * cannot play missions (`src/scenario/mutator.ts`), and a workshop project is
+ * tested in one on every game, since a mutator archive is the one route that
+ * works everywhere (`src/workshop/mutator.ts`, issue #1278). All three are
+ * loose `.sdd` folders under the content root's `games/`, so unitsync scans
+ * them and reports them as games like any other, and every game list picks
+ * them up.
  *
  * That is the whole reason this module exists. Each flow already recognised its
- * own folder, and nothing recognised both, so a picker that filtered one still
- * offered the other. Both names, both predicates and the union of them live
- * here, and every list asks this one module.
+ * own folder, and nothing recognised all three, so a picker that filtered one
+ * still offered the others. Every name, every predicate and the union of them
+ * live here, and every list asks this one module.
  *
  * It imports nothing on purpose. `src/scenario/mutator.ts` reaches the plugin
  * through its bindings, so a picker that only wants to know a folder name should
@@ -31,6 +34,12 @@ export const SCRATCH_FOLDER = "coilbox-lego-test.sdd";
  */
 export const MUTATOR_FOLDER = "coilbox-mission-test.sdd";
 
+/**
+ * The workshop's local test mutator's folder (issue #1278), matching
+ * `mutator::FOLDER` in `tauri-plugin-coilbox-workshop`.
+ */
+export const WORKSHOP_MUTATOR_FOLDER = "coilbox-workshop-test.sdd";
+
 /** Whether a scanned archive is the unit builder's scratch game. */
 export function isScratchArchive(archiveName: string): boolean {
   return archiveName.toLowerCase() === SCRATCH_FOLDER;
@@ -39,6 +48,11 @@ export function isScratchArchive(archiveName: string): boolean {
 /** Whether a scanned archive is the scenario test mutator. */
 export function isMutatorArchive(archiveName: string): boolean {
   return archiveName.toLowerCase() === MUTATOR_FOLDER;
+}
+
+/** Whether a scanned archive is the workshop's local test mutator. */
+export function isWorkshopMutatorArchive(archiveName: string): boolean {
+  return archiveName.toLowerCase() === WORKSHOP_MUTATOR_FOLDER;
 }
 
 const UNDO = "Deleting its folder undoes it.";
@@ -55,6 +69,8 @@ export function generatedGameNote(archiveName: string): string | null {
     return `Coilbox writes this game to test a unit from the builder in, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
   if (isMutatorArchive(archiveName))
     return `Coilbox writes this game to test a scenario in when the real game cannot play one, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
+  if (isWorkshopMutatorArchive(archiveName))
+    return `Coilbox writes this game to test a workshop project in, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
   return null;
 }
 
