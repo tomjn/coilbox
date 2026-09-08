@@ -14,6 +14,14 @@
  * that is not a scalar or a list of numbers draws as a raw key and value row,
  * which is also what a key only the game declares gets when its value is a table.
  *
+ * A table has no control at all, so it is shown as the Lua the game wrote,
+ * small ones in the row and large ones in a drawer. `LuaTableValue` holds that
+ * and the reasoning behind it (issue #2695).
+ *
+ * A field that names a file in the game's archive draws it under the box, which
+ * `AssetPreview` holds and which is where the model, the picture and the way
+ * into the unit builder live (issue #2694).
+ *
  * A custom parameter also carries a note naming the Lua file that reads it
  * (issue #2661), which for most of them is the only thing on the page that says
  * what the value does.
@@ -26,6 +34,7 @@ import { Switch } from "@/components/ui/switch";
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
+import { luaLiteral } from "@/lib/lua";
 import { HelpTip } from "@/mapconv/pages/components/Help";
 import {
   type AssetBrowsing,
@@ -36,6 +45,7 @@ import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldRow } from "../../unitSections";
 import { AssetPicker } from "./AssetPicker";
 import { AssetPreview } from "./AssetPreview";
+import { LuaTableValue } from "./LuaTableValue";
 
 /** Which editor a value gets, or none. */
 type ControlKind = "boolean" | "number" | "numberList" | "text" | "raw";
@@ -66,11 +76,24 @@ function toDraft(value: unknown, kind: ControlKind): string {
   return String(value);
 }
 
-/** How a value reads when it is only being shown, never edited. */
+/** Whether a value is a table, which is the case the row has no control for
+ *  and shows as Lua instead (issue #2695). */
+const isTable = (
+  value: unknown,
+): value is Record<string, unknown> | unknown[] =>
+  typeof value === "object" && value !== null;
+
+/**
+ * How a value reads when it is only being shown, never edited, on one line.
+ *
+ * Lua rather than JSON, for the reason `LuaTableValue` gives, but flattened:
+ * this is the one-line summary under an overridden row, where a table's own
+ * line breaks would push the rows below it off the screen.
+ */
 function display(value: unknown): string {
   if (value === undefined) return "not set";
   if (typeof value === "string") return value;
-  return JSON.stringify(value) ?? String(value);
+  return luaLiteral(value).replace(/\s*\n\s*/g, " ");
 }
 
 /**
@@ -233,6 +256,23 @@ export function UnitFieldRow({
   // whose path reaches nothing, where the warning below says so instead.
   const preview = asset && assets && pointsAt?.member ? pointsAt.member : "";
 
+  /**
+   * Whether the value column holds more than a control's worth of height.
+   *
+   * Two of them now. A model viewport is 12rem (issue #2694) and a table shown
+   * where it stands is up to eight lines of Lua (issue #2695), and against
+   * either a centred label sits halfway down the row, a long way from the thing
+   * it names. Every other row is one control against a two-line label, which is
+   * what the centring is for.
+   *
+   * A table is counted whichever way it draws, rather than only when it draws
+   * inline. Knowing which it is means serialising it, and the row would be
+   * doing that for every table field on the page purely to choose an alignment.
+   * The other way it draws is a button the same height as an input, so on that
+   * one the two alignments are a pixel apart.
+   */
+  const tall = Boolean(preview) || isTable(row.value);
+
   const current = typeof row.value === "string" ? row.value.trim() : "";
   const options =
     choices && current && !choices.options.some((o) => o.value === current)
@@ -250,11 +290,7 @@ export function UnitFieldRow({
     <div
       className={cn(
         "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
-        // Centred for the two-line rows that are almost all of them, and topped
-        // for a row carrying a preview: a model viewport is 12rem tall and a
-        // centred label would sit halfway down it, a long way from the box it
-        // names.
-        preview ? "items-start" : "items-center",
+        tall ? "items-start" : "items-center",
         overridden ? "border-l-primary bg-primary/5" : "border-l-transparent",
       )}
     >
@@ -307,6 +343,8 @@ export function UnitFieldRow({
             onValueChange={onChange}
             options={options}
           />
+        ) : kind === "raw" && isTable(row.value) ? (
+          <LuaTableValue value={row.value} label={row.label} path={row.path} />
         ) : kind === "raw" ? (
           <code className="truncate rounded bg-muted px-1.5 py-1 font-mono text-xs text-muted-foreground">
             {display(row.value)}
