@@ -1,3 +1,4 @@
+import { buttonVariants, cn } from "@picoframe/frame";
 import { ArrowDown, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -164,6 +165,13 @@ export default function GameUnitPage() {
   if (!game) return <NotFound backTo="/library/games" label="game" />;
 
   const unitsBackTo = `/library/games/${encodeURIComponent(game.name)}/units`;
+  // The workshop keys everything by the game's own name string and reads it
+  // out of a query parameter rather than a path segment (see that page's own
+  // note), so this is built with `URLSearchParams` rather than
+  // `encodeURIComponent`: the same escaping the workshop's `useSearchParams`
+  // read expects back, including for a game name with spaces in it (Beyond
+  // All Reason installs as "Beyond All Reason test-...").
+  const workshopHref = `/workshop?${new URLSearchParams({ game: game.name, unit: id }).toString()}`;
 
   if (datasetStatus === "error")
     return (
@@ -313,23 +321,39 @@ export default function GameUnitPage() {
         gameArchive={game.primaryArchive.name}
       />
 
-      <div className="flex items-center gap-3">
-        {src ? (
-          <img
-            src={src}
-            alt=""
-            className="size-16 shrink-0 rounded object-contain"
-          />
-        ) : (
-          <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
-        )}
-        <div>
-          <h1 className="text-xl font-semibold">{unitLabel(unit, id)}</h1>
-          <p className="font-mono text-xs text-muted-foreground">{id}</p>
-          {faction && (
-            <p className="text-xs text-muted-foreground">{faction}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {src ? (
+            <img
+              src={src}
+              alt=""
+              className="size-16 shrink-0 rounded object-contain"
+            />
+          ) : (
+            <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
           )}
+          <div>
+            <h1 className="text-xl font-semibold">{unitLabel(unit, id)}</h1>
+            <p className="font-mono text-xs text-muted-foreground">{id}</p>
+            {faction && (
+              <p className="text-xs text-muted-foreground">{faction}</p>
+            )}
+          </div>
         </div>
+        {/* Always built from data this page already has (the game and the
+            unit are both confirmed above), so this never needs a disabled
+            state of its own. If the workshop cannot read this game's own
+            definitions once it gets there, that is its own error state
+            (`status === "error"`, with its own Retry). */}
+        <Link
+          to={workshopHref}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "shrink-0",
+          )}
+        >
+          Edit in Unit tweaks
+        </Link>
       </div>
 
       <UnitRendersRow renders={renders} />

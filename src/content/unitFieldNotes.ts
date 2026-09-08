@@ -127,13 +127,28 @@ export const UNIT_FIELD_NOTES: Record<string, FieldNote> = {
     help: "One character per footprint square saying what may pass or be built there. Prefix with h for a half-square grid.",
   },
 
-  objectName: { label: "Model", help: "The model file under objects3d/." },
+  objectName: {
+    label: "Model",
+    help: "The model file under objects3d/.",
+    asset: "model",
+  },
   script: {
     label: "Unit script",
     help: "Resolved under scripts/, defaulting to the unit name with a .cob suffix.",
+    asset: "script",
   },
-  buildPic: { label: "Build picture" },
-  iconType: { label: "Map icon" },
+  buildPic: {
+    label: "Build picture",
+    help: "The picture under unitpics/. With none, the engine looks for one named after the unit.",
+    asset: "picture",
+  },
+  iconType: {
+    label: "Map icon",
+    // Not a path, so deliberately not an asset field. Beyond All Reason writes
+    // "armaak" here and Balanced Annihilation "armcommander", and both name an
+    // entry in the game's own icon table rather than a file.
+    help: "Names an entry in the game's gamedata/icontypes.lua, not a file.",
+  },
   corpse: { label: "Wreck", help: "The feature left behind on death." },
   explodeAs: { label: "Death explosion", help: "A weapon definition name." },
   selfDestructAs: {
