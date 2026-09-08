@@ -41,10 +41,17 @@
 //! mod options, it decodes each one back to Lua, classifies it as data or a
 //! program, and evaluates the data ones. See `decode`'s own doc comment for
 //! what it will and will not run through the Lua VM.
+//!
+//! `workshop_change_ledger` (issue #2653) is the seventh, and reads rather
+//! than writes: it traces every edit in a project to the mutator file and,
+//! where the trace can place it, the numbered BAR slot that carries it. See
+//! `ledger`'s own doc comment for why that is a read over the other six
+//! commands' output rather than a new compiled artefact of its own.
 
 mod bar_pack;
 mod compile;
 mod decode;
+mod ledger;
 mod lua;
 mod model;
 mod mutator;
@@ -54,6 +61,7 @@ mod preflight;
 pub use bar_pack::{pack as pack_bar_slots, BarSlotPack};
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use decode::{decode_many, DecodedSlot, DecodedTweakSet, SlotKind};
+pub use ledger::{build_ledger, BarSlotMiss, BarSlotRef, ChangeLedger, LedgerChange, UnitLedger};
 pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
 pub use preflight::{preflight, PreflightReport};
 
@@ -228,6 +236,15 @@ fn workshop_decode_tweak_set(entries: BTreeMap<String, String>) -> CliResult {
     }
 }
 
+/// Trace every edit in a project to what it compiled into (issue #2653): the
+/// mutator file, and, where the trace could place it, the numbered BAR slot.
+/// Reads nothing off disk and writes nothing, the same as `workshop_compile`
+/// it is built over.
+#[tauri::command]
+fn workshop_change_ledger(project: ModProject) -> CliResult {
+    envelope(&ledger::build_ledger(&project))
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
@@ -236,7 +253,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_test_mutator,
             workshop_package_mutator,
             workshop_pack_bar_slots,
-            workshop_decode_tweak_set
+            workshop_decode_tweak_set,
+            workshop_change_ledger
         ])
         .build()
 }
@@ -319,6 +337,9 @@ mod tests {
         assert!(decoded.get("tweakdefs").is_some_and(Value::is_array));
         assert!(decoded.get("tweakunits").is_some_and(Value::is_array));
         assert!(decoded.get("unrecognised").is_some_and(Value::is_array));
+
+        let ledger = unwrap_as_the_frontend_does(workshop_change_ledger(saved_project()));
+        assert!(ledger.get("units").is_some_and(Value::is_array));
     }
 
     /// A project that changes nothing is what the editor holds for the whole

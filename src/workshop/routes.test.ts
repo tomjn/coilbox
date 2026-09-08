@@ -67,4 +67,21 @@ describe("projectPath", () => {
   it("names no unit when there is none to name", () => {
     expect(projectPath("abc")).toBe("/workshop/abc");
   });
+
+  it("names the unit alone when no field is given", () => {
+    expect(projectPath("abc", "armcom")).toBe("/workshop/abc?unit=armcom");
+  });
+
+  /** The change ledger's own link back to a field (issue #2653): a real
+   *  link that lands on the row rather than a name to search the field list
+   *  for. */
+  it("names the field alongside the unit when one is given", () => {
+    expect(projectPath("abc", "armcom", "maxDamage")).toBe(
+      "/workshop/abc?unit=armcom&field=maxDamage",
+    );
+  });
+
+  it("drops a field name with no unit to attach it to", () => {
+    expect(projectPath("abc", undefined, "maxDamage")).toBe("/workshop/abc");
+  });
 });

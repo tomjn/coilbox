@@ -42,11 +42,21 @@ export function newestProjectForGame(
     }, undefined);
 }
 
-/** The editor for one saved project, on a unit when one is named. */
-export function projectPath(id: string, unitKey?: string): string {
-  return unitKey
-    ? `/workshop/${id}?${new URLSearchParams({ unit: unitKey })}`
-    : `/workshop/${id}`;
+/**
+ * The editor for one saved project, on a unit when one is named, and on one
+ * of that unit's fields when a dotted path is also named (issue #2653's
+ * change ledger: a link back to the field a change came from, not a name you
+ * then have to search the field list for).
+ */
+export function projectPath(
+  id: string,
+  unitKey?: string,
+  fieldPath?: string,
+): string {
+  if (!unitKey) return `/workshop/${id}`;
+  const params: Record<string, string> = { unit: unitKey };
+  if (fieldPath) params.field = fieldPath;
+  return `/workshop/${id}?${new URLSearchParams(params)}`;
 }
 
 /**

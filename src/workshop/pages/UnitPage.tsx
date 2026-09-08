@@ -214,6 +214,12 @@ export default function UnitPage() {
   const gameName = project?.gameName ?? params.get("game") ?? "";
   const game = games.find((g) => g.name === gameName);
   const unitKey = params.get("unit") ?? "";
+  // A link back to a field, from the change ledger (issue #2653). The field
+  // is always in the relevant view already: `unitFieldView` keeps every path
+  // the project has overridden whether or not the game's own definition
+  // declares it (see that function's own doc comment), which is exactly what
+  // a change the ledger names always is.
+  const fieldKey = params.get("field") ?? "";
 
   const { defs, status, error, reload } = useUnitDefs(
     selected?.enginePath,
@@ -409,6 +415,18 @@ export default function UnitPage() {
       ),
     [unit, overrides, unitKey, view, edited],
   );
+
+  // Scroll to the field a link named, once the row for it is on the page
+  // (issue #2653). `fields.shown` stands in for "the list has rendered
+  // this render": the row itself carries no ref this page holds, and its id
+  // is stable, so a plain `getElementById` after paint is enough rather than
+  // threading a ref through every row for a link that is followed once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fields retriggers this once the field list has actually rendered, not read in the body.
+  useEffect(() => {
+    if (!fieldKey) return;
+    const row = document.getElementById(`field-${fieldKey}`);
+    row?.scrollIntoView({ block: "center" });
+  }, [fieldKey, fields]);
 
   // What this game's units actually move on, so the class is picked out of a
   // list rather than spelled from memory against a file nobody has open (issue

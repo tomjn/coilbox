@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the workshop plugin's compiler, preflight check, local test launch, packaging, BAR tweak-slot export and tweak-set decode. The compiler and preflight check turn a saved tweak project into the Lua a game reads and read nothing and write nothing; the test launch writes a generated game under the content root's games/ (issue #1278); packaging writes a versioned .sdz to a caller-chosen path (issue #1283); the BAR export packs compiled chunks across Beyond All Reason's numbered tweak slots and reads and writes nothing (issue #1277); the decode command reads a payload or a battle's mod options back to Lua and reads and writes nothing (issue #1280)."
+description = "Allows the workshop plugin's compiler, preflight check, local test launch, packaging, BAR tweak-slot export, tweak-set decode and change ledger. The compiler and preflight check turn a saved tweak project into the Lua a game reads and read nothing and write nothing; the test launch writes a generated game under the content root's games/ (issue #1278); packaging writes a versioned .sdz to a caller-chosen path (issue #1283); the BAR export packs compiled chunks across Beyond All Reason's numbered tweak slots and reads and writes nothing (issue #1277); the decode command reads a payload or a battle's mod options back to Lua and reads and writes nothing (issue #1280); the change ledger traces a project's edits to the mutator file or BAR slot that carries each one and reads and writes nothing (issue #2653)."
 permissions = [
   "allow-workshop-compile",
   "allow-workshop-preflight",
@@ -9,4 +9,5 @@ permissions = [
   "allow-workshop-package-mutator",
   "allow-workshop-pack-bar-slots",
   "allow-workshop-decode-tweak-set",
+  "allow-workshop-change-ledger",
 ]
