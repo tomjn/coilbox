@@ -35,9 +35,16 @@
 //! Beyond All Reason's numbered `tweakdefs`/`tweakunits` mod options, for a
 //! player who is not hosting their own lobby. See `bar_pack`'s own doc
 //! comment for the size and ordering rules this follows.
+//!
+//! `workshop_decode_tweak_set` (issue #1280) is the sixth, and the inverse of
+//! the fifth: given a payload, or a whole set of slots read from a battle's
+//! mod options, it decodes each one back to Lua, classifies it as data or a
+//! program, and evaluates the data ones. See `decode`'s own doc comment for
+//! what it will and will not run through the Lua VM.
 
 mod bar_pack;
 mod compile;
+mod decode;
 mod lua;
 mod model;
 mod mutator;
@@ -46,11 +53,13 @@ mod preflight;
 
 pub use bar_pack::{pack as pack_bar_slots, BarSlotPack};
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
-pub use model::{GameEdits, ModProject};
+pub use decode::{decode_many, DecodedSlot, DecodedTweakSet, SlotKind};
+pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
 pub use preflight::{preflight, PreflightReport};
 
 use picoframe_core::CliResult;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use tauri::{
     plugin::{Builder, TauriPlugin},
     Runtime,
@@ -202,6 +211,23 @@ fn workshop_pack_bar_slots(project: ModProject) -> CliResult {
     envelope(&bar_pack::pack(&compiled.chunks))
 }
 
+/// Decode a payload, or a whole set of slots read from a battle's mod
+/// options, back to Lua (issue #1280). `entries` is a key to raw pasted text
+/// map: a real mod-options set (`tweakdefs`, `tweakunits3`, ...), a single ad
+/// hoc paste under the key `"pasted"`, or both at once. A key this plugin
+/// does not recognise as a tweak slot is ignored rather than reported on, so
+/// a caller can hand over a whole battle's options without expecting a
+/// complaint about every other one. Never refused: an empty or unreadable
+/// entry decodes to its own reported error rather than failing the batch, so
+/// one bad paste never hides what the rest of a lobby's options say.
+#[tauri::command]
+fn workshop_decode_tweak_set(entries: BTreeMap<String, String>) -> CliResult {
+    match decode::decode_many(&entries) {
+        Ok(set) => envelope(&set),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
@@ -209,7 +235,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_preflight,
             workshop_test_mutator,
             workshop_package_mutator,
-            workshop_pack_bar_slots
+            workshop_pack_bar_slots,
+            workshop_decode_tweak_set
         ])
         .build()
 }
@@ -285,6 +312,13 @@ mod tests {
         let bar_pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
         assert!(bar_pack.get("tweakdefs").is_some_and(Value::is_array));
         assert!(bar_pack.get("tweakunits").is_some_and(Value::is_array));
+
+        let mut entries = std::collections::BTreeMap::new();
+        entries.insert("pasted".to_string(), "not valid base64 !!!".to_string());
+        let decoded = unwrap_as_the_frontend_does(workshop_decode_tweak_set(entries));
+        assert!(decoded.get("tweakdefs").is_some_and(Value::is_array));
+        assert!(decoded.get("tweakunits").is_some_and(Value::is_array));
+        assert!(decoded.get("unrecognised").is_some_and(Value::is_array));
     }
 
     /// A project that changes nothing is what the editor holds for the whole
