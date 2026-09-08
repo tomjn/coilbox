@@ -175,11 +175,16 @@ export function UnitTextPanel({
   onChange: (field: TextField, value: string) => void;
   onReset: (field: TextField) => void;
 }) {
-  const destination = isClone
-    ? "Kept in the unit's own definition, since this is a unit you added."
-    : home === "def"
-      ? `Kept in the unit definition, as ${rows.name.path} and ${rows.description.path}.`
-      : `Kept in this game's ${LANGUAGE_UNITS_FILE}, not in the unit definition. This game names its units there, so that is where a rename has to go.`;
+  // The game decides, for a unit you added as much as for one it shipped. A
+  // copy in a game like Beyond All Reason is named in the localisation file
+  // alongside everything else, because that is the only place the game looks
+  // (issue #2673).
+  const destination =
+    home === "language"
+      ? `Kept in this game's ${LANGUAGE_UNITS_FILE}, not in the unit definition. This game names its units there, so that is where a rename has to go.`
+      : isClone
+        ? "Kept in the unit's own definition, since this is a unit you added."
+        : `Kept in the unit definition, as ${rows.name.path} and ${rows.description.path}.`;
 
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border/50 p-2">

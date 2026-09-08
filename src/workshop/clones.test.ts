@@ -3,6 +3,7 @@ import {
   addClone,
   checkCloneName,
   deriveClone,
+  migrateCloneText,
   normaliseCloneKey,
   removeClone,
   suggestCloneKey,
@@ -39,6 +40,19 @@ const ARMAAK: Record<string, unknown> = {
 
 const GAME = { armcom: ARMCOM, armaak: ARMAAK };
 
+/** What BAR's `language/en/units.json` says about the unit above. */
+const BAR_LANGUAGE = {
+  names: { armaak: "Archangel" },
+  descriptions: { armaak: "Anti-Air Turret" },
+};
+
+/**
+ * A copy made in a game that names its units in their definitions, which is
+ * every case below that is not explicitly about the other kind of game.
+ */
+const copy = (args: Omit<Parameters<typeof deriveClone>[0], "home">) =>
+  deriveClone({ ...args, home: "def" }).clone;
+
 describe("normaliseCloneKey", () => {
   it("stores an internal name lowercased and trimmed", () => {
     expect(normaliseCloneKey("  ArmCom4 ")).toBe("armcom4");
@@ -67,7 +81,7 @@ describe("checkCloneName", () => {
   it("refuses a name one of your own clones is already using", () => {
     const clones = addClone(
       {},
-      deriveClone({
+      copy({
         key: "armcom4",
         source: "armcom",
         sourceDef: ARMCOM,
@@ -109,7 +123,7 @@ describe("suggestCloneKey", () => {
 
 describe("deriveClone", () => {
   it("copies the whole definition rather than a patch of it", () => {
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom4",
       source: "armcom",
       sourceDef: ARMCOM,
@@ -124,7 +138,7 @@ describe("deriveClone", () => {
   });
 
   it("does not share any table with the unit it copied", () => {
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom4",
       source: "armcom",
       sourceDef: ARMCOM,
@@ -146,7 +160,7 @@ describe("deriveClone", () => {
    * clone the same way it resolves anything else.
    */
   it("writes the display name where the game already wrote one", () => {
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom4",
       source: "armcom",
       sourceDef: ARMCOM,
@@ -157,8 +171,13 @@ describe("deriveClone", () => {
     expect(clone.def.humanName).toBeUndefined();
   });
 
+  /**
+   * A def home whose def happens to name nothing, which is a handful of units
+   * in Balanced Annihilation. `humanName` is what the engine reads first, and
+   * in this game it is also what its own interface reads.
+   */
   it("adds a name to a definition that carries none", () => {
-    const clone = deriveClone({
+    const clone = copy({
       key: "armaak2",
       source: "armaak",
       sourceDef: ARMAAK,
@@ -169,8 +188,20 @@ describe("deriveClone", () => {
     expect(clone.def.objectname).toBe("Units/ARMAAK.s3o");
   });
 
+  it("hands the copy back with no words to file, for a def home", () => {
+    const { text } = deriveClone({
+      key: "armcom4",
+      source: "armcom",
+      sourceDef: ARMCOM,
+      displayName: "Overlord",
+      replacesGameUnit: false,
+      home: "def",
+    });
+    expect(text).toEqual({});
+  });
+
   it("keeps an internal name internal and puts the display name beside it", () => {
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom4",
       source: "armcom",
       // A game that writes the internal name in `name`, which is what the
@@ -185,7 +216,7 @@ describe("deriveClone", () => {
 
   it("copies the unit as the project has it, edits included", () => {
     const patch = { health: 6000, "weapons.0.name": "bigger" };
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom4",
       source: "armcom",
       sourceDef: ARMCOM,
@@ -202,7 +233,7 @@ describe("deriveClone", () => {
   });
 
   it("records whether it was told it would replace a unit", () => {
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom",
       source: "armcom",
       sourceDef: ARMCOM,
@@ -210,6 +241,157 @@ describe("deriveClone", () => {
       replacesGameUnit: true,
     });
     expect(clone.replacesGameUnit).toBe(true);
+  });
+});
+
+/**
+ * Issue #2673. Beyond All Reason builds every unit's label from
+ * `Spring.I18N('units.names.' .. unitDefName)` and never falls back to the
+ * definition, so a copy named in its own definition would be labelled
+ * `units.names.armaak2` in game. The name has to go where the game looks.
+ */
+describe("a copy in a game that names its units in a language file", () => {
+  const made = () =>
+    deriveClone({
+      key: "armaak2",
+      source: "armaak",
+      sourceDef: ARMAAK,
+      displayName: "Archangel II",
+      replacesGameUnit: false,
+      home: "language",
+      language: BAR_LANGUAGE,
+    });
+
+  it("files the name under the copy's key rather than in its definition", () => {
+    const { clone, text } = made();
+    expect(text.name).toBe("Archangel II");
+    expect(clone.def.humanName).toBeUndefined();
+    expect(clone.def.name).toBeUndefined();
+  });
+
+  /**
+   * The tooltip is the same bug as the name. A def home carries it across in
+   * the definition being copied, and a language file has nothing under a key
+   * the game has never seen.
+   */
+  it("carries the source's description across with it", () => {
+    expect(made().text.description).toBe("Anti-Air Turret");
+  });
+
+  it("says nothing about a description the game does not have", () => {
+    const { text } = deriveClone({
+      key: "armaak2",
+      source: "armaak",
+      sourceDef: ARMAAK,
+      displayName: "Archangel II",
+      replacesGameUnit: false,
+      home: "language",
+      language: { names: { armaak: "Archangel" } },
+    });
+    expect(text).toEqual({ name: "Archangel II" });
+  });
+
+  it("copies everything else about the unit exactly as before", () => {
+    const { clone } = made();
+    expect(clone.def.health).toBe(1000);
+    expect(clone.def.objectname).toBe("Units/ARMAAK.s3o");
+    expect(clone.source).toBe("armaak");
+  });
+
+  /**
+   * `name` is the internal name, per the engine's own comment beside the read.
+   * A copy of a copy made before this rule carries a readable name too, and
+   * that one goes: in this game nothing reads it, and leaving it would drift
+   * against the localisation entry the moment either was edited.
+   */
+  it("keeps an internal name and drops a readable one", () => {
+    const { clone } = deriveClone({
+      key: "mytank2",
+      source: "mytank",
+      sourceDef: { name: "mytank", humanName: "My Tank", health: 12 },
+      displayName: "My Other Tank",
+      replacesGameUnit: false,
+      home: "language",
+      language: BAR_LANGUAGE,
+    });
+    expect(clone.def.name).toBe("mytank2");
+    expect(clone.def.humanName).toBeUndefined();
+    expect(clone.def.health).toBe(12);
+  });
+});
+
+describe("migrateCloneText", () => {
+  /** A copy as `deriveClone` made one before #2673: named in its own def. */
+  const legacy: UnitClones = {
+    armaak2: {
+      key: "armaak2",
+      source: "armaak",
+      replacesGameUnit: false,
+      def: { ...ARMAAK, humanName: "Archangel II" },
+    },
+  };
+
+  it("moves the name out of the definition and into the text store", () => {
+    const moved = migrateCloneText(legacy, {}, "language", BAR_LANGUAGE);
+    expect(moved?.clones.armaak2.def.humanName).toBeUndefined();
+    expect(moved?.text.armaak2).toEqual({
+      name: "Archangel II",
+      description: "Anti-Air Turret",
+    });
+  });
+
+  it("leaves a name the user has since typed alone", () => {
+    const edited = { armaak2: { name: "Seraph" } };
+    const moved = migrateCloneText(legacy, edited, "language", BAR_LANGUAGE);
+    expect(moved?.text.armaak2.name).toBe("Seraph");
+    expect(moved?.clones.armaak2.def.humanName).toBeUndefined();
+  });
+
+  it("does nothing in a game that names its units in their definitions", () => {
+    expect(migrateCloneText(legacy, {}, "def", undefined)).toBeNull();
+  });
+
+  it("does nothing twice, so a render loop cannot start one", () => {
+    const moved = migrateCloneText(legacy, {}, "language", BAR_LANGUAGE);
+    expect(moved).not.toBeNull();
+    if (!moved) return;
+    expect(
+      migrateCloneText(moved.clones, moved.text, "language", BAR_LANGUAGE),
+    ).toBeNull();
+  });
+
+  it("does nothing to a copy already made the new way", () => {
+    const { clone } = deriveClone({
+      key: "armaak2",
+      source: "armaak",
+      sourceDef: ARMAAK,
+      displayName: "Archangel II",
+      replacesGameUnit: false,
+      home: "language",
+      language: BAR_LANGUAGE,
+    });
+    expect(
+      migrateCloneText(addClone({}, clone), {}, "language", BAR_LANGUAGE),
+    ).toBeNull();
+  });
+
+  /**
+   * A unit the lego builder exported carries an `origin` and no `source`, and
+   * it is a file in the game folder rather than anything this store owns, so
+   * there is no unit to ask for a description.
+   */
+  it("moves a name with no source unit to ask about a description", () => {
+    const built: UnitClones = {
+      mytank: {
+        key: "mytank",
+        replacesGameUnit: false,
+        origin: { kind: "lego", projectId: "p1", projectName: "Tanks" },
+        def: { humanName: "My Tank", health: 12 },
+      },
+    };
+    const moved = migrateCloneText(built, {}, "language", BAR_LANGUAGE);
+    expect(moved?.text.mytank).toEqual({ name: "My Tank" });
+    expect(moved?.clones.mytank.def.humanName).toBeUndefined();
   });
 });
 
@@ -224,7 +406,7 @@ describe("a clone stays out of the override set", () => {
     const overrides: UnitOverrides = {};
     const clones = addClone(
       {},
-      deriveClone({
+      copy({
         key: "armcom4",
         source: "armcom",
         sourceDef: ARMCOM,
@@ -239,7 +421,7 @@ describe("a clone stays out of the override set", () => {
 
   it("carries the source's edits into its own definition rather than the set", () => {
     const edited = setOverride({}, "armcom", "health", 6000, 3000);
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom4",
       source: "armcom",
       sourceDef: ARMCOM,
@@ -254,7 +436,7 @@ describe("a clone stays out of the override set", () => {
   });
 
   it("takes ordinary sparse overrides once it exists, against its own values", () => {
-    const clone = deriveClone({
+    const clone = copy({
       key: "armcom4",
       source: "armcom",
       sourceDef: ARMCOM,
@@ -276,7 +458,7 @@ describe("unitsWithClones", () => {
   it("adds a clone to the game's table", () => {
     const clones: UnitClones = addClone(
       {},
-      deriveClone({
+      copy({
         key: "armcom4",
         source: "armcom",
         sourceDef: ARMCOM,
@@ -292,7 +474,7 @@ describe("unitsWithClones", () => {
   it("puts a replacement in the place of the unit it replaces", () => {
     const clones = addClone(
       {},
-      deriveClone({
+      copy({
         key: "armcom",
         source: "armcom",
         sourceDef: ARMCOM,
@@ -312,14 +494,14 @@ describe("unitsWithClones", () => {
 
 describe("removeClone", () => {
   it("forgets one and keeps the rest", () => {
-    const one = deriveClone({
+    const one = copy({
       key: "armcom4",
       source: "armcom",
       sourceDef: ARMCOM,
       displayName: "Overlord",
       replacesGameUnit: false,
     });
-    const two = deriveClone({
+    const two = copy({
       key: "armcom5",
       source: "armcom",
       sourceDef: ARMCOM,
