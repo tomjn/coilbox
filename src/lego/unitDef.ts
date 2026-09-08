@@ -5,13 +5,21 @@
  * on the map, not a full customisation surface. Its job is to unblock the
  * engine load test, not to replace hand-tuning a unit afterwards.
  *
- * Written as a static structure. The builder has no notion of movement
- * classes yet, and a unit with `canMove` set but no matching `movementClass`
- * is rejected outright at load: UnitDefHandler logs an error and drops it, so
- * the whole point of this file (something to spawn) is lost. Leaving
- * movement off is what keeps every export loadable. Nothing has to build the
- * unit either, because the scratch game makes it the side's start unit, so a
- * static unit is still one you meet in a match.
+ * Written as a static structure. A movement class names an entry in the game's
+ * own move definitions, and the builder is a game-independent tool: the same
+ * project exports into Balanced Annihilation and into a scratch game, which
+ * declare different classes under different names. A unit with `canMove` set
+ * but no matching `movementClass` is rejected outright at load, so guessing a
+ * name would lose the whole point of this file (something to spawn). Nothing
+ * has to build the unit either, because the scratch game makes it the side's
+ * start unit, so a static unit is still one you meet in a match.
+ *
+ * Picking a class is therefore the workshop's job rather than this one's, once
+ * the unit is against a game whose classes can be read (issue #2651). What this
+ * file writes is the starting point that always loads, and
+ * {@link legoUnitDef} is the same table the workshop takes as a clone, so the
+ * file in `units/` and the unit on the workshop's page are one definition
+ * rather than two that have to be kept in step.
  *
  * `objectname` has to resolve. The engine's own `gamedata/unitdefs.lua` drops
  * any definition whose model is missing, before the unit ever reaches the
@@ -36,18 +44,18 @@ export function isBuilder(project: LegoProject): boolean {
 }
 
 /** The builder keys, or nothing for a unit with no build arm on it. */
-function builderFields(project: LegoProject): [string, string][] {
-  if (!isBuilder(project)) return [];
+function builderFields(project: LegoProject): Record<string, unknown> {
+  if (!isBuilder(project)) return {};
   const { workerTime, buildDistance, canAssist } = {
     ...DEFAULT_BUILDER,
     ...project.builder,
   };
-  return [
-    ["builder", "true"],
-    ["workertime", String(workerTime)],
-    ["builddistance", String(buildDistance)],
-    ["canassist", canAssist ? "true" : "false"],
-  ];
+  return {
+    builder: true,
+    workertime: workerTime,
+    builddistance: buildDistance,
+    canassist: canAssist,
+  };
 }
 
 /**
@@ -138,38 +146,32 @@ export function luaString(value: string): string {
  * switch is on; and it is still the shape of any unit whose owner turns either
  * switch back off.
  */
-export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
-  const footprintx = footprintSteps(bounds.sizeX);
-  const footprintz = footprintSteps(bounds.sizeZ);
+export function legoUnitDef(
+  project: LegoProject,
+  bounds: UnitBounds,
+): Record<string, unknown> {
   const volume = effectiveCollisionVolume(project, bounds);
 
-  const fields: [string, string][] = [
-    ["name", luaString(project.name)],
-    [
-      "description",
-      luaString(`${project.name}, built with coilbox's unit builder.`),
-    ],
-    ["objectname", luaString(project.unitName)],
-    ["script", luaString(`${project.unitName}.lua`)],
-    ["footprintx", String(footprintx)],
-    ["footprintz", String(footprintz)],
-    ["collisionvolumetype", luaString(volume.type)],
-    ["collisionvolumescales", luaString(luaFloat3(volume.scales))],
-    ["collisionvolumeoffsets", luaString(luaFloat3(volume.offsets))],
+  return {
+    name: project.name,
+    description: `${project.name}, built with coilbox's unit builder.`,
+    objectname: project.unitName,
+    script: `${project.unitName}.lua`,
+    footprintx: footprintSteps(bounds.sizeX),
+    footprintz: footprintSteps(bounds.sizeZ),
+    collisionvolumetype: volume.type,
+    collisionvolumescales: luaFloat3(volume.scales),
+    collisionvolumeoffsets: luaFloat3(volume.offsets),
     // Only written when it is on. The engine's default is false, and a unit
     // that has never asked for piece collision should not carry a line saying
     // it does not want it.
-    ...(project.pieceCollision
-      ? ([["usepiececollisionvolumes", "true"]] as [string, string][])
-      : []),
+    ...(project.pieceCollision ? { usepiececollisionvolumes: true } : {}),
     // The engine's second switch over the same boxes, read by
     // `ParseSelectionVolume`. Written on its own, because neither implies the
     // other in the engine and neither should here.
-    ...(project.pieceSelection
-      ? ([["usepieceselectionvolumes", "true"]] as [string, string][])
-      : []),
-    ["maxdamage", String(DEFAULT_MAX_DAMAGE)],
-    ["canmove", "false"],
+    ...(project.pieceSelection ? { usepieceselectionvolumes: true } : {}),
+    maxdamage: DEFAULT_MAX_DAMAGE,
+    canmove: false,
     // Written together or not at all. `UnitDef::IsBuilderUnit` is `builder &&
     // buildSpeed > 0 && buildDistance > 0`, and `builder` is `&=`'d against
     // that a line later, so `builder = true` on its own clears itself against
@@ -178,15 +180,26 @@ export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
     // without it a builder with these keys still never starts. See
     // `luaScript.ts`.
     ...builderFields(project),
-  ];
+  };
+}
 
+/** One field's value as Lua source. Only the three scalar types reach here. */
+function luaValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  return luaString(String(value));
+}
+
+export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
   const lines = [
     `-- ${project.unitName}, generated by coilbox's unit builder.`,
     "-- Safe to edit: nothing regenerates this file unless you export again.",
     "",
     "return {",
     `  ["${project.unitName}"] = {`,
-    ...fields.map(([key, value]) => `    ${key} = ${value},`),
+    ...Object.entries(legoUnitDef(project, bounds)).map(
+      ([key, value]) => `    ${key} = ${luaValue(value)},`,
+    ),
     "  },",
     "}",
   ];
