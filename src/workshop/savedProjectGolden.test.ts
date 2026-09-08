@@ -1,8 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { addToBuildMenu, moveBeforeInBuildMenu } from "./buildMenus";
-import { removeFromBuildMenu } from "./buildMenus";
+import {
+  addToBuildMenu,
+  moveBeforeInBuildMenu,
+  removeFromBuildMenu,
+} from "./buildMenus";
 import { addClone } from "./clones";
 import { setUnitDisabled } from "./disabled";
 import { setOverride } from "./overrides";
@@ -141,8 +144,6 @@ describe("the saved project fixture the Rust crate reads", () => {
       .map(([slot]) => slot);
 
     expect(empty).toEqual([]);
-    expect(Object.keys(edits).sort()).toEqual(
-      Object.keys(EMPTY_EDITS).sort(),
-    );
+    expect(Object.keys(edits).sort()).toEqual(Object.keys(EMPTY_EDITS).sort());
   });
 });
