@@ -329,8 +329,10 @@ describe("naming and copying", () => {
     expect(copyId).not.toBe(id);
     expect(copy?.name).toBe("Big guns copy");
     expect(copy?.edits).toEqual(original?.edits);
-    // The copy was written against the same game, so it keeps saying so.
+    // The copy was written against the same game, so it keeps saying so, and
+    // copying edits does not count as changing them.
     expect(copy?.authoredChecksum).toBe("abc123");
+    expect(copy?.updatedAt).toBe(original?.updatedAt);
 
     // Editing one does not reach the other.
     act(() => {

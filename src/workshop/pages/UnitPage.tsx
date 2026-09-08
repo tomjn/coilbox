@@ -165,17 +165,21 @@ export default function UnitPage() {
   // Which project is open, per game. A project is one game's, so switching the
   // picker switches project, and switching back brings the same one up with its
   // undo stack intact. A game nobody has chosen for falls back to whichever of
-  // its projects was written to last, which is the one they were in.
+  // its projects was written to last, which is the one they were in. Two that
+  // were written to at the same moment, which is a project and a copy of it,
+  // fall to the older, so duplicating does not move you into the copy.
   const [openByGame, setOpenByGame] = useState<Record<string, string>>({});
   const project = useMemo(() => {
     const chosen = projects.find((p) => p.id === openByGame[gameName]);
     if (chosen) return chosen;
     return projects
       .filter((p) => p.gameName === gameName)
-      .reduce<ModProject | undefined>(
-        (newest, p) => (!newest || p.updatedAt > newest.updatedAt ? p : newest),
-        undefined,
-      );
+      .reduce<ModProject | undefined>((newest, p) => {
+        if (!newest) return p;
+        if (p.updatedAt !== newest.updatedAt)
+          return p.updatedAt > newest.updatedAt ? p : newest;
+        return p.createdAt < newest.createdAt ? p : newest;
+      }, undefined);
   }, [projects, openByGame, gameName]);
   const projectId = project?.id ?? "";
   const edits = project?.edits ?? EMPTY_EDITS;

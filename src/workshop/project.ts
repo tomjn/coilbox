@@ -311,6 +311,10 @@ export function useModProjects() {
    * Copy a project under a new name, keeping the checksum it was authored
    * against: the copy was written against the same game as the original, and
    * saying otherwise would hide a game update from both of them.
+   *
+   * `updatedAt` is kept too, because it says when these edits last changed and
+   * copying them changed none of them. It also keeps the copy from jumping in
+   * front of the project you were working in, which is picked by that field.
    */
   function duplicateProject(id: string): ModProject | null {
     // Read from storage rather than from this render's list, so duplicating a
@@ -319,13 +323,11 @@ export function useModProjects() {
       (p) => p.id === id,
     );
     if (!source) return null;
-    const now = new Date().toISOString();
     const copy: ModProject = {
       ...source,
       id: crypto.randomUUID(),
       name: `${source.name} copy`,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: new Date().toISOString(),
     };
     write((prev) => [copy, ...prev]);
     return copy;
