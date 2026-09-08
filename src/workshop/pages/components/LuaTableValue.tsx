@@ -27,7 +27,7 @@
  * (issue #2661), and each of those values is a scalar with its own control.
  */
 import { Button, cn } from "@picoframe/frame";
-import { Braces, Check, Copy, X } from "lucide-react";
+import { Check, Copy, PanelRightOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useState } from "react";
 import { CodeBlock } from "@/components/CodeBlock";
@@ -39,11 +39,19 @@ const INLINE_MAX_LINES = 8;
 
 /** What the table holds, in the fewest words that let someone decide whether to
  *  open it. */
-function summarise(value: unknown, lines: number): string {
-  const count = Array.isArray(value)
-    ? `${value.length} ${value.length === 1 ? "entry" : "entries"}`
-    : `${Object.keys(value as object).length} keys`;
-  return `${count}, ${lines} lines of Lua`;
+function summarise(
+  value: Record<string, unknown> | unknown[],
+  lines: number,
+): string {
+  const n = Array.isArray(value) ? value.length : Object.keys(value).length;
+  const noun = Array.isArray(value)
+    ? n === 1
+      ? "entry"
+      : "entries"
+    : n === 1
+      ? "key"
+      : "keys";
+  return `${n} ${noun}, ${lines} lines of Lua`;
 }
 
 function CopyButton({ code }: { code: string }) {
@@ -155,7 +163,9 @@ export function LuaTableValue({
         onClick={() => setOpen(true)}
         aria-label={`Read ${label} as Lua`}
       >
-        <Braces className="size-3.5 shrink-0" />
+        {/* A panel opening, not braces. Braces beside "3 keys" reads as an
+            empty table at a glance, and the words already say it is one. */}
+        <PanelRightOpen className="size-3.5 shrink-0" />
         <span className="truncate text-xs">{summarise(value, lines)}</span>
       </Button>
       {open && (

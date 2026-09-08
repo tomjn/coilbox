@@ -27,15 +27,17 @@ const draw = (path: string, label: string, value: unknown) => {
   };
   return render(
     <UnitFieldRow
-      row={{
-        path,
-        field,
-        label,
-        present: true,
-        inherited: value,
-        value,
-        state: "inherited",
-      } satisfies FieldRow}
+      row={
+        {
+          path,
+          field,
+          label,
+          present: true,
+          inherited: value,
+          value,
+          state: "inherited",
+        } satisfies FieldRow
+      }
       onChange={() => {}}
       onReset={() => {}}
     />,
