@@ -23,11 +23,18 @@
 //! `workshop_test_mutator` (issue #1278) is the third: it writes a compiled
 //! project into a generated game under the content root, the local play
 //! route every game supports. See `mutator`'s own doc comment.
+//!
+//! `workshop_package_mutator` (issue #1283) is the fourth: it checks the same
+//! way `workshop_preflight` does, then packs a compiled project into a `.sdz`
+//! at a caller-chosen path, versioned for handing to somebody else rather
+//! than for the local test route's own fixed folder. See `package`'s own doc
+//! comment.
 
 mod compile;
 mod lua;
 mod model;
 mod mutator;
+mod package;
 mod preflight;
 
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
@@ -110,12 +117,61 @@ fn workshop_test_mutator(data_dir: String, project: ModProject) -> CliResult {
     })
 }
 
+/// What `workshop_package_mutator` wrote.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackagedMutatorResult {
+    /// Where the archive was written, absolute.
+    path: String,
+    /// Every file the archive holds, relative to its own root.
+    files: Vec<String>,
+    /// The version written into `modinfo.lua`, echoed back so the caller
+    /// records what actually shipped.
+    version: u32,
+}
+
+/// Compile a saved project, check it, and pack it as a `.sdz` at `dest`
+/// (issue #1283), for somebody else to play rather than for this machine's
+/// own test route. Refused the same way `workshop_test_mutator` is when
+/// there is nothing to package, and refused again when preflight finds a
+/// blocker: a file going out to other people is exactly the case a blocker
+/// should stop rather than only flag (issue #2748).
+#[tauri::command]
+fn workshop_package_mutator(project: ModProject, version: u32, dest: String) -> CliResult {
+    let compiled = compile(&project);
+    if compiled.files.is_empty() {
+        return CliResult::err(
+            "This project has no edits a mutator archive can carry, so there is nothing to package.",
+        );
+    }
+    let report = preflight(&project, &compiled);
+    if !report.blockers.is_empty() {
+        return CliResult::err(format!(
+            "{} blocker{} would reach whoever plays this broken, so it was not packaged: {}",
+            report.blockers.len(),
+            if report.blockers.len() == 1 { "" } else { "s" },
+            report.blockers.join("; "),
+        ));
+    }
+    let files = package::versioned_files(&project, compiled.files, version);
+    let dest_path = std::path::Path::new(&dest);
+    if let Err(e) = package::write_sdz(dest_path, &files) {
+        return CliResult::err(e);
+    }
+    envelope(&PackagedMutatorResult {
+        path: dest_path.to_string_lossy().into_owned(),
+        files: files.into_iter().map(|f| f.path).collect(),
+        version,
+    })
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
             workshop_compile,
             workshop_preflight,
-            workshop_test_mutator
+            workshop_test_mutator,
+            workshop_package_mutator
         ])
         .build()
 }
@@ -175,9 +231,18 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let written = unwrap_as_the_frontend_does(workshop_test_mutator(
             dir.path().to_string_lossy().into_owned(),
-            project,
+            project.clone(),
         ));
         assert!(written.get("files").is_some_and(Value::is_array));
+
+        let dest = dir.path().join("packaged.sdz");
+        let packaged = unwrap_as_the_frontend_does(workshop_package_mutator(
+            project,
+            1,
+            dest.to_string_lossy().into_owned(),
+        ));
+        assert!(packaged.get("files").is_some_and(Value::is_array));
+        assert_eq!(packaged["version"], Value::from(1));
     }
 
     /// A project that changes nothing is what the editor holds for the whole
@@ -212,6 +277,56 @@ mod tests {
             .get("error")
             .and_then(Value::as_str)
             .is_some_and(|e| e.contains("nothing to test")));
+    }
+
+    /// The same empty-project refusal, for the packaging route (issue #1283).
+    /// A `.sdz` with nothing in it is no more use to somebody else than an
+    /// empty test mutator is to this machine.
+    #[test]
+    fn packaging_an_empty_project_is_refused_with_its_own_reason() {
+        let dest = std::env::temp_dir().join("cbx-workshop-package-empty-test.sdz");
+        let result = workshop_package_mutator(
+            ModProject::default(),
+            1,
+            dest.to_string_lossy().into_owned(),
+        );
+        let response = serde_json::to_value(&result).expect("the answer serialises");
+
+        assert_eq!(response.get("success"), Some(&Value::Bool(false)));
+        assert!(response
+            .get("error")
+            .and_then(Value::as_str)
+            .is_some_and(|e| e.contains("nothing to package")));
+        assert!(!dest.exists(), "nothing should have been written");
+    }
+
+    /// A packaged mutator going out to other people is exactly the case a
+    /// blocker should stop rather than only flag (issue #2748). Two clones
+    /// naming the same unit is `preflight`'s own blocker case.
+    #[test]
+    fn packaging_is_refused_when_preflight_finds_a_blocker() {
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "Faster commanders",
+            "gameName": "Balanced Annihilation V15.9.8",
+            "edits": {
+                "clones": {
+                    "first": { "key": "supercom", "replacesGameUnit": false, "def": { "maxDamage": 1 } },
+                    "second": { "key": "supercom", "replacesGameUnit": false, "def": { "maxDamage": 2 } }
+                }
+            },
+        }))
+        .expect("parse");
+        let dest = std::env::temp_dir().join("cbx-workshop-package-blocker-test.sdz");
+
+        let result = workshop_package_mutator(project, 1, dest.to_string_lossy().into_owned());
+        let response = serde_json::to_value(&result).expect("the answer serialises");
+
+        assert_eq!(response.get("success"), Some(&Value::Bool(false)));
+        assert!(response
+            .get("error")
+            .and_then(Value::as_str)
+            .is_some_and(|e| e.contains("blocker") && e.contains("supercom")));
+        assert!(!dest.exists(), "nothing should have been written");
     }
 
     /// The whole point of the fixture: a project saved by the app, through the

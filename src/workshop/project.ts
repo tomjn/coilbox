@@ -206,6 +206,21 @@ export interface ModProject {
    * checksum simply cannot say whether its game has moved.
    */
   authoredChecksum?: string;
+  /**
+   * The version last written into a packaged `.sdz`'s `modinfo.lua` (issue
+   * #1283). Bumped by the packaging drawer after every successful export and
+   * never typed in by hand: two players on different builds of the same
+   * archive name is a sync error, not an error message, so what matters is
+   * only that the number keeps moving, not what it says. Absent for a
+   * project that has never been packaged, in which case the drawer offers 1.
+   *
+   * Left out of the container payload (`modProjectPayload` below) and of
+   * what an imported file can set: it is packaging history for this
+   * machine, not something to carry across a share, and a project imported
+   * fresh starts unpackaged even when the sender had already published a
+   * build of it.
+   */
+  distributionVersion?: number;
   edits: GameEdits;
   createdAt: string;
   updatedAt: string;
@@ -313,6 +328,22 @@ export function useModProjects() {
   }
 
   /**
+   * Record the version a packaged `.sdz` was just written with (issue
+   * #1283). Always overwritten, unlike `recordAuthoredChecksum`: a project
+   * can be packaged more than once, and each one has to move the number on
+   * so the drawer never offers the version that was just shipped a second
+   * time. `updatedAt` is left alone, the same way renaming does not touch
+   * it: packaging is not an edit to the project.
+   */
+  function recordPackagedVersion(id: string, version: number) {
+    write((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, distributionVersion: version } : p,
+      ),
+    );
+  }
+
+  /**
    * Record what the game checksummed to, for a project started before anything
    * had read the game (issue #2696).
    *
@@ -404,6 +435,7 @@ export function useModProjects() {
     applyEdits,
     setEdits,
     recordAuthoredChecksum,
+    recordPackagedVersion,
     updateProjectDetails,
     duplicateProject,
     removeProject,

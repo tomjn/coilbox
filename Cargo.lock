@@ -5841,6 +5841,7 @@ name = "tauri-plugin-coilbox-workshop"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "coilbox-portable",
  "coilbox-springlua",
  "picoframe-core",
  "serde",
@@ -5848,6 +5849,7 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tempfile",
+ "zip 8.6.0",
 ]
 
 [[package]]

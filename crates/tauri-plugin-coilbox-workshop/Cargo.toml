@@ -28,6 +28,12 @@ coilbox-springlua = { path = "../coilbox-springlua" }
 # preflight check proves a chunk survives that same round trip before #1277
 # exists to produce the real payload.
 base64 = { workspace = true }
+# The .sdz writer packaging a project builds (issue #1283), the same crate
+# content, mapconv and scenario already read archives with.
+zip = { workspace = true }
+# `is_safe_rel`, the path-traversal guard the packaged archive's writer shares
+# with the profile/campaign plugins and the scenario archive reader.
+coilbox-portable = { path = "../coilbox-portable" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -462,3 +462,49 @@ describe("naming and copying", () => {
     expect(bar?.edits.overrides).toEqual({});
   });
 });
+
+describe("recordPackagedVersion", () => {
+  it("records the version a package was written with, overwriting the last one", () => {
+    const { result } = renderHook(() => useModProjects(), { wrapper });
+    let id = "";
+    act(() => {
+      id = result.current.createProject({
+        name: "Big guns",
+        gameName: "Balanced Annihilation V15.9.8",
+      }).id;
+    });
+    expect(
+      result.current.projects.find((p) => p.id === id)?.distributionVersion,
+    ).toBeUndefined();
+
+    act(() => {
+      result.current.recordPackagedVersion(id, 1);
+    });
+    const first = result.current.projects.find((p) => p.id === id);
+    expect(first?.distributionVersion).toBe(1);
+    const updatedAtAfterFirst = first?.updatedAt;
+
+    act(() => {
+      result.current.recordPackagedVersion(id, 2);
+    });
+    const second = result.current.projects.find((p) => p.id === id);
+    expect(second?.distributionVersion).toBe(2);
+    // Packaging is not an edit to the project, so it must not touch this.
+    expect(second?.updatedAt).toBe(updatedAtAfterFirst);
+  });
+
+  it("is left out of what an export carries and what an import can set", () => {
+    const project = {
+      id: "whatever",
+      name: "Big guns",
+      gameName: "Balanced Annihilation V15.9.8",
+      distributionVersion: 4,
+      edits: EMPTY_EDITS,
+      createdAt: "2026-09-08T00:00:00.000Z",
+      updatedAt: "2026-09-08T00:00:00.000Z",
+    };
+    const imported = parseModProjectJson(modProjectJson(project));
+    expect(imported).toBeDefined();
+    expect(imported).not.toHaveProperty("distributionVersion");
+  });
+});
