@@ -1,3 +1,4 @@
+import { isLuaIdentifier, luaString } from "@/lib/lua";
 import { effectiveTeams, type Participant } from "../play/participants";
 import type {
   DifficultyRange,
@@ -57,74 +58,22 @@ export function missionPath(scenarioId: string): string {
  * Lua literals.
  * -------------------------------------------------------------------------- */
 
-/** Escapes for characters that cannot appear raw in a quoted Lua string. */
-const ESCAPES: Record<string, string> = {
-  "\\": "\\\\",
-  '"': '\\"',
-  "\n": "\\n",
-  "\r": "\\r",
-  "\t": "\\t",
-};
-
-/**
- * Quote a string as a Lua literal. Scenario names and dialogue text are user
- * input going straight into Lua source, so this has to hold for anything: a
- * quote or backslash would end the literal, and a raw newline is a syntax error
- * in a short string.
- *
- * Remaining control characters become three-digit `\ddd` escapes. The three
- * digits are not optional padding. `\0` followed by the character `5` would
- * otherwise read back as byte 5.
- *
- * Anything above ASCII is left alone. Lua strings are byte strings and the file
- * is written as UTF-8, so the bytes survive the round trip unchanged, which is
- * what a non-English mission needs.
- */
-export function luaString(value: string): string {
-  const body = value.replace(
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: escaping them is the point
-    /[\\"\n\r\t\x00-\x1f\x7f]/g,
-    (ch) => ESCAPES[ch] ?? `\\${ch.charCodeAt(0).toString().padStart(3, "0")}`,
-  );
-  return `"${body}"`;
-}
-
-/** Lua's reserved words, which cannot be used as a bare table key. */
-const KEYWORDS = new Set([
-  "and",
-  "break",
-  "do",
-  "else",
-  "elseif",
-  "end",
-  "false",
-  "for",
-  "function",
-  "if",
-  "in",
-  "local",
-  "nil",
-  "not",
-  "or",
-  "repeat",
-  "return",
-  "then",
-  "true",
-  "until",
-  "while",
-]);
-
-const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** Quoting a string and deciding whether a key can be written bare are the
+ *  same in any Lua, so both live in `@/lib/lua`. Re-exported because this
+ *  module was where `luaString` lived and the mutator imports it from here. */
+export { luaString };
 
 /**
  * A table key. Bare where Lua allows it, bracketed otherwise. Not cosmetic:
  * `repeat` is both a field of a trigger and a Lua keyword, and variable names
  * and game-extension parameter names are author input that can be anything.
+ *
+ * A key that reads as a number still becomes a string key here, unlike the one
+ * in `@/lib/lua`, because a scenario variable called "1" is a variable called
+ * "1" and the runtime looks it up by name.
  */
 function luaKey(key: string): string {
-  return IDENTIFIER.test(key) && !KEYWORDS.has(key)
-    ? key
-    : `[${luaString(key)}]`;
+  return isLuaIdentifier(key) ? key : `[${luaString(key)}]`;
 }
 
 /**
