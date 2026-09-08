@@ -19,15 +19,21 @@
  * what the value does.
  */
 import { Button, cn, Input } from "@picoframe/frame";
-import { RotateCcw } from "lucide-react";
+import { FolderOpen, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
 import { HelpTip } from "@/mapconv/pages/components/Help";
+import {
+  type AssetBrowsing,
+  assetFieldOf,
+  assetState,
+} from "../../assetFields";
 import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldRow } from "../../unitSections";
+import { AssetPicker } from "./AssetPicker";
 
 /** Which editor a value gets, or none. */
 type ControlKind = "boolean" | "number" | "numberList" | "text" | "raw";
@@ -144,11 +150,15 @@ function SettlingInput({
 export function UnitFieldRow({
   row,
   note,
+  assets,
   inheritedLabel = "Game value",
   onChange,
   onReset,
 }: {
   row: FieldRow;
+  /** The game's archive, for a field that names a file in it (issue #2648).
+   *  Absent until the listing lands, and on a page with no game picked. */
+  assets?: AssetBrowsing;
   /** What the game's own Lua says about this field, for a custom parameter
    *  (issue #2661). Absent for every other field, and for a custom parameter
    *  whose scan has not come back. */
@@ -162,6 +172,34 @@ export function UnitFieldRow({
   const kind = controlKind(row);
   const overridden = row.state === "overridden";
   const muted = !overridden;
+
+  const [picking, setPicking] = useState(false);
+  // Only once the archive listing has landed. Without it there is nothing to
+  // offer and nothing to check a value against, and a Browse button that opens
+  // an empty drawer is worse than no button.
+  const asset =
+    assets && assets.index.files.length > 0 && kind === "text"
+      ? assetFieldOf(row, assets.derived)
+      : undefined;
+  const pointsAt =
+    asset && assets ? assetState(assets.index, asset, row.value) : undefined;
+  // The typo this picker exists to catch, said where it was made rather than at
+  // the point the game refuses to load the unit. A field with nothing written in
+  // it has no path to be wrong about, so it says nothing.
+  const missing =
+    asset && assets && pointsAt && pointsAt.member === undefined
+      ? `${assets.archiveLabel} has no ${asset.kind.noun} at this path.`
+      : undefined;
+
+  const input = (
+    <SettlingInput
+      value={row.value}
+      kind={kind}
+      muted={muted}
+      ariaLabel={row.label}
+      onCommit={onChange}
+    />
+  );
 
   return (
     <div
@@ -202,14 +240,44 @@ export function UnitFieldRow({
           <code className="truncate rounded bg-muted px-1.5 py-1 font-mono text-xs text-muted-foreground">
             {display(row.value)}
           </code>
+        ) : asset && assets ? (
+          <div className="flex items-center gap-1.5">
+            {input}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 gap-1.5"
+              onClick={() => setPicking(true)}
+              title={`Choose a ${asset.kind.noun} from ${assets.archiveLabel}`}
+              aria-label={`Browse for ${row.label}`}
+            >
+              <FolderOpen className="size-3.5" />
+              Browse
+            </Button>
+            {picking && (
+              <AssetPicker
+                open
+                onOpenChange={setPicking}
+                field={asset}
+                label={row.label}
+                current={pointsAt?.member}
+                index={assets.index}
+                archive={assets.archive}
+                archiveLabel={assets.archiveLabel}
+                enginePath={assets.enginePath}
+                dataDir={assets.dataDir}
+                onPick={onChange}
+              />
+            )}
+          </div>
         ) : (
-          <SettlingInput
-            value={row.value}
-            kind={kind}
-            muted={muted}
-            ariaLabel={row.label}
-            onCommit={onChange}
-          />
+          input
+        )}
+        {missing && (
+          <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500">
+            <TriangleAlert className="size-3 shrink-0" />
+            {missing}
+          </span>
         )}
         {note && (
           <span className="flex flex-wrap items-baseline gap-x-1.5 text-[10px] text-muted-foreground">

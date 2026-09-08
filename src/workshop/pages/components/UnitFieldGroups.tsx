@@ -17,6 +17,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import type { CustomParamsResult } from "@/content/bindings";
+import type { AssetBrowsing } from "../../assetFields";
 import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
 import { UnitFieldRow } from "./UnitFieldRow";
@@ -24,11 +25,14 @@ import { UnitFieldRow } from "./UnitFieldRow";
 export function UnitFieldGroups({
   view,
   consumers,
+  assets,
   inheritedLabel,
   onChange,
   onReset,
 }: {
   view: UnitFieldView;
+  /** The game's archive, for the fields that name a file in it (issue #2648). */
+  assets?: AssetBrowsing;
   /** The game's custom parameter consumer index, or `null` while it is still
    *  being read. Only custom parameter rows use it (issue #2661). */
   consumers: CustomParamsResult | null;
@@ -78,6 +82,7 @@ export function UnitFieldGroups({
                       key={row.path}
                       row={row}
                       note={consumerNote(row.path, consumers) ?? undefined}
+                      assets={assets}
                       inheritedLabel={inheritedLabel}
                       onChange={(value) => onChange(row, value)}
                       onReset={() => onReset(row)}

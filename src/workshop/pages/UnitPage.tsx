@@ -43,8 +43,10 @@ import { useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { assetIndex } from "@/content/assetKinds";
 import {
   useScanTargetSelection,
+  useUnitsyncArchiveTree,
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "@/content/config";
@@ -53,6 +55,7 @@ import {
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
 import {
   addToBuildMenu,
   applyBuildMenu,
@@ -233,6 +236,36 @@ export default function UnitPage() {
     () => unitsWithClones(gameUnits, clones),
     [gameUnits, clones],
   );
+
+  // The archive behind the game, so a field that names a file in it can offer
+  // the file rather than ask for a path (issue #2648). The listing is the one
+  // the archive browser already uses and is cached per archive for the session,
+  // so a second visit to the page costs nothing. Nothing on the page waits for
+  // it: until it lands, the fields are plain text boxes.
+  const { tree } = useUnitsyncArchiveTree(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+  );
+  const index = useMemo(() => assetIndex(tree?.files ?? []), [tree]);
+  // Read off the game's own table rather than off `units`, so adding a copy of
+  // a unit does not send the whole game's definitions round again. A copy is a
+  // copy of a game unit, so it has nothing to add about which fields are paths.
+  const derivedAssets = useMemo(
+    () => deriveAssetFields(gameUnits, index),
+    [gameUnits, index],
+  );
+  const assets: AssetBrowsing | undefined =
+    game && selected
+      ? {
+          index,
+          derived: derivedAssets,
+          archive: game.primaryArchive.name,
+          archiveLabel: game.name,
+          enginePath: selected.enginePath,
+          dataDir: selected.rootPath,
+        }
+      : undefined;
   const unit = units[unitKey];
   const clone = clones[unitKey];
   const fields = useMemo(
@@ -564,6 +597,7 @@ export default function UnitPage() {
                 <UnitFieldGroups
                   view={fields}
                   consumers={consumers}
+                  assets={assets}
                   inheritedLabel={clone ? "Copied value" : undefined}
                   onChange={(row, value) =>
                     updateOverrides((o) =>
