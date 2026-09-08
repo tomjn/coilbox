@@ -36,10 +36,19 @@
  * Reordering is arrow buttons rather than dragging. A build menu is a short
  * list, one press is one move, and it works from the keyboard, which a drag
  * does not.
+ *
+ * The panel is a {@link SectionPanel}, the card the field sections under it and
+ * the scenario editor's panels already are (issue #2700). It starts shut unless
+ * the project has edited the menu, because it is the one panel on the page whose
+ * height is the builder's roster: a commander's is twenty rows the reader
+ * scrolls past on the way to the numbers, and the summary says how many there
+ * are without opening it. An edited menu opens, so somebody's own work is not
+ * folded away from them.
  */
 import { Button, cn } from "@picoframe/frame";
-import { ArrowDown, ArrowUp, RotateCcw, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Hammer, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo } from "react";
+import { SectionPanel } from "@/components/SectionPanel";
 import { Badge } from "@/components/ui/badge";
 import type {
   UnitBuildpicsResult,
@@ -131,39 +140,49 @@ export function BuildMenuPanel({
   const off = menu.filter((unit) => isUnitDisabled(disabled, unit));
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border/50 p-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold">Build menu</h3>
-          <span className="text-xs text-muted-foreground">
+    <SectionPanel
+      title="Build menu"
+      icon={Hammer}
+      headingLevel={3}
+      defaultOpen={edited}
+      contentClassName="flex flex-col gap-2 p-3"
+      summary={
+        <>
+          <span className="truncate">
             {menu.length === 0
               ? "Builds nothing"
               : `${menu.length} unit${menu.length === 1 ? "" : "s"}, in order${
                   off.length > 0 ? `, ${off.length} disabled` : ""
                 }`}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <UnitPickerButton
-            units={units}
-            gameName={gameName}
-            gameArchive={gameArchive}
-            enginePath={enginePath}
-            dataDir={dataDir}
-            buildpics={buildpics}
-            size="sm"
-            className="w-64"
-            value=""
-            placeholder="Add a unit to this menu"
-            onValueChange={onAdd}
-          />
           {edited && (
-            <Button variant="outline" size="sm" onClick={onReset}>
-              <RotateCcw className="size-3.5" />
-              Reset menu
-            </Button>
+            <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-primary">
+              changed
+            </span>
           )}
-        </div>
+        </>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <UnitPickerButton
+          units={units}
+          gameName={gameName}
+          gameArchive={gameArchive}
+          enginePath={enginePath}
+          dataDir={dataDir}
+          buildpics={buildpics}
+          size="sm"
+          className="w-64"
+          value=""
+          placeholder="Add a unit to this menu"
+          onValueChange={onAdd}
+        />
+        {edited && (
+          <Button variant="outline" size="sm" onClick={onReset}>
+            <RotateCcw className="size-3.5" />
+            Reset menu
+          </Button>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -317,6 +336,6 @@ export function BuildMenuPanel({
           </ul>
         </div>
       )}
-    </section>
+    </SectionPanel>
   );
 }
