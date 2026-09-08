@@ -171,7 +171,7 @@ afterEach(() => {
 describe("PlayLocallyButton", () => {
   it("says there is nothing to test when the project has no edits", () => {
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /play locally/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
     expect(screen.getByText(/this project has no edits yet/i)).toBeTruthy();
     expect(
       (
@@ -185,7 +185,7 @@ describe("PlayLocallyButton", () => {
   it("offers only the mutator route when the game declares no tweakdefs slot", () => {
     mockCompiled = compiled({ files: [{ path: "modinfo.lua", contents: "" }] });
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /play locally/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
     expect(screen.queryByText("Beyond All Reason mod options")).toBeNull();
   });
 
@@ -196,7 +196,7 @@ describe("PlayLocallyButton", () => {
     });
     mockGameInfoOptions = [{ key: "tweakdefs", name: "tweakdefs" }];
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /play locally/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
 
     // The BAR route is the default once it is available, so Play launches
     // it without any further selection.
@@ -215,7 +215,7 @@ describe("PlayLocallyButton", () => {
       files: [{ path: "modinfo.lua", contents: "return {}" }],
     });
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /play locally/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
 
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
@@ -238,7 +238,7 @@ describe("PlayLocallyButton", () => {
       passes: [],
     });
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /play locally/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
 
     await vi.waitFor(() => expect(screen.getByText(/1 blocker/i)).toBeTruthy());

@@ -243,7 +243,7 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
         title="Play this project on your own machine"
       >
         <Rocket className="mr-1 size-3.5" />
-        Play locally
+        Test
       </Button>
       <Drawer
         open={open}

@@ -54,8 +54,7 @@ pub fn write_mutator(dir: &Path, files: &[CompiledFile]) -> Result<(), String> {
         std::fs::remove_dir_all(dir)
             .map_err(|e| format!("could not clear {}: {e}", dir.display()))?;
     }
-    std::fs::create_dir_all(dir)
-        .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     for file in files {
         let target = dir.join(&file.path);
         if let Some(parent) = target.parent() {
