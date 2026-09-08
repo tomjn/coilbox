@@ -15,18 +15,24 @@
 //! reads nothing off disk and writes nothing, so it is safe to call on every
 //! keystroke and there is nothing to clean up if the user closes the drawer.
 //!
-//! `workshop_test_mutator` (issue #1278) is the other command this plugin
-//! exposes. It writes a compiled project into a generated game under the
-//! content root, the local play route every game supports. See `mutator`'s
-//! own doc comment.
+//! `workshop_preflight` (issue #1276) is the second command this plugin
+//! exposes. It compiles the same way, then checks the result before it ever
+//! leaves the app: syntax through `coilbox-springlua`, plus the cheap static
+//! checks `preflight` documents.
+//!
+//! `workshop_test_mutator` (issue #1278) is the third: it writes a compiled
+//! project into a generated game under the content root, the local play
+//! route every game supports. See `mutator`'s own doc comment.
 
 mod compile;
 mod lua;
 mod model;
 mod mutator;
+mod preflight;
 
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use model::{GameEdits, ModProject};
+pub use preflight::{preflight, PreflightReport};
 
 use serde::Serialize;
 use tauri::{
@@ -38,6 +44,14 @@ use tauri::{
 #[tauri::command]
 fn workshop_compile(project: ModProject) -> CompiledMod {
     compile(&project)
+}
+
+/// Compile a saved project and check the result before it ever leaves the
+/// app (issue #1276).
+#[tauri::command]
+fn workshop_preflight(project: ModProject) -> PreflightReport {
+    let compiled = compile(&project);
+    preflight(&project, &compiled)
 }
 
 /// What `workshop_test_mutator` wrote.
@@ -83,6 +97,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
             workshop_compile,
+            workshop_preflight,
             workshop_test_mutator
         ])
         .build()

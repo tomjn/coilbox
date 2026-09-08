@@ -167,6 +167,7 @@ import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
 import { DeliveryRoutesButton } from "./components/DeliveryRoutesButton";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { PlayLocallyButton } from "./components/PlayLocallyButton";
+import { PreflightButton } from "./components/PreflightButton";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import type { FieldChoices } from "./components/UnitFieldRow";
@@ -930,6 +931,12 @@ export default function UnitPage() {
                 Lua
               </Button>
             )}
+            {/* Checking that Lua before it ever leaves the app (issue #1276).
+              Beside the button that shows it, because reading the Lua and
+              checking it answer two different questions: whether coilbox
+              understood the edit, and whether a lobby would accept the
+              result. */}
+            {project && <PreflightButton project={project} />}
             {/* One button that plays the project on your own machine (issue
               #1278). The workshop stops being write only here: everything
               before this point edits a project, and this is the first thing

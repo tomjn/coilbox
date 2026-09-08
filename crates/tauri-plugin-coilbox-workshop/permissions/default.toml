@@ -1,8 +1,9 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the workshop plugin's compiler and local test launch. The compiler turns a saved tweak project into the Lua a game reads and reads nothing and writes nothing; the test launch writes a generated game under the content root's games/ (issue #1278)."
+description = "Allows the workshop plugin's compiler, preflight check and local test launch. The compiler and preflight check turn a saved tweak project into the Lua a game reads and read nothing and write nothing; the test launch writes a generated game under the content root's games/ (issue #1278)."
 permissions = [
   "allow-workshop-compile",
+  "allow-workshop-preflight",
   "allow-workshop-test-mutator",
 ]
