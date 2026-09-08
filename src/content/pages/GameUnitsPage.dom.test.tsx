@@ -273,6 +273,43 @@ describe("GameUnitsPage", () => {
     expect(label.className).not.toContain("truncate");
   });
 
+  it("draws a cell for every unit in a game bigger than the cap used to allow", async () => {
+    // 600 is past the 500 the grid used to stop at, which put 64 of Beyond All
+    // Reason's 564 out of reach of anyone browsing rather than searching
+    // (issue #2716). The last unit of the last block is the one to look for:
+    // the budget was spent in block order, so it was the tail that went.
+    const kids = Array.from(
+      { length: 599 },
+      (_, i) => `armunit${String(i).padStart(3, "0")}`,
+    );
+    renderPage({
+      units: [
+        { name: "armcom", fullName: "Commander", buildOptions: kids },
+        ...kids.map((name) => ({ name, fullName: name })),
+      ],
+      sides: [{ name: "Armada", startUnit: "armcom" }],
+    });
+    expect(await screen.findByText("armunit598")).toBeTruthy();
+    expect(screen.queryByText(/Showing the first/)).toBeNull();
+    expect(screen.getByText("600 units")).toBeTruthy();
+  });
+
+  it("gives both numbers while a search narrows the grid", async () => {
+    renderPage({
+      units: [
+        { name: "armcom", fullName: "Commander", buildOptions: ["armsolar"] },
+        { name: "armsolar", fullName: "Solar Collector" },
+      ],
+      sides: [{ name: "Armada", startUnit: "armcom" }],
+    });
+    await screen.findByText("Commander");
+    expect(screen.getByText("2 units")).toBeTruthy();
+    fireEvent.change(screen.getByRole("searchbox"), {
+      target: { value: "solar" },
+    });
+    expect(screen.getByText("1 of 2 units")).toBeTruthy();
+  });
+
   it("keeps the same buildpic id list when the search query changes", async () => {
     // The id list handed to `useUnitsyncUnitBuildpics` used to be the
     // search-filtered `rows`, so it changed on every keystroke, which

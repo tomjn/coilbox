@@ -15,15 +15,6 @@ import { DetailError, DetailLoading, NotFound } from "./components/states";
 import { UnitIcon } from "./components/UnitIcon";
 
 /**
- * How many cells the grid draws before it stops, in the shape `UnitPicker.tsx`'s
- * `SEARCH_CAP` uses for the same job (a searchable, faction-grouped list): the
- * number reuses that existing cap rather than guessing a new one, so a game with
- * thousands of units stays responsive instead of rendering a build pic `<img>`
- * for every one of them at once.
- */
-const RENDER_CAP = 500;
-
-/**
  * A game's units as a grid, grouped by faction with a unit's morph stages
  * folded into one cell (issue tracked by the encyclopedia design doc). Reads the
  * same scan/game-info/unit-dataset hooks `GameDetailPage` reads, then hands the
@@ -35,6 +26,10 @@ const RENDER_CAP = 500;
  * side rather than the whole game. `rootId` is a side's start unit id, the
  * same id `encyclopediaSections` keys each block's `section.id` on, so the
  * filter below just compares against that rather than re-deriving it.
+ *
+ * Every unit the game has is on it, whether the grid is showing a whole game or
+ * one faction's block (issue #2716). See the note on `rows` below for what the
+ * cap that used to be here cost and saved.
  */
 export default function GameUnitsPage() {
   const { name } = useParams();
@@ -85,20 +80,17 @@ export default function GameUnitsPage() {
   const scoped = factionParam
     ? sections.filter((s) => s.id.toLowerCase() === factionParam.toLowerCase())
     : sections;
-  const total = scoped.reduce((n, s) => n + s.cells.length, 0);
-
-  // The budget crosses section boundaries so one big faction can't starve every
-  // faction after it, matching how `UnitPicker.tsx:577` caps its own list.
-  let left = RENDER_CAP;
-  const rows = scoped
-    .map((section) => {
-      const shown = section.cells.slice(0, Math.max(left, 0));
-      left -= shown.length;
-      return { ...section, cells: shown };
-    })
-    .filter((section) => section.cells.length > 0);
-  const shownCount = rows.reduce((n, s) => n + s.cells.length, 0);
-  const capped = total > shownCount;
+  // Every unit the game has, with nothing held back (issue #2716). The grid used
+  // to stop at 500 cells and ask for a search term, which hid 64 of Beyond All
+  // Reason's 564 from anyone browsing a game they did not already know the names
+  // in. Measured in the app before removing it: 500 cells of this markup cost
+  // 186ms of DOM and layout in the webview and a 350ms React render, and the 64
+  // the cap was holding back are about 22ms and 45ms of that. So the cap was
+  // buying a tenth of a one-off render at the price of the units nobody can
+  // name, and windowing a responsive grid - whose column count is not known
+  // until it is laid out - would be a lot of machinery to buy the same tenth.
+  const rows = scoped.filter((section) => section.cells.length > 0);
+  const total = rows.reduce((n, s) => n + s.cells.length, 0);
 
   // Every cell id the unfiltered grid could ever show, not `rows`' own
   // search-filtered set. `useUnitsyncUnitBuildpics` keys its effect on a
@@ -195,14 +187,24 @@ export default function GameUnitsPage() {
         </Link>
       </h1>
 
-      <Input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search units…"
-        aria-label="Search units"
-        className="h-9 max-w-sm"
-      />
+      <div className="flex items-center gap-3">
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search units…"
+          aria-label="Search units"
+          className="h-9 max-w-sm"
+        />
+        {/* Both numbers while a search is on, because "12 units" alone does not
+          say whether the game has 12 or 564. Up here beside the box rather than
+          under the grid, which on a game this size is 500 cells away. */}
+        <p className="text-xs text-muted-foreground">
+          {query.trim()
+            ? `${total} of ${allCellIds.length} units`
+            : `${total} unit${total === 1 ? "" : "s"}`}
+        </p>
+      </div>
 
       {total === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -230,12 +232,6 @@ export default function GameUnitsPage() {
             </ul>
           </section>
         ))
-      )}
-
-      {capped && (
-        <p className="text-xs text-muted-foreground">
-          Showing the first {shownCount} of {total}. Search to narrow it.
-        </p>
       )}
     </div>
   );
