@@ -2,6 +2,7 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Boxes, Code2, ToyBrick } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { insideSection } from "../general/nav";
 import { getCachedProject } from "./projects";
 
 /**
@@ -24,7 +25,10 @@ const legoPlugin: FramePlugin = {
           id: "lego.units",
           label: "Models",
           to: "/lego",
+          // Lit on the list and on a model you have open, but not on Lego
+          // Parts, which is the item below's (issue #2719).
           end: true,
+          activeWhen: insideSection("/lego", ["/lego/parts"]),
           order: 0,
           icon: Boxes,
           useVisible: useAdvancedMode,
