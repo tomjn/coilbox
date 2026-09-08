@@ -53,26 +53,30 @@ function units(n: number): Record<string, Record<string, unknown>> {
   );
 }
 
+function unitListProps(
+  over: Partial<Parameters<typeof UnitList>[0]> = {},
+): Parameters<typeof UnitList>[0] {
+  return {
+    units: units(600),
+    selected: "",
+    overrides: {},
+    text: {},
+    clones: {},
+    menus: {},
+    disabled: [],
+    nameOf: (key) => key,
+    picOf: () => undefined,
+    picsPending: false,
+    factionOf: () => undefined,
+    onSelect: () => {},
+    ...over,
+  };
+}
+
 function draw(
   over: Partial<Parameters<typeof UnitList>[0]> = {},
 ): ReturnType<typeof render> {
-  return render(
-    <UnitList
-      units={units(600)}
-      selected=""
-      overrides={{}}
-      text={{}}
-      clones={{}}
-      menus={{}}
-      disabled={[]}
-      nameOf={(key) => key}
-      picOf={() => undefined}
-      picsPending={false}
-      factionOf={() => undefined}
-      onSelect={() => {}}
-      {...over}
-    />,
-  );
+  return render(<UnitList {...unitListProps(over)} />);
 }
 
 const rowButtons = () =>
@@ -117,11 +121,22 @@ describe("windowing", () => {
     // so this is the only place the claim can be made. The window is the height
     // of the column divided by the height of a row, so the number of mounted
     // rows does not follow the size of the game at all.
+    //
+    // The huge game arrives by rerender rather than by a fresh mount, and that
+    // is the whole of issue #2722. A container has no measured height until the
+    // ResizeObserver has fired, which is after the first render, and
+    // `visibleRowWindow` renders every row until then rather than none. So a
+    // cold mount of 5000 rows built 5000 of them once before windowing them
+    // down to 16: measured at 1213ms against 142ms for 600 and 4ms to build the
+    // fixture itself, and 7.6s on a loaded worker pool, which is what blew the
+    // 5 second budget. Coming in by rerender the same claim costs 6ms, because
+    // the height is already known by then. Nothing is given up: the steady
+    // state is what the claim is about, and a windowing regression still mounts
+    // 5000 rows here.
     measured(() => {
-      const { unmount } = draw();
+      const view = draw();
       const hundreds = rowButtons().length;
-      unmount();
-      draw({ units: units(5000) });
+      view.rerender(<UnitList {...unitListProps({ units: units(5000) })} />);
       expect(rowButtons()).toHaveLength(hundreds);
     });
   });
@@ -167,22 +182,7 @@ describe("a list that gets shorter under a scrolled window", () => {
       // The game's own units reloaded shorter, which is what an undo of an
       // added unit does. Nothing resets the offset for that, so the window
       // has to cope with an offset past the end on its own.
-      view.rerender(
-        <UnitList
-          units={units(20)}
-          selected=""
-          overrides={{}}
-          text={{}}
-          clones={{}}
-          menus={{}}
-          disabled={[]}
-          nameOf={(key) => key}
-          picOf={() => undefined}
-          picsPending={false}
-          factionOf={() => undefined}
-          onSelect={() => {}}
-        />,
-      );
+      view.rerender(<UnitList {...unitListProps({ units: units(20) })} />);
       expect(rowButtons().length).toBeGreaterThan(0);
     });
   });
