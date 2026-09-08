@@ -164,6 +164,7 @@ import {
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
+import { DeliveryRoutesButton } from "./components/DeliveryRoutesButton";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
@@ -891,6 +892,15 @@ export default function UnitPage() {
                 checking={status !== "ready"}
                 title={`Diagnostics for ${game.name}`}
                 description="What unitsync said while reading this game's unit definitions."
+              />
+            )}
+            {/* Which of the two delivery routes this game supports, and why
+              when one is not (issue #1268). Once a game is picked, the same
+              read that already loads its sides has its mod options too. */}
+            {game && gameInfo && (
+              <DeliveryRoutesButton
+                options={gameInfo.options ?? []}
+                gameName={game.name}
               />
             )}
             {/* Renaming the project you are working in (issue #2711). You find
