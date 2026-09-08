@@ -20,9 +20,17 @@ import {
   within,
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomParamsResult, UnitDefsResult } from "@/content/bindings";
 import { LEGO_SCHEMA_VERSION, type LegoProject } from "@/lego/model";
+
+// The drawer behind the Projects button lives on the app frame, which is not
+// mounted here. Everything else in the frame package is real, including
+// `useSetting`, which the project list is kept in.
+vi.mock("@picoframe/frame", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
+  useDrawer: () => ({ open: () => {}, close: () => {}, isOpen: false }),
+}));
 
 const SELECTED = {
   enginePath: "/engines/105",
@@ -163,6 +171,18 @@ vi.mock("@/lego/projects", () => ({
 }));
 
 const { default: UnitPage } = await import("./UnitPage");
+const { PersistentStoreProvider } = await import("@picoframe/frame");
+const { installSettingsStorage, memorySettingsStorage } = await import(
+  "@/lib/storedSetting"
+);
+const { PROJECTS_KEY } = await import("../project");
+
+/**
+ * The settings store the projects are saved in, replaced per test so one test's
+ * projects are not another's. Both the frame's `useSetting` and the
+ * read-modify-write helpers in `storedSetting.ts` have to see the same one.
+ */
+let storage = memorySettingsStorage();
 
 const ARMCOM: Record<string, unknown> = {
   name: "armcom",
@@ -207,23 +227,27 @@ function show(
     names?: Record<string, string>;
     descriptions?: Record<string, string>;
   } = {},
+  /** What unitsync makes of the game's archives, which a project records. */
+  checksum = "abc",
 ) {
   mockDefs = {
     units,
     weaponDefs: {},
     unitErrors,
     errors: [],
-    checksum: "abc",
+    checksum,
     languageNames: language.names,
     languageDescriptions: language.descriptions,
   };
   mockDataset = dataset;
   return render(
-    <MemoryRouter initialEntries={[entry]}>
-      <Routes>
-        <Route path="/workshop" element={<UnitPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <PersistentStoreProvider storage={storage}>
+      <MemoryRouter initialEntries={[entry]}>
+        <Routes>
+          <Route path="/workshop" element={<UnitPage />} />
+        </Routes>
+      </MemoryRouter>
+    </PersistentStoreProvider>,
   );
 }
 
@@ -234,6 +258,11 @@ const type = (input: HTMLInputElement, value: string) => {
   fireEvent.change(input, { target: { value } });
   fireEvent.blur(input);
 };
+
+beforeEach(() => {
+  storage = memorySettingsStorage();
+  installSettingsStorage(storage);
+});
 
 afterEach(() => {
   cleanup();
@@ -546,6 +575,11 @@ describe("UnitPage", () => {
         ).toBe(true);
         expect(screen.getByText("1 change")).toBeTruthy();
         cleanup();
+        // Both halves of the loop use the same game name, and edits are saved
+        // now, so the second half would otherwise open the first half's project
+        // and count two changes.
+        storage = memorySettingsStorage();
+        installSettingsStorage(storage);
       }
     });
 
@@ -1390,6 +1424,174 @@ describe("UnitPage", () => {
   });
 
   /**
+   * Issue #1282. The edits used to live in this component and die with it.
+   * They now go into a saved project as they are made, so the page has to be
+   * closable, and undo has to reach back over them.
+   */
+  describe("saving and undoing", () => {
+    const units = { armcom: ARMCOM, armlab: ARMLAB };
+    const dataset = [
+      { name: "armcom", fullName: "Commander" },
+      { name: "armlab", fullName: "Bot Lab" },
+    ];
+    const openAt = (unit: string, checksum = "abc") =>
+      show(
+        units,
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
+        dataset,
+        [],
+        {},
+        checksum,
+      );
+
+    /** A row in the unit browser, found by the internal name it shows. */
+    const browserRow = (key: string) =>
+      screen
+        .getAllByRole("button")
+        .find(
+          (b) => b.querySelector("span.font-mono")?.textContent === key,
+        ) as HTMLElement;
+
+    it("starts a project on the first edit and says which one", () => {
+      openAt("armcom");
+      expect(screen.queryByText(/^Saving to/)).toBeNull();
+      type(healthBox(), "5000");
+      expect(screen.getByText(/Saving to/).textContent).toContain(
+        `${GAME.name} tweaks`,
+      );
+    });
+
+    it("still has the edits after the page is closed and reopened", () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      fireEvent.click(screen.getByLabelText("Disable Commander"));
+      cleanup();
+
+      // The same storage, a brand new page: what reopening the app does.
+      openAt("armcom");
+      expect(healthBox().value).toBe("5000");
+      expect(screen.getByText("1 change, 1 unit disabled")).toBeTruthy();
+      expect(screen.getByLabelText("Disable Commander")).toHaveProperty(
+        "dataset.state",
+        "checked",
+      );
+    });
+
+    it("undoes and redoes the last change", () => {
+      openAt("armcom");
+      expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", true);
+
+      type(healthBox(), "5000");
+      expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", false);
+
+      fireEvent.click(screen.getByLabelText("Undo"));
+      expect(healthBox().value).toBe("3000");
+      expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+
+      fireEvent.click(screen.getByLabelText("Redo"));
+      expect(healthBox().value).toBe("5000");
+      expect(screen.getByText("1 change")).toBeTruthy();
+    });
+
+    it("walks back through several changes, in order", () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      fireEvent.click(screen.getByLabelText("Disable Commander"));
+      expect(screen.getByText("1 change, 1 unit disabled")).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText("Undo"));
+      expect(screen.getByText("1 change")).toBeTruthy();
+      expect(healthBox().value).toBe("5000");
+
+      fireEvent.click(screen.getByLabelText("Undo"));
+      expect(screen.queryByText(/^\d+ changes?/)).toBeNull();
+      expect(healthBox().value).toBe("3000");
+      expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", true);
+    });
+
+    /** One press, whatever it took to make the change. Four stores are cleared
+     *  when a copy is deleted, and all four have to come back together. */
+    it("brings a deleted copy back with its own edits", async () => {
+      openAt("armcom");
+      fireEvent.click(screen.getByRole("button", { name: /Copy unit/ }));
+      fireEvent.change(await screen.findByLabelText(/Internal name/), {
+        target: { value: "armcom2" },
+      });
+      fireEvent.change(screen.getByLabelText(/Name in game/), {
+        target: { value: "Commander II" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /^Add unit/ }));
+      await waitFor(() =>
+        expect(screen.queryByLabelText(/Internal name/)).toBeNull(),
+      );
+      type(healthBox(), "9000");
+      fireEvent.click(screen.getByLabelText("Disable Commander II"));
+      expect(screen.getByText("1 change, 1 unit added, 1 unit disabled"));
+
+      fireEvent.click(screen.getByRole("button", { name: /^Delete/ }));
+      const confirm = await waitFor(() => {
+        const [, inPopover] = screen.getAllByRole("button", {
+          name: /^Delete$/,
+        });
+        if (!inPopover) throw new Error("no delete confirmation");
+        return inPopover;
+      });
+      fireEvent.click(confirm);
+      await waitFor(() => expect(screen.queryByText(/unit added/)).toBeNull());
+
+      fireEvent.click(screen.getByLabelText("Undo"));
+      expect(
+        screen.getByText("1 change, 1 unit added, 1 unit disabled"),
+      ).toBeTruthy();
+      fireEvent.click(browserRow("armcom2"));
+      expect(healthBox().value).toBe("9000");
+      expect(screen.getByLabelText("Disable Commander II")).toHaveProperty(
+        "dataset.state",
+        "checked",
+      );
+    });
+
+    /** Issue #2664 again, from the project's side: a game's project is its own
+     *  and so is its history. */
+    it("keeps two games' projects and undo stacks apart", () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.click(browserRow("armcom"));
+      expect(healthBox().value).toBe("3000");
+      expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", true);
+
+      type(healthBox(), "1234");
+      fireEvent.click(screen.getByLabelText("Undo"));
+      expect(healthBox().value).toBe("3000");
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME.name },
+      });
+      fireEvent.click(browserRow("armcom"));
+      // The first game's edit is untouched by anything done in the second.
+      expect(healthBox().value).toBe("5000");
+      expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", false);
+    });
+
+    /** The checksum a project records is a fact about what it was written
+     *  against. Which edits an update actually broke is issue #1281. */
+    it("says when the game has changed since the project was started", () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      cleanup();
+
+      openAt("armcom", "moved on");
+      expect(
+        screen.getByText(new RegExp(`${GAME.name} has changed`)),
+      ).toBeTruthy();
+    });
+  });
+
+  /**
    * Picking a file instead of typing a path (issue #2648). The point of these is
    * the wiring: that a lowercased def key still finds the note describing it,
    * that the picker offers the archive's real members, and that taking one
@@ -1556,13 +1758,48 @@ describe("UnitPage", () => {
     });
 
     /**
-     * A built unit is already a file in the game folder, so it is not work
-     * this page is holding and could lose. The banner must not say it is.
+     * A built unit is already a file in the game folder, so it is not work this
+     * page is holding and it is not an edit anybody made here. Since #1282 that
+     * has a sharper consequence than a banner: nothing about it may reach the
+     * saved project, or the project would claim work the user never did and go
+     * stale the moment the file is edited by hand.
      */
-    it("is not counted as an unsaved change", () => {
+    it("is not counted as a change to the project", () => {
       openBuilt();
-      expect(screen.queryByText(/not saved anywhere yet/)).toBeNull();
+      expect(screen.getByText("1 built unit")).toBeTruthy();
       expect(screen.queryByText(/unit added/)).toBeNull();
+      expect(screen.queryByText(/\d+ changes?/)).toBeNull();
+    });
+
+    it("starts no project, so undo has nothing to take back", () => {
+      openBuilt();
+      expect(screen.queryByText(/^Saving to/)).toBeNull();
+      expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", true);
+      expect(screen.getByLabelText("Redo")).toHaveProperty("disabled", true);
+      expect(storage.get(PROJECTS_KEY)).toBeNull();
+    });
+
+    /** The project holds the units copied on this page and nothing else, so
+     *  editing a built unit saves the edit without adopting the unit. */
+    it("keeps the built unit out of a project an edit does start", () => {
+      openBuilt();
+      type(
+        screen.getByLabelText("Health (old name)") as HTMLInputElement,
+        "4321",
+      );
+
+      expect(screen.getByText(/^Saving to/)).toBeTruthy();
+      const saved = JSON.parse(storage.get(PROJECTS_KEY) ?? "[]");
+      expect(saved).toHaveLength(1);
+      expect(saved[0].edits.clones).toEqual({});
+      expect(saved[0].edits.overrides).toEqual({
+        skyfort: { maxdamage: 4321 },
+      });
+      // One step, and it is the field. Undoing does not remove the unit.
+      fireEvent.click(screen.getByLabelText("Undo"));
+      expect(screen.getAllByText("Sky Fortress").length).toBeGreaterThan(0);
+      expect(screen.getByText("1 built unit")).toBeTruthy();
+      expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", true);
     });
 
     it("cannot be deleted from here, since the file is the builder's", () => {
