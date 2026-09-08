@@ -45,6 +45,25 @@ export interface AssetKind {
   /** Extensions the engine's loader for this kind reads, lowercased, with the
    *  dot. In the order the engine tries them where it tries several. */
   extensions: string[];
+  /**
+   * Whether a name the root does not hold directly is matched by file name
+   * anywhere below it.
+   *
+   * Only the unit script framework does this, and it is why SplinterFaction's
+   * `script = "fedengineer_lus.lua"` finds `Scripts/fed/hbot/fedengineer_lus.lua`.
+   * The model loader and the build picture loader both build one path and read
+   * it, so a name in the wrong folder is a name that does not resolve.
+   */
+  searchesBelowRoot: boolean;
+  /**
+   * Whether a `.cob` may be answered by the `.lua` beside it, and before it.
+   *
+   * The script framework's own order, for a game that moved its scripts to Lua
+   * and left the old names in its definitions.
+   * `crates/coilbox-unitsync-worker/src/unitscriptfile.rs` is the record of both
+   * this and {@link searchesBelowRoot}.
+   */
+  prefersLuaOverCob: boolean;
 }
 
 export const ASSET_KINDS: Record<AssetKindId, AssetKind> = {
@@ -64,6 +83,8 @@ export const ASSET_KINDS: Record<AssetKindId, AssetKind> = {
       ".obj",
       ".blend",
     ],
+    searchesBelowRoot: false,
+    prefersLuaOverCob: false,
   },
   script: {
     id: "script",
@@ -71,6 +92,8 @@ export const ASSET_KINDS: Record<AssetKindId, AssetKind> = {
     noun: "script",
     root: "scripts",
     extensions: [".lua", ".cob"],
+    searchesBelowRoot: true,
+    prefersLuaOverCob: true,
   },
   picture: {
     id: "picture",
@@ -78,6 +101,8 @@ export const ASSET_KINDS: Record<AssetKindId, AssetKind> = {
     noun: "picture",
     root: "unitpics",
     extensions: [".dds", ".png", ".pcx", ".bmp", ".tga", ".jpg", ".jpeg"],
+    searchesBelowRoot: false,
+    prefersLuaOverCob: false,
   },
 };
 
@@ -148,6 +173,10 @@ const hasExtension = (value: string) => /\.[a-z0-9]+$/.test(value);
  * A value that is already a whole member path is accepted as well. The engine
  * accepts one for a model, and for the kinds where it would not, taking it here
  * only means a value we do not warn about rather than a value we would write.
+ *
+ * Every candidate is tried under the root before any is tried by file name,
+ * which is the script framework's own order: a Lua script two folders down still
+ * beats the `.cob` sitting exactly where the definition said.
  */
 export function resolveAsset(
   index: AssetIndex,
@@ -157,9 +186,15 @@ export function resolveAsset(
 ): string | undefined {
   const written = tidy(value);
   if (written === "") return undefined;
-  const candidates = hasExtension(written)
+  const names = hasExtension(written)
     ? [written]
     : kind.extensions.map((extension) => written + extension);
+  const candidates = kind.prefersLuaOverCob
+    ? names.flatMap((name) =>
+        name.endsWith(".cob") ? [`${name.slice(0, -4)}.lua`, name] : [name],
+      )
+    : names;
+
   for (const candidate of candidates) {
     const under = root === "" ? candidate : `${root}/${candidate}`;
     const hit = index.byPath.get(under);
@@ -168,6 +203,14 @@ export function resolveAsset(
   for (const candidate of candidates) {
     const hit = index.byPath.get(candidate);
     if (hit) return hit;
+  }
+  if (!kind.searchesBelowRoot) return undefined;
+
+  const prefix = root === "" ? "" : `${root}/`;
+  for (const candidate of candidates) {
+    const name = candidate.split("/").at(-1) ?? candidate;
+    for (const member of index.byName.get(name) ?? [])
+      if (member.startsWith(prefix)) return index.byPath.get(member);
   }
   return undefined;
 }

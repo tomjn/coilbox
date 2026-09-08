@@ -64,6 +64,33 @@ describe("resolving a written value", () => {
     ).toBe("scripts/Units/ARMAAP.cob");
   });
 
+  /** SplinterFaction writes `script = "fedengineer_lus.lua"` for a file it keeps
+   *  at `Scripts/fed/hbot/fedengineer_lus.lua`, which the framework walks to. */
+  it("finds a script by name anywhere under scripts/", () => {
+    const sf = listing("Scripts/fed/hbot/fedengineer_lus.lua");
+    expect(
+      resolveAsset(sf, ASSET_KINDS.script, "scripts", "fedengineer_lus.lua"),
+    ).toBe("Scripts/fed/hbot/fedengineer_lus.lua");
+  });
+
+  /** The framework's order: the Lua rewrite wins over the `.cob` a definition
+   *  still names, so a game that moved to Lua and kept its old names resolves. */
+  it("answers a .cob with the .lua beside it, and prefers it", () => {
+    const moved = listing("scripts/armcom.cob", "scripts/armcom.lua");
+    expect(
+      resolveAsset(moved, ASSET_KINDS.script, "scripts", "armcom.cob"),
+    ).toBe("scripts/armcom.lua");
+  });
+
+  /** A model is built into one path and read, so a file in the wrong folder is
+   *  a path that does not resolve rather than one to go looking for. */
+  it("does not go looking below the folder for a model", () => {
+    const odd = listing("objects3d/units/deep/armcom.s3o");
+    expect(
+      resolveAsset(odd, ASSET_KINDS.model, "objects3d", "armcom.s3o"),
+    ).toBeUndefined();
+  });
+
   it("takes a whole member path as well, which the model loader accepts", () => {
     expect(
       resolveAsset(
