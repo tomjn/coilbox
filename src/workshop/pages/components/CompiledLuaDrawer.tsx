@@ -15,6 +15,14 @@
  *
  * Read only on purpose. Editing the generated Lua would mean the project and
  * its output could disagree, and the project is the document.
+ *
+ * A project can also carry Lua that is read only for a different reason
+ * (issue #1280): recovered from a decoded tweak set that turned out to be a
+ * program rather than data, so there was never a safe way to turn it into
+ * one of the five editable stores. That Lua is shown here too, in its own
+ * section, and never inside "generated": nothing here compiled it and
+ * nothing here runs it. `compiled.notes` already says how many blocks there
+ * are and why. This is where the actual Lua behind that count is.
  */
 import { Drawer } from "@picoframe/frame";
 import { CodeBlock } from "@/components/CodeBlock";
@@ -110,6 +118,38 @@ export function CompiledLuaDrawer({
             />
           </section>
         ))}
+
+        {project.readOnlyLua && project.readOnlyLua.length > 0 && (
+          <section className="flex flex-col gap-3 border-border/60 border-t pt-4">
+            <h3 className="font-medium text-sm">
+              Read only ({project.readOnlyLua.length})
+            </h3>
+            <p className="text-muted-foreground text-xs">
+              Recovered from a decoded import that turned out to be a program
+              rather than data. Shown for reference only: nothing above compiles
+              or runs it.
+            </p>
+            {project.readOnlyLua.map((block, index) => (
+              <div
+                // Stable for one open project: nothing here reorders.
+                // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                key={index}
+                className="flex min-w-0 flex-col gap-1.5"
+              >
+                <h4 className="font-mono text-muted-foreground text-xs">
+                  {block.title}
+                </h4>
+                <p className="text-muted-foreground text-xs">{block.note}</p>
+                <CodeBlock
+                  code={block.lua}
+                  lang="lua"
+                  label={`${block.title} as Lua, read only`}
+                  className="max-h-96 rounded-lg border border-border/50"
+                />
+              </div>
+            ))}
+          </section>
+        )}
       </div>
     </Drawer>
   );

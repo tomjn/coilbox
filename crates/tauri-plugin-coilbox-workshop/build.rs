@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "workshop_test_mutator",
     "workshop_package_mutator",
     "workshop_pack_bar_slots",
+    "workshop_decode_tweak_set",
 ];
 
 fn main() {

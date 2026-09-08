@@ -270,6 +270,21 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         ));
     }
 
+    // Lua the project carries read-only (issue #1280). It was already refused
+    // as too risky to run automatically at decode time, and nothing about
+    // compiling makes that safer, so the compiler does the same thing it does
+    // with a text edit it cannot carry: says so rather than silently dropping
+    // it or silently running it.
+    if !project.read_only_lua.is_empty() {
+        let count = project.read_only_lua.len();
+        notes.push(format!(
+            "{count} block{} of read-only Lua {} carried on this project but not compiled. {} came from a decoded import that turned out to be a program rather than data, and this compiler does not run a stranger's program automatically. Read it in the project and hand-port anything you want the game to run.",
+            if count == 1 { "" } else { "s" },
+            if count == 1 { "is" } else { "are" },
+            if count == 1 { "It" } else { "They" },
+        ));
+    }
+
     let mut files = Vec::new();
     if !edits.is_empty() {
         files.push(CompiledFile {
@@ -1043,6 +1058,26 @@ mod tests {
         })));
         assert_eq!(out.notes.len(), 1);
         assert!(out.notes[0].starts_with("2 name and description edits are not compiled."));
+    }
+
+    /// Read-only Lua carried on the project (issue #1280) is noted, never
+    /// compiled and never silently dropped.
+    #[test]
+    fn read_only_lua_is_noted_rather_than_compiled_or_dropped() {
+        let mut project = project(json!({ "disabled": ["armflash"] }));
+        project.read_only_lua = vec![crate::model::ReadOnlyLuaBlock {
+            title: "tweakdefs3".to_string(),
+            lua: "do while true do end end".to_string(),
+            note: "Decoded as a program, not data.".to_string(),
+        }];
+        let out = compile(&project);
+        assert!(out
+            .notes
+            .iter()
+            .any(|n| n.contains("1 block of read-only Lua")));
+        for compiled in &out.files {
+            assert!(!compiled.contents.contains("while true do end"));
+        }
     }
 
     /// A project arrives as JSON that somebody may have been sent, and its

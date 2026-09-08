@@ -105,6 +105,24 @@ impl GameEdits {
     }
 }
 
+/// A block of Lua a project carries but does not edit (issue #1280).
+///
+/// A mirror of `src/workshop/readOnlyLua.ts`. What lands here came out of a
+/// decoded tweak set that turned out to be a program rather than data: a
+/// `tweakdefs` block full of loops and conditionals, that could be shown but
+/// not safely read into any of the five editable stores. It sits on
+/// `ModProject` rather than inside `GameEdits`, on purpose: `GameEdits` is the
+/// five stores an edit can land in, and this is not an edit at all, only Lua
+/// kept for the record. Nothing in this crate ever mutates it after a project
+/// is created, and `compile.rs` never compiles it, only notes that it exists.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadOnlyLuaBlock {
+    pub title: String,
+    pub lua: String,
+    pub note: String,
+}
+
 /// A project as the compiler is handed one.
 ///
 /// The same fields `ModProjectPayload` carries, minus the ones nothing here
@@ -122,6 +140,10 @@ pub struct ModProject {
     pub game_name: String,
     #[serde(default)]
     pub edits: GameEdits,
+    /// Lua the project carries read-only (issue #1280). See
+    /// [`ReadOnlyLuaBlock`] for why it lives here rather than in `edits`.
+    #[serde(default)]
+    pub read_only_lua: Vec<ReadOnlyLuaBlock>,
 }
 
 #[cfg(test)]

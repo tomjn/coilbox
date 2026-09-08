@@ -160,6 +160,36 @@ describe("a project survives being closed", () => {
     expect(imported?.authoredChecksum).toBe("abc123");
     expect(imported?.edits).toEqual(edits);
     expect(Object.keys(imported?.edits.overrides ?? {})).toEqual(["armcom"]);
+    // No read-only Lua was carried, so the field is left off rather than
+    // written empty (issue #1280).
+    expect(imported?.readOnlyLua).toBeUndefined();
+  });
+
+  /**
+   * Issue #1280. A project carrying Lua recovered from a decoded import that
+   * turned out to be a program keeps that Lua across a share, but it is not
+   * one of the five stores: it survives the round trip on its own field.
+   */
+  it("carries read-only Lua across a share, unedited", () => {
+    const project = {
+      id: "whatever",
+      name: "Somebody else's tweaks",
+      gameName: "Balanced Annihilation V15.9.8",
+      edits: EMPTY_EDITS,
+      readOnlyLua: [
+        {
+          title: "tweakdefs3",
+          lua: "do while true do end end",
+          note: "Decoded as a program, not data.",
+        },
+      ],
+      createdAt: "2026-09-08T00:00:00.000Z",
+      updatedAt: "2026-09-08T00:00:00.000Z",
+    };
+
+    const imported = parseModProjectJson(modProjectJson(project));
+
+    expect(imported?.readOnlyLua).toEqual(project.readOnlyLua);
   });
 
   it("is a container anything can recognise without opening it", () => {
@@ -293,6 +323,33 @@ describe("reading an untrusted file", () => {
     expect(edits.text).toEqual({ armrock: { en: { name: "Pebble" } } });
     // Lowercased, de-duplicated and sorted, which is what `disabled.ts` keeps.
     expect(edits.disabled).toEqual(["armpw", "armrock"]);
+  });
+
+  /** A read-only block missing a required string field is dropped, not
+   *  patched with a blank: a block with no `lua` is not a block. */
+  it("drops a read-only Lua block that is missing a field", () => {
+    const imported = parseModProjectJson(
+      JSON.stringify({
+        format: "coilbox",
+        container: 1,
+        kind: "mod-project",
+        kindVersion: 1,
+        payload: {
+          name: "x",
+          gameName: "y",
+          edits: {},
+          readOnlyLua: [
+            { title: "good", lua: "do end", note: "a program" },
+            { title: "missing lua", note: "a program" },
+            { title: "missing note", lua: "do end" },
+            "not even an object",
+          ],
+        },
+      }),
+    );
+    expect(imported?.readOnlyLua).toEqual([
+      { title: "good", lua: "do end", note: "a program" },
+    ]);
   });
 
   /**
