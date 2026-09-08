@@ -313,3 +313,13 @@ body,
   border: none;
   border-radius: 4px;
 }
+
+/* shiki writes both themes at once: the light colours inline and the dark ones
+   as custom properties. This swaps them under the dark ramp, so a code block
+   follows the player's theme instead of being a dark island on a light page.
+   `!important` because the colours shiki emits are inline styles. */
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+}
