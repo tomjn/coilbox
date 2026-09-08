@@ -161,6 +161,12 @@ export interface SlotProgress {
    *  names its own limit when it drops an over-long command, and that is a far
    *  better answer than "no echo arrived". */
   serverSaid?: string[];
+  /** Anything the room's host said while this slot was in flight. SPADS refuses
+   *  a `!bSet` in words, and the commonest refusal by far is that the sender is
+   *  not the room's boss. Read only to explain a slot that did not land, never
+   *  to decide whether one did: chat is what a bot chose to say, and script
+   *  tags are what the match will run on. */
+  hostSaid?: string[];
 }
 
 export interface DeliveryProgress {
@@ -185,6 +191,8 @@ export interface DeliveryIo {
   serverMessageCount(): number;
   /** The server announcements that arrived after the given count. */
   serverMessagesSince(count: number): string[];
+  /** What the battle's host said from the given time onwards. */
+  hostSaidSince(at: number): string[];
   sleep(ms: number): Promise<void>;
   now(): number;
   /** Called on every state change, so a caller can render the run as it goes. */
@@ -232,12 +240,17 @@ export async function runDelivery(
     }
   };
 
-  const stop = (index: number, reason: string, serverSaid: string[]) => {
+  const stop = (
+    index: number,
+    reason: string,
+    said: { server: string[]; host: string[] },
+  ) => {
     progress[index] = {
       ...progress[index],
       state: "failed",
       reason,
-      ...(serverSaid.length > 0 ? { serverSaid } : {}),
+      ...(said.server.length > 0 ? { serverSaid: said.server } : {}),
+      ...(said.host.length > 0 ? { hostSaid: said.host } : {}),
     };
     skipFrom(index + 1);
     stoppedAt = index;
@@ -261,24 +274,25 @@ export async function runDelivery(
     }
 
     const seenBefore = io.serverMessageCount();
+    const sentAt = io.now();
+    const said = () => ({
+      server: io.serverMessagesSince(seenBefore),
+      host: io.hostSaidSince(sentAt),
+    });
     progress[i] = { ...progress[i], state: "sending" };
     report();
 
     try {
       await io.send(slot);
     } catch (error) {
-      stop(
-        i,
-        error instanceof Error ? error.message : String(error),
-        io.serverMessagesSince(seenBefore),
-      );
+      stop(i, error instanceof Error ? error.message : String(error), said());
       break;
     }
 
     progress[i] = { ...progress[i], state: "confirming" };
     report();
 
-    const startedAt = io.now();
+    const startedAt = sentAt;
     const timeout = confirmTimeoutMs(slot.bytes, viaAutohost);
     let landed = false;
     while (io.now() - startedAt < timeout) {
@@ -293,7 +307,7 @@ export async function runDelivery(
       stop(
         i,
         `The battle never came back with ${slot.name}, after ${Math.round(timeout / 1000)}s of waiting.`,
-        io.serverMessagesSince(seenBefore),
+        said(),
       );
       break;
     }

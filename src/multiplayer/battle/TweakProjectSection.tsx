@@ -241,16 +241,28 @@ export function TweakProjectSection({
               {failed && (
                 <div className="flex flex-col gap-2 text-xs text-destructive">
                   <p>{failed.reason}</p>
+                  {failed.hostSaid?.map((said) => (
+                    <p key={said} className="break-all">
+                      The host said: {said}
+                    </p>
+                  ))}
                   {failed.serverSaid?.map((said) => (
                     <p key={said} className="break-all">
                       The server said: {said}
                     </p>
                   ))}
+                  {!failed.hostSaid && !failed.serverSaid && (
+                    <p>
+                      Nothing said why. The usual causes are not being the
+                      room's boss, the autohost ignoring you for sending too
+                      much too fast, and a lobby server that drops a line this
+                      long.
+                    </p>
+                  )}
                   <p>
-                    Run it again to finish the set. Slots this battle already
-                    holds are skipped, so a second run only sends what is
-                    missing. Do not start the match until it says every slot is
-                    set.
+                    Do not start the match on what is set now. Running it again
+                    finishes the set and skips the slots this battle already
+                    holds, so a second run only sends what is missing.
                   </p>
                 </div>
               )}

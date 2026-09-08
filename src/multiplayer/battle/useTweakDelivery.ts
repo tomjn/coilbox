@@ -103,6 +103,23 @@ export function useTweakDelivery({
             serverMessageCount: () => mirrorRef.current.serverMessageCount,
             serverMessagesSince: (count) =>
               serverMessagesSince(mirrorRef.current, count),
+            hostSaidSince(at) {
+              const state = mirrorRef.current.state;
+              const battle = state?.battles[String(battleId)];
+              if (!state || !battle?.channel) return [];
+              // Only the host, because an autohost's refusal is the thing worth
+              // quoting and a player in the room saying "no" is not. Only the
+              // first two, because an accepted setting is announced with its own
+              // 16 KB value behind it, split across as many lines as that takes.
+              return (state.channels[battle.channel]?.messages ?? [])
+                .filter(
+                  (m) => m.at >= at && m.from === battle.host && m.id == null,
+                )
+                .slice(0, 2)
+                .map((m) =>
+                  m.text.length > 200 ? `${m.text.slice(0, 200)}…` : m.text,
+                );
+            },
             sleep: (ms) =>
               new Promise<void>((resolve) => setTimeout(resolve, ms)),
             now: () => Date.now(),

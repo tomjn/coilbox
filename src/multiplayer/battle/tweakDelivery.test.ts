@@ -42,6 +42,8 @@ function fakeLobby(opts: {
   tags?: Record<string, string>;
   /** What the lobby server announces once the first slot is on the wire. */
   serverSaysOnSend?: string[];
+  /** What the room's host says once the first slot is on the wire. */
+  hostSaysOnSend?: string[];
   cancelAfterSends?: number;
 }) {
   const tags: Record<string, string> = { ...(opts.tags ?? {}) };
@@ -65,6 +67,7 @@ function fakeLobby(opts: {
     confirmed: (tagKey) => tags[tagKey],
     serverMessageCount: () => serverMessages.length,
     serverMessagesSince: (count) => serverMessages.slice(count),
+    hostSaidSince: () => (sent.length > 0 ? (opts.hostSaysOnSend ?? []) : []),
     async sleep(ms) {
       sleeps.push(ms);
       clock += ms;
@@ -228,6 +231,21 @@ describe("runDelivery", () => {
 
     expect(result.slots[0].serverSaid).toEqual([
       'message length limit of 10000 chars was exceeded: command "!bset tweakdefs1..." dropped.',
+    ]);
+  });
+
+  it("quotes the autohost's own refusal, which is usually about being boss", async () => {
+    const { io } = fakeLobby({
+      echoAfter: { tweakdefs1: "never" },
+      hostSaysOnSend: [
+        '* alice, you are not allowed to call command "bset" in current context (boss mode is enabled).',
+      ],
+    });
+
+    const result = await runDelivery([slot()], io, { viaAutohost: true });
+
+    expect(result.slots[0].hostSaid).toEqual([
+      '* alice, you are not allowed to call command "bset" in current context (boss mode is enabled).',
     ]);
   });
 
