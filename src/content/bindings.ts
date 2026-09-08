@@ -1374,18 +1374,23 @@ export interface UnitDefsResult {
    */
   unitErrors: string[];
   /**
-   * What the game's `language/en/units.json` calls each unit, keyed by
-   * lowercased def key.
+   * What the game calls its units in each `language/<code>/units.json` it
+   * ships, keyed by that language code and then by lowercased def key.
    *
    * Absent for a game that names its units in its unitdefs, which is every game
    * measured here but Beyond All Reason. BAR writes no `name`, no `humanName`
-   * and no `description` in any of its 564 unitdefs and keeps both in this file
-   * instead, so this is the only place a rename or a rewritten tooltip can go
-   * for it (issue #2650).
+   * and no `description` in any of its 564 unitdefs and keeps both in these
+   * files instead, so this is the only place a rename or a rewritten tooltip
+   * can go for it (issue #2650).
+   *
+   * One entry per translation the game ships, since a rename made in English
+   * alone leaves the other translations saying the old thing (issue #2672).
+   * Beyond All Reason ships six: de, en, es, fr, ru and zh.
    */
-  languageNames?: Record<string, string>;
-  /** The `units.descriptions` beside them: the tooltip under the name. */
-  languageDescriptions?: Record<string, string>;
+  languageText?: Record<
+    string,
+    { names?: Record<string, string>; descriptions?: Record<string, string> }
+  >;
   checksum?: string;
   errors: string[];
 }
