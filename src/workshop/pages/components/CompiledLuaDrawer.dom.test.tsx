@@ -93,4 +93,37 @@ describe("the generated Lua drawer", () => {
       screen.getByText(/The compiler could not run: command not found/),
     ).toBeTruthy();
   });
+
+  /**
+   * Issue #1280. Lua recovered from a decoded import that turned out to be a
+   * program is shown in its own section, never mixed in with the generated
+   * files above it: nothing here compiled it and nothing here runs it.
+   */
+  it("shows read-only Lua a decoded import carried, separate from the generated files", () => {
+    render(
+      <CompiledLuaDrawer
+        open
+        onOpenChange={() => {}}
+        project={{
+          ...project,
+          readOnlyLua: [
+            {
+              title: "tweakdefs3",
+              lua: "do while true do end end",
+              note: "Decoded as a program, not data.",
+            },
+          ],
+        }}
+        state={compiled()}
+      />,
+    );
+    expect(screen.getByText("Read only (1)")).toBeTruthy();
+    expect(screen.getByText("tweakdefs3")).toBeTruthy();
+    expect(screen.getByText("Decoded as a program, not data.")).toBeTruthy();
+  });
+
+  it("shows nothing extra for a project with no read-only Lua", () => {
+    draw(compiled());
+    expect(screen.queryByText(/^Read only/)).toBeNull();
+  });
 });
