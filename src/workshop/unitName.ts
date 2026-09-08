@@ -29,6 +29,10 @@
  * from `rts/Sim/Units/UnitDef.cpp:290`, where `humanName` is read with `name`
  * as its default and the engine's comment beside it calls `name` the internal
  * name.
+ *
+ * One unit may also borrow another's name, {@link textRedirect}, which is how
+ * `armcomcon` reads Armada Commander in Beyond All Reason and has no entry of
+ * its own anywhere.
  */
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { unitLabel } from "@/content/unitChoices";
@@ -49,24 +53,63 @@ function readInsensitive(def: Record<string, unknown>, key: string): unknown {
 }
 
 /**
+ * The unit a def hands its name and description lookup to, if it hands them off.
+ *
+ * Beyond All Reason's `luaui/i18nhelpers.lua` reads
+ * `units.names.<customParams.i18nfromunit>` in place of the unit's own key,
+ * which is how its commander variants borrow the name of the commander they are
+ * made from: `armcomcon` reads Armada Commander and has no entry of its own.
+ * Eleven of BAR's unit files set it, measured on 8 September 2026 against
+ * test-30922-8064a43.
+ *
+ * Def keys arrive lowercased, hence the spelling.
+ */
+export function textRedirect(
+  def: Record<string, unknown> | undefined,
+): string | undefined {
+  const params = def?.customparams;
+  if (typeof params !== "object" || params === null) return undefined;
+  const from = (params as Record<string, unknown>).i18nfromunit;
+  if (typeof from !== "string") return undefined;
+  const redirect = from.trim().toLowerCase();
+  return redirect === "" ? undefined : redirect;
+}
+
+/**
  * The name to show, and the key to fall back on.
  *
  * `entry` is the unit's row in the curated dataset, absent while that read is
  * still open or for a unit it does not carry. A game that names a unit nowhere
  * gets its internal key, which reads badly and is at least true: inventing a
  * prettier version of `armaak` would be inventing a fact about the game.
+ *
+ * `borrowed` is the row for the unit this def redirects its lookup to, read
+ * after the unit's own row and before the def. That order is
+ * `fill_missing_names`' order in `dataset.rs`, where a borrowed name is a
+ * fallback for a unit nothing else named, so the heading and the list cannot
+ * disagree with the catalog about the same unit. It costs nothing in Beyond All
+ * Reason, whose defs name no unit at all.
+ *
+ * Pass it for a copy of a redirected unit too. The dataset is not asked about a
+ * copy's own key, since it would answer with the name of the unit the copy
+ * stands in for, but a def naming another unit is asking in so many words.
  */
 export function unitDisplayName(
   key: string,
   def: Record<string, unknown> | undefined,
   entry?: UnitDatasetEntry,
+  borrowed?: UnitDatasetEntry,
 ): string {
-  if (entry) {
-    const named = unitLabel(entry).trim();
-    // `unitLabel` falls back to the entry's own internal name, which is this
-    // key, so a dataset that could not name the unit is not treated as if it
-    // had.
-    if (named && named !== key) return named;
+  const rows: (UnitDatasetEntry | undefined)[] =
+    textRedirect(def) === undefined ? [entry] : [entry, borrowed];
+  for (const row of rows) {
+    if (!row) continue;
+    const named = unitLabel(row).trim();
+    // `unitLabel` falls back to the row's own internal name, so a dataset that
+    // could not name the unit is not treated as if it had. Neither key will do:
+    // a borrowed row that names nothing would otherwise put `armcom` on screen
+    // in place of `armcomcon`, which is a different unit's key.
+    if (named && named !== row.name && named !== key) return named;
   }
   for (const candidate of ["humanName", "name"]) {
     const value = readInsensitive(def ?? {}, candidate);

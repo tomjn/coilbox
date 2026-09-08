@@ -124,7 +124,7 @@ import {
   parseModProjectJson,
   useModProjects,
 } from "../project";
-import { unitDisplayName } from "../unitName";
+import { textRedirect, unitDisplayName } from "../unitName";
 import { type FieldView, unitFieldView } from "../unitSections";
 import {
   BASE_LANGUAGE,
@@ -302,9 +302,21 @@ export default function UnitPage() {
   // (issue #2650). It travels with the project, so an export carries the name
   // and so does a copy of the project.
   const nameOf = useCallback(
-    (key: string, def: Record<string, unknown> | undefined) =>
-      nameEdit(key, def, overrides, text)?.trim() ||
-      unitDisplayName(key, def, clones[key] ? undefined : named.get(key)),
+    (key: string, def: Record<string, unknown> | undefined) => {
+      // The unit this def borrows its name from, where it borrows one
+      // (issue #2686). A copy is asked the same question as the unit it was
+      // copied from, because the redirect travels with the def.
+      const borrowed = textRedirect(def);
+      return (
+        nameEdit(key, def, overrides, text)?.trim() ||
+        unitDisplayName(
+          key,
+          def,
+          clones[key] ? undefined : named.get(key),
+          borrowed === undefined ? undefined : named.get(borrowed),
+        )
+      );
+    },
     [named, clones, overrides, text],
   );
 
@@ -493,9 +505,15 @@ export default function UnitPage() {
       (dataset?.units ?? []).map((u) => [u.name.toLowerCase(), u]),
     );
     for (const clone of Object.values(clones)) {
+      const borrowed = textRedirect(clone.def);
       byName.set(clone.key, {
         name: clone.key,
-        fullName: unitDisplayName(clone.key, clone.def, undefined),
+        fullName: unitDisplayName(
+          clone.key,
+          clone.def,
+          undefined,
+          borrowed === undefined ? undefined : byName.get(borrowed),
+        ),
         buildOptions: buildOptionsOf(clone.def),
       });
     }
