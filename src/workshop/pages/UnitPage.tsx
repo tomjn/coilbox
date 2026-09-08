@@ -71,7 +71,9 @@ import { assetIndex } from "@/content/assetKinds";
 import {
   useScanTargetSelection,
   useUnitsyncArchiveTree,
+  useUnitsyncGameInfo,
   useUnitsyncScan,
+  useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import {
@@ -79,6 +81,7 @@ import {
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { buildTechForest } from "@/content/techForest";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useLegoProjects } from "@/lego/projects";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
@@ -125,6 +128,7 @@ import {
   useModProjects,
 } from "../project";
 import { textRedirect, unitDisplayName } from "../unitName";
+import { unitPicLookup } from "../unitPics";
 import { type FieldView, unitFieldView } from "../unitSections";
 import {
   BASE_LANGUAGE,
@@ -520,6 +524,68 @@ export default function UnitPage() {
     return [...byName.values()];
   }, [dataset, clones]);
 
+  // Every unit's build picture, in one read for the whole game (issue #2692).
+  // Both lists on the page draw from it, and so does the build menu's add
+  // picker, which used to mount the game's archives and decode the lot a second
+  // time on its own the moment it was opened.
+  //
+  // Over the game's own units and never the table with our copies in it. The
+  // read is cached on the id set it was asked for, so a list that grew by one
+  // every time somebody copied a unit would send all 564 round again for the
+  // sake of one name unitsync has never heard of.
+  const picIds = useMemo(() => Object.keys(gameUnits), [gameUnits]);
+  const buildpics = useUnitsyncUnitBuildpics(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+    picIds,
+  );
+  // No pictures yet is not the same as no pictures: until the read lands a row
+  // says nothing either way, rather than claiming the game ships none.
+  const picsPending = !buildpics && picIds.length > 0;
+  const picOf = useMemo(
+    () => unitPicLookup({ buildpics, clones, units, overrides }),
+    [buildpics, clones, units, overrides],
+  );
+
+  // Which side reaches each unit, which is the game's own answer and the only
+  // thing that tells Beyond All Reason's four "Advanced Aircraft Plant" rows
+  // apart. One walk for the page: the left-hand list names the side on the row,
+  // and a builder's roster uses the same answer to mark a unit from another one.
+  const { info: gameInfo } = useUnitsyncGameInfo(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+  );
+  const sides = useMemo(
+    () => (gameInfo?.sides ?? []).filter((s) => !!s.startUnit),
+    [gameInfo],
+  );
+  const forest = useMemo(
+    () =>
+      buildTechForest(
+        pickerUnits,
+        sides.map((s) => s.startUnit as string),
+      ),
+    [pickerUnits, sides],
+  );
+  const factionOf = useCallback(
+    (key: string): string | undefined => {
+      // A one-sided game answers nothing, because the same word on all 379 rows
+      // tells nobody anything. Neither does a unit no side's build graph
+      // reaches, which includes every unit copied or built here: the game has
+      // no opinion about a unit it has never seen, and the row's own "added" or
+      // "built" mark already says whose it is.
+      if (sides.length < 2) return undefined;
+      const root = forest.factionOf.get(key);
+      if (root === undefined) return undefined;
+      return (
+        sides.find((s) => s.startUnit?.toLowerCase() === root)?.name ?? root
+      );
+    },
+    [forest, sides],
+  );
+
   const inheritedMenu = useMemo(() => buildOptionsOf(unit), [unit]);
   const menuOps = menus[unitKey];
   const currentMenu = useMemo(
@@ -892,6 +958,9 @@ export default function UnitPage() {
             menus={menus}
             disabled={disabled}
             nameOf={nameOf}
+            picOf={picOf}
+            picsPending={picsPending}
+            factionOf={factionOf}
             onSelect={(key) => select({ unit: key })}
           />
 
@@ -1048,6 +1117,10 @@ export default function UnitPage() {
                     clones={clones}
                     disabled={disabled}
                     nameOf={(key) => nameOf(key, units[key])}
+                    picOf={picOf}
+                    picsPending={picsPending}
+                    buildpics={buildpics}
+                    factionOf={factionOf}
                     gameName={game.name}
                     gameArchive={game.primaryArchive.name}
                     enginePath={selected?.enginePath}
