@@ -1,15 +1,17 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { SlidersHorizontal } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { cachedProjectName } from "./project";
 
 /**
  * The workshop: changing what a game's units are, rather than what they look
  * like.
  *
- * v0.1 is the unit page: change a unit's numbers, and copy a unit to add one of
- * your own. Edits go into a named project as they are made, one project per
- * game, saved through the frame settings store and exportable as a `.json`
- * anybody can open (issue #1282, and `project.ts`). Asset pickers follow.
+ * Two routes, the same pair the unit builder has: `/workshop` is the projects
+ * you have started and `/workshop/:id` is one of them open (issue #2696). A
+ * project is one game's edits, saved through the frame settings store as they
+ * are made and exportable as a `.json` anybody can open (issue #1282, and
+ * `project.ts`).
  */
 const workshopPlugin: FramePlugin = {
   id: "workshop",
@@ -34,12 +36,26 @@ const workshopPlugin: FramePlugin = {
   ],
   routes: [
     {
-      // The game and the unit are query parameters rather than path segments,
-      // so picking either does not unmount the page and take the unsaved edits
-      // with it. See the page's own note.
       path: "workshop",
-      lazy: gateAdvanced(() => import("./pages/UnitPage")),
+      lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
       crumb: "Unit tweaks",
+    },
+    {
+      // The unit is a query parameter rather than a path segment, so picking one
+      // does not unmount the page and take the game's whole unit table with it.
+      // See the page's own note.
+      //
+      // The route param is an opaque uuid, so the crumb resolves the project's
+      // name from the settings store, falling back when it names no project.
+      // `new` is the editor with no project yet, which is where a unit's
+      // encyclopedia page sends somebody who has picked a unit and not a
+      // project (see `routes.ts`).
+      path: "workshop/:id",
+      lazy: gateAdvanced(() => import("./pages/UnitPage")),
+      crumb: (c) =>
+        c.params.id === "new"
+          ? "New project"
+          : (c.params.id && cachedProjectName(c.params.id)) || "Project",
     },
   ],
   settings: [],

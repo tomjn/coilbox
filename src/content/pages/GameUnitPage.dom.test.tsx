@@ -123,6 +123,14 @@ vi.mock("../config", () => ({
 }));
 
 const { default: GameUnitPage } = await import("./GameUnitPage");
+const { PersistentStoreProvider } = await import("@picoframe/frame");
+const { memorySettingsStorage } = await import("@/lib/storedSetting");
+
+const { EMPTY_EDITS, PROJECTS_KEY } = await import("@/workshop/project");
+
+/** The page reads the saved tweak projects, only to work out where its "Edit in
+ *  Unit tweaks" button goes (issue #2696). Empty except where a test says. */
+const storage = memorySettingsStorage();
 
 afterEach(cleanup);
 
@@ -156,22 +164,67 @@ function renderUnit(
   mockRenders = opts.renders ?? {};
   mockModelRequests = [];
   return render(
-    <MemoryRouter
-      initialEntries={[
-        `/library/games/${encodeURIComponent(GAME_NAME)}/units/${id}`,
-      ]}
-    >
-      <Routes>
-        <Route
-          path="/library/games/:name/units/:unit"
-          element={<GameUnitPage />}
-        />
-      </Routes>
-    </MemoryRouter>,
+    <PersistentStoreProvider storage={storage}>
+      <MemoryRouter
+        initialEntries={[
+          `/library/games/${encodeURIComponent(GAME_NAME)}/units/${id}`,
+        ]}
+      >
+        <Routes>
+          <Route
+            path="/library/games/:name/units/:unit"
+            element={<GameUnitPage />}
+          />
+        </Routes>
+      </MemoryRouter>
+    </PersistentStoreProvider>,
   );
 }
 
 describe("GameUnitPage", () => {
+  /**
+   * Issue #2696. The workshop opens on a list of projects now, and somebody
+   * pressing this has chosen a unit rather than a project. Landing them on the
+   * list, without the unit they were reading about, is the one answer that
+   * would be worse than the single-page workshop this replaced.
+   */
+  describe("the Edit in Unit tweaks button", () => {
+    const link = () =>
+      screen.getByRole("link", { name: /Edit in Unit tweaks/ });
+
+    it("opens the game's own tweak project on this unit", async () => {
+      storage.set(
+        PROJECTS_KEY,
+        JSON.stringify([
+          {
+            id: "abc",
+            name: "Slower tanks",
+            gameName: GAME_NAME,
+            edits: EMPTY_EDITS,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ]),
+      );
+      renderUnit("armsolar", [{ name: "armsolar", fullName: "Solar" }]);
+      await screen.findByRole("heading", { name: "Solar" });
+      expect(link().getAttribute("href")).toBe("/workshop/abc?unit=armsolar");
+    });
+
+    it("opens the editor with no project when the game has none", async () => {
+      storage.set(PROJECTS_KEY, JSON.stringify([]));
+      renderUnit("armsolar", [{ name: "armsolar", fullName: "Solar" }]);
+      await screen.findByRole("heading", { name: "Solar" });
+      // The space in "Test Game" is a `+`, which is what the editor's own
+      // `useSearchParams` read expects back. Beyond All Reason installs under a
+      // name with spaces in it, so this is the ordinary case rather than an
+      // awkward one.
+      expect(link().getAttribute("href")).toBe(
+        "/workshop/new?game=Test+Game&unit=armsolar",
+      );
+    });
+  });
+
   it("names the unit and shows its def key", async () => {
     renderUnit("armsolar", [{ name: "armsolar", fullName: "Solar Collector" }]);
     expect(
