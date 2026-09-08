@@ -20,6 +20,35 @@ Let rustfmt own formatting — run `cargo fmt --all` rather than hand-formatting
 
 Both `apt-get install` steps in CI fail from time to time on the runner rather than on your diff. A red job whose failing step is `Install LuaJIT` or `Linux build dependencies` is an infrastructure flake, so re-run the job rather than changing code.
 
+## Driving the app
+
+Verifying a change on screen is expected for anything visual, and every step below has cost somebody real time. Read this before starting an instance.
+
+**A portable instance has no games until you seed it.** Running your own coilbox is the safe way to avoid disturbing one already open, and portable mode keeps it out of the user's app data: a `.coilbox/profile.json` beside the binary redirects `data_dir` to `.coilbox/data` and `cache_dir` to `.coilbox/cache`. But a fresh portable profile has **no content roots**, because the auto-detection that finds the Spring data directory does not apply there. The game picker comes up empty and every screenshot is of an app with nothing in it. Seed it first:
+
+```sh
+mkdir -p <app-dir>/.coilbox/data <app-dir>/.coilbox/cache
+cp -R "$HOME/Library/Application Support/com.tomjn.coilbox/." <app-dir>/.coilbox/data/
+```
+
+Copy rather than point at the real directory, so you get the games and settings and still write nothing to the user's own profile. The copy carries their existing projects too, so delete only what you create. An empty game picker means an unseeded profile, not a bug in your change.
+
+**The Tauri MCP socket is pinned.** `.mcp.json` fixes it at one path and the app binds that path. If another app already holds it, your MCP calls **drive that app instead of failing**, with nothing in the response saying so. An agent resized somebody else's window that way. Run on your own port with your own socket path, revert those local edits before committing, and confirm which app you are driving before believing what you see.
+
+**`execute_js` is effectively read-only.** Monkey-patching renderer internals wedges the JS bridge, and so does something as ordinary as setting `window.location.hash` to navigate: both have taken the app down with a SIGTERM. Use the MCP's own `navigate` tool, and reach for `execute_js` only to read.
+
+**Anchor any `pkill` to your own path.** `pkill -f "tauri dev"` matches every checkout on the machine, not yours. Use the absolute path of your own binary and your own vite.
+
+**A `tauri dev` app does not use the sidecar you just built.** `bun run sidecar:unitsync` writes `src-tauri/binaries/coilbox-unitsync-worker-<triple>`, which is what a bundled build uses. A dev app resolves `target/debug/coilbox-unitsync-worker`, refreshed only by `cargo build`. After changing the worker, do both, then check the flag directly rather than trusting the build's success message.
+
+## Worktrees and branches
+
+**Give every worktree its own `CARGO_TARGET_DIR`.** Sharing one between checkouts has produced a stale sidecar binary that answered "unknown argument" for a mode that had just merged, and crates whose build scripts pointed into a worktree that no longer existed. The disk saving is not worth the hour.
+
+**Do not `git rebase`.** The `git-safe` hook blocks it and offers `allow: rebase` in `.git-safe` as the escape. Do not take it: editing the guard configuration is the user's call. Update a conflicting branch by merging `origin/main` into it, which needs no force push either.
+
+**Never run `git checkout` or `git pull` in a checkout somebody else is working in.** It switches the shared working tree out from under them, and a commit made in that window lands on the wrong branch. `gh pr merge` and `git fetch` do the job without touching the tree.
+
 ## UI components
 
 Prefer picoframe's components over native elements or hand-rolled ones. picoframe ships UI through **two channels**:
