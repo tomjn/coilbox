@@ -21,6 +21,7 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import { FolderOpen, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Switch } from "@/components/ui/switch";
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
@@ -143,6 +144,23 @@ function SettlingInput({
 }
 
 /**
+ * A field whose value has to name something the game declares, so it is picked
+ * (issue #2651).
+ *
+ * A value already in the box that is not on the list is offered anyway, at the
+ * top and said to be unknown. It is either a name this game spells in a file
+ * nothing here read, or a name carried in from a game that did have it, and
+ * dropping it out of the list would replace the user's value with an empty box
+ * the moment they opened the page.
+ */
+export interface FieldChoices {
+  options: { value: string; label: string; description?: string }[];
+  placeholder: string;
+  /** What to say about a value the list does not contain. */
+  unknownLabel: (value: string) => string;
+}
+
+/**
  * One row. `onChange` is handed the new value and is expected to drop the
  * override when it matches what was inherited, which is what `setOverride`
  * does, so this component never has to decide whether an edit is really an edit.
@@ -151,11 +169,19 @@ export function UnitFieldRow({
   row,
   note,
   assets,
+  choices,
+  warning,
   inheritedLabel = "Game value",
   onChange,
   onReset,
 }: {
   row: FieldRow;
+  /** What this field is allowed to name, when the game declares a list of it
+   *  (issue #2651). Absent for every field that is free text. */
+  choices?: FieldChoices;
+  /** Something wrong with the value that only its neighbours reveal, such as a
+   *  movement class on a unit that does not move (issue #2651). */
+  warning?: string;
   /** The game's archive, for a field that names a file in it (issue #2648).
    *  Absent until the listing lands, and on a page with no game picked. */
   assets?: AssetBrowsing;
@@ -201,6 +227,19 @@ export function UnitFieldRow({
     />
   );
 
+  const current = typeof row.value === "string" ? row.value.trim() : "";
+  const options =
+    choices && current && !choices.options.some((o) => o.value === current)
+      ? [
+          {
+            value: current,
+            label: current,
+            description: choices.unknownLabel(current),
+          },
+          ...choices.options,
+        ]
+      : (choices?.options ?? []);
+
   return (
     <div
       className={cn(
@@ -235,6 +274,15 @@ export function UnitFieldRow({
             checked={row.value === true}
             aria-label={row.label}
             onCheckedChange={(v) => onChange(v)}
+          />
+        ) : choices && kind === "text" ? (
+          <OptionSelect
+            size="sm"
+            ariaLabel={row.label}
+            placeholder={choices.placeholder}
+            value={current}
+            onValueChange={onChange}
+            options={options}
           />
         ) : kind === "raw" ? (
           <code className="truncate rounded bg-muted px-1.5 py-1 font-mono text-xs text-muted-foreground">
@@ -273,12 +321,15 @@ export function UnitFieldRow({
         ) : (
           input
         )}
-        {missing && (
-          <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500">
+        {[missing, warning].filter(Boolean).map((text) => (
+          <span
+            key={text}
+            className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500"
+          >
             <TriangleAlert className="size-3 shrink-0" />
-            {missing}
+            {text}
           </span>
-        )}
+        ))}
         {note && (
           <span className="flex flex-wrap items-baseline gap-x-1.5 text-[10px] text-muted-foreground">
             {note.text}

@@ -133,6 +133,45 @@ describe("unitFieldView", () => {
   const drawable = (def: Record<string, unknown>) =>
     presentPaths(def).filter((p) => !OWN_EDITOR.has(p.toLowerCase()));
 
+  /**
+   * Issue #2651. The relevant view hides a path the def does not declare, and
+   * for the movement class that absence is the thing somebody came to fix, so
+   * the page can name paths to keep.
+   */
+  describe("a path the page asks to keep", () => {
+    it("draws a row for a field the def does not declare", () => {
+      const view = unitFieldView({ canMove: true }, {}, "u", "relevant", [
+        "movementClass",
+      ]);
+      expect(rowsOf(view).map((r) => r.path)).toContain("movementClass");
+    });
+
+    /**
+     * The bug this caught in a real game. The registry spells `movementClass`
+     * and Balanced Annihilation spells `movementclass`, and the path is what
+     * the row reads its value from, so replacing the game's spelling with the
+     * registry's drew an empty box over a unit that had a class.
+     */
+    it("never replaces the game's own spelling of the same key", () => {
+      const view = unitFieldView(
+        { canmove: true, movementclass: "KBOT2" },
+        {},
+        "u",
+        "relevant",
+        ["movementClass"],
+      );
+      const row = rowsOf(view).find(
+        (r) => r.path.toLowerCase() === "movementclass",
+      );
+      expect(row?.path).toBe("movementclass");
+      expect(row?.value).toBe("KBOT2");
+      // And only the one row, not the game's spelling and the registry's.
+      expect(
+        rowsOf(view).filter((r) => r.path.toLowerCase() === "movementclass"),
+      ).toHaveLength(1);
+    });
+  });
+
   it("draws only what the unit declares in the relevant view", () => {
     const view = unitFieldView(armcom, {}, "armcom", "relevant");
     const paths = rowsOf(view).map((r) => r.path);

@@ -471,6 +471,17 @@ function parseOverrides(value: unknown): UnitOverrides {
   return out;
 }
 
+/**
+ * Read the added units out of untrusted JSON.
+ *
+ * A `source` is required, which is what keeps a unit built in the lego builder
+ * out of a project (issue #2651). That unit is a real `units/<name>.lua` file
+ * in the game folder, read off the folder each time rather than held anywhere,
+ * so it has an `origin` and no `source`. The page never writes one into the
+ * project's own store, and requiring a `source` here means a file that somehow
+ * carries one loads without it rather than pinning a stale copy of a definition
+ * the game already owns.
+ */
 function parseClones(value: unknown): UnitClones {
   const source = asRecord(value);
   if (!source) return {};

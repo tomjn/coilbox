@@ -290,6 +290,31 @@ describe("reading an untrusted file", () => {
     // Lowercased, de-duplicated and sorted, which is what `disabled.ts` keeps.
     expect(edits.disabled).toEqual(["armpw", "armrock"]);
   });
+
+  /**
+   * A unit built in the lego builder is a file in the game folder, read off the
+   * folder each time (issue #2651). It is not an edit, so it has no `source`
+   * and it does not belong in a project. Loading one drops it rather than
+   * pinning a stale copy of a definition the game already owns.
+   */
+  it("refuses a unit that came from the lego builder rather than a copy", () => {
+    const edits = parseGameEdits({
+      clones: {
+        skyfort: {
+          key: "skyfort",
+          origin: {
+            kind: "lego",
+            projectId: "p1",
+            projectName: "Sky Fortress",
+          },
+          replacesGameUnit: false,
+          def: { name: "Sky Fortress" },
+        },
+        armcom2: { source: "armcom", def: { name: "armcom2" } },
+      },
+    });
+    expect(Object.keys(edits.clones)).toEqual(["armcom2"]);
+  });
 });
 
 describe("naming and copying", () => {

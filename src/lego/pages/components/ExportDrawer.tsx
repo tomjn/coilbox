@@ -46,7 +46,7 @@ import {
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
 import { unitScript } from "../../luaScript";
-import type { LegoProject } from "../../model";
+import type { LegoExport, LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import {
   buildPieceCollisionScript,
@@ -55,7 +55,7 @@ import {
 import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
-import { buildUnitDef } from "../../unitDef";
+import { buildUnitDef, legoUnitDef } from "../../unitDef";
 
 interface Props {
   open: boolean;
@@ -64,13 +64,15 @@ interface Props {
   pack: LoadedPack;
   /** The meshes of a unit imported from somebody else's model, if it is one. */
   raw: RawGeometry | null;
-  /** Remembered on the document, so the next export does not ask again. */
+  /** Remembered on the document, so the next export does not ask again, plus
+   *  the receipt the workshop reads to find this unit in a game (issue #2651). */
   onRemember: (settings: {
     exportDir: string;
     exportTexture: boolean;
     exportScript: boolean;
     exportGlb: boolean;
     exportObj: boolean;
+    exported: LegoExport;
   }) => void;
 }
 
@@ -176,6 +178,12 @@ export function ExportDrawer({
       return;
     }
     setResult({ state: "working" });
+    // Measured rather than taken off the build: a build's `mid` is the header's,
+    // which is the aim point, and the definition is derived from the bounding
+    // box. Derived once here because two things read it: the Lua file the engine
+    // loads, and the receipt the workshop turns into a unit (issue #2651).
+    const bounds = unitBounds(project, pack, raw);
+    const def = legoUnitDef(project, bounds);
     try {
       const exported = await legoExport({
         dir,
@@ -200,10 +208,7 @@ export function ExportDrawer({
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
-        // Measured rather than taken off the build: a build's `mid` is the
-        // header's, which is the aim point, and the definition is derived from
-        // the bounding box.
-        unitDef: buildUnitDef(project, unitBounds(project, pack, raw)),
+        unitDef: buildUnitDef(project, bounds),
         model,
       });
 
@@ -284,6 +289,16 @@ export function ExportDrawer({
         exportScript: withScript,
         exportGlb: withGlb,
         exportObj: withObj,
+        // Only on the way out of a successful export, so the receipt never
+        // claims a folder holds a unit that failed to reach it. A re-export
+        // overwrites the one before it: a project has one current export, which
+        // is what keeps a second run from becoming a second unit (issue #2651).
+        exported: {
+          dir,
+          at: new Date().toISOString(),
+          unitName: project.unitName,
+          def,
+        },
       });
       setResult({
         state: "done",

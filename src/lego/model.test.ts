@@ -281,6 +281,41 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
   });
 
+  it("round-trips the export receipt the workshop reads (#2651)", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      exported: {
+        dir: "/games/BA.sdd",
+        at: "2026-09-07T12:00:00.000Z",
+        unitName: "skyfort",
+        def: { name: "Sky Fortress", canmove: false, maxdamage: 1000 },
+      },
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  /**
+   * A receipt naming no folder or no unit points at nothing, so the workshop
+   * would have a unit it could not attribute to a game. Dropped rather than
+   * rejecting the whole project, the way every other half-written field here is.
+   */
+  it("drops a receipt that names no folder or no unit", () => {
+    const base = project([piece("root", null)]);
+    const def = { name: "Sky Fortress" };
+    for (const exported of [
+      { dir: "", at: "", unitName: "skyfort", def },
+      { dir: "/games/BA.sdd", at: "", unitName: "", def },
+      { dir: "/games/BA.sdd", at: "", unitName: "skyfort", def: null },
+      "not an object",
+    ]) {
+      const parsed = parseLegoProjectJson(
+        JSON.stringify({ ...base, exported }),
+      );
+      expect(parsed).not.toBeNull();
+      expect(parsed?.exported).toBeUndefined();
+    }
+  });
+
   it("round-trips a piece's preserved original name (#2613)", () => {
     const doc = project([
       piece("root", null),

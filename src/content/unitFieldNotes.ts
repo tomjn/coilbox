@@ -160,6 +160,10 @@ export const UNIT_FIELD_NOTES: Record<string, FieldNote> = {
     label: "Will not chase",
     help: "Space separated category names this unit refuses to pursue.",
   },
+  canMove: {
+    label: "Can move",
+    help: "Whether the unit moves at all. A unit with this on and no movement class is dropped at load.",
+  },
   movementClass: {
     label: "Movement class",
     help: "Names an entry in the game's move definitions. Required for a ground unit.",
