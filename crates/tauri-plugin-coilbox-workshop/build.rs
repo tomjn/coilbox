@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "workshop_preflight",
     "workshop_test_mutator",
     "workshop_package_mutator",
+    "workshop_pack_bar_slots",
 ];
 
 fn main() {

@@ -950,6 +950,7 @@ export default function UnitPage() {
                 onPackaged={(version) =>
                   recordPackagedVersion(project.id, version)
                 }
+                routeOptions={gameInfo?.options}
               />
             )}
           </>
