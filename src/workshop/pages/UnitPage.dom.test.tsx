@@ -303,6 +303,43 @@ const type = (input: HTMLInputElement, value: string) => {
  * is already open, so a test can call it after every navigation without
  * tracking which of them remounted the panel.
  */
+/** The row of controls that act on the open unit, from the switch in it. */
+const unitControls = () =>
+  screen.getByLabelText(/^Disable /).closest("div") as HTMLElement;
+
+/**
+ * What decides where every control in the unit's row sits, and so what a test
+ * of issue #2710's invariant has to pin: press a control and it must still be
+ * under the mouse. Reading the rendered position instead would say nothing,
+ * because happy-dom lays nothing out and answers 0 for every box.
+ *
+ * Two halves. `above` is everything laid out ahead of the row inside the header
+ * block: the unit's name and key beside it, and any earlier row. A column only
+ * moves what is under a change, so that is what can move the row down. `row` is
+ * the text of each control in the row, in order, because a row moves what is
+ * beside a control that changes width or comes and goes, whichever end the row
+ * is anchored to. Neither changing means no control in the row moved.
+ */
+const rowPlacement = () => {
+  const block = screen.getByRole("heading", { level: 2 }).parentElement
+    ?.parentElement?.parentElement?.parentElement as HTMLElement;
+  const above: string[] = [];
+  for (
+    let node: Element = unitControls();
+    node !== block && node.parentElement;
+  ) {
+    for (const sibling of node.parentElement.children) {
+      if (sibling === node) break;
+      above.push(sibling.textContent ?? "");
+    }
+    node = node.parentElement;
+  }
+  return {
+    above: above.join("|"),
+    row: [...unitControls().children].map((c) => c.textContent ?? "").join("|"),
+  };
+};
+
 const openBuildMenu = () => {
   const trigger = screen
     .getAllByRole("button")
@@ -871,6 +908,20 @@ describe("UnitPage", () => {
     fireEvent.click(screen.getByText("All"));
     expect(screen.getByLabelText("Radar range")).toBeTruthy();
     expect(screen.getByText(`${shown + hidden} shown`)).toBeTruthy();
+  });
+
+  /**
+   * Issue #2710 again, for the other control whose press changes something
+   * beside it: the count is a different width in each view, so it sits after
+   * the toggle rather than before it or opposite it.
+   */
+  it("leaves the view toggle where it is when it is pressed", () => {
+    show();
+    const before = rowPlacement();
+
+    fireEvent.click(screen.getByText("All"));
+
+    expect(rowPlacement()).toEqual(before);
   });
 
   it("keeps a field the user overrode visible when it goes back to relevant", () => {
@@ -1644,6 +1695,31 @@ describe("UnitPage", () => {
       expect(screen.getByText("1 unit disabled")).toBeTruthy();
       expect(
         screen.getByText(/comes off every build menu when this is compiled/),
+      ).toBeTruthy();
+    });
+
+    /**
+     * Issue #2710. The note used to go under the unit's internal name, in the
+     * left half of a row the controls shared, so switching a unit off widened
+     * that half, wrapped the controls onto a line of their own and left the
+     * switch somewhere else. It goes below the controls now, which is the only
+     * place it can appear without moving them.
+     */
+    it("leaves the switch where it is when it is pressed", () => {
+      openAt("armcom");
+      const toggle = () => screen.getByLabelText("Disable Commander");
+      const before = rowPlacement();
+
+      fireEvent.click(toggle());
+
+      expect(rowPlacement()).toEqual(before);
+      // And the note the press added is below it rather than above.
+      const note = screen.getByText(
+        /comes off every build menu when this is compiled/,
+      );
+      expect(
+        toggle().compareDocumentPosition(note) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 

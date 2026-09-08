@@ -13,6 +13,11 @@ import { unitIconSrc } from "@/content/unitIcon";
  * at all - which told the same fact three different ways, one of them not at
  * all (issue #2457). `size` covers the four places this is drawn, from a
  * picked-unit badge to a grid cell.
+ *
+ * `xl` is 48px and `2xl` is the 64px the grid draws. The unit page's header
+ * used `lg` against a name and a key stacked under each other. With the unit's
+ * controls beside them the row is taller, 36px reads small in it and 64px takes
+ * the row over, so 48px went in between (issue #2708).
  */
 export function UnitIcon({
   display,
@@ -22,7 +27,7 @@ export function UnitIcon({
   display?: UnitDisplay;
   /** The pics are still being read, so this one is not missing, just not here. */
   pending?: boolean;
-  size?: "sm" | "default" | "lg" | "xl";
+  size?: "sm" | "default" | "lg" | "xl" | "2xl";
 }) {
   const src = unitIconSrc(display);
   const box =
@@ -31,8 +36,10 @@ export function UnitIcon({
       : size === "lg"
         ? "size-9"
         : size === "xl"
-          ? "size-16"
-          : "size-7";
+          ? "size-12"
+          : size === "2xl"
+            ? "size-16"
+            : "size-7";
   if (src) {
     return (
       <img

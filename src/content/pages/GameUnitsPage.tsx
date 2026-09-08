@@ -267,7 +267,7 @@ function UnitCellItem({
         to={`/library/games/${encodeURIComponent(gameName)}/units/${encodeURIComponent(cell.id)}`}
         className="flex flex-col items-center gap-1 rounded-lg border border-border/50 bg-card p-2 text-center transition-colors hover:border-border hover:bg-accent/50"
       >
-        <UnitIcon display={display} pending={pending} size="xl" />
+        <UnitIcon display={display} pending={pending} size="2xl" />
         {/* Wraps to a second line rather than truncating: a game unit's name
             (e.g. SplinterFaction's "Federation of Kala Command Unit") is
             often too long for the cell, and cutting it off leaves cells
