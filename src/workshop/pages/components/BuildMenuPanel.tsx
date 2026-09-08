@@ -38,12 +38,18 @@
  * does not.
  *
  * The panel is a {@link SectionPanel}, the card the field sections under it and
- * the scenario editor's panels already are (issue #2700). It starts shut unless
+ * the scenario editor's panels already are (issue #2700). It arrives shut unless
  * the project has edited the menu, because it is the one panel on the page whose
  * height is the builder's roster: a commander's is twenty rows the reader
  * scrolls past on the way to the numbers, and the summary says how many there
- * are without opening it. An edited menu opens, so somebody's own work is not
- * folded away from them.
+ * are without opening it. An edited menu arrives open, so somebody's own work is
+ * not folded away from them.
+ *
+ * That is where it starts and not a rule it enforces. The card is uncontrolled,
+ * and moving from one builder to the next does not remount it, so whichever way
+ * an author left it is the way the next builder's menu opens. Somebody going
+ * down a list of factories comparing rosters opens it once, which is worth more
+ * than making every unit obey the default again.
  */
 import { Button, cn } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, Hammer, RotateCcw, Undo2, X } from "lucide-react";
