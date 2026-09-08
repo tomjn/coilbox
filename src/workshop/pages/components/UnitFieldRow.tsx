@@ -261,6 +261,18 @@ export function UnitFieldRow({
               game
             </span>
           )}
+          {/* A label nobody wrote is the engine's key wearing a label's clothes,
+              and the reader cannot tell which they are looking at. Saying so is
+              worth more than quietly dropping the key, which is the only thing
+              they can search the engine for (issue #2679). */}
+          {row.field.known && !row.field.described && (
+            <span
+              className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground"
+              title="Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
+            >
+              engine key
+            </span>
+          )}
         </span>
         <span className="truncate font-mono text-[10px] text-muted-foreground">
           {row.path}
