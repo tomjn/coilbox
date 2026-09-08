@@ -154,6 +154,7 @@ It always writes:
 
 - `objects3d/<unit>.s3o`, the model.
 - `units/<unit>.lua`, a unit definition. Without one the engine has nothing to spawn.
+- `language/en/coilbox.json`, but only for a game that names its units in a localisation file rather than in their definitions. See [Where the unit's name goes](#where-the-units-name-goes).
 
 It writes, if you leave the boxes ticked:
 
@@ -166,6 +167,18 @@ It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas
 
 The one exception is coilbox's own scratch game, below, which is a throwaway and is always rewritten in full.
 
+### Where the unit's name goes
+
+Nearly every game reads a unit's name and its one-line description out of the unit definition, as `name` and `description`, and that is where export puts them.
+
+Beyond All Reason does not. It builds every unit's label from `Spring.I18N('units.names.' .. unitDefName)`, keeps the answers in `language/en/units.json`, and never looks at the definition. A unit named in its definition there shows up in game as `units.names.mytank`.
+
+So export opens that one file before it writes anything. A game that names its units in it gets a definition with no `name` and no `description`, and the words go to `language/en/coilbox.json` beside it instead. That is a file of coilbox's own, holding the names of the units coilbox put in the folder and nothing else. Beyond All Reason's `modules/i18n/i18n.lua` reads every `*.json` under `language/<code>/` and merges them, so a second file is read exactly as the first is.
+
+**The game's own `units.json` is never written to.** Export reads it to answer one question. A name the game already declares is the game's, so a unit whose internal name the game already uses gets no name written for it at all.
+
+The drawer says which of the two is about to happen before you press the button, because the wrong answer looks perfectly correct in coilbox and is wrong only in the game.
+
 ### Renaming a unit you have already exported
 
 Every file above is named after the unit, so renaming the unit and exporting again writes a second set rather than moving the first. The old files stay where they are and the game reads them as another unit, which it will happily put on a build menu and spawn. If you renamed the model too, the old unit is broken as well: the engine drops a definition whose `objectname` no longer resolves, so it is in the game folder but never in the game.
@@ -175,6 +188,8 @@ Export does not delete anything. The game folder is yours and two units under tw
 The button only offers files coilbox can prove it wrote, by checking each one against the digest recorded when it was written. A file you edited after exporting, and a file the game shipped under the same name, are both named and both left where they are. Delete those yourself if you want them gone.
 
 In the workshop, a unit left behind this way is marked `stale` in the unit list, so a game with hundreds of units still shows you which one you did not mean to keep.
+
+Its name in `language/<code>/coilbox.json` is not removed. That unit is still in the game until you clear it, and a leftover with a name reads better than a leftover called `units.names.mytank`. Exporting under the new name adds a key beside it rather than replacing one.
 
 **What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, no movement class, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
 

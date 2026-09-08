@@ -1,5 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
+import type { LanguageTexts } from "@/workshop/unitText";
+
 import type { S3oModel } from "./importS3o";
 import type { ExportedFile } from "./model";
 import type { PieceRest } from "./pieceRest";
@@ -115,11 +117,22 @@ export const legoExport = defineCommand<
     pieceCollision: string;
     /** Written only when the game has no unit definition for it yet. */
     unitDef: string | null;
+    /**
+     * The unit's name and description, for a game that reads neither from the
+     * definition (issue #2683). Goes into `language/<code>/coilbox.json`, which
+     * is coilbox's own file beside the game's `units.json` and never that file.
+     *
+     * Null for a game that names its units in their definitions, where the
+     * words are already in `unitDef` and there is nothing to add.
+     */
+    text: { language: string; name: string; description: string } | null;
     model: S3oBuild;
   },
   {
     model: string;
     texture: string | null;
+    /** `language/<code>/coilbox.json`, when `text` was sent. */
+    language: string | null;
     script: string | null;
     /** True when a script was already there and was left as it was. */
     scriptKept: boolean;
@@ -142,6 +155,20 @@ export const legoExport = defineCommand<
     owned: ExportedFile[];
   }
 >("coilbox-lego", "lego_export");
+
+/**
+ * Read a game folder's own `language/<code>/units.json` files, which is where
+ * Beyond All Reason names every one of its units.
+ *
+ * The export drawer asks before it builds anything, because the answer decides
+ * where this unit's name goes (issue #2683). `texts` is empty for a folder with
+ * no `language` folder at all, which is every game that names its units in
+ * their definitions.
+ */
+export const legoGameLanguage = defineCommand<
+  { dir: string },
+  { texts: LanguageTexts }
+>("coilbox-lego", "lego_game_language");
 
 /**
  * Say what an export left behind under a name the unit no longer uses, and

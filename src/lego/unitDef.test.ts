@@ -1,8 +1,32 @@
 import { describe, expect, it } from "vitest";
 
+import type { TextHome } from "@/workshop/unitText";
 import { type LegoProject, newProject } from "./model";
 import type { UnitBounds } from "./s3oBuild";
-import { buildUnitDef, legoUnitDef, luaString } from "./unitDef";
+import {
+  buildUnitDef as buildUnitDefWithHome,
+  legoUnitDef as legoUnitDefWithHome,
+  luaString,
+  unitWords,
+} from "./unitDef";
+
+/**
+ * A definition for a game that names its units in their definitions, which is
+ * the engine's own reading and nearly every game's. Everything below is about
+ * some other field, so the home is defaulted here and named only in the two
+ * tests that are about it.
+ */
+const legoUnitDef = (
+  project: LegoProject,
+  bounds: UnitBounds,
+  home: TextHome = "def",
+) => legoUnitDefWithHome(project, bounds, home);
+
+const buildUnitDef = (
+  project: LegoProject,
+  bounds: UnitBounds,
+  home: TextHome = "def",
+) => buildUnitDefWithHome(project, bounds, home);
 
 /** A measured model. Most of these only care about the two ground axes, so y
  *  and the middle carry stand-in values unless a test says otherwise. */
@@ -81,6 +105,65 @@ describe("legoUnitDef", () => {
       .filter((line) => line.startsWith("    "))
       .map((line) => line.trim().split(" = ")[0]);
     expect(written).toEqual(Object.keys(legoUnitDef(p, b)));
+  });
+
+  /**
+   * The half of #2683 that must not move. A game that reads a unit's name out
+   * of its definition is every game the export has ever been pointed at, and
+   * the definition it gets is the definition it got before.
+   */
+  it("names the unit in the definition for a game that reads one there", () => {
+    const def = legoUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+      "def",
+    );
+    expect(def.name).toBe("Sky Fortress");
+    expect(def.description).toBe(
+      "Sky Fortress, built with coilbox's unit builder.",
+    );
+  });
+
+  /**
+   * Beyond All Reason builds every unit's label from
+   * `Spring.I18N('units.names.' .. unitDefName)` with no fall back to the
+   * definition, so a `name` written there is not a weaker answer, it is a key
+   * nothing opens. It would also tell `textHome` that this game names its units
+   * in their definitions, once the game's own read comes back with the file the
+   * export wrote. The words go to `language/en/coilbox.json` instead.
+   */
+  it("leaves the name out for a game that reads it somewhere else", () => {
+    const def = legoUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+      "language",
+    );
+    expect(def).not.toHaveProperty("name");
+    expect(def).not.toHaveProperty("description");
+    // Everything else about the unit is untouched: only the words move.
+    expect(def).toMatchObject({ objectname: "skyfort", footprintx: 2 });
+  });
+
+  it("writes the same words wherever they end up", () => {
+    const p = project("Sky Fortress", "skyfort");
+    const def = legoUnitDef(p, bounds({ x: 32, z: 48 }), "def");
+    expect(unitWords(p)).toEqual({
+      name: def.name,
+      description: def.description,
+    });
+  });
+
+  it("writes no name line into the file for a language home", () => {
+    const lua = buildUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({ x: 32, z: 48 }),
+      "language",
+    );
+    // Anchored on the indent the file writes fields at, since `objectname` and
+    // `script` both end in a word this would otherwise match.
+    expect(lua).not.toContain("    name =");
+    expect(lua).not.toContain("    description =");
+    expect(lua).toContain('    objectname = "skyfort"');
   });
 });
 
