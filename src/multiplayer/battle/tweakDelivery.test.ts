@@ -9,6 +9,7 @@ import {
   deliverySummary,
   ECHO_BASE_MS,
   ledgerKeyFor,
+  optionTagSlots,
   parseBsetLine,
   runDelivery,
   slotGapMs,
@@ -152,6 +153,33 @@ describe("deliverySlots", () => {
     ]);
     expect(slots[1].tagKey).toBe("game/modoptions/tweakdefs1");
     expect(slots[0].bytes).toBe("!bset tweakdefs AAAA".length);
+  });
+});
+
+describe("optionTagSlots", () => {
+  it("builds one slot per tag, in the order the tags were given", () => {
+    const slots = optionTagSlots({
+      "game/modoptions/maxunits": "1000",
+      "game/modoptions/tweakdefs": "QUJD",
+    });
+    expect(slots).toEqual([
+      {
+        name: "maxunits",
+        value: "1000",
+        tagKey: "game/modoptions/maxunits",
+        bytes: "!bSet maxunits 1000".length,
+      },
+      {
+        name: "tweakdefs",
+        value: "QUJD",
+        tagKey: "game/modoptions/tweakdefs",
+        bytes: "!bSet tweakdefs QUJD".length,
+      },
+    ]);
+  });
+
+  it("has nothing to send for an empty preset", () => {
+    expect(optionTagSlots({})).toEqual([]);
   });
 });
 

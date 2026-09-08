@@ -671,6 +671,8 @@ function BattleRoomPage() {
                   presets.setDefaultForGame(battle.modname, id)
                 }
                 disabled={!room.canEditOptions}
+                isFounder={room.isFounder}
+                delivery={room.presetDelivery}
               />
             </>
           )}
