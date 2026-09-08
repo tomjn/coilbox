@@ -9,6 +9,15 @@
  * buttons rather than one answer, and all three were styled like the actions
  * beside them (Lua, Test), which mixes a verdict with a thing you do.
  *
+ * Compatibility is the fourth of the same kind (issue #1281): whether a game
+ * update has moved anything the project names. It went in here rather than
+ * behind a button of its own for exactly the reason the other three merged.
+ * It is a verdict, it is about the same project, and a fifth control on a
+ * toolbar that was shortened on purpose would have undone the shortening. It
+ * is also the one section that can offer to act on what it found, which is why
+ * a drawer suits it: a finding and the offer that goes with it sit on one row,
+ * with the cost of taking the offer written beside the button.
+ *
  * `DiagnosticsButton` in `src/content/pages/components/states.tsx` set the
  * pattern this follows: present in every state the check can be in, so a
  * button that only appears once something is wrong cannot be mistaken for one
@@ -43,6 +52,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ConfigOption } from "@/content/bindings";
+import type { CompatFinding, CompatState } from "../../compatibility";
 import { deliveryRoutes } from "../../deliveryRoutes";
 import type { PreflightReport } from "../../preflight";
 import { usePreflightReport } from "../../preflight";
@@ -100,9 +110,99 @@ function UnitsyncSection({ errors }: { errors: string[] }) {
   );
 }
 
+/** One finding, and the offer that goes with it when coilbox has one.
+ *  The cost is on the button rather than behind it, because the alternative
+ *  is a control that silently throws away an afternoon's tuning (issue
+ *  #1281). A finding with no button is one where removing the reference is
+ *  not the answer, and the sentence says what is. */
+function CompatRow({
+  finding,
+  onFix,
+}: {
+  finding: CompatFinding;
+  onFix: (finding: CompatFinding) => void;
+}) {
+  return (
+    <li className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2.5">
+      <div className="flex items-start gap-2">
+        {finding.severity === "broken" ? (
+          <CircleX className="mt-0.5 size-4 shrink-0 text-destructive" />
+        ) : (
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+        )}
+        <span className="text-sm">{finding.detail}</span>
+      </div>
+      {finding.fix && (
+        <div className="flex items-center gap-2 self-end">
+          <span className="text-muted-foreground text-xs">
+            Loses {finding.fix.cost}
+          </span>
+          <Button size="sm" variant="outline" onClick={() => onFix(finding)}>
+            {finding.fix.label}
+          </Button>
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** What the game update did to this project's edits (issue #1281).
+ *
+ *  Second in the drawer, straight after the read that produced the
+ *  definitions it compares against: it is a fact about those definitions, and
+ *  on the rare open where it has anything to say it is the most important
+ *  thing in here. Nothing to run and nothing to wait for, because the page
+ *  already holds the game's whole unit table. */
+function CompatibilitySection({
+  gameName,
+  state,
+  onFix,
+}: {
+  gameName: string;
+  state: CompatState | null;
+  onFix: (finding: CompatFinding) => void;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="font-medium text-sm">Still fits {gameName}</h3>
+      {!state ? (
+        <p className="text-muted-foreground text-sm">
+          No project is open yet, so there is nothing to compare.
+        </p>
+      ) : state.kind === "unknown" ? (
+        <p className="text-muted-foreground text-sm">
+          {gameName} could not be checksummed, so whether it has changed since
+          this project was written is not known.
+        </p>
+      ) : state.kind === "unmoved" ? (
+        <p className="text-muted-foreground text-sm">
+          {gameName} is the same build this project was written against.
+        </p>
+      ) : state.report.findings.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          {gameName} has been updated since this project was written, and
+          everything the project names is still there.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="text-muted-foreground text-sm">
+            {gameName} has been updated since this project was written. These
+            edits name things it no longer has.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {state.report.findings.map((finding) => (
+              <CompatRow key={finding.id} finding={finding} onFix={onFix} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Which of the two delivery routes this game supports, and why when one is
- *  not. Second in the drawer: once the game reads cleanly, this is how an
- *  edit actually reaches it. */
+ *  not. Third in the drawer: once the game reads cleanly and the project still
+ *  fits it, this is how an edit actually reaches it. */
 function RoutesSection({
   gameName,
   options,
@@ -236,6 +336,8 @@ export function ChecksButton({
   routeOptions,
   routesChecking,
   project,
+  compatibility,
+  onApplyFix,
 }: {
   gameName: string;
   /** What unitsync said reading the game's definitions. */
@@ -250,14 +352,26 @@ export function ChecksButton({
    *  when no project is open yet, in which case preflight has nothing to
    *  say and does not affect the verdict. */
   project: ModProject | undefined;
+  /** Whether the game has moved under the project, and what that did to it
+   *  (issue #1281). Null when no project is open. Worked out by the page,
+   *  which is where the game's definitions already are. */
+  compatibility: CompatState | null;
+  onApplyFix: (finding: CompatFinding) => void;
 }) {
   const [open, setOpen] = useState(false);
   // Read whenever a project is open, not only while the drawer is up: see
   // the module doc comment for why the button needs a live answer.
   const preflight = usePreflightReport(project, true);
 
-  const blockers = preflight.report?.blockers.length ?? 0;
-  const review = preflight.report?.review.length ?? 0;
+  // A reference that names nothing is blocker-grade even though it stops no
+  // export: the project compiles, ships, and then does not do what it says.
+  // That is exactly the failure this check exists to stop being invisible, so
+  // it must not sit behind a tick.
+  const moved =
+    compatibility?.kind === "moved" ? compatibility.report : undefined;
+  const blockers =
+    (preflight.report?.blockers.length ?? 0) + (moved?.broken ?? 0);
+  const review = (preflight.report?.review.length ?? 0) + (moved?.review ?? 0);
   const diagnostics = diagnosticErrors.length;
   // A command that failed to answer is not a clean project, it is a question
   // this button could not settle. Kept apart from the counted severities
@@ -321,11 +435,16 @@ export function ChecksButton({
         open={open}
         onOpenChange={setOpen}
         title="Checks"
-        description={`Whether ${gameName} is in a fit state to use: the game's own definitions, how an edit reaches it, and what is wrong with what you have written.`}
+        description={`Whether ${gameName} is in a fit state to use: the game's own definitions, whether the project still fits them, how an edit reaches it, and what is wrong with what you have written.`}
         width="34rem"
       >
         <div className="flex flex-col gap-5">
           <UnitsyncSection errors={diagnosticErrors} />
+          <CompatibilitySection
+            gameName={gameName}
+            state={compatibility}
+            onFix={onApplyFix}
+          />
           <RoutesSection
             gameName={gameName}
             options={routeOptions}

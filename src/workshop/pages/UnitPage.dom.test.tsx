@@ -2225,24 +2225,78 @@ describe("UnitPage", () => {
       expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", false);
     });
 
-    /** The checksum a project records is a fact about what it was written
-     *  against. Which edits an update actually broke is issue #1281. */
-    it("says when the game has changed since the project was started", () => {
-      openAt("armcom");
-      type(healthBox(), "5000");
-      cleanup();
-
+    /**
+     * The checksum a project records is a fact about what it was written
+     * against, and issue #1281 is what to do with it. Reopening the project
+     * against a moved game runs the comparison in `compatibility.ts` over the
+     * definitions the page has already read, so the page has something to say
+     * or says nothing at all.
+     *
+     * `reopen` is the same project, opened by its own id, against whatever the
+     * game looks like now.
+     */
+    const reopen = (
+      now: Record<string, Record<string, unknown>>,
+      checksum: string,
+    ) => {
       const project = saved().find((p) => p.gameName === GAME.name);
-      show(
-        units,
+      return show(
+        now,
         `/workshop/${project?.id}?unit=armcom`,
         dataset,
         [],
         {},
-        "moved on",
+        checksum,
       );
+    };
+
+    it("stays quiet when the game moved and every edit still fits", () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      cleanup();
+
+      reopen(units, "moved on");
+      // This used to warn on any checksum change at all, which after a routine
+      // game update is a banner that never goes away and never says anything.
+      expect(screen.queryByText(/no longer fit/)).toBeNull();
+      expect(healthBox().value).toBe("5000");
+    });
+
+    it("says how many edits no longer fit when the game drops a unit", async () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      cleanup();
+
+      reopen({ armlab: ARMLAB }, "moved on");
       expect(
-        screen.getByText(new RegExp(`${GAME.name} has changed`)),
+        screen.getByText(`One edit no longer fits ${GAME.name}`),
+      ).toBeTruthy();
+      // And the verdict on Checks counts it, so the tick cannot claim a
+      // project whose edits land on nothing is clean.
+      expect(
+        await screen.findByRole("button", { name: "1 blocker found" }),
+      ).toBeTruthy();
+    });
+
+    it("takes a dead reference out as one undoable step", async () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      cleanup();
+
+      reopen({ armlab: ARMLAB }, "moved on");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "1 blocker found" }),
+      );
+      expect(screen.getByText("Loses 1 field you set on armcom")).toBeTruthy();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Remove these changes" }),
+      );
+      expect(screen.queryByText(/no longer fit/)).toBeNull();
+      // One press of undo puts the edit back, the same as any other change on
+      // this page. Nothing a fix does is one way.
+      fireEvent.click(screen.getByLabelText("Undo"));
+      expect(
+        screen.getByText(`One edit no longer fits ${GAME.name}`),
       ).toBeTruthy();
     });
 

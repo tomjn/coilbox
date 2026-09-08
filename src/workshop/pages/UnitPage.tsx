@@ -114,6 +114,7 @@ import {
   removeClone,
   unitsWithClones,
 } from "../clones";
+import { compatibilityState } from "../compatibility";
 import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
@@ -796,11 +797,29 @@ export default function UnitPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  /** Whether the game has moved on since the project was started (issue #1281). */
-  const gameMoved =
-    project?.authoredChecksum !== undefined &&
-    defs?.checksum !== undefined &&
-    project.authoredChecksum !== defs.checksum;
+  /**
+   * What a game update did to this project's edits (issue #1281).
+   *
+   * Only when the two checksums disagree, which `compatibilityState` is the
+   * gate for. Past that gate it is arithmetic over `defs`, which the page is
+   * already holding because it cannot draw its unit list without them, so this
+   * costs no read and cannot make opening a project slower. A project whose
+   * game has moved opens and edits exactly as it always did, and this only
+   * changes what the page can tell you about it.
+   */
+  const compatibility = useMemo(
+    () =>
+      project && defs
+        ? compatibilityState(project.authoredChecksum, defs.checksum, {
+            edits: project.edits,
+            units: defs.units,
+            weaponDefs: defs.weaponDefs,
+            gameName: game?.name ?? project.gameName,
+          })
+        : null,
+    [project, defs, game?.name],
+  );
+  const moved = compatibility?.kind === "moved" ? compatibility.report : null;
 
   // `h-full` against the frame's own scroll container, so from `lg` up the two
   // panes each take the height that is left and scroll themselves rather than
@@ -920,6 +939,13 @@ export default function UnitPage() {
                   gameInfoStatus === "idle" || gameInfoStatus === "loading"
                 }
                 project={project}
+                compatibility={compatibility}
+                // Through `commit`, so taking a dead reference out is one undo
+                // step like every other edit on this page. Nothing here is
+                // irreversible, which is what makes an offer safe to press.
+                onApplyFix={(finding) =>
+                  commit(finding.fix?.apply ?? ((e) => e))
+                }
               />
             )}
             {/* What the project compiles to (issue #1275). A game reads Lua,
@@ -984,15 +1010,25 @@ export default function UnitPage() {
         />
       )}
 
-      {/* The game's archives no longer checksum to what they did when this
-        project was started, so something under the edits has moved. Said and
-        nothing more: which edits it actually broke, and what to do about them,
-        is issue #1281's job and needs the whole game read to answer. */}
-      {gameMoved && (
-        <Alert>
+      {/* The game has been updated and it broke something the project names
+        (issue #1281). Only then: this used to fire on any checksum change and
+        say the edits "may" have moved, which after a routine game update is a
+        banner that never goes away and never tells you anything. Now the
+        comparison has actually been run, so the page either has something to
+        say or says nothing. The findings and the offers are in Checks, because
+        a list with a button per row does not belong in a banner. */}
+      {moved && moved.findings.length > 0 && (
+        <Alert variant={moved.broken > 0 ? "destructive" : "default"}>
+          <AlertTitle>
+            {moved.findings.length === 1
+              ? "One edit no longer fits"
+              : `${moved.findings.length} edits no longer fit`}{" "}
+            {game?.name}
+          </AlertTitle>
           <AlertDescription>
-            {game?.name} has changed since this project was started. The edits
-            still apply, but anything they name may have moved.
+            {game?.name} has been updated since this project was written. Open
+            Checks to read what changed underneath it and what can be done about
+            each one.
           </AlertDescription>
         </Alert>
       )}
