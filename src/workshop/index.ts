@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { SlidersHorizontal } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { insideSection } from "../general/nav";
 import { cachedProjectName } from "./project";
 
 /**
@@ -26,7 +27,10 @@ const workshopPlugin: FramePlugin = {
           id: "workshop.units",
           label: "Unit tweaks",
           to: "/workshop",
+          // Lit on the list and on a project you have open, which is where the
+          // time goes (issue #2719).
           end: true,
+          activeWhen: insideSection("/workshop"),
           order: 0,
           icon: SlidersHorizontal,
           useVisible: useAdvancedMode,
