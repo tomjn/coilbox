@@ -8,39 +8,30 @@
  * have built: a project is scoped to one game (issue #2664), so choosing the
  * game is part of starting a project rather than a menu inside the editor.
  *
- * A card says the three things that tell two projects apart: which game, how
- * much it changes and when it last changed. Not a picture. The unit builder's
- * list is pictures because a model is a shape, and a tweak project is a hundred
- * numbers spread over a game's units with no one unit standing for the rest.
- * Drawing a build picture for a project would also mean mounting every game's
- * archives to read one, which is the 23 second read the unit page spends once.
+ * A card says what tells two projects apart: what the author called it and said
+ * it was for, which game, how much it changes and when it last changed. Not a
+ * picture. The unit builder's list is pictures because a model is a shape, and a
+ * tweak project is a hundred numbers spread over a game's units with no one unit
+ * standing for the rest. Drawing a build picture for a project would also mean
+ * mounting every game's archives to read one, which is the 23 second read the
+ * unit page spends once.
+ *
+ * The card itself opens the project, and everything else you can do to one is in
+ * its menu with a word beside it (`ProjectCardMenu`, issue #2706). Starting one,
+ * and renaming one afterwards, are the same drawer (`ProjectDetailsDrawer`,
+ * issue #2707).
  *
  * Starting a project here records no checksum, because nothing has read the
  * game yet and the list must not wait 23 seconds to offer a button. The editor
  * fills it in the first time it opens the project against a game it can read.
  */
-import { Button, Input } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import {
-  Copy,
-  Download,
-  Link2,
-  Pencil,
-  Plus,
-  SlidersHorizontal,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { Plus, SlidersHorizontal, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { Field } from "@/components/Field";
-import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { gameIdentityForName } from "@/container/gameIdentity";
 import { contentWriteFile } from "@/content/bindings";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
@@ -51,7 +42,6 @@ import { copyDeepLink } from "@/deeplink/copyLink";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { forgetEditHistory } from "../history";
 import {
-  defaultProjectName,
   describeEdits,
   type ModProject,
   modProjectCode,
@@ -61,59 +51,11 @@ import {
   useModProjects,
 } from "../project";
 import { projectPath, unitEditPath } from "../routes";
-
-/**
- * Deleting a project throws away every edit in it and undo does not reach past
- * it, so it asks first. The same popover confirmation `CloneActions.tsx` uses,
- * for the same reason.
- */
-function DeleteProjectButton({
-  project,
-  onDelete,
-}: {
-  project: ModProject;
-  onDelete: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="ghost" aria-label={`Delete ${project.name}`}>
-          <Trash2 className="size-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-80 flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-medium text-sm">Delete {project.name}?</h3>
-          <p className="text-muted-foreground text-xs">
-            {describeEdits(project.edits)}. Nothing puts it back, so export it
-            first if you might want it.
-          </p>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              setOpen(false);
-              onDelete();
-            }}
-          >
-            Delete
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
+import { ProjectCardMenu } from "./components/ProjectCardMenu";
+import {
+  type ProjectDetails,
+  ProjectDetailsDrawer,
+} from "./components/ProjectDetailsDrawer";
 
 /** When a project was last written to, in words a person reads at a glance. */
 function when(iso: string): string {
@@ -130,19 +72,16 @@ export default function ProjectsPage() {
   const {
     projects,
     createProject,
-    renameProject,
+    updateProjectDetails,
     duplicateProject,
     removeProject,
   } = useModProjects();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  /** The project whose name is being typed over, and the text so far. */
-  const [renaming, setRenaming] = useState<{
-    id: string;
-    draft: string;
-  } | null>(null);
+  /** Whether the details drawer is up to start a project. */
   const [starting, setStarting] = useState(false);
-  const [newGame, setNewGame] = useState("");
+  /** The project the details drawer is up to rename, if it is. */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   // Newest first, which is the order the editor's own "which project does this
   // game's link open" answer uses. Sorting is safe here in a way it was not in
@@ -153,14 +92,37 @@ export default function ProjectsPage() {
     [projects],
   );
 
-  /** Start a project against a game, open it, and let the editor go from there. */
-  function start(gameName: string) {
-    const project = createProject({
-      name: defaultProjectName(gameName, projects),
-      gameName,
-      game: gameIdentityForName(gameName, games) ?? undefined,
-    });
+  /** The project the details drawer has open, when it is renaming one. */
+  const renaming = renamingId
+    ? (projects.find((p) => p.id === renamingId) ?? null)
+    : null;
+
+  function closeDetails() {
     setStarting(false);
+    setRenamingId(null);
+  }
+
+  /**
+   * The details drawer's one submit, for both jobs it does.
+   *
+   * Starting a project opens it, because the drawer asked everything the editor
+   * would have and there is nothing left to do on this page. Renaming stays
+   * here, since the reason to rename is usually that you are looking at two
+   * projects you cannot tell apart.
+   */
+  function saveDetails(details: ProjectDetails) {
+    if (renaming) {
+      updateProjectDetails(renaming.id, details);
+      closeDetails();
+      return;
+    }
+    const project = createProject({
+      name: details.name,
+      description: details.description,
+      gameName: details.gameName,
+      game: gameIdentityForName(details.gameName, games) ?? undefined,
+    });
+    closeDetails();
     navigate(projectPath(project.id));
   }
 
@@ -260,168 +222,106 @@ export default function ProjectsPage() {
     }
   }
 
-  /** Enter and blur both land here. An empty name is no name, so it is left
-   *  alone rather than saved. */
-  function commitRename() {
-    setRenaming((current) => {
-      if (current) renameProject(current.id, current.draft);
-      return null;
-    });
-  }
-
-  const newProjectButton = (
-    <Popover open={starting} onOpenChange={setStarting}>
-      <PopoverTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-1 size-3.5" />
-          New project
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-80 flex-col gap-3">
-        <Field
-          label="Game"
-          hint="A project changes one game. Start another for a second game."
-        >
-          <OptionSelect
-            size="sm"
-            ariaLabel="Game for the new project"
-            placeholder={scan.loading ? "Scanning…" : "Pick a game"}
-            value={newGame}
-            onValueChange={setNewGame}
-            options={games.map((g) => ({ value: g.name, label: g.name }))}
-          />
-        </Field>
-        {!scan.loading && games.length === 0 ? (
-          <p className="text-muted-foreground text-xs">
-            No games are installed. Add one from the Library.
-          </p>
-        ) : null}
-        <div className="flex justify-end">
-          <Button size="sm" disabled={!newGame} onClick={() => start(newGame)}>
-            Start editing
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <PageHeader
-        title={
-          <>
-            <SlidersHorizontal size={18} /> Unit tweaks
-          </>
-        }
-        description="A project is one game's edits under a name, saved as you work and exportable as a file somebody else can open. Open one to change what its game's units cost, carry and can do."
-        actions={
-          <>
-            <Button size="sm" variant="outline" onClick={onImport}>
-              <Upload className="mr-1 size-3.5" />
-              Import
-            </Button>
-            {newProjectButton}
-          </>
-        }
-      />
+    // A pause before the tip, so crossing a card on the way to another one does
+    // not flash a box over the name you were reading.
+    <TooltipProvider delayDuration={300}>
+      <div className="flex flex-col gap-4 p-4">
+        <PageHeader
+          title={
+            <>
+              <SlidersHorizontal size={18} /> Unit tweaks
+            </>
+          }
+          description="A project is one game's edits under a name, saved as you work and exportable as a file somebody else can open. Open one to change what its game's units cost, carry and can do."
+          actions={
+            <>
+              <Button size="sm" variant="secondary" onClick={onImport}>
+                <Upload className="mr-1 size-3.5" />
+                Import
+              </Button>
+              <Button size="sm" onClick={() => setStarting(true)}>
+                <Plus className="mr-1 size-3.5" />
+                New project
+              </Button>
+            </>
+          }
+        />
 
-      {error ? <p className="text-destructive text-sm">{error}</p> : null}
-      {status ? (
-        <p className="text-muted-foreground text-sm">{status}</p>
-      ) : null}
+        <ProjectDetailsDrawer
+          open={starting || !!renaming}
+          onOpenChange={(next) => {
+            if (!next) closeDetails();
+          }}
+          project={renaming ?? undefined}
+          games={games}
+          scanning={scan.loading}
+          existing={projects}
+          onSubmit={saveDetails}
+        />
 
-      {listed.length === 0 ? (
-        <EmptyState label="No tweak projects yet. Start one against a game, or import one somebody sent you." />
-      ) : (
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
-          {listed.map((project) => (
-            <li
-              key={project.id}
-              className="flex flex-col gap-1 rounded border border-border p-3"
-            >
-              {renaming?.id === project.id ? (
-                <Input
-                  autoFocus
-                  aria-label={`Name of ${project.name}`}
-                  value={renaming.draft}
-                  onChange={(e) =>
-                    setRenaming({ id: project.id, draft: e.target.value })
-                  }
-                  onFocus={(e) => e.target.select()}
-                  onBlur={commitRename}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitRename();
-                    else if (e.key === "Escape") setRenaming(null);
-                  }}
-                  className="h-7"
-                />
-              ) : (
+        {error ? <p className="text-destructive text-sm">{error}</p> : null}
+        {status ? (
+          <p className="text-muted-foreground text-sm">{status}</p>
+        ) : null}
+
+        {listed.length === 0 ? (
+          <EmptyState label="No tweak projects yet. Start one against a game, or import one somebody sent you." />
+        ) : (
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
+            {listed.map((project) => (
+              // The card is the thing you open, so the whole of it is the link
+              // and it colours under the pointer rather than leaving the title to
+              // carry an underline on its own (issue #2706). The menu is a
+              // sibling of the link, not a child: a button inside a link is a
+              // link nobody can trust.
+              <li
+                key={project.id}
+                className="group relative rounded border border-border transition-colors hover:border-primary/40 hover:bg-accent/50"
+              >
                 <Link
                   to={projectPath(project.id)}
-                  className="truncate font-medium text-sm hover:underline"
+                  className="flex flex-col gap-1 p-3 pr-10"
                 >
-                  {project.name}
+                  <span className="truncate font-medium text-sm group-hover:underline">
+                    {project.name}
+                  </span>
+                  {project.description ? (
+                    <span className="line-clamp-2 text-muted-foreground text-xs">
+                      {project.description}
+                    </span>
+                  ) : null}
+                  <span className="truncate text-muted-foreground text-xs">
+                    {project.gameName}
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {describeEdits(project.edits)}
+                    {when(project.updatedAt)
+                      ? ` · changed ${when(project.updatedAt)}`
+                      : ""}
+                  </span>
                 </Link>
-              )}
-              <span className="truncate text-muted-foreground text-xs">
-                {project.gameName}
-              </span>
-              <span className="text-muted-foreground text-xs">
-                {describeEdits(project.edits)}
-                {when(project.updatedAt)
-                  ? ` · changed ${when(project.updatedAt)}`
-                  : ""}
-              </span>
-              <div className="mt-1 flex flex-wrap items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Rename ${project.name}`}
-                  onClick={() =>
-                    setRenaming({ id: project.id, draft: project.name })
-                  }
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const copy = duplicateProject(project.id);
-                    if (copy) setStatus(`Copied to "${copy.name}".`);
-                  }}
-                  aria-label={`Duplicate ${project.name}`}
-                >
-                  <Copy className="size-3.5" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onExport(project)}
-                  aria-label={`Export ${project.name}`}
-                >
-                  <Download className="size-3.5" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onCopyLink(project)}
-                  aria-label={`Copy a link to ${project.name}`}
-                >
-                  <Link2 className="size-3.5" />
-                </Button>
-                <DeleteProjectButton
-                  project={project}
-                  onDelete={() => {
-                    removeProject(project.id);
-                    forgetEditHistory(project.id);
-                  }}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                <div className="absolute top-1 right-1">
+                  <ProjectCardMenu
+                    project={project}
+                    onRename={() => setRenamingId(project.id)}
+                    onDuplicate={() => {
+                      const copy = duplicateProject(project.id);
+                      if (copy) setStatus(`Copied to "${copy.name}".`);
+                    }}
+                    onExport={() => void onExport(project)}
+                    onCopyLink={() => onCopyLink(project)}
+                    onDelete={() => {
+                      removeProject(project.id);
+                      forgetEditHistory(project.id);
+                    }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

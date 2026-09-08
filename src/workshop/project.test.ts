@@ -395,29 +395,48 @@ describe("naming and copying", () => {
     );
   });
 
-  it("renames without touching anything else", () => {
+  it("renames and describes without touching anything else", () => {
     const { result } = renderHook(() => useModProjects(), { wrapper });
     let id = "";
     act(() => {
       id = result.current.createProject({
         name: "Big guns",
+        description: "  Everything shoots further.  ",
         gameName: "Balanced Annihilation V15.9.8",
         edits: fullEdits(),
       }).id;
     });
+    expect(result.current.projects.find((p) => p.id === id)?.description).toBe(
+      "Everything shoots further.",
+    );
+
     act(() => {
-      result.current.renameProject(id, "  Bigger guns  ");
+      result.current.updateProjectDetails(id, {
+        name: "  Bigger guns  ",
+        description: "  Even further.  ",
+      });
     });
     const renamed = result.current.projects.find((p) => p.id === id);
     expect(renamed?.name).toBe("Bigger guns");
+    expect(renamed?.description).toBe("Even further.");
     expect(renamed?.edits).toEqual(fullEdits());
 
-    // An empty name is not a name, so it is refused rather than stored.
+    // An empty name is not a name, so the whole save is refused rather than
+    // stored. An empty description is one somebody deleted, so it goes.
     act(() => {
-      result.current.renameProject(id, "   ");
+      result.current.updateProjectDetails(id, { name: "   " });
     });
     expect(result.current.projects.find((p) => p.id === id)?.name).toBe(
       "Bigger guns",
+    );
+    act(() => {
+      result.current.updateProjectDetails(id, {
+        name: "Bigger guns",
+        description: "  ",
+      });
+    });
+    expect(result.current.projects.find((p) => p.id === id)).not.toHaveProperty(
+      "description",
     );
   });
 

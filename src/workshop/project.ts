@@ -185,6 +185,15 @@ export interface ModProject {
   /** Stable identity, because two projects may share a name. */
   id: string;
   name: string;
+  /**
+   * What the project is for, in the author's own words (issue #2707).
+   *
+   * Asked for when the project is started and shown on its card, so a list of
+   * five projects against one game says which is which. Optional, and absent
+   * rather than empty when nobody wrote one, because a project is worth
+   * starting before you can say what it is.
+   */
+  description?: string;
   /** The game's exact archive name, which is what the page keys on. */
   gameName: string;
   /** The same game in the shape every container kind names one (issue #1335). */
@@ -205,6 +214,7 @@ export interface ModProject {
 /** What a caller supplies. Identity and timestamps belong to the hook. */
 export interface NewProject {
   name: string;
+  description?: string;
   gameName: string;
   game?: GameIdentity;
   authoredChecksum?: string;
@@ -244,6 +254,9 @@ export function useModProjects() {
     const project: ModProject = {
       id: crypto.randomUUID(),
       name: input.name,
+      ...(input.description?.trim()
+        ? { description: input.description.trim() }
+        : {}),
       gameName: input.gameName,
       ...(input.game ? { game: input.game } : {}),
       ...(input.authoredChecksum
@@ -324,11 +337,34 @@ export function useModProjects() {
     );
   }
 
-  function renameProject(id: string, name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
+  /**
+   * Change what a project is called and what it says it is for (issue #2707).
+   *
+   * One call rather than a rename and a separate description setter, because
+   * both come off the same form and a project half saved is a project the list
+   * would draw twice.
+   *
+   * A blank name is no name, so it is left alone rather than saved. A blank
+   * description is a description somebody deleted, so the field goes rather
+   * than being kept as an empty string.
+   *
+   * `updatedAt` is untouched: what a project is called is not one of its edits,
+   * and moving it to the front of the list for a rename would take it away from
+   * wherever the eye last left it.
+   */
+  function updateProjectDetails(
+    id: string,
+    details: { name: string; description?: string },
+  ) {
+    const name = details.name.trim();
+    const description = details.description?.trim() ?? "";
+    if (!name) return;
     write((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, name: trimmed } : p)),
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const { description: _dropped, ...rest } = p;
+        return { ...rest, name, ...(description ? { description } : {}) };
+      }),
     );
   }
 
@@ -368,7 +404,7 @@ export function useModProjects() {
     applyEdits,
     setEdits,
     recordAuthoredChecksum,
-    renameProject,
+    updateProjectDetails,
     duplicateProject,
     removeProject,
   };
@@ -411,6 +447,9 @@ export function cachedProjectName(id: string): string | undefined {
  */
 export interface ModProjectPayload {
   name: string;
+  /** Optional, so a project saved before #2707 reads back unchanged and the
+   *  kind version stays where it is. */
+  description?: string;
   gameName: string;
   game?: GameIdentity;
   authoredChecksum?: string;
@@ -427,6 +466,7 @@ export function modProjectPayload(
   const game = project.game ?? gameIdentityForName(project.gameName, installed);
   return {
     name: project.name,
+    ...(project.description ? { description: project.description } : {}),
     gameName: project.gameName,
     ...(game ? { game } : {}),
     ...(project.authoredChecksum
@@ -671,8 +711,11 @@ export function parseModProjectJson(text: string): ImportedProject | null {
     typeof payload.name === "string" && payload.name.trim()
       ? payload.name.trim()
       : `${gameName} tweaks`;
+  const description =
+    typeof payload.description === "string" ? payload.description.trim() : "";
   return {
     name,
+    ...(description ? { description } : {}),
     gameName,
     ...(game ? { game } : {}),
     ...(typeof payload.authoredChecksum === "string"
