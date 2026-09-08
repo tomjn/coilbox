@@ -629,15 +629,15 @@ enum Kind {
     Binary,
 }
 
-/// Map an extension to a preview kind and its byte cap. `.tga` and `.pcx` are
-/// decoded to PNG for preview, other formats browsers can't render (`.dds`, ...)
+/// Map an extension to a preview kind and its byte cap. `.tga`, `.pcx` and
+/// `.dds` are decoded to PNG for preview, other formats browsers can't render
 /// fall through to binary.
 fn classify(ext: &str) -> (Kind, usize) {
     const TEXT: &[&str] = &[
         "lua", "txt", "cfg", "json", "xml", "ini", "md", "glsl", "h", "tdf", "smd", "fbi", "gui",
         "bos", "yml", "yaml", "csv", "html", "css", "js",
     ];
-    const IMAGE: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "tga", "pcx"];
+    const IMAGE: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "tga", "pcx", "dds"];
     const AUDIO: &[&str] = &["ogg", "oga", "mp3", "wav", "flac", "opus", "m4a"];
     if TEXT.contains(&ext) {
         (Kind::Text, TEXT_CAP)
@@ -689,9 +689,9 @@ fn text_fallback(bytes: &[u8], size: u64) -> Option<ArchiveFileOutput> {
 }
 
 /// Build a `data:` URL for an image member, or `None` if it can't be rendered.
-/// Browser-native formats pass through as-is. `.tga` and `.pcx` are decoded and
-/// re-encoded to PNG, since browsers render neither. Returns `None` when one of
-/// those fails to decode.
+/// Browser-native formats pass through as-is. `.tga`, `.pcx` and `.dds` are
+/// decoded and re-encoded to PNG, since browsers render none of the three.
+/// Returns `None` when one of those fails to decode.
 fn encode_preview_image(ext: &str, bytes: &[u8]) -> Option<String> {
     let (mime, payload) = match ext {
         "png" => ("image/png", bytes.to_vec()),
@@ -700,8 +700,15 @@ fn encode_preview_image(ext: &str, bytes: &[u8]) -> Option<String> {
         "bmp" => ("image/bmp", bytes.to_vec()),
         "tga" => ("image/png", tga_to_png(bytes)?),
         "pcx" => ("image/png", pcx_to_png(bytes)?),
+        "dds" => ("image/png", dds_to_png(bytes)?),
         _ => return None,
     };
+    // A decoded texture is many times the file it came from, and this crosses
+    // the bridge in one message, so a picture that re-encodes past the cap the
+    // read itself allows is treated as one there is no preview for.
+    if payload.len() > IMAGE_CAP {
+        return None;
+    }
     let b64 = base64::engine::general_purpose::STANDARD.encode(&payload);
     Some(format!("data:{mime};base64,{b64}"))
 }
@@ -726,6 +733,22 @@ fn pcx_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
     let img = image::DynamicImage::ImageRgba8(crate::pcx::decode(bytes)?);
     let mut png = std::io::Cursor::new(Vec::new());
     img.write_to(&mut png, image::ImageFormat::Png).ok()?;
+    Some(png.into_inner())
+}
+
+/// Decode DDS bytes and re-encode them as PNG. The decoder is the one the build
+/// icons already use, through `coilbox-texture`.
+///
+/// Alpha is dropped for the reason `tga_to_png` gives, and the reason applies
+/// harder here: `.dds` is what a game keeps its unit textures in, and those use
+/// alpha as the team-colour mask. A build picture's alpha really is
+/// transparency, so it loses its cut-out background and gains whatever is behind
+/// the preview, which is a picture you can see rather than one you cannot.
+fn dds_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
+    let img = image::DynamicImage::ImageRgba8(crate::texture::decode_texture("dds", bytes)?);
+    let rgb = image::DynamicImage::ImageRgb8(img.to_rgb8());
+    let mut png = std::io::Cursor::new(Vec::new());
+    rgb.write_to(&mut png, image::ImageFormat::Png).ok()?;
     Some(png.into_inner())
 }
 
@@ -1335,7 +1358,10 @@ mod tests {
         assert!(matches!(classify("png").0, Kind::Image));
         assert!(matches!(classify("ogg").0, Kind::Audio));
         assert!(matches!(classify("mp3").0, Kind::Audio));
-        assert!(matches!(classify("dds").0, Kind::Binary));
+        // A picture, not a blob of bytes. Every game keeps its build pictures
+        // in `.dds`, so the picker that offers one has nothing to show without
+        // this (issue #2648).
+        assert!(matches!(classify("dds").0, Kind::Image));
         assert!(matches!(classify("").0, Kind::Binary));
     }
 
@@ -1344,7 +1370,56 @@ mod tests {
         assert_eq!(classify("lua").1, TEXT_CAP);
         assert_eq!(classify("png").1, IMAGE_CAP);
         assert_eq!(classify("wav").1, AUDIO_CAP);
-        assert_eq!(classify("dds").1, 0);
+        assert_eq!(classify("dds").1, IMAGE_CAP);
+    }
+
+    /// A `.dds` reaches the decoder the build icons already use, and comes back
+    /// as a PNG the browser can draw.
+    #[test]
+    fn previews_a_dds_as_a_png() {
+        // One red pixel as A8R8G8B8: the "DDS " magic, the 124-byte legacy
+        // header, then BGRA in memory order. Built the way `coilbox-texture`'s
+        // own tests build one.
+        let mut raw = b"DDS ".to_vec();
+        let mut put = |v: u32| raw.extend_from_slice(&v.to_le_bytes());
+        put(124); // header size
+        put(0x1007); // caps | height | width | pixel format
+        put(1); // height
+        put(1); // width
+        put(4); // pitch
+        put(0); // depth
+        put(1); // mip count
+        for _ in 0..11 {
+            put(0); // reserved
+        }
+        put(32); // pixel format size
+        put(0x41); // uncompressed RGB with alpha
+        put(0); // no fourcc: the masks describe the pixels
+        put(32); // bits a pixel
+        put(0x00ff_0000); // red
+        put(0x0000_ff00); // green
+        put(0x0000_00ff); // blue
+        put(0xff00_0000); // alpha
+        put(0x1000); // caps: texture
+        for _ in 0..4 {
+            put(0); // caps2..4, reserved2
+        }
+        raw.extend_from_slice(&[0x00, 0x00, 0xff, 0xff]);
+
+        let url = encode_preview_image("dds", &raw).expect("a dds previews");
+        assert!(url.starts_with("data:image/png;base64,"));
+        let png = base64::engine::general_purpose::STANDARD
+            .decode(url.trim_start_matches("data:image/png;base64,"))
+            .unwrap();
+        let img = image::load_from_memory(&png).unwrap();
+        assert_eq!(img.to_rgba8().get_pixel(0, 0).0, [0xff, 0, 0, 255]);
+    }
+
+    /// Bytes with a `.dds` name that are not a DDS fall through rather than
+    /// previewing as a broken picture, the same as a `.pcx` does.
+    #[test]
+    fn a_dds_that_does_not_decode_has_no_preview() {
+        assert!(encode_preview_image("dds", b"not a dds").is_none());
     }
 
     #[test]

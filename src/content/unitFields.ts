@@ -12,6 +12,7 @@
  * def's `collisionVolume` table, and `*` stands for an array index, so a unit's
  * third weapon mount is `weapons.*.mainDir`.
  */
+import type { AssetKindId } from "./assetKinds";
 import {
   ENGINE_OPEN_TABLES,
   ENGINE_UNIT_FIELDS,
@@ -67,6 +68,19 @@ export interface FieldNote {
   unit?: string;
   /** What the field does, in the reader's terms. */
   help?: string;
+  /**
+   * The kind of file this field names, for a field that holds a path into the
+   * game's archive.
+   *
+   * The engine's own registry cannot answer this. It records the key, the
+   * getter's type and the line of C++ that reads it, and `objectName`,
+   * `buildPic`, `name` and `category` are all a plain string to it. Which of
+   * them the engine then hands to a loader is a fact about the code after the
+   * read, so it is stated here with the rest of what a generator cannot supply.
+   * A field left without one is not left without a picker: `assetFields.ts`
+   * reads the game's own values for the remainder.
+   */
+  asset?: AssetKindId;
 }
 
 export type DefKind = "unit" | "weapon";
@@ -85,6 +99,8 @@ export interface ResolvedField {
   help?: string;
   /** The default, when it is a single literal the engine writes down. */
   default?: string | number | boolean;
+  /** The kind of file this field names, when a note says it names one. */
+  asset?: AssetKindId;
   engine?: EngineField;
 }
 
@@ -167,6 +183,7 @@ export function describeField(kind: DefKind, path: string): ResolvedField {
       type: "any",
       unit: note?.unit,
       help: note?.help,
+      asset: note?.asset,
     };
   }
   return {
@@ -178,6 +195,7 @@ export function describeField(kind: DefKind, path: string): ResolvedField {
     unit: note?.unit,
     help: note?.help ?? engine.description,
     default: defaultValue(engine),
+    asset: note?.asset,
     engine,
   };
 }

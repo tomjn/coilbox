@@ -1,0 +1,165 @@
+/**
+ * Which of a unit's fields hold a path into the game's archive (issue #2648).
+ *
+ * Two answers, in order. A field note may say so, which is where `objectName`,
+ * `script` and `buildPic` are stated, because the engine's own registry cannot:
+ * it records a key, a getter's type and the line of C++ that reads it, and a
+ * model path and a unit's name are both a string to it.
+ *
+ * Everything else is read out of the game itself. A hand-written list of keys is
+ * exactly what issue #2646 existed to stop, and the field the issue calls "the
+ * icon fields" is not a closed set: Beyond All Reason keeps a normal map at
+ * `customparams.normaltex` and a ground decal at `customparams.buildinggrounddecaltype`,
+ * neither of which the engine has ever heard of. So for every field the notes do
+ * not describe, the values the game's own units put there are looked up in the
+ * archive. A field whose values are real files of one kind under one folder
+ * holds a path, whatever it is called and whoever invented it.
+ *
+ * The extension is the guard against reading a name as a path. Balanced
+ * Annihilation's `corpse = "ARMCOM_DEAD"` names a feature definition, and
+ * `objects3d/armcom_dead.3do` is a real file it would otherwise match, so a
+ * value with no extension of a kind the engine loads is never considered here.
+ * A described field is exempt, which is what lets `objectname = "ARMCOM"`
+ * resolve.
+ */
+import {
+  ASSET_KINDS,
+  type AssetIndex,
+  type AssetKind,
+  type AssetKindId,
+  locateAsset,
+  resolveAsset,
+} from "@/content/assetKinds";
+import { normaliseFieldPath } from "@/content/unitFields";
+import type { FieldRow } from "./unitSections";
+
+/** A field that names a file, and where that file is looked for. */
+export interface AssetField {
+  kind: AssetKind;
+  /** The archive folder the written value is relative to. */
+  root: string;
+  /** Whether a field note said so, against read out of the game's own values. */
+  declared: boolean;
+}
+
+/** Everything a field row needs to offer the archive, gathered once by the page
+ *  so a row does not fetch anything of its own. */
+export interface AssetBrowsing {
+  index: AssetIndex;
+  /** The fields the game's own data says hold a path, by lowercased path. */
+  derived: Map<string, AssetField>;
+  /** The archive name unitsync knows the game by, which every read needs. */
+  archive: string;
+  /** The game's name, for saying which archive was searched. */
+  archiveLabel: string;
+  enginePath?: string;
+  dataDir?: string;
+}
+
+/** The key a field path is looked up under: array indices folded to `*` and the
+ *  whole thing lowercased, so the registry's `weapons.*.name` and a def's
+ *  `weapons.0.name` are one field. `unitSections.ts` matches the same way. */
+const matchKey = (path: string) => normaliseFieldPath(path).toLowerCase();
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+/** Every string leaf in a definition, with the path it was found at. */
+function eachString(
+  def: Record<string, unknown>,
+  visit: (path: string, value: string) => void,
+): void {
+  const walk = (path: string, value: unknown) => {
+    if (typeof value === "string") {
+      visit(path, value);
+      return;
+    }
+    if (!isPlainObject(value)) return;
+    for (const key of Object.keys(value)) walk(`${path}.${key}`, value[key]);
+  };
+  for (const key of Object.keys(def)) walk(key, def[key]);
+}
+
+/**
+ * Read the whole game's definitions for fields that hold a path, keyed by the
+ * lowercased field path.
+ *
+ * One walk of every unit rather than of the one on screen, because a single
+ * unit is a poor sample: the field a picker would help most with is often the
+ * one this unit left empty. Where a game disagrees with itself the folder its
+ * values land under most often wins.
+ */
+export function deriveAssetFields(
+  units: Record<string, Record<string, unknown>>,
+  index: AssetIndex,
+): Map<string, AssetField> {
+  if (index.files.length === 0) return new Map();
+
+  /** Per field path, how often its values landed on each kind and folder. A
+   *  field has one or two of these in practice, so this is a short list rather
+   *  than a map with a made-up key joining the two halves. */
+  const tally = new Map<
+    string,
+    { kind: AssetKindId; root: string; count: number }[]
+  >();
+
+  for (const def of Object.values(units)) {
+    eachString(def, (path, value) => {
+      const at = locateAsset(index, value);
+      if (!at) return;
+      const key = matchKey(path);
+      const seen = tally.get(key);
+      if (!seen) {
+        tally.set(key, [{ kind: at.kind, root: at.root, count: 1 }]);
+        return;
+      }
+      const hit = seen.find((s) => s.kind === at.kind && s.root === at.root);
+      if (hit) hit.count += 1;
+      else seen.push({ kind: at.kind, root: at.root, count: 1 });
+    });
+  }
+
+  const out = new Map<string, AssetField>();
+  for (const [key, best] of tally) {
+    // Most often wins, and the first one seen breaks a tie, so the answer does
+    // not move about between reads of the same game.
+    const top = best.reduce((a, b) => (b.count > a.count ? b : a));
+    out.set(key, {
+      kind: ASSET_KINDS[top.kind],
+      root: top.root,
+      declared: false,
+    });
+  }
+  return out;
+}
+
+/** What a row's field names, if it names a file at all. A note wins over what
+ *  the game's data suggests: the engine reads `buildPic` out of `unitpics/`
+ *  whatever a game happens to have put there. */
+export function assetFieldOf(
+  row: FieldRow,
+  derived: Map<string, AssetField>,
+): AssetField | undefined {
+  const declared = row.field.asset;
+  if (declared)
+    return {
+      kind: ASSET_KINDS[declared],
+      root: ASSET_KINDS[declared].root,
+      declared: true,
+    };
+  return derived.get(matchKey(row.path));
+}
+
+/** Where a field's current value points, and whether anything is there. Absent
+ *  for a field with nothing written in it, which is not a broken path. */
+export function assetState(
+  index: AssetIndex,
+  field: AssetField,
+  value: unknown,
+): { written: string; member?: string } | undefined {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  return {
+    written: value,
+    member: resolveAsset(index, field.kind, field.root, value),
+  };
+}

@@ -57,6 +57,9 @@ let mockDataset: {
 }[] = [];
 /** The game's sides, which the build menu panel reads to name a faction. */
 let mockSides: { name: string; startUnit: string }[] = [];
+/** The game archive's member list, which the asset fields browse (issue #2648).
+ *  Empty in most tests, where a field is a plain text box. */
+let mockArchiveFiles: { path: string; size: number }[] = [];
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -76,6 +79,14 @@ vi.mock("@/content/config", () => ({
   // first by the panel itself, to say which faction a row belongs to.
   useUnitsyncGameInfo: () => ({ info: { sides: mockSides }, loading: false }),
   useUnitsyncUnitBuildpics: () => null,
+  // The archive listing behind the Browse action on an asset field (#2648).
+  useUnitsyncArchiveTree: () => ({
+    tree: { files: mockArchiveFiles, errors: [] },
+    loading: false,
+  }),
+  // Read by the picker's preview once a file in it is selected.
+  useUnitsyncArchiveFile: () => ({ data: null, loading: false }),
+  useUnitsyncUnitModel: () => ({ model: null, loading: false, failed: false }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
 
@@ -217,6 +228,7 @@ afterEach(() => {
   mockStatus = "ready";
   mockDataset = [];
   mockSides = [];
+  mockArchiveFiles = [];
   mockConsumers = null;
   mockConsumersByArchive = {};
 });
@@ -1361,6 +1373,90 @@ describe("UnitPage", () => {
       expect(
         within(browserRow("armcom")).getByTitle(/^Disabled:/),
       ).toBeTruthy();
+    });
+  });
+
+  /**
+   * Picking a file instead of typing a path (issue #2648). The point of these is
+   * the wiring: that a lowercased def key still finds the note describing it,
+   * that the picker offers the archive's real members, and that taking one
+   * writes an ordinary override which resets like any other.
+   */
+  describe("picking an asset out of the game's archive", () => {
+    const ARCHIVE = [
+      { path: "objects3d/Units/ARMAAK.s3o", size: 2048 },
+      { path: "objects3d/Units/ARMAAP.s3o", size: 4096 },
+      { path: "scripts/Units/ARMAAK.cob", size: 512 },
+      { path: "unitpics/ARMAAK.DDS", size: 256 },
+      { path: "gamedata/icontypes.lua", size: 64 },
+    ];
+
+    const openArmaak = () => {
+      mockArchiveFiles = ARCHIVE;
+      show(
+        { armaak: ARMAAK },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        [{ name: "armaak", fullName: "Anti-Air Turret" }],
+      );
+    };
+
+    const modelBox = () => screen.getByLabelText("Model") as HTMLInputElement;
+
+    it("offers Browse on a model field and not on a field that is not a path", () => {
+      openArmaak();
+      expect(screen.getByLabelText("Browse for Model")).toBeTruthy();
+      expect(screen.queryByLabelText("Browse for Health")).toBeNull();
+    });
+
+    it("offers nothing while the archive listing has not landed", () => {
+      mockArchiveFiles = [];
+      show(
+        { armaak: ARMAAK },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        [{ name: "armaak", fullName: "Anti-Air Turret" }],
+      );
+      expect(screen.queryByLabelText("Browse for Model")).toBeNull();
+    });
+
+    it("lists the archive's models, named as the definition would write them", async () => {
+      openArmaak();
+      fireEvent.click(screen.getByLabelText("Browse for Model"));
+      const drawer = await screen.findByRole("dialog");
+      // Relative to objects3d/, which is what the engine reads the field under,
+      // and only the models: the script and the picture are other fields.
+      expect(within(drawer).getByText("Units/ARMAAP.s3o")).toBeTruthy();
+      expect(within(drawer).queryByText(/ARMAAK\.cob/)).toBeNull();
+      expect(within(drawer).queryByText(/ARMAAK\.DDS/)).toBeNull();
+    });
+
+    it("writes the picked file as an ordinary override that resets", async () => {
+      openArmaak();
+      expect(modelBox().value).toBe("Units/ARMAAK.s3o");
+
+      fireEvent.click(screen.getByLabelText("Browse for Model"));
+      const drawer = await screen.findByRole("dialog");
+      fireEvent.click(within(drawer).getByText("Units/ARMAAP.s3o"));
+      fireEvent.click(within(drawer).getByRole("button", { name: /Use this/ }));
+
+      await waitFor(() => expect(modelBox().value).toBe("Units/ARMAAP.s3o"));
+      expect(screen.getByText("1 change")).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText(/^Reset Model/));
+      expect(modelBox().value).toBe("Units/ARMAAK.s3o");
+      expect(screen.queryByText("1 change")).toBeNull();
+    });
+
+    /** The typo the issue is about, said beside the field rather than left for
+     *  the game to refuse the unit over. */
+    it("says when a value points at nothing in the archive", async () => {
+      openArmaak();
+      expect(screen.queryByText(/has no model at this path/)).toBeNull();
+      type(modelBox(), "Units/ARMAAQ.s3o");
+      await waitFor(() =>
+        expect(
+          screen.getByText(/Test Game has no model at this path/),
+        ).toBeTruthy(),
+      );
     });
   });
 });
