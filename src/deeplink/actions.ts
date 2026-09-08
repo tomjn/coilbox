@@ -179,6 +179,21 @@ export function prepareImport(code: string): PrepareImportResult {
           detail: "It opens in the keybinds editor, unsaved.",
         },
       };
+    case "mod-project":
+      // The unit page is where a tweak project is read and written, so a shared
+      // one is saved into the project list there. That page is behind Advanced
+      // mode, which the detail says, because somebody who has it off is sent
+      // home by the route's gate rather than shown the project.
+      return {
+        ok: true,
+        plan: {
+          ...(base as ImportPlan),
+          route: importRoute("/workshop", code),
+          label: containerKindName("mod-project"),
+          detail:
+            "It is saved to Unit tweaks, which needs Advanced mode turned on in Settings.",
+        },
+      };
   }
 }
 

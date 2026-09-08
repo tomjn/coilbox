@@ -21,8 +21,19 @@
  * has an `armcom` replaces it, which is occasionally the point and usually a
  * mistake, so {@link checkCloneName} answers which of the two is about to
  * happen and the page says so before anything is created.
+ *
+ * The other failure mode is where the name goes. A clone's definition is the
+ * right home for it in a game that names its units there, and the wrong one in a
+ * game that does not, so this asks `unitText.ts` which of the two it is dealing
+ * with rather than always writing the engine's keys (issue #2673).
  */
 import { resolvedDef } from "./overrides";
+import type {
+  LanguageText,
+  TextField,
+  TextHome,
+  UnitTextEdits,
+} from "./unitText";
 
 /**
  * Where a clone's definition came from, when it was not copied from a unit.
@@ -148,10 +159,11 @@ export function suggestCloneKey(
  * then `name`, and ignores a `name` that only repeats the unit's internal name.
  * So a `name` that repeated the source's key was the internal name and becomes
  * the clone's, and anything else in either key was a name for a person to read
- * and becomes the new one. A definition carrying neither, which is every unit
- * in Beyond All Reason, gets a `humanName` added: without it the clone would
- * have no name anywhere, since the game's own language file cannot name a unit
- * the game has never heard of.
+ * and becomes the new one. A definition carrying neither gets a `humanName`
+ * added, since there would otherwise be nothing to read.
+ *
+ * Only for a game whose units are named in their definitions. A game that names
+ * them somewhere else gets {@link stripNames} instead.
  *
  * Mutates the definition it is given, which is always a fresh copy here.
  */
@@ -180,6 +192,58 @@ function applyNames(
 }
 
 /**
+ * Leave a definition with an internal name and no readable one.
+ *
+ * What a copy's definition has to look like in a game that names its units in
+ * `language/en/units.json`. Beyond All Reason reads a unit's label from
+ * `Spring.I18N('units.names.' .. unitDefName)` and never from the definition, so
+ * a `humanName` there is not a second-best answer, it is a key nothing reads,
+ * and one that would drift the moment the name was edited afterwards in the
+ * place the game does read.
+ *
+ * A `name` that repeats the source's key is the internal name and becomes the
+ * copy's. Anything else in either key was a name for a person to read, and in
+ * this game nobody reads it, so it goes. That branch only fires for a copy of a
+ * copy made before this rule existed, or for a hand-edited project file: no unit
+ * of a language-home game carries a readable name, or `textHome` would have
+ * called the game a def home.
+ *
+ * Mutates the definition it is given.
+ */
+function stripNames(
+  def: Record<string, unknown>,
+  source: string,
+  key: string,
+): void {
+  for (const k of Object.keys(def)) {
+    const lower = k.toLowerCase();
+    if (lower !== "name" && lower !== "humanname") continue;
+    const value = def[k];
+    if (
+      lower === "name" &&
+      typeof value === "string" &&
+      value.trim() === source
+    )
+      def[k] = key;
+    else delete def[k];
+  }
+}
+
+/**
+ * A copy, and the words that did not fit in it.
+ *
+ * Two stores rather than one, because for a language home the copy's name is
+ * not part of its definition at all. `text` is empty for a def home, where the
+ * name and the description are in the definition where the game will read them.
+ * The caller writes both in one commit, so undo puts the copy and its name back
+ * together.
+ */
+export interface DerivedClone {
+  clone: UnitClone;
+  text: Partial<Record<TextField, string>>;
+}
+
+/**
  * Copy a unit under a new name.
  *
  * `patch` is the source's own overrides, so the copy is of the unit as the
@@ -187,6 +251,16 @@ function applyNames(
  * doubled a unit's health and then clones it means the one with the health they
  * set. Those edits are written into the clone's definition rather than carried
  * over as overrides, because from here on they are simply what this unit is.
+ *
+ * `home` is the game's, from `textHome`, and it decides where the name lands.
+ * It defaults to nothing so that a caller has to say, since a copy named in the
+ * wrong home looks perfectly correct in coilbox and is wrong only in the game.
+ *
+ * For a language home the description comes across too, out of `language`.
+ * A def home gets it for free, since it is a key in the definition being copied,
+ * but a language file has nothing under a key the game has never seen, and a
+ * copy whose tooltip reads `units.descriptions.mycopy` is the same bug as one
+ * whose name does.
  */
 export function deriveClone({
   key,
@@ -195,6 +269,8 @@ export function deriveClone({
   patch,
   displayName,
   replacesGameUnit,
+  home,
+  language,
 }: {
   key: string;
   source: string;
@@ -202,10 +278,75 @@ export function deriveClone({
   patch?: Record<string, unknown>;
   displayName: string;
   replacesGameUnit: boolean;
-}): UnitClone {
+  home: TextHome;
+  language?: LanguageText;
+}): DerivedClone {
   const def = resolvedDef(sourceDef, patch);
-  applyNames(def, source, key, displayName.trim());
-  return { key, source, replacesGameUnit, def };
+  const name = displayName.trim();
+  const clone: UnitClone = { key, source, replacesGameUnit, def };
+  if (home === "def") {
+    applyNames(def, source, key, name);
+    return { clone, text: {} };
+  }
+  stripNames(def, source, key);
+  const description = language?.descriptions?.[source];
+  return {
+    clone,
+    text: { name, ...(description === undefined ? {} : { description }) },
+  };
+}
+
+/**
+ * Move a copy's name out of its definition, where copies made before #2673 put
+ * it, and into the store the game actually reads.
+ *
+ * Projects with copies in them were saved before the rule above existed, and a
+ * copy in Beyond All Reason carries a `humanName` no widget in that game will
+ * ever look at. Nothing on screen says so, because coilbox reads the definition,
+ * which is why this cannot wait for the user to notice and retype the name.
+ *
+ * Only the project's own copies, never a unit the lego builder exported: that
+ * one is a file in the game folder read fresh each time, so there is nothing
+ * here to rewrite.
+ *
+ * Returns `null` when there is nothing to move, which is every load in a def
+ * home and every load after the first anywhere else, so the page can hold this
+ * against a store it must not write to on every render.
+ */
+export function migrateCloneText(
+  clones: UnitClones,
+  text: UnitTextEdits,
+  home: TextHome,
+  language?: LanguageText,
+): { clones: UnitClones; text: UnitTextEdits } | null {
+  if (home === "def") return null;
+  let nextClones = clones;
+  let nextText = text;
+  for (const clone of Object.values(clones)) {
+    const named = Object.entries(clone.def).find(([k, value]) => {
+      const lower = k.toLowerCase();
+      if (lower !== "name" && lower !== "humanname") return false;
+      return typeof value === "string" && value.trim() !== clone.key;
+    });
+    if (!named) continue;
+    const def = { ...clone.def };
+    stripNames(def, clone.source ?? clone.key, clone.key);
+    nextClones = { ...nextClones, [clone.key]: { ...clone, def } };
+    // The name it was made with, unless the user has since said otherwise in
+    // the store this is moving it to.
+    const entry = nextText[clone.key] ?? {};
+    const description =
+      clone.source === undefined
+        ? undefined
+        : language?.descriptions?.[clone.source];
+    const moved: Partial<Record<TextField, string>> = {
+      name: String(named[1]).trim(),
+      ...(description === undefined ? {} : { description }),
+      ...entry,
+    };
+    nextText = { ...nextText, [clone.key]: moved };
+  }
+  return nextClones === clones ? null : { clones: nextClones, text: nextText };
 }
 
 export function addClone(clones: UnitClones, clone: UnitClone): UnitClones {

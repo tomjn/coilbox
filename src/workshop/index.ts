@@ -7,8 +7,9 @@ import { gateAdvanced, useAdvancedMode } from "../general/advanced";
  * like.
  *
  * v0.1 is the unit page: change a unit's numbers, and copy a unit to add one of
- * your own. A tweak is held in the page for as long as it is open and saved
- * nowhere, which is issue #1282's job. Build menus and asset pickers follow.
+ * your own. Edits go into a named project as they are made, one project per
+ * game, saved through the frame settings store and exportable as a `.json`
+ * anybody can open (issue #1282, and `project.ts`). Asset pickers follow.
  */
 const workshopPlugin: FramePlugin = {
   id: "workshop",

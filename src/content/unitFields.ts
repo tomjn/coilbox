@@ -93,6 +93,17 @@ export interface ResolvedField {
   key: string;
   /** False when only the game declares this key, so render it as a raw row. */
   known: boolean;
+  /**
+   * Whether {@link label} was written for a reader, rather than being the
+   * engine's own key standing in for one.
+   *
+   * The page needs to be able to say which it is. A row labelled `upDirSmoothing`
+   * looks the same whether coilbox has nothing to say about the field or whether
+   * that is genuinely what it is called, and only one of those is worth a
+   * reader's time. The key is still shown, because it is what an experienced
+   * modder recognises and it is the only thing anybody can search the engine for.
+   */
+  described: boolean;
   label: string;
   type: EngineFieldType;
   unit?: string;
@@ -179,6 +190,7 @@ export function describeField(kind: DefKind, path: string): ResolvedField {
       path: normalised,
       key,
       known: false,
+      described: note?.label !== undefined,
       label: note?.label ?? key,
       type: "any",
       unit: note?.unit,
@@ -190,6 +202,7 @@ export function describeField(kind: DefKind, path: string): ResolvedField {
     path: normalised,
     key: engine.key,
     known: true,
+    described: note?.label !== undefined,
     label: note?.label ?? engine.key,
     type: engine.type,
     unit: note?.unit,

@@ -310,7 +310,7 @@ describe("parseLegoProjectJson", () => {
         def: { name: "Sky Fortress" },
       },
     };
-    expect(parseLegoProjectJson(JSON.stringify(doc)).exported?.files).toEqual(
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.exported?.files).toEqual(
       [],
     );
   });
@@ -339,7 +339,7 @@ describe("parseLegoProjectJson", () => {
       ],
     };
     expect(
-      parseLegoProjectJson(JSON.stringify(doc)).staleExports,
+      parseLegoProjectJson(JSON.stringify(doc))?.staleExports,
     ).toBeUndefined();
   });
 

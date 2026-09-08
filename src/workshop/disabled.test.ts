@@ -94,7 +94,8 @@ describe("switching a unit off touches nothing else the project holds", () => {
         sourceDef: { name: "armpw", health: 100 },
         displayName: "Peewee II",
         replacesGameUnit: false,
-      }),
+        home: "def",
+      }).clone,
     );
     const menus: BuildMenus = addToBuildMenu(
       removeFromBuildMenu({}, "armlab", "armrock", inherited),

@@ -263,8 +263,8 @@ describe("unitFieldView", () => {
       "weapons.1.name",
       "weapons.1.slaveTo",
     ]);
-    expect(rows?.[0].label).toBe("name (weapon 1)");
-    expect(rows?.[1].label).toBe("name (weapon 2)");
+    expect(rows?.[0].label).toBe("Weapon (weapon 1)");
+    expect(rows?.[1].label).toBe("Weapon (weapon 2)");
   });
 
   it("inherits the game's value where the def has one, and the engine's where it does not", () => {
@@ -360,7 +360,7 @@ describe("unitFieldView", () => {
         "weapons.1.name",
         "weapons.1.badtargetcategory",
       ]);
-      expect(rows?.[1].label).toBe("onlyTargetCategory (weapon 1)");
+      expect(rows?.[1].label).toBe("Only shoots at (weapon 1)");
     });
 
     it("walks into customParams however the game spells it", () => {

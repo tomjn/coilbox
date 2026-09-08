@@ -162,11 +162,44 @@ describe("the hand-written notes", () => {
     expect(f.type).toBe("number");
   });
 
-  it("leaves an undescribed field rendering under its own key", () => {
-    const f = describeField("unit", "seismicSignature");
-    expect(UNIT_FIELD_NOTES.seismicSignature).toBeUndefined();
+  it("leaves an undescribed field rendering under its own key, and says so", () => {
+    // A table other fields nest inside. The page draws its children rather than
+    // a row for the table itself, which is why it is one of the few left with
+    // no note after issue #2679.
+    const f = describeField("unit", "SFXTypes");
+    expect(UNIT_FIELD_NOTES.SFXTypes).toBeUndefined();
     expect(f.known).toBe(true);
-    expect(f.label).toBe("seismicSignature");
+    expect(f.label).toBe("SFXTypes");
+    expect(f.described).toBe(false);
+  });
+
+  it("marks a field it did write a label for as described", () => {
+    expect(describeField("unit", "upDirSmoothing").described).toBe(true);
+    expect(describeField("unit", "upDirSmoothing").label).not.toBe(
+      "upDirSmoothing",
+    );
+  });
+
+  it("describes every unit field the page can draw a row for", () => {
+    // The tables above are containers, and the three names have their own
+    // editor (see OWN_EDITOR in unitSections.ts), so no row is drawn for any of
+    // them. Everything else the engine reads is written up.
+    const containersAndOwnEditors = new Set([
+      "buildOptions",
+      "collisionVolume",
+      "description",
+      "humanName",
+      "name",
+      "selectionVolume",
+      "SFXTypes",
+      "sounds",
+      "weapons",
+    ]);
+    const undescribed = engineFields("unit")
+      .map((f) => (f.section === "" ? f.key : `${f.section}.${f.key}`))
+      .filter((path) => !describeField("unit", path).described)
+      .filter((path) => !containersAndOwnEditors.has(path));
+    expect(undescribed).toEqual([]);
   });
 });
 
