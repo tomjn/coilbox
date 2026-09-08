@@ -44,8 +44,11 @@ use std::path::Path;
 /// otherwise report no morphs for ever, since the cache is keyed on file
 /// identity and knows nothing about a shim change. v16: the unit-defs read
 /// gained the game's `language/en/units.json` names and descriptions (#2650),
-/// which a game scanned under v15 has no entry for at all.
-const INFO_CACHE_VERSION: u32 = 16;
+/// which a game scanned under v15 has no entry for at all. v17: that read now
+/// covers every `language/<code>/units.json` the game ships and is keyed by
+/// language code (#2672), so a v16 blob holds the old one-locale shape, which
+/// deserialises as no translations at all rather than as English.
+const INFO_CACHE_VERSION: u32 = 17;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

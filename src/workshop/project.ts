@@ -60,7 +60,7 @@ import type { DisabledUnits } from "./disabled";
 import type { UnitOverrides } from "./overrides";
 import { overrideCount } from "./overrides";
 import type { TextField, UnitTextEdits } from "./unitText";
-import { textEditCount } from "./unitText";
+import { BASE_LANGUAGE, textEditCount } from "./unitText";
 
 /** Payload schema version for a tweak project container. */
 export const MOD_PROJECT_KIND_VERSION = 1;
@@ -527,17 +527,42 @@ function parseMenus(value: unknown): BuildMenus {
   return out;
 }
 
+/** The two fields out of one language's object, dropping anything else. */
+function parseTextFields(value: unknown): Partial<Record<TextField, string>> {
+  const fields = asRecord(value);
+  if (!fields) return {};
+  const entry: Partial<Record<TextField, string>> = {};
+  if (typeof fields.name === "string") entry.name = fields.name;
+  if (typeof fields.description === "string")
+    entry.description = fields.description;
+  return entry;
+}
+
+/**
+ * The text store, by unit, then by language, then by field.
+ *
+ * A project saved before #2672 put the fields straight under the unit, and the
+ * only file the worker read then was `language/en/units.json`, so those edits
+ * are English edits and are lifted into the English bucket here. A string where
+ * a language object belongs is what says which of the two shapes this is, so a
+ * language whose code happened to be `name` would still be read correctly.
+ */
 function parseText(value: unknown): UnitTextEdits {
   const source = asRecord(value);
   if (!source) return {};
   const out: UnitTextEdits = {};
   for (const [unit, raw] of Object.entries(source)) {
-    const fields = asRecord(raw);
-    if (!fields) continue;
-    const entry: Partial<Record<TextField, string>> = {};
-    if (typeof fields.name === "string") entry.name = fields.name;
-    if (typeof fields.description === "string")
-      entry.description = fields.description;
+    const languages = asRecord(raw);
+    if (!languages) continue;
+    const entry: Record<string, Partial<Record<TextField, string>>> = {};
+    const legacy = parseTextFields(languages);
+    for (const [code, fields] of Object.entries(languages)) {
+      if (typeof fields === "string") continue;
+      const parsed = parseTextFields(fields);
+      if (Object.keys(parsed).length > 0) entry[code] = parsed;
+    }
+    if (Object.keys(legacy).length > 0)
+      entry[BASE_LANGUAGE] = { ...legacy, ...entry[BASE_LANGUAGE] };
     if (Object.keys(entry).length > 0) out[unit] = entry;
   }
   return out;

@@ -40,10 +40,13 @@ const ARMAAK: Record<string, unknown> = {
 
 const GAME = { armcom: ARMCOM, armaak: ARMAAK };
 
-/** What BAR's `language/en/units.json` says about the unit above. */
+/** What BAR's `language/<code>/units.json` files say about the unit above. */
 const BAR_LANGUAGE = {
-  names: { armaak: "Archangel" },
-  descriptions: { armaak: "Anti-Air Turret" },
+  en: {
+    names: { armaak: "Archangel" },
+    descriptions: { armaak: "Anti-Air Turret" },
+  },
+  de: { names: { armaak: "Erzengel" } },
 };
 
 /**
@@ -259,12 +262,12 @@ describe("a copy in a game that names its units in a language file", () => {
       displayName: "Archangel II",
       replacesGameUnit: false,
       home: "language",
-      language: BAR_LANGUAGE,
+      texts: BAR_LANGUAGE,
     });
 
   it("files the name under the copy's key rather than in its definition", () => {
     const { clone, text } = made();
-    expect(text.name).toBe("Archangel II");
+    expect(text.en.name).toBe("Archangel II");
     expect(clone.def.humanName).toBeUndefined();
     expect(clone.def.name).toBeUndefined();
   });
@@ -275,7 +278,7 @@ describe("a copy in a game that names its units in a language file", () => {
    * the game has never seen.
    */
   it("carries the source's description across with it", () => {
-    expect(made().text.description).toBe("Anti-Air Turret");
+    expect(made().text.en.description).toBe("Anti-Air Turret");
   });
 
   it("says nothing about a description the game does not have", () => {
@@ -286,9 +289,9 @@ describe("a copy in a game that names its units in a language file", () => {
       displayName: "Archangel II",
       replacesGameUnit: false,
       home: "language",
-      language: { names: { armaak: "Archangel" } },
+      texts: { en: { names: { armaak: "Archangel" } } },
     });
-    expect(text).toEqual({ name: "Archangel II" });
+    expect(text).toEqual({ en: { name: "Archangel II" } });
   });
 
   it("copies everything else about the unit exactly as before", () => {
@@ -312,7 +315,7 @@ describe("a copy in a game that names its units in a language file", () => {
       displayName: "My Other Tank",
       replacesGameUnit: false,
       home: "language",
-      language: BAR_LANGUAGE,
+      texts: BAR_LANGUAGE,
     });
     expect(clone.def.name).toBe("mytank2");
     expect(clone.def.humanName).toBeUndefined();
@@ -335,15 +338,14 @@ describe("migrateCloneText", () => {
     const moved = migrateCloneText(legacy, {}, "language", BAR_LANGUAGE);
     expect(moved?.clones.armaak2.def.humanName).toBeUndefined();
     expect(moved?.text.armaak2).toEqual({
-      name: "Archangel II",
-      description: "Anti-Air Turret",
+      en: { name: "Archangel II", description: "Anti-Air Turret" },
     });
   });
 
   it("leaves a name the user has since typed alone", () => {
-    const edited = { armaak2: { name: "Seraph" } };
+    const edited = { armaak2: { en: { name: "Seraph" } } };
     const moved = migrateCloneText(legacy, edited, "language", BAR_LANGUAGE);
-    expect(moved?.text.armaak2.name).toBe("Seraph");
+    expect(moved?.text.armaak2.en.name).toBe("Seraph");
     expect(moved?.clones.armaak2.def.humanName).toBeUndefined();
   });
 
@@ -368,7 +370,7 @@ describe("migrateCloneText", () => {
       displayName: "Archangel II",
       replacesGameUnit: false,
       home: "language",
-      language: BAR_LANGUAGE,
+      texts: BAR_LANGUAGE,
     });
     expect(
       migrateCloneText(addClone({}, clone), {}, "language", BAR_LANGUAGE),
@@ -392,7 +394,7 @@ describe("migrateCloneText", () => {
       },
     };
     const moved = migrateCloneText(built, {}, "language", BAR_LANGUAGE);
-    expect(moved?.text.mytank).toEqual({ name: "My Tank" });
+    expect(moved?.text.mytank).toEqual({ en: { name: "My Tank" } });
     expect(moved?.clones.mytank.def.humanName).toBeUndefined();
   });
 });

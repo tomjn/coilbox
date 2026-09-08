@@ -94,7 +94,7 @@ function fullEdits(): GameEdits {
   edits = editSlot(edits, "disabled", (d) => setUnitDisabled(d, "armpw", true));
   // A rename that lands in the language file rather than in the def.
   edits = editSlot(edits, "text", (t) =>
-    setUnitText(t, "armrock", "name", "Pebble", "Rocko"),
+    setUnitText(t, "armrock", "en", "name", "Pebble", "Rocko"),
   );
   return edits;
 }
@@ -287,9 +287,35 @@ describe("reading an untrusted file", () => {
     expect(Object.keys(edits.clones)).toEqual(["good"]);
     expect(edits.clones.good.replacesGameUnit).toBe(false);
     expect(edits.menus).toEqual({ armlab: [{ op: "add", unit: "armpw" }] });
-    expect(edits.text).toEqual({ armrock: { name: "Pebble" } });
+    // Lifted into English, which is the only language a store written in that
+    // shape could hold: it predates #2672 and the worker read `language/en`
+    // and nothing else.
+    expect(edits.text).toEqual({ armrock: { en: { name: "Pebble" } } });
     // Lowercased, de-duplicated and sorted, which is what `disabled.ts` keeps.
     expect(edits.disabled).toEqual(["armpw", "armrock"]);
+  });
+
+  /**
+   * Issue #2672. The text store gained a language dimension, and projects saved
+   * before it hold the fields straight under the unit. Those are English edits,
+   * because `language/en/units.json` was the only file the worker read.
+   */
+  it("reads a text store written before it had languages", () => {
+    const edits = parseGameEdits({
+      text: {
+        armrock: { name: "Pebble", description: "Throws rocks" },
+        armaak: { de: { name: "Erzengel" } },
+        // Both shapes on one unit, which only a hand-edited file produces. The
+        // language object wins, since it is the newer of the two.
+        armcom: { name: "Boss", en: { name: "Overlord" } },
+      },
+    });
+
+    expect(edits.text).toEqual({
+      armrock: { en: { name: "Pebble", description: "Throws rocks" } },
+      armaak: { de: { name: "Erzengel" } },
+      armcom: { en: { name: "Overlord" } },
+    });
   });
 
   /**
