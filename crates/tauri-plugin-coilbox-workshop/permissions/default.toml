@@ -1,0 +1,7 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows the workshop plugin's compiler, which turns a saved tweak project into the Lua a game reads. It reads nothing and writes nothing."
+permissions = [
+  "allow-workshop-compile",
+]
