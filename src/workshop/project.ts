@@ -59,6 +59,7 @@ import type { UnitClone, UnitClones } from "./clones";
 import type { DisabledUnits } from "./disabled";
 import type { UnitOverrides } from "./overrides";
 import { overrideCount } from "./overrides";
+import type { ReadOnlyLuaBlock } from "./readOnlyLua";
 import type { TextField, UnitTextEdits } from "./unitText";
 import { BASE_LANGUAGE, textEditCount } from "./unitText";
 
@@ -222,6 +223,13 @@ export interface ModProject {
    */
   distributionVersion?: number;
   edits: GameEdits;
+  /**
+   * Lua the project carries but cannot edit (issue #1280). See
+   * `readOnlyLua.ts` for why this sits beside `edits` rather than inside it.
+   * Absent for every project started the ordinary way. Only a decoded tweak
+   * import writes it, and nothing here offers a way to change one afterwards.
+   */
+  readOnlyLua?: ReadOnlyLuaBlock[];
   createdAt: string;
   updatedAt: string;
 }
@@ -234,6 +242,7 @@ export interface NewProject {
   game?: GameIdentity;
   authoredChecksum?: string;
   edits?: GameEdits;
+  readOnlyLua?: ReadOnlyLuaBlock[];
 }
 
 /** A name for a project nobody has named: the game, and which one it is. */
@@ -278,6 +287,7 @@ export function useModProjects() {
         ? { authoredChecksum: input.authoredChecksum }
         : {}),
       edits: input.edits ?? EMPTY_EDITS,
+      ...(input.readOnlyLua?.length ? { readOnlyLua: input.readOnlyLua } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -486,6 +496,7 @@ export interface ModProjectPayload {
   game?: GameIdentity;
   authoredChecksum?: string;
   edits: GameEdits;
+  readOnlyLua?: ReadOnlyLuaBlock[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -505,6 +516,9 @@ export function modProjectPayload(
       ? { authoredChecksum: project.authoredChecksum }
       : {}),
     edits: project.edits,
+    ...(project.readOnlyLua?.length
+      ? { readOnlyLua: project.readOnlyLua }
+      : {}),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
@@ -697,6 +711,31 @@ function parseDisabled(value: unknown): DisabledUnits {
   return [...keys].sort();
 }
 
+/**
+ * Read the read-only Lua blocks out of untrusted JSON.
+ *
+ * Every field is required as a string, and an entry missing one is dropped
+ * rather than patched with an empty string: a block with no `lua` is not a
+ * block, and one with no `note` would show as read-only for a reason nobody
+ * wrote down.
+ */
+function parseReadOnlyLua(value: unknown): ReadOnlyLuaBlock[] {
+  if (!Array.isArray(value)) return [];
+  const out: ReadOnlyLuaBlock[] = [];
+  for (const entry of value) {
+    const record = asRecord(entry);
+    if (
+      !record ||
+      typeof record.title !== "string" ||
+      typeof record.lua !== "string" ||
+      typeof record.note !== "string"
+    )
+      continue;
+    out.push({ title: record.title, lua: record.lua, note: record.note });
+  }
+  return out;
+}
+
 /** Read the five stores out of untrusted JSON, each validated on its own. */
 export function parseGameEdits(value: unknown): GameEdits {
   const source = asRecord(value) ?? {};
@@ -745,6 +784,7 @@ export function parseModProjectJson(text: string): ImportedProject | null {
       : `${gameName} tweaks`;
   const description =
     typeof payload.description === "string" ? payload.description.trim() : "";
+  const readOnlyLua = parseReadOnlyLua(payload.readOnlyLua);
   return {
     name,
     ...(description ? { description } : {}),
@@ -754,5 +794,6 @@ export function parseModProjectJson(text: string): ImportedProject | null {
       ? { authoredChecksum: payload.authoredChecksum }
       : {}),
     edits: parseGameEdits(payload.edits),
+    ...(readOnlyLua.length ? { readOnlyLua } : {}),
   };
 }

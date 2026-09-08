@@ -47,10 +47,12 @@ import {
   modProjectCode,
   modProjectFileName,
   modProjectJson,
+  type NewProject,
   parseModProjectJson,
   useModProjects,
 } from "../project";
 import { projectPath, unitEditPath } from "../routes";
+import { DecodeTweakSetDrawer } from "./components/DecodeTweakSetDrawer";
 import { ProjectCardMenu } from "./components/ProjectCardMenu";
 import {
   type ProjectDetails,
@@ -222,6 +224,17 @@ export default function ProjectsPage() {
     }
   }
 
+  /**
+   * What a decoded tweak set turned into is created and opened the same way
+   * an imported file is (issue #1280): a project is a document rather than a
+   * setting, so there is nothing left to ask once the drawer has a game and
+   * something to put in it.
+   */
+  function onDecodedStart(input: NewProject) {
+    setError(null);
+    navigate(projectPath(createProject(input).id));
+  }
+
   return (
     // A pause before the tip, so crossing a card on the way to another one does
     // not flash a box over the name you were reading.
@@ -236,6 +249,11 @@ export default function ProjectsPage() {
           description="A project is one game's edits under a name, saved as you work and exportable as a file somebody else can open. Open one to change what its game's units cost, carry and can do."
           actions={
             <>
+              <DecodeTweakSetDrawer
+                games={games}
+                scanning={scan.loading}
+                onStarted={onDecodedStart}
+              />
               <Button size="sm" variant="secondary" onClick={onImport}>
                 <Upload className="mr-1 size-3.5" />
                 Import
