@@ -37,13 +37,14 @@
  * fifth store at all: its rename is an ordinary override on `name` or
  * `humanName` (issue #2650, and `unitText.ts`).
  *
- * A unit built in the lego builder and exported into this game's folder joins
- * the clones, because it is the same thing: a whole definition the game will
- * read that the game did not ship. It is not held in any store, though, since
- * the file is already in the game whether this page is open or not, so it is
- * derived from the lego projects each render (issue #2651, and `legoUnits.ts`).
- * That is also what answers #663: the unit reaching the clone table is the unit
- * reaching the build menu editor, with nothing built twice for it.
+ * A unit built in the lego builder and exported into this game's folder is a
+ * sixth thing again, and the only one that is not a store: the file is in the
+ * game whether this page is open or not, so it is read off the lego projects
+ * each render rather than held anywhere (issue #2651, and `legoUnits.ts`).
+ * Mostly it only marks a unit the game's own read already has, since the
+ * exported definition is a file the engine loads like any other. That is what
+ * answers #663, and it costs nothing extra: a unit in the def table is already
+ * a unit the build menu editor can place.
  *
  * Both the clones and the overrides are kept per game, keyed by the same
  * `gameName` the `?game=` param and the picker already use to say which game
