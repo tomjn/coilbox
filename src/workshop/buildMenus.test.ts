@@ -3,11 +3,12 @@ import {
   addToBuildMenu,
   applyBuildMenu,
   type BuildMenus,
+  builderFlagOf,
   buildMenuOpCount,
   buildOptionsOf,
   clearBuildMenu,
   isBuilder,
-  moveInBuildMenu,
+  moveBeforeInBuildMenu,
   removeFromBuildMenu,
   resolvedBuildMenu,
 } from "./buildMenus";
@@ -66,6 +67,26 @@ describe("isBuilder", () => {
   });
 });
 
+describe("builderFlagOf", () => {
+  /** The case the panel warns about: a full roster the engine will ignore. */
+  it("is false for a def with a build list and the flag off", () => {
+    expect(isBuilder({ buildoptions: ["armpw"], builder: false })).toBe(true);
+    expect(builderFlagOf({ buildoptions: ["armpw"], builder: false })).toBe(
+      false,
+    );
+  });
+
+  it("is false for a def that never mentions it, which is the engine default", () => {
+    expect(builderFlagOf({ buildoptions: ["armpw"] })).toBe(false);
+    expect(builderFlagOf(undefined)).toBe(false);
+  });
+
+  it("reads the key in whatever case the def wrote it", () => {
+    expect(builderFlagOf(LAB)).toBe(true);
+    expect(builderFlagOf({ Builder: true })).toBe(true);
+  });
+});
+
 describe("editing a build menu", () => {
   const inherited = buildOptionsOf(LAB);
 
@@ -101,7 +122,13 @@ describe("editing a build menu", () => {
   });
 
   it("moves a unit up", () => {
-    const menus = moveInBuildMenu({}, "armlab", "armham", -1, inherited);
+    const menus = moveBeforeInBuildMenu(
+      {},
+      "armlab",
+      "armham",
+      "armrock",
+      inherited,
+    );
     expect(applyBuildMenu(inherited, menus.armlab)).toEqual([
       "armpw",
       "armham",
@@ -110,7 +137,13 @@ describe("editing a build menu", () => {
   });
 
   it("moves a unit down", () => {
-    const menus = moveInBuildMenu({}, "armlab", "armpw", 1, inherited);
+    const menus = moveBeforeInBuildMenu(
+      {},
+      "armlab",
+      "armpw",
+      "armham",
+      inherited,
+    );
     expect(applyBuildMenu(inherited, menus.armlab)).toEqual([
       "armrock",
       "armpw",
@@ -119,7 +152,7 @@ describe("editing a build menu", () => {
   });
 
   it("moves a unit to the end", () => {
-    const menus = moveInBuildMenu({}, "armlab", "armpw", 2, inherited);
+    const menus = moveBeforeInBuildMenu({}, "armlab", "armpw", null, inherited);
     expect(applyBuildMenu(inherited, menus.armlab)).toEqual([
       "armrock",
       "armham",
@@ -127,9 +160,42 @@ describe("editing a build menu", () => {
     ]);
   });
 
-  it("does nothing at either end of the list", () => {
-    expect(moveInBuildMenu({}, "armlab", "armpw", -1, inherited)).toEqual({});
-    expect(moveInBuildMenu({}, "armlab", "armham", 1, inherited)).toEqual({});
+  /** The anchor a drop lands on is the row it was dropped before, and dropping
+   *  a row on itself is where it already was. */
+  it("records nothing for a move that changes nothing", () => {
+    expect(
+      moveBeforeInBuildMenu({}, "armlab", "armpw", "armrock", inherited),
+    ).toEqual({});
+    expect(
+      moveBeforeInBuildMenu({}, "armlab", "armham", null, inherited),
+    ).toEqual({});
+    expect(
+      moveBeforeInBuildMenu({}, "armlab", "armpw", "armpw", inherited),
+    ).toEqual({});
+  });
+
+  it("records nothing for a unit that is not on the menu", () => {
+    expect(
+      moveBeforeInBuildMenu({}, "armlab", "corak", "armpw", inherited),
+    ).toEqual({});
+  });
+
+  /** The reason the anchor is stored rather than an index: a unit the game adds
+   *  to this factory later must not be shoved by somebody's old reorder. */
+  it("keeps its meaning when the game grows the list", () => {
+    const menus = moveBeforeInBuildMenu(
+      {},
+      "armlab",
+      "armham",
+      "armpw",
+      inherited,
+    );
+    expect(applyBuildMenu(["armnewunit", ...inherited], menus.armlab)).toEqual([
+      "armnewunit",
+      "armham",
+      "armpw",
+      "armrock",
+    ]);
   });
 
   it("forgets an add that was taken back out again", () => {
@@ -139,14 +205,20 @@ describe("editing a build menu", () => {
   });
 
   it("forgets a move that put a unit back where it started", () => {
-    let menus: BuildMenus = moveInBuildMenu(
+    let menus: BuildMenus = moveBeforeInBuildMenu(
       {},
       "armlab",
       "armpw",
-      1,
+      "armham",
       inherited,
     );
-    menus = moveInBuildMenu(menus, "armlab", "armpw", -1, inherited);
+    menus = moveBeforeInBuildMenu(
+      menus,
+      "armlab",
+      "armpw",
+      "armrock",
+      inherited,
+    );
     expect(menus).toEqual({});
   });
 
@@ -174,7 +246,13 @@ describe("editing a build menu", () => {
     );
     expect(Object.keys(menus)).toEqual(["armlab"]);
     menus = addToBuildMenu(menus, "armlab", "armpw", inherited);
-    menus = moveInBuildMenu(menus, "armlab", "armpw", -2, inherited);
+    menus = moveBeforeInBuildMenu(
+      menus,
+      "armlab",
+      "armpw",
+      "armrock",
+      inherited,
+    );
     expect(menus).toEqual({});
     expect(buildMenuOpCount(menus)).toBe(0);
   });
@@ -196,11 +274,11 @@ describe("an op set outlives a change to the game underneath it", () => {
    */
   it("keeps a unit the game added after the edit was made", () => {
     const before = buildOptionsOf(LAB);
-    const menus = moveInBuildMenu(
+    const menus = moveBeforeInBuildMenu(
       addToBuildMenu({}, "armlab", "corak", before),
       "armlab",
       "corak",
-      -3,
+      "armpw",
       before,
     );
     expect(applyBuildMenu(before, menus.armlab)).toEqual([
@@ -235,7 +313,7 @@ describe("build menu edits stay out of the sparse override set", () => {
     const overrides: UnitOverrides = {};
     let menus: BuildMenus = addToBuildMenu({}, "armlab", "corak", inherited);
     menus = removeFromBuildMenu(menus, "armlab", "armrock", inherited);
-    menus = moveInBuildMenu(menus, "armlab", "corak", -2, inherited);
+    menus = moveBeforeInBuildMenu(menus, "armlab", "corak", "armpw", inherited);
 
     expect(buildMenuOpCount(menus)).toBeGreaterThan(0);
     expect(overrides).toEqual({});
@@ -251,7 +329,13 @@ describe("build menu edits stay out of the sparse override set", () => {
 
   it("holds no buildoptions path anywhere in the stored shape", () => {
     let menus: BuildMenus = addToBuildMenu({}, "armlab", "corak", inherited);
-    menus = moveInBuildMenu(menus, "armlab", "corak", -1, inherited);
+    menus = moveBeforeInBuildMenu(
+      menus,
+      "armlab",
+      "corak",
+      "armham",
+      inherited,
+    );
     expect(JSON.stringify(menus)).not.toContain("buildoptions");
   });
 });
