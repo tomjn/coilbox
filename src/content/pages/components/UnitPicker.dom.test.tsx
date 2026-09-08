@@ -8,6 +8,10 @@
  * file opens a real DOM instead, because proving the fix means actually typing
  * into the input and reading what comes back, not just inspecting the initial
  * markup.
+ *
+ * The windowing (issue #2715) is here for the same reason: the list used to stop
+ * at 500 rows and ask for a search term, and proving that every unit is reachable
+ * now means scrolling a real container and reading what mounted.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -96,5 +100,139 @@ describe("the unit picker's search", () => {
     // it means finding the base's row, not "No units match.".
     expect(screen.getByText("Commander, 2 upgrades")).not.toBeNull();
     expect(screen.queryByText("No units match.")).toBeNull();
+  });
+});
+
+/** happy-dom's ResizeObserver is a stub that never calls back, so a test that
+ *  needs a measured container brings its own, firing once with a fixed height.
+ *  Copied from `UnitList.dom.test.tsx`, which windows the same way. */
+class FixedSizeResizeObserver {
+  #callback: ResizeObserverCallback;
+  constructor(callback: ResizeObserverCallback) {
+    this.#callback = callback;
+  }
+  observe() {
+    this.#callback(
+      [{ contentRect: { height: 320 } } as ResizeObserverEntry],
+      this as unknown as ResizeObserver,
+    );
+  }
+  unobserve() {}
+  disconnect() {}
+}
+
+function measured<T>(body: () => T): T {
+  const original = globalThis.ResizeObserver;
+  globalThis.ResizeObserver =
+    FixedSizeResizeObserver as unknown as typeof ResizeObserver;
+  try {
+    return body();
+  } finally {
+    globalThis.ResizeObserver = original;
+  }
+}
+
+/**
+ * Two sides of `perSide` units each, plus the commander that roots each side, so
+ * the list has faction headings between its blocks the way a real game's does.
+ * Named so a unit's sort order is its index within its side.
+ */
+function twoSides(perSide: number): UnitDatasetEntry[] {
+  const units: UnitDatasetEntry[] = [];
+  for (const side of ["arm", "cor"]) {
+    const kids = Array.from(
+      { length: perSide },
+      (_, i) => `${side}unit${String(i).padStart(3, "0")}`,
+    );
+    units.push(unit(`${side}com`, `${side}com`, kids));
+    for (const kid of kids) units.push(unit(kid, kid));
+  }
+  return units;
+}
+
+const TWO_SIDES = [
+  { startUnit: "armcom", name: "Armada" },
+  { startUnit: "corcom", name: "Cortex" },
+];
+
+function drawBig(perSide = 300) {
+  return render(
+    createElement(UnitPicker, {
+      units: twoSides(perSide),
+      factions: TWO_SIDES,
+      selected: [],
+      onChange: () => {},
+    }),
+  );
+}
+
+const rowEls = () =>
+  Array.from(document.querySelectorAll<HTMLElement>("[data-row]"));
+const scroller = () =>
+  rowEls()[0].closest("ul")?.parentElement?.parentElement as HTMLElement;
+
+describe("a game bigger than the cap that used to be here", () => {
+  it("counts every unit and never asks for a search term", () => {
+    drawBig();
+    expect(screen.queryByText(/Showing the first/)).toBeNull();
+    // The caller's own count already carries the total, so the list does not
+    // print a second one beside it saying the same thing.
+    expect(screen.getByText("0 of 602 selected")).not.toBeNull();
+  });
+
+  it("gives both numbers while a search narrows the list", () => {
+    drawBig();
+    fireEvent.change(screen.getByPlaceholderText("Search units…"), {
+      target: { value: "corunit1" },
+    });
+    // corunit100 to corunit199: a hundred of the six hundred and two.
+    expect(screen.getByText("100 of 602 units")).not.toBeNull();
+  });
+
+  it("mounts far fewer rows than units once the container is measured", () => {
+    measured(() => {
+      drawBig();
+      expect(rowEls().length).toBeGreaterThan(0);
+      expect(rowEls().length).toBeLessThan(100);
+    });
+  });
+
+  it("reaches the last unit of the last faction by scrolling", () => {
+    measured(() => {
+      drawBig();
+      // Past the end on purpose: the window clamps to the bottom of the list,
+      // which is where the units the cap used to hide are.
+      fireEvent.scroll(scroller(), { target: { scrollTop: 100000 } });
+      // By its checkbox's label, since a row prints the unit's name and its def
+      // key and this fixture's units are named after their keys.
+      expect(screen.getByLabelText("corunit299")).not.toBeNull();
+    });
+  });
+
+  it("tells a screen reader each unit's place in the whole list", () => {
+    measured(() => {
+      drawBig();
+      const first = rowEls()[0].closest("li");
+      expect(first?.getAttribute("aria-setsize")).toBe("602");
+      expect(first?.getAttribute("aria-posinset")).toBe("1");
+    });
+  });
+
+  it("is one tab stop, whose arrow keys walk past the end of the window", () => {
+    measured(() => {
+      drawBig();
+      expect(rowEls().filter((el) => el.tabIndex === 0)).toHaveLength(1);
+      rowEls()[0].focus();
+      for (let i = 0; i < 40; i++) {
+        fireEvent.keyDown(document.activeElement as Element, {
+          key: "ArrowDown",
+        });
+      }
+      // 40 rows down from the first unit, over a faction heading that is a row
+      // of the list but not a stop on the way through it.
+      expect(document.activeElement?.closest("li")?.textContent).toContain(
+        "armunit039",
+      );
+    });
   });
 });

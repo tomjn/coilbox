@@ -1,12 +1,22 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import { Check, ChevronsUpDown, X } from "lucide-react";
-import { createContext, type ReactNode, use, useMemo, useState } from "react";
+import {
+  createContext,
+  type KeyboardEvent,
+  type ReactNode,
+  use,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { visibleRowWindow } from "@/lib/rowVirtualize";
 import { usePreferredTarget } from "../../../play/config";
 import type {
   UnitBuildpicsResult,
@@ -29,9 +39,36 @@ import {
 import { unitLabel } from "../../unitChoices";
 import { UnitIcon } from "./UnitIcon";
 
-/** Cap on how many rows the list shows at once, so a huge game stays responsive
- * (a 4000-unit game would otherwise render every row). */
-const SEARCH_CAP = 500;
+/**
+ * A row's height in pixels, pinned by an inline style on every row so the
+ * windowing arithmetic and the real layout cannot drift apart.
+ *
+ * Measured in the app rather than assumed: a unit's row comes out at 36 pixels
+ * and a faction heading at 28. One height covers both, which is what lets the
+ * flat arithmetic in `rowVirtualize.ts` window a grouped list at all, so a
+ * heading now sits in the same 36 pixel band a unit does with its text centred
+ * in it. That is the whole visual cost of this: 8 more pixels of air around a
+ * faction name.
+ */
+const ROW_HEIGHT = 36;
+/**
+ * Rows kept in the DOM above and below the visible range, so a fast scroll does
+ * not show a blank strip while the next frame's window catches up.
+ */
+const OVERSCAN = 8;
+
+/**
+ * One line of the list: a faction heading, or a unit.
+ *
+ * The groups are flattened into one indexed array because the windowing maths
+ * counts rows, and in a grouped list the number of rows above a unit depends on
+ * how many headings came before it. `place` is the unit's position among the
+ * units alone, which is what a screen reader is told, since a heading is not
+ * one of the things being counted.
+ */
+type PickerRow =
+  | { kind: "heading"; key: string; label: string }
+  | { kind: "unit"; key: string; id: string; place: number };
 
 /**
  * Which game the pickers below are picking from.
@@ -546,10 +583,138 @@ function UnitList({
     return factionGroups(forest, rowIds, name, heading, match);
   }, [forest, rowIds, stagesOf, labels, factions, query]);
 
-  const total = groups.reduce((n, g) => n + g.units.length, 0);
-  const capped = total > SEARCH_CAP;
-  let left = SEARCH_CAP;
   const showHeadings = groups.length > 1;
+  const rows = useMemo(() => {
+    const out: PickerRow[] = [];
+    let place = 0;
+    for (const group of groups) {
+      if (showHeadings)
+        out.push({
+          kind: "heading",
+          key: `heading:${group.id || "__other"}`,
+          label: group.label,
+        });
+      for (const id of group.units)
+        out.push({ kind: "unit", key: id, id, place: ++place });
+    }
+    return out;
+  }, [groups, showHeadings]);
+  const total = groups.reduce((n, g) => n + g.units.length, 0);
+
+  // The element itself rather than a ref, because a search that matches nothing
+  // takes the whole scroller out of the DOM and puts a fresh one back when the
+  // search is cleared, leaving a mount-once observer watching the element that
+  // went.
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+  /** A row waiting to take keyboard focus, once the scroll below has put it in
+   *  the window and React has mounted it. Cleared as soon as it has. */
+  const [focusRow, setFocusRow] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!scroller) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setViewportHeight(entry.contentRect.height);
+    });
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [scroller]);
+
+  // Clamped here rather than left to the scroll event, because a search that
+  // shortens the list leaves `scrollTop` past the end of it for one frame, and
+  // a window starting past the end of the list is an empty list.
+  const { start, end } = visibleRowWindow(
+    Math.min(scrollTop, Math.max(0, rows.length * ROW_HEIGHT - viewportHeight)),
+    viewportHeight,
+    rows.length,
+    ROW_HEIGHT,
+    OVERSCAN,
+  );
+
+  // A new search is a new list, so it is read from the top. Without this the
+  // old offset carries over and the results open part way down, or past their
+  // own end.
+  const needle = query.trim();
+  useLayoutEffect(() => {
+    if (!scroller || !needle) return;
+    scroller.scrollTop = 0;
+    setScrollTop(0);
+  }, [needle, scroller]);
+
+  useLayoutEffect(() => {
+    if (focusRow === null) return;
+    scroller?.querySelector<HTMLElement>(`[data-row="${focusRow}"]`)?.focus();
+    setFocusRow(null);
+  }, [focusRow, scroller]);
+
+  /** The next row in `step`'s direction that a person can actually land on: a
+   *  heading is a label, not a choice. -1 when there is none that way. */
+  const unitRowFrom = (from: number, step: number) => {
+    for (let i = from; i >= 0 && i < rows.length; i += step)
+      if (rows[i].kind === "unit") return i;
+    return -1;
+  };
+
+  /** Scrolls by the least that puts `row` fully on screen, and tells the window
+   *  about it in the same batch so the row is mounted by the time focus moves
+   *  to it. */
+  const moveFocus = (to: number) => {
+    if (to < 0) return;
+    if (scroller) {
+      const top = to * ROW_HEIGHT;
+      const next =
+        top < scroller.scrollTop
+          ? top
+          : top + ROW_HEIGHT > scroller.scrollTop + scroller.clientHeight
+            ? top + ROW_HEIGHT - scroller.clientHeight
+            : null;
+      if (next !== null) {
+        scroller.scrollTop = next;
+        setScrollTop(next);
+      }
+    }
+    setFocusRow(to);
+  };
+
+  // Arrow keys, because tab cannot do this job any more: a row outside the
+  // window is not in the DOM, so tabbing off the end of it would drop focus out
+  // of the list entirely. Only one row is a tab stop, which is also the end of
+  // tabbing through hundreds of rows to reach whatever is under the list.
+  const onRowKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
+    const row = Number(
+      (e.target as HTMLElement).closest("[data-row]")?.getAttribute("data-row"),
+    );
+    if (!Number.isInteger(row)) return;
+    const to =
+      e.key === "ArrowDown"
+        ? unitRowFrom(row + 1, 1)
+        : e.key === "ArrowUp"
+          ? unitRowFrom(row - 1, -1)
+          : e.key === "Home"
+            ? unitRowFrom(0, 1)
+            : e.key === "End"
+              ? unitRowFrom(rows.length - 1, -1)
+              : null;
+    if (to === null) return;
+    e.preventDefault();
+    moveFocus(to);
+  };
+
+  // The tab stop follows the picked unit while it is on screen, and otherwise
+  // is the first unit in the window, so there is always exactly one rendered
+  // row to tab on to even when the pick has been scrolled out of the DOM.
+  const pickedRow = rows.findIndex((r) => r.kind === "unit" && isOn(r.id));
+  const firstInWindow = rows
+    .slice(start, end)
+    .findIndex((r) => r.kind === "unit");
+  const tabStop =
+    pickedRow >= start && pickedRow < end
+      ? pickedRow
+      : firstInWindow < 0
+        ? -1
+        : start + firstInWindow;
 
   return (
     <div className="flex flex-col gap-2">
@@ -571,46 +736,69 @@ function UnitList({
         )}
       </div>
 
-      <ul className="flex max-h-80 flex-col overflow-auto rounded-md border border-border/50 p-1">
-        {groups.map((group) => {
-          const shown = group.units.slice(0, Math.max(left, 0));
-          left -= shown.length;
-          if (shown.length === 0) return null;
-          return (
-            <li key={group.id || "__other"}>
-              {showHeadings && (
-                <p className="px-2 pb-1 pt-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {group.label}
-                </p>
-              )}
-              <ul>
-                {shown.map((id) => (
+      {total === 0 ? (
+        <p className="rounded-md border border-border/50 px-2 py-1 text-xs text-muted-foreground">
+          No units match.
+        </p>
+      ) : (
+        <div
+          ref={setScroller}
+          onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+          className="max-h-80 overflow-auto rounded-md border border-border/50 p-1"
+        >
+          {/* The full length of the list, whether or not its rows are mounted,
+            so the scrollbar is the size of the game rather than the size of
+            the window. */}
+          <div style={{ height: rows.length * ROW_HEIGHT }}>
+            <ul
+              onKeyDown={onRowKeyDown}
+              style={{ transform: `translateY(${start * ROW_HEIGHT}px)` }}
+            >
+              {rows.slice(start, end).map((row, i) =>
+                row.kind === "heading" ? (
+                  <li
+                    key={row.key}
+                    style={{ height: ROW_HEIGHT }}
+                    className="flex items-end px-2 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground"
+                  >
+                    {row.label}
+                  </li>
+                ) : (
                   <UnitRow
-                    key={id}
-                    id={id}
-                    label={label(id)}
-                    display={icons?.units[id]}
+                    key={row.key}
+                    id={row.id}
+                    row={start + i}
+                    // The position and the total are said out loud, because a
+                    // list with 20 of its rows in the DOM would otherwise be
+                    // read as a list of 20.
+                    place={row.place}
+                    total={total}
+                    tabStop={start + i === tabStop}
+                    label={label(row.id)}
+                    display={icons?.units[row.id]}
                     pending={iconsPending}
-                    on={isOn(id)}
+                    on={isOn(row.id)}
                     mode={mode}
-                    onPick={(on) => onPick(id, on)}
+                    onPick={(on) => onPick(row.id, on)}
                   />
-                ))}
-              </ul>
-            </li>
-          );
-        })}
-        {total === 0 && (
-          <li className="px-2 py-1 text-xs text-muted-foreground">
-            No units match.
-          </li>
-        )}
-        {capped && (
-          <li className="px-2 py-1 text-xs text-muted-foreground">
-            Showing the first {SEARCH_CAP} of {total}. Search to narrow it.
-          </li>
-        )}
-      </ul>
+                ),
+              )}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Both numbers while a search is on, because "12 units" alone does not
+        say whether the game has 12 or 564. Left to the caller's own count when
+        it has one, since "12 of 379 allowed" beside "379 units" is the same
+        fact said twice. */}
+      {(needle || !count) && (
+        <p className="text-xs text-muted-foreground">
+          {needle
+            ? `${total} of ${rowIds.length} units`
+            : `${total} unit${total === 1 ? "" : "s"}`}
+        </p>
+      )}
     </div>
   );
 }
@@ -618,6 +806,10 @@ function UnitList({
 /** One unit: build pic, name, internal id, and whatever the mode uses to pick it. */
 function UnitRow({
   id,
+  row,
+  place,
+  total,
+  tabStop,
   label,
   display,
   pending,
@@ -626,6 +818,15 @@ function UnitRow({
   onPick,
 }: {
   id: string;
+  /** Where this row sits in the whole flattened list, headings included, which
+   *  is what the arrow keys move through. */
+  row: number;
+  /** This unit's place among the units alone, for a screen reader. */
+  place: number;
+  total: number;
+  /** This is the list's one tab stop, so tab reaches the list and then leaves
+   *  it rather than walking every mounted row. */
+  tabStop: boolean;
   label: string;
   /** This unit's resolved build pic, absent until the icons come back. */
   display?: UnitDisplay;
@@ -648,16 +849,22 @@ function UnitRow({
 
   if (mode === "single") {
     return (
-      <li>
+      <li
+        aria-posinset={place}
+        aria-setsize={total}
+        style={{ height: ROW_HEIGHT }}
+      >
         {/* A list of buttons rather than a listbox: the picked one says so with
             `aria-pressed`, and the search box above stays a plain text field
             instead of having to own arrow-key navigation for the list. */}
         <button
           type="button"
+          data-row={row}
+          tabIndex={tabStop ? 0 : -1}
           aria-pressed={on}
           onClick={() => onPick(true)}
           className={cn(
-            "flex w-full items-center gap-2 rounded px-1 py-1 text-left text-sm",
+            "flex h-full w-full items-center gap-2 rounded px-1 py-1 text-left text-sm",
             "hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
             on && "bg-accent",
           )}
@@ -673,10 +880,14 @@ function UnitRow({
   }
 
   return (
-    <li>
+    <li
+      aria-posinset={place}
+      aria-setsize={total}
+      style={{ height: ROW_HEIGHT }}
+    >
       <div
         className={cn(
-          "flex items-center gap-2 rounded px-1 py-1 text-sm",
+          "flex h-full items-center gap-2 rounded px-1 py-1 text-sm",
           // Only the read-only view tints the row. Where there are checkboxes the
           // checkbox is the state, and a tint behind every ticked row in a list
           // that starts fully ticked is a wall of colour saying nothing.
@@ -696,6 +907,8 @@ function UnitRow({
         ) : (
           <Checkbox
             checked={on}
+            data-row={row}
+            tabIndex={tabStop ? 0 : -1}
             onCheckedChange={(v) => onPick(v === true)}
             aria-label={label}
           />
