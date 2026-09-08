@@ -13,6 +13,14 @@
  * (issue #2649). The wording here says "remove" and never "disable" for that
  * reason, and nothing on this panel touches a unit's own definition.
  *
+ * So a row has three states, not two. Present is an ordinary row. Removed is
+ * gone from the list and offered back under it. Disabled keeps its row and its
+ * place, struck through and marked, because the unit is switched off on its own
+ * page and not by anything done here: the placement is intact, and switching
+ * the unit back on is all it takes to have it again. Showing it as missing
+ * would be the conflation the issue is about, and taking the row away would
+ * lose the order somebody chose.
+ *
  * Cross faction entries get the attention the issue asks for, because giving one
  * side another side's unit is the most common thing anyone does here. The add
  * button opens the picker over the whole game rather than over this builder's
@@ -23,7 +31,7 @@
  * list, one press is one move, and it works from the keyboard, which a drag
  * does not.
  */
-import { Button } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +40,7 @@ import { useUnitsyncGameInfo } from "@/content/config";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { buildTechForest } from "@/content/techForest";
 import type { UnitClones } from "../../clones";
+import { type DisabledUnits, isUnitDisabled } from "../../disabled";
 
 export function BuildMenuPanel({
   builderKey,
@@ -41,6 +50,7 @@ export function BuildMenuPanel({
   edited,
   units,
   clones,
+  disabled,
   nameOf,
   gameName,
   gameArchive,
@@ -67,6 +77,8 @@ export function BuildMenuPanel({
   /** Every unit that can be added: the game's, with the project's among them. */
   units: UnitDatasetEntry[];
   clones: UnitClones;
+  /** The units the project switches off, which is not a menu edit (#2649). */
+  disabled: DisabledUnits;
   /** What to call a unit, resolved by the page against the curated dataset. */
   nameOf: (key: string) => string;
   gameName?: string;
@@ -108,6 +120,7 @@ export function BuildMenuPanel({
     [units],
   );
   const removed = inherited.filter((unit) => !menu.includes(unit));
+  const off = menu.filter((unit) => isUnitDisabled(disabled, unit));
 
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-border/50 p-2">
@@ -117,7 +130,9 @@ export function BuildMenuPanel({
           <span className="text-xs text-muted-foreground">
             {menu.length === 0
               ? "Builds nothing"
-              : `${menu.length} unit${menu.length === 1 ? "" : "s"}, in order`}
+              : `${menu.length} unit${menu.length === 1 ? "" : "s"}, in order${
+                  off.length > 0 ? `, ${off.length} disabled` : ""
+                }`}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -146,7 +161,8 @@ export function BuildMenuPanel({
         What {builderName} offers, in the order the buttons appear. The picker
         covers the whole game, so another side's units go in here the same way
         this side's do. Taking a unit out of this menu does not remove it from
-        the game.
+        the game. A unit switched off on its own page keeps its place here and
+        is marked disabled instead of disappearing.
       </p>
 
       {menu.length === 0 ? (
@@ -158,6 +174,7 @@ export function BuildMenuPanel({
           {menu.map((unit, index) => {
             const faction = factionName(unit);
             const label = nameOf(unit);
+            const switchedOff = isUnitDisabled(disabled, unit);
             return (
               <li
                 key={unit}
@@ -168,7 +185,24 @@ export function BuildMenuPanel({
                 </span>
                 <span className="flex min-w-0 flex-col">
                   <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-sm">{label}</span>
+                    <span
+                      className={cn(
+                        "truncate text-sm",
+                        switchedOff &&
+                          "text-muted-foreground line-through decoration-muted-foreground/60",
+                      )}
+                    >
+                      {label}
+                    </span>
+                    {switchedOff && (
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-[10px]"
+                        title="This unit is switched off, so it comes off every build menu in the game when this is compiled. Its place here is kept, and switching it back on restores it."
+                      >
+                        disabled
+                      </Badge>
+                    )}
                     {faction && (
                       <Badge
                         variant="secondary"
@@ -253,10 +287,20 @@ export function BuildMenuPanel({
                   size="sm"
                   className="h-7 gap-1 text-xs"
                   onClick={() => onAdd(unit)}
-                  title={`Put ${nameOf(unit)} back on this menu`}
+                  title={
+                    isUnitDisabled(disabled, unit)
+                      ? `Put ${nameOf(unit)} back on this menu. It is switched off as well, so it would come back marked disabled.`
+                      : `Put ${nameOf(unit)} back on this menu`
+                  }
                 >
                   <Undo2 className="size-3" />
-                  {nameOf(unit)}
+                  <span
+                    className={cn(
+                      isUnitDisabled(disabled, unit) && "line-through",
+                    )}
+                  >
+                    {nameOf(unit)}
+                  </span>
                 </Button>
               </li>
             ))}

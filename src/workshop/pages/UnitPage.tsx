@@ -25,6 +25,18 @@
  * gives: it is an ordered list the game still owns, so it is recorded as what
  * the user did to it rather than as the list that came out (issue #1274).
  *
+ * Switching a unit off is a fourth store and deliberately not any of the other
+ * three: it is a mark against a unit rather than an edit to anything, so it
+ * writes nowhere else and switching the unit back on leaves every build menu
+ * placement exactly where it was (issue #2649, and `disabled.ts`).
+ *
+ * A fifth store holds a renamed unit for a game that keeps its names in a
+ * localisation file rather than in its unitdefs, which is what Beyond All
+ * Reason does. That edit patches a JSON file rather than a unit table, so it
+ * cannot be an override, and a game that does keep its names in the def has no
+ * fifth store at all: its rename is an ordinary override on `name` or
+ * `humanName` (issue #2650, and `unitText.ts`).
+ *
  * Both the clones and the overrides are kept per game, keyed by the same
  * `gameName` the `?game=` param and the picker already use to say which game
  * is open. An override is a patch against one game's own unit table, so it
@@ -68,6 +80,11 @@ import {
 } from "../clones";
 import { useCustomParams, useUnitDefs } from "../config";
 import {
+  type DisabledUnits,
+  isUnitDisabled,
+  setUnitDisabled,
+} from "../disabled";
+import {
   clearOverride,
   clearUnit,
   overrideCount,
@@ -90,6 +107,7 @@ import {
 } from "../unitText";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
+import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
@@ -100,6 +118,7 @@ const NO_CLONES: UnitClones = {};
 const NO_OVERRIDES: UnitOverrides = {};
 const NO_MENUS: BuildMenus = {};
 const NO_TEXT: UnitTextEdits = {};
+const NO_DISABLED: DisabledUnits = [];
 
 export default function UnitPage() {
   const [params, setParams] = useSearchParams();
@@ -198,6 +217,29 @@ export default function UnitPage() {
       setTextByGame((all) => {
         const next = update(all[gameName] ?? {});
         if (Object.keys(next).length === 0) {
+          if (!Object.hasOwn(all, gameName)) return all;
+          const { [gameName]: _dropped, ...rest } = all;
+          return rest;
+        }
+        return { ...all, [gameName]: next };
+      }),
+    [gameName],
+  );
+  // Kept per game too, and a set of its own rather than a flag folded into one
+  // of the other three. It is a mark, not an edit: nothing here writes an
+  // override, a clone or a build menu operation, so switching a unit back on
+  // puts every placement back exactly (issue #2649).
+  const [disabledByGame, setDisabledByGame] = useState<
+    Record<string, DisabledUnits>
+  >({});
+  const disabled = disabledByGame[gameName] ?? NO_DISABLED;
+  const updateDisabled = useCallback(
+    (update: (current: DisabledUnits) => DisabledUnits) =>
+      setDisabledByGame((all) => {
+        const current = all[gameName] ?? NO_DISABLED;
+        const next = update(current);
+        if (next === current) return all;
+        if (next.length === 0) {
           if (!Object.hasOwn(all, gameName)) return all;
           const { [gameName]: _dropped, ...rest } = all;
           return rest;
@@ -344,7 +386,10 @@ export default function UnitPage() {
     Object.keys(overrides[unitKey] ?? {}).length + unitTextCount(text, unitKey);
   const addedCount = Object.keys(clones).length;
   const menuEdits = buildMenuOpCount(menus);
-  const anythingChanged = edits > 0 || addedCount > 0 || menuEdits > 0;
+  const offCount = disabled.length;
+  const unitDisabled = isUnitDisabled(disabled, unitKey);
+  const anythingChanged =
+    edits > 0 || addedCount > 0 || menuEdits > 0 || offCount > 0;
 
   /** Copy the selected unit, as the project has it, under a new name. */
   const createClone = (key: string, displayName: string, replaces: boolean) => {
@@ -370,6 +415,10 @@ export default function UnitPage() {
     updateClones((current) => removeClone(current, unitKey));
     updateOverrides((o) => clearUnit(o, unitKey));
     updateText((t) => clearUnitTexts(t, unitKey));
+    // The mark goes with it. A unit that no longer exists cannot be switched
+    // off, and an entry naming one is the empty-entry trap the other three
+    // stores prune for.
+    updateDisabled((d) => setUnitDisabled(d, unitKey, false));
     select({ unit: "" });
   };
 
@@ -407,6 +456,8 @@ export default function UnitPage() {
                   `${addedCount} unit${addedCount === 1 ? "" : "s"} added`,
                 menuEdits > 0 &&
                   `${menuEdits} build menu edit${menuEdits === 1 ? "" : "s"}`,
+                offCount > 0 &&
+                  `${offCount} unit${offCount === 1 ? "" : "s"} disabled`,
               ]
                 .filter(Boolean)
                 .join(", ")}
@@ -485,6 +536,7 @@ export default function UnitPage() {
             text={text}
             clones={clones}
             menus={menus}
+            disabled={disabled}
             nameOf={nameOf}
             onSelect={(key) => select({ unit: key })}
           />
@@ -508,8 +560,26 @@ export default function UnitPage() {
                         : `Yours, copied from ${clone.source}`}
                     </span>
                   )}
+                  {unitDisabled && (
+                    // Capped, or the sentence sets the width of the column it
+                    // is in and pushes the controls beside it onto their own
+                    // row for as long as the unit is switched off.
+                    <span className="max-w-prose text-xs text-muted-foreground">
+                      Disabled: it comes off every build menu when this is
+                      compiled. The definition is kept, so switching it back on
+                      restores it.
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <DisableUnitSwitch
+                    unitKey={unitKey}
+                    unitName={nameOf(unitKey, unit)}
+                    disabled={unitDisabled}
+                    onChange={(off) =>
+                      updateDisabled((d) => setUnitDisabled(d, unitKey, off))
+                    }
+                  />
                   <CloneUnitButton
                     sourceKey={unitKey}
                     sourceName={nameOf(unitKey, unit)}
@@ -574,6 +644,7 @@ export default function UnitPage() {
                     edited={(menuOps?.length ?? 0) > 0}
                     units={pickerUnits}
                     clones={clones}
+                    disabled={disabled}
                     nameOf={(key) => nameOf(key, units[key])}
                     gameName={game.name}
                     gameArchive={game.primaryArchive.name}

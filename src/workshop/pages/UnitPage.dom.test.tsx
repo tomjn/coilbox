@@ -1157,4 +1157,210 @@ describe("UnitPage", () => {
       expect(row()?.textContent).toContain("menu");
     });
   });
+
+  /**
+   * Issue #2649. Taking a unit out of one factory's list is a roster change and
+   * taking it out of the game is not, so the two have separate controls, say
+   * different things, and above all keep separate stores: the mark must write
+   * nothing into the overrides, the copies or the build menu operations, or
+   * switching a unit back on could not restore its placements exactly.
+   */
+  describe("switching a unit off", () => {
+    const PEEWEE: Record<string, unknown> = {
+      name: "armpw",
+      humanName: "Peewee",
+      health: 100,
+    };
+    const UNITS = { armcom: ARMCOM, armlab: ARMLAB, armpw: PEEWEE };
+    const DATASET = [
+      { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
+      { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
+      { name: "armpw", fullName: "Peewee" },
+      { name: "armrock", fullName: "Rocko" },
+      { name: "armham", fullName: "Hammer" },
+    ];
+
+    const openAt = (unit: string) =>
+      show(
+        UNITS,
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
+        DATASET,
+      );
+
+    /**
+     * A row in the browser on the left, found by the internal key printed under
+     * the name. By key rather than by text, because a copy called `armcom2`
+     * contains `armcom` and the two rows are both on screen at once.
+     */
+    const browserRow = (key: string) =>
+      screen
+        .getAllByRole("button")
+        .find(
+          (b) => b.querySelector("span.font-mono")?.textContent === key,
+        ) as HTMLElement;
+
+    /** The build menu's rows, in the order they are drawn. */
+    const rows = () =>
+      screen
+        .getAllByRole("listitem")
+        .filter((li) => li.querySelector("button[aria-label^='Move ']"))
+        .map((li) => li.textContent ?? "");
+
+    /** Whether the open unit's switch is on. Read off the attribute, because
+     *  happy-dom does not reflect it onto the element as a property. */
+    const isOff = (name: string) =>
+      screen.getByLabelText(`Disable ${name}`).getAttribute("aria-checked") ===
+      "true";
+
+    it("switches a unit off and says what that will do", () => {
+      openAt("armcom");
+      expect(screen.queryByText(/unit disabled/)).toBeNull();
+
+      fireEvent.click(screen.getByLabelText("Disable Commander"));
+
+      expect(screen.getByText("1 unit disabled")).toBeTruthy();
+      expect(
+        screen.getByText(/comes off every build menu when this is compiled/),
+      ).toBeTruthy();
+    });
+
+    it("switches it back on again, leaving nothing behind", () => {
+      openAt("armcom");
+      const toggle = () => screen.getByLabelText("Disable Commander");
+      fireEvent.click(toggle());
+      fireEvent.click(toggle());
+      expect(screen.queryByText(/unit disabled/)).toBeNull();
+      expect(
+        screen.queryByText(/comes off every build menu when this is compiled/),
+      ).toBeNull();
+    });
+
+    it("keeps the mark when another unit is picked and then this one again", () => {
+      openAt("armcom");
+      fireEvent.click(screen.getByLabelText("Disable Commander"));
+
+      fireEvent.click(browserRow("armlab"));
+      expect(isOff("Bot Lab")).toBe(false);
+
+      fireEvent.click(browserRow("armcom"));
+      expect(isOff("Commander")).toBe(true);
+      expect(screen.getByText("1 unit disabled")).toBeTruthy();
+    });
+
+    /** The rule #2664 set for the overrides, which holds for this too: the
+     *  mark names a unit in one game's table and says nothing about another. */
+    it("does not carry the mark onto another game's unit of the same name", () => {
+      openAt("armcom");
+      fireEvent.click(screen.getByLabelText("Disable Commander"));
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME_2.name },
+      });
+      fireEvent.click(browserRow("armcom"));
+      expect(isOff("Commander")).toBe(false);
+      expect(screen.queryByText(/unit disabled/)).toBeNull();
+
+      fireEvent.change(screen.getByLabelText("Game"), {
+        target: { value: GAME.name },
+      });
+      fireEvent.click(browserRow("armcom"));
+      expect(isOff("Commander")).toBe(true);
+    });
+
+    /**
+     * The whole point of the issue on screen: a disabled unit keeps its row and
+     * its place in the order, marked, rather than vanishing into the list of
+     * units somebody took off this menu on purpose.
+     */
+    it("shows a disabled unit in its place on the menu, not as one taken off", () => {
+      mockSides = [];
+      openAt("armpw");
+      fireEvent.click(screen.getByLabelText("Disable Peewee"));
+      fireEvent.click(browserRow("armlab"));
+
+      expect(rows()).toHaveLength(3);
+      expect(rows()[0]).toContain("Peewee");
+      expect(rows()[0]).toContain("disabled");
+      expect(rows()[1]).not.toContain("disabled");
+      // Which is not the same thing as being taken off this menu, and the panel
+      // must not offer to put back a unit nobody removed.
+      expect(screen.queryByText(/Taken off this menu/)).toBeNull();
+      expect(screen.getByText("3 units, in order, 1 disabled")).toBeTruthy();
+    });
+
+    /** It is not a menu edit, so it is not counted as one either. */
+    it("is not counted as a build menu edit", () => {
+      mockSides = [];
+      openAt("armpw");
+      fireEvent.click(screen.getByLabelText("Disable Peewee"));
+      expect(screen.queryByText(/build menu edit/)).toBeNull();
+    });
+
+    /**
+     * The guarantee the issue turns on, driven through the page rather than
+     * over the stores: a project with a change of every other kind in it is
+     * untouched by the switch, and comes back exactly as it was.
+     */
+    it("writes nothing into the changes, the copies or the build menus", async () => {
+      mockSides = [];
+      openAt("armcom");
+
+      // A field change.
+      type(healthBox(), "5000");
+      // A copy.
+      fireEvent.click(screen.getByRole("button", { name: /Copy unit/ }));
+      fireEvent.change(await screen.findByLabelText(/Internal name/), {
+        target: { value: "armcom2" },
+      });
+      fireEvent.change(screen.getByLabelText(/Name in game/), {
+        target: { value: "Commander II" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /^Add unit/ }));
+      await waitFor(() =>
+        expect(screen.queryByLabelText(/Internal name/)).toBeNull(),
+      );
+      // A build menu edit.
+      fireEvent.click(browserRow("armlab"));
+      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+
+      const SUMMARY = "1 change, 1 unit added, 1 build menu edit";
+      expect(screen.getByText(SUMMARY)).toBeTruthy();
+      const before = rows();
+
+      fireEvent.click(screen.getByLabelText("Disable Bot Lab"));
+      expect(screen.getByText(`${SUMMARY}, 1 unit disabled`)).toBeTruthy();
+      expect(rows()).toEqual(before);
+
+      fireEvent.click(screen.getByLabelText("Disable Bot Lab"));
+      expect(screen.getByText(SUMMARY)).toBeTruthy();
+      expect(rows()).toEqual(before);
+      // And the copy and the field change are still exactly where they were.
+      expect(browserRow("armcom2")).toBeTruthy();
+      fireEvent.click(browserRow("armcom"));
+      expect(healthBox().value).toBe("5000");
+    });
+
+    /** Design decision, stated in the code: the mark blocks nothing, because it
+     *  is reversible and blocking would only mean switching on and off again. */
+    it("still lets a disabled unit be edited and copied", () => {
+      openAt("armcom");
+      fireEvent.click(screen.getByLabelText("Disable Commander"));
+      type(healthBox(), "5000");
+      expect(healthBox().value).toBe("5000");
+      expect(screen.getByText("1 change, 1 unit disabled")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Copy unit/ })).toHaveProperty(
+        "disabled",
+        false,
+      );
+    });
+
+    it("marks a disabled unit in the browser", () => {
+      openAt("armcom");
+      expect(browserRow("armcom").textContent).not.toContain("off");
+      fireEvent.click(screen.getByLabelText("Disable Commander"));
+      expect(
+        within(browserRow("armcom")).getByTitle(/^Disabled:/),
+      ).toBeTruthy();
+    });
+  });
 });

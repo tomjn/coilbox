@@ -17,11 +17,16 @@
  * same reason a changed field is (issue #1274). It is a separate mark, because
  * it is a separate kind of edit: a changed number and a changed roster are not
  * the same thing and the counts must not be added together.
+ *
+ * A unit the project switches off gets a mark of its own too (issue #2649), and
+ * it is not a count: switching a unit off is one decision, not N edits, so it
+ * says "off" rather than a number.
  */
 import { cn, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import type { BuildMenus } from "../../buildMenus";
 import type { UnitClones } from "../../clones";
+import { type DisabledUnits, isUnitDisabled } from "../../disabled";
 import type { UnitOverrides } from "../../overrides";
 import { type UnitTextEdits, unitTextCount } from "../../unitText";
 
@@ -39,6 +44,7 @@ export function UnitList({
   text,
   clones,
   menus,
+  disabled,
   nameOf,
   onSelect,
 }: {
@@ -52,6 +58,8 @@ export function UnitList({
   clones: UnitClones;
   /** The build menus the project changes, keyed by builder (issue #1274). */
   menus: BuildMenus;
+  /** The units the project switches off (issue #2649). */
+  disabled: DisabledUnits;
   /** What to call a unit, resolved by the page against the curated dataset. */
   nameOf: (key: string, def: Record<string, unknown>) => string;
   onSelect: (key: string) => void;
@@ -100,6 +108,7 @@ export function UnitList({
               unitTextCount(text, u.key);
             const clone = clones[u.key];
             const menuEdits = menus[u.key]?.length ?? 0;
+            const off = isUnitDisabled(disabled, u.key);
             return (
               <li key={u.key}>
                 <button
@@ -112,12 +121,28 @@ export function UnitList({
                   )}
                 >
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate">{u.label}</span>
+                    <span
+                      className={cn(
+                        "truncate",
+                        off &&
+                          "text-muted-foreground line-through decoration-muted-foreground/60",
+                      )}
+                    >
+                      {u.label}
+                    </span>
                     <span className="truncate font-mono text-[10px] text-muted-foreground">
                       {u.key}
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1">
+                    {off && (
+                      <span
+                        className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
+                        title="Disabled: taken off every build menu in the game when this is compiled"
+                      >
+                        off
+                      </span>
+                    )}
                     {clone && (
                       <span
                         className="rounded-full border border-border px-1.5 text-[10px] font-medium text-muted-foreground"
