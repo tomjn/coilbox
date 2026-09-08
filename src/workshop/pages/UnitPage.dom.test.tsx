@@ -1368,6 +1368,17 @@ describe("UnitPage", () => {
       corak: { name: "corak", humanName: "The Can" },
       /** In the game's defs and on nobody's build menu, so no side reaches it. */
       armflea: { name: "armflea", humanName: "Flea" },
+      /**
+       * A builder no side reaches, which Beyond All Reason really has: neither
+       * commander builds the underwater Advanced Aircraft Plants. Its own menu
+       * spans both sides, so it is the case issue #2699 is about.
+       */
+      armhaapuw: {
+        name: "armhaapuw",
+        humanName: "Advanced Aircraft Plant",
+        builder: true,
+        buildoptions: ["armpw", "corak"],
+      },
     };
     const DATASET = [
       { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
@@ -1376,6 +1387,11 @@ describe("UnitPage", () => {
       { name: "corcom", fullName: "Core Commander", buildOptions: ["corak"] },
       { name: "corak", fullName: "The Can" },
       { name: "armflea", fullName: "Flea" },
+      {
+        name: "armhaapuw",
+        fullName: "Advanced Aircraft Plant",
+        buildOptions: ["armpw", "corak"],
+      },
     ];
     const SIDES = [
       { name: "Arm", startUnit: "armcom" },
@@ -1463,6 +1479,33 @@ describe("UnitPage", () => {
       mockSides = SIDES;
       open();
       expect(listRow("armflea")?.textContent).toBe("no picFleaarmflea");
+    });
+
+    /**
+     * Issue #2699. The badge means "this row's unit is not on the builder's own
+     * side", and a builder with no side of its own cannot make that comparison.
+     * Marking every row instead says exactly as much as marking none of them,
+     * and it hides the one thing the badge is for. So an unknown own side means
+     * "cannot say" and nothing is badged.
+     */
+    it("badges nothing on a builder no side's build graph reaches", () => {
+      mockSides = SIDES;
+      open("armhaapuw");
+      openBuildMenu();
+      const menu = screen
+        .getAllByRole("listitem")
+        .filter((li) => li.querySelector("button[aria-label^='Move ']"));
+      // Both rows are drawn: one Arm unit and one Core unit, on a menu whose
+      // builder is neither.
+      expect(menu).toHaveLength(2);
+      expect(menu[0].textContent).toContain("Peewee");
+      expect(menu[1].textContent).toContain("The Can");
+      const badges = menu.flatMap((li) =>
+        [...li.querySelectorAll("span")]
+          .map((s) => s.textContent)
+          .filter((text) => text === "Arm" || text === "Core"),
+      );
+      expect(badges).toEqual([]);
     });
 
     it("draws the pictures in a builder's roster too", () => {

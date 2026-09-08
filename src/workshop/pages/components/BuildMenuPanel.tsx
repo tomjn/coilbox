@@ -126,8 +126,16 @@ export function BuildMenuPanel({
   // Which faction reaches each unit is the game's answer rather than ours, out
   // of the build graph the picker groups by. Only used here to say when a row
   // crosses a faction line, so a row on the builder's own side says nothing.
+  //
+  // A builder no side's build graph reaches has no faction, and that is "cannot
+  // say" rather than "differs from everything" (issue #2699). Compared against
+  // nothing, every row on the menu crosses a line and the whole list is badged,
+  // which says exactly as much as badging none of it. Beyond All Reason's
+  // underwater Advanced Aircraft Plants are the real case: neither commander
+  // builds one, so neither has a side of its own to be compared with.
   const ownFaction = factionOf(builderKey);
   const crossFaction = (unit: string): string | undefined => {
+    if (ownFaction === undefined) return undefined;
     const side = factionOf(unit);
     return side === undefined || side === ownFaction ? undefined : side;
   };
