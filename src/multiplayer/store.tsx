@@ -242,6 +242,20 @@ export interface LobbyMirror {
   serverIgnoreList: string[];
   serverIgnoreListSeq: number;
   /**
+   * The last few `SERVERMSG` announcements, plus a running total of how many
+   * have ever arrived. Both, because a caller wants "what did the server say
+   * while I was doing that", and a count taken before an action is the only way
+   * to ask it: the list is capped, so an index into it is not stable.
+   *
+   * Kept for the tweak-slot delivery run (issue #1279), which sends lines big
+   * enough for a server to refuse. Uberserver names its own limit when it drops
+   * an over-long command, and quoting that beats reporting a timeout. The toast
+   * these also raise is transient by design and gone by the time anyone reads a
+   * failure report.
+   */
+  serverMessages: string[];
+  serverMessageCount: number;
+  /**
    * Monotonic count of `battleStarting` events: a Tachyon server telling us
    * where the match is. There is no state behind it, because the connection has
    * already promised the server we will be there, so the room watches this
@@ -251,6 +265,26 @@ export interface LobbyMirror {
 }
 
 const CONSOLE_CAP = 500;
+
+/** How many server announcements to keep. Enough to cover one slot's flight in
+ *  a delivery run, which is the only thing that reads them back. */
+const SERVER_MESSAGE_CAP = 20;
+
+/**
+ * The announcements that arrived after a running total was taken.
+ *
+ * The kept list is capped and the total is not, so the answer is the last
+ * `total - since` of it. Clamped to what is still there, because a burst longer
+ * than the cap has already thrown some away and reporting the wrong ones would
+ * be worse than reporting fewer.
+ */
+export function serverMessagesSince(
+  m: Pick<LobbyMirror, "serverMessages" | "serverMessageCount">,
+  since: number,
+): string[] {
+  const wanted = Math.max(0, m.serverMessageCount - since);
+  return wanted === 0 ? [] : m.serverMessages.slice(-wanted);
+}
 
 export const initialMirror: LobbyMirror = {
   connected: false,
@@ -263,6 +297,8 @@ export const initialMirror: LobbyMirror = {
   channelListReceivedSeq: 0,
   serverIgnoreList: [],
   serverIgnoreListSeq: 0,
+  serverMessages: [],
+  serverMessageCount: 0,
   battleStartSeq: 0,
 };
 
@@ -334,6 +370,21 @@ export function mirrorReducer(
             return {
               ...m,
               channelListReceivedSeq: m.channelListReceivedSeq + 1,
+            };
+          }
+          // An announcement is a toast for whoever is looking, but it is also
+          // the only place a server explains itself when it drops a command for
+          // being too long. Keep the last few so a delivery run can say what
+          // happened rather than only that nothing came back (issue #1279).
+          if (d.kind === "serverMessage") {
+            const next = [...m.serverMessages, d.text];
+            return {
+              ...m,
+              serverMessages:
+                next.length > SERVER_MESSAGE_CAP
+                  ? next.slice(-SERVER_MESSAGE_CAP)
+                  : next,
+              serverMessageCount: m.serverMessageCount + 1,
             };
           }
           // The full server ignore list finished streaming: record it and tick the

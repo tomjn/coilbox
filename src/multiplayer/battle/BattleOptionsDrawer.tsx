@@ -20,6 +20,7 @@ import {
   scriptTagKey,
 } from "./battleOptions";
 import { disabledFromTags } from "./restrictTags";
+import { TweakProjectSection } from "./TweakProjectSection";
 import { useBattleOptions } from "./useBattleOptions";
 
 /**
@@ -42,6 +43,7 @@ export function BattleOptionsDrawer({
   restrictionsUnavailable,
   startPositionsUnavailable,
   onRestrictChange,
+  isFounder,
 }: {
   battle: Battle;
   modOptionsSchema: ConfigOption[];
@@ -62,6 +64,9 @@ export function BattleOptionsDrawer({
   startPositionsUnavailable?: string | null;
   /** Apply the full disabled-unit set (writes `game/restrict/*` script tags). */
   onRestrictChange: (disabled: string[]) => void;
+  /** Whether we opened this battle, which decides whether a workshop project's
+   *  slots are written as script tags or asked of the autohost (issue #1279). */
+  isFounder: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { pending, setOption } = useBattleOptions(
@@ -159,6 +164,14 @@ export function BattleOptionsDrawer({
                 pending={pending}
                 canEdit={canEdit}
                 setOption={setOption}
+              />
+              <TweakProjectSection
+                gameName={battle.modname}
+                modOptionsSchema={modOptionsSchema}
+                scriptTags={battle.scriptTags}
+                battleId={battle.id}
+                isFounder={isFounder}
+                canEdit={canEdit}
               />
               <RestrictSection
                 gameName={battle.modname}
