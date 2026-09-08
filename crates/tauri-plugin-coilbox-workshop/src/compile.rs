@@ -77,6 +77,22 @@ pub struct CompiledMod {
     /// What the compiler could not do, and what to watch out for in what it
     /// did. Empty is the ordinary case.
     pub notes: Vec<String>,
+    /// Every edit as one `do ... end` block, for Beyond All Reason's bare
+    /// `tweakdefs` mod option on a local skirmish launch (issue #1278). `None`
+    /// when there is nothing to tweak.
+    ///
+    /// Only `tweakdefs` is used, never `tweakunits`: a `tweakunits` slot is a
+    /// plain table BAR merges into `UnitDefs` by some rule of its own that
+    /// nothing here has confirmed, while `tweakdefs` runs as Lua with
+    /// `UnitDefs` in scope, the same contract `gamedata/unitdefs_post.lua`
+    /// already relies on and this project has already tested. So an added
+    /// unit is folded in here as a plain `UnitDefs[name] = def` assignment
+    /// rather than left for a `tweakunits` slot to interpret, and everything
+    /// this field carries is exactly as certain as the mutator route already
+    /// is. Splitting a large project across BAR's numbered slots is issue
+    /// #1277's, not this field's: a project too big for the one bare slot is
+    /// simply not offered this route (see `src/workshop/localBar.ts`).
+    pub bar_tweakdefs: Option<String>,
 }
 
 /// Where the executable half of a mutator has to live.
@@ -124,23 +140,26 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         .filter(|clone| clone.replaces_game_unit && valid_unit_key(&clone.key))
         .collect();
 
+    // Computed unconditionally, so `bar_tweakdefs` below can fold the same
+    // added units in as assignments without resolving their definitions a
+    // second time.
+    let added_entries: Vec<(String, Value)> = added
+        .iter()
+        .map(|clone| (clone.key.clone(), resolved_clone_def(clone, edits)))
+        .collect();
     let mut unit_files = Vec::new();
-    if !added.is_empty() {
-        let entries: Vec<(String, Value)> = added
-            .iter()
-            .map(|clone| (clone.key.clone(), resolved_clone_def(clone, edits)))
-            .collect();
+    if !added_entries.is_empty() {
         chunks.push(Chunk {
             form: LuaForm::Table,
             title: format!(
                 "{} unit{} added",
-                entries.len(),
-                if entries.len() == 1 { "" } else { "s" }
+                added_entries.len(),
+                if added_entries.len() == 1 { "" } else { "s" }
             ),
             reason: "A copy owns its whole definition, so nothing about it depends on what the game says.".to_string(),
-            lua: unit_table(&entries, ""),
+            lua: unit_table(&added_entries, ""),
         });
-        for (key, def) in &entries {
+        for (key, def) in &added_entries {
             unit_files.push(CompiledFile {
                 path: format!("units/{key}.lua"),
                 contents: unit_file(project, key, def),
@@ -273,10 +292,23 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         ));
     }
 
+    let bar_tweakdefs = if added_entries.is_empty() && patches.is_empty() && post_blocks.is_empty()
+    {
+        None
+    } else {
+        Some(bar_tweakdefs_body(
+            project,
+            &added_entries,
+            &patches,
+            &post_blocks,
+        ))
+    };
+
     CompiledMod {
         chunks,
         files,
         notes,
+        bar_tweakdefs,
     }
 }
 
@@ -611,43 +643,80 @@ fn unit_file(project: &ModProject, key: &str, def: &Value) -> String {
     )
 }
 
-/// The executable half of the mutator: the patch table with the code that
-/// applies it, then every block.
-fn post_file(project: &ModProject, patches: &[(String, PatchTree)], blocks: &[&str]) -> String {
-    let mut out = header(project);
-    if !patches.is_empty() {
-        out.push_str(
-            "\n-- Field changes. Only the fields the project set are here, so everything\n",
-        );
-        out.push_str("-- else still follows the game when it updates.\n");
-        out.push_str(&format!("local changes = {}\n", patch_table(patches, "")));
-        out.push_str(
-            "\nlocal function merge(dest, src)\n\
-             \x20 for key, value in pairs(src) do\n\
-             \x20   if type(value) == \"table\" and type(dest[key]) == \"table\" then\n\
-             \x20     merge(dest[key], value)\n\
-             \x20   else\n\
-             \x20     dest[key] = value\n\
-             \x20   end\n\
-             \x20 end\n\
-             end\n\n",
-        );
-        out.push_str(
-            "-- A unit the game no longer has is skipped rather than created: a patch is a\n\
-             -- change to a definition, and half of one is not a unit.\n\
-             for name, patch in pairs(changes) do\n\
-             \x20 local def = UnitDefs[name]\n\
-             \x20 if def then\n\
-             \x20   merge(def, patch)\n\
-             \x20 end\n\
-             end\n",
-        );
+/// The patch table with the code that applies it: every field change, merged
+/// onto whatever `UnitDefs` already holds. Shared by [`post_file`] and
+/// [`bar_tweakdefs_body`], which both run this over the same `UnitDefs` the
+/// engine loaded, just reached through a different slot.
+fn write_patches_section(out: &mut String, patches: &[(String, PatchTree)]) {
+    if patches.is_empty() {
+        return;
     }
+    out.push_str("\n-- Field changes. Only the fields the project set are here, so everything\n");
+    out.push_str("-- else still follows the game when it updates.\n");
+    out.push_str(&format!("local changes = {}\n", patch_table(patches, "")));
+    out.push_str(
+        "\nlocal function merge(dest, src)\n\
+         \x20 for key, value in pairs(src) do\n\
+         \x20   if type(value) == \"table\" and type(dest[key]) == \"table\" then\n\
+         \x20     merge(dest[key], value)\n\
+         \x20   else\n\
+         \x20     dest[key] = value\n\
+         \x20   end\n\
+         \x20 end\n\
+         end\n\n",
+    );
+    out.push_str(
+        "-- A unit the game no longer has is skipped rather than created: a patch is a\n\
+         -- change to a definition, and half of one is not a unit.\n\
+         for name, patch in pairs(changes) do\n\
+         \x20 local def = UnitDefs[name]\n\
+         \x20 if def then\n\
+         \x20   merge(def, patch)\n\
+         \x20 end\n\
+         end\n",
+    );
+}
+
+/// Every block, one after another. Shared by [`post_file`] and
+/// [`bar_tweakdefs_body`] for the reason [`write_patches_section`] is.
+fn write_blocks_section(out: &mut String, blocks: &[&str]) {
     for block in blocks {
         out.push('\n');
         out.push_str(block);
         out.push('\n');
     }
+}
+
+/// The executable half of the mutator: the patch table with the code that
+/// applies it, then every block.
+fn post_file(project: &ModProject, patches: &[(String, PatchTree)], blocks: &[&str]) -> String {
+    let mut out = header(project);
+    write_patches_section(&mut out, patches);
+    write_blocks_section(&mut out, blocks);
+    out
+}
+
+/// The same edits as one payload for BAR's bare `tweakdefs` mod option
+/// (issue #1278). Everything [`post_file`] runs, plus the units a project
+/// adds, folded in as plain assignments rather than left for a `tweakunits`
+/// slot: see [`CompiledMod::bar_tweakdefs`] for why.
+fn bar_tweakdefs_body(
+    project: &ModProject,
+    added: &[(String, Value)],
+    patches: &[(String, PatchTree)],
+    blocks: &[&str],
+) -> String {
+    let mut out = header(project);
+    if !added.is_empty() {
+        out.push_str(
+            "\n-- Units added. Assigned directly: none of these existed before, so there is\n",
+        );
+        out.push_str("-- nothing to merge onto.\n");
+        out.push_str(&format!("local added = {}\n", unit_table(added, "")));
+        out.push_str("for name, def in pairs(added) do\n  UnitDefs[name] = def\nend\n");
+    }
+    write_patches_section(&mut out, patches);
+    write_blocks_section(&mut out, blocks);
     out
 }
 
@@ -750,6 +819,7 @@ mod tests {
         assert!(out.chunks.is_empty());
         assert!(out.files.is_empty());
         assert!(out.notes.is_empty());
+        assert!(out.bar_tweakdefs.is_none());
     }
 
     /// The form the issue asks for on the simple case: a plain table, no code.
@@ -1046,5 +1116,78 @@ mod tests {
         write_path(&mut def, &["customParams", "tier"], json!("2"));
         assert_eq!(def["weapons"][0]["name"], json!("NEW"));
         assert_eq!(def["customParams"]["tier"], json!("2"));
+    }
+
+    /// A field change reaches `bar_tweakdefs` through exactly the same merge
+    /// code `POST_FILE` runs, since both have to apply the same patch onto the
+    /// same `UnitDefs`.
+    #[test]
+    fn a_field_change_lands_in_bar_tweakdefs_as_a_merge() {
+        let out = compile(&project(json!({
+            "overrides": { "armcom": { "maxDamage": 5000 } }
+        })));
+        let tweakdefs = out.bar_tweakdefs.expect("bar_tweakdefs");
+        assert!(tweakdefs.contains("local changes = "));
+        assert!(tweakdefs.contains("merge(def, patch)"));
+        assert!(tweakdefs.contains("maxDamage = 5000"));
+    }
+
+    /// An added unit cannot go through a merge: there is nothing in
+    /// `UnitDefs` yet to merge onto, so it is a plain assignment instead.
+    #[test]
+    fn an_added_unit_lands_in_bar_tweakdefs_as_an_assignment() {
+        let out = compile(&project(json!({
+            "clones": { "supercom": {
+                "key": "supercom", "source": "armcom",
+                "replacesGameUnit": false,
+                "def": { "maxDamage": 9000 }
+            } }
+        })));
+        let tweakdefs = out.bar_tweakdefs.expect("bar_tweakdefs");
+        assert!(tweakdefs.contains("local added = "));
+        assert!(tweakdefs.contains("UnitDefs[name] = def"));
+        assert!(tweakdefs.contains("maxDamage = 9000"));
+        // Not a merge: nothing existed to merge onto.
+        assert!(!tweakdefs.contains("local changes ="));
+    }
+
+    /// Every block-form edit (a replaced unit, a build menu, a disabled unit)
+    /// reaches `bar_tweakdefs` the same way it reaches `POST_FILE`: as the
+    /// exact block the chunk list already shows the user, run in the same
+    /// order.
+    #[test]
+    fn block_form_edits_land_in_bar_tweakdefs_in_compiled_order() {
+        let out = compile(&project(json!({
+            "menus": { "armlab": [{ "op": "add", "unit": "armpw" }] },
+            "disabled": ["armflash"],
+            "clones": { "armcom": {
+                "key": "armcom", "replacesGameUnit": true, "def": { "maxdamage": 1 }
+            } }
+        })));
+        let tweakdefs = out.bar_tweakdefs.expect("bar_tweakdefs");
+        let blocks: Vec<&Chunk> = out
+            .chunks
+            .iter()
+            .filter(|chunk| chunk.form == LuaForm::Block)
+            .collect();
+        assert_eq!(blocks.len(), 3);
+        let mut at = 0;
+        for block in blocks {
+            let found = tweakdefs[at..]
+                .find(&block.lua)
+                .unwrap_or_else(|| panic!("{} is not in bar_tweakdefs", block.title));
+            at += found + block.lua.len();
+        }
+    }
+
+    /// A name and description edit is the one thing neither route can carry
+    /// (compile.rs's own note), so it must not silently appear in
+    /// `bar_tweakdefs` either.
+    #[test]
+    fn text_only_edits_leave_bar_tweakdefs_empty() {
+        let out = compile(&project(json!({
+            "text": { "armcom": { "en": { "name": "Commander" } } }
+        })));
+        assert!(out.bar_tweakdefs.is_none());
     }
 }
