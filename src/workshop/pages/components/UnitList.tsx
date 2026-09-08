@@ -28,6 +28,7 @@ import type { BuildMenus } from "../../buildMenus";
 import type { UnitClones } from "../../clones";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
 import type { UnitOverrides } from "../../overrides";
+import { type UnitTextEdits, unitTextCount } from "../../unitText";
 
 /**
  * How many rows are drawn before the list stops and asks for a search term.
@@ -40,6 +41,7 @@ export function UnitList({
   units,
   selected,
   overrides,
+  text,
   clones,
   menus,
   disabled,
@@ -50,6 +52,9 @@ export function UnitList({
   units: Record<string, Record<string, unknown>>;
   selected: string;
   overrides: UnitOverrides;
+  /** Renames and rewritten tooltips a game keeps outside its unit table, which
+   *  count towards a unit's mark the same way an override does (issue #2650). */
+  text: UnitTextEdits;
   clones: UnitClones;
   /** The build menus the project changes, keyed by builder (issue #1274). */
   menus: BuildMenus;
@@ -98,7 +103,9 @@ export function UnitList({
       ) : (
         <ul className="flex max-h-[60vh] min-h-0 flex-col gap-0.5 overflow-y-auto rounded-lg border border-border/50 p-1 lg:max-h-none lg:flex-1">
           {rows.map((u) => {
-            const edits = Object.keys(overrides[u.key] ?? {}).length;
+            const edits =
+              Object.keys(overrides[u.key] ?? {}).length +
+              unitTextCount(text, u.key);
             const clone = clones[u.key];
             const menuEdits = menus[u.key]?.length ?? 0;
             const off = isUnitDisabled(disabled, u.key);

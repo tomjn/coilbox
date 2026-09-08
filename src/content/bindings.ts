@@ -1373,6 +1373,19 @@ export interface UnitDefsResult {
    * simply be absent, with nothing to say whether the game ships it.
    */
   unitErrors: string[];
+  /**
+   * What the game's `language/en/units.json` calls each unit, keyed by
+   * lowercased def key.
+   *
+   * Absent for a game that names its units in its unitdefs, which is every game
+   * measured here but Beyond All Reason. BAR writes no `name`, no `humanName`
+   * and no `description` in any of its 564 unitdefs and keeps both in this file
+   * instead, so this is the only place a rename or a rewritten tooltip can go
+   * for it (issue #2650).
+   */
+  languageNames?: Record<string, string>;
+  /** The `units.descriptions` beside them: the tooltip under the name. */
+  languageDescriptions?: Record<string, string>;
   checksum?: string;
   errors: string[];
 }

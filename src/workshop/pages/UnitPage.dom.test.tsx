@@ -190,6 +190,11 @@ function show(
     { name: "armcom", fullName: "Commander" },
   ],
   unitErrors: string[] = [],
+  /** What the game's `language/en/units.json` says, for a game that has one. */
+  language: {
+    names?: Record<string, string>;
+    descriptions?: Record<string, string>;
+  } = {},
 ) {
   mockDefs = {
     units,
@@ -197,6 +202,8 @@ function show(
     unitErrors,
     errors: [],
     checksum: "abc",
+    languageNames: language.names,
+    languageDescriptions: language.descriptions,
   };
   mockDataset = dataset;
   return render(
@@ -450,6 +457,139 @@ describe("UnitPage", () => {
     expect(screen.queryByText(/Game value: 3000/)).toBeNull();
     expect(screen.queryByLabelText(/^Reset Health/)).toBeNull();
     expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+  });
+
+  /**
+   * Issue #2650. Renaming a unit and rewriting its tooltip are one control on
+   * the page and two different edits underneath, because the two games this was
+   * measured against keep those words in different files.
+   */
+  describe("the name and the description", () => {
+    /** A Balanced Annihilation unit: both words are in the def. */
+    const AJUNO: Record<string, unknown> = {
+      name: "Arm Juno",
+      description: "Anti Radar/Jammer/Minefield/ScoutSpam Weapon",
+      maxdamage: 2120,
+    };
+    const ba = (entryUnit = "ajuno") =>
+      show(
+        { ajuno: AJUNO },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${entryUnit}`,
+        [{ name: "ajuno", fullName: "Arm Juno" }],
+      );
+
+    /** A Beyond All Reason unit: neither word is anywhere in the def. */
+    const bar = () =>
+      show(
+        { armaak: ARMAAK },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        [{ name: "armaak", fullName: "Archangel" }],
+        [],
+        {
+          names: { armaak: "Archangel" },
+          descriptions: { armaak: "Anti-Air Turret" },
+        },
+      );
+
+    const nameBox = () => screen.getByLabelText("Name") as HTMLInputElement;
+    const descriptionBox = () =>
+      screen.getByLabelText("Description") as HTMLInputElement;
+
+    it("shows the def's own words for a game that writes them there", () => {
+      ba();
+      expect(nameBox().value).toBe("Arm Juno");
+      expect(descriptionBox().value).toBe(
+        "Anti Radar/Jammer/Minefield/ScoutSpam Weapon",
+      );
+      expect(screen.getByText(/Kept in the unit definition/)).toBeTruthy();
+    });
+
+    it("shows the language file's words for a game that writes them there", () => {
+      bar();
+      expect(nameBox().value).toBe("Archangel");
+      expect(descriptionBox().value).toBe("Anti-Air Turret");
+      expect(
+        screen.getByText(/Kept in this game's language\/en\/units\.json/),
+      ).toBeTruthy();
+    });
+
+    /** The rest of the page has to agree, or the list and the heading go on
+     *  calling the unit something its owner has renamed. */
+    it("renames the unit everywhere on the page, in either game", () => {
+      for (const [open, typed] of [
+        [ba, "Big Juno"],
+        [bar, "Seraph"],
+      ] as const) {
+        open();
+        type(nameBox(), typed);
+
+        expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+          typed,
+        );
+        expect(
+          screen
+            .getAllByRole("button")
+            .some((b) => b.textContent?.includes(typed)),
+        ).toBe(true);
+        expect(screen.getByText("1 change")).toBeTruthy();
+        cleanup();
+      }
+    });
+
+    it("keeps the inherited words in view and resets to them", () => {
+      bar();
+      type(descriptionBox(), "Shoots things that fly");
+
+      expect(screen.getByText(/Game value: Anti-Air Turret/)).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText(/^Reset Description/));
+
+      expect(descriptionBox().value).toBe("Anti-Air Turret");
+      expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+    });
+
+    it("records nothing when the game's own name is typed back in", () => {
+      bar();
+      type(nameBox(), "Archangel");
+      expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+      expect(screen.queryByLabelText(/^Reset Name/)).toBeNull();
+    });
+
+    /** A def home writes an ordinary override, so the per-unit reset and the
+     *  unit list mark it the same way they mark a changed number. */
+    it("marks the unit in the list whichever store the edit landed in", () => {
+      bar();
+      type(nameBox(), "Seraph");
+      const row = screen
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes("armaak"));
+      expect(
+        within(row as HTMLElement).getByTitle("1 field changed"),
+      ).toBeTruthy();
+
+      fireEvent.click(screen.getByText(/Reset 1 change/));
+      expect(nameBox().value).toBe("Archangel");
+    });
+
+    /** Two boxes for one value is one too many, so the field list stops
+     *  offering the keys the panel owns. */
+    it("is the only place the page offers a name or a description", () => {
+      ba();
+      fireEvent.click(screen.getByText("All"));
+      expect(screen.getAllByLabelText("Name")).toHaveLength(1);
+      expect(screen.getAllByLabelText("Description")).toHaveLength(1);
+      expect(screen.queryByLabelText("Human name")).toBeNull();
+    });
+
+    /** Nothing is recorded about a unit that was only looked at, which is the
+     *  guarantee the whole override set rests on. */
+    it("records nothing about a unit that is only opened", () => {
+      bar();
+      expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
+      expect(
+        screen.queryAllByLabelText(/^Reset .* to the inherited value$/),
+      ).toHaveLength(0);
+    });
   });
 
   it("records nothing when a field is typed back to the value it already had", () => {

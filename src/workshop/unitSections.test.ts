@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { engineFields } from "@/content/unitFields";
 import { setOverride, type UnitOverrides } from "./overrides";
-import { presentPaths, UNIT_FIELD_GROUPS, unitFieldView } from "./unitSections";
+import {
+  OWN_EDITOR,
+  presentPaths,
+  UNIT_FIELD_GROUPS,
+  unitFieldView,
+} from "./unitSections";
 
 const registryPaths = engineFields("unit").map((f) =>
   f.section === "" ? f.key : `${f.section}.${f.key}`,
@@ -68,7 +73,11 @@ describe("UNIT_FIELD_GROUPS", () => {
     const placed = new Set(
       UNIT_FIELD_GROUPS.flatMap((g) => g.sections.flatMap((s) => s.paths)),
     );
-    const unplaced = registryPaths.filter((p) => !placed.has(p));
+    // A path with a control of its own is not unplaced, it is somewhere else on
+    // the page: the build menu roster and the name panel (issues #1274, #2650).
+    const unplaced = registryPaths.filter(
+      (p) => !placed.has(p) && !OWN_EDITOR.has(p.toLowerCase()),
+    );
     expect(unplaced.sort()).toEqual(
       [
         "SFXTypes",
@@ -120,11 +129,33 @@ describe("unitFieldView", () => {
   const rowsOf = (view: ReturnType<typeof unitFieldView>) =>
     view.groups.flatMap((g) => g.sections.flatMap((s) => s.rows));
 
+  /** What the unit declares, minus the paths another control on the page owns. */
+  const drawable = (def: Record<string, unknown>) =>
+    presentPaths(def).filter((p) => !OWN_EDITOR.has(p.toLowerCase()));
+
   it("draws only what the unit declares in the relevant view", () => {
     const view = unitFieldView(armcom, {}, "armcom", "relevant");
     const paths = rowsOf(view).map((r) => r.path);
-    expect(paths.sort()).toEqual(presentPaths(armcom).sort());
-    expect(view.shown).toBe(presentPaths(armcom).length);
+    expect(paths.sort()).toEqual(drawable(armcom).sort());
+    expect(view.shown).toBe(drawable(armcom).length);
+  });
+
+  /**
+   * The name and the description have a panel of their own (issue #2650), and
+   * two boxes for one value is one too many. `weapons.0.name` is a different
+   * field that happens to end in the same word, so it stays.
+   */
+  it("leaves the name and the description to the panel that owns them", () => {
+    const withText = { ...armcom, humanName: "Commander", description: "Big" };
+    for (const view of ["relevant", "all"] as const) {
+      const paths = rowsOf(unitFieldView(withText, {}, "armcom", view)).map(
+        (r) => r.path,
+      );
+      expect(paths).not.toContain("name");
+      expect(paths).not.toContain("humanName");
+      expect(paths).not.toContain("description");
+      expect(paths).toContain("weapons.0.name");
+    }
   });
 
   it("counts the fields the relevant view is not drawing", () => {

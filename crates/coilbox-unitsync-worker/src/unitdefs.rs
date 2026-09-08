@@ -297,12 +297,25 @@ pub(crate) fn resolve(
         }
     };
     errors.extend(us.drain_errors());
+
+    // What the game calls its units, for a game that does not say so in the
+    // defs (issue #2650). Read here rather than left to the curated dataset
+    // because the dataset carries a name and no description, and rewriting a
+    // unit's tooltip is the edit this page exists for.
+    let language = if any_unit_unnamed(&doc.units) {
+        crate::dataset::language_text(us, game_archive)
+    } else {
+        Default::default()
+    };
+    errors.extend(us.drain_errors());
     us.remove_all_archives();
 
     let out = UnitDefsOutput {
         units: doc.units,
         weapon_defs: doc.weapon_defs,
         unit_errors: doc.unit_errors,
+        language_names: language.names.into_iter().collect(),
+        language_descriptions: language.descriptions.into_iter().collect(),
         checksum,
         errors,
     };
@@ -312,6 +325,36 @@ pub(crate) fn resolve(
         }
     }
     out
+}
+
+/// Whether any unit is left for a localisation file to name.
+///
+/// The same guard `dataset::resolve` uses, for the same reason: reading the
+/// file means opening the archive a second time and listing every member of it,
+/// which is wasted on a game that names its units in its own defs.
+fn any_unit_unnamed(units: &Map<String, Value>) -> bool {
+    units.iter().any(|(key, def)| !def_names_unit(key, def))
+}
+
+/// Whether a unitdef carries a name a person would read.
+///
+/// The engine's own order, from `rts/Sim/Units/UnitDef.cpp:290`, where
+/// `humanName` is read with `name` as its default and the comment beside `name`
+/// calls it the internal name. So a `name` that only repeats the def key names
+/// nothing, and a def with neither key names nothing at all.
+fn def_names_unit(key: &str, def: &Value) -> bool {
+    let Some(table) = def.as_object() else {
+        return false;
+    };
+    let read = |wanted: &str| {
+        table
+            .iter()
+            .find(|(k, _)| k.to_lowercase() == wanted)
+            .and_then(|(_, v)| v.as_str())
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+    };
+    read("humanname").is_some() || read("name").is_some_and(|name| name != key)
 }
 
 /// Whether a read is an answer, and so worth remembering.
