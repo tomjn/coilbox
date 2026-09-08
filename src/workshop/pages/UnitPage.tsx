@@ -95,10 +95,11 @@ import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
 import {
   addToBuildMenu,
   applyBuildMenu,
+  builderFlagOf,
   buildOptionsOf,
   clearBuildMenu,
   isBuilder,
-  moveInBuildMenu,
+  moveBeforeInBuildMenu,
   removeFromBuildMenu,
 } from "../buildMenus";
 import {
@@ -603,6 +604,26 @@ export default function UnitPage() {
     [inheritedMenu, menuOps],
   );
 
+  // Whether the engine will let this unit build at all, which is not the same
+  // question as whether it has a menu to draw (issue #2714). Read off the def
+  // with the project's own edits on it, so switching the field back on in the
+  // panel puts the warning away in the same render.
+  const builderFlag = useMemo(
+    () => builderFlagOf(resolvedDef(unit, overrides[unitKey])),
+    [unit, overrides, unitKey],
+  );
+  // The def's own spelling of the key, so switching it on writes over the value
+  // that is there rather than adding a second `builder` beside it. Lowercase
+  // for anything out of `gamedata/defs.lua`, which lowercases every key, and
+  // lowercase again for a def that has never mentioned it, which is the
+  // registry's spelling and what the field row would write.
+  const builderPath = useMemo(
+    () =>
+      Object.keys(unit ?? {}).find((key) => key.toLowerCase() === "builder") ??
+      "builder",
+    [unit],
+  );
+
   /**
    * Which project the URL is for, ahead of the render that will say so.
    *
@@ -1096,6 +1117,7 @@ export default function UnitPage() {
                   <BuildMenuPanel
                     builderKey={unitKey}
                     builderName={nameOf(unitKey, unit)}
+                    builderFlag={builderFlag}
                     inherited={inheritedMenu}
                     menu={currentMenu}
                     edited={(menuOps?.length ?? 0) > 0}
@@ -1121,14 +1143,29 @@ export default function UnitPage() {
                         removeFromBuildMenu(m, unitKey, target, inheritedMenu),
                       )
                     }
-                    onMove={(target, delta) =>
+                    onMoveBefore={(target, before) =>
                       updateMenus((m) =>
-                        moveInBuildMenu(
+                        moveBeforeInBuildMenu(
                           m,
                           unitKey,
                           target,
-                          delta,
+                          before,
                           inheritedMenu,
+                        ),
+                      )
+                    }
+                    // The one edit on this panel that touches the unit's own
+                    // definition, and it goes through the same `setOverride`
+                    // every field row uses, so it counts and undoes as a field
+                    // change rather than as a menu edit.
+                    onEnableBuilder={() =>
+                      updateOverrides((o) =>
+                        setOverride(
+                          o,
+                          unitKey,
+                          builderPath,
+                          true,
+                          unit?.[builderPath],
                         ),
                       )
                     }
