@@ -8,9 +8,12 @@
  * page on every pick would throw away the edit set with it. `?game=` and
  * `?unit=` keep the deep link a separate detail route would have given.
  *
- * The edits live in this component's state and go nowhere else. Saving a project
- * to disk is issue #1282, and until it lands the page says so rather than
- * letting somebody spend an evening in here and lose it.
+ * The edits live in a saved project, one per game, and are written as they are
+ * made (issue #1282). There is no save button: the first edit starts a project
+ * named after the game, everything after it writes into that project, and
+ * closing the app loses nothing. `project.ts` holds the five stores and the
+ * list, `history.ts` holds undo and redo over them, and the drawer behind the
+ * Projects button is where a project is renamed, copied, exported and deleted.
  *
  * Two reads, joined on the lowercased def key. `--unit-defs` gives the fields,
  * and the curated dataset gives the name a person reads, which is not in the
@@ -37,19 +40,21 @@
  * fifth store at all: its rename is an ordinary override on `name` or
  * `humanName` (issue #2650, and `unitText.ts`).
  *
- * Both the clones and the overrides are kept per game, keyed by the same
- * `gameName` the `?game=` param and the picker already use to say which game
- * is open. An override is a patch against one game's own unit table, so it
- * means nothing under another game that happens to share a unit's internal
- * name, and picking a different game must not carry it over (issue #2664).
+ * All five stores are scoped to one game, and so is the project that holds
+ * them. An override is a patch against one game's own unit table, so it means
+ * nothing under another game that happens to share a unit's internal name, and
+ * picking a different game must not carry it over (issue #2664). The page
+ * therefore keeps which project is open per game and switches with the picker,
+ * so moving between games keeps both games' work and mixes neither.
  */
-import { Button } from "@picoframe/frame";
-import { RotateCcw } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { Button, useDrawer } from "@picoframe/frame";
+import { FolderOpen, Plus, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { gameIdentityForName } from "@/container/gameIdentity";
 import {
   useScanTargetSelection,
   useUnitsyncScan,
@@ -60,37 +65,32 @@ import {
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { useImportParam } from "@/deeplink/useImportParam";
 import {
   addToBuildMenu,
   applyBuildMenu,
-  type BuildMenus,
-  buildMenuOpCount,
   buildOptionsOf,
   clearBuildMenu,
   isBuilder,
   moveInBuildMenu,
   removeFromBuildMenu,
 } from "../buildMenus";
-import {
-  addClone,
-  deriveClone,
-  removeClone,
-  type UnitClones,
-  unitsWithClones,
-} from "../clones";
+import { addClone, deriveClone, removeClone, unitsWithClones } from "../clones";
 import { useCustomParams, useUnitDefs } from "../config";
+import { isUnitDisabled, setUnitDisabled } from "../disabled";
+import { useEditHistory } from "../history";
+import { clearOverride, clearUnit, setOverride } from "../overrides";
 import {
-  type DisabledUnits,
-  isUnitDisabled,
-  setUnitDisabled,
-} from "../disabled";
-import {
-  clearOverride,
-  clearUnit,
-  overrideCount,
-  setOverride,
-  type UnitOverrides,
-} from "../overrides";
+  defaultProjectName,
+  describeEdits,
+  EMPTY_EDITS,
+  editCounts,
+  editSlot,
+  type GameEdits,
+  type ModProject,
+  parseModProjectJson,
+  useModProjects,
+} from "../project";
 import { unitDisplayName } from "../unitName";
 import { type FieldView, unitFieldView } from "../unitSections";
 import {
@@ -99,26 +99,20 @@ import {
   nameEdit,
   setUnitText,
   type TextField,
-  textEditCount,
   textHome,
-  type UnitTextEdits,
   unitTextCount,
   unitTextRows,
 } from "../unitText";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
+import { ProjectsDrawer } from "./components/ProjectsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
 
-/** Stable empties, so a page with neither does not re-derive on every render. */
+/** A stable empty, so a page with no game does not re-derive on every render. */
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
-const NO_CLONES: UnitClones = {};
-const NO_OVERRIDES: UnitOverrides = {};
-const NO_MENUS: BuildMenus = {};
-const NO_TEXT: UnitTextEdits = {};
-const NO_DISABLED: DisabledUnits = [];
 
 export default function UnitPage() {
   const [params, setParams] = useSearchParams();
@@ -160,106 +154,79 @@ export default function UnitPage() {
     game?.primaryArchive.name,
   );
 
-  // Kept per game, for the same reason clones are (issue #2664): an edit is a
-  // patch against one game's own table, and has nothing to say about another
-  // game's unit of the same name.
-  const [overridesByGame, setOverridesByGame] = useState<
-    Record<string, UnitOverrides>
-  >({});
-  const overrides = overridesByGame[gameName] ?? NO_OVERRIDES;
-  const updateOverrides = useCallback(
-    (update: (current: UnitOverrides) => UnitOverrides) =>
-      setOverridesByGame((all) => {
-        const next = update(all[gameName] ?? {});
-        // A game left with no overrides drops out entirely, the same way one
-        // unit does inside `clearOverride`: an empty table standing in for
-        // "nothing changed" is the sparseness guarantee leaking one level up.
-        if (Object.keys(next).length === 0) {
-          if (!Object.hasOwn(all, gameName)) return all;
-          const { [gameName]: _dropped, ...rest } = all;
-          return rest;
-        }
-        return { ...all, [gameName]: next };
-      }),
-    [gameName],
-  );
-  // Kept per game as well, and for a reason of its own on top of #2664's: a
-  // build menu names units out of one game's table, so an operation over it says
-  // nothing at all under another game.
-  const [menusByGame, setMenusByGame] = useState<Record<string, BuildMenus>>(
-    {},
-  );
-  const menus = menusByGame[gameName] ?? NO_MENUS;
-  const updateMenus = useCallback(
-    (update: (current: BuildMenus) => BuildMenus) =>
-      setMenusByGame((all) => {
-        const next = update(all[gameName] ?? {});
-        if (Object.keys(next).length === 0) {
-          if (!Object.hasOwn(all, gameName)) return all;
-          const { [gameName]: _dropped, ...rest } = all;
-          return rest;
-        }
-        return { ...all, [gameName]: next };
-      }),
-    [gameName],
-  );
+  // The saved projects, which is where every edit on this page lands. Five
+  // stores that each used to key themselves by game and prune an emptied entry
+  // are now five slots inside one project, so the keying and the pruning happen
+  // once here rather than five times in this file (see `project.ts`).
+  const { projects, createProject, applyEdits, setEdits } = useModProjects();
+  const history = useEditHistory();
+  const drawer = useDrawer();
 
-  // Kept per game for #2664's reason again, and needed at all only for a game
-  // that names its units outside its unit table: a rename there is a patch
-  // against a localisation file rather than against a def, so it cannot live in
-  // the override set (issue #2650, and `unitText.ts` for why).
-  const [textByGame, setTextByGame] = useState<Record<string, UnitTextEdits>>(
-    {},
-  );
-  const text = textByGame[gameName] ?? NO_TEXT;
-  const updateText = useCallback(
-    (update: (current: UnitTextEdits) => UnitTextEdits) =>
-      setTextByGame((all) => {
-        const next = update(all[gameName] ?? {});
-        if (Object.keys(next).length === 0) {
-          if (!Object.hasOwn(all, gameName)) return all;
-          const { [gameName]: _dropped, ...rest } = all;
-          return rest;
-        }
-        return { ...all, [gameName]: next };
-      }),
-    [gameName],
-  );
-  // Kept per game too, and a set of its own rather than a flag folded into one
-  // of the other three. It is a mark, not an edit: nothing here writes an
-  // override, a clone or a build menu operation, so switching a unit back on
-  // puts every placement back exactly (issue #2649).
-  const [disabledByGame, setDisabledByGame] = useState<
-    Record<string, DisabledUnits>
-  >({});
-  const disabled = disabledByGame[gameName] ?? NO_DISABLED;
-  const updateDisabled = useCallback(
-    (update: (current: DisabledUnits) => DisabledUnits) =>
-      setDisabledByGame((all) => {
-        const current = all[gameName] ?? NO_DISABLED;
-        const next = update(current);
-        if (next === current) return all;
-        if (next.length === 0) {
-          if (!Object.hasOwn(all, gameName)) return all;
-          const { [gameName]: _dropped, ...rest } = all;
-          return rest;
-        }
-        return { ...all, [gameName]: next };
-      }),
-    [gameName],
-  );
+  // Which project is open, per game. A project is one game's, so switching the
+  // picker switches project, and switching back brings the same one up with its
+  // undo stack intact. A game nobody has chosen for falls back to whichever of
+  // its projects was written to last, which is the one they were in.
+  const [openByGame, setOpenByGame] = useState<Record<string, string>>({});
+  const project = useMemo(() => {
+    const chosen = projects.find((p) => p.id === openByGame[gameName]);
+    if (chosen) return chosen;
+    return projects
+      .filter((p) => p.gameName === gameName)
+      .reduce<ModProject | undefined>(
+        (newest, p) => (!newest || p.updatedAt > newest.updatedAt ? p : newest),
+        undefined,
+      );
+  }, [projects, openByGame, gameName]);
+  const projectId = project?.id ?? "";
+  const edits = project?.edits ?? EMPTY_EDITS;
+  const { overrides, clones, menus, text, disabled } = edits;
+
+  /**
+   * Record one change, as one undo step.
+   *
+   * Every edit on the page goes through here, so an action that touches four
+   * stores at once (deleting a copied unit) is still one press of undo, and an
+   * edit that turned out to change nothing costs no step at all: all five
+   * stores return what they were given when there is nothing to record,
+   * `editSlot` passes that through, and `applyEdits` writes nothing and reports
+   * nothing to record.
+   */
+  const commit = (update: (current: GameEdits) => GameEdits) => {
+    // Nothing to write into yet. The change is tried against an empty project
+    // first, so blurring a field nobody touched does not leave a project behind.
+    if (!project && update(EMPTY_EDITS) === EMPTY_EDITS) return;
+    const target =
+      project ??
+      startProject(defaultProjectName(gameName, projects), EMPTY_EDITS);
+    const changed = applyEdits(target.id, update);
+    if (changed) history.push(target.id, changed.before);
+  };
+
+  /** Make a project for this game and open it. */
+  const startProject = (name: string, edits: GameEdits): ModProject => {
+    const started = createProject({
+      name,
+      gameName,
+      game: gameIdentityForName(gameName, games) ?? undefined,
+      authoredChecksum: defs?.checksum,
+      edits,
+    });
+    setOpenByGame((all) => ({ ...all, [gameName]: started.id }));
+    return started;
+  };
+
+  /** Change exactly one of the five stores, which is most of what the page does. */
+  const editing =
+    <K extends keyof GameEdits>(slot: K) =>
+    (update: (current: GameEdits[K]) => GameEdits[K]) =>
+      commit((current) => editSlot(current, slot, update));
+  const updateOverrides = editing("overrides");
+  const updateMenus = editing("menus");
+  const updateText = editing("text");
+  const updateDisabled = editing("disabled");
+  const updateClones = editing("clones");
 
   const [view, setView] = useState<FieldView>("relevant");
-  // Kept per game. A copy of a unit is a whole definition taken out of one
-  // game's table, so it has no meaning under another game, and the browser
-  // would be showing units that game has never heard of.
-  const [added, setAdded] = useState<Record<string, UnitClones>>({});
-  const clones = added[gameName] ?? NO_CLONES;
-  const updateClones = useCallback(
-    (update: (current: UnitClones) => UnitClones) =>
-      setAdded((all) => ({ ...all, [gameName]: update(all[gameName] ?? {}) })),
-    [gameName],
-  );
 
   // The curated dataset describes the game's units, so it is not asked about
   // one of ours: a copy that stands in for `armcom` would otherwise be handed
@@ -267,8 +234,8 @@ export default function UnitPage() {
   //
   // A name the user has typed wins over all of it, so every list, heading,
   // roster and picker on this page calls the unit what its owner calls it
-  // (issue #2650). Nothing outside this page can see it yet, because none of
-  // this is saved anywhere (issue #1282).
+  // (issue #2650). It travels with the project, so an export carries the name
+  // and so does a copy of the project.
   const nameOf = useCallback(
     (key: string, def: Record<string, unknown> | undefined) =>
       nameEdit(key, def, overrides, text)?.trim() ||
@@ -379,17 +346,51 @@ export default function UnitPage() {
     setParams(merged, { replace: true });
   };
 
-  // Both stores count as changes, because to the person who made them they are
-  // the same thing: an edit to a unit. Only where it lands differs.
-  const edits = overrideCount(overrides) + textEditCount(text);
+  /**
+   * Open a project: its game, then the project itself.
+   *
+   * Held in a ref because the drawer keeps the element it was handed, so a
+   * callback closing over this render's `params` would go on writing the query
+   * string as it was when the drawer opened.
+   */
+  const openRef = useRef<(project: ModProject) => void>(() => {});
+  openRef.current = (chosen: ModProject) => {
+    setOpenByGame((all) => ({ ...all, [chosen.gameName]: chosen.id }));
+    select({ game: chosen.gameName, unit: "" });
+  };
+
+  // A shared project link lands here with its code in the query string. It is
+  // saved and opened, because a project is a document rather than a setting:
+  // nothing about the game changes until it is compiled, so there is nothing to
+  // ask permission for beyond the deep-link confirmation it already passed.
+  const { code: importCode } = useImportParam();
+  const [importError, setImportError] = useState<string | null>(null);
+  const importRef = useRef<(code: string) => void>(() => {});
+  importRef.current = (code: string) => {
+    const imported = parseModProjectJson(code);
+    if (!imported) {
+      setImportError("That link is not a coilbox tweak project.");
+      return;
+    }
+    setImportError(null);
+    openRef.current(createProject(imported));
+  };
+  useEffect(() => {
+    if (importCode) importRef.current(importCode);
+  }, [importCode]);
+
+  // The override set and the text set both count as changes, because to the
+  // person who made them they are the same thing: an edit to a unit. Only where
+  // it lands differs.
+  const counts = editCounts(edits);
   const unitEdits =
     Object.keys(overrides[unitKey] ?? {}).length + unitTextCount(text, unitKey);
-  const addedCount = Object.keys(clones).length;
-  const menuEdits = buildMenuOpCount(menus);
-  const offCount = disabled.length;
   const unitDisabled = isUnitDisabled(disabled, unitKey);
   const anythingChanged =
-    edits > 0 || addedCount > 0 || menuEdits > 0 || offCount > 0;
+    counts.fields > 0 ||
+    counts.added > 0 ||
+    counts.menuOps > 0 ||
+    counts.off > 0;
 
   /** Copy the selected unit, as the project has it, under a new name. */
   const createClone = (key: string, displayName: string, replaces: boolean) => {
@@ -410,17 +411,89 @@ export default function UnitPage() {
     select({ unit: key });
   };
 
-  /** Take one of ours back out, edits and all: nothing else refers to it. */
+  /**
+   * Take one of ours back out, edits and all: nothing else refers to it.
+   *
+   * Four stores in one commit, so one press of undo brings the unit back with
+   * everything that was on it. Four separate commits would have put the copy
+   * back stripped of its own edits, which is the failure per-store undo stacks
+   * would have made unavoidable (see `history.ts`).
+   */
   const deleteClone = () => {
-    updateClones((current) => removeClone(current, unitKey));
-    updateOverrides((o) => clearUnit(o, unitKey));
-    updateText((t) => clearUnitTexts(t, unitKey));
-    // The mark goes with it. A unit that no longer exists cannot be switched
-    // off, and an entry naming one is the empty-entry trap the other three
-    // stores prune for.
-    updateDisabled((d) => setUnitDisabled(d, unitKey, false));
+    commit((current) => {
+      let next = editSlot(current, "clones", (c) => removeClone(c, unitKey));
+      next = editSlot(next, "overrides", (o) => clearUnit(o, unitKey));
+      next = editSlot(next, "text", (t) => clearUnitTexts(t, unitKey));
+      // The mark goes with it. A unit that no longer exists cannot be switched
+      // off, and an entry naming one is the empty-entry trap the other three
+      // stores prune for.
+      return editSlot(next, "disabled", (d) =>
+        setUnitDisabled(d, unitKey, false),
+      );
+    });
     select({ unit: "" });
   };
+
+  /** Put the open project back one step, or forward one. */
+  const undo = () => {
+    if (!project) return;
+    const previous = history.undo(project.id, edits);
+    if (previous) setEdits(project.id, previous);
+  };
+  const redo = () => {
+    if (!project) return;
+    const next = history.redo(project.id, edits);
+    if (next) setEdits(project.id, next);
+  };
+
+  // The usual keys, and only outside a text box: a browser undoes typing in an
+  // input on its own, and taking that over would make a half-typed number
+  // impossible to correct without losing an unrelated edit.
+  const shortcut = useRef({ undo, redo });
+  shortcut.current = { undo, redo };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable) return;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      if (e.shiftKey) shortcut.current.redo();
+      else shortcut.current.undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const openProjects = () =>
+    drawer.open({
+      title: "Tweak projects",
+      width: "30rem",
+      content: (
+        <ProjectsDrawer
+          openId={projectId}
+          installed={games}
+          onOpen={(chosen) => {
+            openRef.current(chosen);
+            drawer.close();
+          }}
+          onDeleted={(id) => history.forget(id)}
+        />
+      ),
+    });
+
+  /** Start a second project for this game, leaving the first one alone. */
+  const newProject = () => {
+    startProject(defaultProjectName(gameName, projects), EMPTY_EDITS);
+    select({ unit: "" });
+  };
+
+  /** Whether the game has moved on since the project was started (issue #1281). */
+  const gameMoved =
+    project?.authoredChecksum !== undefined &&
+    defs?.checksum !== undefined &&
+    project.authoredChecksum !== defs.checksum;
 
   // `h-full` against the frame's own scroll container, so from `lg` up the two
   // panes each take the height that is left and scroll themselves rather than
@@ -437,6 +510,17 @@ export default function UnitPage() {
             one of your own, and put it on a builder's menu so something can
             build it.
           </p>
+          {/* Which project the edits are going into. There is no save button:
+            it says so here rather than leaving somebody to wonder. */}
+          {project && (
+            <p className="text-xs text-muted-foreground">
+              Saving to{" "}
+              <span className="font-medium text-foreground">
+                {project.name}
+              </span>
+              . Rename it under Projects.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <OptionSelect
@@ -450,19 +534,44 @@ export default function UnitPage() {
           />
           {anythingChanged && (
             <span className="text-xs text-muted-foreground">
-              {[
-                edits > 0 && `${edits} change${edits === 1 ? "" : "s"}`,
-                addedCount > 0 &&
-                  `${addedCount} unit${addedCount === 1 ? "" : "s"} added`,
-                menuEdits > 0 &&
-                  `${menuEdits} build menu edit${menuEdits === 1 ? "" : "s"}`,
-                offCount > 0 &&
-                  `${offCount} unit${offCount === 1 ? "" : "s"} disabled`,
-              ]
-                .filter(Boolean)
-                .join(", ")}
+              {describeEdits(edits)}
             </span>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!history.canUndo(projectId)}
+            onClick={undo}
+            aria-label="Undo"
+            title="Undo the last change"
+          >
+            <Undo2 className="size-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!history.canRedo(projectId)}
+            onClick={redo}
+            aria-label="Redo"
+            title="Redo the change you undid"
+          >
+            <Redo2 className="size-3.5" />
+          </Button>
+          {game && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={newProject}
+              title="Start a second project for this game"
+            >
+              <Plus className="size-3.5" />
+              New
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={openProjects}>
+            <FolderOpen className="size-3.5" />
+            Projects
+          </Button>
           {/* What unitsync said while reading this game's defs. It used to be a
             panel below everything else, which on a page that claims the window
             height and scrolls its two panes inside it meant a strip of the
@@ -479,12 +588,21 @@ export default function UnitPage() {
         </div>
       </header>
 
-      {anythingChanged && (
+      {importError && (
+        <Alert variant="destructive">
+          <AlertDescription>{importError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* The game's archives no longer checksum to what they did when this
+        project was started, so something under the edits has moved. Said and
+        nothing more: which edits it actually broke, and what to do about them,
+        is issue #1281's job and needs the whole game read to answer. */}
+      {gameMoved && (
         <Alert>
-          <AlertTitle>These changes are not saved anywhere yet</AlertTitle>
           <AlertDescription>
-            They live in this page for as long as it is open. Saving a tweak
-            project to disk is still to come.
+            {game?.name} has changed since this project was started. The edits
+            still apply, but anything they name may have moved.
           </AlertDescription>
         </Alert>
       )}
@@ -599,10 +717,19 @@ export default function UnitPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        updateOverrides((o) => clearUnit(o, unitKey));
-                        updateText((t) => clearUnitTexts(t, unitKey));
-                      }}
+                      // One commit over both stores, so undoing a reset brings
+                      // back every edit it cleared rather than half of them.
+                      onClick={() =>
+                        commit((current) =>
+                          editSlot(
+                            editSlot(current, "overrides", (o) =>
+                              clearUnit(o, unitKey),
+                            ),
+                            "text",
+                            (t) => clearUnitTexts(t, unitKey),
+                          ),
+                        )
+                      }
                     >
                       <RotateCcw className="size-3.5" />
                       Reset {unitEdits} change{unitEdits === 1 ? "" : "s"}

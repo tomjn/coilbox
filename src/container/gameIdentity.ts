@@ -167,6 +167,7 @@ export function gameIdentityFromPayload(
       return parseGameIdentity(games[0]);
     }
     case "preset":
+    case "mod-project":
       return parseGameIdentity(p.gameName);
     case "challenge":
       return challengeSettingsIdentity(p);

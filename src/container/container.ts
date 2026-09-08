@@ -56,7 +56,8 @@ export type ContainerKind =
   | "setup-pack"
   | "scenario"
   | "keymap"
-  | "blueprint";
+  | "blueprint"
+  | "mod-project";
 
 export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "campaign",
@@ -66,6 +67,7 @@ export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "scenario",
   "keymap",
   "blueprint",
+  "mod-project",
 ];
 
 /**
@@ -81,6 +83,7 @@ export const SUPPORTED_KIND_VERSIONS: Record<ContainerKind, number> = {
   scenario: 2,
   keymap: 1,
   blueprint: 1,
+  "mod-project": 1,
 };
 
 export interface Container<P = unknown> {
@@ -306,6 +309,19 @@ export interface Identification {
 }
 
 /**
+ * The five stores a tweak project's `edits` table can hold. Named here so
+ * {@link sniffPayloadKind} can recognise the payload without importing the
+ * workshop, which this file is vendored into the hub without.
+ */
+const MOD_PROJECT_SLOTS = [
+  "overrides",
+  "clones",
+  "menus",
+  "text",
+  "disabled",
+] as const;
+
+/**
  * Guess a kind purely from a payload's shape, or `null`. Used to flag a
  * mismatch such as "declared a campaign but the contents look like a preset",
  * and to recognise a legacy bare preset (which carries no envelope at all).
@@ -349,6 +365,18 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
     (p.fakeMeta === null || typeof p.fakeMeta === "string")
   ) {
     return "keymap";
+  }
+  // A unit tweak project: a named set of edits against one game's unit table.
+  // Recognised by its `edits` table rather than by any one store inside it,
+  // because every store is sparse and a project may hold only one of them.
+  // `src/workshop/project.ts` in tomjn/coilbox is the shape and the reader.
+  if (
+    typeof p.name === "string" &&
+    typeof p.edits === "object" &&
+    p.edits !== null &&
+    MOD_PROJECT_SLOTS.some((slot) => slot in (p.edits as object))
+  ) {
+    return "mod-project";
   }
   // A base blueprint: a named layout of buildings, each with an offset and a
   // facing, plus how much ground each def stands on. `src/blueprint/payload.ts`
