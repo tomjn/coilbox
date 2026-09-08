@@ -222,11 +222,11 @@ function show(
     { name: "armcom", fullName: "Commander" },
   ],
   unitErrors: string[] = [],
-  /** What the game's `language/en/units.json` says, for a game that has one. */
-  language: {
-    names?: Record<string, string>;
-    descriptions?: Record<string, string>;
-  } = {},
+  /** Every `language/<code>/units.json` the game ships, for one that ships any. */
+  language: Record<
+    string,
+    { names?: Record<string, string>; descriptions?: Record<string, string> }
+  > = {},
   /** What unitsync makes of the game's archives, which a project records. */
   checksum = "abc",
 ) {
@@ -236,8 +236,7 @@ function show(
     unitErrors,
     errors: [],
     checksum,
-    languageNames: language.names,
-    languageDescriptions: language.descriptions,
+    languageText: language,
   };
   mockDataset = dataset;
   return render(
@@ -528,8 +527,30 @@ describe("UnitPage", () => {
         [{ name: "armaak", fullName: "Archangel" }],
         [],
         {
-          names: { armaak: "Archangel" },
-          descriptions: { armaak: "Anti-Air Turret" },
+          en: {
+            names: { armaak: "Archangel" },
+            descriptions: { armaak: "Anti-Air Turret" },
+          },
+        },
+      );
+
+    /** The same game with the five translations it actually ships alongside. */
+    const barTranslated = () =>
+      show(
+        { armaak: ARMAAK },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        [{ name: "armaak", fullName: "Archangel" }],
+        [],
+        {
+          en: {
+            names: { armaak: "Archangel" },
+            descriptions: { armaak: "Anti-Air Turret" },
+          },
+          de: { names: { armaak: "Erzengel" } },
+          es: { names: { armaak: "Arcangel" } },
+          fr: { names: { armaak: "Archange" } },
+          ru: { names: { armaak: "Arkhangel" } },
+          zh: { names: { armaak: "Da Tian Shi" } },
         },
       );
 
@@ -600,6 +621,88 @@ describe("UnitPage", () => {
       type(nameBox(), "Archangel");
       expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
       expect(screen.queryByLabelText(/^Reset Name/)).toBeNull();
+    });
+
+    /**
+     * Issue #2672. Beyond All Reason ships a `units.json` for six locales, and
+     * a rename made against English alone leaves the other five saying the old
+     * thing.
+     */
+    describe("a game that ships more than one translation", () => {
+      const tabs = () => screen.getAllByRole("tab").map((t) => t.textContent);
+      // Radix picks a tab on mouse down rather than on click, so a plain click
+      // leaves the panel where it was.
+      const pick = (code: string) =>
+        fireEvent.mouseDown(screen.getByRole("tab", { name: code }));
+
+      it("offers a tab per language, English first", () => {
+        barTranslated();
+        expect(tabs()).toEqual(["en", "de", "es", "fr", "ru", "zh"]);
+      });
+
+      /** A picker with one entry is a control that cannot be used. */
+      it("offers no picker for a game that ships one", () => {
+        bar();
+        expect(screen.queryAllByRole("tab")).toEqual([]);
+      });
+
+      it("offers none at all for a game that names its units in the def", () => {
+        ba();
+        expect(screen.queryAllByRole("tab")).toEqual([]);
+      });
+
+      it("shows each language's own words", () => {
+        barTranslated();
+        pick("de");
+
+        expect(nameBox().value).toBe("Erzengel");
+        expect(
+          screen.getByText(/Kept in this game's language\/de\/units\.json/),
+        ).toBeTruthy();
+      });
+
+      /**
+       * What the player reads. BAR's i18n module answers in English for a key
+       * the chosen locale has no entry for, so an untranslated box shows the
+       * English string and says where it came from.
+       */
+      it("shows the English value where a language says nothing", () => {
+        barTranslated();
+        pick("de");
+
+        expect(descriptionBox().value).toBe("Anti-Air Turret");
+        expect(screen.getByText(/falls back to English/)).toBeTruthy();
+      });
+
+      it("keeps one language's rename out of another's", () => {
+        barTranslated();
+        pick("de");
+        type(nameBox(), "Racheengel");
+
+        expect(screen.getByText("1 change")).toBeTruthy();
+
+        pick("en");
+        expect(nameBox().value).toBe("Archangel");
+
+        pick("de");
+        expect(nameBox().value).toBe("Racheengel");
+      });
+
+      /** Two languages of one field are two edits, and each resets on its own. */
+      it("counts and resets each language apart", () => {
+        barTranslated();
+        type(nameBox(), "Seraph");
+        pick("de");
+        type(nameBox(), "Racheengel");
+
+        expect(screen.getByText("2 changes")).toBeTruthy();
+
+        fireEvent.click(screen.getByLabelText(/^Reset Name/));
+        expect(screen.getByText("1 change")).toBeTruthy();
+        // Back to the name the game ships in German, not to the English
+        // rename: German has an entry of its own, so it never falls back.
+        expect(nameBox().value).toBe("Erzengel");
+      });
     });
 
     /** A def home writes an ordinary override, so the per-unit reset and the
