@@ -31,6 +31,7 @@ import {
   mirrorReducer,
   RECONNECT_DELAYS_MS,
   reconnectDelay,
+  serverMessagesSince,
 } from "./store";
 
 const emptyState = {} as LobbyState;
@@ -79,6 +80,47 @@ describe("mirrorReducer Tachyon phases", () => {
       ev: { kind: "console", direction: "in", line: frame },
     });
     expect(m.consoleLines).toEqual([`<< ${frame}`]);
+  });
+});
+
+describe("server announcements kept for a delivery run", () => {
+  const said = (text: string) =>
+    ({
+      type: "event",
+      ev: {
+        kind: "delta",
+        delta: { kind: "serverMessage", text, boxed: false },
+      },
+    }) as const;
+
+  it("records each announcement and counts every one that ever arrived", () => {
+    let m = mirrorReducer(initialMirror, said("Maintenance in 5 minutes"));
+    m = mirrorReducer(m, said("message length limit of 10000 chars"));
+    expect(m.serverMessages).toEqual([
+      "Maintenance in 5 minutes",
+      "message length limit of 10000 chars",
+    ]);
+    expect(m.serverMessageCount).toBe(2);
+  });
+
+  it("answers what arrived since a count taken earlier", () => {
+    let m = mirrorReducer(initialMirror, said("before"));
+    const mark = m.serverMessageCount;
+    m = mirrorReducer(m, said("during one"));
+    m = mirrorReducer(m, said("during two"));
+    expect(serverMessagesSince(m, mark)).toEqual(["during one", "during two"]);
+    expect(serverMessagesSince(m, m.serverMessageCount)).toEqual([]);
+  });
+
+  it("keeps the count honest past the cap, and answers with what it still has", () => {
+    let m = initialMirror;
+    for (let i = 0; i < 25; i += 1) m = mirrorReducer(m, said(`msg ${i}`));
+    expect(m.serverMessageCount).toBe(25);
+    expect(m.serverMessages).toHaveLength(20);
+    // Asked for more than survived the cap, it hands back everything it kept
+    // rather than inventing the ones it threw away.
+    expect(serverMessagesSince(m, 0)).toHaveLength(20);
+    expect(serverMessagesSince(m, 23)).toEqual(["msg 23", "msg 24"]);
   });
 });
 
