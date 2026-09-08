@@ -68,10 +68,12 @@
  * is opening its game, so the two cannot meet.
  */
 import { Button, buttonVariants, cn } from "@picoframe/frame";
-import { FolderOpen, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { ArrowLeft, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { gameIdentityForName } from "@/container/gameIdentity";
 import { assetIndex } from "@/content/assetKinds";
@@ -788,82 +790,94 @@ export default function UnitPage() {
   // scrolls, which is why the height is not claimed there.
   return (
     <div className="flex flex-col gap-4 p-4 lg:h-full lg:min-h-0">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">
-            {project ? project.name : "Unit tweaks"}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            Change a unit's numbers. Only the fields you change are recorded, so
-            the rest still follow the game when it updates. Copy a unit to add
-            one of your own, and put it on a builder's menu so something can
-            build it.
-          </p>
-          {/* Which game, and where the edits are going. There is no save
-            button, so it says so here rather than leaving somebody to wonder. */}
-          <p className="text-xs text-muted-foreground">
-            {project
-              ? `Editing ${project.gameName}. Saved as you work.`
-              : gameName
-                ? `Editing ${gameName}. The first change starts a project.`
-                : "No project open."}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {anythingToShow && (
-            <span className="text-xs text-muted-foreground">
-              {[
-                anythingChanged && describeEdits(edits),
-                builtCount > 0 &&
-                  `${builtCount} built unit${builtCount === 1 ? "" : "s"}`,
-                staleCount > 0 && `${staleCount} left behind by a rename`,
-              ]
-                .filter(Boolean)
-                .join(", ")}
-            </span>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!history.canUndo(projectId)}
-            onClick={undo}
-            aria-label="Undo"
-            title="Undo the last change"
-          >
-            <Undo2 className="size-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!history.canRedo(projectId)}
-            onClick={redo}
-            aria-label="Redo"
-            title="Redo the change you undid"
-          >
-            <Redo2 className="size-3.5" />
-          </Button>
+      <PageHeader
+        // The way back to the list, as the small link every other detail page
+        // in the app draws above its title. It was a Projects button down in
+        // the body, which is the one place nothing else in coilbox puts one
+        // (issue #2708).
+        back={
           <Link
             to="/workshop"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
           >
-            <FolderOpen className="size-3.5" />
-            Projects
+            <ArrowLeft className="size-3.5" /> Projects
           </Link>
-          {/* What unitsync said while reading this game's defs. It used to be a
-            panel below everything else, which on a page that claims the window
-            height and scrolls its two panes inside it meant a strip of the
-            bottom edge gone for the session (issue #2667). Only once a game is
-            picked: with none there is no read to report on. */}
-          {game && status !== "error" && (
-            <DiagnosticsButton
-              errors={defs?.unitErrors ?? []}
-              checking={status !== "ready"}
-              title={`Diagnostics for ${game.name}`}
-              description="What unitsync said while reading this game's unit definitions."
-            />
-          )}
-        </div>
-      </header>
+        }
+        title={project ? project.name : "Unit tweaks"}
+        // One paragraph, which includes which game is being edited and where
+        // the edits go. There is no save button, so it says so rather than
+        // leaving somebody to wonder.
+        //
+        // It used to end by saying a unit can be copied and put on a builder's
+        // menu. That is two lines of the window, kept for the life of the page,
+        // describing the Copy unit button a few pixels away. What is left is
+        // the part that is not on screen anywhere: a project records only what
+        // you changed.
+        description={`${
+          project
+            ? `Change a unit's numbers in ${project.gameName}, saved as you work.`
+            : gameName
+              ? `Change a unit's numbers in ${gameName}. The first change starts a project.`
+              : "Change a unit's numbers. No project is open."
+        } Only the fields you change are recorded, so the rest still follow the game when it updates.`}
+        actions={
+          <>
+            {/* What is in the project, beside the buttons that step through it:
+              a status rather than an action, and the thing undo acts on. First
+              in a row pinned to the right, so its width changing as edits are
+              made or undone moves nothing to the right of it (issue #2710). */}
+            {anythingToShow && (
+              <span className="text-xs text-muted-foreground">
+                {[
+                  anythingChanged && describeEdits(edits),
+                  builtCount > 0 &&
+                    `${builtCount} built unit${builtCount === 1 ? "" : "s"}`,
+                  staleCount > 0 && `${staleCount} left behind by a rename`,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+              </span>
+            )}
+            {/* One control with two directions rather than two buttons that
+              happen to sit together. */}
+            <ButtonGroup>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!history.canUndo(projectId)}
+                onClick={undo}
+                aria-label="Undo"
+                title="Undo the last change"
+              >
+                <Undo2 className="size-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!history.canRedo(projectId)}
+                onClick={redo}
+                aria-label="Redo"
+                title="Redo the change you undid"
+              >
+                <Redo2 className="size-3.5" />
+              </Button>
+            </ButtonGroup>
+            {/* What unitsync said while reading this game's defs. It used to be
+              a panel below everything else, which on a page that claims the
+              window height and scrolls its two panes inside it meant a strip of
+              the bottom edge gone for the session (issue #2667). Only once a
+              game is picked: with none there is no read to report on. */}
+            {game && status !== "error" && (
+              <DiagnosticsButton
+                errors={defs?.unitErrors ?? []}
+                checking={status !== "ready"}
+                title={`Diagnostics for ${game.name}`}
+                description="What unitsync said while reading this game's unit definitions."
+              />
+            )}
+          </>
+        }
+      />
 
       {/* The game's archives no longer checksum to what they did when this
         project was started, so something under the edits has moved. Said and
@@ -962,144 +976,175 @@ export default function UnitPage() {
             <EmptyState label="Pick a unit to see its fields." />
           ) : (
             <div className="flex min-w-0 flex-col gap-3 lg:min-h-0">
-              <div className="flex flex-wrap items-center justify-between gap-2 lg:shrink-0">
-                <div className="flex items-start gap-2.5">
-                  {/* The same picture the row in the list beside it draws, off
-                    the same whole-game read (issue #2692). The two halves of
-                    the screen used to disagree: every row had a picture and the
-                    heading for the row you had picked had none. `lg` rather
-                    than the list's own size, because it stands against a name
-                    and a key rather than a single line of text. */}
-                  <UnitIcon
-                    display={picOf(unitKey)}
-                    pending={picsPending}
-                    size="lg"
-                  />
-                  <div className="flex flex-col">
-                    <h2 className="text-base font-semibold">
-                      {nameOf(unitKey, unit)}
-                    </h2>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {unitKey}
-                    </span>
-                    {builtBy ? (
-                      builtBy.stale ? (
-                        <span className="max-w-prose text-xs text-destructive">
-                          Left behind when {builtBy.projectName} was renamed.
-                          Its files are still in {game.name}, so the game has
-                          this unit and the renamed one. The unit builder's
-                          export drawer clears them.
-                        </span>
-                      ) : (
-                        <span className="max-w-prose text-xs text-muted-foreground">
-                          Built in the unit builder as {builtBy.projectName} and
-                          exported into {game.name}
-                          {clone
-                            ? ". Not in this game's definitions yet, so this is what the export wrote."
-                            : ""}
-                        </span>
-                      )
-                    ) : (
-                      clone && (
-                        <span className="max-w-prose text-xs text-muted-foreground">
-                          {clone.replacesGameUnit
-                            ? `Yours, copied from ${clone.source}, in place of the game's own`
-                            : `Yours, copied from ${clone.source}`}
-                        </span>
-                      )
-                    )}
-                    {unitDisabled && (
-                      // Capped, or the sentence sets the width of the column it
-                      // is in and pushes the controls beside it onto their own
-                      // row for as long as the unit is switched off.
-                      <span className="max-w-prose text-xs text-muted-foreground">
-                        Disabled: it comes off every build menu when this is
-                        compiled. The definition is kept, so switching it back
-                        on restores it.
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* A copy the project added has no entry of its own in the
-                      game's real unit dataset, so there is nothing for this
-                      to open there (issue #2652). Every game unit, including
-                      one a clone replaces, still has one. */}
-                  {!clone && (
-                    <Link
-                      to={`/library/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(unitKey)}`}
-                      className={cn(
-                        buttonVariants({ variant: "outline", size: "sm" }),
-                      )}
-                    >
-                      View unit details
-                    </Link>
-                  )}
-                  <DisableUnitSwitch
-                    unitKey={unitKey}
-                    unitName={nameOf(unitKey, unit)}
-                    disabled={unitDisabled}
-                    onChange={(off) =>
-                      updateDisabled((d) => setUnitDisabled(d, unitKey, off))
-                    }
-                  />
-                  <CloneUnitButton
-                    sourceKey={unitKey}
-                    sourceName={nameOf(unitKey, unit)}
-                    gameUnits={gameUnits}
-                    clones={clones}
-                    nameOf={nameOf}
-                    onCreate={createClone}
-                  />
-                  {/* Only a unit copied here. Taking a built one out would
-                    have to delete a file in the game folder, which is the
-                    builder's export to undo and not this page's. */}
-                  {clone && !clone.origin && (
-                    <DeleteCloneButton
-                      name={nameOf(unitKey, unit)}
-                      edits={unitEdits}
-                      onDelete={deleteClone}
+              {/* Who the unit is on the left, everything that acts on it on the
+                right, and what is worth saying about it underneath.
+
+                One row for the controls or, once they no longer fit beside the
+                name, one row under it: `shrink-0` keeps them together so they
+                drop as a block rather than half of them wrapping, and their own
+                `flex-wrap` is the last resort at a width where a single line
+                would run off the edge. Which of those happens depends on the
+                window and on the unit's name, never on the state of a control.
+
+                Nothing that changes when a control is pressed is inside this
+                row (issue #2710). The note a disabled unit gets used to sit
+                under the unit's key, in the left half, where it widened that
+                half and wrapped the controls beside it onto their own line, so
+                the switch that had just been pressed was somewhere else. It is
+                below the whole row now. So is the field count, which the
+                Relevant/All toggle changes the width of: it is a fact about the
+                list below rather than a control, and beside the toggle it moved
+                the toggle. The three controls that come and go are first, so a
+                copy taking the details link away and putting the delete button
+                there moves nothing that was pressed. */}
+              <div className="flex flex-col gap-2 lg:shrink-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    {/* The same picture the row in the list beside it draws, off
+                      the same whole-game read (issue #2692). The two halves of
+                      the screen used to disagree: every row had a picture and
+                      the heading for the row you had picked had none. Bigger
+                      than the list's own, and bigger than it was, because it
+                      stands against a name, a key and a row of controls. */}
+                    <UnitIcon
+                      display={picOf(unitKey)}
+                      pending={picsPending}
+                      size="xl"
                     />
-                  )}
-                  {unitEdits > 0 && (
-                    <Button
+                    <div className="flex flex-col">
+                      <h2 className="text-base font-semibold">
+                        {nameOf(unitKey, unit)}
+                      </h2>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {unitKey}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
+                    {/* A copy the project added has no entry of its own in the
+                        game's real unit dataset, so there is nothing for this
+                        to open there (issue #2652). Every game unit, including
+                        one a clone replaces, still has one. */}
+                    {!clone && (
+                      <Link
+                        to={`/library/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(unitKey)}`}
+                        className={cn(
+                          buttonVariants({ variant: "outline", size: "sm" }),
+                        )}
+                      >
+                        View unit details
+                      </Link>
+                    )}
+                    {/* Only a unit copied here. Taking a built one out would
+                      have to delete a file in the game folder, which is the
+                      builder's export to undo and not this page's. */}
+                    {clone && !clone.origin && (
+                      <DeleteCloneButton
+                        name={nameOf(unitKey, unit)}
+                        edits={unitEdits}
+                        onDelete={deleteClone}
+                      />
+                    )}
+                    {unitEdits > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        // One commit over both stores, so undoing a reset brings
+                        // back every edit it cleared rather than half of them.
+                        onClick={() =>
+                          commit((current) =>
+                            editSlot(
+                              editSlot(current, "overrides", (o) =>
+                                clearUnit(o, unitKey),
+                              ),
+                              "text",
+                              (t) => clearUnitTexts(t, unitKey),
+                            ),
+                          )
+                        }
+                      >
+                        <RotateCcw className="size-3.5" />
+                        Reset {unitEdits} change{unitEdits === 1 ? "" : "s"}
+                      </Button>
+                    )}
+                    <DisableUnitSwitch
+                      unitKey={unitKey}
+                      unitName={nameOf(unitKey, unit)}
+                      disabled={unitDisabled}
+                      onChange={(off) =>
+                        updateDisabled((d) => setUnitDisabled(d, unitKey, off))
+                      }
+                    />
+                    <CloneUnitButton
+                      sourceKey={unitKey}
+                      sourceName={nameOf(unitKey, unit)}
+                      gameUnits={gameUnits}
+                      clones={clones}
+                      nameOf={nameOf}
+                      onCreate={createClone}
+                    />
+                    <ToggleGroup
+                      type="single"
                       variant="outline"
                       size="sm"
-                      // One commit over both stores, so undoing a reset brings
-                      // back every edit it cleared rather than half of them.
-                      onClick={() =>
-                        commit((current) =>
-                          editSlot(
-                            editSlot(current, "overrides", (o) =>
-                              clearUnit(o, unitKey),
-                            ),
-                            "text",
-                            (t) => clearUnitTexts(t, unitKey),
-                          ),
-                        )
-                      }
+                      value={view}
+                      onValueChange={(v) => v && setView(v as FieldView)}
+                      aria-label="Which fields to show"
                     >
-                      <RotateCcw className="size-3.5" />
-                      Reset {unitEdits} change{unitEdits === 1 ? "" : "s"}
-                    </Button>
-                  )}
-                  <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    size="sm"
-                    value={view}
-                    onValueChange={(v) => v && setView(v as FieldView)}
-                    aria-label="Which fields to show"
-                  >
-                    <ToggleGroupItem value="relevant">Relevant</ToggleGroupItem>
-                    <ToggleGroupItem value="all">All</ToggleGroupItem>
-                  </ToggleGroup>
-                  <span className="text-xs text-muted-foreground">
-                    {view === "relevant"
-                      ? `${fields.shown} shown, ${fields.hidden} hidden`
-                      : `${fields.shown} shown`}
-                  </span>
+                      <ToggleGroupItem value="relevant">
+                        Relevant
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="all">All</ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
                 </div>
+
+                {/* How much of the unit the list below is showing. Under the
+                  row and against its right edge, so it reads with the toggle it
+                  belongs to without being able to move it. */}
+                <span className="self-end text-xs text-muted-foreground">
+                  {view === "relevant"
+                    ? `${fields.shown} shown, ${fields.hidden} hidden`
+                    : `${fields.shown} shown`}
+                </span>
+
+                {/* What is true of this unit: where it came from, and whether
+                  it is switched off. The width cap is for reading length now,
+                  not for holding a row together. */}
+                {builtBy ? (
+                  builtBy.stale ? (
+                    <p className="max-w-prose text-xs text-destructive">
+                      Left behind when {builtBy.projectName} was renamed. Its
+                      files are still in {game.name}, so the game has this unit
+                      and the renamed one. The unit builder's export drawer
+                      clears them.
+                    </p>
+                  ) : (
+                    <p className="max-w-prose text-xs text-muted-foreground">
+                      Built in the unit builder as {builtBy.projectName} and
+                      exported into {game.name}
+                      {clone
+                        ? ". Not in this game's definitions yet, so this is what the export wrote."
+                        : ""}
+                    </p>
+                  )
+                ) : (
+                  clone && (
+                    <p className="max-w-prose text-xs text-muted-foreground">
+                      {clone.replacesGameUnit
+                        ? `Yours, copied from ${clone.source}, in place of the game's own`
+                        : `Yours, copied from ${clone.source}`}
+                    </p>
+                  )
+                )}
+                {unitDisabled && (
+                  <p className="max-w-prose text-xs text-muted-foreground">
+                    Disabled: it comes off every build menu when this is
+                    compiled. The definition is kept, so switching it back on
+                    restores it.
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
