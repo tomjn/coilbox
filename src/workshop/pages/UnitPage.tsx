@@ -919,11 +919,6 @@ export default function UnitPage() {
           onSubmit={(details) => {
             updateProjectDetails(project.id, details);
             setRenaming(false);
-            // The crumb over this page is the project's name, which the frame's
-            // top bar reads from the store on its own render and nothing
-            // re-renders on a write. Re-navigating to the URL we are on gives it
-            // that render, so the crumb and the heading agree.
-            select({});
           }}
         />
       )}

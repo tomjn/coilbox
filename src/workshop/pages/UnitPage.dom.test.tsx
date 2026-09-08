@@ -224,9 +224,9 @@ const ARMLAB: Record<string, unknown> = {
  * The router's key for the entry the page is on, rendered where a test can read
  * it.
  *
- * For one thing only: the crumb over this page is the project's name, and the
- * frame's top bar reads it from the store on its own render, which a write to
- * the store does not cause. A fresh key is that render happening.
+ * For one thing only: proving a rename does not move the page. The frame reads
+ * the crumb out of the store and follows a write on its own, so a fresh key here
+ * would mean coilbox had gone back to forcing that render itself (issue #2739).
  */
 function LocationKey() {
   return <span data-testid="location-key">{useLocation().key}</span>;
@@ -2303,11 +2303,12 @@ describe("UnitPage", () => {
 
     /**
      * The crumb above the heading is the project's name too, and it comes from
-     * the store rather than from this page. Renaming puts the page back on the
-     * URL it is already on, which is what gives the frame's top bar the render
-     * it needs to read the new name.
+     * the store rather than from this page. This page used to re-navigate to the
+     * URL it was already on to force the frame's top bar to read the name again
+     * (issue #2739). picoframe 0.9.1 re-resolves a crumb when the store is
+     * written, so the rename writes and stops there.
      */
-    it("puts the page back on its own url, so the crumb is read again", async () => {
+    it("stays on the url it is on, leaving the crumb to the frame", async () => {
       openNew(GAME.name, units);
       type(healthBox(), "5000");
       const before = screen.getByTestId("location-key").textContent;
@@ -2318,7 +2319,7 @@ describe("UnitPage", () => {
       });
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-      expect(screen.getByTestId("location-key").textContent).not.toBe(before);
+      expect(screen.getByTestId("location-key").textContent).toBe(before);
     });
 
     /** Renaming is not an edit, so it costs no undo step and does not change
