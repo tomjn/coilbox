@@ -29,7 +29,14 @@
 //! at a caller-chosen path, versioned for handing to somebody else rather
 //! than for the local test route's own fixed folder. See `package`'s own doc
 //! comment.
+//!
+//! `workshop_pack_bar_slots` (issue #1277) is the fifth: it checks the same
+//! way the other two export routes do, then packs the compiled chunks across
+//! Beyond All Reason's numbered `tweakdefs`/`tweakunits` mod options, for a
+//! player who is not hosting their own lobby. See `bar_pack`'s own doc
+//! comment for the size and ordering rules this follows.
 
+mod bar_pack;
 mod compile;
 mod lua;
 mod model;
@@ -37,6 +44,7 @@ mod mutator;
 mod package;
 mod preflight;
 
+pub use bar_pack::{pack as pack_bar_slots, BarSlotPack};
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use model::{GameEdits, ModProject};
 pub use preflight::{preflight, PreflightReport};
@@ -165,13 +173,43 @@ fn workshop_package_mutator(project: ModProject, version: u32, dest: String) -> 
     })
 }
 
+/// Compile a saved project, check it, and pack its chunks across Beyond All
+/// Reason's numbered tweak slots (issue #1277), for a player who is not
+/// hosting their own lobby. Refused the same way the other export routes are
+/// when there is nothing to pack or preflight finds a blocker: a lobby chat
+/// line going out to other people is exactly the case a blocker should stop
+/// rather than only flag (issue #2748). A chunk `bar_pack::pack` could not
+/// place, whether too big for any slot or simply out of slots, is not a
+/// refusal: the caller decides what to do with a partial pack, since some of
+/// the project reaching a lobby is better than none of it silently vanishing.
+#[tauri::command]
+fn workshop_pack_bar_slots(project: ModProject) -> CliResult {
+    let compiled = compile(&project);
+    if compiled.chunks.is_empty() {
+        return CliResult::err(
+            "This project has no edits, so there is nothing to pack for a Beyond All Reason lobby.",
+        );
+    }
+    let report = preflight(&project, &compiled);
+    if !report.blockers.is_empty() {
+        return CliResult::err(format!(
+            "{} blocker{} would reach the lobby broken, so it was not packed: {}",
+            report.blockers.len(),
+            if report.blockers.len() == 1 { "" } else { "s" },
+            report.blockers.join("; "),
+        ));
+    }
+    envelope(&bar_pack::pack(&compiled.chunks))
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
             workshop_compile,
             workshop_preflight,
             workshop_test_mutator,
-            workshop_package_mutator
+            workshop_package_mutator,
+            workshop_pack_bar_slots
         ])
         .build()
 }
@@ -237,12 +275,16 @@ mod tests {
 
         let dest = dir.path().join("packaged.sdz");
         let packaged = unwrap_as_the_frontend_does(workshop_package_mutator(
-            project,
+            project.clone(),
             1,
             dest.to_string_lossy().into_owned(),
         ));
         assert!(packaged.get("files").is_some_and(Value::is_array));
         assert_eq!(packaged["version"], Value::from(1));
+
+        let bar_pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
+        assert!(bar_pack.get("tweakdefs").is_some_and(Value::is_array));
+        assert!(bar_pack.get("tweakunits").is_some_and(Value::is_array));
     }
 
     /// A project that changes nothing is what the editor holds for the whole
@@ -327,6 +369,70 @@ mod tests {
             .and_then(Value::as_str)
             .is_some_and(|e| e.contains("blocker") && e.contains("supercom")));
         assert!(!dest.exists(), "nothing should have been written");
+    }
+
+    /// The same empty-project refusal, for the BAR tweak-slot route (issue
+    /// #1277). Nothing to compile means nothing to pack.
+    #[test]
+    fn packing_bar_slots_for_an_empty_project_is_refused_with_its_own_reason() {
+        let response = serde_json::to_value(workshop_pack_bar_slots(ModProject::default()))
+            .expect("the answer serialises");
+
+        assert_eq!(response.get("success"), Some(&Value::Bool(false)));
+        assert!(response
+            .get("error")
+            .and_then(Value::as_str)
+            .is_some_and(|e| e.contains("nothing to pack")));
+    }
+
+    /// A lobby chat line going out to other people is exactly the case a
+    /// blocker should stop rather than only flag (issue #2748), the same
+    /// reasoning `workshop_package_mutator` already follows.
+    #[test]
+    fn packing_bar_slots_is_refused_when_preflight_finds_a_blocker() {
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "Faster commanders",
+            "gameName": "Balanced Annihilation V15.9.8",
+            "edits": {
+                "clones": {
+                    "first": { "key": "supercom", "replacesGameUnit": false, "def": { "maxDamage": 1 } },
+                    "second": { "key": "supercom", "replacesGameUnit": false, "def": { "maxDamage": 2 } }
+                }
+            },
+        }))
+        .expect("parse");
+
+        let response =
+            serde_json::to_value(workshop_pack_bar_slots(project)).expect("the answer serialises");
+
+        assert_eq!(response.get("success"), Some(&Value::Bool(false)));
+        assert!(response
+            .get("error")
+            .and_then(Value::as_str)
+            .is_some_and(|e| e.contains("blocker") && e.contains("supercom")));
+    }
+
+    /// The saved fixture carries both a table-form edit (an override) and
+    /// several block-form ones (a copy, a menu, a disabled unit), so packing
+    /// it is a real check that both slot kinds come back non-empty rather
+    /// than only the one the other tests happen to build.
+    #[test]
+    fn packing_bar_slots_for_the_saved_project_fills_both_kinds_of_slot() {
+        let project = saved_project();
+        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
+
+        let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
+        let tweakunits = pack["tweakunits"].as_array().expect("tweakunits array");
+        assert!(
+            !tweakdefs.is_empty(),
+            "the saved project has block-form edits"
+        );
+        assert!(
+            !tweakunits.is_empty(),
+            "the saved project has table-form edits"
+        );
+        assert!(pack["oversized"].as_array().is_some_and(Vec::is_empty));
+        assert!(pack["unplaced"].as_array().is_some_and(Vec::is_empty));
     }
 
     /// The whole point of the fixture: a project saved by the app, through the

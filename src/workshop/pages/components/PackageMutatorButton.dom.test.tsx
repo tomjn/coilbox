@@ -19,7 +19,12 @@ const project = {
   updatedAt: "2026-09-01T00:00:00.000Z",
 };
 
-const { save, workshopPreflight, workshopPackageMutator } = vi.hoisted(() => ({
+const {
+  save,
+  workshopPreflight,
+  workshopPackageMutator,
+  workshopPackBarSlots,
+} = vi.hoisted(() => ({
   save: vi.fn(
     async (): Promise<string | null> => "/home/tom/faster-commanders-v1.sdz",
   ),
@@ -32,6 +37,12 @@ const { save, workshopPreflight, workshopPackageMutator } = vi.hoisted(() => ({
     path: "/home/tom/faster-commanders-v1.sdz",
     files: ["modinfo.lua"],
     version: 1,
+  })),
+  workshopPackBarSlots: vi.fn(async () => ({
+    tweakdefs: ["!bset tweakdefs abc123"],
+    tweakunits: [] as string[],
+    oversized: [] as string[],
+    unplaced: [] as string[],
   })),
 }));
 
@@ -49,6 +60,11 @@ vi.mock("../../package", () => ({
   packagedMutatorFileName: (p: { name: string }, version: number) =>
     `${p.name.toLowerCase().replace(/\s+/g, "-")}-v${version}.sdz`,
 }));
+vi.mock("../../barPack", async () => {
+  const actual =
+    await vi.importActual<typeof import("../../barPack")>("../../barPack");
+  return { ...actual, workshopPackBarSlots };
+});
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save }));
 
 const { PackageMutatorButton } = await import("./PackageMutatorButton");
@@ -57,10 +73,18 @@ function compiled(files: { path: string; contents: string }[]) {
   return { compiled: { files }, loading: false, error: null };
 }
 
-function draw(onPackaged = vi.fn()) {
+function draw(
+  onPackaged = vi.fn(),
+  routeOptions?: { key: string; name: string }[],
+) {
   render(
-    // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture, not the real ModProject
-    <PackageMutatorButton project={project as any} onPackaged={onPackaged} />,
+    <PackageMutatorButton
+      // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture, not the real ModProject
+      project={project as any}
+      onPackaged={onPackaged}
+      // biome-ignore lint/suspicious/noExplicitAny: a trimmed ConfigOption fixture
+      routeOptions={routeOptions as any}
+    />,
   );
   return onPackaged;
 }
@@ -76,6 +100,13 @@ afterEach(() => {
     path: "/home/tom/faster-commanders-v1.sdz",
     files: ["modinfo.lua"],
     version: 1,
+  });
+  workshopPackBarSlots.mockClear();
+  workshopPackBarSlots.mockResolvedValue({
+    tweakdefs: ["!bset tweakdefs abc123"],
+    tweakunits: [],
+    oversized: [],
+    unplaced: [],
   });
   mockCompiled = compiled([]);
 });
@@ -149,5 +180,82 @@ describe("PackageMutatorButton", () => {
     expect(screen.getByText(/supercom is defined by 2 copies/)).toBeTruthy();
     expect(save).not.toHaveBeenCalled();
     expect(workshopPackageMutator).not.toHaveBeenCalled();
+  });
+
+  describe("BAR tweak slots mode", () => {
+    function openBarMode() {
+      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
+      fireEvent.click(screen.getByRole("radio", { name: /bar tweak slots/i }));
+    }
+
+    it("packs the project and shows one line per slot with a copy button", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      draw(vi.fn(), [{ key: "tweakdefs", name: "tweakdefs" }]);
+      openBarMode();
+      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+
+      await vi.waitFor(() =>
+        expect(workshopPackBarSlots).toHaveBeenCalledWith({ project }),
+      );
+      expect(workshopPreflight).toHaveBeenCalledWith({ project });
+      expect(screen.getByText("!bset tweakdefs abc123")).toBeTruthy();
+    });
+
+    it("refuses to pack when preflight finds a blocker, before packing runs", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      workshopPreflight.mockResolvedValue({
+        blockers: ["supercom is defined by 2 copies"],
+        review: [],
+        passes: [],
+      });
+      draw();
+      openBarMode();
+      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+
+      await vi.waitFor(() =>
+        expect(screen.getByText(/1 blocker/i)).toBeTruthy(),
+      );
+      expect(screen.getByText(/supercom is defined by 2 copies/)).toBeTruthy();
+      expect(workshopPackBarSlots).not.toHaveBeenCalled();
+    });
+
+    it("warns before the export when the game declares fewer slots than the pack needs", async () => {
+      workshopPackBarSlots.mockResolvedValue({
+        tweakdefs: ["!bset tweakdefs a", "!bset tweakdefs1 b"],
+        tweakunits: [],
+        oversized: [],
+        unplaced: [],
+      });
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      // Only the bare slot is declared, but the pack above needed two.
+      draw(vi.fn(), [{ key: "tweakdefs", name: "tweakdefs" }]);
+      openBarMode();
+      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+
+      await vi.waitFor(() =>
+        expect(
+          screen.getByText(
+            /needs 2 tweakdefs slots, but this game only declares 1/i,
+          ),
+        ).toBeTruthy(),
+      );
+    });
+
+    it("says which chunks could not be placed", async () => {
+      workshopPackBarSlots.mockResolvedValue({
+        tweakdefs: [],
+        tweakunits: [],
+        oversized: ["a huge patch"],
+        unplaced: [],
+      });
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      draw();
+      openBarMode();
+      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+
+      await vi.waitFor(() =>
+        expect(screen.getByText(/a huge patch would exceed/i)).toBeTruthy(),
+      );
+    });
   });
 });
