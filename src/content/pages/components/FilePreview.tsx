@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Check, Copy, Download, FileQuestion } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { CodeBlock } from "@/components/CodeBlock";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes } from "@/lib/format";
 import { modelFormatFor } from "../../archiveModel";
@@ -34,45 +35,6 @@ const LANG: Record<string, string> = {
 function langFor(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   return LANG[ext] ?? "text";
-}
-
-/** Syntax-highlight `code` with shiki (lazy-loaded); plain `<pre>` until ready. */
-function TextPreview({ code, lang }: { code: string; lang: string }) {
-  const [html, setHtml] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setHtml(null);
-    import("shiki")
-      .then(({ codeToHtml }) =>
-        codeToHtml(code, { lang, theme: "github-dark" }),
-      )
-      .then((h) => {
-        if (!cancelled) setHtml(h);
-      })
-      .catch(() => {
-        if (!cancelled) setHtml(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [code, lang]);
-
-  if (html) {
-    return (
-      <div
-        // shiki emits a styled <pre>; reset its margins and pad uniformly.
-        className="h-full overflow-auto rounded-lg border border-border/50 text-xs [&_pre]:!m-0 [&_pre]:min-h-full [&_pre]:!p-3"
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: shiki output of our own archive bytes
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
-  }
-  return (
-    <pre className="h-full overflow-auto rounded-lg border border-border/50 bg-card p-3 font-mono text-xs">
-      {code}
-    </pre>
-  );
 }
 
 /** The selected member's contents: a drawn model, highlighted text, an inline
@@ -123,7 +85,13 @@ function PreviewBody({
     return <Centered>Could not read this file.</Centered>;
   }
   if (result.kind === "text" && result.text != null) {
-    return <TextPreview code={result.text} lang={langFor(path)} />;
+    return (
+      <CodeBlock
+        code={result.text}
+        lang={langFor(path)}
+        className="h-full rounded-lg border border-border/50 [&_pre]:min-h-full"
+      />
+    );
   }
   if (result.kind === "image" && result.dataUrl) {
     return (

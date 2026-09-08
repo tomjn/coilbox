@@ -14,6 +14,10 @@
  * that is not a scalar or a list of numbers draws as a raw key and value row,
  * which is also what a key only the game declares gets when its value is a table.
  *
+ * A table has no control at all, so it is shown as the Lua the game wrote,
+ * small ones in the row and large ones in a drawer. `LuaTableValue` holds that
+ * and the reasoning behind it (issue #2695).
+ *
  * A custom parameter also carries a note naming the Lua file that reads it
  * (issue #2661), which for most of them is the only thing on the page that says
  * what the value does.
@@ -26,6 +30,7 @@ import { Switch } from "@/components/ui/switch";
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
+import { luaLiteral } from "@/lib/lua";
 import { HelpTip } from "@/mapconv/pages/components/Help";
 import {
   type AssetBrowsing,
@@ -35,6 +40,7 @@ import {
 import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldRow } from "../../unitSections";
 import { AssetPicker } from "./AssetPicker";
+import { LuaTableValue } from "./LuaTableValue";
 
 /** Which editor a value gets, or none. */
 type ControlKind = "boolean" | "number" | "numberList" | "text" | "raw";
@@ -65,11 +71,24 @@ function toDraft(value: unknown, kind: ControlKind): string {
   return String(value);
 }
 
-/** How a value reads when it is only being shown, never edited. */
+/** Whether a value is a table, which is the case the row has no control for
+ *  and shows as Lua instead (issue #2695). */
+const isTable = (
+  value: unknown,
+): value is Record<string, unknown> | unknown[] =>
+  typeof value === "object" && value !== null;
+
+/**
+ * How a value reads when it is only being shown, never edited, on one line.
+ *
+ * Lua rather than JSON, for the reason `LuaTableValue` gives, but flattened:
+ * this is the one-line summary under an overridden row, where a table's own
+ * line breaks would push the rows below it off the screen.
+ */
 function display(value: unknown): string {
   if (value === undefined) return "not set";
   if (typeof value === "string") return value;
-  return JSON.stringify(value) ?? String(value);
+  return luaLiteral(value).replace(/\s*\n\s*/g, " ");
 }
 
 /**
@@ -296,6 +315,8 @@ export function UnitFieldRow({
             onValueChange={onChange}
             options={options}
           />
+        ) : kind === "raw" && isTable(row.value) ? (
+          <LuaTableValue value={row.value} label={row.label} path={row.path} />
         ) : kind === "raw" ? (
           <code className="truncate rounded bg-muted px-1.5 py-1 font-mono text-xs text-muted-foreground">
             {display(row.value)}
