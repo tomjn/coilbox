@@ -24,12 +24,34 @@
  */
 import { resolvedDef } from "./overrides";
 
+/**
+ * Where a clone's definition came from, when it was not copied from a unit.
+ *
+ * A unit built in the lego builder and exported into the game folder is a whole
+ * definition the game will read, which is exactly what a clone is, so it enters
+ * here rather than in a list of its own (issue #2651). It carries the project it
+ * was built in, because that is what a re-export is matched on: the name can
+ * change between one export and the next, the project cannot.
+ */
+export interface CloneOrigin {
+  kind: "lego";
+  /** The lego project's id. */
+  projectId: string;
+  /** What the project is called, for saying so on the page. */
+  projectName: string;
+}
+
 /** One unit the project adds, held as a whole definition rather than a patch. */
 export interface UnitClone {
   /** Its internal name, which is its key in the game's unit table. */
   key: string;
-  /** The unit it was copied from, for provenance. */
-  source: string;
+  /**
+   * The unit it was copied from, for provenance. Absent for a unit that was
+   * not copied from one, which is every unit built in the lego builder.
+   */
+  source?: string;
+  /** Where the definition came from, when nothing in the game was copied. */
+  origin?: CloneOrigin;
   /**
    * Whether it stood in for a unit the game already had when it was made.
    *

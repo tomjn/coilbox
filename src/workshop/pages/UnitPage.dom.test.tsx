@@ -22,6 +22,7 @@ import {
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CustomParamsResult, UnitDefsResult } from "@/content/bindings";
+import { LEGO_SCHEMA_VERSION, type LegoProject } from "@/lego/model";
 
 const SELECTED = {
   enginePath: "/engines/105",
@@ -32,13 +33,13 @@ const SELECTED = {
 
 const GAME = {
   name: "Test Game",
-  primaryArchive: { name: "testgame.sdd" },
+  primaryArchive: { name: "testgame.sdd", path: "/data/games/testgame.sdd" },
 };
 
 /** A second, unrelated game that happens to name a unit the same thing. */
 const GAME_2 = {
   name: "Test Game 2",
-  primaryArchive: { name: "testgame2.sdd" },
+  primaryArchive: { name: "testgame2.sdd", path: "/data/games/testgame2.sdd" },
 };
 
 let mockDefs: UnitDefsResult = {
@@ -150,6 +151,17 @@ vi.mock("@/components/OptionSelect", () => ({
   ),
 }));
 
+/** The lego builder's saved units, which the page reads to find what has been
+ *  exported into the open game's folder (issue #2651). */
+let mockLegoProjects: LegoProject[] = [];
+vi.mock("@/lego/projects", () => ({
+  useLegoProjects: () => ({
+    projects: mockLegoProjects,
+    loading: false,
+    error: null,
+  }),
+}));
+
 const { default: UnitPage } = await import("./UnitPage");
 
 const ARMCOM: Record<string, unknown> = {
@@ -231,6 +243,7 @@ afterEach(() => {
   mockArchiveFiles = [];
   mockConsumers = null;
   mockConsumersByArchive = {};
+  mockLegoProjects = [];
 });
 
 describe("UnitPage", () => {
@@ -1457,6 +1470,332 @@ describe("UnitPage", () => {
           screen.getByText(/Test Game has no model at this path/),
         ).toBeTruthy(),
       );
+    });
+  });
+
+  /**
+   * Issue #2651, and the answer #663 closed without. A unit built in the lego
+   * builder and exported into a game folder is a definition the game will read
+   * and nothing could build, because no part of coilbox looked at the folder
+   * afterwards. This is that look: the unit turns up in the list, edits through
+   * the ordinary field rows, and goes on a factory's menu through the ordinary
+   * build menu editor.
+   */
+  describe("a unit built in the lego builder", () => {
+    /** The definition `legoUnitDef` writes, as the export receipt holds it. */
+    const SKYFORT: Record<string, unknown> = {
+      name: "Sky Fortress",
+      description: "Sky Fortress, built with coilbox's unit builder.",
+      objectname: "skyfort",
+      script: "skyfort.lua",
+      footprintx: 4,
+      footprintz: 4,
+      maxdamage: 1000,
+      canmove: false,
+    };
+
+    function legoProject(over: Partial<LegoProject> = {}): LegoProject {
+      return {
+        schemaVersion: LEGO_SCHEMA_VERSION,
+        id: "proj-1",
+        name: "Sky Fortress",
+        unitName: "skyfort",
+        packId: "lego",
+        packVersion: "1",
+        createdAt: "",
+        updatedAt: "",
+        rootPieceId: "root",
+        pieces: [],
+        exported: {
+          dir: GAME.primaryArchive.path,
+          at: "2026-09-07T12:00:00.000Z",
+          unitName: "skyfort",
+          def: SKYFORT,
+        },
+        ...over,
+      };
+    }
+
+    const openBuilt = (projects: LegoProject[] = [legoProject()]) => {
+      mockLegoProjects = projects;
+      return show(
+        { armcom: ARMCOM },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+        [{ name: "armcom", fullName: "Commander" }],
+      );
+    };
+
+    it("appears in the game's unit list", () => {
+      openBuilt();
+      expect(screen.getAllByText("Sky Fortress").length).toBeGreaterThan(0);
+      expect(screen.getByText("1 built unit")).toBeTruthy();
+    });
+
+    it("says which project built it rather than a unit it was copied from", () => {
+      openBuilt();
+      expect(
+        screen.getByText(
+          /Built in the unit builder as Sky Fortress and exported into Test Game/,
+        ),
+      ).toBeTruthy();
+    });
+
+    it("edits through the ordinary field rows", () => {
+      openBuilt();
+      // The builder writes the Total Annihilation spelling of health, which is
+      // the field the page draws for it.
+      const health = screen.getByLabelText(
+        "Health (old name)",
+      ) as HTMLInputElement;
+      expect(health.value).toBe("1000");
+      type(health, "4000");
+      expect(health.value).toBe("4000");
+      expect(screen.getAllByText(/1 change/).length).toBeGreaterThan(0);
+      // Against the definition the export wrote, not against the game.
+      expect(screen.getByText(/Exported value: 1000/)).toBeTruthy();
+    });
+
+    /**
+     * A built unit is already a file in the game folder, so it is not work
+     * this page is holding and could lose. The banner must not say it is.
+     */
+    it("is not counted as an unsaved change", () => {
+      openBuilt();
+      expect(screen.queryByText(/not saved anywhere yet/)).toBeNull();
+      expect(screen.queryByText(/unit added/)).toBeNull();
+    });
+
+    it("cannot be deleted from here, since the file is the builder's", () => {
+      openBuilt();
+      expect(screen.queryByRole("button", { name: /^Delete/ })).toBeNull();
+    });
+
+    it("stays out of a game it was not exported into", () => {
+      mockLegoProjects = [legoProject()];
+      show(
+        { armcom: ARMCOM },
+        `/workshop?game=${encodeURIComponent(GAME_2.name)}&unit=armcom`,
+        [{ name: "armcom", fullName: "Commander" }],
+      );
+      expect(screen.queryByText("Sky Fortress")).toBeNull();
+    });
+
+    /**
+     * The usual case once the game's read catches up. `units/<name>.lua` is a
+     * file in the game, so the engine reads it and the def table already has
+     * the unit. It is still attributed, and the definition on the page is the
+     * game's own, because the export writes that file once and then leaves it
+     * alone for hand editing.
+     */
+    it("attributes a unit the game's own read already has", () => {
+      mockLegoProjects = [legoProject()];
+      show(
+        { armcom: ARMCOM, skyfort: { ...SKYFORT, maxdamage: 9000 } },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+        [{ name: "armcom", fullName: "Commander" }],
+      );
+      expect(
+        screen.getByText(
+          /Built in the unit builder as Sky Fortress and exported into Test Game/,
+        ),
+      ).toBeTruthy();
+      expect(
+        (screen.getByLabelText("Health (old name)") as HTMLInputElement).value,
+      ).toBe("9000");
+      // It is the game's unit, not one this page put up, so nothing calls it a
+      // copy and nothing offers to delete it.
+      expect(screen.queryByText(/copied from/)).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Delete/ })).toBeNull();
+    });
+
+    /**
+     * The export never overwrites a `units/<name>.lua` that is already there,
+     * so a name the game uses leaves the game's own definition in place. The
+     * page must show that definition rather than the one the export generated.
+     */
+    it("does not stand its definition in front of the game's own", () => {
+      mockLegoProjects = [
+        legoProject({
+          exported: {
+            dir: GAME.primaryArchive.path,
+            at: "",
+            unitName: "armcom",
+            def: SKYFORT,
+          },
+        }),
+      ];
+      show(
+        { armcom: ARMCOM },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+        [{ name: "armcom", fullName: "Commander" }],
+      );
+      expect((healthBox() as HTMLInputElement).value).toBe("3000");
+      expect(screen.queryByText(/in place of the game's own/)).toBeNull();
+    });
+
+    it("goes on a factory's build menu like any other unit", async () => {
+      mockLegoProjects = [legoProject()];
+      mockSides = [{ name: "Arm", startUnit: "armcom" }];
+      show(
+        { armlab: ARMLAB, armcom: ARMCOM },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armlab`,
+        [
+          { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
+          { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
+          { name: "armpw", fullName: "Peewee" },
+          { name: "armrock", fullName: "Rocko" },
+          { name: "armham", fullName: "Hammer" },
+        ],
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Add a unit to this menu/ }),
+      );
+      const popover = await waitFor(() => {
+        const found = document.querySelector('[data-slot="popover-content"]');
+        if (!found) throw new Error("the picker did not open");
+        return found as HTMLElement;
+      });
+      fireEvent.click(
+        within(popover).getByRole("button", { name: /Sky Fortress/ }),
+      );
+
+      expect(screen.getByText(/1 build menu edit/)).toBeTruthy();
+      expect(
+        screen.getByLabelText("Remove Sky Fortress from this build menu"),
+      ).toBeTruthy();
+    });
+  });
+
+  /**
+   * Issue #2651's other half. A movement class names an entry in the game's own
+   * move definitions, so it is picked out of what this game's units already
+   * move on rather than typed against a file nobody has open.
+   */
+  describe("the movement class", () => {
+    /**
+     * Keyed the way Balanced Annihilation writes them, all lower case, which
+     * is not how the engine's registry spells the same field. The two must
+     * resolve to one row reading the game's own value: keying this picker off
+     * the registry's spelling drew an empty box over a unit that had a class.
+     */
+    const GROUND: Record<string, Record<string, unknown>> = {
+      armcom: ARMCOM,
+      armpw: { name: "armpw", canmove: true, movementclass: "ARMCOMKBOT" },
+      armstump: { name: "armstump", canmove: true, movementclass: "TANKSMALL" },
+      armrock: { name: "armrock", canmove: true, movementclass: "ARMCOMKBOT" },
+    };
+
+    const openPeewee = () =>
+      show(
+        GROUND,
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armpw`,
+        [{ name: "armpw", fullName: "Peewee" }],
+      );
+
+    it("is picked from the classes this game's units move on", () => {
+      openPeewee();
+      const picker = screen.getByLabelText(
+        "Movement class",
+      ) as HTMLSelectElement;
+      expect([...picker.options].map((o) => o.value)).toEqual([
+        "ARMCOMKBOT",
+        "TANKSMALL",
+      ]);
+      expect(picker.value).toBe("ARMCOMKBOT");
+    });
+
+    it("writes a pick as an ordinary override that resets", () => {
+      openPeewee();
+      const picker = screen.getByLabelText(
+        "Movement class",
+      ) as HTMLSelectElement;
+      fireEvent.change(picker, { target: { value: "TANKSMALL" } });
+      expect(screen.getByText("1 change")).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText(/^Reset Movement class/));
+      expect(
+        (screen.getByLabelText("Movement class") as HTMLSelectElement).value,
+      ).toBe("ARMCOMKBOT");
+      expect(screen.queryByText("1 change")).toBeNull();
+    });
+
+    /**
+     * The failure #663 recorded, said where the class is picked instead of
+     * leaving the user with a unit that is silently not in the game.
+     */
+    it("says nothing about a unit whose two halves agree", () => {
+      openPeewee();
+      expect(screen.queryByText(/drops it at load/)).toBeNull();
+      expect(screen.queryByText(/no effect until Can move is on/)).toBeNull();
+    });
+
+    it("warns that a moving unit with no class is dropped at load", () => {
+      show(
+        { ...GROUND, armflea: { name: "armflea", canMove: true } },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armflea`,
+        [{ name: "armflea", fullName: "Flea" }],
+      );
+      expect(screen.getByText(/drops it at load/)).toBeTruthy();
+    });
+
+    /** The quieter half: a class nothing will ever read. */
+    it("warns that a class on a unit that does not move has no effect", () => {
+      show(
+        { ...GROUND, armtl: { name: "armtl", movementClass: "TANKSMALL" } },
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armtl`,
+        [{ name: "armtl", fullName: "Torpedo Launcher" }],
+      );
+      expect(screen.getByText(/no effect until Can move is on/)).toBeTruthy();
+    });
+
+    /**
+     * A built unit is why this matters. It arrives static, because the builder
+     * has no game to name a class out of, and picking one here is the edit that
+     * turns it into a unit somebody can drive (issues #663 and #2651).
+     */
+    it("is the field a built unit arrives without", () => {
+      mockLegoProjects = [
+        {
+          schemaVersion: LEGO_SCHEMA_VERSION,
+          id: "proj-1",
+          name: "Sky Fortress",
+          unitName: "skyfort",
+          packId: "lego",
+          packVersion: "1",
+          createdAt: "",
+          updatedAt: "",
+          rootPieceId: "root",
+          pieces: [],
+          exported: {
+            dir: GAME.primaryArchive.path,
+            at: "",
+            unitName: "skyfort",
+            def: { name: "Sky Fortress", maxdamage: 1000, canmove: false },
+          },
+        },
+      ];
+      show(
+        GROUND,
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+        [{ name: "armpw", fullName: "Peewee" }],
+      );
+
+      // The definition names no class, so without this the relevant view would
+      // hide the row and the fix with it.
+      const picker = screen.getByLabelText(
+        "Movement class",
+      ) as HTMLSelectElement;
+      expect([...picker.options].map((o) => o.value)).toEqual([
+        "ARMCOMKBOT",
+        "TANKSMALL",
+      ]);
+
+      fireEvent.change(picker, { target: { value: "TANKSMALL" } });
+      expect(screen.getByText(/no effect until Can move is on/)).toBeTruthy();
+      fireEvent.click(screen.getByLabelText("Can move"));
+      expect(screen.queryByText(/no effect until Can move is on/)).toBeNull();
+      expect(screen.queryByText(/drops it at load/)).toBeNull();
     });
   });
 });

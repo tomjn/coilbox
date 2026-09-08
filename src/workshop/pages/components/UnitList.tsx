@@ -25,7 +25,7 @@
 import { cn, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import type { BuildMenus } from "../../buildMenus";
-import type { UnitClones } from "../../clones";
+import type { CloneOrigin, UnitClones } from "../../clones";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
 import type { UnitOverrides } from "../../overrides";
 import { type UnitTextEdits, unitTextCount } from "../../unitText";
@@ -43,6 +43,7 @@ export function UnitList({
   overrides,
   text,
   clones,
+  builtBy,
   menus,
   disabled,
   nameOf,
@@ -56,6 +57,8 @@ export function UnitList({
    *  count towards a unit's mark the same way an override does (issue #2650). */
   text: UnitTextEdits;
   clones: UnitClones;
+  /** Which units came out of the lego builder, keyed by unit (issue #2651). */
+  builtBy?: Record<string, CloneOrigin>;
   /** The build menus the project changes, keyed by builder (issue #1274). */
   menus: BuildMenus;
   /** The units the project switches off (issue #2649). */
@@ -143,17 +146,32 @@ export function UnitList({
                         off
                       </span>
                     )}
-                    {clone && (
+                    {/* A unit out of the lego builder is marked as built
+                      rather than added, whether or not the game's read has
+                      caught up with it (issue #2651). Its own chip because it
+                      answers a different question: not "did I add this here"
+                      but "is this one of mine at all", which in a game with
+                      hundreds of units is the only way to find it again. */}
+                    {builtBy?.[u.key] ? (
                       <span
                         className="rounded-full border border-border px-1.5 text-[10px] font-medium text-muted-foreground"
-                        title={
-                          clone.replacesGameUnit
-                            ? `Your copy of ${clone.source}, standing in for the game's own`
-                            : `A unit you added, copied from ${clone.source}`
-                        }
+                        title={`Built in the unit builder as ${builtBy[u.key].projectName} and exported into this game`}
                       >
-                        {clone.replacesGameUnit ? "replaced" : "added"}
+                        built
                       </span>
+                    ) : (
+                      clone && (
+                        <span
+                          className="rounded-full border border-border px-1.5 text-[10px] font-medium text-muted-foreground"
+                          title={
+                            clone.replacesGameUnit
+                              ? `Your copy of ${clone.source}, standing in for the game's own`
+                              : `A unit you added, copied from ${clone.source}`
+                          }
+                        >
+                          {clone.replacesGameUnit ? "replaced" : "added"}
+                        </span>
+                      )
                     )}
                     {menuEdits > 0 && (
                       <span

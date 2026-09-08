@@ -37,6 +37,14 @@
  * fifth store at all: its rename is an ordinary override on `name` or
  * `humanName` (issue #2650, and `unitText.ts`).
  *
+ * A unit built in the lego builder and exported into this game's folder joins
+ * the clones, because it is the same thing: a whole definition the game will
+ * read that the game did not ship. It is not held in any store, though, since
+ * the file is already in the game whether this page is open or not, so it is
+ * derived from the lego projects each render (issue #2651, and `legoUnits.ts`).
+ * That is also what answers #663: the unit reaching the clone table is the unit
+ * reaching the build menu editor, with nothing built twice for it.
+ *
  * Both the clones and the overrides are kept per game, keyed by the same
  * `gameName` the `?game=` param and the picker already use to say which game
  * is open. An override is a patch against one game's own unit table, so it
@@ -62,6 +70,7 @@ import {
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { useLegoProjects } from "@/lego/projects";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
 import {
   addToBuildMenu,
@@ -87,10 +96,17 @@ import {
   isUnitDisabled,
   setUnitDisabled,
 } from "../disabled";
+import { withLegoUnits } from "../legoUnits";
+import {
+  asksAboutMovement,
+  moveClassesOf,
+  moveClassProblem,
+} from "../moveClasses";
 import {
   clearOverride,
   clearUnit,
   overrideCount,
+  resolvedDef,
   setOverride,
   type UnitOverrides,
 } from "../overrides";
@@ -112,6 +128,7 @@ import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
+import type { FieldChoices } from "./components/UnitFieldRow";
 import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
 
@@ -257,12 +274,33 @@ export default function UnitPage() {
   // game's table, so it has no meaning under another game, and the browser
   // would be showing units that game has never heard of.
   const [added, setAdded] = useState<Record<string, UnitClones>>({});
-  const clones = added[gameName] ?? NO_CLONES;
+  const ownClones = added[gameName] ?? NO_CLONES;
   const updateClones = useCallback(
     (update: (current: UnitClones) => UnitClones) =>
       setAdded((all) => ({ ...all, [gameName]: update(all[gameName] ?? {}) })),
     [gameName],
   );
+
+  const gameUnits = defs?.units ?? NO_UNITS;
+
+  // Every unit built in the lego builder and exported into this game's folder
+  // (issue #2651). Derived rather than seeded into the state above, for the
+  // reason `legoUnits.ts` gives: a lego unit is a file already sitting in the
+  // game, so it is a fact to read each time rather than an edit somebody made
+  // on this page and could lose. Mostly it only attributes a unit the game's
+  // own read already has, since the exported file is a file in the game.
+  const { projects: legoProjects } = useLegoProjects();
+  const built = useMemo(
+    () =>
+      withLegoUnits(
+        ownClones,
+        legoProjects,
+        game?.primaryArchive.path,
+        gameUnits,
+      ),
+    [ownClones, legoProjects, game, gameUnits],
+  );
+  const clones = built.clones;
 
   // The curated dataset describes the game's units, so it is not asked about
   // one of ours: a copy that stands in for `armcom` would otherwise be handed
@@ -279,7 +317,6 @@ export default function UnitPage() {
     [named, clones, overrides, text],
   );
 
-  const gameUnits = defs?.units ?? NO_UNITS;
   const units = useMemo(
     () => unitsWithClones(gameUnits, clones),
     [gameUnits, clones],
@@ -316,10 +353,50 @@ export default function UnitPage() {
       : undefined;
   const unit = units[unitKey];
   const clone = clones[unitKey];
-  const fields = useMemo(
-    () => unitFieldView(unit, overrides, unitKey, view),
-    [unit, overrides, unitKey, view],
+  /** The lego project this unit came out of, when it came out of one. */
+  const builtBy = built.builtBy[unitKey];
+  // The unit as the page has it, edits and all. The movement fields need it
+  // because they are about each other, and both are usually the two somebody
+  // has just changed.
+  const edited = useMemo(
+    () => resolvedDef(unit, overrides[unitKey]),
+    [unit, overrides, unitKey],
   );
+  const fields = useMemo(
+    () =>
+      unitFieldView(
+        unit,
+        overrides,
+        unitKey,
+        view,
+        asksAboutMovement(edited) ? ["movementClass"] : [],
+      ),
+    [unit, overrides, unitKey, view, edited],
+  );
+
+  // What this game's units actually move on, so the class is picked out of a
+  // list rather than spelled from memory against a file nobody has open (issue
+  // #2651). Off the game's own table, never the one with our units in it: a
+  // built unit has nothing to say about which classes exist.
+  const moveClasses = useMemo(() => moveClassesOf(gameUnits), [gameUnits]);
+  const choices = useMemo((): Record<string, FieldChoices> | undefined => {
+    if (moveClasses.length === 0) return undefined;
+    return {
+      movementclass: {
+        placeholder: "Does not move",
+        unknownLabel: () => `No unit in ${gameName} moves on this`,
+        options: moveClasses.map((c) => ({
+          value: c.name,
+          label: c.name,
+          description: `${c.units} unit${c.units === 1 ? "" : "s"}`,
+        })),
+      },
+    };
+  }, [moveClasses, gameName]);
+  const warnings = useMemo(() => {
+    const problem = moveClassProblem(edited);
+    return problem ? { movementclass: problem } : undefined;
+  }, [edited]);
 
   // What the game's own localisation file calls its units, which for a game
   // like BAR is the only place a name or a description exists at all.
@@ -417,12 +494,17 @@ export default function UnitPage() {
   const edits = overrideCount(overrides) + textEditCount(text);
   const unitEdits =
     Object.keys(overrides[unitKey] ?? {}).length + unitTextCount(text, unitKey);
-  const addedCount = Object.keys(clones).length;
+  // Only the ones copied here. A unit the lego builder exported is already a
+  // file in the game folder, so counting it as an unsaved change would make the
+  // banner below claim work is at risk that is not.
+  const addedCount = Object.keys(ownClones).length;
+  const builtCount = Object.keys(built.builtBy).length;
   const menuEdits = buildMenuOpCount(menus);
   const offCount = disabled.length;
   const unitDisabled = isUnitDisabled(disabled, unitKey);
   const anythingChanged =
     edits > 0 || addedCount > 0 || menuEdits > 0 || offCount > 0;
+  const anythingToShow = anythingChanged || builtCount > 0;
 
   /** Copy the selected unit, as the project has it, under a new name. */
   const createClone = (key: string, displayName: string, replaces: boolean) => {
@@ -481,12 +563,14 @@ export default function UnitPage() {
             onValueChange={(name) => select({ game: name, unit: "" })}
             options={games.map((g) => ({ value: g.name, label: g.name }))}
           />
-          {anythingChanged && (
+          {anythingToShow && (
             <span className="text-xs text-muted-foreground">
               {[
                 edits > 0 && `${edits} change${edits === 1 ? "" : "s"}`,
                 addedCount > 0 &&
                   `${addedCount} unit${addedCount === 1 ? "" : "s"} added`,
+                builtCount > 0 &&
+                  `${builtCount} built unit${builtCount === 1 ? "" : "s"}`,
                 menuEdits > 0 &&
                   `${menuEdits} build menu edit${menuEdits === 1 ? "" : "s"}`,
                 offCount > 0 &&
@@ -518,6 +602,20 @@ export default function UnitPage() {
           <AlertDescription>
             They live in this page for as long as it is open. Saving a tweak
             project to disk is still to come.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {built.conflicts.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTitle>
+            {built.conflicts.length} built unit
+            {built.conflicts.length === 1 ? " is" : "s are"} not shown
+          </AlertTitle>
+          <AlertDescription>
+            {built.conflicts.join(", ")} exported into {game?.name} under a name
+            another unit here already uses. Rename the unit in the builder and
+            export again, or take the other one out.
           </AlertDescription>
         </Alert>
       )}
@@ -568,6 +666,7 @@ export default function UnitPage() {
             overrides={overrides}
             text={text}
             clones={clones}
+            builtBy={built.builtBy}
             menus={menus}
             disabled={disabled}
             nameOf={nameOf}
@@ -586,12 +685,22 @@ export default function UnitPage() {
                   <span className="font-mono text-xs text-muted-foreground">
                     {unitKey}
                   </span>
-                  {clone && (
-                    <span className="text-xs text-muted-foreground">
-                      {clone.replacesGameUnit
-                        ? `Yours, copied from ${clone.source}, in place of the game's own`
-                        : `Yours, copied from ${clone.source}`}
+                  {builtBy ? (
+                    <span className="max-w-prose text-xs text-muted-foreground">
+                      Built in the unit builder as {builtBy.projectName} and
+                      exported into {game.name}
+                      {clone
+                        ? ". Not in this game's definitions yet, so this is what the export wrote."
+                        : ""}
                     </span>
+                  ) : (
+                    clone && (
+                      <span className="max-w-prose text-xs text-muted-foreground">
+                        {clone.replacesGameUnit
+                          ? `Yours, copied from ${clone.source}, in place of the game's own`
+                          : `Yours, copied from ${clone.source}`}
+                      </span>
+                    )
                   )}
                   {unitDisabled && (
                     // Capped, or the sentence sets the width of the column it
@@ -621,7 +730,10 @@ export default function UnitPage() {
                     nameOf={nameOf}
                     onCreate={createClone}
                   />
-                  {clone && (
+                  {/* Only a unit copied here. Taking a built one out would
+                    have to delete a file in the game folder, which is the
+                    builder's export to undo and not this page's. */}
+                  {clone && !clone.origin && (
                     <DeleteCloneButton
                       name={nameOf(unitKey, unit)}
                       edits={unitEdits}
@@ -713,7 +825,17 @@ export default function UnitPage() {
                   view={fields}
                   consumers={consumers}
                   assets={assets}
-                  inheritedLabel={clone ? "Copied value" : undefined}
+                  choices={choices}
+                  warnings={warnings}
+                  inheritedLabel={
+                    clone
+                      ? clone.origin
+                        ? "Exported value"
+                        : "Copied value"
+                      : builtBy
+                        ? "Value in the game"
+                        : undefined
+                  }
                   onChange={(row, value) =>
                     updateOverrides((o) =>
                       setOverride(o, unitKey, row.path, value, row.inherited),
