@@ -140,10 +140,11 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
       {
         id: "classification",
         label: "Classification",
+        // `name`, `humanName` and `description` used to head this list. They
+        // now have a panel of their own at the top of the page, for the reason
+        // {@link OWN_EDITOR} gives, and placing a path this module never draws
+        // would only leave somebody looking for the row it promises.
         paths: [
-          "name",
-          "humanName",
-          "description",
           "category",
           "noChaseCategory",
           "decoyFor",
@@ -583,8 +584,19 @@ export function presentPaths(
  * with add, remove and reorder on it (issue #1274). Left in the field list as
  * well it would be a second, worse way to say the same thing: a read-only blob
  * of JSON beside a control that already shows the same list in order.
+ *
+ * `name`, `humanname` and `description` have a panel of their own for a
+ * stronger reason (issue #2650). For a game that names its units in a
+ * localisation file rather than in its defs, a `name` row here would be an
+ * empty box that writes a key the game never reads. The panel knows where the
+ * game keeps its names and this list cannot, so the list stops offering them.
  */
-const OWN_EDITOR = new Set(["buildoptions"]);
+export const OWN_EDITOR = new Set([
+  "buildoptions",
+  "name",
+  "humanname",
+  "description",
+]);
 
 /** Which view of the field list the page is showing. */
 export type FieldView = "relevant" | "all";
