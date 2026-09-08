@@ -35,6 +35,13 @@
  * a clean project nobody has looked at yet. `ScenarioEditPage`'s own problems
  * button reads the same way, live off the document rather than gated on a
  * drawer.
+ *
+ * The change ledger (issue #2653) is last, beside preflight rather than
+ * folded into the verdict: it does not say whether the project is fit to
+ * use, it says where each of its edits went once compiled, which is only
+ * worth reading once you already know something is wrong. It is read only
+ * while the drawer is open, unlike preflight, since nothing on the toolbar
+ * face depends on it.
  */
 import { Button, Drawer } from "@picoframe/frame";
 import {
@@ -45,6 +52,8 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -52,11 +61,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ConfigOption } from "@/content/bindings";
+import type { ChangeLedger, LedgerChange } from "../../changeLedger";
+import { ledgerByOutput, useChangeLedger } from "../../changeLedger";
 import type { CompatFinding, CompatState } from "../../compatibility";
 import { deliveryRoutes } from "../../deliveryRoutes";
 import type { PreflightReport } from "../../preflight";
 import { usePreflightReport } from "../../preflight";
 import type { ModProject } from "../../project";
+import { projectPath } from "../../routes";
 
 /** One labelled group of preflight lines, styled by what the group means.
  *  Kept apart from the other two groups on purpose: a blocker that stops an
@@ -306,6 +318,183 @@ function PreflightSection({
   );
 }
 
+/** What to say about where a change landed, or why it did not, under its
+ *  description: the file(s) it reached, the BAR slot when the trace could
+ *  place it, and the reason when it could not reach anything at all. */
+function ChangeDestination({ change }: { change: LedgerChange }) {
+  const parts: string[] = [...change.files];
+  if (change.barSlot) parts.push(`!bset ${change.barSlot.label}`);
+  else if (change.barMiss === "oversized")
+    parts.push("too big for any BAR slot");
+  else if (change.barMiss === "unplaced")
+    parts.push("no BAR slot left to hold it");
+  else if (change.barMiss === "unresolved")
+    parts.push("BAR slot not traced for this project");
+  if (change.uncompiledReason) parts.push(change.uncompiledReason);
+  if (parts.length === 0) return null;
+  return (
+    <span className="font-mono text-[10px] text-muted-foreground">
+      {parts.join(" · ")}
+    </span>
+  );
+}
+
+/** One traced change, linking back to the unit and, where it names one, the
+ *  field it came from (issue #2653): a real link that takes you to the row
+ *  rather than a name you then have to search the field list for. */
+function ChangeLink({
+  projectId,
+  unit,
+  change,
+}: {
+  projectId: string;
+  unit: string;
+  change: LedgerChange;
+}) {
+  return (
+    <li className="flex flex-col gap-0.5">
+      <Link
+        to={projectPath(projectId, unit, change.fieldPath ?? undefined)}
+        className="text-xs text-primary hover:underline"
+      >
+        {change.description}
+      </Link>
+      <ChangeDestination change={change} />
+    </li>
+  );
+}
+
+/**
+ * What this project's edits compiled into, unit by unit or output by output
+ * (issue #2653).
+ *
+ * Both views draw off the one trace `useChangeLedger` reads, because both
+ * are real questions and neither answers the other. Grouped by unit is what
+ * the issue asks for and what somebody tuning one unit's numbers wants: "what
+ * did I just do to armcom". Grouped by output is what somebody holding a
+ * broken file or a lobby slot wants: "what is in units/supercom.lua",
+ * without first working out which of thirty units it might be. A file or a
+ * lobby slot is the thing in your hand when the game is wrong, so it gets
+ * its own view rather than being left for someone to reconstruct by reading
+ * every unit's row.
+ */
+function ChangeLedgerSection({
+  projectId,
+  ledger,
+  loading,
+  error,
+}: {
+  projectId: string | undefined;
+  ledger: ChangeLedger | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const [view, setView] = useState<"unit" | "output">("unit");
+  const units = ledger?.units.filter((u) => u.changes.length > 0) ?? [];
+  const totalChanges = units.reduce((n, u) => n + u.changes.length, 0);
+
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-medium text-sm">Change ledger</h3>
+        {totalChanges > 0 && (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={view}
+            onValueChange={(v) => v && setView(v as "unit" | "output")}
+            aria-label="Group the change ledger by"
+          >
+            <ToggleGroupItem value="unit">By unit</ToggleGroupItem>
+            <ToggleGroupItem value="output">By output</ToggleGroupItem>
+          </ToggleGroup>
+        )}
+      </div>
+      {!projectId ? (
+        <p className="text-muted-foreground text-sm">
+          No project is open yet, so there is nothing to trace.
+        </p>
+      ) : error ? (
+        <p className="text-destructive text-sm">
+          The change ledger could not be built: {error}
+        </p>
+      ) : !ledger ? (
+        <p className="text-muted-foreground text-sm">
+          {loading ? "Tracing…" : "Not traced yet."}
+        </p>
+      ) : totalChanges === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          This project changes nothing yet, so there is nothing to trace.
+        </p>
+      ) : view === "unit" ? (
+        <ul className="flex flex-col gap-2">
+          {units.map((unitLedger) => (
+            <li
+              key={unitLedger.unit}
+              className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2.5"
+            >
+              <Link
+                to={projectPath(projectId, unitLedger.unit)}
+                className="font-mono text-xs font-medium hover:underline"
+              >
+                {unitLedger.unit}
+              </Link>
+              <ul className="flex flex-col gap-1.5 pl-2">
+                {unitLedger.changes.map((change) => (
+                  <ChangeLink
+                    key={`${change.description}:${change.fieldPath ?? ""}`}
+                    projectId={projectId}
+                    unit={unitLedger.unit}
+                    change={change}
+                  />
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {ledgerByOutput(ledger).map((row) => (
+            <li
+              key={row.key}
+              className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2.5"
+            >
+              <span className="font-mono text-xs font-medium">{row.label}</span>
+              <ul className="flex flex-col gap-1.5 pl-2">
+                {row.entries.map(({ unit, change }) => (
+                  <li key={`${unit}:${change.description}`} className="text-xs">
+                    <Link
+                      to={projectPath(
+                        projectId,
+                        unit,
+                        change.fieldPath ?? undefined,
+                      )}
+                      className="text-primary hover:underline"
+                    >
+                      {unit}
+                    </Link>
+                    : {change.description}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+      {ledger && ledger.notes.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {ledger.notes.map((note) => (
+            <li key={note} className="text-xs text-muted-foreground">
+              {note}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /**
  * A few words on what was found, or null when there is nothing to say.
  * Blockers lead because they are the one severity that would reach the game
@@ -362,6 +551,9 @@ export function ChecksButton({
   // Read whenever a project is open, not only while the drawer is up: see
   // the module doc comment for why the button needs a live answer.
   const preflight = usePreflightReport(project, true);
+  // Only while the drawer is open: see the module doc comment for why the
+  // change ledger does not need the same always-on read preflight does.
+  const changeLedger = useChangeLedger(project, open);
 
   // A reference that names nothing is blocker-grade even though it stops no
   // export: the project compiles, ships, and then does not do what it says.
@@ -435,7 +627,7 @@ export function ChecksButton({
         open={open}
         onOpenChange={setOpen}
         title="Checks"
-        description={`Whether ${gameName} is in a fit state to use: the game's own definitions, whether the project still fits them, how an edit reaches it, and what is wrong with what you have written.`}
+        description={`Whether ${gameName} is in a fit state to use: the game's own definitions, whether the project still fits them, how an edit reaches it, what is wrong with what you have written, and which output each edit ended up in.`}
         width="34rem"
       >
         <div className="flex flex-col gap-5">
@@ -455,6 +647,12 @@ export function ChecksButton({
             report={preflight.report}
             loading={preflight.loading}
             error={preflight.error}
+          />
+          <ChangeLedgerSection
+            projectId={project?.id}
+            ledger={changeLedger.ledger}
+            loading={changeLedger.loading}
+            error={changeLedger.error}
           />
         </div>
       </Drawer>

@@ -10,13 +10,16 @@
  * drawer sees.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let preflightResponse: unknown = { blockers: [], review: [], passes: [] };
+let changeLedgerResponse: unknown = { units: [], notes: [] };
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
     (_plugin: string, command: string) => async (_args: unknown) => {
       if (command === "workshop_preflight") return preflightResponse;
+      if (command === "workshop_change_ledger") return changeLedgerResponse;
       throw new Error(`unexpected command ${command}`);
     },
 }));
@@ -37,22 +40,25 @@ const project: ModProject = {
 afterEach(() => {
   cleanup();
   preflightResponse = { blockers: [], review: [], passes: [] };
+  changeLedgerResponse = { units: [], notes: [] };
 });
 
 /** The single toolbar button, whichever state it is asked to render in. */
 function renderButton(props: Partial<Parameters<typeof ChecksButton>[0]> = {}) {
   return render(
-    <ChecksButton
-      gameName="Balanced Annihilation V15.9.8"
-      diagnosticErrors={[]}
-      diagnosticsChecking={false}
-      routeOptions={[]}
-      routesChecking={false}
-      project={undefined}
-      compatibility={null}
-      onApplyFix={() => {}}
-      {...props}
-    />,
+    <MemoryRouter>
+      <ChecksButton
+        gameName="Balanced Annihilation V15.9.8"
+        diagnosticErrors={[]}
+        diagnosticsChecking={false}
+        routeOptions={[]}
+        routesChecking={false}
+        project={undefined}
+        compatibility={null}
+        onApplyFix={() => {}}
+        {...props}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -110,7 +116,7 @@ describe("the checks button", () => {
   });
 
   describe("the drawer", () => {
-    it("orders its sections definitions, compatibility, routes, then preflight", async () => {
+    it("orders its sections definitions, compatibility, routes, preflight, then the change ledger", async () => {
       renderButton({
         diagnosticErrors: ["could not read units/armcom.lua"],
       });
@@ -123,6 +129,7 @@ describe("the checks button", () => {
         "Still fits Balanced Annihilation V15.9.8",
         "Delivery routes",
         "Preflight",
+        "Change ledger",
       ]);
     });
 
@@ -294,6 +301,128 @@ describe("the checks button", () => {
           "No project is open yet, so there is nothing compiled to check.",
         ),
       ).toBeTruthy();
+    });
+
+    /**
+     * The change ledger (issue #2653). `ledger.rs`'s own Rust tests own
+     * whether a trace is right. This is about whether a person reading the
+     * drawer can follow it back to the unit it came from.
+     */
+    describe("change ledger", () => {
+      it("says there is nothing to trace when no project is open", () => {
+        renderButton({ diagnosticErrors: ["could not read units/armcom.lua"] });
+        fireEvent.click(screen.getByRole("button", { name: /to review/ }));
+        expect(
+          screen.getByText(
+            "No project is open yet, so there is nothing to trace.",
+          ),
+        ).toBeTruthy();
+      });
+
+      it("links a traced change back to the unit and field it came from", async () => {
+        changeLedgerResponse = {
+          units: [
+            {
+              unit: "armcom",
+              changes: [
+                {
+                  description: "Field change: maxDamage",
+                  fieldPath: "maxDamage",
+                  files: ["gamedata/unitdefs_post.lua"],
+                  barSlot: { kind: "tweakunits", label: "tweakunits" },
+                  barMiss: null,
+                  uncompiledReason: null,
+                },
+              ],
+            },
+          ],
+          notes: [],
+        };
+        renderButton({ project });
+        fireEvent.click(
+          await screen.findByRole("button", { name: "No problems found" }),
+        );
+        const link = await screen.findByRole("link", {
+          name: "Field change: maxDamage",
+        });
+        expect(link.getAttribute("href")).toBe(
+          "/workshop/p1?unit=armcom&field=maxDamage",
+        );
+        expect(screen.getByText(/gamedata\/unitdefs_post\.lua/)).toBeTruthy();
+        expect(screen.getByText(/!bset tweakunits/)).toBeTruthy();
+      });
+
+      it("says why a change reached no BAR slot", async () => {
+        changeLedgerResponse = {
+          units: [
+            {
+              unit: "armcom",
+              changes: [
+                {
+                  description: "Switched off",
+                  fieldPath: null,
+                  files: ["gamedata/unitdefs_post.lua"],
+                  barSlot: null,
+                  barMiss: "oversized",
+                  uncompiledReason: null,
+                },
+              ],
+            },
+          ],
+          notes: [],
+        };
+        renderButton({ project });
+        fireEvent.click(
+          await screen.findByRole("button", { name: "No problems found" }),
+        );
+        expect(
+          await screen.findByText(/too big for any BAR slot/),
+        ).toBeTruthy();
+      });
+
+      it("switches to the by-output view and groups changes under the file that carries them", async () => {
+        changeLedgerResponse = {
+          units: [
+            {
+              unit: "armflash",
+              changes: [
+                {
+                  description: "Switched off",
+                  fieldPath: null,
+                  files: ["gamedata/unitdefs_post.lua"],
+                  barSlot: { kind: "tweakdefs", label: "tweakdefs" },
+                  barMiss: null,
+                  uncompiledReason: null,
+                },
+              ],
+            },
+            {
+              unit: "armrock",
+              changes: [
+                {
+                  description: "Switched off",
+                  fieldPath: null,
+                  files: ["gamedata/unitdefs_post.lua"],
+                  barSlot: { kind: "tweakdefs", label: "tweakdefs" },
+                  barMiss: null,
+                  uncompiledReason: null,
+                },
+              ],
+            },
+          ],
+          notes: [],
+        };
+        renderButton({ project });
+        fireEvent.click(
+          await screen.findByRole("button", { name: "No problems found" }),
+        );
+        await screen.findByText("Change ledger");
+        fireEvent.click(screen.getByRole("radio", { name: "By output" }));
+        const fileRow = screen.getByText("gamedata/unitdefs_post.lua");
+        const container = fileRow.closest("li");
+        expect(container?.textContent).toContain("armflash");
+        expect(container?.textContent).toContain("armrock");
+      });
     });
   });
 });

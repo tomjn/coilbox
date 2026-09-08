@@ -439,6 +439,39 @@ describe("UnitPage", () => {
   });
 
   /**
+   * The change ledger's own link back to a field (issue #2653): `?field=`
+   * scrolls to the row rather than leaving somebody to search the field
+   * list for a path they were handed by name.
+   */
+  describe("a link naming a field", () => {
+    let scrolled: Element[] = [];
+
+    beforeEach(() => {
+      scrolled = [];
+      vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(
+        function (this: Element) {
+          scrolled.push(this);
+        },
+      );
+    });
+
+    it("scrolls to the row for the named field", () => {
+      show(
+        { armcom: ARMCOM },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom&field=metalCost`,
+      );
+      const row = document.getElementById("field-metalCost");
+      expect(row).not.toBeNull();
+      expect(scrolled).toEqual([row]);
+    });
+
+    it("scrolls to nothing when the route names no field", () => {
+      show();
+      expect(scrolled).toEqual([]);
+    });
+  });
+
+  /**
    * The defect a screenshot of BAR caught: every row read `armaak` twice, once
    * as the title and once as the key beneath it. BAR writes no name of any kind
    * in a unit def, so the name has to come from the read that can answer for it.

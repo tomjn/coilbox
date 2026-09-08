@@ -288,6 +288,12 @@ export function UnitFieldRow({
 
   return (
     <div
+      // Named for the change ledger's own link back to the field (issue
+      // #2653): a row a broken change traces to is something a link can
+      // scroll to rather than a path somebody then has to search this list
+      // for. The path rather than the label, because it is unique and it is
+      // what the ledger already carries.
+      id={`field-${row.path}`}
       className={cn(
         "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
         tall ? "items-start" : "items-center",
