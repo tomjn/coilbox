@@ -237,7 +237,8 @@ describe("withLegoUnits", () => {
         sourceDef: ARMCOM,
         displayName: "My Fort",
         replacesGameUnit: false,
-      }),
+        home: "def",
+      }).clone,
     );
     const { clones: out, conflicts } = withLegoUnits(
       mine,

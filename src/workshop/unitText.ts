@@ -65,9 +65,12 @@ export type UnitTextEdits = Record<string, Partial<Record<TextField, string>>>;
  * file for the few units its defs leave blank.
  *
  * Pass the game's own unit table, never the table with the project's copies
- * merged in: a copy always carries a `humanName` of its own (see `clones.ts`),
- * so one copy in Beyond All Reason would otherwise flip the whole game over to
- * a home its 564 units do not use.
+ * merged in. A copy made in a language home carries no readable name of its own
+ * any more (issue #2673), but one made before that rule does, as does any copy
+ * in a def home and any unit the lego builder exported, and one of those in
+ * Beyond All Reason would otherwise flip the whole game over to a home its 564
+ * units do not use. The answer is a fact about the game either way, so it is
+ * asked of the game.
  */
 export function textHome(
   units: Record<string, Record<string, unknown>>,

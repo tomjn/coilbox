@@ -91,7 +91,13 @@ import {
   moveInBuildMenu,
   removeFromBuildMenu,
 } from "../buildMenus";
-import { addClone, deriveClone, removeClone, unitsWithClones } from "../clones";
+import {
+  addClone,
+  deriveClone,
+  migrateCloneText,
+  removeClone,
+  unitsWithClones,
+} from "../clones";
 import { useCustomParams, useUnitDefs } from "../config";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
@@ -260,7 +266,6 @@ export default function UnitPage() {
   const updateMenus = editing("menus");
   const updateText = editing("text");
   const updateDisabled = editing("disabled");
-  const updateClones = editing("clones");
 
   const [view, setView] = useState<FieldView>("relevant");
 
@@ -396,7 +401,10 @@ export default function UnitPage() {
     () => textHome(gameUnits, language),
     [gameUnits, language],
   );
-  const home = clone ? "def" : gameTextHome;
+  // The game's answer, for a unit we added as much as for one it shipped. A
+  // copy used to be told its name was in its own definition, which is where the
+  // engine reads one but not where Beyond All Reason does (issue #2673).
+  const home = gameTextHome;
   const textRows = useMemo(
     () =>
       unitTextRows({
@@ -409,6 +417,36 @@ export default function UnitPage() {
       }),
     [unitKey, unit, home, language, overrides, text],
   );
+
+  // A copy made before #2673 put its name in its own definition, which in a
+  // game like Beyond All Reason is a key nothing reads. Saved projects hold
+  // copies like that and nothing on this page looks wrong, because this page
+  // reads the definition, so the move happens on the first render that knows
+  // which home the game uses rather than waiting for the user to notice a name
+  // that is only wrong in the game. `migrateCloneText` answers `null` once
+  // there is nothing left to move, which is every render after the first, so
+  // the effect settles rather than writing again.
+  const pendingCloneText = useMemo(
+    () => migrateCloneText(ownClones, text, home, language),
+    [ownClones, text, home, language],
+  );
+  const migrateRef = useRef<() => void>(() => {});
+  migrateRef.current = () => {
+    commit((current) => {
+      const moved = migrateCloneText(
+        current.clones,
+        current.text,
+        home,
+        language,
+      );
+      if (!moved) return current;
+      const next = editSlot(current, "clones", () => moved.clones);
+      return editSlot(next, "text", () => moved.text);
+    });
+  };
+  useEffect(() => {
+    if (pendingCloneText) migrateRef.current();
+  }, [pendingCloneText]);
 
   /** Rename the unit, or rewrite its tooltip, wherever this game keeps them. */
   const commitText = (field: TextField, value: string) => {
@@ -525,22 +563,31 @@ export default function UnitPage() {
     counts.off > 0;
   const anythingToShow = anythingChanged || builtCount > 0;
 
-  /** Copy the selected unit, as the project has it, under a new name. */
+  /**
+   * Copy the selected unit, as the project has it, under a new name.
+   *
+   * Two stores in one commit, because in a game like Beyond All Reason the
+   * copy's name is not part of its definition: `deriveClone` hands back the
+   * definition and, separately, the words that belong in the localisation file
+   * instead. One commit so undo takes the copy and its name away together.
+   */
   const createClone = (key: string, displayName: string, replaces: boolean) => {
     if (!unit) return;
-    updateClones((current) =>
-      addClone(
-        current,
-        deriveClone({
-          key,
-          source: unitKey,
-          sourceDef: unit,
-          patch: overrides[unitKey],
-          displayName,
-          replacesGameUnit: replaces,
-        }),
-      ),
-    );
+    const { clone: made, text: words } = deriveClone({
+      key,
+      source: unitKey,
+      sourceDef: unit,
+      patch: overrides[unitKey],
+      displayName,
+      replacesGameUnit: replaces,
+      home,
+      language,
+    });
+    commit((current) => {
+      const next = editSlot(current, "clones", (c) => addClone(c, made));
+      if (Object.keys(words).length === 0) return next;
+      return editSlot(next, "text", (t) => ({ ...t, [key]: words }));
+    });
     select({ unit: key });
   };
 

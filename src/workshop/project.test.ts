@@ -79,7 +79,8 @@ function fullEdits(): GameEdits {
         patch: edits.overrides.armcom,
         displayName: "Super Commander",
         replacesGameUnit: false,
-      }),
+        home: "def",
+      }).clone,
     ),
   );
   // A build menu with the new unit on it and one entry moved.
