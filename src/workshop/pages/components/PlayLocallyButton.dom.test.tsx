@@ -28,23 +28,29 @@ const WORKSHOP_TEST_GAME = {
 };
 const MAP = { name: "Comet Catcher Redux" };
 
-const { primeScan, launch, workshopTestMutator } = vi.hoisted(() => ({
-  primeScan: vi.fn(async () => ({
-    games: [GAME, WORKSHOP_TEST_GAME],
-    maps: [MAP],
-  })),
-  launch: vi.fn(
-    async (
-      _kind: string,
-      _opts: { config: { gameType: string; modOptions: unknown } },
-    ) => ({ exitCode: 0 }),
-  ),
-  workshopTestMutator: vi.fn(async () => ({
-    dir: "/data/games/coilbox-workshop-test.sdd",
-    folder: "coilbox-workshop-test.sdd",
-    files: ["modinfo.lua"],
-  })),
-}));
+const { primeScan, launch, workshopTestMutator, workshopPreflight } =
+  vi.hoisted(() => ({
+    primeScan: vi.fn(async () => ({
+      games: [GAME, WORKSHOP_TEST_GAME],
+      maps: [MAP],
+    })),
+    launch: vi.fn(
+      async (
+        _kind: string,
+        _opts: { config: { gameType: string; modOptions: unknown } },
+      ) => ({ exitCode: 0 }),
+    ),
+    workshopPreflight: vi.fn(async () => ({
+      blockers: [] as string[],
+      review: [] as string[],
+      passes: [] as string[],
+    })),
+    workshopTestMutator: vi.fn(async () => ({
+      dir: "/data/games/coilbox-workshop-test.sdd",
+      folder: "coilbox-workshop-test.sdd",
+      files: ["modinfo.lua"],
+    })),
+  }));
 
 /** Reassigned per test, and read by the mocks below at call time. */
 let mockCompiled: {
@@ -97,6 +103,7 @@ vi.mock("@/play/config", () => ({
   }),
 }));
 vi.mock("../../mutator", () => ({ workshopTestMutator }));
+vi.mock("../../preflight", () => ({ workshopPreflight }));
 vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({
     value,
@@ -155,6 +162,8 @@ afterEach(() => {
   primeScan.mockClear();
   launch.mockClear();
   workshopTestMutator.mockClear();
+  workshopPreflight.mockClear();
+  workshopPreflight.mockResolvedValue({ blockers: [], review: [], passes: [] });
   mockCompiled = compiled({});
   mockGameInfoOptions = [];
 });
@@ -217,5 +226,24 @@ describe("PlayLocallyButton", () => {
     expect(primeScan).toHaveBeenCalledWith("/engines/105", "/data", true);
     const [, opts] = launch.mock.calls[0];
     expect(opts.config.gameType).toBe(WORKSHOP_TEST_GAME.name);
+  });
+
+  it("refuses to launch when preflight finds a blocker, before writing anything", async () => {
+    mockCompiled = compiled({
+      files: [{ path: "modinfo.lua", contents: "return {}" }],
+    });
+    workshopPreflight.mockResolvedValue({
+      blockers: ["supercom is defined by 2 copies"],
+      review: [],
+      passes: [],
+    });
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /play locally/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+    await vi.waitFor(() => expect(screen.getByText(/1 blocker/i)).toBeTruthy());
+    expect(screen.getByText(/supercom is defined by 2 copies/)).toBeTruthy();
+    expect(workshopTestMutator).not.toHaveBeenCalled();
+    expect(launch).not.toHaveBeenCalled();
   });
 });

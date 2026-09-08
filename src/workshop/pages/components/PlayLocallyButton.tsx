@@ -39,6 +39,7 @@ import { usePlay } from "@/play/PlayProvider";
 import { useCompiledProject } from "../../compile";
 import { barRouteAvailable, barTweakModOptions } from "../../localBar";
 import { workshopTestMutator } from "../../mutator";
+import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
 
 /** Random start position: a test needs a spawn, not a chosen one. */
@@ -155,6 +156,20 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
     const route = selectedRoute;
     setPhase({ state: "writing" });
     try {
+      // Nothing reaches the engine unchecked (issue #1276). A blocker is
+      // something that would reach the game broken, so it stops the launch
+      // here rather than being found out mid-game with the cause buried in
+      // an infolog.
+      const preflight = await workshopPreflight({ project });
+      if (preflight.blockers.length > 0) {
+        const [first, ...rest] = preflight.blockers;
+        setPhase({
+          state: "failed",
+          message: `${preflight.blockers.length} blocker${preflight.blockers.length === 1 ? "" : "s"} would reach the game broken: ${first}${rest.length > 0 ? ` (and ${rest.length} more)` : ""}`,
+        });
+        return;
+      }
+
       let gameType = game.name;
       let modOptions: Record<string, string> = {};
       let dir: string | null = null;
