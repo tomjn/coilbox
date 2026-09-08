@@ -18,6 +18,10 @@
  * small ones in the row and large ones in a drawer. `LuaTableValue` holds that
  * and the reasoning behind it (issue #2695).
  *
+ * A field that names a file in the game's archive draws it under the box, which
+ * `AssetPreview` holds and which is where the model, the picture and the way
+ * into the unit builder live (issue #2694).
+ *
  * A custom parameter also carries a note naming the Lua file that reads it
  * (issue #2661), which for most of them is the only thing on the page that says
  * what the value does.
@@ -40,6 +44,7 @@ import {
 import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldRow } from "../../unitSections";
 import { AssetPicker } from "./AssetPicker";
+import { AssetPreview } from "./AssetPreview";
 import { LuaTableValue } from "./LuaTableValue";
 
 /** Which editor a value gets, or none. */
@@ -246,6 +251,28 @@ export function UnitFieldRow({
     />
   );
 
+  // The one file the field names, once the archive has been found to hold it
+  // (issue #2694). Absent for a field with nothing written in it and for one
+  // whose path reaches nothing, where the warning below says so instead.
+  const preview = asset && assets && pointsAt?.member ? pointsAt.member : "";
+
+  /**
+   * Whether the value column holds more than a control's worth of height.
+   *
+   * Two of them now. A model viewport is 12rem (issue #2694) and a table shown
+   * where it stands is up to eight lines of Lua (issue #2695), and against
+   * either a centred label sits halfway down the row, a long way from the thing
+   * it names. Every other row is one control against a two-line label, which is
+   * what the centring is for.
+   *
+   * A table is counted whichever way it draws, rather than only when it draws
+   * inline. Knowing which it is means serialising it, and the row would be
+   * doing that for every table field on the page purely to choose an alignment.
+   * The other way it draws is a button the same height as an input, so on that
+   * one the two alignments are a pixel apart.
+   */
+  const tall = Boolean(preview) || isTable(row.value);
+
   const current = typeof row.value === "string" ? row.value.trim() : "";
   const options =
     choices && current && !choices.options.some((o) => o.value === current)
@@ -262,7 +289,8 @@ export function UnitFieldRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
+        "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
+        tall ? "items-start" : "items-center",
         overridden ? "border-l-primary bg-primary/5" : "border-l-transparent",
       )}
     >
@@ -353,6 +381,15 @@ export function UnitFieldRow({
           </div>
         ) : (
           input
+        )}
+        {/* The file the field names, drawn (issue #2694). */}
+        {preview && asset && assets && (
+          <AssetPreview
+            field={asset}
+            member={preview}
+            assets={assets}
+            label={row.label}
+          />
         )}
         {[missing, warning].filter(Boolean).map((text) => (
           <span
