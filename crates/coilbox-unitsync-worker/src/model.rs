@@ -763,6 +763,19 @@ pub struct UnitDefsOutput {
     /// the unit would simply be absent, with nothing to say whether the game
     /// ships it.
     pub unit_errors: Vec<String>,
+    /// What the game's `language/en/units.json` calls each unit, keyed by
+    /// lowercased def key.
+    ///
+    /// Empty for a game that names its units in its unitdefs, which is every
+    /// game here but Beyond All Reason. BAR writes no `name`, no `humanName`
+    /// and no `description` in any of its 564 unitdefs and keeps both in this
+    /// file instead, so an editor that only reads the def has nothing to show
+    /// and nothing to edit for the game most people are modding (issue #2650).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub language_names: BTreeMap<String, String>,
+    /// The `units.descriptions` beside them: the tooltip under the name.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub language_descriptions: BTreeMap<String, String>,
     /// Sync checksum (from GetPrimaryModChecksum), over the archive plus every
     /// dependency. Also this dataset's cache key.
     #[serde(skip_serializing_if = "Option::is_none")]
