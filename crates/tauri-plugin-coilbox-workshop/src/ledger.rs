@@ -750,4 +750,46 @@ mod tests {
             serde_json::to_string(&second).expect("json")
         );
     }
+
+    // -- the refusal: what happens when this module's own reconstruction
+    // does not match what `compile::compile` really produced. No real
+    // project can reach these paths while `categorize` and `compile::compile`
+    // agree, which every test above demonstrates they do, so the fallback
+    // itself is exercised directly rather than left to chance.
+
+    /// A chunk count that does not match `compile::compile`'s own is refused
+    /// rather than paired up positionally anyway.
+    #[test]
+    fn resolve_slots_refuses_to_guess_when_the_chunk_count_disagrees() {
+        let positions = vec![(PositionKey::Added, LuaForm::Table)];
+        let pack = bar_pack::pack(&[]);
+        assert!(resolve_slots(&positions, &[], &pack).is_none());
+    }
+
+    /// The counts can agree while the forms at a position do not, which is
+    /// just as much a sign this reconstruction has drifted.
+    #[test]
+    fn resolve_slots_refuses_to_guess_when_a_forms_disagree() {
+        let chunk = Chunk {
+            form: LuaForm::Block,
+            title: "1 unit added".to_string(),
+            reason: "test".to_string(),
+            lua: "do end".to_string(),
+        };
+        let chunks = [chunk];
+        let pack = bar_pack::pack(&chunks);
+        let positions = vec![(PositionKey::Added, LuaForm::Table)];
+        assert!(resolve_slots(&positions, &chunks, &pack).is_none());
+    }
+
+    /// What a change looks like once the trace could not be verified: not
+    /// silence, `unresolved`, so a reader can tell "no slot" apart from "not
+    /// traced" (see `ChangeDestination` in `ChecksButton.tsx`, which reads
+    /// this value and says which one it is).
+    #[test]
+    fn slot_fields_reports_unresolved_rather_than_silence_when_unverified() {
+        let (slot, miss) = slot_fields(None, false);
+        assert!(slot.is_none());
+        assert_eq!(miss, Some(BarSlotMiss::Unresolved));
+    }
 }
