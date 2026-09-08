@@ -35,6 +35,7 @@ import {
 import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldRow } from "../../unitSections";
 import { AssetPicker } from "./AssetPicker";
+import { AssetPreview } from "./AssetPreview";
 
 /** Which editor a value gets, or none. */
 type ControlKind = "boolean" | "number" | "numberList" | "text" | "raw";
@@ -227,6 +228,11 @@ export function UnitFieldRow({
     />
   );
 
+  // The one file the field names, once the archive has been found to hold it
+  // (issue #2694). Absent for a field with nothing written in it and for one
+  // whose path reaches nothing, where the warning below says so instead.
+  const preview = asset && assets && pointsAt?.member ? pointsAt.member : "";
+
   const current = typeof row.value === "string" ? row.value.trim() : "";
   const options =
     choices && current && !choices.options.some((o) => o.value === current)
@@ -243,7 +249,12 @@ export function UnitFieldRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
+        "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
+        // Centred for the two-line rows that are almost all of them, and topped
+        // for a row carrying a preview: a model viewport is 12rem tall and a
+        // centred label would sit halfway down it, a long way from the box it
+        // names.
+        preview ? "items-start" : "items-center",
         overridden ? "border-l-primary bg-primary/5" : "border-l-transparent",
       )}
     >
@@ -332,6 +343,15 @@ export function UnitFieldRow({
           </div>
         ) : (
           input
+        )}
+        {/* The file the field names, drawn (issue #2694). */}
+        {preview && asset && assets && (
+          <AssetPreview
+            field={asset}
+            member={preview}
+            assets={assets}
+            label={row.label}
+          />
         )}
         {[missing, warning].filter(Boolean).map((text) => (
           <span
