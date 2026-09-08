@@ -73,12 +73,16 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
     // the game environment unitsync omits. An engine whose native path works keeps
     // it and never runs the second pass.
     let mut units = collect_units_native(&us);
+    let mut redirects = Redirects::new();
     let unit_errors = us.drain_errors();
     if units.is_empty() {
         let shimmed = units_via_shim(&us);
         let _ = us.drain_errors();
         match shimmed {
-            Ok(shimmed) if !shimmed.is_empty() => units = shimmed,
+            Ok((shimmed, borrowed)) if !shimmed.is_empty() => {
+                units = shimmed;
+                redirects = borrowed;
+            }
             Ok(_) => errors.extend(unit_errors),
             Err(e) => {
                 errors.extend(unit_errors);
@@ -91,18 +95,23 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
     units.sort_by(|a, b| a.name.cmp(&b.name));
 
     // A game that names its units in a localisation file rather than in its
-    // unitdefs (issue #1925). `dataset::render` has done this since that fix and
-    // this read had not, so Beyond All Reason arrived here with no names at all:
-    // every `full_name` null, and with them every side's `start_unit_name`, which
-    // is what put `corcom` on the faction list where Cortex Commander belongs
-    // (issue #2690). Only worth opening the archive when something is actually
-    // missing a name, which for every game but BAR is nothing.
+    // unitdefs (issue #1925), following the same `i18nfromunit` redirect
+    // `dataset::render` follows (issue #2686). This read used to do neither, so
+    // Beyond All Reason arrived here with no names at all: every `full_name`
+    // null, and with them every side's `start_unit_name`, which is what put
+    // `corcom` on the faction list where Cortex Commander belongs (issue #2690).
+    // Only worth opening the archive when something is actually missing a name,
+    // which for every game but BAR is nothing.
     if units.iter().any(|u| u.full_name.is_none()) {
         let named = crate::dataset::base_language_names(&us, game_archive);
         crate::dataset::fill_missing_names(
-            units
-                .iter_mut()
-                .map(|u| (u.name.as_str(), &mut u.full_name)),
+            units.iter_mut().map(|u| {
+                let key = redirects
+                    .get(&u.name.to_lowercase())
+                    .map(String::as_str)
+                    .unwrap_or(u.name.as_str());
+                (key, &mut u.full_name)
+            }),
             &named,
         );
         let _ = us.drain_errors();
@@ -195,12 +204,29 @@ local names = {}
 for k in pairs(ud) do names[#names + 1] = k end
 table.sort(names)
 
+-- The unit a def hands its name lookup to, lowercased, or '' for the ordinary
+-- unit that names itself. Beyond All Reason's `luaui/i18nhelpers.lua` reads
+-- `units.names.<customparams.i18nfromunit>` in place of the unit's own key,
+-- which is how its commander variants borrow the name of the commander they are
+-- made from (issue #2686). `dataset.rs` reads the same field the same way.
+local function name_from(d)
+  local cp = (type(d) == 'table') and (d.customparams or d.customParams) or nil
+  if type(cp) ~= 'table' then return '' end
+  local from
+  for key, value in pairs(cp) do
+    if type(key) == 'string' and string.lower(key) == 'i18nfromunit' then from = value end
+  end
+  if type(from) ~= 'string' then return '' end
+  local key = string.match(string.lower(from), '^%s*(.-)%s*$') or ''
+  return (key:gsub('[\t\r\n]', ''))
+end
+
 local lines = {}
 for _, k in ipairs(names) do
   local d = ud[k]
   local full = (type(d) == 'table' and type(d.name) == 'string' and d.name ~= '') and d.name or k
   full = tostring(full):gsub('[\t\r\n]', ' ')
-  lines[#lines + 1] = tostring(k) .. '\t' .. full
+  lines[#lines + 1] = tostring(k) .. '\t' .. full .. '\t' .. name_from(d)
 end
 -- Sent back in pieces: a big game's list is longer than unitsync can return in
 -- one string.
@@ -225,9 +251,9 @@ fn collect_units_native(us: &Unitsync) -> Vec<UnitEntry> {
 /// The second unit loader, and for Beyond All Reason the only one that works: run
 /// the game's `gamedata/defs.lua` through the Lua parser (archives already mounted
 /// by the caller) with the missing game environment shimmed in, and read back
-/// `name\tfullname` per unit. The failure is returned so the caller can report why
-/// a game has no units.
-fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitEntry>, String> {
+/// `name\tfullname\tnamefrom` per unit. The failure is returned so the caller can
+/// report why a game has no units.
+fn units_via_shim(us: &Unitsync) -> Result<(Vec<UnitEntry>, Redirects), String> {
     let script = format!(
         "{}{}{UNIT_DEFS_SHIM_SCRIPT}",
         crate::lua::CHUNKED_RESULT,
@@ -237,22 +263,35 @@ fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitEntry>, String> {
         .map(|raw| parse_shim_units(&raw))
 }
 
-/// Parse the `name\tfullname` lines [`UNIT_DEFS_SHIM_SCRIPT`] returns into
-/// `UnitEntry`s. A full name equal to the internal name (the script's fallback)
-/// or missing collapses to `None`, matching the native path's `full_unit_name`.
-fn parse_shim_units(raw: &str) -> Vec<UnitEntry> {
-    raw.lines()
-        .filter_map(|line| {
-            let (name, full) = line.split_once('\t')?;
-            if name.is_empty() {
-                return None;
-            }
-            Some(UnitEntry {
-                name: name.to_string(),
-                full_name: Some(full.to_string()).filter(|s| !s.is_empty() && s != name),
-            })
-        })
-        .collect()
+/// Def key (lowercased) to the def key its name is looked up under, for the
+/// units that borrow one. Kept beside the unit list rather than on `UnitEntry`,
+/// because it is how this read finds a name and not a fact about the game worth
+/// putting in the output.
+type Redirects = HashMap<String, String>;
+
+/// Parse the `name\tfullname\tnamefrom` lines [`UNIT_DEFS_SHIM_SCRIPT`] returns.
+/// A full name equal to the internal name (the script's fallback) or missing
+/// collapses to `None`, matching the native path's `full_unit_name`.
+fn parse_shim_units(raw: &str) -> (Vec<UnitEntry>, Redirects) {
+    let mut units = Vec::new();
+    let mut redirects = Redirects::new();
+    for line in raw.lines() {
+        let mut fields = line.splitn(3, '\t');
+        let Some(name) = fields.next().filter(|n| !n.is_empty()) else {
+            continue;
+        };
+        let Some(full) = fields.next() else {
+            continue;
+        };
+        if let Some(from) = fields.next().filter(|f| !f.is_empty()) {
+            redirects.insert(name.to_lowercase(), from.to_string());
+        }
+        units.push(UnitEntry {
+            name: name.to_string(),
+            full_name: Some(full.to_string()).filter(|s| !s.is_empty() && s != name),
+        });
+    }
+    (units, redirects)
 }
 
 /// Map internal unit name to friendly full name, to resolve side start units.
@@ -282,7 +321,7 @@ mod tests {
     /// same file `dataset::render` reads.
     #[test]
     fn a_game_that_names_nothing_in_its_defs_still_names_its_start_unit() {
-        let mut units = parse_shim_units("armcom\tarmcom\ncorcom\tcorcom");
+        let (mut units, redirects) = parse_shim_units("armcom\tarmcom\t\ncorcom\tcorcom\t");
         assert!(units.iter().all(|u| u.full_name.is_none()));
         assert!(full_names(&units).is_empty());
 
@@ -290,12 +329,7 @@ mod tests {
             ("armcom".to_string(), "Armada Commander".to_string()),
             ("corcom".to_string(), "Cortex Commander".to_string()),
         ]);
-        crate::dataset::fill_missing_names(
-            units
-                .iter_mut()
-                .map(|u| (u.name.as_str(), &mut u.full_name)),
-            &named,
-        );
+        fill(&mut units, &redirects, &named);
 
         assert_eq!(
             full_names(&units).get("corcom").map(String::as_str),
@@ -308,23 +342,31 @@ mod tests {
     /// invention.
     #[test]
     fn the_defs_win_and_an_unnamed_unit_stays_a_def_key() {
-        let mut units = parse_shim_units("armcom\tCommander\ndummycom\tdummycom");
+        let (mut units, redirects) = parse_shim_units("armcom\tCommander\t\ndummycom\tdummycom\t");
         let named = BTreeMap::from([("armcom".to_string(), "Armada Commander".to_string())]);
-        crate::dataset::fill_missing_names(
-            units
-                .iter_mut()
-                .map(|u| (u.name.as_str(), &mut u.full_name)),
-            &named,
-        );
+        fill(&mut units, &redirects, &named);
 
         let full = full_names(&units);
         assert_eq!(full.get("armcom").map(String::as_str), Some("Commander"));
         assert_eq!(full.get("dummycom"), None);
     }
 
+    /// The same redirect `dataset::render` follows (issue #2686). This read has
+    /// to follow it too, or the two answers for one game differ by the 27 units
+    /// Beyond All Reason names this way.
+    #[test]
+    fn a_unit_that_borrows_a_name_is_looked_up_under_the_unit_it_borrows_from() {
+        let (mut units, redirects) = parse_shim_units("armcomlvl2\tarmcomlvl2\tarmcom");
+        let named = BTreeMap::from([("armcom".to_string(), "Armada Commander".to_string())]);
+        fill(&mut units, &redirects, &named);
+
+        assert_eq!(units[0].full_name.as_deref(), Some("Armada Commander"));
+    }
+
     #[test]
     fn parses_tab_separated_shim_units() {
-        let units = parse_shim_units("armcom\tArmada Commander\ncube\tcube\n\tskip\nlone\t");
+        let (units, redirects) =
+            parse_shim_units("armcom\tArmada Commander\t\ncube\tcube\t\n\tskip\t\nlone\t");
         // Two usable rows: the empty-name row and the trailing-empty-name are dropped.
         assert_eq!(units.len(), 3);
         assert_eq!(units[0].name, "armcom");
@@ -332,8 +374,23 @@ mod tests {
         // Full name equal to the internal name collapses to None.
         assert_eq!(units[1].name, "cube");
         assert_eq!(units[1].full_name, None);
-        // Missing full name is None.
+        // Missing full name is None, and so is a missing redirect column.
         assert_eq!(units[2].name, "lone");
         assert_eq!(units[2].full_name, None);
+        assert!(redirects.is_empty());
+    }
+
+    /// Drives the shared fill the way `render` does, redirect and all.
+    fn fill(units: &mut [UnitEntry], redirects: &Redirects, named: &BTreeMap<String, String>) {
+        crate::dataset::fill_missing_names(
+            units.iter_mut().map(|u| {
+                let key = redirects
+                    .get(&u.name.to_lowercase())
+                    .map(String::as_str)
+                    .unwrap_or(u.name.as_str());
+                (key, &mut u.full_name)
+            }),
+            named,
+        );
     }
 }

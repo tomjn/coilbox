@@ -47,11 +47,15 @@ use std::path::Path;
 /// which a game scanned under v15 has no entry for at all. v17: that read now
 /// covers every `language/<code>/units.json` the game ships and is keyed by
 /// language code (#2672), so a v16 blob holds the old one-locale shape, which
-/// deserialises as no translations at all rather than as English. v18 is #2686's
-/// and lands beside this one. v19: the game info read now names its units out of
-/// the game's localisation file too, not just the unit dataset (#2690), so a
-/// Beyond All Reason blob cached under either of those holds a unit list with no
-/// names and four sides whose start units are def keys.
+/// deserialises as no translations at all rather than as English. v18: a unit
+/// whose def hands its name lookup to another unit is now read under that
+/// unit's key (#2686), so a blob cached under v17 holds `armcomcon` where
+/// Armada Commander belongs. The payload's shape is unchanged, its contents are
+/// not, and the key is otherwise the archive's own identity. v19: the game info
+/// read now names its units out of the game's localisation file too, not just
+/// the unit dataset (#2690), so a Beyond All Reason blob cached under either v17
+/// or v18 holds a unit list with no names and four sides whose start units are
+/// def keys.
 const INFO_CACHE_VERSION: u32 = 19;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
