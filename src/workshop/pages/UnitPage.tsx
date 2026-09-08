@@ -499,13 +499,18 @@ export default function UnitPage() {
   // file in the game folder, so counting it as an unsaved change would make the
   // banner below claim work is at risk that is not.
   const addedCount = Object.keys(ownClones).length;
-  const builtCount = Object.keys(built.builtBy).length;
+  // Counted apart from the stale ones beside them (issue #2680). A name a
+  // rename left behind is a unit in the game and belongs in this line, but
+  // calling it built would say the user meant to put it there.
+  const origins = Object.values(built.builtBy);
+  const builtCount = origins.filter((origin) => !origin.stale).length;
+  const staleCount = origins.length - builtCount;
   const menuEdits = buildMenuOpCount(menus);
   const offCount = disabled.length;
   const unitDisabled = isUnitDisabled(disabled, unitKey);
   const anythingChanged =
     edits > 0 || addedCount > 0 || menuEdits > 0 || offCount > 0;
-  const anythingToShow = anythingChanged || builtCount > 0;
+  const anythingToShow = anythingChanged || origins.length > 0;
 
   /** Copy the selected unit, as the project has it, under a new name. */
   const createClone = (key: string, displayName: string, replaces: boolean) => {
@@ -572,6 +577,8 @@ export default function UnitPage() {
                   `${addedCount} unit${addedCount === 1 ? "" : "s"} added`,
                 builtCount > 0 &&
                   `${builtCount} built unit${builtCount === 1 ? "" : "s"}`,
+                staleCount > 0 &&
+                  `${staleCount} left behind by a rename`,
                 menuEdits > 0 &&
                   `${menuEdits} build menu edit${menuEdits === 1 ? "" : "s"}`,
                 offCount > 0 &&
@@ -687,13 +694,22 @@ export default function UnitPage() {
                     {unitKey}
                   </span>
                   {builtBy ? (
-                    <span className="max-w-prose text-xs text-muted-foreground">
-                      Built in the unit builder as {builtBy.projectName} and
-                      exported into {game.name}
-                      {clone
-                        ? ". Not in this game's definitions yet, so this is what the export wrote."
-                        : ""}
-                    </span>
+                    builtBy.stale ? (
+                      <span className="max-w-prose text-xs text-destructive">
+                        Left behind when {builtBy.projectName} was renamed. Its
+                        files are still in {game.name}, so the game has this
+                        unit and the renamed one. The unit builder's export
+                        drawer clears them.
+                      </span>
+                    ) : (
+                      <span className="max-w-prose text-xs text-muted-foreground">
+                        Built in the unit builder as {builtBy.projectName} and
+                        exported into {game.name}
+                        {clone
+                          ? ". Not in this game's definitions yet, so this is what the export wrote."
+                          : ""}
+                      </span>
+                    )
                   ) : (
                     clone && (
                       <span className="max-w-prose text-xs text-muted-foreground">

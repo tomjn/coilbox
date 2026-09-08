@@ -15,6 +15,7 @@ const ARMCOM: Record<string, unknown> = {
 const GAME = { armcom: ARMCOM, armpw: { name: "Peewee", health: 300 } };
 
 const BA_FOLDER = "/Users/someone/.spring/games/BA.sdd";
+const SF_FOLDER = "/Users/someone/.spring/games/SF.sdd";
 
 /**
  * The definition `legoUnitDef` generates, as the export receipt stores it. Not
@@ -49,6 +50,7 @@ function project(over: Partial<LegoProject> = {}): LegoProject {
       dir: BA_FOLDER,
       at: "2026-09-07T12:00:00.000Z",
       unitName: "skyfort",
+      files: [],
       def: BUILT_DEF,
     },
     ...over,
@@ -86,6 +88,7 @@ describe("exportedInto", () => {
             dir: "C:\\games\\BA.sdd\\",
             at: "",
             unitName: "skyfort",
+            files: [],
             def: BUILT_DEF,
           },
         }),
@@ -128,6 +131,7 @@ describe("withLegoUnits", () => {
             dir: BA_FOLDER,
             at: "",
             unitName: "SkyFort",
+            files: [],
             def: BUILT_DEF,
           },
         }),
@@ -195,6 +199,7 @@ describe("withLegoUnits", () => {
         dir: BA_FOLDER,
         at: "2026-09-08T12:00:00.000Z",
         unitName: "skyfort2",
+        files: [],
         def: { ...BUILT_DEF, objectname: "skyfort2" },
       },
     });
@@ -211,6 +216,7 @@ describe("withLegoUnits", () => {
         dir: BA_FOLDER,
         at: "",
         unitName: "guntower",
+        files: [],
         def: BUILT_DEF,
       },
     });
@@ -258,6 +264,78 @@ describe("withLegoUnits", () => {
       GAME,
     );
     expect(conflicts).toEqual(["Twin"]);
+  });
+});
+
+/**
+ * Issue #2680. Renaming a unit and exporting again leaves the old name's files
+ * in the game, and the game reads them as a second unit. This page is where
+ * somebody notices, so this is where it has to be marked.
+ */
+describe("a unit a rename left behind", () => {
+  const renamed = project({
+    unitName: "skyfort2",
+    exported: {
+      dir: BA_FOLDER,
+      at: "",
+      unitName: "skyfort2",
+      files: [],
+      def: { ...BUILT_DEF, objectname: "skyfort2" },
+    },
+    staleExports: [{ dir: BA_FOLDER, at: "", unitName: "skyfort", files: [] }],
+  });
+
+  it("marks the old name where the game read the file it left", () => {
+    const { builtBy } = withLegoUnits({}, [renamed], BA_FOLDER, {
+      ...GAME,
+      skyfort: BUILT_DEF,
+    });
+    expect(builtBy.skyfort).toEqual({
+      kind: "lego",
+      projectId: "proj-1",
+      projectName: "Sky Fortress",
+      stale: true,
+    });
+    // And the current name is still marked as the unit somebody meant.
+    expect(builtBy.skyfort2?.stale).toBeUndefined();
+  });
+
+  /**
+   * A definition whose `objectname` no longer resolves is dropped by
+   * `gamedata/unitdefs.lua` before the game sees it, which is exactly what a
+   * rename does when the model was renamed too. There is then no unit on the
+   * page and nothing to put a mark against.
+   */
+  it("says nothing about a name the game's read does not have", () => {
+    const { builtBy, clones } = withLegoUnits({}, [renamed], BA_FOLDER, GAME);
+    expect(builtBy.skyfort).toBeUndefined();
+    // And no definition is invented for it, unlike a current export.
+    expect(clones.skyfort).toBeUndefined();
+  });
+
+  it("leaves another game's units alone", () => {
+    const { builtBy } = withLegoUnits({}, [renamed], SF_FOLDER, {
+      ...GAME,
+      skyfort: BUILT_DEF,
+    });
+    expect(builtBy).toEqual({});
+  });
+
+  /**
+   * The current export wins. A project renamed to a name it had left behind
+   * would otherwise be marked stale against its own live unit.
+   */
+  it("does not mark a name the project is exporting under again", () => {
+    const back = project({
+      staleExports: [
+        { dir: BA_FOLDER, at: "", unitName: "skyfort", files: [] },
+      ],
+    });
+    const { builtBy } = withLegoUnits({}, [back], BA_FOLDER, {
+      ...GAME,
+      skyfort: BUILT_DEF,
+    });
+    expect(builtBy.skyfort?.stale).toBeUndefined();
   });
 });
 

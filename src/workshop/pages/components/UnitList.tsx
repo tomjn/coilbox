@@ -154,10 +154,18 @@ export function UnitList({
                       hundreds of units is the only way to find it again. */}
                     {builtBy?.[u.key] ? (
                       <span
-                        className="rounded-full border border-border px-1.5 text-[10px] font-medium text-muted-foreground"
-                        title={`Built in the unit builder as ${builtBy[u.key].projectName} and exported into this game`}
+                        className={
+                          builtBy[u.key].stale
+                            ? "rounded-full bg-destructive/15 px-1.5 text-[10px] font-medium text-destructive"
+                            : "rounded-full border border-border px-1.5 text-[10px] font-medium text-muted-foreground"
+                        }
+                        title={
+                          builtBy[u.key].stale
+                            ? `Left behind when ${builtBy[u.key].projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer.`
+                            : `Built in the unit builder as ${builtBy[u.key].projectName} and exported into this game`
+                        }
                       >
-                        built
+                        {builtBy[u.key].stale ? "stale" : "built"}
                       </span>
                     ) : (
                       clone && (
