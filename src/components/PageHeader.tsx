@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
  * their own constraints and keep their own markup.
  */
 export function PageHeader({
+  back,
   title,
   description,
   descriptionClassName,
@@ -41,6 +42,11 @@ export function PageHeader({
   className,
   children,
 }: {
+  /** The way up, on a page that has one: the small back link the detail pages
+   * draw above their title (`MapDetailPage`, `ArchiveDetailPage`). Above the
+   * title row rather than in `actions`, so going up never sits among the
+   * buttons that act on the page. */
+  back?: ReactNode;
   /** Usually a string. A node so a page can put an icon or a badge beside it. */
   title: ReactNode;
   /** What the page is for. Omitted on pages that say it another way. */
@@ -56,6 +62,7 @@ export function PageHeader({
 }) {
   return (
     <header className={cn("flex flex-col gap-1", className)}>
+      {back}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="flex items-center gap-2 text-lg font-semibold">
           {title}
