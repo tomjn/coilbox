@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type LegoProject, newProject } from "./model";
 import type { UnitBounds } from "./s3oBuild";
-import { buildUnitDef, luaString } from "./unitDef";
+import { buildUnitDef, legoUnitDef, luaString } from "./unitDef";
 
 /** A measured model. Most of these only care about the two ground axes, so y
  *  and the middle carry stand-in values unless a test says otherwise. */
@@ -31,6 +31,58 @@ function project(name: string, unitName?: string) {
     now: "2026-07-28T00:00:00Z",
   });
 }
+
+/**
+ * The table behind the file (issue #2651). The workshop takes a built unit as a
+ * clone by storing this on the export receipt, so the definition the engine
+ * reads out of `units/` and the definition the workshop puts on its page are one
+ * table rather than two that have to be kept in step.
+ */
+describe("legoUnitDef", () => {
+  it("keys the definition the way the engine reads one: lower case", () => {
+    const def = legoUnitDef(
+      project("Sky Fortress", "skyfort"),
+      bounds({
+        x: 32,
+        z: 48,
+      }),
+    );
+    expect(Object.keys(def)).toEqual(
+      Object.keys(def).map((k) => k.toLowerCase()),
+    );
+    expect(def).toMatchObject({
+      name: "Sky Fortress",
+      objectname: "skyfort",
+      script: "skyfort.lua",
+      footprintx: 2,
+      footprintz: 3,
+      maxdamage: 1000,
+      canmove: false,
+    });
+  });
+
+  /**
+   * Real values rather than Lua source. A workshop field editor reads a number
+   * as a number and a flag as a flag, and a table of pre-quoted strings would
+   * give every field a raw row and no editor at all.
+   */
+  it("holds values, not the Lua they will be written as", () => {
+    const def = legoUnitDef(project("Sky Fortress"), bounds({ x: 32, z: 32 }));
+    expect(def.canmove).toBe(false);
+    expect(def.maxdamage).toBe(1000);
+    expect(def.collisionvolumescales).toEqual(expect.any(String));
+  });
+
+  it("writes every field it holds into the file, and no others", () => {
+    const p = project("Sky Fortress", "skyfort");
+    const b = bounds({ x: 32, z: 48 });
+    const written = buildUnitDef(p, b)
+      .split("\n")
+      .filter((line) => line.startsWith("    "))
+      .map((line) => line.trim().split(" = ")[0]);
+    expect(written).toEqual(Object.keys(legoUnitDef(p, b)));
+  });
+});
 
 describe("luaString", () => {
   it("escapes the two characters that would end the literal", () => {

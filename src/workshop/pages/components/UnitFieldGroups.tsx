@@ -20,17 +20,28 @@ import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
 import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
-import { UnitFieldRow } from "./UnitFieldRow";
+import { type FieldChoices, UnitFieldRow } from "./UnitFieldRow";
 
 export function UnitFieldGroups({
   view,
   consumers,
   assets,
+  choices,
+  warnings,
   inheritedLabel,
   onChange,
   onReset,
 }: {
   view: UnitFieldView;
+  /** What a field is allowed to name, keyed by lowercased path, for the fields
+   *  that name something the game declares rather than take free text (issue
+   *  #2651). Lowercased because a path is the game's own spelling of a key, and
+   *  the games do not agree on it: the registry says `movementClass` and
+   *  Balanced Annihilation says `movementclass`. */
+  choices?: Record<string, FieldChoices>;
+  /** Something wrong with a field that only its neighbours reveal, keyed the
+   *  same way (issue #2651). */
+  warnings?: Record<string, string>;
   /** The game's archive, for the fields that name a file in it (issue #2648). */
   assets?: AssetBrowsing;
   /** The game's custom parameter consumer index, or `null` while it is still
@@ -83,6 +94,8 @@ export function UnitFieldGroups({
                       row={row}
                       note={consumerNote(row.path, consumers) ?? undefined}
                       assets={assets}
+                      choices={choices?.[row.path.toLowerCase()]}
+                      warning={warnings?.[row.path.toLowerCase()]}
                       inheritedLabel={inheritedLabel}
                       onChange={(value) => onChange(row, value)}
                       onReset={() => onReset(row)}

@@ -728,10 +728,18 @@ function pathsForView(
   view: FieldView,
   present: string[],
   overridden: string[],
+  always: string[] = [],
 ): string[] {
   const paths = new Map<string, string>();
   for (const path of [...present, ...overridden])
     paths.set(path.toLowerCase(), path);
+  // Added only where the def has nothing, never over it. The registry spells
+  // `movementClass` and Balanced Annihilation spells `movementclass`, and the
+  // path is what the value is read from, so overwriting the game's spelling
+  // with the registry's would leave the row reading an absent key and drawing
+  // an empty box over a unit that has a value.
+  for (const path of always)
+    if (!paths.has(path.toLowerCase())) paths.set(path.toLowerCase(), path);
   if (view === "all") {
     const walkedInto = [...paths.keys()];
     for (const path of REGISTRY_PATHS) {
@@ -751,18 +759,30 @@ function pathsForView(
  *
  * `def` is the unit's table exactly as the game left it and `overrides` is the
  * project's sparse edit set. Nothing here writes to either.
+ *
+ * `always` names paths the relevant view keeps whether the def declares them or
+ * not, for a field whose absence is the thing somebody came to fix. A unit that
+ * moves and names no movement class is the case it exists for (issue #2651):
+ * the field is missing, that is exactly why the engine will drop the unit, and
+ * a filter that hides it because it is missing hides the fix as well.
  */
 export function unitFieldView(
   def: Record<string, unknown> | undefined,
   overrides: UnitOverrides,
   unitKey: string,
   view: FieldView,
+  always: string[] = [],
 ): UnitFieldView {
   const present = presentPaths(def);
   const presentSet = new Set(present);
   const overridden = Object.keys(overrides[unitKey] ?? {});
-  const paths = pathsForView(view, present, overridden);
-  const relevantCount = pathsForView("relevant", present, overridden).length;
+  const paths = pathsForView(view, present, overridden, always);
+  const relevantCount = pathsForView(
+    "relevant",
+    present,
+    overridden,
+    always,
+  ).length;
 
   const bySection = new Map<string, FieldRow[]>();
   for (const path of paths) {

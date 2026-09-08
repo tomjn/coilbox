@@ -424,6 +424,49 @@ export interface LegoProject {
   exportGlb?: boolean;
   /** Whether that export also wrote an .obj and .mtl, for the same reason. */
   exportObj?: boolean;
+  /** What the last export actually put in a game folder (issue #2651). */
+  exported?: LegoExport;
+}
+
+/**
+ * A receipt for one export: which game folder it went into, and the definition
+ * it wrote there (issue #2651).
+ *
+ * Separate from `exportDir` and the checkboxes beside it, which are settings
+ * for the next export rather than a record of the last one. The workshop reads
+ * this to find the units a game folder has been given, so it has to say what
+ * was written rather than what the drawer will offer to write.
+ *
+ * The definition is kept rather than derived again. Deriving it needs the parts
+ * library, the atlas and the baked geometry, which is the whole builder, and
+ * the workshop would then be showing a definition slightly unlike the file the
+ * engine reads whenever any of those has moved on. Storing it makes the two the
+ * same table by construction.
+ */
+export interface LegoExport {
+  /** The game folder chosen in the export drawer. */
+  dir: string;
+  /** When it was written, ISO. */
+  at: string;
+  /** The internal name it was written under: the file's name and the def's key. */
+  unitName: string;
+  /** The definition as written, keyed the way the engine reads it: lower case. */
+  def: Record<string, unknown>;
+}
+
+function parseExport(raw: unknown): LegoExport | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const e = raw as Record<string, unknown>;
+  if (typeof e.dir !== "string" || e.dir === "") return null;
+  if (typeof e.unitName !== "string" || e.unitName === "") return null;
+  if (typeof e.def !== "object" || e.def === null || Array.isArray(e.def))
+    return null;
+  return {
+    dir: e.dir,
+    at: typeof e.at === "string" ? e.at : "",
+    unitName: e.unitName,
+    def: e.def as Record<string, unknown>,
+  };
 }
 
 /**
@@ -735,6 +778,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       : {}),
     ...(typeof d.exportGlb === "boolean" ? { exportGlb: d.exportGlb } : {}),
     ...(typeof d.exportObj === "boolean" ? { exportObj: d.exportObj } : {}),
+    ...(() => {
+      const exported = parseExport(d.exported);
+      return exported ? { exported } : {};
+    })(),
   };
   // A document saved before pieces were written in save order, or hand-edited,
   // may not have its parents first. Normalise here so the invariant holds the
