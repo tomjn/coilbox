@@ -220,6 +220,17 @@ export function AssetPicker({
     return [...rows].sort((a, b) => a.path.localeCompare(b.path));
   }, [choices, query]);
 
+  // The file the field already names is put at the top when the cap would
+  // otherwise cut it. Beyond All Reason keeps 2,043 models, so for most units
+  // the one they use sorts well past the two hundredth, and a picker that opens
+  // on a file you cannot see has not said what the field is set to.
+  const shown = useMemo(() => {
+    const rows = matched.slice(0, ROW_CAP);
+    if (!selected || rows.some((entry) => entry.path === selected)) return rows;
+    const held = matched.find((entry) => entry.path === selected);
+    return held ? [held, ...rows.slice(0, ROW_CAP - 1)] : rows;
+  }, [matched, selected]);
+
   const take = (member: string) => {
     onPick(assetValue(field.root, member));
     onOpenChange(false);
@@ -261,7 +272,7 @@ export function AssetPicker({
                 />
               </div>
               <FileList
-                rows={matched.slice(0, ROW_CAP)}
+                rows={shown}
                 root={field.root}
                 selected={selected}
                 onSelect={setSelected}
