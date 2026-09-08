@@ -67,6 +67,9 @@ let mockDataset: {
 }[] = [];
 /** The game's sides, which the page reads to name a unit's faction. */
 let mockSides: { name: string; startUnit: string }[] = [];
+/** The game's mod options, which the checks button reads for delivery
+ *  routes (issue #2748). Empty by default: no tweak slots declared. */
+let mockGameOptions: { key: string; name: string }[] = [];
 /** The build pictures unitsync resolved, null until the read lands (#2692). */
 let mockBuildpics: UnitBuildpicsResult | null = null;
 /** The game archive's member list, which the asset fields browse (issue #2648).
@@ -87,9 +90,14 @@ vi.mock("@/content/config", () => ({
     reload: () => {},
     loading: false,
   }),
-  // Both read by the unit picker the build menu panel adds through, and the
-  // first by the panel itself, to say which faction a row belongs to.
-  useUnitsyncGameInfo: () => ({ info: { sides: mockSides }, loading: false }),
+  // Read by the unit picker the build menu panel adds through, by the panel
+  // itself to say which faction a row belongs to, and by the checks button
+  // for the game's mod options (issue #2748).
+  useUnitsyncGameInfo: () => ({
+    info: { sides: mockSides, options: mockGameOptions },
+    status: "ready",
+    loading: false,
+  }),
   useUnitsyncUnitBuildpics: () => mockBuildpics,
   // The archive listing behind the Browse action on an asset field (#2648).
   useUnitsyncArchiveTree: () => ({
@@ -105,6 +113,21 @@ vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
 // page that never opens its drawer still needs a provider to render under.
 vi.mock("@/play/PlayProvider", () => ({
   usePlay: () => ({ running: false, launch: async () => ({ exitCode: 0 }) }),
+}));
+
+/** What `workshop_preflight` answers with. The checks button (issue #2748)
+ *  reads this the moment a project exists rather than only once its drawer
+ *  is open, so a page under test needs an answer as soon as an edit starts
+ *  one, not just in the one test that opens the drawer. Clean by default:
+ *  most of this file is about the fields and stores, not the preflight
+ *  check, which has its own coverage in `ChecksButton.dom.test.tsx`. */
+let mockPreflightReport = { blockers: [], review: [], passes: [] };
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand:
+    (_plugin: string, command: string) => async (_args: unknown) => {
+      if (command === "workshop_preflight") return mockPreflightReport;
+      throw new Error(`unexpected command ${command}`);
+    },
 }));
 
 /** The custom parameter consumer index, which most tests leave empty. */
@@ -398,11 +421,13 @@ afterEach(() => {
   mockStatus = "ready";
   mockDataset = [];
   mockSides = [];
+  mockGameOptions = [];
   mockBuildpics = null;
   mockArchiveFiles = [];
   mockConsumers = null;
   mockConsumersByArchive = {};
   mockLegoProjects = [];
+  mockPreflightReport = { blockers: [], review: [], passes: [] };
 });
 
 describe("UnitPage", () => {
@@ -513,12 +538,17 @@ describe("UnitPage", () => {
   });
 
   /**
-   * Issue #2667. These used to be an amber panel below the two panes, on a page
-   * that gives those panes the whole window height, so it never scrolled away.
-   * Now it is a button in the header, present in all three states the read can
-   * be in for the reason the scenario editor's problems button is (issue #2272).
+   * Issue #2667, folded into the single checks button by issue #2748.
+   * Diagnostics used to be an amber panel below the two panes, on a page that
+   * gives those panes the whole window height, so it never scrolled away.
+   * Then it was its own button in the header, present in all three states the
+   * read can be in for the reason the scenario editor's problems button is
+   * (issue #2272). Now it is one section of the checks drawer, and the button
+   * that opens it answers for delivery routes and preflight too, so a clean
+   * read only shows a tick with no label (see "the checks button" below for
+   * that state).
    */
-  describe("the diagnostics button", () => {
+  describe("the checks button's diagnostics section", () => {
     const errors = [
       "could not read units/armcom.lua",
       "unknown key in units/armaak.lua",
@@ -531,17 +561,18 @@ describe("UnitPage", () => {
       expect(button.hasAttribute("disabled")).toBe(true);
     });
 
-    it("says No problems, enabled, once the read lands with nothing to report", () => {
+    it("is a quiet, enabled tick once the read lands with nothing to report", () => {
       show();
-      const button = screen.getByRole("button", { name: /No problems/ });
+      const button = screen.getByRole("button", { name: "No problems found" });
       expect(button.hasAttribute("disabled")).toBe(false);
+      expect(button.textContent).toBe("");
     });
 
     it("counts what unitsync said without putting any of it on the page", async () => {
       show({ armcom: ARMCOM }, undefined, undefined, errors);
       expect(screen.queryByText(errors[0])).toBeNull();
 
-      fireEvent.click(screen.getByRole("button", { name: /2 diagnostics/ }));
+      fireEvent.click(screen.getByRole("button", { name: /2 to review/ }));
 
       expect(await screen.findByText(errors[0])).toBeTruthy();
       expect(screen.getByText(errors[1])).toBeTruthy();
@@ -549,7 +580,9 @@ describe("UnitPage", () => {
 
     it("says nothing about a read that has not happened, with no game picked", () => {
       show({ armcom: ARMCOM }, "/workshop/new");
-      expect(screen.queryByRole("button", { name: /No problems/ })).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "No problems found" }),
+      ).toBeNull();
       expect(screen.queryByRole("button", { name: /Checking/ })).toBeNull();
     });
   });

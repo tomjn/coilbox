@@ -92,11 +92,7 @@ import {
   useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
 } from "@/content/config";
-import {
-  DiagnosticsButton,
-  EmptyState,
-  SkeletonList,
-} from "@/content/pages/components/states";
+import { EmptyState, SkeletonList } from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
 import { useLegoProjects } from "@/lego/projects";
@@ -162,12 +158,11 @@ import {
   unitTextRows,
 } from "../unitText";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
+import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
-import { DeliveryRoutesButton } from "./components/DeliveryRoutesButton";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { PlayLocallyButton } from "./components/PlayLocallyButton";
-import { PreflightButton } from "./components/PreflightButton";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import type { FieldChoices } from "./components/UnitFieldRow";
@@ -583,7 +578,7 @@ export default function UnitPage() {
   // thing that tells Beyond All Reason's four "Advanced Aircraft Plant" rows
   // apart. One walk for the page: the left-hand list names the side on the row,
   // and a builder's roster uses the same answer to mark a unit from another one.
-  const { info: gameInfo } = useUnitsyncGameInfo(
+  const { info: gameInfo, status: gameInfoStatus } = useUnitsyncGameInfo(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
@@ -824,7 +819,30 @@ export default function UnitPage() {
             <ArrowLeft className="size-3.5" /> Projects
           </Link>
         }
-        title={project ? project.name : "Unit tweaks"}
+        // A node rather than a string once a project is open, so rename sits
+        // beside the name it acts on rather than as a full-sized button at
+        // the far end of the toolbar (issue #2748). It reads as a detail of
+        // the title rather than an item in the row of things you can do.
+        title={
+          project ? (
+            <span className="inline-flex items-center gap-1.5">
+              {project.name}
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0 text-muted-foreground"
+                onClick={() => setRenaming(true)}
+                aria-label="Rename this project"
+                title="Rename this project, or change what it says it is for"
+              >
+                <Pencil className="size-3.5" aria-hidden="true" />
+              </Button>
+            </span>
+          ) : (
+            "Unit tweaks"
+          )
+        }
         // One paragraph, which includes which game is being edited and where
         // the edits go. There is no save button, so it says so rather than
         // leaving somebody to wonder.
@@ -883,43 +901,28 @@ export default function UnitPage() {
                 <Redo2 className="size-3.5" />
               </Button>
             </ButtonGroup>
-            {/* What unitsync said while reading this game's defs. It used to be
-              a panel below everything else, which on a page that claims the
-              window height and scrolls its two panes inside it meant a strip of
-              the bottom edge gone for the session (issue #2667). Only once a
-              game is picked: with none there is no read to report on. */}
+            {/* Whether this project is in a fit state to use, as one control
+              rather than three (issue #2748): what unitsync said reading the
+              game's defs, which delivery routes this game supports, and what
+              preflight found in the compiled output. Three verdicts sitting
+              next to each other and styled like the buttons beside them (Lua,
+              Test) were what made this toolbar unreadable, and all three
+              needed a game picked before there was anything to say. */}
             {game && status !== "error" && (
-              <DiagnosticsButton
-                errors={defs?.unitErrors ?? []}
-                checking={status !== "ready"}
-                title={`Diagnostics for ${game.name}`}
-                description="What unitsync said while reading this game's unit definitions."
-              />
-            )}
-            {/* Which of the two delivery routes this game supports, and why
-              when one is not (issue #1268). Once a game is picked, the same
-              read that already loads its sides has its mod options too. */}
-            {game && gameInfo && (
-              <DeliveryRoutesButton
-                options={gameInfo.options ?? []}
+              <ChecksButton
                 gameName={game.name}
+                diagnosticErrors={defs?.unitErrors ?? []}
+                diagnosticsChecking={status !== "ready"}
+                routeOptions={gameInfo?.options}
+                routesChecking={
+                  gameInfoStatus === "idle" || gameInfoStatus === "loading"
+                }
+                project={project}
               />
             )}
-            {/* Renaming the project you are working in (issue #2711). You find
-              out a name is wrong while you are under it, and until this the
-              only way to change it was to go back to the list and find the
-              card again.
-
-              Last in the row, because the two controls before it act on the
-              edits and this acts on the document that holds them, which is the
-              same split the scenario editor's header makes. A button rather
-              than an editable heading: the heading is the one thing on the row
-              whose width already changes, and turning it into a field on a
-              press is exactly the layout shift #2710 went and removed. */}
             {/* What the project compiles to (issue #1275). A game reads Lua,
               and the fastest way to find out whether coilbox understood the
-              edit is to read what it wrote. Beside Rename because both act on
-              the project rather than on the edits. */}
+              edit is to read what it wrote. */}
             {project && (
               <Button
                 variant="outline"
@@ -931,28 +934,11 @@ export default function UnitPage() {
                 Lua
               </Button>
             )}
-            {/* Checking that Lua before it ever leaves the app (issue #1276).
-              Beside the button that shows it, because reading the Lua and
-              checking it answer two different questions: whether coilbox
-              understood the edit, and whether a lobby would accept the
-              result. */}
-            {project && <PreflightButton project={project} />}
             {/* One button that plays the project on your own machine (issue
               #1278). The workshop stops being write only here: everything
               before this point edits a project, and this is the first thing
               that lets you find out whether the edits were right. */}
             {project && <PlayLocallyButton project={project} />}
-            {project && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRenaming(true)}
-                title="Rename this project, or change what it says it is for"
-              >
-                <Pencil className="mr-1 size-3.5" />
-                Rename
-              </Button>
-            )}
           </>
         }
       />
