@@ -88,6 +88,7 @@ import {
   EmptyState,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
 import { useLegoProjects } from "@/lego/projects";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
@@ -941,49 +942,62 @@ export default function UnitPage() {
           ) : (
             <div className="flex min-w-0 flex-col gap-3 lg:min-h-0">
               <div className="flex flex-wrap items-center justify-between gap-2 lg:shrink-0">
-                <div className="flex flex-col">
-                  <h2 className="text-base font-semibold">
-                    {nameOf(unitKey, unit)}
-                  </h2>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {unitKey}
-                  </span>
-                  {builtBy ? (
-                    builtBy.stale ? (
-                      <span className="max-w-prose text-xs text-destructive">
-                        Left behind when {builtBy.projectName} was renamed. Its
-                        files are still in {game.name}, so the game has this
-                        unit and the renamed one. The unit builder's export
-                        drawer clears them.
-                      </span>
-                    ) : (
-                      <span className="max-w-prose text-xs text-muted-foreground">
-                        Built in the unit builder as {builtBy.projectName} and
-                        exported into {game.name}
-                        {clone
-                          ? ". Not in this game's definitions yet, so this is what the export wrote."
-                          : ""}
-                      </span>
-                    )
-                  ) : (
-                    clone && (
-                      <span className="max-w-prose text-xs text-muted-foreground">
-                        {clone.replacesGameUnit
-                          ? `Yours, copied from ${clone.source}, in place of the game's own`
-                          : `Yours, copied from ${clone.source}`}
-                      </span>
-                    )
-                  )}
-                  {unitDisabled && (
-                    // Capped, or the sentence sets the width of the column it
-                    // is in and pushes the controls beside it onto their own
-                    // row for as long as the unit is switched off.
-                    <span className="max-w-prose text-xs text-muted-foreground">
-                      Disabled: it comes off every build menu when this is
-                      compiled. The definition is kept, so switching it back on
-                      restores it.
+                <div className="flex items-start gap-2.5">
+                  {/* The same picture the row in the list beside it draws, off
+                    the same whole-game read (issue #2692). The two halves of
+                    the screen used to disagree: every row had a picture and the
+                    heading for the row you had picked had none. `lg` rather
+                    than the list's own size, because it stands against a name
+                    and a key rather than a single line of text. */}
+                  <UnitIcon
+                    display={picOf(unitKey)}
+                    pending={picsPending}
+                    size="lg"
+                  />
+                  <div className="flex flex-col">
+                    <h2 className="text-base font-semibold">
+                      {nameOf(unitKey, unit)}
+                    </h2>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {unitKey}
                     </span>
-                  )}
+                    {builtBy ? (
+                      builtBy.stale ? (
+                        <span className="max-w-prose text-xs text-destructive">
+                          Left behind when {builtBy.projectName} was renamed.
+                          Its files are still in {game.name}, so the game has
+                          this unit and the renamed one. The unit builder's
+                          export drawer clears them.
+                        </span>
+                      ) : (
+                        <span className="max-w-prose text-xs text-muted-foreground">
+                          Built in the unit builder as {builtBy.projectName} and
+                          exported into {game.name}
+                          {clone
+                            ? ". Not in this game's definitions yet, so this is what the export wrote."
+                            : ""}
+                        </span>
+                      )
+                    ) : (
+                      clone && (
+                        <span className="max-w-prose text-xs text-muted-foreground">
+                          {clone.replacesGameUnit
+                            ? `Yours, copied from ${clone.source}, in place of the game's own`
+                            : `Yours, copied from ${clone.source}`}
+                        </span>
+                      )
+                    )}
+                    {unitDisabled && (
+                      // Capped, or the sentence sets the width of the column it
+                      // is in and pushes the controls beside it onto their own
+                      // row for as long as the unit is switched off.
+                      <span className="max-w-prose text-xs text-muted-foreground">
+                        Disabled: it comes off every build menu when this is
+                        compiled. The definition is kept, so switching it back
+                        on restores it.
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {/* A copy the project added has no entry of its own in the
