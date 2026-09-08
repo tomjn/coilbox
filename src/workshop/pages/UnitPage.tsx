@@ -43,10 +43,10 @@
  * means nothing under another game that happens to share a unit's internal
  * name, and picking a different game must not carry it over (issue #2664).
  */
-import { Button } from "@picoframe/frame";
+import { Button, buttonVariants, cn } from "@picoframe/frame";
 import { RotateCcw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -605,6 +605,20 @@ export default function UnitPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* A copy the project added has no entry of its own in the
+                      game's real unit dataset, so there is nothing for this
+                      to open there (issue #2652). Every game unit, including
+                      one a clone replaces, still has one. */}
+                  {!clone && (
+                    <Link
+                      to={`/library/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(unitKey)}`}
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "sm" }),
+                      )}
+                    >
+                      View unit details
+                    </Link>
+                  )}
                   <DisableUnitSwitch
                     unitKey={unitKey}
                     unitName={nameOf(unitKey, unit)}
