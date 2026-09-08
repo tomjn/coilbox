@@ -24,7 +24,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CustomParamsResult,
@@ -220,6 +220,18 @@ const ARMLAB: Record<string, unknown> = {
   buildoptions: ["armpw", "armrock", "armham"],
 };
 
+/**
+ * The router's key for the entry the page is on, rendered where a test can read
+ * it.
+ *
+ * For one thing only: the crumb over this page is the project's name, and the
+ * frame's top bar reads it from the store on its own render, which a write to
+ * the store does not cause. A fresh key is that render happening.
+ */
+function LocationKey() {
+  return <span data-testid="location-key">{useLocation().key}</span>;
+}
+
 function show(
   units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
   entry = `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
@@ -251,7 +263,15 @@ function show(
           {/* The list, which the editor's Projects button and its "no project"
               states link to. Only enough of it to be navigated to. */}
           <Route path="/workshop" element={<p>Tweak projects</p>} />
-          <Route path="/workshop/:id" element={<UnitPage />} />
+          <Route
+            path="/workshop/:id"
+            element={
+              <>
+                <UnitPage />
+                <LocationKey />
+              </>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </PersistentStoreProvider>,
@@ -2210,6 +2230,113 @@ describe("UnitPage", () => {
       // Not an edit to the project, so it does not restamp when it changed.
       expect(saved()[0]).toHaveProperty("updatedAt", project.updatedAt);
       expect(screen.queryByText(/has changed since/)).toBeNull();
+    });
+  });
+
+  /**
+   * Renaming from inside the editor (issue #2711). Until this the only way was
+   * to go back to the list and find the card, which is the wrong way round: you
+   * find out a name is wrong while you are working under it.
+   *
+   * What is worth proving is that it reaches the store rather than only the
+   * heading, because the list and the breadcrumb read the store and a rename
+   * that only redrew this page would look right and be lost.
+   */
+  describe("renaming the open project", () => {
+    const units = { armcom: ARMCOM };
+
+    /** Open the drawer from the header, which is the only way in. */
+    const openRename = () =>
+      fireEvent.click(screen.getByRole("button", { name: /Rename/ }));
+
+    it("offers nothing to rename before the first edit has started one", () => {
+      openNew(GAME.name, units);
+      expect(screen.queryByRole("button", { name: /Rename/ })).toBeNull();
+    });
+
+    it("writes the new name to the heading and to the store", async () => {
+      openNew(GAME.name, units);
+      type(healthBox(), "5000");
+      expect(saved()[0].name).toBe(`${GAME.name} tweaks`);
+
+      openRename();
+      fireEvent.change(await screen.findByLabelText("Project name"), {
+        target: { value: "Slower tanks" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(saved()[0].name).toBe("Slower tanks");
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+        "Slower tanks",
+      );
+    });
+
+    it("changes what the project says it is for at the same time", async () => {
+      openNew(GAME.name, units);
+      type(healthBox(), "5000");
+
+      openRename();
+      fireEvent.change(
+        await screen.findByLabelText("What the project is for"),
+        {
+          target: { value: "Everything on tracks costs more." },
+        },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(saved()[0]).toMatchObject({
+        name: `${GAME.name} tweaks`,
+        description: "Everything on tracks costs more.",
+      });
+    });
+
+    /** The game is the one thing a rename may not touch: every edit in the
+     *  project is a patch against this game's own units (issue #2664). */
+    it("shows the game it is against and does not offer to change it", async () => {
+      openNew(GAME.name, units);
+      type(healthBox(), "5000");
+
+      openRename();
+      expect(await screen.findByText(GAME.name)).toBeTruthy();
+      expect(screen.queryByLabelText("Game for the new project")).toBeNull();
+    });
+
+    /**
+     * The crumb above the heading is the project's name too, and it comes from
+     * the store rather than from this page. Renaming puts the page back on the
+     * URL it is already on, which is what gives the frame's top bar the render
+     * it needs to read the new name.
+     */
+    it("puts the page back on its own url, so the crumb is read again", async () => {
+      openNew(GAME.name, units);
+      type(healthBox(), "5000");
+      const before = screen.getByTestId("location-key").textContent;
+
+      openRename();
+      fireEvent.change(await screen.findByLabelText("Project name"), {
+        target: { value: "Slower tanks" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(screen.getByTestId("location-key").textContent).not.toBe(before);
+    });
+
+    /** Renaming is not an edit, so it costs no undo step and does not change
+     *  what the header says is in the project. */
+    it("leaves the edits and the undo stack alone", async () => {
+      openNew(GAME.name, units);
+      type(healthBox(), "5000");
+
+      openRename();
+      fireEvent.change(await screen.findByLabelText("Project name"), {
+        target: { value: "Slower tanks" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(screen.getByText("1 change")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(healthBox().value).toBe("3000");
+      expect(saved()[0].name).toBe("Slower tanks");
     });
   });
 

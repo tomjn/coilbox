@@ -68,7 +68,7 @@
  * is opening its game, so the two cannot meet.
  */
 import { Button, buttonVariants, cn } from "@picoframe/frame";
-import { ArrowLeft, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { ArrowLeft, Pencil, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
@@ -156,6 +156,7 @@ import {
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
+import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import type { FieldChoices } from "./components/UnitFieldRow";
 import { UnitList } from "./components/UnitList";
@@ -180,8 +181,11 @@ export default function UnitPage() {
     applyEdits,
     setEdits,
     recordAuthoredChecksum,
+    updateProjectDetails,
   } = useModProjects();
   const history = useEditHistory();
+  /** Whether the details drawer is up to rename the open project (issue #2711). */
+  const [renaming, setRenaming] = useState(false);
 
   // Which project is open. The route says so, except on `/workshop/new`, where
   // there is no project yet and the game comes from the link that sent us here.
@@ -875,9 +879,54 @@ export default function UnitPage() {
                 description="What unitsync said while reading this game's unit definitions."
               />
             )}
+            {/* Renaming the project you are working in (issue #2711). You find
+              out a name is wrong while you are under it, and until this the
+              only way to change it was to go back to the list and find the
+              card again.
+
+              Last in the row, because the two controls before it act on the
+              edits and this acts on the document that holds them, which is the
+              same split the scenario editor's header makes. A button rather
+              than an editable heading: the heading is the one thing on the row
+              whose width already changes, and turning it into a field on a
+              press is exactly the layout shift #2710 went and removed. */}
+            {project && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRenaming(true)}
+                title="Rename this project, or change what it says it is for"
+              >
+                <Pencil className="mr-1 size-3.5" />
+                Rename
+              </Button>
+            )}
           </>
         }
       />
+
+      {/* The list's own form, not a second one: the fields, the defaults and
+        the one call that writes both are `ProjectDetailsDrawer`'s, so a rename
+        here and a rename from a card cannot drift apart. */}
+      {project && (
+        <ProjectDetailsDrawer
+          open={renaming}
+          onOpenChange={setRenaming}
+          project={project}
+          games={games}
+          scanning={scan.loading}
+          existing={projects}
+          onSubmit={(details) => {
+            updateProjectDetails(project.id, details);
+            setRenaming(false);
+            // The crumb over this page is the project's name, which the frame's
+            // top bar reads from the store on its own render and nothing
+            // re-renders on a write. Re-navigating to the URL we are on gives it
+            // that render, so the crumb and the heading agree.
+            select({});
+          }}
+        />
+      )}
 
       {/* The game's archives no longer checksum to what they did when this
         project was started, so something under the edits has moved. Said and

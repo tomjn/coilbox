@@ -196,6 +196,7 @@ describe("the chain with bundled art registered", () => {
       "scenario.builder",
       "lego.units",
       "lego.parts",
+      "workshop.units",
       "mapconv.projects",
       "mapconv.compile",
       "mapconv.decompile",
