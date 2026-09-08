@@ -19,10 +19,18 @@
  * A game shipping more than one translation gets a tab per language (issue
  * #2672). A game shipping one gets no tabs, because a picker with a single entry
  * is a control that cannot be used.
+ *
+ * The panel is a {@link SectionPanel}, so it matches the field sections under it
+ * (issue #2700). It starts open, unlike the build menu beside it: it is two rows
+ * tall whatever the unit, it is the first edit most people make, and shutting it
+ * would save a reader nothing. The file the words land in moves to the summary,
+ * where a shut panel would still say it, and the sentence explaining why keeps
+ * its place above the boxes.
  */
 import { Button, cn, Input } from "@picoframe/frame";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Type } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SectionPanel } from "@/components/SectionPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -277,12 +285,40 @@ export function UnitTextPanel({
     </div>
   );
 
+  // Where the words go, short enough to sit on one line, and how many of the
+  // two boxes carry an edit. Between them a shut panel says the two things
+  // somebody would open it to find out.
+  const changed = [rows.name, rows.description].filter(
+    (row) => row.state === "overridden",
+  ).length;
+
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border/50 p-2">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <h3 className="text-sm font-semibold">Name and description</h3>
-        <span className="text-xs text-muted-foreground">{destination}</span>
-      </div>
+    <SectionPanel
+      title="Name and description"
+      icon={Type}
+      headingLevel={3}
+      defaultOpen
+      contentClassName="flex flex-col gap-2 p-3"
+      summary={
+        <>
+          {/* Monospaced for the file, because that is what it is, and plain for
+              the sentence beside it, which is not. */}
+          {home === "language" ? (
+            <span className="truncate font-mono">
+              {languageUnitsFile(language)}
+            </span>
+          ) : (
+            <span className="truncate">In the unit definition</span>
+          )}
+          {changed > 0 && (
+            <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-primary">
+              {changed} changed
+            </span>
+          )}
+        </>
+      }
+    >
+      <p className="text-xs text-muted-foreground">{destination}</p>
       {translated ? (
         <Tabs value={language} onValueChange={onLanguage}>
           <TabsList aria-label="Language">
@@ -299,6 +335,6 @@ export function UnitTextPanel({
       ) : (
         fields
       )}
-    </section>
+    </SectionPanel>
   );
 }

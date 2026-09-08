@@ -36,10 +36,25 @@
  * Reordering is arrow buttons rather than dragging. A build menu is a short
  * list, one press is one move, and it works from the keyboard, which a drag
  * does not.
+ *
+ * The panel is a {@link SectionPanel}, the card the field sections under it and
+ * the scenario editor's panels already are (issue #2700). It arrives shut unless
+ * the project has edited the menu, because it is the one panel on the page whose
+ * height is the builder's roster: a commander's is twenty rows the reader
+ * scrolls past on the way to the numbers, and the summary says how many there
+ * are without opening it. An edited menu arrives open, so somebody's own work is
+ * not folded away from them.
+ *
+ * That is where it starts and not a rule it enforces. The card is uncontrolled,
+ * and moving from one builder to the next does not remount it, so whichever way
+ * an author left it is the way the next builder's menu opens. Somebody going
+ * down a list of factories comparing rosters opens it once, which is worth more
+ * than making every unit obey the default again.
  */
 import { Button, cn } from "@picoframe/frame";
-import { ArrowDown, ArrowUp, RotateCcw, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Hammer, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo } from "react";
+import { SectionPanel } from "@/components/SectionPanel";
 import { Badge } from "@/components/ui/badge";
 import type {
   UnitBuildpicsResult,
@@ -117,8 +132,16 @@ export function BuildMenuPanel({
   // Which faction reaches each unit is the game's answer rather than ours, out
   // of the build graph the picker groups by. Only used here to say when a row
   // crosses a faction line, so a row on the builder's own side says nothing.
+  //
+  // A builder no side's build graph reaches has no faction, and that is "cannot
+  // say" rather than "differs from everything" (issue #2699). Compared against
+  // nothing, every row on the menu crosses a line and the whole list is badged,
+  // which says exactly as much as badging none of it. Beyond All Reason's
+  // underwater Advanced Aircraft Plants are the real case: neither commander
+  // builds one, so neither has a side of its own to be compared with.
   const ownFaction = factionOf(builderKey);
   const crossFaction = (unit: string): string | undefined => {
+    if (ownFaction === undefined) return undefined;
     const side = factionOf(unit);
     return side === undefined || side === ownFaction ? undefined : side;
   };
@@ -131,39 +154,49 @@ export function BuildMenuPanel({
   const off = menu.filter((unit) => isUnitDisabled(disabled, unit));
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border/50 p-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold">Build menu</h3>
-          <span className="text-xs text-muted-foreground">
+    <SectionPanel
+      title="Build menu"
+      icon={Hammer}
+      headingLevel={3}
+      defaultOpen={edited}
+      contentClassName="flex flex-col gap-2 p-3"
+      summary={
+        <>
+          <span className="truncate">
             {menu.length === 0
               ? "Builds nothing"
               : `${menu.length} unit${menu.length === 1 ? "" : "s"}, in order${
                   off.length > 0 ? `, ${off.length} disabled` : ""
                 }`}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <UnitPickerButton
-            units={units}
-            gameName={gameName}
-            gameArchive={gameArchive}
-            enginePath={enginePath}
-            dataDir={dataDir}
-            buildpics={buildpics}
-            size="sm"
-            className="w-64"
-            value=""
-            placeholder="Add a unit to this menu"
-            onValueChange={onAdd}
-          />
           {edited && (
-            <Button variant="outline" size="sm" onClick={onReset}>
-              <RotateCcw className="size-3.5" />
-              Reset menu
-            </Button>
+            <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-primary">
+              changed
+            </span>
           )}
-        </div>
+        </>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <UnitPickerButton
+          units={units}
+          gameName={gameName}
+          gameArchive={gameArchive}
+          enginePath={enginePath}
+          dataDir={dataDir}
+          buildpics={buildpics}
+          size="sm"
+          className="w-64"
+          value=""
+          placeholder="Add a unit to this menu"
+          onValueChange={onAdd}
+        />
+        {edited && (
+          <Button variant="outline" size="sm" onClick={onReset}>
+            <RotateCcw className="size-3.5" />
+            Reset menu
+          </Button>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -317,6 +350,6 @@ export function BuildMenuPanel({
           </ul>
         </div>
       )}
-    </section>
+    </SectionPanel>
   );
 }
