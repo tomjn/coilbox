@@ -101,6 +101,11 @@ vi.mock("@/content/config", () => ({
   useUnitsyncUnitModel: () => ({ model: null, loading: false, failed: false }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
+// PlayLocallyButton (issue #1278) reaches usePlay() on every render, so a
+// page that never opens its drawer still needs a provider to render under.
+vi.mock("@/play/PlayProvider", () => ({
+  usePlay: () => ({ running: false, launch: async () => ({ exitCode: 0 }) }),
+}));
 
 /** The custom parameter consumer index, which most tests leave empty. */
 let mockConsumers: CustomParamsResult | null = null;

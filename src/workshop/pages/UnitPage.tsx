@@ -166,6 +166,7 @@ import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
 import { DeliveryRoutesButton } from "./components/DeliveryRoutesButton";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
+import { PlayLocallyButton } from "./components/PlayLocallyButton";
 import { PreflightButton } from "./components/PreflightButton";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
@@ -936,6 +937,11 @@ export default function UnitPage() {
               understood the edit, and whether a lobby would accept the
               result. */}
             {project && <PreflightButton project={project} />}
+            {/* One button that plays the project on your own machine (issue
+              #1278). The workshop stops being write only here: everything
+              before this point edits a project, and this is the first thing
+              that lets you find out whether the edits were right. */}
+            {project && <PlayLocallyButton project={project} />}
             {project && (
               <Button
                 variant="outline"

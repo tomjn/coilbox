@@ -24,7 +24,7 @@ const project: ModProject = {
 };
 
 const compiled = (over: Partial<CompiledMod> = {}): CompileState => ({
-  compiled: { chunks: [], files: [], notes: [], ...over },
+  compiled: { chunks: [], files: [], notes: [], barTweakdefs: null, ...over },
   loading: false,
   error: null,
 });
