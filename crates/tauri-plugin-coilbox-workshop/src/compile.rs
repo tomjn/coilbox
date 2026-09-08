@@ -102,9 +102,16 @@ pub struct CompiledMod {
 /// anything that reads the game's definitions.
 const POST_FILE: &str = "gamedata/unitdefs_post.lua";
 
-/// A mutator archive's version. The archive's name is its `name` and this,
-/// joined, so it has to be something. Versioning a project for distribution is
-/// issue #1283's, and until it exists every compile is version one.
+/// A mutator archive's version for every route except packaging.
+///
+/// The local test route (`mutator.rs`) rewrites its folder whole on every
+/// test and the BAR route (`localBar.ts`) writes a mod option that is
+/// forgotten the moment the skirmish ends, so neither reads this field.
+/// Packaging a project for somebody else is the one route where the number
+/// has to mean something (issue #1283): two players on different builds of
+/// the same archive name is a sync error, not an error message, so
+/// `package.rs` renders `modinfo.lua` a second time through
+/// [`modinfo_versioned`] with the version the author is publishing.
 const MUTATOR_VERSION: &str = "1";
 
 /// Compile a project.
@@ -727,6 +734,14 @@ fn bar_tweakdefs_body(
 /// is the same string a start script names, so the two cannot drift apart. The
 /// same shape `src/scenario/mutator.ts` and `src/lego/scratchGame.ts` write.
 fn modinfo(project: &ModProject) -> String {
+    modinfo_versioned(project, MUTATOR_VERSION)
+}
+
+/// [`modinfo`] with an explicit version rather than the placeholder every
+/// other route leaves in place. `package.rs` calls this directly to render
+/// the file a second time with the version being published, since nothing
+/// else about a compile depends on the archive's own version.
+pub(crate) fn modinfo_versioned(project: &ModProject, version: &str) -> String {
     let name = if project.name.is_empty() {
         "Coilbox tweaks"
     } else {
@@ -752,7 +767,7 @@ fn modinfo(project: &ModProject) -> String {
         header = header(project),
         name = lua_string(name),
         shortname = lua_string(&shortname(name)),
-        version = lua_string(MUTATOR_VERSION),
+        version = lua_string(version),
         description = lua_string(&description),
         depend = lua_string(&project.game_name),
     )

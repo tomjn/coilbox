@@ -162,6 +162,7 @@ import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
+import { PackageMutatorButton } from "./components/PackageMutatorButton";
 import { PlayLocallyButton } from "./components/PlayLocallyButton";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
@@ -188,6 +189,7 @@ export default function UnitPage() {
     applyEdits,
     setEdits,
     recordAuthoredChecksum,
+    recordPackagedVersion,
     updateProjectDetails,
   } = useModProjects();
   const history = useEditHistory();
@@ -939,6 +941,17 @@ export default function UnitPage() {
               before this point edits a project, and this is the first thing
               that lets you find out whether the edits were right. */}
             {project && <PlayLocallyButton project={project} />}
+            {/* The step after Test: a file somebody else can play rather
+              than a folder only this machine's engine can see (issue
+              #1283). */}
+            {project && (
+              <PackageMutatorButton
+                project={project}
+                onPackaged={(version) =>
+                  recordPackagedVersion(project.id, version)
+                }
+              />
+            )}
           </>
         }
       />
