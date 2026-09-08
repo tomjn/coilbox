@@ -512,12 +512,14 @@ pub(crate) fn resolve(
     // unitdefs (issue #1925). Only worth opening the archive when something is
     // actually missing a name, which for every game but BAR is nothing.
     if units.iter().any(|u| u.full_name.is_none()) {
-        let texts = language_texts(us, game_archive);
-        if let Some(named) = base_language(&texts).map(|t| &t.names) {
-            if !named.is_empty() {
-                fill_missing_names(&mut units, named);
-            }
-        }
+        let named = base_language_names(us, game_archive);
+        fill_missing_names(
+            units.iter_mut().map(|u| {
+                let key = u.name_from.as_deref().unwrap_or(u.name.as_str());
+                (key, &mut u.full_name)
+            }),
+            &named,
+        );
         let _ = us.drain_errors();
     }
 
@@ -810,6 +812,19 @@ fn string_table(units: &Map<String, Value>, section: &str) -> BTreeMap<String, S
         .collect()
 }
 
+/// The names a game keeps in its localisation file rather than in its unitdefs,
+/// in the locale [`base_language`] picks, keyed by lowercased def key.
+///
+/// Empty for a game that names its units in its defs, which is every game but
+/// Beyond All Reason. Shared with `game::render`, which reads the same list to
+/// name its sides' start units (issue #2690).
+pub(crate) fn base_language_names(us: &Unitsync, game_archive: &str) -> BTreeMap<String, String> {
+    let texts = language_texts(us, game_archive);
+    base_language(&texts)
+        .map(|t| t.names.clone())
+        .unwrap_or_default()
+}
+
 /// Give a name to every unit whose unitdef did not carry one.
 ///
 /// A fallback and never an override: the unitdef is the game's own answer, and
@@ -820,12 +835,23 @@ fn string_table(units: &Map<String, Value>, section: &str) -> BTreeMap<String, S
 /// names rather than under its own key (issue #2686), which is what Beyond All
 /// Reason's `luaui/i18nhelpers.lua` does and the only way `armcomcon` reads as
 /// Armada Commander. One hop and no further, the same as the game: the redirect
-/// names a unit, not another redirect.
-fn fill_missing_names(units: &mut [UnitDatasetEntry], named: &BTreeMap<String, String>) {
-    for unit in units.iter_mut().filter(|u| u.full_name.is_none()) {
-        let key = unit.name_from.as_ref().unwrap_or(&unit.name);
-        if let Some(name) = named.get(key) {
-            unit.full_name = Some(name.clone());
+/// names a unit, not another redirect. Which key that is belongs to the caller,
+/// since it is the caller that read the def.
+///
+/// Takes each unit as that key plus a handle on its name, so the two readers
+/// that need this share one implementation across their two entry types. They
+/// used not to, and a game read through `game::render` came back with no names
+/// at all while the same game read through this module had them (issue #2690).
+pub(crate) fn fill_missing_names<'a>(
+    units: impl IntoIterator<Item = (&'a str, &'a mut Option<String>)>,
+    named: &BTreeMap<String, String>,
+) {
+    for (key, full_name) in units {
+        if full_name.is_some() {
+            continue;
+        }
+        if let Some(name) = named.get(&key.to_lowercase()) {
+            *full_name = Some(name.clone());
         }
     }
 }
@@ -1030,7 +1056,7 @@ mod language_name_tests {
         let named = text_from_language_json(BAR_SHAPED).names;
         let mut units = vec![unit("corcom", Some("Commander"))];
 
-        fill_missing_names(&mut units, &named);
+        fill(&mut units, &named);
 
         assert_eq!(units[0].full_name.as_deref(), Some("Commander"));
     }
@@ -1040,11 +1066,25 @@ mod language_name_tests {
         let named = text_from_language_json(BAR_SHAPED).names;
         let mut units = vec![unit("corcom", None), unit("armsolar", None)];
 
-        fill_missing_names(&mut units, &named);
+        fill(&mut units, &named);
 
         assert_eq!(units[0].full_name.as_deref(), Some("Cortex Commander"));
         // Absent from the file, so it stays a def key rather than an invention.
         assert_eq!(units[1].full_name, None);
+    }
+
+    /// The file's keys are lowercased on the way in ("CorAP" in BAR's own
+    /// English file), and a def key that is not lowercase still has to find
+    /// them. `game::render` reads its unit list straight out of the def table
+    /// without lowercasing, so this is its case rather than a hypothetical.
+    #[test]
+    fn a_def_key_finds_its_name_whatever_its_case() {
+        let named = text_from_language_json(BAR_SHAPED).names;
+        let mut units = vec![unit("CorAP", None)];
+
+        fill(&mut units, &named);
+
+        assert_eq!(units[0].full_name.as_deref(), Some("Aircraft Plant"));
     }
 
     /// Beyond All Reason's commander variants name themselves nowhere and point
@@ -1055,7 +1095,7 @@ mod language_name_tests {
         let named = text_from_language_json(BAR_SHAPED).names;
         let mut units = vec![borrowing("corcomcon", "corcom")];
 
-        fill_missing_names(&mut units, &named);
+        fill(&mut units, &named);
 
         assert_eq!(units[0].full_name.as_deref(), Some("Cortex Commander"));
     }
@@ -1071,7 +1111,7 @@ mod language_name_tests {
             ..unit("corcomcon", Some("Cortex Commander Decoy"))
         }];
 
-        fill_missing_names(&mut units, &named);
+        fill(&mut units, &named);
 
         assert_eq!(
             units[0].full_name.as_deref(),
@@ -1086,9 +1126,21 @@ mod language_name_tests {
         let named = text_from_language_json(BAR_SHAPED).names;
         let mut units = vec![borrowing("dummycom", "random")];
 
-        fill_missing_names(&mut units, &named);
+        fill(&mut units, &named);
 
         assert_eq!(units[0].full_name, None);
+    }
+
+    /// Both readers reach `fill_missing_names` through their own entry type, so
+    /// the tests above drive it the way `dataset::render` does, redirect and all.
+    fn fill(units: &mut [UnitDatasetEntry], named: &BTreeMap<String, String>) {
+        fill_missing_names(
+            units.iter_mut().map(|u| {
+                let key = u.name_from.as_deref().unwrap_or(u.name.as_str());
+                (key, &mut u.full_name)
+            }),
+            named,
+        );
     }
 }
 

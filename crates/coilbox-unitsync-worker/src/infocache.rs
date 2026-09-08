@@ -51,8 +51,12 @@ use std::path::Path;
 /// whose def hands its name lookup to another unit is now read under that
 /// unit's key (#2686), so a blob cached under v17 holds `armcomcon` where
 /// Armada Commander belongs. The payload's shape is unchanged, its contents are
-/// not, and the key is otherwise the archive's own identity.
-const INFO_CACHE_VERSION: u32 = 18;
+/// not, and the key is otherwise the archive's own identity. v19: the game info
+/// read now names its units out of the game's localisation file too, not just
+/// the unit dataset (#2690), so a Beyond All Reason blob cached under either v17
+/// or v18 holds a unit list with no names and four sides whose start units are
+/// def keys.
+const INFO_CACHE_VERSION: u32 = 19;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.
