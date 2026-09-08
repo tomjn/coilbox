@@ -27,6 +27,12 @@
  * own faction, so another side's units are one search away, and a row whose unit
  * belongs to a different faction from the builder says which one.
  *
+ * Each row carries the unit's build picture, the same one the add picker beside
+ * it has always drawn (issue #2692). This is a list of the buttons a player will
+ * look at, and a player finds them by their pictures, so a roster of text was
+ * the one place on the page where what the author sees and what the player sees
+ * had nothing in common.
+ *
  * Reordering is arrow buttons rather than dragging. A build menu is a short
  * list, one press is one move, and it works from the keyboard, which a drag
  * does not.
@@ -35,10 +41,13 @@ import { Button, cn } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import type { UnitDatasetEntry } from "@/content/bindings";
-import { useUnitsyncGameInfo } from "@/content/config";
+import type {
+  UnitBuildpicsResult,
+  UnitDatasetEntry,
+  UnitDisplay,
+} from "@/content/bindings";
+import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
-import { buildTechForest } from "@/content/techForest";
 import type { UnitClones } from "../../clones";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
 
@@ -52,6 +61,10 @@ export function BuildMenuPanel({
   clones,
   disabled,
   nameOf,
+  picOf,
+  picsPending,
+  buildpics,
+  factionOf,
   gameName,
   gameArchive,
   enginePath,
@@ -81,6 +94,16 @@ export function BuildMenuPanel({
   disabled: DisabledUnits;
   /** What to call a unit, resolved by the page against the curated dataset. */
   nameOf: (key: string) => string;
+  /** This unit's build picture, from `unitPics.ts` (issue #2692). */
+  picOf: (key: string) => UnitDisplay | undefined;
+  /** The pictures are still being read, so a row claims nothing about them. */
+  picsPending: boolean;
+  /** The same read, handed to the picker so opening it does not mount the
+   *  game's archives and decode every build picture a second time. */
+  buildpics: UnitBuildpicsResult | null;
+  /** Which side reaches a unit, over the game's own build graph. Resolved by
+   *  the page, which asks it of the left-hand list too. */
+  factionOf: (key: string) => string | undefined;
   gameName?: string;
   gameArchive?: string;
   enginePath?: string;
@@ -91,28 +114,13 @@ export function BuildMenuPanel({
   onMove: (unit: string, delta: number) => void;
   onReset: () => void;
 }) {
-  // Which faction reaches each unit, which is the game's answer rather than
-  // ours: it comes out of the same build graph the picker groups by, over the
-  // game's own sides. Only used to say when a row crosses a faction line.
-  const { info } = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
-  const sides = useMemo(
-    () => (info?.sides ?? []).filter((s) => !!s.startUnit),
-    [info],
-  );
-  const forest = useMemo(
-    () =>
-      buildTechForest(
-        units,
-        sides.map((s) => s.startUnit as string),
-      ),
-    [units, sides],
-  );
-  const factionName = (unit: string): string | undefined => {
-    const own = forest.factionOf.get(builderKey);
-    const root = forest.factionOf.get(unit);
-    if (!root || root === own) return undefined;
-    const side = sides.find((s) => s.startUnit?.toLowerCase() === root);
-    return side?.name ?? root;
+  // Which faction reaches each unit is the game's answer rather than ours, out
+  // of the build graph the picker groups by. Only used here to say when a row
+  // crosses a faction line, so a row on the builder's own side says nothing.
+  const ownFaction = factionOf(builderKey);
+  const crossFaction = (unit: string): string | undefined => {
+    const side = factionOf(unit);
+    return side === undefined || side === ownFaction ? undefined : side;
   };
 
   const known = useMemo(
@@ -142,6 +150,7 @@ export function BuildMenuPanel({
             gameArchive={gameArchive}
             enginePath={enginePath}
             dataDir={dataDir}
+            buildpics={buildpics}
             size="sm"
             className="w-64"
             value=""
@@ -172,17 +181,18 @@ export function BuildMenuPanel({
       ) : (
         <ol className="flex flex-col gap-0.5">
           {menu.map((unit, index) => {
-            const faction = factionName(unit);
+            const faction = crossFaction(unit);
             const label = nameOf(unit);
             const switchedOff = isUnitDisabled(disabled, unit);
             return (
               <li
                 key={unit}
-                className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-1 py-1 hover:bg-accent/50"
+                className="grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-1 py-1 hover:bg-accent/50"
               >
                 <span className="text-right font-mono text-xs text-muted-foreground">
                   {index + 1}
                 </span>
+                <UnitIcon display={picOf(unit)} pending={picsPending} />
                 <span className="flex min-w-0 flex-col">
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span
