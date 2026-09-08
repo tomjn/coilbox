@@ -348,6 +348,18 @@ const openBuildMenu = () => {
     fireEvent.click(trigger);
 };
 
+/**
+ * Move a build menu row with the keyboard, which is what the drag handle is for
+ * when there is no pointer (issue #2714).
+ *
+ * The keys are the unit list's own set next door: the arrows one place, Home
+ * and End to either end. The whole point of putting them on the handle is that
+ * a reorder is reachable without a mouse, so this is the path the tests drive.
+ */
+const reorder = (handle: RegExp, key: string) => {
+  fireEvent.keyDown(screen.getByRole("button", { name: handle }), { key });
+};
+
 beforeEach(() => {
   storage = memorySettingsStorage();
   installSettingsStorage(storage);
@@ -1299,7 +1311,7 @@ describe("UnitPage", () => {
     const rows = () =>
       screen
         .getAllByRole("listitem")
-        .filter((li) => li.querySelector("button[aria-label^='Move ']"))
+        .filter((li) => li.querySelector("button[aria-label^='Reorder ']"))
         .map((li) => li.textContent ?? "");
 
     it("shows the builder's list in the order the game declares it", () => {
@@ -1323,14 +1335,74 @@ describe("UnitPage", () => {
       expect(screen.queryByText("buildoptions")).toBeNull();
     });
 
-    it("reorders with the arrow buttons", () => {
+    it("reorders from the keyboard, one place per press", () => {
       openLab();
-      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+      reorder(/^Reorder Peewee/, "ArrowDown");
       expect(rows()[0]).toContain("Rocko");
       expect(rows()[1]).toContain("Peewee");
-      fireEvent.click(screen.getByLabelText("Move Hammer up"));
+      reorder(/^Reorder Hammer/, "ArrowUp");
       expect(rows()[1]).toContain("Hammer");
       expect(rows()[2]).toContain("Peewee");
+    });
+
+    it("sends a row to either end with Home and End", () => {
+      openLab();
+      reorder(/^Reorder Hammer/, "Home");
+      expect(rows()[0]).toContain("Hammer");
+      reorder(/^Reorder Hammer/, "End");
+      expect(rows()[2]).toContain("Hammer");
+    });
+
+    /** The row at the end of the list has nowhere further to go, and a press
+     *  that does nothing must not leave a no-op operation behind. */
+    it("records nothing for a press at the end of the list", () => {
+      openLab();
+      reorder(/^Reorder Peewee/, "ArrowUp");
+      reorder(/^Reorder Hammer/, "ArrowDown");
+      expect(rows()[0]).toContain("Peewee");
+      expect(rows()[2]).toContain("Hammer");
+      expect(screen.queryByText(/build menu edit/)).toBeNull();
+    });
+
+    /**
+     * The handle's other half. A drag ends as one anchored move, exactly like a
+     * key press, so this drives the pointer path end to end and checks the row
+     * landed where it was dropped.
+     */
+    it("reorders by dragging a row past another", () => {
+      openLab();
+      const handle = screen.getByRole("button", { name: /^Reorder Peewee/ });
+      const list = handle.closest("ol") as HTMLOListElement;
+      // happy-dom lays nothing out, so every row measures as a zero-height box
+      // at the origin. The rows are given heights of their own here, which is
+      // what the panel measures when the drag starts.
+      list.querySelectorAll("li").forEach((row, i) => {
+        row.getBoundingClientRect = () =>
+          ({ top: i * 40, bottom: i * 40 + 40 }) as DOMRect;
+      });
+      fireEvent.pointerDown(handle, { pointerId: 1, button: 0 });
+      // Past the middle of the third row, so Peewee lands last.
+      fireEvent.pointerMove(list, { pointerId: 1, clientY: 110 });
+      expect(rows()[2]).toContain("Peewee");
+      fireEvent.pointerUp(list, { pointerId: 1 });
+      expect(rows()[2]).toContain("Peewee");
+      expect(screen.getByText("1 build menu edit")).toBeTruthy();
+    });
+
+    /** A drag let go where it started is not an edit. */
+    it("records nothing for a drag that lands where it started", () => {
+      openLab();
+      const handle = screen.getByRole("button", { name: /^Reorder Peewee/ });
+      const list = handle.closest("ol") as HTMLOListElement;
+      list.querySelectorAll("li").forEach((row, i) => {
+        row.getBoundingClientRect = () =>
+          ({ top: i * 40, bottom: i * 40 + 40 }) as DOMRect;
+      });
+      fireEvent.pointerDown(handle, { pointerId: 1, button: 0 });
+      fireEvent.pointerMove(list, { pointerId: 1, clientY: 5 });
+      fireEvent.pointerUp(list, { pointerId: 1 });
+      expect(rows()[0]).toContain("Peewee");
+      expect(screen.queryByText(/build menu edit/)).toBeNull();
     });
 
     it("takes a unit off the menu and offers it back", () => {
@@ -1398,7 +1470,7 @@ describe("UnitPage", () => {
      */
     it("is counted as a build menu edit, not as a field change", () => {
       openLab();
-      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+      reorder(/^Reorder Peewee/, "ArrowDown");
       expect(screen.getByText("1 build menu edit")).toBeTruthy();
       expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
       // The per-unit override reset is what the override set drives, and it is
@@ -1423,6 +1495,62 @@ describe("UnitPage", () => {
       expect(screen.queryByText("Build menu")).toBeNull();
     });
 
+    /**
+     * Issue #2714. A roster with `builder` off is drawn by us and ignored by
+     * the engine, and the four fields that default from `builder` mean the unit
+     * has lost repair and reclaim with it. The panel says so and offers to put
+     * it right, which is the one edit here that touches the unit's own def.
+     */
+    describe("a builder whose builder field is off", () => {
+      const DEAD = { ...ARMLAB, builder: false };
+      const openDead = () => {
+        mockSides = SIDES;
+        show({ armlab: DEAD, armcom: ARMCOM }, entry, DATASET);
+        openBuildMenu();
+      };
+
+      it("says the menu will not reach the game, and what else went with it", () => {
+        openDead();
+        expect(
+          screen.getByText(
+            /cannot build, so none of this menu reaches the game/,
+          ),
+        ).toBeTruthy();
+        const warning = screen.getByRole("alert");
+        for (const field of [
+          "canAssist",
+          "canReclaim",
+          "canRepair",
+          "canRestore",
+        ])
+          expect(warning.textContent).toContain(field);
+      });
+
+      it("says nothing on a builder whose flag is on", () => {
+        openLab();
+        expect(screen.queryByRole("alert")).toBeNull();
+      });
+
+      it("switches the field back on and puts the warning away", () => {
+        openDead();
+        fireEvent.click(
+          screen.getByRole("button", { name: /Switch builder on/ }),
+        );
+        expect(screen.queryByRole("alert")).toBeNull();
+      });
+
+      /** It is an edit to the def, so it counts as one. Writing it into the
+       *  menu store would be the conflation this panel exists to avoid. */
+      it("counts as a field change rather than as a build menu edit", () => {
+        openDead();
+        fireEvent.click(
+          screen.getByRole("button", { name: /Switch builder on/ }),
+        );
+        expect(screen.queryByText(/build menu edit/)).toBeNull();
+        expect(screen.getByText("1 change")).toBeTruthy();
+      });
+    });
+
     /** Otherwise the only way back to your own work is to remember where it
      *  was, which is the argument the browser's other marks were added on. */
     it("marks the builder in the browser", () => {
@@ -1432,7 +1560,7 @@ describe("UnitPage", () => {
           .getAllByRole("button")
           .find((b) => b.textContent?.includes("armlab"));
       expect(row()?.textContent).not.toContain("menu");
-      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+      reorder(/^Reorder Peewee/, "ArrowDown");
       expect(row()?.textContent).toContain("menu");
     });
   });
@@ -1583,7 +1711,7 @@ describe("UnitPage", () => {
       openBuildMenu();
       const menu = screen
         .getAllByRole("listitem")
-        .filter((li) => li.querySelector("button[aria-label^='Move ']"));
+        .filter((li) => li.querySelector("button[aria-label^='Reorder ']"));
       // Both rows are drawn: one Arm unit and one Core unit, on a menu whose
       // builder is neither.
       expect(menu).toHaveLength(2);
@@ -1603,7 +1731,7 @@ describe("UnitPage", () => {
       openBuildMenu();
       const row = screen
         .getAllByRole("listitem")
-        .filter((li) => li.querySelector("button[aria-label^='Move ']"))
+        .filter((li) => li.querySelector("button[aria-label^='Reorder ']"))
         .find((li) => li.textContent?.includes("Peewee"));
       expect(row?.querySelector("img")?.getAttribute("src")).toBe(PEEWEE_PIC);
     });
@@ -1677,7 +1805,7 @@ describe("UnitPage", () => {
     const rows = () =>
       screen
         .getAllByRole("listitem")
-        .filter((li) => li.querySelector("button[aria-label^='Move ']"))
+        .filter((li) => li.querySelector("button[aria-label^='Reorder ']"))
         .map((li) => li.textContent ?? "");
 
     /** Whether the open unit's switch is on. Read off the attribute, because
@@ -1818,7 +1946,7 @@ describe("UnitPage", () => {
       // A build menu edit.
       fireEvent.click(browserRow("armlab"));
       openBuildMenu();
-      fireEvent.click(screen.getByLabelText("Move Peewee down"));
+      reorder(/^Reorder Peewee/, "ArrowDown");
 
       const SUMMARY = "1 change, 1 unit added, 1 build menu edit";
       expect(screen.getByText(SUMMARY)).toBeTruthy();

@@ -21,7 +21,7 @@ import {
   installSettingsStorage,
   memorySettingsStorage,
 } from "../lib/storedSetting";
-import { addToBuildMenu, moveInBuildMenu } from "./buildMenus";
+import { addToBuildMenu, moveBeforeInBuildMenu } from "./buildMenus";
 import { addClone, deriveClone } from "./clones";
 import { setUnitDisabled } from "./disabled";
 import { setOverride } from "./overrides";
@@ -88,7 +88,7 @@ function fullEdits(): GameEdits {
     addToBuildMenu(m, "armlab", "armcom2", ARMLAB_MENU),
   );
   edits = editSlot(edits, "menus", (m) =>
-    moveInBuildMenu(m, "armlab", "armham", -1, ARMLAB_MENU),
+    moveBeforeInBuildMenu(m, "armlab", "armham", "armrock", ARMLAB_MENU),
   );
   // A unit switched off across the game.
   edits = editSlot(edits, "disabled", (d) => setUnitDisabled(d, "armpw", true));

@@ -62,6 +62,36 @@ export function isBuilder(def: Record<string, unknown> | undefined): boolean {
 }
 
 /**
+ * Whether the engine will let this unit build at all.
+ *
+ * A separate question from {@link isBuilder}, which asks whether there is a menu
+ * to draw. A def can carry a full `buildoptions` list with `builder` off, and
+ * then the list is drawn by us and ignored by the game.
+ *
+ * The engine's default is false, so an absent key is off. Read case
+ * insensitively, because the key is `builder` in the def data and `builder` in
+ * the registry but a game may have written it either way.
+ */
+export function builderFlagOf(
+  def: Record<string, unknown> | undefined,
+): boolean {
+  if (!def) return false;
+  const found = Object.entries(def).find(
+    ([key]) => key.toLowerCase() === "builder",
+  );
+  return found?.[1] === true;
+}
+
+/** The engine fields that take their default from `builder`, so a unit with it
+ *  off has lost more than its menu. Named in the panel's warning. */
+export const BUILDER_DEFAULTED_FIELDS = [
+  "canAssist",
+  "canReclaim",
+  "canRepair",
+  "canRestore",
+] as const;
+
+/**
  * The build list a definition declares, lowercased and de-duplicated.
  *
  * Read case insensitively, because the key is `buildoptions` in the data and
@@ -200,31 +230,29 @@ export function removeFromBuildMenu(
 }
 
 /**
- * Move a unit `delta` places along the menu, one press of an arrow being one.
+ * Put a unit immediately before another one, or on the end when `before` is
+ * null. The one way a reorder is recorded, whether it came from a drag, from
+ * the arrow keys or from Home and End.
  *
- * The anchor is worked out here rather than by the caller, so the interface only
- * has to know which row was pressed and which way.
+ * The caller names the anchor rather than an index because the anchor is what
+ * gets stored, and the caller is the one with the list on screen. A drop between
+ * two rows is the row below the gap, which is this argument exactly.
  */
-export function moveInBuildMenu(
+export function moveBeforeInBuildMenu(
   menus: BuildMenus,
   builder: string,
   unit: string,
-  delta: number,
+  before: string | null,
   inherited: string[],
 ): BuildMenus {
   const key = unit.toLowerCase();
+  if (before !== null && before.toLowerCase() === key) return menus;
   const ops = menus[builder] ?? [];
-  const list = applyBuildMenu(inherited, ops);
-  const from = list.indexOf(key);
-  if (from < 0) return menus;
-  const to = Math.min(Math.max(from + delta, 0), list.length - 1);
-  if (to === from) return menus;
-  const rest = list.filter((other) => other !== key);
-  const before = rest[to] ?? null;
+  if (!applyBuildMenu(inherited, ops).includes(key)) return menus;
   return withOps(
     menus,
     builder,
-    [...ops, { op: "move", unit: key, before }],
+    [...ops, { op: "move", unit: key, before: before?.toLowerCase() ?? null }],
     inherited,
   );
 }
