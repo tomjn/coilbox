@@ -35,6 +35,10 @@ Copy rather than point at the real directory, so you get the games and settings 
 
 **The Tauri MCP socket is pinned.** `.mcp.json` fixes it at one path and the app binds that path. If another app already holds it, your MCP calls **drive that app instead of failing**, with nothing in the response saying so. An agent resized somebody else's window that way. Run on your own port with your own socket path, revert those local edits before committing, and confirm which app you are driving before believing what you see.
 
+Giving your app its own socket is only half of it, because the session's MCP server is still pointed at the pinned path, so the tools stay aimed at whatever holds that. **Spawn a second MCP server pointed at your own socket and drive it over stdio**, rather than trying to repoint the session's. That leaves the running app completely alone and gives you full control of yours. `~/dev/tauri-plugin-mcp/mcp-server-ts/build/index.js` is the server. Issues #2726 and #1597 cover making the path an environment variable, which would remove the source edit entirely.
+
+**A window nobody can see still paints, but does not animate.** If the user is full screen in another app your window stays occluded and `document.visibilityState` is `hidden`. Screenshots are genuine, but CSS transitions never run, so anything that slides in sits at its start position and appears in no shot. Read the DOM for those and say so, rather than taking the screen off the user for a prettier picture.
+
 **`execute_js` is effectively read-only.** Monkey-patching renderer internals wedges the JS bridge, and so does something as ordinary as setting `window.location.hash` to navigate: both have taken the app down with a SIGTERM. Use the MCP's own `navigate` tool, and reach for `execute_js` only to read.
 
 **Anchor any `pkill` to your own path.** `pkill -f "tauri dev"` matches every checkout on the machine, not yours. Use the absolute path of your own binary and your own vite.
