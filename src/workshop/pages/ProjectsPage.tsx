@@ -279,9 +279,15 @@ export default function ProjectsPage() {
                 key={project.id}
                 className="group relative rounded border border-border transition-colors hover:border-primary/40 hover:bg-accent/50"
               >
+                {/* `h-full` because the grid stretches every card in a row to
+                    the tallest of them, and without it a card with no
+                    description ends short of its own border: the strip below
+                    the text still hovered but nothing happened when you clicked
+                    it (issue #2718). The right-hand padding keeps the title
+                    clear of the menu button without giving up the pixels. */}
                 <Link
                   to={projectPath(project.id)}
-                  className="flex flex-col gap-1 p-3 pr-10"
+                  className="flex h-full flex-col gap-1 p-3 pr-10"
                 >
                   <span className="truncate font-medium text-sm group-hover:underline">
                     {project.name}
