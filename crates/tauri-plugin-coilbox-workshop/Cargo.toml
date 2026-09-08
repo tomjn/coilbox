@@ -1,0 +1,24 @@
+[package]
+name = "tauri-plugin-coilbox-workshop"
+version = "0.0.0"
+description = "Compiles a workshop mod project into the Lua a Spring game reads. ACL identifier: coilbox-workshop"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this
+# name with the `tauri-plugin-` prefix stripped -> `coilbox-workshop`.
+links = "tauri-plugin-coilbox-workshop"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+# Runs the generated blocks in a real Lua 5.1 VM, so a test can say what the
+# Lua does rather than what it looks like. Issue #1276 turns the same crate into
+# a preflight the user sees. Here it is only the test harness.
+coilbox-springlua = { path = "../coilbox-springlua" }
+tempfile = { workspace = true }
