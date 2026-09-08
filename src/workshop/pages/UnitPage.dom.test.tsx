@@ -24,7 +24,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CustomParamsResult,
@@ -220,6 +220,18 @@ const ARMLAB: Record<string, unknown> = {
   buildoptions: ["armpw", "armrock", "armham"],
 };
 
+/**
+ * The router's key for the entry the page is on, rendered where a test can read
+ * it.
+ *
+ * For one thing only: the crumb over this page is the project's name, and the
+ * frame's top bar reads it from the store on its own render, which a write to
+ * the store does not cause. A fresh key is that render happening.
+ */
+function LocationKey() {
+  return <span data-testid="location-key">{useLocation().key}</span>;
+}
+
 function show(
   units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
   entry = `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
@@ -251,7 +263,15 @@ function show(
           {/* The list, which the editor's Projects button and its "no project"
               states link to. Only enough of it to be navigated to. */}
           <Route path="/workshop" element={<p>Tweak projects</p>} />
-          <Route path="/workshop/:id" element={<UnitPage />} />
+          <Route
+            path="/workshop/:id"
+            element={
+              <>
+                <UnitPage />
+                <LocationKey />
+              </>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </PersistentStoreProvider>,
@@ -2279,6 +2299,26 @@ describe("UnitPage", () => {
       openRename();
       expect(await screen.findByText(GAME.name)).toBeTruthy();
       expect(screen.queryByLabelText("Game for the new project")).toBeNull();
+    });
+
+    /**
+     * The crumb above the heading is the project's name too, and it comes from
+     * the store rather than from this page. Renaming puts the page back on the
+     * URL it is already on, which is what gives the frame's top bar the render
+     * it needs to read the new name.
+     */
+    it("puts the page back on its own url, so the crumb is read again", async () => {
+      openNew(GAME.name, units);
+      type(healthBox(), "5000");
+      const before = screen.getByTestId("location-key").textContent;
+
+      openRename();
+      fireEvent.change(await screen.findByLabelText("Project name"), {
+        target: { value: "Slower tanks" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(screen.getByTestId("location-key").textContent).not.toBe(before);
     });
 
     /** Renaming is not an edit, so it costs no undo step and does not change
