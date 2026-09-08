@@ -1,0 +1,67 @@
+{
+  "id": "5f6c1d9e-0000-4000-8000-0000000000ab",
+  "name": "Faster commanders",
+  "description": "What the checked-in fixture is for",
+  "gameName": "Balanced Annihilation V15.9.8",
+  "game": {
+    "name": "Balanced Annihilation V15.9.8",
+    "shortname": "BA"
+  },
+  "authoredChecksum": "c6a15f1f",
+  "edits": {
+    "overrides": {
+      "armcom": {
+        "maxDamage": 5000,
+        "weapondefs.disintegrator.range": 400
+      },
+      "armflash": {
+        "buildTime": 900
+      }
+    },
+    "clones": {
+      "supercom": {
+        "key": "supercom",
+        "source": "armcom",
+        "replacesGameUnit": false,
+        "def": {
+          "name": "Super Commander",
+          "maxDamage": 9000,
+          "buildTime": 12000
+        }
+      }
+    },
+    "menus": {
+      "armlab": [
+        {
+          "op": "add",
+          "unit": "armstump"
+        },
+        {
+          "op": "remove",
+          "unit": "armflash"
+        },
+        {
+          "op": "move",
+          "unit": "armstump",
+          "before": "armpw"
+        }
+      ]
+    },
+    "text": {
+      "armcom": {
+        "en": {
+          "name": "Commander"
+        },
+        "de": {
+          "description": "Kommandant"
+        }
+      }
+    },
+    "disabled": [
+      "armaser",
+      "armbanth"
+    ]
+  },
+  "createdAt": "2026-09-08T11:44:47.201Z",
+  "updatedAt": "2026-09-08T11:47:21.638Z"
+}

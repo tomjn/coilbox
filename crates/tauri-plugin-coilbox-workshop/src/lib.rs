@@ -34,24 +34,40 @@ pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use model::{GameEdits, ModProject};
 pub use preflight::{preflight, PreflightReport};
 
+use picoframe_core::CliResult;
 use serde::Serialize;
 use tauri::{
     plugin::{Builder, TauriPlugin},
     Runtime,
 };
 
+/// A payload in the envelope the frontend unwraps.
+///
+/// Every picoframe plugin command answers with a [`CliResult`], and the
+/// `defineCommand` bindings in `src/workshop/*.ts` read `success` off it before
+/// they hand anything back. A command that returns its payload bare therefore
+/// looks like a failure to the caller however well it ran, which is what issue
+/// #2751 was: preflight computed a clean report and the button said the check
+/// could not run.
+fn envelope<T: Serialize>(value: &T) -> CliResult {
+    match serde_json::to_value(value) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not report the result: {e}")),
+    }
+}
+
 /// Compile a saved project into the Lua a game reads.
 #[tauri::command]
-fn workshop_compile(project: ModProject) -> CompiledMod {
-    compile(&project)
+fn workshop_compile(project: ModProject) -> CliResult {
+    envelope(&compile(&project))
 }
 
 /// Compile a saved project and check the result before it ever leaves the
 /// app (issue #1276).
 #[tauri::command]
-fn workshop_preflight(project: ModProject) -> PreflightReport {
+fn workshop_preflight(project: ModProject) -> CliResult {
     let compiled = compile(&project);
-    preflight(&project, &compiled)
+    envelope(&preflight(&project, &compiled))
 }
 
 /// What `workshop_test_mutator` wrote.
@@ -73,20 +89,21 @@ pub struct TestMutatorResult {
 /// edits are text that cannot compile to a mutator at all) is refused rather
 /// than writing an empty archive: there is nothing to test.
 #[tauri::command]
-fn workshop_test_mutator(
-    data_dir: String,
-    project: ModProject,
-) -> Result<TestMutatorResult, String> {
+fn workshop_test_mutator(data_dir: String, project: ModProject) -> CliResult {
     let compiled = compile(&project);
     if compiled.files.is_empty() {
-        return Err(
-            "This project has no edits a mutator archive can carry, so there is nothing to test."
-                .to_string(),
+        return CliResult::err(
+            "This project has no edits a mutator archive can carry, so there is nothing to test.",
         );
     }
-    let dir = mutator::mutator_dir(&data_dir)?;
-    mutator::write_mutator(&dir, &compiled.files)?;
-    Ok(TestMutatorResult {
+    let dir = match mutator::mutator_dir(&data_dir) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    if let Err(e) = mutator::write_mutator(&dir, &compiled.files) {
+        return CliResult::err(e);
+    }
+    envelope(&TestMutatorResult {
         dir: dir.to_string_lossy().into_owned(),
         folder: mutator::FOLDER,
         files: compiled.files.into_iter().map(|f| f.path).collect(),
@@ -101,4 +118,154 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_test_mutator
         ])
         .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::BuildMenuOp;
+    use serde_json::Value;
+
+    /// One project in the shape the frame settings store really holds, written
+    /// by `src/workshop/savedProjectGolden.test.ts` from the five stores' own
+    /// functions. See that file for how it stays current.
+    const SAVED_PROJECT: &str = include_str!("../tests/fixtures/saved-project.json");
+
+    fn saved_project() -> ModProject {
+        serde_json::from_str(SAVED_PROJECT).expect("the saved project parses")
+    }
+
+    /// What `defineCommand` does with a command's answer, in Rust.
+    ///
+    /// `node_modules/@picoframe/plugin-sdk/dist/command.js` reads `success` off
+    /// the response and throws `"<plugin>|<command> failed"` when it is not
+    /// there, so a command answering with a bare payload reads as a failure
+    /// however well it ran. Returns the `data` a caller would have been handed.
+    fn unwrap_as_the_frontend_does(result: CliResult) -> Value {
+        let response = serde_json::to_value(&result).expect("the answer serialises");
+        assert_eq!(
+            response.get("success"),
+            Some(&Value::Bool(true)),
+            "the frontend reads `success` off this and throws when it is missing: {response}"
+        );
+        response
+            .get("data")
+            .expect("a successful answer carries its payload under `data`")
+            .clone()
+    }
+
+    /// Issue #2751. Every one of the three answered with its payload bare, so
+    /// the checks button reported "coilbox-workshop|workshop_preflight failed"
+    /// on a preflight that had run and come back clean.
+    #[test]
+    fn every_command_answers_in_the_envelope_the_frontend_unwraps() {
+        let project = saved_project();
+
+        let compiled = unwrap_as_the_frontend_does(workshop_compile(project.clone()));
+        assert!(compiled.get("files").is_some_and(Value::is_array));
+
+        let report = unwrap_as_the_frontend_does(workshop_preflight(project.clone()));
+        for list in ["blockers", "review", "passes"] {
+            assert!(
+                report.get(list).is_some_and(Value::is_array),
+                "the report is missing {list}: {report}"
+            );
+        }
+
+        let dir = tempfile::tempdir().expect("temp dir");
+        let written = unwrap_as_the_frontend_does(workshop_test_mutator(
+            dir.path().to_string_lossy().into_owned(),
+            project,
+        ));
+        assert!(written.get("files").is_some_and(Value::is_array));
+    }
+
+    /// A project that changes nothing is what the editor holds for the whole
+    /// of the first session, and it is what both of the saved projects on the
+    /// machine #2751 was reported from held. Both commands answer it rather
+    /// than refusing it: an empty compile and an empty report are answers.
+    #[test]
+    fn a_project_with_no_edits_is_answered_not_refused() {
+        let empty = ModProject::default();
+
+        let compiled = unwrap_as_the_frontend_does(workshop_compile(empty.clone()));
+        assert_eq!(compiled["files"].as_array().map(Vec::len), Some(0));
+        assert_eq!(compiled["barTweakdefs"], Value::Null);
+
+        let report = unwrap_as_the_frontend_does(workshop_preflight(empty));
+        assert_eq!(report["blockers"].as_array().map(Vec::len), Some(0));
+    }
+
+    /// A refusal has to reach the user as its own words. `defineCommand` throws
+    /// `error` when there is one, so this is the difference between "there is
+    /// nothing to test" and the generic message #2751 was.
+    #[test]
+    fn a_refusal_carries_its_reason() {
+        let result = workshop_test_mutator(
+            std::env::temp_dir().to_string_lossy().into_owned(),
+            ModProject::default(),
+        );
+        let response = serde_json::to_value(&result).expect("the answer serialises");
+
+        assert_eq!(response.get("success"), Some(&Value::Bool(false)));
+        assert!(response
+            .get("error")
+            .and_then(Value::as_str)
+            .is_some_and(|e| e.contains("nothing to test")));
+    }
+
+    /// The whole point of the fixture: a project saved by the app, through the
+    /// real deserialiser rather than through a value built in Rust. Every store
+    /// is checked, so a store whose shape moves on the TypeScript side fails
+    /// here rather than in front of somebody who saved a project.
+    #[test]
+    fn a_saved_project_reaches_every_store() {
+        let project = saved_project();
+
+        assert_eq!(project.name, "Faster commanders");
+        assert_eq!(project.game_name, "Balanced Annihilation V15.9.8");
+        assert_eq!(
+            project.description.as_deref(),
+            Some("What the checked-in fixture is for")
+        );
+
+        let edits = &project.edits;
+        assert_eq!(
+            edits.overrides["armcom"]["weapondefs.disintegrator.range"],
+            serde_json::json!(400),
+            "a dotted path is one key, not a nested table"
+        );
+        let clone = &edits.clones["supercom"];
+        assert_eq!(clone.key, "supercom");
+        assert_eq!(clone.source.as_deref(), Some("armcom"));
+        assert!(!clone.replaces_game_unit);
+        assert!(clone.def.get("maxDamage").is_some());
+
+        let ops = &edits.menus["armlab"];
+        assert!(matches!(&ops[0], BuildMenuOp::Add { unit } if unit == "armstump"));
+        assert!(matches!(&ops[1], BuildMenuOp::Remove { unit } if unit == "armflash"));
+        assert!(matches!(&ops[2], BuildMenuOp::Move { before: Some(b), .. } if b == "armpw"));
+
+        assert_eq!(
+            edits.text["armcom"]["en"].name.as_deref(),
+            Some("Commander")
+        );
+        assert_eq!(
+            edits.text["armcom"]["de"].description.as_deref(),
+            Some("Kommandant"),
+            "text is keyed by unit and then by language"
+        );
+        assert_eq!(edits.disabled, vec!["armaser", "armbanth"]);
+    }
+
+    /// A project somebody saved compiles and passes its own checks. Preflight
+    /// had never been run over one: every other test builds its input here.
+    #[test]
+    fn a_saved_project_passes_preflight() {
+        let project = saved_project();
+        let report = preflight(&project, &compile(&project));
+
+        assert_eq!(report.blockers, Vec::<String>::new());
+        assert!(!report.passes.is_empty());
+    }
 }

@@ -15,6 +15,9 @@ tauri-plugin = { version = "2", features = ["build"] }
 tauri = { version = "2" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The `CliResult` envelope every picoframe plugin command answers with, and
+# which the frontend's `defineCommand` bindings unwrap. See `lib.rs`.
+picoframe-core = "0.0.4"
 # The syntax half of the preflight check (issue #1276): runs generated Lua
 # through a real Lua 5.1 VM so a check can say what the Lua does rather than
 # what it looks like. Was a dev-dependency only, for the integration tests
