@@ -68,7 +68,14 @@
  * is opening its game, so the two cannot meet.
  */
 import { Button, buttonVariants, cn } from "@picoframe/frame";
-import { ArrowLeft, Pencil, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Code2,
+  Pencil,
+  Redo2,
+  RotateCcw,
+  Undo2,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
@@ -111,6 +118,7 @@ import {
   removeClone,
   unitsWithClones,
 } from "../clones";
+import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
@@ -155,6 +163,7 @@ import {
 } from "../unitText";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
+import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
 import { DeliveryRoutesButton } from "./components/DeliveryRoutesButton";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
@@ -187,6 +196,8 @@ export default function UnitPage() {
   const history = useEditHistory();
   /** Whether the details drawer is up to rename the open project (issue #2711). */
   const [renaming, setRenaming] = useState(false);
+  /** Whether the generated Lua is on screen (issue #1275). */
+  const [readingLua, setReadingLua] = useState(false);
 
   // Which project is open. The route says so, except on `/workshop/new`, where
   // there is no project yet and the game comes from the link that sent us here.
@@ -699,6 +710,9 @@ export default function UnitPage() {
     counts.menuOps > 0 ||
     counts.off > 0;
   const anythingToShow = anythingChanged || origins.length > 0;
+  // Only while the drawer is open, so a page nobody has asked to see the Lua
+  // for does not compile the project on every keystroke.
+  const compiled = useCompiledProject(project, readingLua);
 
   /**
    * Copy the selected unit, as the project has it, under a new name.
@@ -900,6 +914,21 @@ export default function UnitPage() {
               than an editable heading: the heading is the one thing on the row
               whose width already changes, and turning it into a field on a
               press is exactly the layout shift #2710 went and removed. */}
+            {/* What the project compiles to (issue #1275). A game reads Lua,
+              and the fastest way to find out whether coilbox understood the
+              edit is to read what it wrote. Beside Rename because both act on
+              the project rather than on the edits. */}
+            {project && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReadingLua(true)}
+                title="Read the Lua this project compiles to"
+              >
+                <Code2 className="mr-1 size-3.5" />
+                Lua
+              </Button>
+            )}
             {project && (
               <Button
                 variant="outline"
@@ -930,6 +959,15 @@ export default function UnitPage() {
             updateProjectDetails(project.id, details);
             setRenaming(false);
           }}
+        />
+      )}
+
+      {project && (
+        <CompiledLuaDrawer
+          open={readingLua}
+          onOpenChange={setReadingLua}
+          project={project}
+          state={compiled}
         />
       )}
 
