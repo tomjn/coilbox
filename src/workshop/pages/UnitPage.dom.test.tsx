@@ -10,6 +10,11 @@
  * replaced, reset puts it back, and nothing the user only looked at is
  * recorded on the way. The override set itself is checked in
  * `overrides.test.ts`. This checks that the page's own wiring reaches it.
+ *
+ * Most tests open `/workshop/new?game=`, the editor with no project yet, which
+ * is what a unit's encyclopedia page links to for a game nothing has been
+ * tweaked in (issue #2696). The first edit starts the project, exactly as the
+ * page did when it had a game picker instead of a route.
  */
 import {
   cleanup,
@@ -27,14 +32,6 @@ import type {
   UnitDefsResult,
 } from "@/content/bindings";
 import { LEGO_SCHEMA_VERSION, type LegoProject } from "@/lego/model";
-
-// The drawer behind the Projects button lives on the app frame, which is not
-// mounted here. Everything else in the frame package is real, including
-// `useSetting`, which the project list is kept in.
-vi.mock("@picoframe/frame", async () => ({
-  ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
-  useDrawer: () => ({ open: () => {}, close: () => {}, isOpen: false }),
-}));
 
 const SELECTED = {
   enginePath: "/engines/105",
@@ -138,7 +135,7 @@ vi.mock("../config", () => ({
 
 // A plain <select>, the same stand-in `BrowsePage.dom.test.tsx` uses: the real
 // picker is a Radix popover with pointer-capture behaviour happy-dom does not
-// implement, and switching games is the one test here that needs to drive it.
+// implement, and the movement class rows below need to drive it.
 vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({
     value,
@@ -182,6 +179,8 @@ const { installSettingsStorage, memorySettingsStorage } = await import(
   "@/lib/storedSetting"
 );
 const { PROJECTS_KEY } = await import("../project");
+const { resetEditHistory } = await import("../history");
+const { readStoredSetting } = await import("@/lib/storedSetting");
 
 /**
  * The settings store the projects are saved in, replaced per test so one test's
@@ -223,7 +222,7 @@ const ARMLAB: Record<string, unknown> = {
 
 function show(
   units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
-  entry = `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+  entry = `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
   dataset: { name: string; fullName?: string; buildOptions?: string[] }[] = [
     { name: "armcom", fullName: "Commander" },
   ],
@@ -249,15 +248,45 @@ function show(
     <PersistentStoreProvider storage={storage}>
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
-          <Route path="/workshop" element={<UnitPage />} />
+          {/* The list, which the editor's Projects button and its "no project"
+              states link to. Only enough of it to be navigated to. */}
+          <Route path="/workshop" element={<p>Tweak projects</p>} />
+          <Route path="/workshop/:id" element={<UnitPage />} />
         </Routes>
       </MemoryRouter>
     </PersistentStoreProvider>,
   );
 }
 
+/** The editor on a game with no project yet, on `armcom`. */
+const openNew = (
+  game: string,
+  units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
+) => show(units, `/workshop/new?game=${encodeURIComponent(game)}&unit=armcom`);
+
+/**
+ * The editor on the project already saved for a game, on `armcom`. Opening a
+ * project by its own id is what the list does, and what a link into a project
+ * is. There is one project per game in the tests that use this.
+ */
+const openSaved = (
+  game: string,
+  units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
+) => {
+  const project = saved().find((p) => p.gameName === game);
+  if (!project) throw new Error(`nothing saved for ${game}`);
+  return show(units, `/workshop/${project.id}?unit=armcom`);
+};
+
 /** The health box, which most tests below drive. */
 const healthBox = () => screen.getByLabelText("Health") as HTMLInputElement;
+
+/** The saved projects, for a test that has to reopen one by its own id. */
+const saved = () =>
+  readStoredSetting<{ id: string; name: string; gameName: string }[]>(
+    PROJECTS_KEY,
+    [],
+  );
 
 const type = (input: HTMLInputElement, value: string) => {
   fireEvent.change(input, { target: { value } });
@@ -267,6 +296,9 @@ const type = (input: HTMLInputElement, value: string) => {
 beforeEach(() => {
   storage = memorySettingsStorage();
   installSettingsStorage(storage);
+  // Module state, shared by every mount since #2696, so one test's undo stack
+  // would otherwise still be there for the next.
+  resetEditHistory();
 });
 
 afterEach(() => {
@@ -295,7 +327,7 @@ describe("UnitPage", () => {
    * in a unit def, so the name has to come from the read that can answer for it.
    */
   describe("naming a unit whose def carries no name", () => {
-    const entry = `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`;
+    const entry = `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armaak`;
 
     it("takes the name from the curated dataset", () => {
       show({ armaak: ARMAAK }, entry, [
@@ -342,13 +374,44 @@ describe("UnitPage", () => {
   });
 
   it("asks for a unit before showing any fields", () => {
-    show({ armcom: ARMCOM }, `/workshop?game=${encodeURIComponent(GAME.name)}`);
+    show(
+      { armcom: ARMCOM },
+      `/workshop/new?game=${encodeURIComponent(GAME.name)}`,
+    );
     expect(screen.getByText("Pick a unit to see its fields.")).toBeTruthy();
   });
 
-  it("asks for a game before showing any units", () => {
-    show({ armcom: ARMCOM }, "/workshop");
-    expect(screen.getByText("Pick a game to see its units.")).toBeTruthy();
+  /** `/workshop/new` with no game names nothing to edit. Since #2696 the way
+   *  to pick one is to start a project, which happens on the list. */
+  it("sends you to the list when the route names no game", () => {
+    show({ armcom: ARMCOM }, "/workshop/new");
+    expect(
+      screen.getByText(
+        "Start a project under Unit tweaks to edit a game's units.",
+      ),
+    ).toBeTruthy();
+  });
+
+  /** A link to a project that has been deleted, or one shared from a machine
+   *  that has it and this one does not. Nothing is started in its place. */
+  it("says so when the route names a project this machine has not got", () => {
+    show({ armcom: ARMCOM }, "/workshop/2f0f5a2e-0000-4000-8000-000000000000");
+    expect(
+      screen.getByText(/That project is not on this machine/),
+    ).toBeTruthy();
+    expect(saved()).toEqual([]);
+  });
+
+  /** An imported project can name a game nobody here has installed. Its edits
+   *  are kept, there is simply nothing to apply them against. */
+  it("says when the project's game is not installed", () => {
+    show(
+      { armcom: ARMCOM },
+      "/workshop/new?game=A+Game+Nobody+Has&unit=armcom",
+    );
+    expect(
+      screen.getByText(/A Game Nobody Has is not installed here/),
+    ).toBeTruthy();
   });
 
   it("says it is still reading while the defs load", () => {
@@ -393,7 +456,7 @@ describe("UnitPage", () => {
     });
 
     it("says nothing about a read that has not happened, with no game picked", () => {
-      show({ armcom: ARMCOM }, "/workshop");
+      show({ armcom: ARMCOM }, "/workshop/new");
       expect(screen.queryByRole("button", { name: /No problems/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /Checking/ })).toBeNull();
     });
@@ -522,7 +585,7 @@ describe("UnitPage", () => {
     const ba = (entryUnit = "ajuno") =>
       show(
         { ajuno: AJUNO },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${entryUnit}`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=${entryUnit}`,
         [{ name: "ajuno", fullName: "Arm Juno" }],
       );
 
@@ -530,7 +593,7 @@ describe("UnitPage", () => {
     const bar = () =>
       show(
         { armaak: ARMAAK },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
         [{ name: "armaak", fullName: "Archangel" }],
         [],
         {
@@ -545,7 +608,7 @@ describe("UnitPage", () => {
     const barTranslated = () =>
       show(
         { armaak: ARMAAK },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
         [{ name: "armaak", fullName: "Archangel" }],
         [],
         {
@@ -817,56 +880,42 @@ describe("UnitPage", () => {
 
   /**
    * Issue #2664: an edit is a patch against one game's own unit table, so it
-   * must say nothing about another game's unit of the same name, even though
-   * both games are open in the same page across the switch.
+   * must say nothing about another game's unit of the same name. Since #2696
+   * that is the routing rather than a picker inside the page: each game's edits
+   * are a project of their own, and opening one is opening its game.
    */
-  describe("switching games", () => {
+  describe("two games", () => {
     it("does not carry an edit from one game onto another game's unit of the same name", () => {
-      show();
+      openNew(GAME.name);
       type(healthBox(), "5000");
       expect(screen.getByText("1 change")).toBeTruthy();
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME_2.name },
-      });
-      fireEvent.click(
-        screen
-          .getAllByRole("button")
-          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
-      );
-
+      openNew(GAME_2.name);
       expect(healthBox().value).toBe("3000");
       expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
     });
 
-    it("keeps the edit for when the first game is picked again", () => {
-      show();
+    it("keeps the edit for when the first game's project is opened again", () => {
+      openNew(GAME.name);
       type(healthBox(), "5000");
+      cleanup();
+      openNew(GAME_2.name);
+      type(healthBox(), "1234");
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME_2.name },
-      });
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME.name },
-      });
-      fireEvent.click(
-        screen
-          .getAllByRole("button")
-          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
-      );
-
+      openSaved(GAME.name);
       expect(healthBox().value).toBe("5000");
       expect(screen.getByText("1 change")).toBeTruthy();
     });
 
     /**
      * Issues #2664 and #2661 both scope a game's own read out of a flat map,
-     * and neither could prove the other switches correctly on its own: the
-     * consumer scan is keyed per game the same way overrides now are, so an
-     * edit and a consumer note must change together rather than one lagging
-     * behind the other.
+     * and neither could prove the other on its own: the consumer scan is keyed
+     * per game the same way the edits are, so opening the other game's project
+     * must move both rather than one lagging behind the other.
      */
-    it("switches the custom parameter rows and their consumer notes with the game", () => {
+    it("reads each project's own game for the custom parameter notes", () => {
       mockConsumersByArchive[GAME.primaryArchive.name] = {
         params: {
           canareaattack: {
@@ -892,37 +941,26 @@ describe("UnitPage", () => {
         truncated: false,
         errors: [],
       };
-      show({ armcom: { ...ARMCOM, customParams: { canareaattack: "1" } } });
+      const withParam = {
+        armcom: { ...ARMCOM, customParams: { canareaattack: "1" } },
+      };
+      openNew(GAME.name, withParam);
       type(healthBox(), "5000");
       expect(
         screen.getByText("Custom parameters").closest("div")?.textContent,
       ).toContain("luarules/gadgets/unit_areaattack.lua");
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME_2.name },
-      });
-      fireEvent.click(
-        screen
-          .getAllByRole("button")
-          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
-      );
-
+      openNew(GAME_2.name, withParam);
       expect(healthBox().value).toBe("3000");
       const custom = screen.getByText("Custom parameters").closest("div");
       expect(custom?.textContent).not.toContain(
         "luarules/gadgets/unit_areaattack.lua",
       );
       expect(custom?.textContent).toContain("3 files read the whole");
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME.name },
-      });
-      fireEvent.click(
-        screen
-          .getAllByRole("button")
-          .find((b) => b.textContent?.includes("armcom")) as HTMLElement,
-      );
-
+      openSaved(GAME.name, withParam);
       expect(healthBox().value).toBe("5000");
       expect(
         screen.getByText("Custom parameters").closest("div")?.textContent,
@@ -1103,7 +1141,7 @@ describe("UnitPage", () => {
      * reach a unit the dataset has never seen.
      */
     it("names a replacement from what it was given", async () => {
-      show({ armaak: ARMAAK }, `/workshop?game=${GAME.name}&unit=armaak`, [
+      show({ armaak: ARMAAK }, `/workshop/new?game=${GAME.name}&unit=armaak`, [
         { name: "armaak", fullName: "Archangel" },
       ]);
       await copy("armaak", "Archangel II");
@@ -1146,7 +1184,7 @@ describe("UnitPage", () => {
    * reach the build menu store and stay out of the override set.
    */
   describe("editing a build menu", () => {
-    const entry = `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armlab`;
+    const entry = `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armlab`;
     const DATASET = [
       { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
       { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
@@ -1373,7 +1411,7 @@ describe("UnitPage", () => {
       };
       return show(
         UNITS,
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
         DATASET,
       );
     };
@@ -1412,7 +1450,7 @@ describe("UnitPage", () => {
       mockSides = SIDES;
       show(
         UNITS,
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armlab`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armlab`,
         DATASET,
       );
       const row = listRow("armpw");
@@ -1503,7 +1541,7 @@ describe("UnitPage", () => {
     const openAt = (unit: string) =>
       show(
         UNITS,
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
         DATASET,
       );
 
@@ -1572,18 +1610,14 @@ describe("UnitPage", () => {
     it("does not carry the mark onto another game's unit of the same name", () => {
       openAt("armcom");
       fireEvent.click(screen.getByLabelText("Disable Commander"));
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME_2.name },
-      });
-      fireEvent.click(browserRow("armcom"));
+      openNew(GAME_2.name, UNITS);
       expect(isOff("Commander")).toBe(false);
       expect(screen.queryByText(/unit disabled/)).toBeNull();
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME.name },
-      });
-      fireEvent.click(browserRow("armcom"));
+      openSaved(GAME.name, UNITS);
       expect(isOff("Commander")).toBe(true);
     });
 
@@ -1698,7 +1732,7 @@ describe("UnitPage", () => {
     const openAt = (unit: string, checksum = "abc") =>
       show(
         units,
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
         dataset,
         [],
         {},
@@ -1713,13 +1747,36 @@ describe("UnitPage", () => {
           (b) => b.querySelector("span.font-mono")?.textContent === key,
         ) as HTMLElement;
 
+    /**
+     * The rule #2696 kept: someone who followed "Edit in Unit tweaks" from a
+     * unit's page has chosen a unit and not a project, so looking at it leaves
+     * nothing behind and the first edit is what starts the project.
+     */
     it("starts a project on the first edit and says which one", () => {
       openAt("armcom");
-      expect(screen.queryByText(/^Saving to/)).toBeNull();
+      expect(saved()).toEqual([]);
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+        "Unit tweaks",
+      );
+
       type(healthBox(), "5000");
-      expect(screen.getByText(/Saving to/).textContent).toContain(
+
+      expect(saved()).toHaveLength(1);
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
         `${GAME.name} tweaks`,
       );
+    });
+
+    /** And the URL becomes the project's own, so reloading or sharing the page
+     *  lands back in what was started rather than starting a second one. */
+    it("moves the page onto the project it started", () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      cleanup();
+
+      openSaved(GAME.name, units);
+      expect(healthBox().value).toBe("5000");
+      expect(screen.getByText("1 change")).toBeTruthy();
     });
 
     it("still has the edits after the page is closed and reopened", () => {
@@ -1728,8 +1785,9 @@ describe("UnitPage", () => {
       fireEvent.click(screen.getByLabelText("Disable Commander"));
       cleanup();
 
-      // The same storage, a brand new page: what reopening the app does.
-      openAt("armcom");
+      // The same storage, a brand new page: what reopening the app and picking
+      // the project off the list does.
+      openSaved(GAME.name, units);
       expect(healthBox().value).toBe("5000");
       expect(screen.getByText("1 change, 1 unit disabled")).toBeTruthy();
       expect(screen.getByLabelText("Disable Commander")).toHaveProperty(
@@ -1812,28 +1870,28 @@ describe("UnitPage", () => {
       );
     });
 
-    /** Issue #2664 again, from the project's side: a game's project is its own
-     *  and so is its history. */
+    /**
+     * Issue #2664 again, from the project's side: a game's project is its own
+     * and so is its history. Since #2696 the history has to survive the editor
+     * being unmounted for that to hold, which is why the stacks live in the
+     * module rather than in the page (`history.ts`).
+     */
     it("keeps two games' projects and undo stacks apart", () => {
-      openAt("armcom");
+      openNew(GAME.name, units);
       type(healthBox(), "5000");
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME_2.name },
-      });
-      fireEvent.click(browserRow("armcom"));
+      openNew(GAME_2.name, units);
       expect(healthBox().value).toBe("3000");
       expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", true);
-
       type(healthBox(), "1234");
       fireEvent.click(screen.getByLabelText("Undo"));
       expect(healthBox().value).toBe("3000");
+      cleanup();
 
-      fireEvent.change(screen.getByLabelText("Game"), {
-        target: { value: GAME.name },
-      });
-      fireEvent.click(browserRow("armcom"));
-      // The first game's edit is untouched by anything done in the second.
+      openSaved(GAME.name, units);
+      // The first game's edit is untouched by anything done in the second, and
+      // its own undo step is still there.
       expect(healthBox().value).toBe("5000");
       expect(screen.getByLabelText("Undo")).toHaveProperty("disabled", false);
     });
@@ -1845,10 +1903,42 @@ describe("UnitPage", () => {
       type(healthBox(), "5000");
       cleanup();
 
-      openAt("armcom", "moved on");
+      const project = saved().find((p) => p.gameName === GAME.name);
+      show(
+        units,
+        `/workshop/${project?.id}?unit=armcom`,
+        dataset,
+        [],
+        {},
+        "moved on",
+      );
       expect(
         screen.getByText(new RegExp(`${GAME.name} has changed`)),
       ).toBeTruthy();
+    });
+
+    /**
+     * A project started from the list names a game nobody had read, so it has
+     * no checksum to compare against. The first open that can read the game
+     * fills it in rather than leaving #1281 with nothing to work from.
+     */
+    it("records what the game checksummed to for a project started without one", () => {
+      const project = {
+        id: "2f0f5a2e-0000-4000-8000-000000000000",
+        name: "Started from the list",
+        gameName: GAME.name,
+        edits: { overrides: {}, clones: {}, menus: {}, text: {}, disabled: [] },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+
+      show(units, `/workshop/${project.id}?unit=armcom`, dataset);
+
+      expect(saved()[0]).toHaveProperty("authoredChecksum", "abc");
+      // Not an edit to the project, so it does not restamp when it changed.
+      expect(saved()[0]).toHaveProperty("updatedAt", project.updatedAt);
+      expect(screen.queryByText(/has changed since/)).toBeNull();
     });
   });
 
@@ -1871,7 +1961,7 @@ describe("UnitPage", () => {
       mockArchiveFiles = ARCHIVE;
       show(
         { armaak: ARMAAK },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
         [{ name: "armaak", fullName: "Anti-Air Turret" }],
       );
     };
@@ -1888,7 +1978,7 @@ describe("UnitPage", () => {
       mockArchiveFiles = [];
       show(
         { armaak: ARMAAK },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
         [{ name: "armaak", fullName: "Anti-Air Turret" }],
       );
       expect(screen.queryByLabelText("Browse for Model")).toBeNull();
@@ -1984,7 +2074,7 @@ describe("UnitPage", () => {
       mockLegoProjects = projects;
       return show(
         { armcom: ARMCOM },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
         [{ name: "armcom", fullName: "Commander" }],
       );
     };
@@ -2050,11 +2140,10 @@ describe("UnitPage", () => {
         "4321",
       );
 
-      expect(screen.getByText(/^Saving to/)).toBeTruthy();
-      const saved = JSON.parse(storage.get(PROJECTS_KEY) ?? "[]");
-      expect(saved).toHaveLength(1);
-      expect(saved[0].edits.clones).toEqual({});
-      expect(saved[0].edits.overrides).toEqual({
+      const projects = JSON.parse(storage.get(PROJECTS_KEY) ?? "[]");
+      expect(projects).toHaveLength(1);
+      expect(projects[0].edits.clones).toEqual({});
+      expect(projects[0].edits.overrides).toEqual({
         skyfort: { maxdamage: 4321 },
       });
       // One step, and it is the field. Undoing does not remove the unit.
@@ -2073,7 +2162,7 @@ describe("UnitPage", () => {
       mockLegoProjects = [legoProject()];
       show(
         { armcom: ARMCOM },
-        `/workshop?game=${encodeURIComponent(GAME_2.name)}&unit=armcom`,
+        `/workshop/new?game=${encodeURIComponent(GAME_2.name)}&unit=armcom`,
         [{ name: "armcom", fullName: "Commander" }],
       );
       expect(screen.queryByText("Sky Fortress")).toBeNull();
@@ -2090,7 +2179,7 @@ describe("UnitPage", () => {
       mockLegoProjects = [legoProject()];
       show(
         { armcom: ARMCOM, skyfort: { ...SKYFORT, maxdamage: 9000 } },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
         [{ name: "armcom", fullName: "Commander" }],
       );
       expect(
@@ -2126,7 +2215,7 @@ describe("UnitPage", () => {
       ];
       show(
         { armcom: ARMCOM },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
         [{ name: "armcom", fullName: "Commander" }],
       );
       expect((healthBox() as HTMLInputElement).value).toBe("3000");
@@ -2138,7 +2227,7 @@ describe("UnitPage", () => {
       mockSides = [{ name: "Arm", startUnit: "armcom" }];
       show(
         { armlab: ARMLAB, armcom: ARMCOM },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armlab`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armlab`,
         [
           { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
           { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
@@ -2189,7 +2278,7 @@ describe("UnitPage", () => {
     const openPeewee = () =>
       show(
         GROUND,
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armpw`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armpw`,
         [{ name: "armpw", fullName: "Peewee" }],
       );
 
@@ -2233,7 +2322,7 @@ describe("UnitPage", () => {
     it("warns that a moving unit with no class is dropped at load", () => {
       show(
         { ...GROUND, armflea: { name: "armflea", canMove: true } },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armflea`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armflea`,
         [{ name: "armflea", fullName: "Flea" }],
       );
       expect(screen.getByText(/drops it at load/)).toBeTruthy();
@@ -2243,7 +2332,7 @@ describe("UnitPage", () => {
     it("warns that a class on a unit that does not move has no effect", () => {
       show(
         { ...GROUND, armtl: { name: "armtl", movementClass: "TANKSMALL" } },
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armtl`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armtl`,
         [{ name: "armtl", fullName: "Torpedo Launcher" }],
       );
       expect(screen.getByText(/no effect until Can move is on/)).toBeTruthy();
@@ -2278,7 +2367,7 @@ describe("UnitPage", () => {
       ];
       show(
         GROUND,
-        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=skyfort`,
         [{ name: "armpw", fullName: "Peewee" }],
       );
 

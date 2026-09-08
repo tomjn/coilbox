@@ -38,8 +38,14 @@
  * The stacks are not capped. A step retains only what it changed, and the one
  * expensive change a project can make - copying a unit, which is a whole
  * definition - is retained once however many steps refer to it.
+ *
+ * They live in this module rather than in the editor's own state, so that
+ * leaving the editor and coming back keeps the history the third decision above
+ * promises. That used to be free: switching project was switching a picker
+ * inside a page that stayed mounted. Since #2696 it is a route change, and a
+ * stack held in the page would go with the page.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import type { GameEdits } from "./project";
 
 interface Stacks {
@@ -48,6 +54,42 @@ interface Stacks {
 }
 
 const NO_STACKS: Stacks = { past: [], future: [] };
+
+let stacks: Record<string, Stacks> = {};
+const listeners = new Set<() => void>();
+
+function setStacks(update: (all: Record<string, Stacks>) => typeof stacks) {
+  const next = update(stacks);
+  if (next === stacks) return;
+  stacks = next;
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Throw every project's history away. For tests, which share this module. */
+export function resetEditHistory() {
+  stacks = {};
+  for (const listener of listeners) listener();
+}
+
+/**
+ * Drop a deleted project's history. A plain function as well as a method on the
+ * hook, because the project list deletes projects and has no other reason to
+ * subscribe to a stack it never pushes to.
+ */
+export function forgetEditHistory(key: string) {
+  setStacks((all) => {
+    if (!Object.hasOwn(all, key)) return all;
+    const { [key]: _dropped, ...rest } = all;
+    return rest;
+  });
+}
 
 /**
  * Stacks only. The present state lives in the saved project, because that is
@@ -72,7 +114,7 @@ export interface EditHistory {
 }
 
 export function useEditHistory(): EditHistory {
-  const [stacks, setStacks] = useState<Record<string, Stacks>>({});
+  const all = useSyncExternalStore(subscribe, () => stacks);
 
   const push = useCallback((key: string, current: GameEdits) => {
     setStacks((all) => {
@@ -85,7 +127,7 @@ export function useEditHistory(): EditHistory {
 
   const undo = useCallback(
     (key: string, current: GameEdits): GameEdits | undefined => {
-      const stack = stacks[key] ?? NO_STACKS;
+      const stack = all[key] ?? NO_STACKS;
       const previous = stack.past[stack.past.length - 1];
       if (previous === undefined) return undefined;
       setStacks((all) => {
@@ -101,12 +143,12 @@ export function useEditHistory(): EditHistory {
       });
       return previous;
     },
-    [stacks],
+    [all],
   );
 
   const redo = useCallback(
     (key: string, current: GameEdits): GameEdits | undefined => {
-      const stack = stacks[key] ?? NO_STACKS;
+      const stack = all[key] ?? NO_STACKS;
       const next = stack.future[0];
       if (next === undefined) return undefined;
       setStacks((all) => {
@@ -122,25 +164,17 @@ export function useEditHistory(): EditHistory {
       });
       return next;
     },
-    [stacks],
+    [all],
   );
 
   const canUndo = useCallback(
-    (key: string) => (stacks[key]?.past.length ?? 0) > 0,
-    [stacks],
+    (key: string) => (all[key]?.past.length ?? 0) > 0,
+    [all],
   );
   const canRedo = useCallback(
-    (key: string) => (stacks[key]?.future.length ?? 0) > 0,
-    [stacks],
+    (key: string) => (all[key]?.future.length ?? 0) > 0,
+    [all],
   );
 
-  const forget = useCallback((key: string) => {
-    setStacks((all) => {
-      if (!Object.hasOwn(all, key)) return all;
-      const { [key]: _dropped, ...rest } = all;
-      return rest;
-    });
-  }, []);
-
-  return { push, undo, redo, canUndo, canRedo, forget };
+  return { push, undo, redo, canUndo, canRedo, forget: forgetEditHistory };
 }

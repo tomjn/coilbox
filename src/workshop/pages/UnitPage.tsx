@@ -1,19 +1,28 @@
 /**
- * The workshop's unit page: pick a game, find a unit, change its numbers
- * (issues #1270, #1271 and #2647).
+ * One tweak project, open: find a unit, change its numbers (issues #1270, #1271
+ * and #2647).
  *
- * One route rather than a list route and a detail route, with the game and the
- * unit in the query string. A tweak is a set of edits across several units and
- * the person making it moves between them constantly, so unmounting the whole
- * page on every pick would throw away the edit set with it. `?game=` and
- * `?unit=` keep the deep link a separate detail route would have given.
+ * `/workshop/:id` is the project, and the unit is in the query string. A tweak
+ * is a set of edits across several units and the person making it moves between
+ * them constantly, so unmounting the whole page on every pick would throw away
+ * everything the page has read. `?unit=` keeps the deep link a separate detail
+ * route would have given.
  *
- * The edits live in a saved project, one per game, and are written as they are
- * made (issue #1282). There is no save button: the first edit starts a project
- * named after the game, everything after it writes into that project, and
+ * `/workshop/new?game=` is the same page with no project yet, which is where a
+ * unit's encyclopedia page sends somebody who has picked a unit and no project
+ * (issue #2696, and `routes.ts`). The first edit starts the project and the URL
+ * becomes the project's own.
+ *
+ * The edits live in a saved project and are written as they are made (issue
+ * #1282). There is no save button: everything writes into the open project and
  * closing the app loses nothing. `project.ts` holds the five stores and the
- * list, `history.ts` holds undo and redo over them, and the drawer behind the
- * Projects button is where a project is renamed, copied, exported and deleted.
+ * list, `history.ts` holds undo and redo over them, and `/workshop` is where a
+ * project is started, renamed, copied, exported and deleted.
+ *
+ * There is no game picker. A project is one game's (issue #2664), so the game
+ * is a property of what is open rather than a control on the page, and working
+ * on another game is opening another project. The picker used to switch project
+ * with it, which is the same thing said in one page instead of two.
  *
  * Two reads, joined on the lowercased def key. `--unit-defs` gives the fields,
  * and the curated dataset gives the name a person reads, which is not in the
@@ -55,15 +64,13 @@
  * All five stores are scoped to one game, and so is the project that holds
  * them. An override is a patch against one game's own unit table, so it means
  * nothing under another game that happens to share a unit's internal name, and
- * picking a different game must not carry it over (issue #2664). The page
- * therefore keeps which project is open per game and switches with the picker,
- * so moving between games keeps both games' work and mixes neither.
+ * one game's edits must never reach another's (issue #2664). Opening a project
+ * is opening its game, so the two cannot meet.
  */
-import { Button, buttonVariants, cn, useDrawer } from "@picoframe/frame";
-import { FolderOpen, Plus, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { Button, buttonVariants, cn } from "@picoframe/frame";
+import { FolderOpen, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
-import { OptionSelect } from "@/components/OptionSelect";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { gameIdentityForName } from "@/container/gameIdentity";
@@ -82,7 +89,6 @@ import {
   SkeletonList,
 } from "@/content/pages/components/states";
 import { buildTechForest } from "@/content/techForest";
-import { useImportParam } from "@/deeplink/useImportParam";
 import { useLegoProjects } from "@/lego/projects";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
 import {
@@ -124,9 +130,9 @@ import {
   editSlot,
   type GameEdits,
   type ModProject,
-  parseModProjectJson,
   useModProjects,
 } from "../project";
+import { projectPath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
 import { type FieldView, unitFieldView } from "../unitSections";
@@ -146,7 +152,6 @@ import {
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
-import { ProjectsDrawer } from "./components/ProjectsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import type { FieldChoices } from "./components/UnitFieldRow";
 import { UnitList } from "./components/UnitList";
@@ -156,12 +161,37 @@ import { UnitTextPanel } from "./components/UnitTextPanel";
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
 
 export default function UnitPage() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
   const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
 
+  // The saved projects, which is where every edit on this page lands. Five
+  // stores that each used to key themselves by game and prune an emptied entry
+  // are now five slots inside one project, so the keying and the pruning happen
+  // once here rather than five times in this file (see `project.ts`).
+  const {
+    projects,
+    createProject,
+    applyEdits,
+    setEdits,
+    recordAuthoredChecksum,
+  } = useModProjects();
+  const history = useEditHistory();
+
+  // Which project is open. The route says so, except on `/workshop/new`, where
+  // there is no project yet and the game comes from the link that sent us here.
+  // `new` is a value of the same param rather than a route of its own, so the
+  // first edit changes the URL without remounting the page and taking the
+  // game's whole unit table down with it. No project's id can collide with it:
+  // they are uuids.
+  const { id: routeId } = useParams();
+  const project = projects.find((p) => p.id === routeId);
+  /** Whether the route names a project that is not in the list any more. */
+  const missing = routeId !== "new" && !project;
+
   const games = scan.data?.games ?? [];
-  const gameName = params.get("game") ?? "";
+  const gameName = project?.gameName ?? params.get("game") ?? "";
   const game = games.find((g) => g.name === gameName);
   const unitKey = params.get("unit") ?? "";
 
@@ -195,33 +225,6 @@ export default function UnitPage() {
     game?.primaryArchive.name,
   );
 
-  // The saved projects, which is where every edit on this page lands. Five
-  // stores that each used to key themselves by game and prune an emptied entry
-  // are now five slots inside one project, so the keying and the pruning happen
-  // once here rather than five times in this file (see `project.ts`).
-  const { projects, createProject, applyEdits, setEdits } = useModProjects();
-  const history = useEditHistory();
-  const drawer = useDrawer();
-
-  // Which project is open, per game. A project is one game's, so switching the
-  // picker switches project, and switching back brings the same one up with its
-  // undo stack intact. A game nobody has chosen for falls back to whichever of
-  // its projects was written to last, which is the one they were in. Two that
-  // were written to at the same moment, which is a project and a copy of it,
-  // fall to the older, so duplicating does not move you into the copy.
-  const [openByGame, setOpenByGame] = useState<Record<string, string>>({});
-  const project = useMemo(() => {
-    const chosen = projects.find((p) => p.id === openByGame[gameName]);
-    if (chosen) return chosen;
-    return projects
-      .filter((p) => p.gameName === gameName)
-      .reduce<ModProject | undefined>((newest, p) => {
-        if (!newest) return p;
-        if (p.updatedAt !== newest.updatedAt)
-          return p.updatedAt > newest.updatedAt ? p : newest;
-        return p.createdAt < newest.createdAt ? p : newest;
-      }, undefined);
-  }, [projects, openByGame, gameName]);
   const projectId = project?.id ?? "";
   const edits = project?.edits ?? EMPTY_EDITS;
   // `clones` is deliberately not taken here. The project owns the units copied
@@ -251,7 +254,12 @@ export default function UnitPage() {
     if (changed) history.push(target.id, changed.before);
   };
 
-  /** Make a project for this game and open it. */
+  /**
+   * Make a project for this game and open it, which is what the first edit on
+   * `/workshop/new` does. The URL becomes the project's own, replacing rather
+   * than pushing so that going back leaves the workshop rather than landing on
+   * a `/workshop/new` that would start a second empty project.
+   */
   const startProject = (name: string, edits: GameEdits): ModProject => {
     const started = createProject({
       name,
@@ -260,7 +268,8 @@ export default function UnitPage() {
       authoredChecksum: defs?.checksum,
       edits,
     });
-    setOpenByGame((all) => ({ ...all, [gameName]: started.id }));
+    pathRef.current = started.id;
+    navigate(projectPath(started.id, unitKey), { replace: true });
     return started;
   };
 
@@ -593,49 +602,48 @@ export default function UnitPage() {
     [inheritedMenu, menuOps],
   );
 
+  /**
+   * Which project the URL is for, ahead of the render that will say so.
+   *
+   * Copying a unit starts a project and then selects the copy, both in one
+   * handler. The second write reads the location the handler started at, so
+   * without this it would put the URL back on `/workshop/new` and lose the
+   * project the first write had just made.
+   */
+  const pathRef = useRef(routeId);
+  pathRef.current = routeId;
+
   // Replaces rather than pushes, so backing out of the page does not walk
   // through every unit that was looked at on the way.
   const select = (next: Record<string, string>) => {
     const merged = new URLSearchParams(params);
+    // Once a project is open the game comes from the project, so carrying the
+    // one the link arrived with would leave a parameter nothing reads.
+    if (pathRef.current !== "new") merged.delete("game");
     for (const [key, value] of Object.entries(next)) {
       if (value) merged.set(key, value);
       else merged.delete(key);
     }
-    setParams(merged, { replace: true });
+    navigate(`/workshop/${pathRef.current}?${merged}`, { replace: true });
   };
 
   /**
-   * Open a project: its game, then the project itself.
+   * Record what the game checksums to for a project that has no answer yet,
+   * which is one started from the list against a game nobody had read (issue
+   * #2696). Once only, and never over an answer the project already has: see
+   * `recordAuthoredChecksum`.
    *
-   * Held in a ref because the drawer keeps the element it was handed, so a
-   * callback closing over this render's `params` would go on writing the query
-   * string as it was when the drawer opened.
+   * Held in a ref so the effect fires on the read landing rather than on every
+   * render the project list changes in, which while editing is all of them.
    */
-  const openRef = useRef<(project: ModProject) => void>(() => {});
-  openRef.current = (chosen: ModProject) => {
-    setOpenByGame((all) => ({ ...all, [chosen.gameName]: chosen.id }));
-    select({ game: chosen.gameName, unit: "" });
-  };
-
-  // A shared project link lands here with its code in the query string. It is
-  // saved and opened, because a project is a document rather than a setting:
-  // nothing about the game changes until it is compiled, so there is nothing to
-  // ask permission for beyond the deep-link confirmation it already passed.
-  const { code: importCode } = useImportParam();
-  const [importError, setImportError] = useState<string | null>(null);
-  const importRef = useRef<(code: string) => void>(() => {});
-  importRef.current = (code: string) => {
-    const imported = parseModProjectJson(code);
-    if (!imported) {
-      setImportError("That link is not a coilbox tweak project.");
-      return;
-    }
-    setImportError(null);
-    openRef.current(createProject(imported));
+  const checksumRef = useRef<(checksum: string) => void>(() => {});
+  checksumRef.current = (checksum: string) => {
+    if (project && project.authoredChecksum === undefined)
+      recordAuthoredChecksum(project.id, checksum);
   };
   useEffect(() => {
-    if (importCode) importRef.current(importCode);
-  }, [importCode]);
+    if (defs?.checksum) checksumRef.current(defs.checksum);
+  }, [defs?.checksum]);
 
   // The override set and the text set both count as changes, because to the
   // person who made them they are the same thing: an edit to a unit. Only where
@@ -746,29 +754,6 @@ export default function UnitPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const openProjects = () =>
-    drawer.open({
-      title: "Tweak projects",
-      width: "30rem",
-      content: (
-        <ProjectsDrawer
-          openId={projectId}
-          installed={games}
-          onOpen={(chosen) => {
-            openRef.current(chosen);
-            drawer.close();
-          }}
-          onDeleted={(id) => history.forget(id)}
-        />
-      ),
-    });
-
-  /** Start a second project for this game, leaving the first one alone. */
-  const newProject = () => {
-    startProject(defaultProjectName(gameName, projects), EMPTY_EDITS);
-    select({ unit: "" });
-  };
-
   /** Whether the game has moved on since the project was started (issue #1281). */
   const gameMoved =
     project?.authoredChecksum !== undefined &&
@@ -783,35 +768,26 @@ export default function UnitPage() {
     <div className="flex flex-col gap-4 p-4 lg:h-full lg:min-h-0">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Unit tweaks</h1>
+          <h1 className="text-lg font-semibold">
+            {project ? project.name : "Unit tweaks"}
+          </h1>
           <p className="text-xs text-muted-foreground">
             Change a unit's numbers. Only the fields you change are recorded, so
             the rest still follow the game when it updates. Copy a unit to add
             one of your own, and put it on a builder's menu so something can
             build it.
           </p>
-          {/* Which project the edits are going into. There is no save button:
-            it says so here rather than leaving somebody to wonder. */}
-          {project && (
-            <p className="text-xs text-muted-foreground">
-              Saving to{" "}
-              <span className="font-medium text-foreground">
-                {project.name}
-              </span>
-              . Rename it under Projects.
-            </p>
-          )}
+          {/* Which game, and where the edits are going. There is no save
+            button, so it says so here rather than leaving somebody to wonder. */}
+          <p className="text-xs text-muted-foreground">
+            {project
+              ? `Editing ${project.gameName}. Saved as you work.`
+              : gameName
+                ? `Editing ${gameName}. The first change starts a project.`
+                : "No project open."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <OptionSelect
-            className="w-64"
-            size="sm"
-            ariaLabel="Game"
-            placeholder={scan.loading ? "Scanning…" : "Pick a game"}
-            value={game?.name ?? ""}
-            onValueChange={(name) => select({ game: name, unit: "" })}
-            options={games.map((g) => ({ value: g.name, label: g.name }))}
-          />
           {anythingToShow && (
             <span className="text-xs text-muted-foreground">
               {[
@@ -844,21 +820,13 @@ export default function UnitPage() {
           >
             <Redo2 className="size-3.5" />
           </Button>
-          {game && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={newProject}
-              title="Start a second project for this game"
-            >
-              <Plus className="size-3.5" />
-              New
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={openProjects}>
+          <Link
+            to="/workshop"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
             <FolderOpen className="size-3.5" />
             Projects
-          </Button>
+          </Link>
           {/* What unitsync said while reading this game's defs. It used to be a
             panel below everything else, which on a page that claims the window
             height and scrolls its two panes inside it meant a strip of the
@@ -874,12 +842,6 @@ export default function UnitPage() {
           )}
         </div>
       </header>
-
-      {importError && (
-        <Alert variant="destructive">
-          <AlertDescription>{importError}</AlertDescription>
-        </Alert>
-      )}
 
       {/* The game's archives no longer checksum to what they did when this
         project was started, so something under the edits has moved. Said and
@@ -916,14 +878,24 @@ export default function UnitPage() {
         </Alert>
       )}
 
-      {!game ? (
+      {missing ? (
+        // A link to a project that has been deleted, or one from a machine that
+        // never had it. Nothing is started in its place: the edits it named are
+        // gone, and an empty project under the same link would say they were not.
+        <EmptyState label="That project is not on this machine. Pick one under Unit tweaks." />
+      ) : !game ? (
         <EmptyState
           label={
             scan.loading
               ? "Scanning for installed games…"
               : games.length === 0
                 ? "No games are installed. Add one from the Library."
-                : "Pick a game to see its units."
+                : gameName
+                  ? // An imported project naming a game this machine has not
+                    // got. Its edits are safe, there is just nothing to apply
+                    // them against until the game is installed.
+                    `${gameName} is not installed here, so there are no units to show. The project's edits are kept.`
+                  : "Start a project under Unit tweaks to edit a game's units."
           }
         />
       ) : status === "error" ? (

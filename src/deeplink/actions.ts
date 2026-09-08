@@ -180,10 +180,10 @@ export function prepareImport(code: string): PrepareImportResult {
         },
       };
     case "mod-project":
-      // The unit page is where a tweak project is read and written, so a shared
-      // one is saved into the project list there. That page is behind Advanced
-      // mode, which the detail says, because somebody who has it off is sent
-      // home by the route's gate rather than shown the project.
+      // The projects list is where a tweak project is saved, so a shared one
+      // lands there and the page opens what it made (issue #2696). That page is
+      // behind Advanced mode, which the detail says, because somebody who has it
+      // off is sent home by the route's gate rather than shown the project.
       return {
         ok: true,
         plan: {
@@ -191,7 +191,7 @@ export function prepareImport(code: string): PrepareImportResult {
           route: importRoute("/workshop", code),
           label: containerKindName("mod-project"),
           detail:
-            "It is saved to Unit tweaks, which needs Advanced mode turned on in Settings.",
+            "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings.",
         },
       };
   }
