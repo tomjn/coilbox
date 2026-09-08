@@ -703,6 +703,21 @@ pub struct UnitDatasetEntry {
     /// both mean no reader should draw one.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub morph_targets: Vec<serde_json::Map<String, serde_json::Value>>,
+    /// The unit this def borrows its name from, out of
+    /// `customparams.i18nfromunit` (issue #2686). `None` for the ordinary unit,
+    /// which names itself.
+    ///
+    /// Beyond All Reason's `luaui/i18nhelpers.lua` looks a redirected unit up
+    /// under `units.names.<i18nfromunit>` rather than under its own key, and its
+    /// commander variants use it to borrow the name of the commander they are
+    /// made from. Without it `armcomcon` reads as `armcomcon` where the game
+    /// reads Armada Commander.
+    ///
+    /// Not serialised: it is read once, while the localisation file is open, and
+    /// what comes out of that is `full_name`. Keeping it out leaves the payload
+    /// the hub and the app already parse exactly as it was.
+    #[serde(skip)]
+    pub name_from: Option<String>,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +

@@ -47,8 +47,12 @@ use std::path::Path;
 /// which a game scanned under v15 has no entry for at all. v17: that read now
 /// covers every `language/<code>/units.json` the game ships and is keyed by
 /// language code (#2672), so a v16 blob holds the old one-locale shape, which
-/// deserialises as no translations at all rather than as English.
-const INFO_CACHE_VERSION: u32 = 17;
+/// deserialises as no translations at all rather than as English. v18: a unit
+/// whose def hands its name lookup to another unit is now read under that
+/// unit's key (#2686), so a blob cached under v17 holds `armcomcon` where
+/// Armada Commander belongs. The payload's shape is unchanged, its contents are
+/// not, and the key is otherwise the archive's own identity.
+const INFO_CACHE_VERSION: u32 = 18;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

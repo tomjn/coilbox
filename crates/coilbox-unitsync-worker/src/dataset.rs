@@ -387,6 +387,19 @@ local function morph_of(k, d)
   return '[' .. table.concat(out, ',') .. ']'
 end
 
+-- The unit a def hands its name lookup to, lowercased, or '' for the ordinary
+-- unit that names itself. Beyond All Reason's `luaui/i18nhelpers.lua` reads
+-- `units.names.<customparams.i18nfromunit>` in place of the unit's own key,
+-- which is how its commander variants borrow the name of the commander they are
+-- made from (issue #2686).
+local function name_from(d)
+  local cp = lowered(type(d) == 'table' and (d.customparams or d.customParams) or nil)
+  local from = cp['i18nfromunit']
+  if type(from) ~= 'string' then return '' end
+  local key = string.match(string.lower(from), '^%s*(.-)%s*$') or ''
+  return (key:gsub('[\t\r\n]', ''))
+end
+
 -- The game's weapondefs once, indexed by lowercased name: that is how a
 -- unitdef's weapons list points at them, and how the engine's own lookup
 -- matches them.
@@ -425,6 +438,7 @@ for _, k in ipairs(names) do
     .. '\t' .. string.format('%.4f', waterline_of(d))
     .. '\t' .. stats_of(d, wdefs)
     .. '\t' .. morph_of(k, d)
+    .. '\t' .. name_from(d)
 end
 -- A big game's list runs to hundreds of kilobytes, far past what unitsync can
 -- hand back in one string, so it goes back in pieces.
@@ -708,6 +722,11 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
             let waterline = parse_water(it.next());
             let stats = parse_stats(it.next());
             let morph_targets = parse_morph_targets(it.next());
+            let name_from = it
+                .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty() && *s != name)
+                .map(str::to_string);
             let build_options = opts
                 .split(',')
                 .map(str::trim)
@@ -729,6 +748,7 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
                 waterline,
                 stats,
                 morph_targets,
+                name_from,
             })
         })
         .collect()
@@ -795,9 +815,16 @@ fn string_table(units: &Map<String, Value>, section: &str) -> BTreeMap<String, S
 /// A fallback and never an override: the unitdef is the game's own answer, and
 /// a game that answered is left alone. A unit the file does not mention keeps
 /// its def key, which reads badly and is at least true.
+///
+/// A def carrying `customparams.i18nfromunit` is looked up under the unit it
+/// names rather than under its own key (issue #2686), which is what Beyond All
+/// Reason's `luaui/i18nhelpers.lua` does and the only way `armcomcon` reads as
+/// Armada Commander. One hop and no further, the same as the game: the redirect
+/// names a unit, not another redirect.
 fn fill_missing_names(units: &mut [UnitDatasetEntry], named: &BTreeMap<String, String>) {
     for unit in units.iter_mut().filter(|u| u.full_name.is_none()) {
-        if let Some(name) = named.get(&unit.name) {
+        let key = unit.name_from.as_ref().unwrap_or(&unit.name);
+        if let Some(name) = named.get(key) {
             unit.full_name = Some(name.clone());
         }
     }
@@ -889,6 +916,14 @@ mod language_name_tests {
             name: name.to_string(),
             full_name: full.map(str::to_string),
             ..Default::default()
+        }
+    }
+
+    /// A unit whose def hands its name lookup to another unit.
+    fn borrowing(name: &str, from: &str) -> UnitDatasetEntry {
+        UnitDatasetEntry {
+            name_from: Some(from.to_string()),
+            ..unit(name, None)
         }
     }
 
@@ -1010,6 +1045,50 @@ mod language_name_tests {
         assert_eq!(units[0].full_name.as_deref(), Some("Cortex Commander"));
         // Absent from the file, so it stays a def key rather than an invention.
         assert_eq!(units[1].full_name, None);
+    }
+
+    /// Beyond All Reason's commander variants name themselves nowhere and point
+    /// `customparams.i18nfromunit` at the commander they are made from, which is
+    /// the only entry the file holds for them (issue #2686).
+    #[test]
+    fn a_unit_that_borrows_a_name_is_looked_up_under_the_unit_it_borrows_from() {
+        let named = text_from_language_json(BAR_SHAPED).names;
+        let mut units = vec![borrowing("corcomcon", "corcom")];
+
+        fill_missing_names(&mut units, &named);
+
+        assert_eq!(units[0].full_name.as_deref(), Some("Cortex Commander"));
+    }
+
+    /// The def is still the game's own answer. A game like Balanced
+    /// Annihilation, which names its units in the def, is not touched by any of
+    /// this, redirect or no redirect.
+    #[test]
+    fn a_name_in_the_def_survives_a_redirect() {
+        let named = text_from_language_json(BAR_SHAPED).names;
+        let mut units = vec![UnitDatasetEntry {
+            name_from: Some("corcom".into()),
+            ..unit("corcomcon", Some("Cortex Commander Decoy"))
+        }];
+
+        fill_missing_names(&mut units, &named);
+
+        assert_eq!(
+            units[0].full_name.as_deref(),
+            Some("Cortex Commander Decoy")
+        );
+    }
+
+    /// One hop, the same as the game: a redirect names a unit, and the name it
+    /// asks for is whatever the file holds under that unit's key.
+    #[test]
+    fn a_redirect_at_a_unit_the_file_does_not_name_stays_a_def_key() {
+        let named = text_from_language_json(BAR_SHAPED).names;
+        let mut units = vec![borrowing("dummycom", "random")];
+
+        fill_missing_names(&mut units, &named);
+
+        assert_eq!(units[0].full_name, None);
     }
 }
 
@@ -1226,7 +1305,39 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("maxwaterdepth"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("weapondefs"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("stats_of"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("i18nfromunit"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_chunk("));
+    }
+
+    /// The redirect rides the same tab-separated line as everything else, and a
+    /// unit that declares none says so with an empty last column.
+    #[test]
+    fn reads_the_unit_a_def_borrows_its_name_from() {
+        let units = parse_dataset_units(
+            "corcomcon\t\t\t0\t\t1\t1\t0.0000\t0\t0\t0\t0\t{}\t[]\tcorcom\n\
+             corcom\t\t\t0\t\t1\t1\t0.0000\t0\t0\t0\t0\t{}\t[]\t",
+        );
+
+        assert_eq!(units[0].name_from.as_deref(), Some("corcom"));
+        assert_eq!(units[1].name_from, None);
+    }
+
+    /// A line written before the column existed borrows from nobody, the same
+    /// as a unit that declares nothing.
+    #[test]
+    fn a_line_without_the_redirect_column_borrows_nothing() {
+        let units = parse_dataset_units("armsolar\tSolar\t\t0\tARMSOLAR");
+        assert_eq!(units[0].name_from, None);
+    }
+
+    /// A def pointing at itself, which BAR's `armscavengerbossv2` does, is not
+    /// a redirect at all: the lookup it asks for is the one the unit would get
+    /// anyway.
+    #[test]
+    fn a_def_that_points_at_itself_borrows_nothing() {
+        let units =
+            parse_dataset_units("corcom\t\t\t0\t\t1\t1\t0.0000\t0\t0\t0\t0\t{}\t[]\tcorcom");
+        assert_eq!(units[0].name_from, None);
     }
 
     // ------------------------------------------------------------- stats column
