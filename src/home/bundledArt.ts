@@ -1183,6 +1183,83 @@ const legoParts: Drawing = {
   },
 };
 
+/**
+ * A unit's numbers, with one of them pushed past the value the game shipped.
+ *
+ * Two cards along, the unit builder's is a machine made of blocks, so this one
+ * cannot be a picture of a unit: what the workshop changes is not the shape.
+ * It is the figures behind it, and the one thing a tweak project records is the
+ * difference between what the game says a unit costs, carries and can do and
+ * what you have decided it should. So the subject is a row of values with the
+ * old mark still on the one that moved, which is the project in miniature.
+ *
+ * The pair of diamonds on the left is a unit and the copy of it the page can
+ * make, drawn in the shape `battles` and `uberstressRun` already use for one
+ * unit. Two shapes rather than a drawing of a tank, because a tank here would
+ * be the builder's card again in fewer blocks.
+ */
+const workshopUnits: Drawing = {
+  pools: [
+    [248, 104, 122, 0.2],
+    [64, 84, 96, 0.1],
+  ],
+  paint: (p) => {
+    /** Where a value bar starts, and the rows it is one of. */
+    const start = 166;
+    const rows: readonly (readonly [number, number])[] = [
+      [46, 72],
+      [76, 48],
+      [106, 104],
+      [136, 86],
+    ];
+    /** The row that has been changed, and where the game's own value ended. */
+    const [changedY, changedWidth] = rows[2];
+    const wasAt = 222;
+    const labels = rows
+      .map(
+        ([y]) =>
+          `<rect x="126" y="${y + 1.5}" width="30" height="5" rx="2.5" fill="${p.faint}" fill-opacity="0.32"/>`,
+      )
+      .join("");
+    const bars = rows
+      .map(([y, w], i) =>
+        i === 2
+          ? ""
+          : `<rect x="${start}" y="${y}" width="${w}" height="8" rx="3" fill="${p.line}" fill-opacity="0.22"/>`,
+      )
+      .join("");
+    // Guides at even steps, so the bars read as measured against something
+    // rather than as four bars of arbitrary length.
+    const guides = [166, 210, 254, 298]
+      .map((x) => `<path d="M${x} 32 L${x} 154"/>`)
+      .join("");
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.12">${guides}</g>` +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.3">${diamond(80, 100, 32)}</g>` +
+      `<g fill="${p.line}" fill-opacity="0.26">${diamond(62, 80, 32)}</g>` +
+      `<g fill="none" stroke="${p.line}" stroke-width="1.8" stroke-opacity="0.5">${diamond(62, 80, 32)}</g>` +
+      labels +
+      bars +
+      `<rect x="${start}" y="${changedY}" width="${changedWidth}" height="8" rx="3" fill="${p.line}" fill-opacity="0.5"/>` +
+      // Where the value was before the project moved it, and the distance it
+      // travelled.
+      `<g fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.65" stroke-linecap="round">` +
+      `<path d="M${wasAt} ${changedY - 14} L${wasAt} ${changedY - 2}"/>` +
+      `<path d="M${wasAt} ${changedY + 10} L${wasAt} ${changedY + 22}"/>` +
+      "</g>" +
+      `<g fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.55" stroke-dasharray="4 5">` +
+      `<path d="M${wasAt + 2} ${changedY + 4} L${start + changedWidth - 14} ${changedY + 4}"/>` +
+      "</g>" +
+      // An arrow head rather than the round handle every other card ends a bar
+      // with. A knob on a track is the engine settings card three along, and
+      // this is a value that has been moved rather than one you are holding.
+      `<g fill="none" stroke="${p.spark}" stroke-width="2.5" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round">` +
+      `<path d="M${start + changedWidth - 12} ${changedY - 3} L${start + changedWidth} ${changedY + 4} L${start + changedWidth - 12} ${changedY + 11}"/>` +
+      "</g>"
+    );
+  },
+};
+
 /** A tray of map projects, one open. */
 const mapconvProjects: Drawing = {
   pools: [
@@ -1635,6 +1712,7 @@ const DRAWINGS: Record<string, Drawing> = {
   "hub.browse": hub,
   "lego.units": legoUnits,
   "lego.parts": legoParts,
+  "workshop.units": workshopUnits,
   "mapconv.projects": mapconvProjects,
   "mapconv.compile": mapconvCompile,
   "mapconv.decompile": mapconvDecompile,
