@@ -89,17 +89,28 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
         errors.extend(unit_errors);
     }
     units.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // A game that names its units in a localisation file rather than in its
+    // unitdefs (issue #1925). `dataset::render` has done this since that fix and
+    // this read had not, so Beyond All Reason arrived here with no names at all:
+    // every `full_name` null, and with them every side's `start_unit_name`, which
+    // is what put `corcom` on the faction list where Cortex Commander belongs
+    // (issue #2690). Only worth opening the archive when something is actually
+    // missing a name, which for every game but BAR is nothing.
+    if units.iter().any(|u| u.full_name.is_none()) {
+        let named = crate::dataset::base_language_names(&us, game_archive);
+        crate::dataset::fill_missing_names(
+            units
+                .iter_mut()
+                .map(|u| (u.name.as_str(), &mut u.full_name)),
+            &named,
+        );
+        let _ = us.drain_errors();
+    }
+
     let unit_count = units.len() as u32;
 
-    // Map internal unit name -> friendly full name, to resolve side start units.
-    let full_by_name: HashMap<String, String> = units
-        .iter()
-        .filter_map(|u| {
-            u.full_name
-                .as_ref()
-                .map(|full| (u.name.to_lowercase(), full.clone()))
-        })
-        .collect();
+    let full_by_name = full_names(&units);
 
     let mut sides = Vec::new();
     for s in 0..us.side_count() {
@@ -244,9 +255,72 @@ fn parse_shim_units(raw: &str) -> Vec<UnitEntry> {
         .collect()
 }
 
+/// Map internal unit name to friendly full name, to resolve side start units.
+/// Lowercased, because a side's `startUnit` and the def table need not agree on
+/// case. A unit with no name is left out, so the caller falls back to the def
+/// key rather than showing a blank.
+fn full_names(units: &[UnitEntry]) -> HashMap<String, String> {
+    units
+        .iter()
+        .filter_map(|u| {
+            u.full_name
+                .as_ref()
+                .map(|full| (u.name.to_lowercase(), full.clone()))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
+
+    /// Beyond All Reason names nothing in its unitdefs, so every row the shim
+    /// returns collapses to `None` and a side's start unit had nothing to
+    /// resolve against: the faction list showed `corcom` (issue #2690). The
+    /// names come out of the game's `language/<code>/units.json` instead, the
+    /// same file `dataset::render` reads.
+    #[test]
+    fn a_game_that_names_nothing_in_its_defs_still_names_its_start_unit() {
+        let mut units = parse_shim_units("armcom\tarmcom\ncorcom\tcorcom");
+        assert!(units.iter().all(|u| u.full_name.is_none()));
+        assert!(full_names(&units).is_empty());
+
+        let named = BTreeMap::from([
+            ("armcom".to_string(), "Armada Commander".to_string()),
+            ("corcom".to_string(), "Cortex Commander".to_string()),
+        ]);
+        crate::dataset::fill_missing_names(
+            units
+                .iter_mut()
+                .map(|u| (u.name.as_str(), &mut u.full_name)),
+            &named,
+        );
+
+        assert_eq!(
+            full_names(&units).get("corcom").map(String::as_str),
+            Some("Cortex Commander")
+        );
+    }
+
+    /// A game that answered the question keeps its own answer, and a start unit
+    /// the localisation file never mentions stays a def key rather than an
+    /// invention.
+    #[test]
+    fn the_defs_win_and_an_unnamed_unit_stays_a_def_key() {
+        let mut units = parse_shim_units("armcom\tCommander\ndummycom\tdummycom");
+        let named = BTreeMap::from([("armcom".to_string(), "Armada Commander".to_string())]);
+        crate::dataset::fill_missing_names(
+            units
+                .iter_mut()
+                .map(|u| (u.name.as_str(), &mut u.full_name)),
+            &named,
+        );
+
+        let full = full_names(&units);
+        assert_eq!(full.get("armcom").map(String::as_str), Some("Commander"));
+        assert_eq!(full.get("dummycom"), None);
+    }
 
     #[test]
     fn parses_tab_separated_shim_units() {
