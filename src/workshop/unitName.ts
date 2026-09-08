@@ -33,12 +33,19 @@
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { unitLabel } from "@/content/unitChoices";
 
+/** The key a def spells `wanted` with, or `undefined` if it declares none. */
+function spelling(
+  def: Record<string, unknown>,
+  wanted: string,
+): string | undefined {
+  const lower = wanted.toLowerCase();
+  return Object.keys(def).find((k) => k.toLowerCase() === lower);
+}
+
 /** Read a def key however the game happened to spell it. */
 function readInsensitive(def: Record<string, unknown>, key: string): unknown {
-  const wanted = key.toLowerCase();
-  for (const [k, v] of Object.entries(def))
-    if (k.toLowerCase() === wanted) return v;
-  return undefined;
+  const spelt = spelling(def, key);
+  return spelt === undefined ? undefined : def[spelt];
 }
 
 /**
@@ -67,4 +74,37 @@ export function unitDisplayName(
       return value.trim();
   }
   return key;
+}
+
+/**
+ * Which def key a rename writes to, in the game's own spelling of it.
+ *
+ * The write side of the read above, and the same order for the same reason.
+ * `humanName` when the def declares one, since that is what the engine reads
+ * first. Otherwise `name`, but only when the def's `name` is a name rather than
+ * a repeat of the internal key, because overwriting the internal name would
+ * rename the unit itself. A def carrying neither gets a `humanName`, which is
+ * the key the engine looks in first and the one `clones.ts` adds for the same
+ * reason.
+ */
+export function defNamePath(
+  key: string,
+  def: Record<string, unknown> | undefined,
+): string {
+  const table = def ?? {};
+  const human = spelling(table, "humanName");
+  if (human) return human;
+  const plain = spelling(table, "name");
+  if (plain) {
+    const value = table[plain];
+    if (typeof value !== "string" || value.trim() !== key) return plain;
+  }
+  return "humanName";
+}
+
+/** Which def key a rewritten tooltip writes to, in the game's own spelling. */
+export function defDescriptionPath(
+  def: Record<string, unknown> | undefined,
+): string {
+  return spelling(def ?? {}, "description") ?? "description";
 }

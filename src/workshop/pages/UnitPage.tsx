@@ -76,16 +76,30 @@ import {
 } from "../overrides";
 import { unitDisplayName } from "../unitName";
 import { type FieldView, unitFieldView } from "../unitSections";
+import {
+  clearUnitText,
+  clearUnitTexts,
+  nameEdit,
+  setUnitText,
+  type TextField,
+  textEditCount,
+  textHome,
+  type UnitTextEdits,
+  unitTextCount,
+  unitTextRows,
+} from "../unitText";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import { UnitList } from "./components/UnitList";
+import { UnitTextPanel } from "./components/UnitTextPanel";
 
 /** Stable empties, so a page with neither does not re-derive on every render. */
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
 const NO_CLONES: UnitClones = {};
 const NO_OVERRIDES: UnitOverrides = {};
 const NO_MENUS: BuildMenus = {};
+const NO_TEXT: UnitTextEdits = {};
 
 export default function UnitPage() {
   const [params, setParams] = useSearchParams();
@@ -171,6 +185,28 @@ export default function UnitPage() {
     [gameName],
   );
 
+  // Kept per game for #2664's reason again, and needed at all only for a game
+  // that names its units outside its unit table: a rename there is a patch
+  // against a localisation file rather than against a def, so it cannot live in
+  // the override set (issue #2650, and `unitText.ts` for why).
+  const [textByGame, setTextByGame] = useState<Record<string, UnitTextEdits>>(
+    {},
+  );
+  const text = textByGame[gameName] ?? NO_TEXT;
+  const updateText = useCallback(
+    (update: (current: UnitTextEdits) => UnitTextEdits) =>
+      setTextByGame((all) => {
+        const next = update(all[gameName] ?? {});
+        if (Object.keys(next).length === 0) {
+          if (!Object.hasOwn(all, gameName)) return all;
+          const { [gameName]: _dropped, ...rest } = all;
+          return rest;
+        }
+        return { ...all, [gameName]: next };
+      }),
+    [gameName],
+  );
+
   const [view, setView] = useState<FieldView>("relevant");
   // Kept per game. A copy of a unit is a whole definition taken out of one
   // game's table, so it has no meaning under another game, and the browser
@@ -186,10 +222,16 @@ export default function UnitPage() {
   // The curated dataset describes the game's units, so it is not asked about
   // one of ours: a copy that stands in for `armcom` would otherwise be handed
   // the game's name for `armcom` and show it instead of the one it was given.
+  //
+  // A name the user has typed wins over all of it, so every list, heading,
+  // roster and picker on this page calls the unit what its owner calls it
+  // (issue #2650). Nothing outside this page can see it yet, because none of
+  // this is saved anywhere (issue #1282).
   const nameOf = useCallback(
     (key: string, def: Record<string, unknown> | undefined) =>
+      nameEdit(key, def, overrides, text)?.trim() ||
       unitDisplayName(key, def, clones[key] ? undefined : named.get(key)),
-    [named, clones],
+    [named, clones, overrides, text],
   );
 
   const gameUnits = defs?.units ?? NO_UNITS;
@@ -203,6 +245,60 @@ export default function UnitPage() {
     () => unitFieldView(unit, overrides, unitKey, view),
     [unit, overrides, unitKey, view],
   );
+
+  // What the game's own localisation file calls its units, which for a game
+  // like BAR is the only place a name or a description exists at all.
+  const language = useMemo(
+    () => ({
+      names: defs?.languageNames,
+      descriptions: defs?.languageDescriptions,
+    }),
+    [defs],
+  );
+  // Asked of the game's own units, never the table with our copies in it, for
+  // the reason `textHome` gives. A copy is always its own definition's problem.
+  const gameTextHome = useMemo(
+    () => textHome(gameUnits, language),
+    [gameUnits, language],
+  );
+  const home = clone ? "def" : gameTextHome;
+  const textRows = useMemo(
+    () =>
+      unitTextRows({
+        unitKey,
+        def: unit,
+        home,
+        language,
+        overrides,
+        edits: text,
+      }),
+    [unitKey, unit, home, language, overrides, text],
+  );
+
+  /** Rename the unit, or rewrite its tooltip, wherever this game keeps them. */
+  const commitText = (field: TextField, value: string) => {
+    const row = textRows[field];
+    if (row.path === undefined) {
+      updateText((t) => setUnitText(t, unitKey, field, value, row.inherited));
+      return;
+    }
+    const path = row.path;
+    // Emptying a box the game never filled is not an edit, it is the box going
+    // back to how it was found. Every other case is `setOverride`'s to decide.
+    if (value === "" && !row.present) {
+      updateOverrides((o) => clearOverride(o, unitKey, path));
+      return;
+    }
+    updateOverrides((o) =>
+      setOverride(o, unitKey, path, value, row.inheritedValue),
+    );
+  };
+
+  const resetText = (field: TextField) => {
+    const path = textRows[field].path;
+    if (path === undefined) updateText((t) => clearUnitText(t, unitKey, field));
+    else updateOverrides((o) => clearOverride(o, unitKey, path));
+  };
 
   // What the build menu picker offers: the game's own dataset, with the
   // project's units in among it rather than in a list of their own, which is
@@ -241,8 +337,11 @@ export default function UnitPage() {
     setParams(merged, { replace: true });
   };
 
-  const edits = overrideCount(overrides);
-  const unitEdits = Object.keys(overrides[unitKey] ?? {}).length;
+  // Both stores count as changes, because to the person who made them they are
+  // the same thing: an edit to a unit. Only where it lands differs.
+  const edits = overrideCount(overrides) + textEditCount(text);
+  const unitEdits =
+    Object.keys(overrides[unitKey] ?? {}).length + unitTextCount(text, unitKey);
   const addedCount = Object.keys(clones).length;
   const menuEdits = buildMenuOpCount(menus);
   const anythingChanged = edits > 0 || addedCount > 0 || menuEdits > 0;
@@ -270,6 +369,7 @@ export default function UnitPage() {
   const deleteClone = () => {
     updateClones((current) => removeClone(current, unitKey));
     updateOverrides((o) => clearUnit(o, unitKey));
+    updateText((t) => clearUnitTexts(t, unitKey));
     select({ unit: "" });
   };
 
@@ -382,6 +482,7 @@ export default function UnitPage() {
             units={units}
             selected={unitKey}
             overrides={overrides}
+            text={text}
             clones={clones}
             menus={menus}
             nameOf={nameOf}
@@ -428,9 +529,10 @@ export default function UnitPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        updateOverrides((o) => clearUnit(o, unitKey))
-                      }
+                      onClick={() => {
+                        updateOverrides((o) => clearUnit(o, unitKey));
+                        updateText((t) => clearUnitTexts(t, unitKey));
+                      }}
                     >
                       <RotateCcw className="size-3.5" />
                       Reset {unitEdits} change{unitEdits === 1 ? "" : "s"}
@@ -456,6 +558,13 @@ export default function UnitPage() {
               </div>
 
               <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+                <UnitTextPanel
+                  rows={textRows}
+                  home={home}
+                  isClone={clone !== undefined}
+                  onChange={commitText}
+                  onReset={resetText}
+                />
                 {isBuilder(unit) && (
                   <BuildMenuPanel
                     builderKey={unitKey}
