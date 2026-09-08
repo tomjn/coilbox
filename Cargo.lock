@@ -616,6 +616,7 @@ dependencies = [
  "tauri-plugin-coilbox-scenario",
  "tauri-plugin-coilbox-uberstress",
  "tauri-plugin-coilbox-unitsync",
+ "tauri-plugin-coilbox-workshop",
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
  "tauri-plugin-mcp",
@@ -5828,6 +5829,18 @@ dependencies = [
  "coilbox-thumb-cache",
  "coilbox-unitsync-worker",
  "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tempfile",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-workshop"
+version = "0.0.0"
+dependencies = [
+ "coilbox-springlua",
  "serde",
  "serde_json",
  "tauri",

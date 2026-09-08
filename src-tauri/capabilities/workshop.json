@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "workshop",
+  "description": "Grants the tweak project compiler to the main window. It turns a project into Lua in memory, reading and writing nothing.",
+  "windows": ["main"],
+  "permissions": ["coilbox-workshop:default"]
+}

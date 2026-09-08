@@ -29,6 +29,7 @@ members = [
   "crates/tauri-plugin-coilbox-campaign",
   "crates/tauri-plugin-coilbox-scenario",
   "crates/tauri-plugin-coilbox-lego",
+  "crates/tauri-plugin-coilbox-workshop",
   "crates/tauri-plugin-coilbox-conquest",
   "crates/tauri-plugin-coilbox-runlite",
   "crates/tauri-plugin-coilbox-profile",
