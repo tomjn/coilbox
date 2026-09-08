@@ -33,26 +33,12 @@
  * export. Running the export again rewrites that receipt rather than adding a
  * second, so a re-export can never become a second unit.
  */
+import { samePath } from "@/lego/exportRecord";
 import type { LegoProject } from "@/lego/model";
 import { type CloneOrigin, normaliseCloneKey, type UnitClones } from "./clones";
 
 /** Stable empty, so a page with no built units does not re-render for one. */
 const NONE: Record<string, CloneOrigin> = {};
-
-/**
- * One path as it compares to another.
- *
- * Separators go one way and a trailing one is dropped, because the export's
- * folder picker and unitsync's own path are two different pieces of software
- * describing one directory and neither promises the other's spelling. Case is
- * folded for the same reason, which is wrong on a case-sensitive filesystem
- * holding two folders whose names differ only in case: a real possibility, and
- * a far smaller one than the export silently never being found on macOS or
- * Windows, where the user typed one case and the scan reported the other.
- */
-function comparablePath(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-}
 
 /** Whether an export went into this game's folder. */
 export function exportedInto(
@@ -60,7 +46,7 @@ export function exportedInto(
   gameFolder: string | undefined,
 ): boolean {
   if (!gameFolder || !project.exported) return false;
-  return comparablePath(project.exported.dir) === comparablePath(gameFolder);
+  return samePath(project.exported.dir, gameFolder);
 }
 
 /** What a game folder was given, and what the page could not take. */
@@ -70,7 +56,14 @@ export interface LegoUnits {
    * game's read has not come back with.
    */
   clones: UnitClones;
-  /** Which units on this page came out of the lego builder, keyed by unit. */
+  /**
+   * Which units on this page came out of the lego builder, keyed by unit.
+   *
+   * Includes the names a project has stopped exporting under whose files a
+   * rename left in the game, marked `stale` (issue #2680). Those are the whole
+   * reason this is worth marking at all: the game reads them as ordinary units
+   * and nothing else on the page can tell them from the one that was meant.
+   */
   builtBy: Record<string, CloneOrigin>;
   /**
    * A built unit whose name something else on the page already holds, named by
@@ -95,7 +88,15 @@ export function withLegoUnits(
   gameUnits: Record<string, unknown>,
 ): LegoUnits {
   const built = projects.filter((p) => exportedInto(p, gameFolder));
-  if (built.length === 0) return { clones, conflicts: [], builtBy: NONE };
+  const stale = gameFolder
+    ? projects.flatMap((project) =>
+        (project.staleExports ?? [])
+          .filter((entry) => samePath(entry.dir, gameFolder))
+          .map((entry) => ({ project, entry })),
+      )
+    : [];
+  if (built.length === 0 && stale.length === 0)
+    return { clones, conflicts: [], builtBy: NONE };
 
   let out = clones;
   const builtBy: Record<string, CloneOrigin> = {};
@@ -129,5 +130,29 @@ export function withLegoUnits(
         [key]: { key, origin, replacesGameUnit: false, def: exported.def },
       };
   }
+
+  // The names a rename left behind (issue #2680). Marked only where the game's
+  // own read has the unit, because that is the harm: the file is still there,
+  // the engine loaded it, and the page shows a second unit nothing distinguishes
+  // from the one that was meant. A stale unit the engine dropped, which is what
+  // happens when the model was renamed too and its `objectname` no longer
+  // resolves, is not in the game's table and there is nothing here to mark.
+  //
+  // No definition is put up for one, unlike a current export. There is nothing
+  // to show that is not already the game's own table, and standing a receipt in
+  // front of a unit somebody is about to delete would only describe it wrongly.
+  for (const { project, entry } of stale) {
+    const key = normaliseCloneKey(entry.unitName);
+    if (!key || Object.hasOwn(builtBy, key) || Object.hasOwn(out, key))
+      continue;
+    if (!Object.hasOwn(gameUnits, key)) continue;
+    builtBy[key] = {
+      kind: "lego",
+      projectId: project.id,
+      projectName: project.name,
+      stale: true,
+    };
+  }
+
   return { clones: out, conflicts, builtBy };
 }

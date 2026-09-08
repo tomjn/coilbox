@@ -301,9 +301,11 @@ pub(crate) fn resolve(
     // What the game calls its units, for a game that does not say so in the
     // defs (issue #2650). Read here rather than left to the curated dataset
     // because the dataset carries a name and no description, and rewriting a
-    // unit's tooltip is the edit this page exists for.
+    // unit's tooltip is the edit this page exists for. Every translation the
+    // game ships, since renaming a unit in English alone leaves the rest saying
+    // the old thing (issue #2672).
     let language = if any_unit_unnamed(&doc.units) {
-        crate::dataset::language_text(us, game_archive)
+        crate::dataset::language_texts(us, game_archive)
     } else {
         Default::default()
     };
@@ -314,8 +316,7 @@ pub(crate) fn resolve(
         units: doc.units,
         weapon_defs: doc.weapon_defs,
         unit_errors: doc.unit_errors,
-        language_names: language.names.into_iter().collect(),
-        language_descriptions: language.descriptions.into_iter().collect(),
+        language_text: language,
         checksum,
         errors,
     };

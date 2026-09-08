@@ -34,8 +34,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
-  LANGUAGE_UNITS_FILE,
+  baseLanguage,
+  type LanguageTexts,
   languageNamesUnits,
+  languageUnitsFile,
   type TextHome,
 } from "@/workshop/unitText";
 import { atlasUrl, exportTextureName, unitAtlas } from "../../atlas";
@@ -45,14 +47,21 @@ import {
   legoExport,
   legoExportGlb,
   legoExportObj,
+  legoExportStale,
   legoGameLanguage,
   legoOpenPath,
   legoTexturePng,
 } from "../../bindings";
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
+import { digestsOf, forgetStale, recordExport } from "../../exportRecord";
 import { unitScript } from "../../luaScript";
-import type { LegoExport, LegoProject } from "../../model";
+import type {
+  ExportedFile,
+  LegoExport,
+  LegoProject,
+  StaleExport,
+} from "../../model";
 import type { LoadedPack } from "../../pack";
 import {
   buildPieceCollisionScript,
@@ -71,7 +80,8 @@ interface Props {
   /** The meshes of a unit imported from somebody else's model, if it is one. */
   raw: RawGeometry | null;
   /** Remembered on the document, so the next export does not ask again, plus
-   *  the receipt the workshop reads to find this unit in a game (issue #2651). */
+   *  the receipt the workshop reads to find this unit in a game (issue #2651)
+   *  and the names it has stopped using in that folder (issue #2680). */
   onRemember: (settings: {
     exportDir: string;
     exportTexture: boolean;
@@ -79,7 +89,20 @@ interface Props {
     exportGlb: boolean;
     exportObj: boolean;
     exported: LegoExport;
+    staleExports: StaleExport[];
   }) => void;
+  /** The leftovers alone, for when the drawer clears a name's files without
+   *  exporting anything. Stable, since an effect here reads it. */
+  onStale: (staleExports: StaleExport[]) => void;
+}
+
+/** What is still in the game folder under one name the unit no longer uses. */
+interface Leftover {
+  stale: StaleExport;
+  /** Files still exactly as coilbox wrote them, so it can offer to remove them. */
+  ours: string[];
+  /** Files under that name that coilbox did not write, or no longer recognises. */
+  kept: string[];
 }
 
 type Result =
@@ -106,7 +129,7 @@ type Result =
        *  went through. Reported rather than thrown: the `.s3o` is already on
        *  disk by then and is the half the engine reads. */
       blenderProblem: string | null;
-      /** `language/en/coilbox.json`, for a game named out of one. */
+      /** `language/<code>/coilbox.json`, for a game named out of one. */
       language: string | null;
     }
   | { state: "failed"; message: string };
@@ -116,14 +139,14 @@ type Result =
  *
  * Read off the folder rather than off a game scan, because the export drawer is
  * given a directory by a picker and there may be no scanned game behind it at
- * all. That is enough: the one file it opens is the whole of the answer, for
- * the reason `languageNamesUnits` gives.
+ * all. That is enough: the files it opens are the whole of the answer, for the
+ * reason `languageNamesUnits` gives.
  */
 type GameText =
   | { state: "unread" }
   | { state: "reading" }
-  | { state: "read"; home: TextHome; names: Record<string, string> }
-  /** The file is there and will not read, so the home cannot be answered. */
+  | { state: "read"; home: TextHome; texts: LanguageTexts }
+  /** A file is there and will not read, so the home cannot be answered. */
   | { state: "failed"; message: string };
 
 /**
@@ -150,6 +173,7 @@ export function ExportDrawer({
   pack,
   raw,
   onRemember,
+  onStale,
 }: Props) {
   const [dir, setDir] = useState(project.exportDir ?? "");
   const [withTexture, setWithTexture] = useState(
@@ -171,11 +195,11 @@ export function ExportDrawer({
     }
     setGameText({ state: "reading" });
     try {
-      const language = await legoGameLanguage({ dir: folder });
+      const { texts } = await legoGameLanguage({ dir: folder });
       setGameText({
         state: "read",
-        home: languageNamesUnits(language) ? "language" : "def",
-        names: language.names,
+        home: languageNamesUnits(texts) ? "language" : "def",
+        texts,
       });
     } catch (error) {
       setGameText({
@@ -195,13 +219,102 @@ export function ExportDrawer({
   // is the answer for the great majority of games. The drawer says so, because
   // the one game it is wrong for is the one this whole thing is about.
   const home: TextHome = gameText.state === "read" ? gameText.home : "def";
+  // The locale the name goes in: the one the game's other locales fall back to,
+  // which for anything descended from Beyond All Reason is English. A unit is
+  // built with one name, so it is written once rather than into every file the
+  // game ships. Translating it is the workshop's job (issue #2672).
+  const language =
+    gameText.state === "read" ? baseLanguage(gameText.texts) : "en";
   // A name the game itself declares is the game's. Export already keeps that
   // unit's own `units/<name>.lua` rather than overwriting it, so writing our
   // name over the game's would rename a unit that was never ours.
   const gameNamesThisUnit =
     gameText.state === "read" &&
-    Object.hasOwn(gameText.names, project.unitName.toLowerCase());
+    Object.hasOwn(
+      gameText.texts[language]?.names ?? {},
+      project.unitName.toLowerCase(),
+    );
   const writesLanguage = home === "language" && !gameNamesThisUnit;
+
+  // What a rename left in the game folder, looked for each time the drawer
+  // opens and again after each export (issue #2680). Null until the first look,
+  // so an empty list means "nothing left behind" rather than "not asked yet".
+  const [leftovers, setLeftovers] = useState<Leftover[] | null>(null);
+  const [clearing, setClearing] = useState<string | null>(null);
+
+  const staleExports = project.staleExports;
+  useEffect(() => {
+    if (!isOpen) return;
+    const stale = staleExports ?? [];
+    if (stale.length === 0) {
+      setLeftovers([]);
+      return;
+    }
+    let live = true;
+    void (async () => {
+      const found = await Promise.all(
+        stale.map(async (entry): Promise<Leftover> => {
+          try {
+            const seen = await legoExportStale({
+              dir: entry.dir,
+              unitName: entry.unitName,
+              digests: digestsOf(entry.files),
+              dryRun: true,
+            });
+            return { stale: entry, ours: seen.ours, kept: seen.kept };
+          } catch {
+            // A folder that has moved, or one this build cannot read. Nothing
+            // to offer and nothing to say, so it drops out of the list rather
+            // than becoming an error the user cannot act on.
+            return { stale: entry, ours: [], kept: [] };
+          }
+        }),
+      );
+      if (!live) return;
+      const left = found.filter(
+        (entry) => entry.ours.length + entry.kept.length > 0,
+      );
+      setLeftovers(left);
+      // A name whose files are gone, deleted by hand or by an earlier run, has
+      // nothing left to say, so the project stops carrying it.
+      if (left.length < found.length) onStale(left.map((entry) => entry.stale));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [isOpen, staleExports, onStale]);
+
+  async function clearStale(entry: Leftover) {
+    setClearing(entry.stale.unitName);
+    try {
+      const gone = await legoExportStale({
+        dir: entry.stale.dir,
+        unitName: entry.stale.unitName,
+        digests: digestsOf(entry.stale.files),
+        dryRun: false,
+      });
+      const left = (leftovers ?? []).flatMap((other) =>
+        other.stale === entry.stale
+          ? gone.kept.length > 0
+            ? [{ stale: other.stale, ours: [], kept: gone.kept }]
+            : []
+          : [other],
+      );
+      setLeftovers(left);
+      // The receipt only goes when nothing is left under that name. A file
+      // coilbox did not write stays where it is, and forgetting the name would
+      // take away the only thing that could ever mention it again.
+      if (gone.kept.length === 0)
+        onStale(forgetStale(staleExports ?? [], entry.stale));
+    } catch (error) {
+      setResult({
+        state: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setClearing(null);
+    }
+  }
 
   // Whichever atlas the unit samples, installed or not. The s3o names it
   // either way, so an atlas installed later puts a re-export right without the
@@ -278,7 +391,7 @@ export function ExportDrawer({
         // Where the name goes for a game that will not read one in the
         // definition. Coilbox's own file beside the game's, never the game's
         // (issue #2683).
-        text: writesLanguage ? unitWords(project) : null,
+        text: writesLanguage ? { language, ...unitWords(project) } : null,
         model,
       });
 
@@ -290,6 +403,9 @@ export function ExportDrawer({
       let mtlPath: string | null = null;
       let written: BlenderTextureWritten[] = [];
       let blenderProblem: string | null = null;
+      // Every file this run put on disk under the unit's name, for the receipt
+      // a later rename reads to know what is still its own (issue #2680).
+      let owned: ExportedFile[] = exported.owned;
       try {
         // The mask is not a colour map, so it goes beside whichever file is
         // written rather than into a material slot that would misdescribe it.
@@ -316,6 +432,7 @@ export function ExportDrawer({
             });
             glbPath = glbWritten.path;
             written = [...written, ...glbWritten.textures];
+            owned = [...owned, ...glbWritten.owned];
           }
         }
 
@@ -347,28 +464,36 @@ export function ExportDrawer({
             objPath = objWritten.obj;
             mtlPath = objWritten.mtl;
             written = [...written, ...objWritten.textures];
+            owned = [...owned, ...objWritten.owned];
           }
         }
       } catch (error) {
         blenderProblem = error instanceof Error ? error.message : String(error);
       }
 
+      // Only on the way out of a successful export, so the receipt never claims
+      // a folder holds a unit that failed to reach it. A re-export overwrites
+      // the one before it: a project has one current export, which is what keeps
+      // a second run from becoming a second unit (issue #2651). Where the name
+      // changed, the receipt it replaces is moved aside rather than dropped,
+      // since the files under the old name are still in the folder and after
+      // this nothing else knows they are there (issue #2680).
       onRemember({
         exportDir: dir,
         exportTexture: withTexture,
         exportScript: withScript,
         exportGlb: withGlb,
         exportObj: withObj,
-        // Only on the way out of a successful export, so the receipt never
-        // claims a folder holds a unit that failed to reach it. A re-export
-        // overwrites the one before it: a project has one current export, which
-        // is what keeps a second run from becoming a second unit (issue #2651).
-        exported: {
-          dir,
-          at: new Date().toISOString(),
-          unitName: project.unitName,
-          def,
-        },
+        ...recordExport(
+          project,
+          {
+            dir,
+            at: new Date().toISOString(),
+            unitName: project.unitName,
+            def,
+          },
+          owned,
+        ),
       });
       setResult({
         state: "done",
@@ -448,30 +573,30 @@ export function ExportDrawer({
                 </p>
               ) : gameText.state === "failed" ? (
                 <p className="text-xs text-destructive">
-                  This game has a <code>{LANGUAGE_UNITS_FILE}</code> that will
-                  not read, so coilbox cannot tell where it names its units:{" "}
-                  {gameText.message}. The name goes into the definition, which
-                  is where most games read it. If the game reads names out of
-                  that file instead, this unit will show as{" "}
+                  This game has a <code>{languageUnitsFile(language)}</code>{" "}
+                  that will not read, so coilbox cannot tell where it names its
+                  units: {gameText.message}. The name goes into the definition,
+                  which is where most games read it. If the game reads names out
+                  of that file instead, this unit will show as{" "}
                   <code>units.names.{project.unitName}</code> until the file is
                   fixed.
                 </p>
               ) : writesLanguage ? (
                 <p className="text-xs text-muted-foreground">
                   This game names its units in{" "}
-                  <code>{LANGUAGE_UNITS_FILE}</code> rather than in their
-                  definitions, so <strong>{project.name}</strong> goes into{" "}
-                  <code>language/en/coilbox.json</code> beside it. That is
-                  coilbox's own file, holding the names of the units coilbox put
-                  in this folder and nothing else. The game's own file is never
-                  opened for writing.
+                  <code>{languageUnitsFile(language)}</code> rather than in
+                  their definitions, so <strong>{project.name}</strong> goes
+                  into <code>language/{language}/coilbox.json</code> beside it.
+                  That is coilbox's own file, holding the names of the units
+                  coilbox put in this folder and nothing else. The game's own
+                  file is never opened for writing.
                 </p>
               ) : gameNamesThisUnit ? (
                 <p className="text-xs text-muted-foreground">
                   This game already names a unit <code>{project.unitName}</code>{" "}
-                  in <code>{LANGUAGE_UNITS_FILE}</code>, so coilbox writes no
-                  name for it. That unit's definition is the game's own and is
-                  left alone too.
+                  in <code>{languageUnitsFile(language)}</code>, so coilbox
+                  writes no name for it. That unit's definition is the game's
+                  own and is left alone too.
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
@@ -653,6 +778,84 @@ export function ExportDrawer({
                 </p>
               </div>
             </div>
+
+            {/* What a rename left in the game folder. Shown rather than cleared
+                on its own: two units under two names is occasionally what
+                somebody wanted, and a game folder is theirs. But it is never
+                left unsaid, which is the bug in issue #2680. */}
+            {leftovers && leftovers.length > 0 ? (
+              <div className="flex flex-col gap-3 rounded border border-border bg-muted/40 p-3">
+                <span className="text-sm font-medium">
+                  Left behind by a rename
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  Export names its files after the unit, so renaming one and
+                  exporting again writes a second set rather than moving the
+                  first. The game reads what is left as another unit, which it
+                  will build and spawn.
+                </p>
+                {leftovers.map((entry) => (
+                  <div
+                    key={`${entry.stale.dir}/${entry.stale.unitName}`}
+                    className="flex flex-col gap-1.5 text-xs"
+                  >
+                    <span className="font-medium">
+                      Still there as <code>{entry.stale.unitName}</code>
+                    </span>
+                    {entry.ours.map((path) => (
+                      <code key={path} className="break-all">
+                        {path}
+                      </code>
+                    ))}
+                    {/* The explanation goes above the paths it is about, so it
+                        is clear which of the files it names. */}
+                    {entry.kept.length > 0 ? (
+                      <>
+                        <p className="pt-1 text-muted-foreground">
+                          {entry.kept.length === 1
+                            ? "This one is not"
+                            : "These are not"}{" "}
+                          what coilbox wrote, so removing{" "}
+                          {entry.kept.length === 1 ? "it" : "them"} is not
+                          offered. Either the file was edited after the export,
+                          or the game had one of that name already.
+                        </p>
+                        {entry.kept.map((path) => (
+                          <code key={path} className="break-all">
+                            {path}
+                          </code>
+                        ))}
+                      </>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2 pt-0.5">
+                      {entry.ours.length > 0 ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={clearing !== null}
+                          onClick={() => void clearStale(entry)}
+                        >
+                          {clearing === entry.stale.unitName
+                            ? "Removing"
+                            : `Remove the ${entry.ours.length} file${entry.ours.length === 1 ? "" : "s"}`}
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          void legoOpenPath({
+                            path: entry.ours[0] ?? entry.kept[0],
+                          })
+                        }
+                      >
+                        Show me
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
               <Button

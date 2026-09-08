@@ -127,8 +127,11 @@ import {
 import { unitDisplayName } from "../unitName";
 import { type FieldView, unitFieldView } from "../unitSections";
 import {
+  BASE_LANGUAGE,
+  baseLanguage,
   clearUnitText,
   clearUnitTexts,
+  languageCodes,
   nameEdit,
   setUnitText,
   type TextField,
@@ -386,36 +389,42 @@ export default function UnitPage() {
     return problem ? { movementclass: problem } : undefined;
   }, [edited]);
 
-  // What the game's own localisation file calls its units, which for a game
-  // like BAR is the only place a name or a description exists at all.
-  const language = useMemo(
-    () => ({
-      names: defs?.languageNames,
-      descriptions: defs?.languageDescriptions,
-    }),
-    [defs],
-  );
+  // What the game's own localisation files call its units, which for a game
+  // like BAR is the only place a name or a description exists at all. One entry
+  // per translation the game ships (issue #2672).
+  const texts = useMemo(() => defs?.languageText ?? {}, [defs]);
   // Asked of the game's own units, never the table with our copies in it, for
   // the reason `textHome` gives. A copy is always its own definition's problem.
   const gameTextHome = useMemo(
-    () => textHome(gameUnits, language),
-    [gameUnits, language],
+    () => textHome(gameUnits, texts),
+    [gameUnits, texts],
   );
   // The game's answer, for a unit we added as much as for one it shipped. A
   // copy used to be told its name was in its own definition, which is where the
   // engine reads one but not where Beyond All Reason does (issue #2673).
   const home = gameTextHome;
+  // The languages on offer and the one on screen. Held here rather than in the
+  // panel so that moving to another unit keeps the language you were working
+  // in: translating a game is done a language at a time, not a unit at a time.
+  const languages = useMemo(() => languageCodes(texts), [texts]);
+  const [language, setLanguage] = useState(BASE_LANGUAGE);
+  // A game with no translations, or one that has dropped the locale you were
+  // in, answers in the base language rather than in a code it does not ship.
+  const shownLanguage = languages.includes(language)
+    ? language
+    : baseLanguage(texts);
   const textRows = useMemo(
     () =>
       unitTextRows({
         unitKey,
         def: unit,
         home,
-        language,
+        texts,
+        language: shownLanguage,
         overrides,
         edits: text,
       }),
-    [unitKey, unit, home, language, overrides, text],
+    [unitKey, unit, home, texts, shownLanguage, overrides, text],
   );
 
   // A copy made before #2673 put its name in its own definition, which in a
@@ -427,18 +436,13 @@ export default function UnitPage() {
   // there is nothing left to move, which is every render after the first, so
   // the effect settles rather than writing again.
   const pendingCloneText = useMemo(
-    () => migrateCloneText(ownClones, text, home, language),
-    [ownClones, text, home, language],
+    () => migrateCloneText(ownClones, text, home, texts),
+    [ownClones, text, home, texts],
   );
   const migrateRef = useRef<() => void>(() => {});
   migrateRef.current = () => {
     commit((current) => {
-      const moved = migrateCloneText(
-        current.clones,
-        current.text,
-        home,
-        language,
-      );
+      const moved = migrateCloneText(current.clones, current.text, home, texts);
       if (!moved) return current;
       const next = editSlot(current, "clones", () => moved.clones);
       return editSlot(next, "text", () => moved.text);
@@ -451,8 +455,13 @@ export default function UnitPage() {
   /** Rename the unit, or rewrite its tooltip, wherever this game keeps them. */
   const commitText = (field: TextField, value: string) => {
     const row = textRows[field];
+    // A def that hands its lookup to another unit has no keys of its own to
+    // write, so the panel offers no box and nothing can arrive here.
+    if (row.redirect !== undefined) return;
     if (row.path === undefined) {
-      updateText((t) => setUnitText(t, unitKey, field, value, row.inherited));
+      updateText((t) =>
+        setUnitText(t, unitKey, shownLanguage, field, value, row.inherited),
+      );
       return;
     }
     const path = row.path;
@@ -469,7 +478,8 @@ export default function UnitPage() {
 
   const resetText = (field: TextField) => {
     const path = textRows[field].path;
-    if (path === undefined) updateText((t) => clearUnitText(t, unitKey, field));
+    if (path === undefined)
+      updateText((t) => clearUnitText(t, unitKey, shownLanguage, field));
     else updateOverrides((o) => clearOverride(o, unitKey, path));
   };
 
@@ -554,14 +564,20 @@ export default function UnitPage() {
   // project claim work the user never did, and go stale against the file the
   // moment it is edited by hand. `editCounts` reads the project's own stores,
   // so it never sees one.
-  const builtCount = Object.keys(built.builtBy).length;
+  //
+  // Counted apart from the stale ones beside them (issue #2680). A name a
+  // rename left behind is a unit in the game and belongs in this line, but
+  // calling it built would say the user meant to put it there.
+  const origins = Object.values(built.builtBy);
+  const builtCount = origins.filter((origin) => !origin.stale).length;
+  const staleCount = origins.length - builtCount;
   const unitDisabled = isUnitDisabled(disabled, unitKey);
   const anythingChanged =
     counts.fields > 0 ||
     counts.added > 0 ||
     counts.menuOps > 0 ||
     counts.off > 0;
-  const anythingToShow = anythingChanged || builtCount > 0;
+  const anythingToShow = anythingChanged || origins.length > 0;
 
   /**
    * Copy the selected unit, as the project has it, under a new name.
@@ -581,7 +597,7 @@ export default function UnitPage() {
       displayName,
       replacesGameUnit: replaces,
       home,
-      language,
+      texts,
     });
     commit((current) => {
       const next = editSlot(current, "clones", (c) => addClone(c, made));
@@ -718,6 +734,7 @@ export default function UnitPage() {
                 anythingChanged && describeEdits(edits),
                 builtCount > 0 &&
                   `${builtCount} built unit${builtCount === 1 ? "" : "s"}`,
+                staleCount > 0 && `${staleCount} left behind by a rename`,
               ]
                 .filter(Boolean)
                 .join(", ")}
@@ -873,13 +890,22 @@ export default function UnitPage() {
                     {unitKey}
                   </span>
                   {builtBy ? (
-                    <span className="max-w-prose text-xs text-muted-foreground">
-                      Built in the unit builder as {builtBy.projectName} and
-                      exported into {game.name}
-                      {clone
-                        ? ". Not in this game's definitions yet, so this is what the export wrote."
-                        : ""}
-                    </span>
+                    builtBy.stale ? (
+                      <span className="max-w-prose text-xs text-destructive">
+                        Left behind when {builtBy.projectName} was renamed. Its
+                        files are still in {game.name}, so the game has this
+                        unit and the renamed one. The unit builder's export
+                        drawer clears them.
+                      </span>
+                    ) : (
+                      <span className="max-w-prose text-xs text-muted-foreground">
+                        Built in the unit builder as {builtBy.projectName} and
+                        exported into {game.name}
+                        {clone
+                          ? ". Not in this game's definitions yet, so this is what the export wrote."
+                          : ""}
+                      </span>
+                    )
                   ) : (
                     clone && (
                       <span className="max-w-prose text-xs text-muted-foreground">
@@ -987,6 +1013,9 @@ export default function UnitPage() {
                   rows={textRows}
                   home={home}
                   isClone={clone !== undefined}
+                  languages={languages}
+                  language={shownLanguage}
+                  onLanguage={setLanguage}
                   onChange={commitText}
                   onReset={resetText}
                 />

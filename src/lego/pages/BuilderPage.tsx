@@ -16,7 +16,7 @@ import {
   Undo,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -62,6 +62,7 @@ import {
   type LegoProject,
   normalisePieceName,
   projectProblems,
+  type StaleExport,
   uniquePieceName,
 } from "../model";
 import {
@@ -134,6 +135,14 @@ function Builder({ id }: { id: string | undefined }) {
   const doc = useLegoDocument(id);
   const { edit, selectedId, selectedIds, select: setSelectedId } = doc;
   const draft = doc.project;
+  // The names this unit has stopped exporting under, whose files are still in
+  // the game folder (issue #2680). Held steady, because the export drawer reads
+  // it in an effect and a fresh function each render would loop.
+  const setStaleExports = useCallback(
+    (staleExports: StaleExport[]) =>
+      edit((project) => ({ ...project, staleExports })),
+    [edit],
+  );
   const { compounds } = useLegoCompounds();
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
@@ -744,6 +753,7 @@ function Builder({ id }: { id: string | undefined }) {
           onRemember={(settings) =>
             edit((project) => ({ ...project, ...settings }))
           }
+          onStale={setStaleExports}
         />
 
         <TestDrawer

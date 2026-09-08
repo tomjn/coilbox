@@ -13,9 +13,8 @@
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { LoadedPack } from "../../pack";
 import { newProject } from "../../model";
+import type { LoadedPack } from "../../pack";
 import { ExportDrawer } from "./ExportDrawer";
 
 const legoGameLanguage = vi.fn();
@@ -24,6 +23,12 @@ vi.mock("../../bindings", () => ({
   legoExport: vi.fn(),
   legoExportGlb: vi.fn(),
   legoExportObj: vi.fn(),
+  legoExportStale: vi.fn().mockResolvedValue({
+    ours: [],
+    kept: [],
+    missing: [],
+    dryRun: true,
+  }),
   legoGameLanguage: (args: { dir: string }) => legoGameLanguage(args),
   legoOpenPath: vi.fn(),
   legoTexturePng: vi.fn(),
@@ -57,6 +62,7 @@ function show() {
       pack={pack}
       raw={null}
       onRemember={vi.fn()}
+      onStale={vi.fn()}
     />,
   );
 }
@@ -71,11 +77,7 @@ afterEach(() => {
 
 describe("where the unit's name is going", () => {
   it("says the definition for a game with no localisation file", async () => {
-    legoGameLanguage.mockResolvedValue({
-      present: false,
-      names: {},
-      descriptions: {},
-    });
+    legoGameLanguage.mockResolvedValue({ texts: {} });
     show();
     await waitFor(() =>
       expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
@@ -85,9 +87,9 @@ describe("where the unit's name is going", () => {
 
   it("says the language file for a game that names its units there", async () => {
     legoGameLanguage.mockResolvedValue({
-      present: true,
-      names: { armcom: "Armada Commander" },
-      descriptions: {},
+      texts: {
+        en: { names: { armcom: "Armada Commander" }, descriptions: {} },
+      },
     });
     show();
     await waitFor(() =>
@@ -106,13 +108,28 @@ describe("where the unit's name is going", () => {
    */
   it("writes no name where the game already names that unit", async () => {
     legoGameLanguage.mockResolvedValue({
-      present: true,
-      names: { skyfort: "The Game's Own Skyfort" },
-      descriptions: {},
+      texts: {
+        en: { names: { skyfort: "The Game's Own Skyfort" }, descriptions: {} },
+      },
     });
     show();
     await waitFor(() =>
       expect(screen.getByText(/coilbox writes no name for it/)).toBeTruthy(),
+    );
+  });
+
+  /**
+   * A game that ships no English file names its units in whichever locale it
+   * does ship, so the name follows that rather than landing in a folder the
+   * game has no file in (issue #2672 made this possible to get wrong).
+   */
+  it("names the locale the game's other files fall back to", async () => {
+    legoGameLanguage.mockResolvedValue({
+      texts: { ru: { names: { armcom: "Командир" }, descriptions: {} } },
+    });
+    show();
+    await waitFor(() =>
+      expect(screen.getByText(/language\/ru\/coilbox\.json/)).toBeTruthy(),
     );
   });
 

@@ -738,6 +738,30 @@ pub struct UnitDatasetOutput {
 /// units while it does, and there is no cheaper way to read one unit than to
 /// read them all. The cache is keyed on the game's sync checksum, which is one
 /// identity for the whole set, and matches.
+/// One game's `language/<code>/units.json`, keyed by lowercased def key.
+///
+/// A translation is sparse against English: a locale file names the units
+/// somebody has translated and says nothing about the rest, and the game's own
+/// i18n module falls back to English for a key it has no entry for.
+#[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LanguageUnitText {
+    /// `units.names`: what a person reads instead of `corcom`.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub names: BTreeMap<String, String>,
+    /// `units.descriptions`: the one-line tooltip under that name.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub descriptions: BTreeMap<String, String>,
+}
+
+impl LanguageUnitText {
+    /// Whether this locale said anything at all, which is what decides if it is
+    /// worth carrying.
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty() && self.descriptions.is_empty()
+    }
+}
+
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct UnitDefsOutput {
@@ -763,19 +787,20 @@ pub struct UnitDefsOutput {
     /// the unit would simply be absent, with nothing to say whether the game
     /// ships it.
     pub unit_errors: Vec<String>,
-    /// What the game's `language/en/units.json` calls each unit, keyed by
-    /// lowercased def key.
+    /// What the game calls its units in each `language/<code>/units.json` it
+    /// ships, keyed by that language code.
     ///
     /// Empty for a game that names its units in its unitdefs, which is every
     /// game here but Beyond All Reason. BAR writes no `name`, no `humanName`
-    /// and no `description` in any of its 564 unitdefs and keeps both in this
-    /// file instead, so an editor that only reads the def has nothing to show
+    /// and no `description` in any of its 564 unitdefs and keeps both in these
+    /// files instead, so an editor that only reads the def has nothing to show
     /// and nothing to edit for the game most people are modding (issue #2650).
+    ///
+    /// One entry per translation rather than English alone, because a rename
+    /// made against English alone leaves BAR's German, Spanish, French, Russian
+    /// and Chinese players reading the old name (issue #2672).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub language_names: BTreeMap<String, String>,
-    /// The `units.descriptions` beside them: the tooltip under the name.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub language_descriptions: BTreeMap<String, String>,
+    pub language_text: BTreeMap<String, LanguageUnitText>,
     /// Sync checksum (from GetPrimaryModChecksum), over the archive plus every
     /// dependency. Also this dataset's cache key.
     #[serde(skip_serializing_if = "Option::is_none")]

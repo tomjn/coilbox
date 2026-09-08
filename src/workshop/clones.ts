@@ -29,11 +29,12 @@
  */
 import { resolvedDef } from "./overrides";
 import type {
-  LanguageText,
+  LanguageTexts,
   TextField,
   TextHome,
   UnitTextEdits,
 } from "./unitText";
+import { baseLanguage } from "./unitText";
 
 /**
  * Where a clone's definition came from, when it was not copied from a unit.
@@ -50,6 +51,16 @@ export interface CloneOrigin {
   projectId: string;
   /** What the project is called, for saying so on the page. */
   projectName: string;
+  /**
+   * Whether this is a name the project has stopped exporting under, whose files
+   * a rename left in the game (issue #2680).
+   *
+   * The game reads them as a unit of its own, so the page shows it like any
+   * other. Marking it is the point: two units under two names look identical
+   * here apart from the name, and this is where somebody notices the one they
+   * did not mean to keep.
+   */
+  stale?: boolean;
 }
 
 /** One unit the project adds, held as a whole definition rather than a patch. */
@@ -227,10 +238,15 @@ function stripNames(
  * name and the description are in the definition where the game will read them.
  * The caller writes both in one commit, so undo puts the copy and its name back
  * together.
+ *
+ * `text` is keyed by language, since that is what the store holds (issue #2672),
+ * and a copy fills in one: the base language, which every other locale falls
+ * back to. Writing the user's one typed name into all six of Beyond All Reason's
+ * locales would claim six translations nobody made.
  */
 export interface DerivedClone {
   clone: UnitClone;
-  text: Partial<Record<TextField, string>>;
+  text: Record<string, Partial<Record<TextField, string>>>;
 }
 
 /**
@@ -246,7 +262,7 @@ export interface DerivedClone {
  * It defaults to nothing so that a caller has to say, since a copy named in the
  * wrong home looks perfectly correct in coilbox and is wrong only in the game.
  *
- * For a language home the description comes across too, out of `language`.
+ * For a language home the description comes across too, out of `texts`.
  * A def home gets it for free, since it is a key in the definition being copied,
  * but a language file has nothing under a key the game has never seen, and a
  * copy whose tooltip reads `units.descriptions.mycopy` is the same bug as one
@@ -260,7 +276,7 @@ export function deriveClone({
   displayName,
   replacesGameUnit,
   home,
-  language,
+  texts,
 }: {
   key: string;
   source: string;
@@ -269,7 +285,7 @@ export function deriveClone({
   displayName: string;
   replacesGameUnit: boolean;
   home: TextHome;
-  language?: LanguageText;
+  texts?: LanguageTexts;
 }): DerivedClone {
   const def = resolvedDef(sourceDef, patch);
   const name = displayName.trim();
@@ -279,10 +295,13 @@ export function deriveClone({
     return { clone, text: {} };
   }
   stripNames(def, source, key);
-  const description = language?.descriptions?.[source];
+  const base = baseLanguage(texts);
+  const description = texts?.[base]?.descriptions?.[source];
   return {
     clone,
-    text: { name, ...(description === undefined ? {} : { description }) },
+    text: {
+      [base]: { name, ...(description === undefined ? {} : { description }) },
+    },
   };
 }
 
@@ -307,9 +326,10 @@ export function migrateCloneText(
   clones: UnitClones,
   text: UnitTextEdits,
   home: TextHome,
-  language?: LanguageText,
+  texts?: LanguageTexts,
 ): { clones: UnitClones; text: UnitTextEdits } | null {
   if (home === "def") return null;
+  const base = baseLanguage(texts);
   let nextClones = clones;
   let nextText = text;
   for (const clone of Object.values(clones)) {
@@ -323,18 +343,20 @@ export function migrateCloneText(
     stripNames(def, clone.source ?? clone.key, clone.key);
     nextClones = { ...nextClones, [clone.key]: { ...clone, def } };
     // The name it was made with, unless the user has since said otherwise in
-    // the store this is moving it to.
+    // the store this is moving it to. Into the base language, which is where a
+    // copy's name has always gone and the only language a project written before
+    // #2672 could hold one in.
     const entry = nextText[clone.key] ?? {};
     const description =
       clone.source === undefined
         ? undefined
-        : language?.descriptions?.[clone.source];
+        : texts?.[base]?.descriptions?.[clone.source];
     const moved: Partial<Record<TextField, string>> = {
       name: String(named[1]).trim(),
       ...(description === undefined ? {} : { description }),
-      ...entry,
+      ...entry[base],
     };
-    nextText = { ...nextText, [clone.key]: moved };
+    nextText = { ...nextText, [clone.key]: { ...entry, [base]: moved } };
   }
   return nextClones === clones ? null : { clones: nextClones, text: nextText };
 }

@@ -289,9 +289,58 @@ describe("parseLegoProjectJson", () => {
         at: "2026-09-07T12:00:00.000Z",
         unitName: "skyfort",
         def: { name: "Sky Fortress", canmove: false, maxdamage: 1000 },
+        files: [{ path: "/games/BA.sdd/units/skyfort.lua", sha256: "abc" }],
       },
     };
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  /**
+   * A receipt written before the digests were recorded has no file list, and
+   * comes back with an empty one: nothing under that name is provably coilbox's,
+   * which is what an empty list means everywhere it is read (issue #2680).
+   */
+  it("reads a receipt written before the files were recorded", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      exported: {
+        dir: "/games/BA.sdd",
+        at: "",
+        unitName: "skyfort",
+        def: { name: "Sky Fortress" },
+      },
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.exported?.files).toEqual(
+      [],
+    );
+  });
+
+  it("round-trips the names a rename left behind (#2680)", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      staleExports: [
+        {
+          dir: "/games/BA.sdd",
+          at: "2026-09-07T12:00:00.000Z",
+          unitName: "skyfort",
+          files: [{ path: "/games/BA.sdd/units/skyfort.lua", sha256: "abc" }],
+        },
+      ],
+    };
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("drops a leftover naming no folder or no unit", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      staleExports: [
+        { dir: "", at: "", unitName: "skyfort", files: [] },
+        { dir: "/games/BA.sdd", at: "", unitName: "", files: [] },
+      ],
+    };
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.staleExports,
+    ).toBeUndefined();
   });
 
   /**

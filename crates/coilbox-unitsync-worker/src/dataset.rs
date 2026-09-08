@@ -16,9 +16,9 @@
 
 use crate::ffi::Unitsync;
 use crate::infocache;
-use crate::model::{UnitDatasetEntry, UnitDatasetOutput};
+use crate::model::{LanguageUnitText, UnitDatasetEntry, UnitDatasetOutput};
 use serde_json::{Map, Value};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 /// VFS modes for the parser: raw + map + mod + base — the same set `game.rs`, the
@@ -498,9 +498,11 @@ pub(crate) fn resolve(
     // unitdefs (issue #1925). Only worth opening the archive when something is
     // actually missing a name, which for every game but BAR is nothing.
     if units.iter().any(|u| u.full_name.is_none()) {
-        let named = language_text(us, game_archive).names;
-        if !named.is_empty() {
-            fill_missing_names(&mut units, &named);
+        let texts = language_texts(us, game_archive);
+        if let Some(named) = base_language(&texts).map(|t| &t.names) {
+            if !named.is_empty() {
+                fill_missing_names(&mut units, named);
+            }
         }
         let _ = us.drain_errors();
     }
@@ -732,14 +734,17 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
         .collect()
 }
 
-/// What a game's localisation file says about its units, keyed by lowercased
-/// def key.
-#[derive(Default)]
-pub(crate) struct LanguageText {
-    /// `units.names`: what a person reads instead of `corcom`.
-    pub names: HashMap<String, String>,
-    /// `units.descriptions`: the one-line tooltip under that name.
-    pub descriptions: HashMap<String, String>,
+/// Every `language/<code>/units.json` a game ships, keyed by language code.
+pub(crate) type LanguageTexts = BTreeMap<String, LanguageUnitText>;
+
+/// The locale a name is read in when nothing says otherwise: English if the
+/// game ships it, else whichever it does ship, in code order.
+///
+/// The hub holds one name per unit and its pages are written in English, so
+/// English is the catalog's column. A game that ships only Russian is better
+/// read in Russian than as def keys.
+pub(crate) fn base_language(texts: &LanguageTexts) -> Option<&LanguageUnitText> {
+    texts.get("en").or_else(|| texts.values().next())
 }
 
 /// The unit names and descriptions a game keeps in a localisation file rather
@@ -757,14 +762,14 @@ pub(crate) struct LanguageText {
 /// Answers nothing rather than failing on a file that will not parse. A game
 /// whose translations are broken still has units, and they are better read as
 /// def keys than not at all.
-fn text_from_language_json(text: &str) -> LanguageText {
+fn text_from_language_json(text: &str) -> LanguageUnitText {
     let Ok(Value::Object(root)) = serde_json::from_str::<Value>(text) else {
-        return LanguageText::default();
+        return LanguageUnitText::default();
     };
     let Some(units) = root.get("units").and_then(Value::as_object) else {
-        return LanguageText::default();
+        return LanguageUnitText::default();
     };
-    LanguageText {
+    LanguageUnitText {
         names: string_table(units, "names"),
         descriptions: string_table(units, "descriptions"),
     }
@@ -772,9 +777,9 @@ fn text_from_language_json(text: &str) -> LanguageText {
 
 /// One table of def key to string out of the `units` object, dropping anything
 /// that is not a string and anything blank.
-fn string_table(units: &Map<String, Value>, section: &str) -> HashMap<String, String> {
+fn string_table(units: &Map<String, Value>, section: &str) -> BTreeMap<String, String> {
     let Some(Value::Object(table)) = units.get(section) else {
-        return HashMap::new();
+        return BTreeMap::new();
     };
     table
         .iter()
@@ -790,7 +795,7 @@ fn string_table(units: &Map<String, Value>, section: &str) -> HashMap<String, St
 /// A fallback and never an override: the unitdef is the game's own answer, and
 /// a game that answered is left alone. A unit the file does not mention keeps
 /// its def key, which reads badly and is at least true.
-fn fill_missing_names(units: &mut [UnitDatasetEntry], named: &HashMap<String, String>) {
+fn fill_missing_names(units: &mut [UnitDatasetEntry], named: &BTreeMap<String, String>) {
     for unit in units.iter_mut().filter(|u| u.full_name.is_none()) {
         if let Some(name) = named.get(&unit.name) {
             unit.full_name = Some(name.clone());
@@ -798,36 +803,65 @@ fn fill_missing_names(units: &mut [UnitDatasetEntry], named: &HashMap<String, St
     }
 }
 
-/// The game's own `language/en/units.json`, when it ships one.
+/// Every `language/<code>/units.json` the game's own archive ships.
 ///
-/// English because the hub holds one name per unit and its pages are written in
-/// English, not because English is the truest name. BAR ships eight locales,
-/// six of them with a `units.json`, and a catalog with one column cannot hold
-/// six. Offering the other five for editing is issue #2672.
-pub(crate) fn language_text(us: &Unitsync, game_archive: &str) -> LanguageText {
-    const LANGUAGE_FILE: &str = "language/en/units.json";
+/// All of them rather than English alone, because a rename made against English
+/// alone leaves a game's other translations saying the old thing (issue #2672).
+/// Beyond All Reason ships ten `language/` directories and six of those carry a
+/// `units.json`: de, en, es, fr, ru and zh, measured 8 September 2026 against
+/// test-30922-8064a43.
+///
+/// The archive is opened once and its member list walked once, so the cost over
+/// the old English-only read is the extra files' bytes: five more at BAR's
+/// scale, which is 80 KB each.
+///
+/// A locale that said nothing about units is dropped rather than carried as an
+/// empty entry, so a language picker built from these keys offers only locales
+/// there is something to show.
+pub(crate) fn language_texts(us: &Unitsync, game_archive: &str) -> LanguageTexts {
     // Generous next to an 80 KB file, and still a bound on a game that ships
     // something enormous under that name.
     const CAP: usize = 4 * 1024 * 1024;
 
     let Some(open_path) = crate::archive::resolve_open_path(us, game_archive) else {
-        return LanguageText::default();
+        return LanguageTexts::new();
     };
     let Some(handle) = us.open_archive(&open_path) else {
-        return LanguageText::default();
+        return LanguageTexts::new();
     };
-    let found = us
+    let members: Vec<(String, String)> = us
         .list_archive_files(handle)
         .into_iter()
-        .find(|(path, _)| path.replace('\\', "/").to_lowercase() == LANGUAGE_FILE)
-        .and_then(|(path, _)| us.read_archive_member(handle, &path, CAP))
-        .map(|(_, bytes)| String::from_utf8_lossy(&bytes).into_owned());
+        .filter_map(|(path, _)| {
+            let code = language_code_of(&path)?;
+            Some((code, path))
+        })
+        .collect();
+    let mut texts = LanguageTexts::new();
+    for (code, path) in members {
+        let Some((_, bytes)) = us.read_archive_member(handle, &path, CAP) else {
+            continue;
+        };
+        let text = text_from_language_json(&String::from_utf8_lossy(&bytes));
+        if !text.is_empty() {
+            texts.insert(code, text);
+        }
+    }
     us.close_archive(handle);
+    texts
+}
 
-    found
-        .as_deref()
-        .map(text_from_language_json)
-        .unwrap_or_default()
+/// The language code in an archive member path, for the `units.json` files and
+/// nothing else.
+///
+/// Case and slash direction are the archive's business rather than the game's,
+/// so both are normalised before matching. A code with a slash left in it is a
+/// deeper path than `language/<code>/units.json` and is not one of these.
+fn language_code_of(path: &str) -> Option<String> {
+    let normalised = path.replace('\\', "/").to_lowercase();
+    let rest = normalised.strip_prefix("language/")?;
+    let code = rest.strip_suffix("/units.json")?;
+    (!code.is_empty() && !code.contains('/')).then(|| code.to_string())
 }
 
 #[cfg(test)]
@@ -899,6 +933,51 @@ mod language_name_tests {
             named.get("corap").map(String::as_str),
             Some("Aircraft Plant")
         );
+    }
+
+    /// Which archive members are a translation of the unit names, out of the
+    /// several thousand a game ships. Beyond All Reason keeps ten `language/`
+    /// directories and puts other JSON beside `units.json` in them.
+    #[test]
+    fn picks_the_language_code_out_of_a_units_json_path() {
+        assert_eq!(
+            language_code_of("language/de/units.json").as_deref(),
+            Some("de")
+        );
+        assert_eq!(
+            language_code_of("LANGUAGE\\ZH\\Units.json").as_deref(),
+            Some("zh")
+        );
+        assert_eq!(language_code_of("language/en/ui.json"), None);
+        assert_eq!(language_code_of("language/units.json"), None);
+        assert_eq!(language_code_of("language/en/extra/units.json"), None);
+        assert_eq!(language_code_of("units.json"), None);
+    }
+
+    /// English is the catalog's column, but a game that ships no English at all
+    /// is better read in whatever it does ship than as def keys.
+    #[test]
+    fn the_base_language_is_english_where_there_is_one() {
+        let de = text_from_language_json(r#"{"units":{"names":{"corcom":"Kommandant"}}}"#);
+        let en = text_from_language_json(BAR_SHAPED);
+
+        let both = LanguageTexts::from([("de".into(), de.clone()), ("en".into(), en)]);
+        assert_eq!(
+            base_language(&both)
+                .and_then(|t| t.names.get("corcom"))
+                .map(String::as_str),
+            Some("Cortex Commander")
+        );
+
+        let german_only = LanguageTexts::from([("de".into(), de)]);
+        assert_eq!(
+            base_language(&german_only)
+                .and_then(|t| t.names.get("corcom"))
+                .map(String::as_str),
+            Some("Kommandant")
+        );
+
+        assert!(base_language(&LanguageTexts::new()).is_none());
     }
 
     #[test]

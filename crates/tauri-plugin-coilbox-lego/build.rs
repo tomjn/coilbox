@@ -24,6 +24,7 @@ const COMMANDS: &[&str] = &[
     "lego_game_language",
     "lego_export_glb",
     "lego_export_obj",
+    "lego_export_stale",
     "lego_scratch_game",
     "lego_run_script",
     "lego_probe_script",

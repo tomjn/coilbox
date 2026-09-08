@@ -1,6 +1,9 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
+import type { LanguageTexts } from "@/workshop/unitText";
+
 import type { S3oModel } from "./importS3o";
+import type { ExportedFile } from "./model";
 import type { PieceRest } from "./pieceRest";
 import type { S3oBuild } from "./s3oBuild";
 import type {
@@ -116,19 +119,19 @@ export const legoExport = defineCommand<
     unitDef: string | null;
     /**
      * The unit's name and description, for a game that reads neither from the
-     * definition (issue #2683). Goes into `language/en/coilbox.json`, which is
-     * coilbox's own file beside the game's `units.json` and never that file.
+     * definition (issue #2683). Goes into `language/<code>/coilbox.json`, which
+     * is coilbox's own file beside the game's `units.json` and never that file.
      *
      * Null for a game that names its units in their definitions, where the
      * words are already in `unitDef` and there is nothing to add.
      */
-    text: { name: string; description: string } | null;
+    text: { language: string; name: string; description: string } | null;
     model: S3oBuild;
   },
   {
     model: string;
     texture: string | null;
-    /** `language/en/coilbox.json`, when `text` was sent. */
+    /** `language/<code>/coilbox.json`, when `text` was sent. */
     language: string | null;
     script: string | null;
     /** True when a script was already there and was left as it was. */
@@ -143,26 +146,58 @@ export const legoExport = defineCommand<
     textures: string[];
     /** Stored textures already there under that name, and left alone. */
     texturesKept: string[];
+    /**
+     * The files this run wrote, with the digest of what it wrote, for the
+     * receipt (issue #2680). Never a file it kept, and never a texture: an
+     * atlas is shared and an imported unit's textures land under the game's own
+     * names, so neither is keyed on the unit name.
+     */
+    owned: ExportedFile[];
   }
 >("coilbox-lego", "lego_export");
 
 /**
- * Read a game folder's own `language/en/units.json`, the file Beyond All Reason
- * names every one of its units in.
+ * Read a game folder's own `language/<code>/units.json` files, which is where
+ * Beyond All Reason names every one of its units.
  *
  * The export drawer asks before it builds anything, because the answer decides
- * where this unit's name goes (issue #2683). `present` is false for a folder
- * with no such file, which is every game that names its units in their
- * definitions.
+ * where this unit's name goes (issue #2683). `texts` is empty for a folder with
+ * no `language` folder at all, which is every game that names its units in
+ * their definitions.
  */
 export const legoGameLanguage = defineCommand<
   { dir: string },
-  {
-    present: boolean;
-    names: Record<string, string>;
-    descriptions: Record<string, string>;
-  }
+  { texts: LanguageTexts }
 >("coilbox-lego", "lego_game_language");
+
+/**
+ * Say what an export left behind under a name the unit no longer uses, and
+ * optionally clear it (issue #2680).
+ *
+ * Renaming a unit and exporting again writes a second set of files rather than
+ * moving the first. `digests` are the ones the old receipt recorded, and a file
+ * only comes back under `ours`, and is only ever removed, when its contents
+ * still hash to one of them. Anything else is somebody's hand edit or the
+ * game's own file, and comes back under `kept` untouched.
+ */
+export const legoExportStale = defineCommand<
+  {
+    dir: string;
+    unitName: string;
+    digests: string[];
+    /** True to report only. What the drawer shows before offering the button. */
+    dryRun: boolean;
+  },
+  {
+    /** Still exactly what coilbox wrote. Removed unless this was a dry run. */
+    ours: string[];
+    /** There, but not what coilbox wrote, so left alone and only named. */
+    kept: string[];
+    /** Not there at all. */
+    missing: string[];
+    dryRun: boolean;
+  }
+>("coilbox-lego", "lego_export_stale");
 
 /**
  * A texture for a Blender export to decode out of the store.
@@ -204,7 +239,12 @@ export const legoExportGlb = defineCommand<
     bytes: number[];
     textures: BlenderTextureRef[];
   },
-  { path: string; textures: BlenderTextureWritten[] }
+  {
+    path: string;
+    textures: BlenderTextureWritten[];
+    /** The `.glb`, for the receipt: it is keyed on the unit name too (#2680). */
+    owned: ExportedFile[];
+  }
 >("coilbox-lego", "lego_export_glb");
 
 /**
@@ -234,6 +274,8 @@ export const legoExportObj = defineCommand<
     mtl: string;
     texture: string | null;
     textures: BlenderTextureWritten[];
+    /** Both files, for the receipt: both are keyed on the unit name (#2680). */
+    owned: ExportedFile[];
   }
 >("coilbox-lego", "lego_export_obj");
 

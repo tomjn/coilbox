@@ -438,9 +438,11 @@ fn keep_existing(target: &Path, scratch: bool) -> bool {
 }
 
 /// Where a game keeps the words a player reads, when it keeps them outside its
-/// unit definitions. Beyond All Reason's path, and the one the unitsync worker
-/// reads a game's names out of.
-const GAME_LANGUAGE_FILE: &str = "language/en/units.json";
+/// unit definitions, for one locale. Beyond All Reason's layout, and the one the
+/// unitsync worker reads a game's names out of.
+fn game_language_file(root: &Path, code: &str) -> PathBuf {
+    root.join("language").join(code).join("units.json")
+}
 
 /// Coilbox's own file beside it, holding the names of the units coilbox put in
 /// this folder and nothing else (issue #2683).
@@ -455,7 +457,21 @@ const GAME_LANGUAGE_FILE: &str = "language/en/units.json";
 /// so a key the game also declares is the game's rather than ours. Nothing
 /// relies on that: [`write_unit_text`] is only ever asked to write a key the
 /// caller has already checked the game does not use.
-const COILBOX_LANGUAGE_FILE: &str = "language/en/coilbox.json";
+fn coilbox_language_file(root: &Path, code: &str) -> PathBuf {
+    root.join("language").join(code).join("coilbox.json")
+}
+
+/// What a locale may be called, which is also what may become a folder name
+/// here. Beyond All Reason ships `de`, `en`, `es`, `fr`, `ru`, `zh` and
+/// `test_unicode`, so this is deliberately wider than two letters, and narrow
+/// enough that nothing arriving over the IPC boundary can name a path.
+fn valid_language_code(code: &str) -> bool {
+    !code.is_empty()
+        && code.len() <= 32
+        && code
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
 
 /// Generous next to Beyond All Reason's own 80 KB file, and still a bound on a
 /// game that ships something enormous under that name. The unitsync worker caps
@@ -521,8 +537,13 @@ struct LanguageTables {
 
 /// A built unit's name and the line under it, for a game that reads neither
 /// from the unit definition.
+///
+/// One locale, the game's base one, because a unit is built with one name. The
+/// game's other locales fall back to it, which is the same thing they do for
+/// every unit the game itself did not translate.
 #[derive(Deserialize)]
 struct UnitText {
+    language: String,
     name: String,
     description: String,
 }
@@ -539,7 +560,10 @@ struct UnitText {
 /// something has happened to it, and the alternative is throwing away whatever
 /// that something was.
 fn write_unit_text(root: &Path, unit_name: &str, text: &UnitText) -> Result<String, String> {
-    let path = root.join(COILBOX_LANGUAGE_FILE);
+    if !valid_language_code(&text.language) {
+        return Err(format!("invalid language code: {}", text.language));
+    }
+    let path = coilbox_language_file(root, &text.language);
     let existing = read_language_file(&path)?.unwrap_or(LanguageTables {
         names: HashMap::new(),
         descriptions: HashMap::new(),
@@ -576,7 +600,34 @@ fn write_unit_text(root: &Path, unit_name: &str, text: &UnitText) -> Result<Stri
     Ok(path.to_string_lossy().to_string())
 }
 
-/// `lego_game_language` reads a game folder's own `language/en/units.json`.
+/// Every `language/<code>/units.json` a game folder ships, keyed by code.
+///
+/// Only the game's own file. Coilbox's `coilbox.json` beside it is deliberately
+/// not read back: the caller is asking what the game says, and answering with
+/// coilbox's own past exports would let one export decide the next one's home.
+fn read_game_languages(root: &Path) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let mut out = serde_json::Map::new();
+    let Ok(entries) = std::fs::read_dir(root.join("language")) else {
+        return Ok(out);
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !valid_language_code(&name) {
+            continue;
+        }
+        let Some(tables) = read_language_file(&game_language_file(root, &name))? else {
+            continue;
+        };
+        out.insert(
+            name,
+            json!({ "names": tables.names, "descriptions": tables.descriptions }),
+        );
+    }
+    Ok(out)
+}
+
+/// `lego_game_language` reads a game folder's own `language/<code>/units.json`
+/// files.
 ///
 /// The export drawer asks this before it builds anything, because the answer
 /// decides where a unit's name goes (issue #2683). A game whose units are named
@@ -584,8 +635,8 @@ fn write_unit_text(root: &Path, unit_name: &str, text: &UnitText) -> Result<Stri
 /// builds every label from `Spring.I18N('units.names.' .. unitDefName)` and
 /// falls back to the key rather than to the def.
 ///
-/// `present` is false for a folder with no such file, which is every game that
-/// names its units in their definitions and is the answer for the great
+/// `texts` is empty for a folder with no `language` folder, which is every game
+/// that names its units in their definitions and is the answer for the great
 /// majority of games.
 #[tauri::command]
 async fn lego_game_language(dir: String) -> CliResult {
@@ -593,19 +644,42 @@ async fn lego_game_language(dir: String) -> CliResult {
     if !root.is_absolute() || !root.is_dir() {
         return CliResult::err(format!("not a folder: {dir}"));
     }
-    match read_language_file(&root.join(GAME_LANGUAGE_FILE)) {
-        Ok(None) => CliResult::ok(json!({
-            "present": false,
-            "names": json!({}),
-            "descriptions": json!({}),
-        })),
-        Ok(Some(tables)) => CliResult::ok(json!({
-            "present": true,
-            "names": tables.names,
-            "descriptions": tables.descriptions,
-        })),
+    match read_game_languages(&root) {
+        Ok(texts) => CliResult::ok(json!({ "texts": texts })),
         Err(e) => CliResult::err(e),
     }
+}
+
+/// One file an export wrote, with the digest of the bytes it wrote.
+///
+/// The digest is what lets a later cleanup prove a file is still coilbox's own
+/// (issue #2680). A rename leaves the old name's files behind, and the only
+/// safe way to take them away is to check that what is on disk now is exactly
+/// what was written. A hand edit made since, or a file the game shipped under
+/// that name, hashes to something else and is left alone.
+fn owned_file(path: &Path, bytes: &[u8]) -> serde_json::Value {
+    json!({ "path": path.to_string_lossy(), "sha256": hex_digest(bytes) })
+}
+
+/// Every file an export writes under one unit name, derived from the folder and
+/// the name alone.
+///
+/// Never a texture. An atlas is shared by every unit that samples it, and a unit
+/// imported from somebody else's model places its textures under the names that
+/// model already gives them, which are the game's own. Neither is keyed on the
+/// unit name, so neither is part of a rename.
+fn export_paths(root: &Path, unit_name: &str) -> Vec<PathBuf> {
+    vec![
+        root.join("objects3d").join(format!("{unit_name}.s3o")),
+        root.join("scripts").join(format!("{unit_name}.lua")),
+        root.join("scripts")
+            .join("coilbox")
+            .join(format!("{unit_name}_collision.lua")),
+        root.join("units").join(format!("{unit_name}.lua")),
+        root.join("blender").join(format!("{unit_name}.glb")),
+        root.join("blender").join(format!("{unit_name}.obj")),
+        root.join("blender").join(format!("{unit_name}.mtl")),
+    ]
 }
 
 #[derive(Deserialize)]
@@ -1643,7 +1717,7 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
 /// rewritten every time, because those are the files the builder alone owns.
 ///
 /// `text` is the unit's name and description for a game that reads neither from
-/// the definition, and goes to [`COILBOX_LANGUAGE_FILE`]. `None` for a game
+/// the definition, and goes to [`coilbox_language_file`]. `None` for a game
 /// that names its units in their definitions, where the words are already in
 /// the `unit_def` above and nothing here has anything to add.
 // Each argument is one field of the IPC payload, so grouping them would only
@@ -1692,6 +1766,11 @@ async fn lego_export<R: Runtime>(
     if let Err(e) = std::fs::write(&model_path, &bytes) {
         return CliResult::err(format!("could not write {}: {e}", model_path.display()));
     }
+    // What this run wrote, and what it wrote there, so a rename can later prove
+    // which files under the old name are still coilbox's to remove (issue
+    // #2680). A file that was kept rather than written is deliberately absent:
+    // coilbox did not put those contents there and has no claim on them.
+    let mut owned = vec![owned_file(&model_path, &bytes)];
 
     // The texture is written once and then left alone, like the two files
     // below. The name it is written under is the caller's and cannot collide
@@ -1775,10 +1854,11 @@ async fn lego_export<R: Runtime>(
         let target = scripts.join(format!("{unit_name}.lua"));
         if keep_existing(&target, scratch) {
             script_kept = true;
-        } else if let Err(e) = std::fs::write(&target, script) {
+        } else if let Err(e) = std::fs::write(&target, &script) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
         } else {
             script_path = Some(target.to_string_lossy().to_string());
+            owned.push(owned_file(&target, script.as_bytes()));
         }
     }
 
@@ -1804,10 +1884,11 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", generated.display()));
         }
         let target = generated.join(format!("{unit_name}_collision.lua"));
-        if let Err(e) = std::fs::write(&target, lua) {
+        if let Err(e) = std::fs::write(&target, &lua) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
         }
         piece_collision_path = Some(target.to_string_lossy().to_string());
+        owned.push(owned_file(&target, lua.as_bytes()));
     }
 
     // The unit definition follows the same rule as the script, scratch
@@ -1823,10 +1904,11 @@ async fn lego_export<R: Runtime>(
         let target = units.join(format!("{unit_name}.lua"));
         if keep_existing(&target, scratch) {
             unit_def_kept = true;
-        } else if let Err(e) = std::fs::write(&target, unit_def) {
+        } else if let Err(e) = std::fs::write(&target, &unit_def) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
         } else {
             unit_def_path = Some(target.to_string_lossy().to_string());
+            owned.push(owned_file(&target, unit_def.as_bytes()));
         }
     }
 
@@ -1854,7 +1936,98 @@ async fn lego_export<R: Runtime>(
         "pieceCollision": piece_collision_path,
         "unitDef": unit_def_path,
         "unitDefKept": unit_def_kept,
+        "owned": owned,
     }))
+}
+
+/// `lego_export_stale` reports, and optionally removes, the files an export left
+/// behind under a name the unit no longer uses (issue #2680).
+///
+/// Renaming a unit and exporting again writes a second set of files rather than
+/// moving the first, so the game ends up with two units. This is how the old
+/// set is found and cleared. `digests` are the ones the receipt recorded for
+/// that name, and a file is only ever removed when its contents still hash to
+/// one of them. That is the whole safety rule: a file the user edited by hand
+/// since, and a file the game shipped under the same name, both hash to
+/// something else and come back under `kept` instead.
+///
+/// `dry_run` reports without touching anything, which is what the export drawer
+/// shows before offering the button.
+#[tauri::command]
+async fn lego_export_stale(
+    dir: String,
+    unit_name: String,
+    digests: Vec<String>,
+    dry_run: bool,
+) -> CliResult {
+    if !valid_unit_name(&unit_name) {
+        return CliResult::err(format!(
+            "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
+        ));
+    }
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+    match sort_stale_files(&root, &unit_name, &digests, dry_run) {
+        Ok(sorted) => CliResult::ok(json!({
+            "ours": sorted.ours,
+            "kept": sorted.kept,
+            "missing": sorted.missing,
+            "dryRun": dry_run,
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// What is left under an old unit name, split by whether coilbox can prove the
+/// file is its own.
+struct StaleFiles {
+    /// Present, and still exactly what coilbox wrote. Removed unless dry run.
+    ours: Vec<String>,
+    /// Present, but not what coilbox wrote. Never touched, only reported.
+    kept: Vec<String>,
+    /// Not there at all, so a rename left nothing at this path.
+    missing: Vec<String>,
+}
+
+/// Sort every file the old name could own, removing the ones that are provably
+/// coilbox's when this is not a dry run. See [`lego_export_stale`].
+fn sort_stale_files(
+    root: &Path,
+    unit_name: &str,
+    digests: &[String],
+    dry_run: bool,
+) -> Result<StaleFiles, String> {
+    let known: std::collections::HashSet<&str> = digests.iter().map(String::as_str).collect();
+    let mut sorted = StaleFiles {
+        ours: Vec::new(),
+        kept: Vec::new(),
+        missing: Vec::new(),
+    };
+    for path in export_paths(root, unit_name) {
+        let display = path.to_string_lossy().to_string();
+        if !path.is_file() {
+            sorted.missing.push(display);
+            continue;
+        }
+        // A file that will not read cannot be shown to be ours, so it is left
+        // alone rather than assumed either way.
+        let Ok(bytes) = std::fs::read(&path) else {
+            sorted.kept.push(display);
+            continue;
+        };
+        if !known.contains(hex_digest(&bytes).as_str()) {
+            sorted.kept.push(display);
+            continue;
+        }
+        if !dry_run {
+            std::fs::remove_file(&path)
+                .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+        }
+        sorted.ours.push(display);
+    }
+    Ok(sorted)
 }
 
 /// A texture to decode into a Blender export's folder.
@@ -1947,6 +2120,9 @@ async fn lego_export_glb<R: Runtime>(
         Ok(written) => CliResult::ok(json!({
             "path": target.to_string_lossy(),
             "textures": written,
+            // Named on the receipt for the same reason the `.s3o` is: it is
+            // keyed on the unit name, so a rename leaves it behind (#2680).
+            "owned": [owned_file(&target, &bytes)],
         })),
         Err(e) => CliResult::err(e),
     }
@@ -2005,11 +2181,11 @@ async fn lego_export_obj<R: Runtime>(
     };
 
     let obj_path = blender.join(format!("{unit_name}.obj"));
-    if let Err(e) = std::fs::write(&obj_path, obj) {
+    if let Err(e) = std::fs::write(&obj_path, &obj) {
         return CliResult::err(format!("could not write {}: {e}", obj_path.display()));
     }
     let mtl_path = blender.join(format!("{unit_name}.mtl"));
-    if let Err(e) = std::fs::write(&mtl_path, mtl) {
+    if let Err(e) = std::fs::write(&mtl_path, &mtl) {
         return CliResult::err(format!("could not write {}: {e}", mtl_path.display()));
     }
 
@@ -2029,6 +2205,12 @@ async fn lego_export_obj<R: Runtime>(
         "mtl": mtl_path.to_string_lossy(),
         "texture": texture_path.map(|p| p.to_string_lossy().to_string()),
         "textures": written,
+        // Both are keyed on the unit name, so both are left behind by a rename
+        // and both belong on the receipt (issue #2680).
+        "owned": [
+            owned_file(&obj_path, obj.as_bytes()),
+            owned_file(&mtl_path, mtl.as_bytes()),
+        ],
     }))
 }
 
@@ -2212,6 +2394,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_game_language,
             lego_export_glb,
             lego_export_obj,
+            lego_export_stale,
             lego_scratch_game,
             lego_run_script,
             lego_probe_script
@@ -2595,7 +2778,12 @@ mod tests {
     }
 
     fn text(name: &str, description: &str) -> UnitText {
+        in_language("en", name, description)
+    }
+
+    fn in_language(code: &str, name: &str, description: &str) -> UnitText {
         UnitText {
+            language: code.to_string(),
             name: name.to_string(),
             description: description.to_string(),
         }
@@ -2605,14 +2793,76 @@ mod tests {
     /// and the game's is not opened for writing at all.
     #[test]
     fn the_games_own_language_file_survives_byte_for_byte() {
-        let dir = language_game(&[(GAME_LANGUAGE_FILE, GAME_UNITS_JSON)]);
-        let before = std::fs::read(dir.path().join(GAME_LANGUAGE_FILE)).expect("read");
+        let dir = language_game(&[("language/en/units.json", GAME_UNITS_JSON)]);
+        let game = game_language_file(dir.path(), "en");
+        let before = std::fs::read(&game).expect("read");
 
         write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("write");
 
-        let after = std::fs::read(dir.path().join(GAME_LANGUAGE_FILE)).expect("read");
-        assert_eq!(before, after);
-        assert!(dir.path().join(COILBOX_LANGUAGE_FILE).is_file());
+        assert_eq!(before, std::fs::read(&game).expect("read"));
+        assert!(coilbox_language_file(dir.path(), "en").is_file());
+    }
+
+    /// A game shipping no English file names its units in whichever locale it
+    /// does ship, and the frontend's `baseLanguage` picks it. The write follows
+    /// that rather than assuming English exists.
+    #[test]
+    fn a_name_lands_in_the_locale_it_was_sent_for() {
+        let dir = language_game(&[]);
+        write_unit_text(
+            dir.path(),
+            "skyfort",
+            &in_language("ru", "Небесная", "Летает"),
+        )
+        .expect("write");
+
+        assert!(coilbox_language_file(dir.path(), "ru").is_file());
+        assert!(!coilbox_language_file(dir.path(), "en").exists());
+    }
+
+    /// A code arrives over the IPC boundary, so it is held to the same "a name,
+    /// never a path" rule as every other caller-supplied name here.
+    #[test]
+    fn a_language_code_cannot_name_a_path() {
+        let dir = language_game(&[]);
+        let error = write_unit_text(dir.path(), "skyfort", &in_language("../..", "X", "Y"))
+            .expect_err("should refuse");
+        assert!(error.contains("invalid language code"), "{error}");
+        assert!(valid_language_code("test_unicode"));
+        assert!(!valid_language_code(""));
+        assert!(!valid_language_code("en/../.."));
+    }
+
+    /// Every locale the game ships, which is what the drawer decides the home
+    /// from. Coilbox's own file beside them is not read back: this answers what
+    /// the game says, not what an earlier export did.
+    #[test]
+    fn every_locale_a_game_ships_comes_back() {
+        let dir = language_game(&[
+            ("language/en/units.json", GAME_UNITS_JSON),
+            (
+                "language/de/units.json",
+                r#"{"units":{"names":{"armcom":"Kommandant"}}}"#,
+            ),
+            (
+                "language/en/coilbox.json",
+                r#"{"units":{"names":{"x":"X"}}}"#,
+            ),
+        ]);
+        let texts = read_game_languages(dir.path()).expect("read");
+        assert_eq!(texts.len(), 2);
+        assert!(texts.contains_key("en"));
+        assert!(texts.contains_key("de"));
+        assert_eq!(
+            texts["en"]["names"]["armcom"].as_str(),
+            Some("Armada Commander")
+        );
+    }
+
+    #[test]
+    fn a_folder_with_no_language_folder_ships_no_locales() {
+        let dir = language_game(&[]);
+        assert!(read_game_languages(dir.path()).expect("read").is_empty());
     }
 
     #[test]
@@ -2620,7 +2870,7 @@ mod tests {
         let dir = language_game(&[]);
         write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("write");
 
-        let written = read_language_file(&dir.path().join(COILBOX_LANGUAGE_FILE))
+        let written = read_language_file(&coilbox_language_file(dir.path(), "en"))
             .expect("read")
             .expect("present");
         assert_eq!(
@@ -2641,7 +2891,7 @@ mod tests {
         write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("first");
         write_unit_text(dir.path(), "digger", &text("Digger", "It digs")).expect("second");
 
-        let written = read_language_file(&dir.path().join(COILBOX_LANGUAGE_FILE))
+        let written = read_language_file(&coilbox_language_file(dir.path(), "en"))
             .expect("read")
             .expect("present");
         assert_eq!(written.names.len(), 2);
@@ -2664,7 +2914,7 @@ mod tests {
         write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies")).expect("first");
         write_unit_text(dir.path(), "skyfort", &text("Sky Fort", "Renamed")).expect("second");
 
-        let written = read_language_file(&dir.path().join(COILBOX_LANGUAGE_FILE))
+        let written = read_language_file(&coilbox_language_file(dir.path(), "en"))
             .expect("read")
             .expect("present");
         assert_eq!(
@@ -2678,12 +2928,12 @@ mod tests {
     /// has happened to it, and overwriting would throw that something away.
     #[test]
     fn a_language_file_that_will_not_parse_stops_the_write() {
-        let dir = language_game(&[(COILBOX_LANGUAGE_FILE, "{ this is not json")]);
+        let dir = language_game(&[("language/en/coilbox.json", "{ this is not json")]);
         let error = write_unit_text(dir.path(), "skyfort", &text("Sky Fortress", "It flies"))
             .expect_err("should refuse");
         assert!(error.contains("will not parse"), "{error}");
         assert_eq!(
-            std::fs::read_to_string(dir.path().join(COILBOX_LANGUAGE_FILE)).expect("read"),
+            std::fs::read_to_string(coilbox_language_file(dir.path(), "en")).expect("read"),
             "{ this is not json"
         );
     }
@@ -2693,7 +2943,7 @@ mod tests {
     #[test]
     fn a_folder_with_no_language_file_reads_as_absent() {
         let dir = language_game(&[]);
-        assert!(read_language_file(&dir.path().join(GAME_LANGUAGE_FILE))
+        assert!(read_language_file(&game_language_file(dir.path(), "en"))
             .expect("read")
             .is_none());
     }
@@ -2701,10 +2951,10 @@ mod tests {
     #[test]
     fn a_games_names_come_back_lowercased_and_blanks_are_dropped() {
         let dir = language_game(&[(
-            GAME_LANGUAGE_FILE,
+            "language/en/units.json",
             r#"{"units":{"names":{"ARMCOM":"Armada Commander","corcom":"   "}}}"#,
         )]);
-        let tables = read_language_file(&dir.path().join(GAME_LANGUAGE_FILE))
+        let tables = read_language_file(&game_language_file(dir.path(), "en"))
             .expect("read")
             .expect("present");
         assert_eq!(
@@ -2712,6 +2962,94 @@ mod tests {
             Some("Armada Commander")
         );
         assert!(!tables.names.contains_key("corcom"));
+    }
+
+    /// Write every file an export leaves under `unit_name`, and answer with the
+    /// digests of the ones coilbox would have written.
+    fn exported_unit(root: &Path, unit_name: &str) -> Vec<String> {
+        let mut digests = Vec::new();
+        for path in export_paths(root, unit_name) {
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+            let contents = format!("{unit_name} at {}", path.display());
+            std::fs::write(&path, &contents).expect("write");
+            digests.push(hex_digest(contents.as_bytes()));
+        }
+        digests
+    }
+
+    #[test]
+    fn a_rename_leaves_seven_files_behind_and_the_digests_find_them() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let digests = exported_unit(dir.path(), "skyfort");
+
+        let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
+        assert_eq!(dry.ours.len(), 7);
+        assert!(dry.kept.is_empty());
+        assert!(dry.missing.is_empty());
+        // A dry run removes none of them.
+        assert!(dir.path().join("units/skyfort.lua").is_file());
+
+        let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
+        assert_eq!(done.ours.len(), 7);
+        assert!(!dir.path().join("units/skyfort.lua").exists());
+        assert!(!dir.path().join("objects3d/skyfort.s3o").exists());
+        assert!(!dir
+            .path()
+            .join("scripts/coilbox/skyfort_collision.lua")
+            .exists());
+        assert!(!dir.path().join("blender/skyfort.mtl").exists());
+    }
+
+    /// The rule that makes this safe to offer at all: a file whose contents are
+    /// not what coilbox wrote is somebody else's, whether they edited it after
+    /// the export or the game shipped it under that name all along.
+    #[test]
+    fn a_file_edited_since_the_export_is_reported_rather_than_removed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let digests = exported_unit(dir.path(), "skyfort");
+        let edited = dir.path().join("units/skyfort.lua");
+        std::fs::write(&edited, "-- my own changes").expect("write");
+
+        let sorted = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
+        assert_eq!(sorted.kept, vec![edited.to_string_lossy().to_string()]);
+        assert_eq!(sorted.ours.len(), 6);
+        assert!(edited.is_file());
+    }
+
+    /// A receipt written before the digests were recorded knows the name and
+    /// nothing else, so every file is reported and none is removed.
+    #[test]
+    fn with_no_digests_recorded_nothing_is_removed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        exported_unit(dir.path(), "skyfort");
+
+        let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
+        assert!(sorted.ours.is_empty());
+        assert_eq!(sorted.kept.len(), 7);
+        assert!(dir.path().join("units/skyfort.lua").is_file());
+    }
+
+    #[test]
+    fn a_name_that_left_nothing_behind_is_all_missing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
+        assert_eq!(sorted.missing.len(), 7);
+        assert!(sorted.ours.is_empty());
+        assert!(sorted.kept.is_empty());
+    }
+
+    /// The textures are the reason this walks a fixed list rather than the
+    /// folder: an atlas is shared by every unit that samples it, and an imported
+    /// unit's textures land under the game's own names, so a rename owns
+    /// neither.
+    #[test]
+    fn no_texture_is_ever_a_candidate() {
+        let paths = export_paths(Path::new("/game"), "skyfort");
+        assert!(!paths.iter().any(|p| p.starts_with("/game/unittextures")));
+        assert_eq!(
+            paths.first(),
+            Some(&PathBuf::from("/game/objects3d/skyfort.s3o"))
+        );
     }
 
     #[test]
