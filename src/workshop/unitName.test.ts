@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { unitDisplayName } from "./unitName";
+import { textRedirect, unitDisplayName } from "./unitName";
 
 /** A Balanced Annihilation def, which names the unit itself. */
 const baArmcom = { name: "Commander", description: "Commander" };
 
 /** A Beyond All Reason def, which names it nowhere. */
 const barArmaak = { health: 1000, objectname: "Units/ARMAAK.s3o" };
+
+/** BAR's `armcomcon`, which borrows the commander's name (issue #2686). */
+const barArmcomcon = { health: 1000, customparams: { i18nfromunit: "armcom" } };
+
+/** The commander's own row, as the curated dataset carries it. */
+const armcomRow = { name: "armcom", fullName: "Armada Commander" };
 
 describe("unitDisplayName", () => {
   it("prefers the curated dataset, which is the only read that answers for every game", () => {
@@ -63,5 +69,85 @@ describe("unitDisplayName", () => {
   it("ignores a def name that is only the internal key again", () => {
     expect(unitDisplayName("armcom", { name: "armcom" })).toBe("armcom");
     expect(unitDisplayName("armcom", { name: "   " })).toBe("armcom");
+  });
+
+  it("calls a unit what it borrows, which is what the game reads", () => {
+    expect(
+      unitDisplayName("armcomcon", barArmcomcon, undefined, armcomRow),
+    ).toBe("Armada Commander");
+  });
+
+  /**
+   * `fill_missing_names` in the worker only borrows for a unit nothing else
+   * named, and this has to answer the same way or the heading and the catalog
+   * would call one unit two things.
+   */
+  it("takes a name of the unit's own over a borrowed one", () => {
+    expect(
+      unitDisplayName(
+        "armcomcon",
+        barArmcomcon,
+        { name: "armcomcon", fullName: "Construction Commander" },
+        armcomRow,
+      ),
+    ).toBe("Construction Commander");
+  });
+
+  /** The ordinary Beyond All Reason case: nothing else names it at all. */
+  it("borrows once the unit's own row has nothing to say", () => {
+    expect(
+      unitDisplayName(
+        "armcomcon",
+        barArmcomcon,
+        { name: "armcomcon" },
+        armcomRow,
+      ),
+    ).toBe("Armada Commander");
+  });
+
+  /**
+   * A row that names nothing answers with its own key, and that key belongs to
+   * a different unit. Showing it would rename `armcomcon` to `armcom`.
+   */
+  it("does not put the borrowed unit's key on screen", () => {
+    expect(
+      unitDisplayName("armcomcon", barArmcomcon, undefined, {
+        name: "armcom",
+      }),
+    ).toBe("armcomcon");
+  });
+
+  /** A game that names its units in the def is not touched by any of this. */
+  it("leaves a def that names itself alone", () => {
+    expect(
+      unitDisplayName(
+        "armcom",
+        { ...baArmcom, customparams: { i18nfromunit: "armcom" } },
+        undefined,
+        undefined,
+      ),
+    ).toBe("Commander");
+    expect(unitDisplayName("armcom", baArmcom, undefined, armcomRow)).toBe(
+      "Commander",
+    );
+  });
+});
+
+describe("textRedirect", () => {
+  it("reads the unit a def borrows its name from", () => {
+    expect(textRedirect(barArmcomcon)).toBe("armcom");
+    expect(textRedirect({ customparams: { i18nfromunit: " ArmCom " } })).toBe(
+      "armcom",
+    );
+  });
+
+  it("answers nothing for a def that borrows nothing", () => {
+    expect(textRedirect(barArmaak)).toBeUndefined();
+    expect(textRedirect(undefined)).toBeUndefined();
+    expect(textRedirect({ customparams: {} })).toBeUndefined();
+    expect(
+      textRedirect({ customparams: { i18nfromunit: "  " } }),
+    ).toBeUndefined();
+    expect(textRedirect({ customparams: { i18nfromunit: 7 } })).toBeUndefined();
   });
 });

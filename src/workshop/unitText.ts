@@ -42,7 +42,12 @@
  * the player would read, and typing that value back in is not an edit.
  */
 import { readPath, type UnitOverrides } from "./overrides";
-import { defDescriptionPath, defNamePath, unitDisplayName } from "./unitName";
+import {
+  defDescriptionPath,
+  defNamePath,
+  textRedirect,
+  unitDisplayName,
+} from "./unitName";
 
 /** The two things on a unit that are words rather than numbers. */
 export type TextField = "name" | "description";
@@ -192,28 +197,6 @@ export interface UnitTextRow {
 /** How a value reads once it is on screen. */
 const asText = (value: unknown): string =>
   value === undefined || value === null ? "" : String(value);
-
-/**
- * The unit a def hands its name and description lookup to, if it hands them off.
- *
- * Beyond All Reason's `luaui/i18nhelpers.lua` reads
- * `units.names.<customParams.i18nfromunit>` in place of the unit's own key,
- * which is how its commander variants and its scavengers borrow the name of the
- * unit they are made from. Eleven of BAR's unit files set it, measured on
- * 8 September 2026 against test-30922-8064a43.
- *
- * Def keys arrive lowercased, hence the spelling.
- */
-export function textRedirect(
-  def: Record<string, unknown> | undefined,
-): string | undefined {
-  const params = def?.customparams;
-  if (typeof params !== "object" || params === null) return undefined;
-  const from = (params as Record<string, unknown>).i18nfromunit;
-  if (typeof from !== "string") return undefined;
-  const key = from.trim().toLowerCase();
-  return key === "" ? undefined : key;
-}
 
 /**
  * Both fields for one unit, ready to draw.
