@@ -376,9 +376,11 @@ describe("migrateCloneText", () => {
   });
 
   /**
-   * A unit the lego builder exported carries an `origin` and no `source`, and
-   * it is a file in the game folder rather than anything this store owns, so
-   * there is no unit to ask for a description.
+   * `source` is optional on a copy, so this handles one without it rather than
+   * reading a description off a unit that was never named. The page cannot
+   * reach it, since `parseClones` drops a stored copy that carries no source
+   * and a lego-built unit never enters the project's own store at all, but the
+   * type allows it and a hand-written project file could.
    */
   it("moves a name with no source unit to ask about a description", () => {
     const built: UnitClones = {
