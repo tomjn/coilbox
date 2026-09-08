@@ -100,6 +100,7 @@ function project(fields: {
   id: string;
   name: string;
   gameName: string;
+  description?: string;
 }): ModProject {
   return {
     ...fields,
@@ -125,6 +126,15 @@ function show(saved: ModProject[] = [], entry = "/workshop") {
 
 /** What is stored now, which is what a create or a rename has to have written. */
 const stored = () => readStoredSetting<ModProject[]>(PROJECTS_KEY, []);
+
+/** Open a card's action menu the way a keyboard does. The menu is a Radix
+ *  dropdown, which happy-dom cannot drive with a pointer but does open on
+ *  Enter, the same route `ScenarioBuilderPage.dom.test.tsx` takes. */
+function openCardMenu(name: string) {
+  const trigger = screen.getByRole("button", { name: `Actions for ${name}` });
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "Enter" });
+}
 
 beforeEach(() => {
   storage = memorySettingsStorage();
@@ -152,7 +162,47 @@ describe("ProjectsPage", () => {
     expect(screen.getByText("editor abc")).toBeTruthy();
   });
 
-  it("starts a project against a game and opens it", () => {
+  it("shows the description a project was given", () => {
+    show([
+      project({
+        id: "a",
+        name: "Slower tanks",
+        gameName: GAME.name,
+        description: "Everything on tracks costs more.",
+      }),
+    ]);
+    expect(screen.getByText("Everything on tracks costs more.")).toBeTruthy();
+  });
+
+  /**
+   * The whole of #2707: the drawer asks for a name and a description at the
+   * moment the project is started, rather than naming it after the game and
+   * leaving a rename button on every card to undo that (issue #2706).
+   */
+  it("starts a project under the name and description it was given", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: /New project/ }));
+    fireEvent.change(screen.getByLabelText("Game for the new project"), {
+      target: { value: GAME_2.name },
+    });
+    fireEvent.change(screen.getByLabelText("Name for the new project"), {
+      target: { value: "Slower tanks" },
+    });
+    fireEvent.change(screen.getByLabelText("What the project is for"), {
+      target: { value: "Everything on tracks costs more." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start editing" }));
+
+    const [made] = stored();
+    expect(made).toMatchObject({
+      gameName: GAME_2.name,
+      name: "Slower tanks",
+      description: "Everything on tracks costs more.",
+    });
+    expect(screen.getByText(`editor ${made.id}`)).toBeTruthy();
+  });
+
+  it("takes the game's name for a project nobody named", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: /New project/ }));
     fireEvent.change(screen.getByLabelText("Game for the new project"), {
@@ -165,26 +215,43 @@ describe("ProjectsPage", () => {
       gameName: GAME_2.name,
       name: `${GAME_2.name} tweaks`,
     });
+    expect(made).not.toHaveProperty("description");
     expect(screen.getByText(`editor ${made.id}`)).toBeTruthy();
   });
 
-  it("renames a project", () => {
+  it("renames a project from the card's menu", async () => {
     show([project({ id: "abc", name: "Slower tanks", gameName: GAME.name })]);
-    fireEvent.click(screen.getByRole("button", { name: /Rename/ }));
-    const box = screen.getByLabelText("Name of Slower tanks");
+    openCardMenu("Slower tanks");
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Rename/ }));
+
+    const box = await screen.findByLabelText("Project name");
     fireEvent.change(box, { target: { value: "Faster tanks" } });
-    fireEvent.keyDown(box, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
     expect(stored()[0]).toHaveProperty("name", "Faster tanks");
   });
 
   it("deletes a project once, after asking", async () => {
     show([project({ id: "abc", name: "Slower tanks", gameName: GAME.name })]);
-    fireEvent.click(
-      screen.getByRole("button", { name: /Delete Slower tanks/ }),
-    );
-    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    openCardMenu("Slower tanks");
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Delete/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Delete$/ }));
     expect(stored()).toEqual([]);
     expect(screen.getByText(/No tweak projects yet/)).toBeTruthy();
+  });
+
+  it("reaches every action on a card by its name", async () => {
+    show([project({ id: "abc", name: "Slower tanks", gameName: GAME.name })]);
+    openCardMenu("Slower tanks");
+    expect(
+      (await screen.findAllByRole("menuitem")).map((i) => i.textContent),
+    ).toEqual([
+      expect.stringContaining("Rename"),
+      expect.stringContaining("Duplicate"),
+      expect.stringContaining("Export as a file"),
+      expect.stringContaining("Copy a share link"),
+      expect.stringContaining("Delete"),
+    ]);
   });
 
   /**
