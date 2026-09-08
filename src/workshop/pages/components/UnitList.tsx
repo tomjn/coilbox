@@ -1,10 +1,24 @@
 /**
  * The searchable list of every unit in the selected game (issue #1270).
  *
- * Two lines a row: the name a person reads, and under it the internal key. The
- * key earns its place rather than being debug output, because it is what every
- * other part of coilbox joins on and what a tweak will be written against, so
- * somebody working here needs to be able to see it and search by it.
+ * Two lines a row beside the unit's build picture: the name a person reads, and
+ * under it the faction and the internal key. The key earns its place rather than
+ * being debug output, because it is what every other part of coilbox joins on
+ * and what a tweak will be written against, so somebody working here needs to be
+ * able to see it and search by it.
+ *
+ * The picture is the point (issue #2692). Picking one unit out of Beyond All
+ * Reason's 564 is recognising it, not reading it, and the name on its own does
+ * not even identify it: BAR has four units called "Advanced Aircraft Plant", one
+ * per side. So the faction is on the row too, wherever the game's own build graph
+ * reaches the unit.
+ *
+ * Per row rather than grouped under faction headings, which is what the content
+ * side's `UnitPicker` does with the same facts. This list is sorted by name and
+ * capped, and someone here has usually come to find one unit they can already
+ * name. Grouping would sort by faction first and then spend the cap on whichever
+ * side came out top, so a search that matched two units on two sides could show
+ * one of them.
  *
  * A unit the project has edited is marked, because otherwise the only way to
  * find your own work again is to remember where you left it.
@@ -24,6 +38,8 @@
  */
 import { cn, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
+import type { UnitDisplay } from "@/content/bindings";
+import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import type { BuildMenus } from "../../buildMenus";
 import type { CloneOrigin, UnitClones } from "../../clones";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
@@ -47,6 +63,9 @@ export function UnitList({
   menus,
   disabled,
   nameOf,
+  picOf,
+  picsPending,
+  factionOf,
   onSelect,
 }: {
   /** The game's units with the project's own already in among them. */
@@ -65,6 +84,13 @@ export function UnitList({
   disabled: DisabledUnits;
   /** What to call a unit, resolved by the page against the curated dataset. */
   nameOf: (key: string, def: Record<string, unknown>) => string;
+  /** This unit's build picture, from `unitPics.ts`. */
+  picOf: (key: string) => UnitDisplay | undefined;
+  /** The pictures are still being read, so a row claims nothing about them. */
+  picsPending: boolean;
+  /** Which side reaches this unit, where the game has more than one and its
+   *  build graph reaches it at all. */
+  factionOf: (key: string) => string | undefined;
   onSelect: (key: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -112,6 +138,7 @@ export function UnitList({
             const clone = clones[u.key];
             const menuEdits = menus[u.key]?.length ?? 0;
             const off = isUnitDisabled(disabled, u.key);
+            const faction = factionOf(u.key);
             return (
               <li key={u.key}>
                 <button
@@ -119,11 +146,12 @@ export function UnitList({
                   onClick={() => onSelect(u.key)}
                   aria-current={u.key === selected ? "true" : undefined}
                   className={cn(
-                    "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent",
+                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent",
                     u.key === selected && "bg-accent font-medium",
                   )}
                 >
-                  <span className="flex min-w-0 flex-col">
+                  <UnitIcon display={picOf(u.key)} pending={picsPending} />
+                  <span className="flex min-w-0 flex-1 flex-col">
                     <span
                       className={cn(
                         "truncate",
@@ -133,8 +161,20 @@ export function UnitList({
                     >
                       {u.label}
                     </span>
-                    <span className="truncate font-mono text-[10px] text-muted-foreground">
-                      {u.key}
+                    {/* The faction leads the second line because it is what
+                      tells four units of the same name apart, and it is short
+                      where the key is not, so the key is the one that gives
+                      way when the column runs out. */}
+                    <span className="flex min-w-0 items-baseline gap-1 text-[10px] text-muted-foreground">
+                      {faction && (
+                        <>
+                          <span className="max-w-[50%] shrink-0 truncate">
+                            {faction}
+                          </span>
+                          <span aria-hidden>·</span>
+                        </>
+                      )}
+                      <span className="truncate font-mono">{u.key}</span>
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1">

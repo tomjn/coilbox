@@ -21,7 +21,11 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CustomParamsResult, UnitDefsResult } from "@/content/bindings";
+import type {
+  CustomParamsResult,
+  UnitBuildpicsResult,
+  UnitDefsResult,
+} from "@/content/bindings";
 import { LEGO_SCHEMA_VERSION, type LegoProject } from "@/lego/model";
 
 // The drawer behind the Projects button lives on the app frame, which is not
@@ -64,8 +68,10 @@ let mockDataset: {
   fullName?: string;
   buildOptions?: string[];
 }[] = [];
-/** The game's sides, which the build menu panel reads to name a faction. */
+/** The game's sides, which the page reads to name a unit's faction. */
 let mockSides: { name: string; startUnit: string }[] = [];
+/** The build pictures unitsync resolved, null until the read lands (#2692). */
+let mockBuildpics: UnitBuildpicsResult | null = null;
 /** The game archive's member list, which the asset fields browse (issue #2648).
  *  Empty in most tests, where a field is a plain text box. */
 let mockArchiveFiles: { path: string; size: number }[] = [];
@@ -87,7 +93,7 @@ vi.mock("@/content/config", () => ({
   // Both read by the unit picker the build menu panel adds through, and the
   // first by the panel itself, to say which faction a row belongs to.
   useUnitsyncGameInfo: () => ({ info: { sides: mockSides }, loading: false }),
-  useUnitsyncUnitBuildpics: () => null,
+  useUnitsyncUnitBuildpics: () => mockBuildpics,
   // The archive listing behind the Browse action on an asset field (#2648).
   useUnitsyncArchiveTree: () => ({
     tree: { files: mockArchiveFiles, errors: [] },
@@ -268,6 +274,7 @@ afterEach(() => {
   mockStatus = "ready";
   mockDataset = [];
   mockSides = [];
+  mockBuildpics = null;
   mockArchiveFiles = [];
   mockConsumers = null;
   mockConsumersByArchive = {};
@@ -1317,6 +1324,157 @@ describe("UnitPage", () => {
       expect(row()?.textContent).not.toContain("menu");
       fireEvent.click(screen.getByLabelText("Move Peewee down"));
       expect(row()?.textContent).toContain("menu");
+    });
+  });
+
+  /**
+   * Issue #2692. A person picking one unit out of Beyond All Reason's 564
+   * recognises the picture long before the name, and the name on its own does
+   * not even identify it there: four units are called "Advanced Aircraft
+   * Plant", one per side.
+   */
+  describe("build pictures and factions", () => {
+    const UNITS = {
+      armcom: ARMCOM,
+      armlab: ARMLAB,
+      armpw: {
+        name: "armpw",
+        humanName: "Peewee",
+        health: 100,
+        buildpic: "ARMPW.DDS",
+      },
+      corcom: { name: "corcom", humanName: "Core Commander" },
+      corak: { name: "corak", humanName: "The Can" },
+      /** In the game's defs and on nobody's build menu, so no side reaches it. */
+      armflea: { name: "armflea", humanName: "Flea" },
+    };
+    const DATASET = [
+      { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
+      { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
+      { name: "armpw", fullName: "Peewee" },
+      { name: "corcom", fullName: "Core Commander", buildOptions: ["corak"] },
+      { name: "corak", fullName: "The Can" },
+      { name: "armflea", fullName: "Flea" },
+    ];
+    const SIDES = [
+      { name: "Arm", startUnit: "armcom" },
+      { name: "Core", startUnit: "corcom" },
+    ];
+    const PEEWEE_PIC = "data:image/png;base64,peewee";
+
+    const open = (unit = "armlab") => {
+      mockBuildpics = {
+        units: {
+          armpw: { icon: PEEWEE_PIC },
+          armlab: { icon: "data:image/png;base64,botlab" },
+          corak: { iconSkipped: "no-source" },
+        },
+        errors: [],
+      };
+      return show(
+        UNITS,
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=${unit}`,
+        DATASET,
+      );
+    };
+
+    /** One row of the left-hand list, by the key printed under its name. */
+    const listRow = (key: string) =>
+      screen
+        .getAllByRole("button")
+        .find((b) =>
+          [...b.querySelectorAll("span")].some((s) => s.textContent === key),
+        );
+
+    it("draws each unit's build picture beside its name", () => {
+      mockSides = SIDES;
+      open();
+      expect(listRow("armpw")?.querySelector("img")?.getAttribute("src")).toBe(
+        PEEWEE_PIC,
+      );
+    });
+
+    /**
+     * The same answer `UnitPicker` has always given, out of the one component
+     * that draws a build pic anywhere in coilbox: a box the size of the picture
+     * saying which of "the game ships none" and "coilbox could not read it"
+     * happened, so a half-empty list still lines up and still says why.
+     */
+    it("says so in the picture's place when the game ships none", () => {
+      mockSides = SIDES;
+      open();
+      const row = listRow("corak");
+      expect(row?.querySelector("img")).toBeNull();
+      expect(row?.textContent).toContain("no pic");
+    });
+
+    it("claims nothing about a picture the read has not answered for yet", () => {
+      mockSides = SIDES;
+      show(
+        UNITS,
+        `/workshop?game=${encodeURIComponent(GAME.name)}&unit=armlab`,
+        DATASET,
+      );
+      const row = listRow("armpw");
+      expect(row?.querySelector("img")).toBeNull();
+      expect(row?.textContent).not.toContain("no pic");
+    });
+
+    /** The side leads the second line and the key follows it, so the row still
+     *  carries the thing the rest of coilbox joins on. */
+    it("names the side the game's build graph reaches each unit from", () => {
+      mockSides = SIDES;
+      open();
+      expect(listRow("armpw")?.textContent).toBe("PeeweeArm·armpw");
+      expect(listRow("corak")?.textContent).toBe("no picThe CanCore·corak");
+    });
+
+    /** Saying "Arm" on all of a one-sided game's rows tells nobody anything. */
+    it("says nothing about a side for a game that declares one", () => {
+      mockSides = [{ name: "Arm", startUnit: "armcom" }];
+      open();
+      expect(listRow("armpw")?.textContent).toBe("Peeweearmpw");
+    });
+
+    /** A unit no side's build graph reaches is one the game has no opinion
+     *  about, so the row says nothing rather than guessing. */
+    it("says nothing about a side for a unit no side builds", () => {
+      mockSides = SIDES;
+      open();
+      expect(listRow("armflea")?.textContent).toBe("no picFleaarmflea");
+    });
+
+    it("draws the pictures in a builder's roster too", () => {
+      mockSides = SIDES;
+      open();
+      const row = screen
+        .getAllByRole("listitem")
+        .filter((li) => li.querySelector("button[aria-label^='Move ']"))
+        .find((li) => li.textContent?.includes("Peewee"));
+      expect(row?.querySelector("img")?.getAttribute("src")).toBe(PEEWEE_PIC);
+    });
+
+    /** A copy is in no archive, so unitsync has never heard of it. It carries
+     *  its source's `buildpic` and draws that picture in the game, so it draws
+     *  it here (`unitPics.ts`). */
+    it("gives a copy the picture of the unit it was copied from", async () => {
+      mockSides = SIDES;
+      open("armpw");
+      screen.getByRole("button", { name: /Copy unit/ }).click();
+      const keyBox = (await screen.findByLabelText(
+        /Internal name/,
+      )) as HTMLInputElement;
+      fireEvent.change(keyBox, { target: { value: "armpw2" } });
+      fireEvent.change(screen.getByLabelText(/Name in game/), {
+        target: { value: "Peewee II" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /^Add unit/ }));
+      await waitFor(() => expect(listRow("armpw2")).toBeDefined());
+      // The copy carries `armpw`'s `buildpic`, so that is the picture it will
+      // draw in the game.
+      expect(listRow("armpw2")?.querySelector("img")?.getAttribute("src")).toBe(
+        PEEWEE_PIC,
+      );
     });
   });
 
