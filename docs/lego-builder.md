@@ -8,7 +8,7 @@ The builder is a modding tool, so it is hidden until you turn on **Advanced mode
 
 Two things to know before you spend an evening on this:
 
-- A unit you export cannot be built or moved in a game yet. The only way to see it is `/cheat` then `/give`. See [what an exported unit cannot do](#what-an-exported-unit-cannot-do-yet).
+- A unit you export arrives in the game static and unbuildable. Giving it a movement class and putting it on a builder's menu happens in the workshop afterwards. See [making the game use the unit](#making-the-game-use-the-unit).
 - An exported unit has been loaded in a headless engine, which proves its pieces, its size and its script are right. Nobody has yet seen one drawn, so nothing has confirmed it looks right. See [the engine load checklist](#the-engine-load-checklist).
 
 ## Build a unit
@@ -166,7 +166,7 @@ It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas
 
 The one exception is coilbox's own scratch game, below, which is a throwaway and is always rewritten in full.
 
-**What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, no movement class, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. Making the game use it is your decision to make, in files you already own.
+**What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, no movement class, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
 
 ## The collision volume
 
@@ -246,11 +246,25 @@ Cheats have to be on before `/give` does anything. Spawning is left to you: `/gi
 
 You need an engine, at least one game and at least one map installed. The drawer says which of those is missing rather than failing at launch.
 
-## What an exported unit cannot do yet
+## Making the game use the unit
 
-A unit coilbox exports cannot be played normally. Its unit definition sets `canmove = false`, and nothing lists it in any unit's `buildoptions`, so nothing can build it and it cannot move. `/cheat` and `/give` is the only way to get one onto a map.
+Straight out of export, a unit cannot be played normally. Its definition sets `canmove = false`, and nothing lists it in any unit's `buildoptions`, so nothing can build it and it cannot move. `/cheat` and `/give` is the only way to get one onto a map.
 
-`canmove` is off because the engine drops a unit that can move but has no movement class, and the builder has no notion of movement classes, so leaving it off is what keeps every export loadable. How a custom unit should properly enter a game, which builder gains it as an option or whether it arrives another way, is an open design question: [issue #663](https://github.com/tomjn/coilbox/issues/663).
+That is on purpose, and it is not the end of the road. A movement class names an entry in the game's own move definitions, and the engine drops a unit that can move but names a class that does not resolve. The builder does not know which game the unit is going to, so writing a class here would be a guess, and a wrong guess is a unit that silently is not in the game. Leaving movement off is what keeps every export loadable everywhere.
+
+The decisions the builder cannot make are made in **Unit tweaks**, under **workshop** in the sidebar. Pick the game you exported into and your unit is in the list, alongside the game's own:
+
+- **Give it a movement class.** The field is a picker, and what it offers is the classes this game's units already move on. Turn **Can move** on beside it. The page says so if only one of the two is set, because either half on its own is wrong.
+- **Put it on a builder's menu.** Open the factory or the commander that should build it and add it to the roster. That is the answer to "which builder gains it as an option", and it is the same editor you would use to change any of the game's own build menus.
+- **Change any other number.** Health, cost, categories, weapons: the unit edits exactly like a unit the game shipped.
+
+The unit is in that list because `units/<unit>.lua` is a file in the game and the engine reads it like any other. What export adds is a note of where it wrote, so the workshop can mark the unit as yours and say which model it came out of, rather than leaving you to spot it among the game's own. Export the same unit again and it is still one unit, not two. Nothing is imported and there is no button to press.
+
+If the unit is not in the list, unitsync has not re-read the game yet. The workshop shows the definition export wrote until it does.
+
+Renaming the unit in the builder and exporting again leaves the old `units/<name>.lua` behind in the game folder. Delete it by hand.
+
+One thing this does not yet do is save. Workshop edits live on the page for as long as it is open ([issue #1282](https://github.com/tomjn/coilbox/issues/1282)). The exported unit itself is a real file and is not going anywhere.
 
 ## The engine load checklist
 
