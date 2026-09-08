@@ -437,6 +437,38 @@ fn keep_existing(target: &Path, scratch: bool) -> bool {
     target.exists() && !scratch
 }
 
+/// One file an export wrote, with the digest of the bytes it wrote.
+///
+/// The digest is what lets a later cleanup prove a file is still coilbox's own
+/// (issue #2680). A rename leaves the old name's files behind, and the only
+/// safe way to take them away is to check that what is on disk now is exactly
+/// what was written. A hand edit made since, or a file the game shipped under
+/// that name, hashes to something else and is left alone.
+fn owned_file(path: &Path, bytes: &[u8]) -> serde_json::Value {
+    json!({ "path": path.to_string_lossy(), "sha256": hex_digest(bytes) })
+}
+
+/// Every file an export writes under one unit name, derived from the folder and
+/// the name alone.
+///
+/// Never a texture. An atlas is shared by every unit that samples it, and a unit
+/// imported from somebody else's model places its textures under the names that
+/// model already gives them, which are the game's own. Neither is keyed on the
+/// unit name, so neither is part of a rename.
+fn export_paths(root: &Path, unit_name: &str) -> Vec<PathBuf> {
+    vec![
+        root.join("objects3d").join(format!("{unit_name}.s3o")),
+        root.join("scripts").join(format!("{unit_name}.lua")),
+        root.join("scripts")
+            .join("coilbox")
+            .join(format!("{unit_name}_collision.lua")),
+        root.join("units").join(format!("{unit_name}.lua")),
+        root.join("blender").join(format!("{unit_name}.glb")),
+        root.join("blender").join(format!("{unit_name}.obj")),
+        root.join("blender").join(format!("{unit_name}.mtl")),
+    ]
+}
+
 #[derive(Deserialize)]
 struct ExportVertex {
     pos: [f32; 3],
@@ -1515,6 +1547,11 @@ async fn lego_export<R: Runtime>(
     if let Err(e) = std::fs::write(&model_path, &bytes) {
         return CliResult::err(format!("could not write {}: {e}", model_path.display()));
     }
+    // What this run wrote, and what it wrote there, so a rename can later prove
+    // which files under the old name are still coilbox's to remove (issue
+    // #2680). A file that was kept rather than written is deliberately absent:
+    // coilbox did not put those contents there and has no claim on them.
+    let mut owned = vec![owned_file(&model_path, &bytes)];
 
     // The texture is written once and then left alone, like the two files
     // below. The name it is written under is the caller's and cannot collide
@@ -1598,10 +1635,11 @@ async fn lego_export<R: Runtime>(
         let target = scripts.join(format!("{unit_name}.lua"));
         if keep_existing(&target, scratch) {
             script_kept = true;
-        } else if let Err(e) = std::fs::write(&target, script) {
+        } else if let Err(e) = std::fs::write(&target, &script) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
         } else {
             script_path = Some(target.to_string_lossy().to_string());
+            owned.push(owned_file(&target, script.as_bytes()));
         }
     }
 
@@ -1627,10 +1665,11 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", generated.display()));
         }
         let target = generated.join(format!("{unit_name}_collision.lua"));
-        if let Err(e) = std::fs::write(&target, lua) {
+        if let Err(e) = std::fs::write(&target, &lua) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
         }
         piece_collision_path = Some(target.to_string_lossy().to_string());
+        owned.push(owned_file(&target, lua.as_bytes()));
     }
 
     // The unit definition follows the same rule as the script, scratch
@@ -1646,10 +1685,11 @@ async fn lego_export<R: Runtime>(
         let target = units.join(format!("{unit_name}.lua"));
         if keep_existing(&target, scratch) {
             unit_def_kept = true;
-        } else if let Err(e) = std::fs::write(&target, unit_def) {
+        } else if let Err(e) = std::fs::write(&target, &unit_def) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
         } else {
             unit_def_path = Some(target.to_string_lossy().to_string());
+            owned.push(owned_file(&target, unit_def.as_bytes()));
         }
     }
 
@@ -1664,7 +1704,98 @@ async fn lego_export<R: Runtime>(
         "pieceCollision": piece_collision_path,
         "unitDef": unit_def_path,
         "unitDefKept": unit_def_kept,
+        "owned": owned,
     }))
+}
+
+/// `lego_export_stale` reports, and optionally removes, the files an export left
+/// behind under a name the unit no longer uses (issue #2680).
+///
+/// Renaming a unit and exporting again writes a second set of files rather than
+/// moving the first, so the game ends up with two units. This is how the old
+/// set is found and cleared. `digests` are the ones the receipt recorded for
+/// that name, and a file is only ever removed when its contents still hash to
+/// one of them. That is the whole safety rule: a file the user edited by hand
+/// since, and a file the game shipped under the same name, both hash to
+/// something else and come back under `kept` instead.
+///
+/// `dry_run` reports without touching anything, which is what the export drawer
+/// shows before offering the button.
+#[tauri::command]
+async fn lego_export_stale(
+    dir: String,
+    unit_name: String,
+    digests: Vec<String>,
+    dry_run: bool,
+) -> CliResult {
+    if !valid_unit_name(&unit_name) {
+        return CliResult::err(format!(
+            "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
+        ));
+    }
+    let root = PathBuf::from(&dir);
+    if !root.is_absolute() || !root.is_dir() {
+        return CliResult::err(format!("not a folder: {dir}"));
+    }
+    match sort_stale_files(&root, &unit_name, &digests, dry_run) {
+        Ok(sorted) => CliResult::ok(json!({
+            "ours": sorted.ours,
+            "kept": sorted.kept,
+            "missing": sorted.missing,
+            "dryRun": dry_run,
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// What is left under an old unit name, split by whether coilbox can prove the
+/// file is its own.
+struct StaleFiles {
+    /// Present, and still exactly what coilbox wrote. Removed unless dry run.
+    ours: Vec<String>,
+    /// Present, but not what coilbox wrote. Never touched, only reported.
+    kept: Vec<String>,
+    /// Not there at all, so a rename left nothing at this path.
+    missing: Vec<String>,
+}
+
+/// Sort every file the old name could own, removing the ones that are provably
+/// coilbox's when this is not a dry run. See [`lego_export_stale`].
+fn sort_stale_files(
+    root: &Path,
+    unit_name: &str,
+    digests: &[String],
+    dry_run: bool,
+) -> Result<StaleFiles, String> {
+    let known: std::collections::HashSet<&str> = digests.iter().map(String::as_str).collect();
+    let mut sorted = StaleFiles {
+        ours: Vec::new(),
+        kept: Vec::new(),
+        missing: Vec::new(),
+    };
+    for path in export_paths(root, unit_name) {
+        let display = path.to_string_lossy().to_string();
+        if !path.is_file() {
+            sorted.missing.push(display);
+            continue;
+        }
+        // A file that will not read cannot be shown to be ours, so it is left
+        // alone rather than assumed either way.
+        let Ok(bytes) = std::fs::read(&path) else {
+            sorted.kept.push(display);
+            continue;
+        };
+        if !known.contains(hex_digest(&bytes).as_str()) {
+            sorted.kept.push(display);
+            continue;
+        }
+        if !dry_run {
+            std::fs::remove_file(&path)
+                .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+        }
+        sorted.ours.push(display);
+    }
+    Ok(sorted)
 }
 
 /// A texture to decode into a Blender export's folder.
@@ -1757,6 +1888,9 @@ async fn lego_export_glb<R: Runtime>(
         Ok(written) => CliResult::ok(json!({
             "path": target.to_string_lossy(),
             "textures": written,
+            // Named on the receipt for the same reason the `.s3o` is: it is
+            // keyed on the unit name, so a rename leaves it behind (#2680).
+            "owned": [owned_file(&target, &bytes)],
         })),
         Err(e) => CliResult::err(e),
     }
@@ -1815,11 +1949,11 @@ async fn lego_export_obj<R: Runtime>(
     };
 
     let obj_path = blender.join(format!("{unit_name}.obj"));
-    if let Err(e) = std::fs::write(&obj_path, obj) {
+    if let Err(e) = std::fs::write(&obj_path, &obj) {
         return CliResult::err(format!("could not write {}: {e}", obj_path.display()));
     }
     let mtl_path = blender.join(format!("{unit_name}.mtl"));
-    if let Err(e) = std::fs::write(&mtl_path, mtl) {
+    if let Err(e) = std::fs::write(&mtl_path, &mtl) {
         return CliResult::err(format!("could not write {}: {e}", mtl_path.display()));
     }
 
@@ -1839,6 +1973,12 @@ async fn lego_export_obj<R: Runtime>(
         "mtl": mtl_path.to_string_lossy(),
         "texture": texture_path.map(|p| p.to_string_lossy().to_string()),
         "textures": written,
+        // Both are keyed on the unit name, so both are left behind by a rename
+        // and both belong on the receipt (issue #2680).
+        "owned": [
+            owned_file(&obj_path, obj.as_bytes()),
+            owned_file(&mtl_path, mtl.as_bytes()),
+        ],
     }))
 }
 
@@ -2021,6 +2161,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_export,
             lego_export_glb,
             lego_export_obj,
+            lego_export_stale,
             lego_scratch_game,
             lego_run_script,
             lego_probe_script
@@ -2386,6 +2527,94 @@ mod tests {
         // The scratch game has nothing worth keeping, so it is always rewritten.
         assert!(!keep_existing(&existing, true));
         assert!(!keep_existing(&missing, true));
+    }
+
+    /// Write every file an export leaves under `unit_name`, and answer with the
+    /// digests of the ones coilbox would have written.
+    fn exported_unit(root: &Path, unit_name: &str) -> Vec<String> {
+        let mut digests = Vec::new();
+        for path in export_paths(root, unit_name) {
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+            let contents = format!("{unit_name} at {}", path.display());
+            std::fs::write(&path, &contents).expect("write");
+            digests.push(hex_digest(contents.as_bytes()));
+        }
+        digests
+    }
+
+    #[test]
+    fn a_rename_leaves_seven_files_behind_and_the_digests_find_them() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let digests = exported_unit(dir.path(), "skyfort");
+
+        let dry = sort_stale_files(dir.path(), "skyfort", &digests, true).expect("dry run");
+        assert_eq!(dry.ours.len(), 7);
+        assert!(dry.kept.is_empty());
+        assert!(dry.missing.is_empty());
+        // A dry run removes none of them.
+        assert!(dir.path().join("units/skyfort.lua").is_file());
+
+        let done = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
+        assert_eq!(done.ours.len(), 7);
+        assert!(!dir.path().join("units/skyfort.lua").exists());
+        assert!(!dir.path().join("objects3d/skyfort.s3o").exists());
+        assert!(!dir
+            .path()
+            .join("scripts/coilbox/skyfort_collision.lua")
+            .exists());
+        assert!(!dir.path().join("blender/skyfort.mtl").exists());
+    }
+
+    /// The rule that makes this safe to offer at all: a file whose contents are
+    /// not what coilbox wrote is somebody else's, whether they edited it after
+    /// the export or the game shipped it under that name all along.
+    #[test]
+    fn a_file_edited_since_the_export_is_reported_rather_than_removed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let digests = exported_unit(dir.path(), "skyfort");
+        let edited = dir.path().join("units/skyfort.lua");
+        std::fs::write(&edited, "-- my own changes").expect("write");
+
+        let sorted = sort_stale_files(dir.path(), "skyfort", &digests, false).expect("removal");
+        assert_eq!(sorted.kept, vec![edited.to_string_lossy().to_string()]);
+        assert_eq!(sorted.ours.len(), 6);
+        assert!(edited.is_file());
+    }
+
+    /// A receipt written before the digests were recorded knows the name and
+    /// nothing else, so every file is reported and none is removed.
+    #[test]
+    fn with_no_digests_recorded_nothing_is_removed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        exported_unit(dir.path(), "skyfort");
+
+        let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
+        assert!(sorted.ours.is_empty());
+        assert_eq!(sorted.kept.len(), 7);
+        assert!(dir.path().join("units/skyfort.lua").is_file());
+    }
+
+    #[test]
+    fn a_name_that_left_nothing_behind_is_all_missing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sorted = sort_stale_files(dir.path(), "skyfort", &[], false).expect("removal");
+        assert_eq!(sorted.missing.len(), 7);
+        assert!(sorted.ours.is_empty());
+        assert!(sorted.kept.is_empty());
+    }
+
+    /// The textures are the reason this walks a fixed list rather than the
+    /// folder: an atlas is shared by every unit that samples it, and an imported
+    /// unit's textures land under the game's own names, so a rename owns
+    /// neither.
+    #[test]
+    fn no_texture_is_ever_a_candidate() {
+        let paths = export_paths(Path::new("/game"), "skyfort");
+        assert!(!paths.iter().any(|p| p.starts_with("/game/unittextures")));
+        assert_eq!(
+            paths.first(),
+            Some(&PathBuf::from("/game/objects3d/skyfort.s3o"))
+        );
     }
 
     #[test]

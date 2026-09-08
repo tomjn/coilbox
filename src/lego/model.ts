@@ -426,6 +426,14 @@ export interface LegoProject {
   exportObj?: boolean;
   /** What the last export actually put in a game folder (issue #2651). */
   exported?: LegoExport;
+  /**
+   * Names this project has exported under in the same folder and no longer
+   * uses, whose files are still sitting in the game (issue #2680).
+   *
+   * An entry goes when the export drawer clears the files or finds them already
+   * gone, so an empty list means the rename left nothing behind.
+   */
+  staleExports?: StaleExport[];
 }
 
 /**
@@ -452,6 +460,55 @@ export interface LegoExport {
   unitName: string;
   /** The definition as written, keyed the way the engine reads it: lower case. */
   def: Record<string, unknown>;
+  /**
+   * Every file coilbox wrote under this name, and the digest of what it wrote
+   * (issue #2680).
+   *
+   * Kept so a rename can prove which of the old name's files are still its own.
+   * A file the export kept rather than wrote is deliberately not here: coilbox
+   * did not put those contents on disk and has no claim on them. Empty for a
+   * receipt written before this was recorded, which means the same thing as far
+   * as anything acting on it goes: nothing here is provably ours.
+   */
+  files: ExportedFile[];
+}
+
+/** One file an export wrote, by path and by the digest of the bytes written. */
+export interface ExportedFile {
+  path: string;
+  /** Lower case hex sha256. */
+  sha256: string;
+}
+
+/**
+ * A name a project exported under and no longer uses (issue #2680).
+ *
+ * Renaming a unit and exporting again writes a second set of files rather than
+ * moving the first, so the game ends up holding two units. This is what
+ * remembers the first one, since the receipt for it is about to be overwritten
+ * and after that nothing anywhere knows the old name.
+ *
+ * No definition, unlike {@link LegoExport}. Nothing shows a stale unit's fields:
+ * either the engine reads the file that is still there, or the unit is broken
+ * and there is nothing to show. Carrying one would only grow the project file
+ * every time somebody renamed.
+ */
+export interface StaleExport {
+  dir: string;
+  at: string;
+  unitName: string;
+  files: ExportedFile[];
+}
+
+function parseExportedFiles(raw: unknown): ExportedFile[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const f = entry as Record<string, unknown>;
+    if (typeof f.path !== "string" || f.path === "") return [];
+    if (typeof f.sha256 !== "string" || f.sha256 === "") return [];
+    return [{ path: f.path, sha256: f.sha256 }];
+  });
 }
 
 function parseExport(raw: unknown): LegoExport | null {
@@ -466,7 +523,26 @@ function parseExport(raw: unknown): LegoExport | null {
     at: typeof e.at === "string" ? e.at : "",
     unitName: e.unitName,
     def: e.def as Record<string, unknown>,
+    files: parseExportedFiles(e.files),
   };
+}
+
+function parseStaleExports(raw: unknown): StaleExport[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const e = entry as Record<string, unknown>;
+    if (typeof e.dir !== "string" || e.dir === "") return [];
+    if (typeof e.unitName !== "string" || e.unitName === "") return [];
+    return [
+      {
+        dir: e.dir,
+        at: typeof e.at === "string" ? e.at : "",
+        unitName: e.unitName,
+        files: parseExportedFiles(e.files),
+      },
+    ];
+  });
 }
 
 /**
@@ -781,6 +857,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(() => {
       const exported = parseExport(d.exported);
       return exported ? { exported } : {};
+    })(),
+    ...(() => {
+      const stale = parseStaleExports(d.staleExports);
+      return stale.length > 0 ? { staleExports: stale } : {};
     })(),
   };
   // A document saved before pieces were written in save order, or hand-edited,

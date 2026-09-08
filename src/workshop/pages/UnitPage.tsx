@@ -554,14 +554,20 @@ export default function UnitPage() {
   // project claim work the user never did, and go stale against the file the
   // moment it is edited by hand. `editCounts` reads the project's own stores,
   // so it never sees one.
-  const builtCount = Object.keys(built.builtBy).length;
+  //
+  // Counted apart from the stale ones beside them (issue #2680). A name a
+  // rename left behind is a unit in the game and belongs in this line, but
+  // calling it built would say the user meant to put it there.
+  const origins = Object.values(built.builtBy);
+  const builtCount = origins.filter((origin) => !origin.stale).length;
+  const staleCount = origins.length - builtCount;
   const unitDisabled = isUnitDisabled(disabled, unitKey);
   const anythingChanged =
     counts.fields > 0 ||
     counts.added > 0 ||
     counts.menuOps > 0 ||
     counts.off > 0;
-  const anythingToShow = anythingChanged || builtCount > 0;
+  const anythingToShow = anythingChanged || origins.length > 0;
 
   /**
    * Copy the selected unit, as the project has it, under a new name.
@@ -718,6 +724,7 @@ export default function UnitPage() {
                 anythingChanged && describeEdits(edits),
                 builtCount > 0 &&
                   `${builtCount} built unit${builtCount === 1 ? "" : "s"}`,
+                staleCount > 0 && `${staleCount} left behind by a rename`,
               ]
                 .filter(Boolean)
                 .join(", ")}
@@ -873,13 +880,22 @@ export default function UnitPage() {
                     {unitKey}
                   </span>
                   {builtBy ? (
-                    <span className="max-w-prose text-xs text-muted-foreground">
-                      Built in the unit builder as {builtBy.projectName} and
-                      exported into {game.name}
-                      {clone
-                        ? ". Not in this game's definitions yet, so this is what the export wrote."
-                        : ""}
-                    </span>
+                    builtBy.stale ? (
+                      <span className="max-w-prose text-xs text-destructive">
+                        Left behind when {builtBy.projectName} was renamed. Its
+                        files are still in {game.name}, so the game has this
+                        unit and the renamed one. The unit builder's export
+                        drawer clears them.
+                      </span>
+                    ) : (
+                      <span className="max-w-prose text-xs text-muted-foreground">
+                        Built in the unit builder as {builtBy.projectName} and
+                        exported into {game.name}
+                        {clone
+                          ? ". Not in this game's definitions yet, so this is what the export wrote."
+                          : ""}
+                      </span>
+                    )
                   ) : (
                     clone && (
                       <span className="max-w-prose text-xs text-muted-foreground">

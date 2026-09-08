@@ -1,6 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
 import type { S3oModel } from "./importS3o";
+import type { ExportedFile } from "./model";
 import type { PieceRest } from "./pieceRest";
 import type { S3oBuild } from "./s3oBuild";
 import type {
@@ -132,8 +133,44 @@ export const legoExport = defineCommand<
     textures: string[];
     /** Stored textures already there under that name, and left alone. */
     texturesKept: string[];
+    /**
+     * The files this run wrote, with the digest of what it wrote, for the
+     * receipt (issue #2680). Never a file it kept, and never a texture: an
+     * atlas is shared and an imported unit's textures land under the game's own
+     * names, so neither is keyed on the unit name.
+     */
+    owned: ExportedFile[];
   }
 >("coilbox-lego", "lego_export");
+
+/**
+ * Say what an export left behind under a name the unit no longer uses, and
+ * optionally clear it (issue #2680).
+ *
+ * Renaming a unit and exporting again writes a second set of files rather than
+ * moving the first. `digests` are the ones the old receipt recorded, and a file
+ * only comes back under `ours`, and is only ever removed, when its contents
+ * still hash to one of them. Anything else is somebody's hand edit or the
+ * game's own file, and comes back under `kept` untouched.
+ */
+export const legoExportStale = defineCommand<
+  {
+    dir: string;
+    unitName: string;
+    digests: string[];
+    /** True to report only. What the drawer shows before offering the button. */
+    dryRun: boolean;
+  },
+  {
+    /** Still exactly what coilbox wrote. Removed unless this was a dry run. */
+    ours: string[];
+    /** There, but not what coilbox wrote, so left alone and only named. */
+    kept: string[];
+    /** Not there at all. */
+    missing: string[];
+    dryRun: boolean;
+  }
+>("coilbox-lego", "lego_export_stale");
 
 /**
  * A texture for a Blender export to decode out of the store.
@@ -175,7 +212,12 @@ export const legoExportGlb = defineCommand<
     bytes: number[];
     textures: BlenderTextureRef[];
   },
-  { path: string; textures: BlenderTextureWritten[] }
+  {
+    path: string;
+    textures: BlenderTextureWritten[];
+    /** The `.glb`, for the receipt: it is keyed on the unit name too (#2680). */
+    owned: ExportedFile[];
+  }
 >("coilbox-lego", "lego_export_glb");
 
 /**
@@ -205,6 +247,8 @@ export const legoExportObj = defineCommand<
     mtl: string;
     texture: string | null;
     textures: BlenderTextureWritten[];
+    /** Both files, for the receipt: both are keyed on the unit name (#2680). */
+    owned: ExportedFile[];
   }
 >("coilbox-lego", "lego_export_obj");
 

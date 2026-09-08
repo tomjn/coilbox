@@ -50,6 +50,16 @@ export interface CloneOrigin {
   projectId: string;
   /** What the project is called, for saying so on the page. */
   projectName: string;
+  /**
+   * Whether this is a name the project has stopped exporting under, whose files
+   * a rename left in the game (issue #2680).
+   *
+   * The game reads them as a unit of its own, so the page shows it like any
+   * other. Marking it is the point: two units under two names look identical
+   * here apart from the name, and this is where somebody notices the one they
+   * did not mean to keep.
+   */
+  stale?: boolean;
 }
 
 /** One unit the project adds, held as a whole definition rather than a patch. */

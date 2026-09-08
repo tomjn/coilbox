@@ -166,6 +166,16 @@ It can also write a `.glb`, or an `.obj` with its `.mtl` and a copy of the atlas
 
 The one exception is coilbox's own scratch game, below, which is a throwaway and is always rewritten in full.
 
+### Renaming a unit you have already exported
+
+Every file above is named after the unit, so renaming the unit and exporting again writes a second set rather than moving the first. The old files stay where they are and the game reads them as another unit, which it will happily put on a build menu and spawn. If you renamed the model too, the old unit is broken as well: the engine drops a definition whose `objectname` no longer resolves, so it is in the game folder but never in the game.
+
+Export does not delete anything. The game folder is yours and two units under two names is occasionally what somebody wanted. What it does is tell you: the export drawer lists what is still there under the old name, with a button that removes it.
+
+The button only offers files coilbox can prove it wrote, by checking each one against the digest recorded when it was written. A file you edited after exporting, and a file the game shipped under the same name, are both named and both left where they are. Delete those yourself if you want them gone.
+
+In the workshop, a unit left behind this way is marked `stale` in the unit list, so a game with hundreds of units still shows you which one you did not mean to keep.
+
 **What it deliberately does not write:** anything about the game around the unit. No weapon definitions, no cost, no build picture, no side or category, no movement class, and no edit to any other unit's `buildoptions`. Export puts a unit in a game folder. [Making the game use it](#making-the-game-use-the-unit) happens in the workshop, against the game itself.
 
 ## The collision volume
