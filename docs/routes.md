@@ -104,7 +104,8 @@ Reachable by clicking through the lists above. Not sidebar items, but you can de
 | `#/warpath/:runId`                        | A Warpath run's node map                       |
 | `#/lego/open`                             | Opens an archive member in the unit builder (advanced) |
 | `#/lego/:id`                              | Editing a unit in the builder (advanced)       |
-| `#/workshop?game=:name&unit=:unit`        | Opens one unit for editing in the workshop (advanced) |
+| `#/workshop/:id`                          | Editing one tweak project (advanced)           |
+| `#/workshop/new?game=:name&unit=:unit`    | The tweak editor on a unit with no project yet, which the first change starts (advanced) |
 
 ## Settings sections
 

@@ -299,6 +299,31 @@ export function useModProjects() {
     applyEdits(id, () => edits);
   }
 
+  /**
+   * Record what the game checksummed to, for a project started before anything
+   * had read the game (issue #2696).
+   *
+   * A project started from the list names a game nobody has opened, and reading
+   * one takes long enough that the list must not wait for it. So the editor
+   * fills the field in the first time it opens a project against a game it can
+   * read, which is the first moment there is an answer and still before any edit
+   * has been made.
+   *
+   * Only ever when the project has none. Overwriting one would erase the fact
+   * {@link ModProject.authoredChecksum} exists to record, and hide from #1281
+   * exactly the game update it is there to catch. `updatedAt` is left alone for
+   * the same reason: this is not an edit to the project.
+   */
+  function recordAuthoredChecksum(id: string, checksum: string) {
+    write((prev) =>
+      prev.some((p) => p.id === id && p.authoredChecksum === undefined)
+        ? prev.map((p) =>
+            p.id === id ? { ...p, authoredChecksum: checksum } : p,
+          )
+        : prev,
+    );
+  }
+
   function renameProject(id: string, name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -342,10 +367,30 @@ export function useModProjects() {
     createProject,
     applyEdits,
     setEdits,
+    recordAuthoredChecksum,
     renameProject,
     duplicateProject,
     removeProject,
   };
+}
+
+/**
+ * A saved project's name, straight from the settings store.
+ *
+ * For the breadcrumb, which has the route's id and no hook to read with. The
+ * route param is an opaque uuid, so without this the crumb over the editor says
+ * "Project" for every project. Anything that goes wrong reading the store, which
+ * in practice means a test that never installed one, answers nothing and the
+ * crumb falls back.
+ */
+export function cachedProjectName(id: string): string | undefined {
+  try {
+    return readStoredSetting<ModProject[]>(PROJECTS_KEY, []).find(
+      (p) => p.id === id,
+    )?.name;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

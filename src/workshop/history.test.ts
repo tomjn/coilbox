@@ -5,12 +5,13 @@
  * looking at.
  *
  * The hook holds stacks and nothing else, so these tests carry the present
- * state themselves the way the page does.
+ * state themselves the way the page does. The stacks are module state, shared
+ * by every mount, so each test starts by throwing the last one's away.
  */
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { setUnitDisabled } from "./disabled";
-import { useEditHistory } from "./history";
+import { resetEditHistory, useEditHistory } from "./history";
 import { setOverride } from "./overrides";
 import { EMPTY_EDITS, editSlot, type GameEdits } from "./project";
 
@@ -21,6 +22,8 @@ const withHealth = (edits: GameEdits, value: number) =>
 
 const withDisabled = (edits: GameEdits, unit: string) =>
   editSlot(edits, "disabled", (d) => setUnitDisabled(d, unit, true));
+
+beforeEach(resetEditHistory);
 
 describe("undo and redo", () => {
   it("walks back and forward through the steps", () => {
@@ -130,5 +133,21 @@ describe("undo and redo", () => {
     act(() => result.current.forget("p1"));
     expect(result.current.canUndo("p1")).toBe(false);
     expect(result.current.canRedo("p1")).toBe(false);
+  });
+
+  /**
+   * The reason the stacks are module state (issue #2696). Going back to the
+   * project list and opening the same project again unmounts the editor, and a
+   * stack held in it would go too.
+   */
+  it("survives the editor being unmounted and mounted again", () => {
+    const first = renderHook(() => useEditHistory());
+    act(() => first.result.current.push("p1", EMPTY_EDITS));
+    first.unmount();
+
+    const second = renderHook(() => useEditHistory());
+    expect(second.result.current.canUndo("p1")).toBe(true);
+    expect(second.result.current.undo("p1", withHealth(EMPTY_EDITS, 4000))) //
+      .toBe(EMPTY_EDITS);
   });
 });

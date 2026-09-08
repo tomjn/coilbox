@@ -2,6 +2,8 @@ import { buttonVariants, cn } from "@picoframe/frame";
 import { ArrowDown, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useModProjects } from "@/workshop/project";
+import { unitEditPath } from "@/workshop/routes";
 import {
   useScanTargetSelection,
   useUnitsyncGameInfo,
@@ -53,6 +55,11 @@ export default function GameUnitPage() {
     selected?.rootPath,
     game?.primaryArchive.name,
   );
+
+  // The tweak projects, only to work out where "Edit in Unit tweaks" goes
+  // (issue #2696). Read from the settings store rather than from unitsync, so
+  // it costs nothing and answers on the first render.
+  const { projects: tweakProjects } = useModProjects();
 
   const unit = dataset?.units.find((u) => u.name.toLowerCase() === id);
 
@@ -165,13 +172,13 @@ export default function GameUnitPage() {
   if (!game) return <NotFound backTo="/library/games" label="game" />;
 
   const unitsBackTo = `/library/games/${encodeURIComponent(game.name)}/units`;
-  // The workshop keys everything by the game's own name string and reads it
-  // out of a query parameter rather than a path segment (see that page's own
-  // note), so this is built with `URLSearchParams` rather than
-  // `encodeURIComponent`: the same escaping the workshop's `useSearchParams`
-  // read expects back, including for a game name with spaces in it (Beyond
-  // All Reason installs as "Beyond All Reason test-...").
-  const workshopHref = `/workshop?${new URLSearchParams({ game: game.name, unit: id }).toString()}`;
+  // Somebody pressing this has picked a unit, not a project, and the workshop
+  // opens on a list of projects (issue #2696). So it resolves to this game's
+  // own project where there is one, and to the editor with none where there is
+  // not, rather than dropping the reader on a list having lost the unit they
+  // were reading about. `unitEditPath` is where that choice is made and
+  // explained.
+  const workshopHref = unitEditPath(tweakProjects, game.name, id);
 
   if (datasetStatus === "error")
     return (
