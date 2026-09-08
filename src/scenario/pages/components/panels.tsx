@@ -11,18 +11,14 @@
  */
 
 import { Input } from "@picoframe/frame";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   forwardRef,
   type ReactNode,
   useImperativeHandle,
   useState,
 } from "react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { SectionPanel } from "@/components/SectionPanel";
 import { useFieldProblem } from "@/lib/useFieldProblem";
 import { useFieldText } from "@/lib/useFieldText";
 
@@ -58,23 +54,15 @@ export const EditorPanel = forwardRef<
   useImperativeHandle(ref, () => ({ open: () => setOpen(true) }), []);
 
   return (
-    <Collapsible
+    <SectionPanel
       open={open}
       onOpenChange={setOpen}
-      className="rounded-lg border border-border/50 bg-card"
+      title={title}
+      icon={Icon}
+      summary={summary}
     >
-      <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-2 p-4 text-left">
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-        <Icon className="size-4 shrink-0 text-muted-foreground" />
-        <h2 className="text-sm font-medium">{title}</h2>
-        <span className="ml-auto truncate text-xs text-muted-foreground">
-          {summary}
-        </span>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="border-t border-border/50 p-4">{children}</div>
-      </CollapsibleContent>
-    </Collapsible>
+      {children}
+    </SectionPanel>
   );
 });
 
