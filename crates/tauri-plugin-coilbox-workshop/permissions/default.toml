@@ -1,7 +1,8 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the workshop plugin's compiler, which turns a saved tweak project into the Lua a game reads. It reads nothing and writes nothing."
+description = "Allows the workshop plugin's compiler and preflight check, which turn a saved tweak project into the Lua a game reads and check it before it leaves the app. Both read nothing and write nothing."
 permissions = [
   "allow-workshop-compile",
+  "allow-workshop-preflight",
 ]

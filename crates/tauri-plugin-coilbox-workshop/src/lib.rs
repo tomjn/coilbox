@@ -14,13 +14,20 @@
 //! The command takes the whole project and returns the whole compilation. It
 //! reads nothing off disk and writes nothing, so it is safe to call on every
 //! keystroke and there is nothing to clean up if the user closes the drawer.
+//!
+//! `workshop_preflight` (issue #1276) is the other command this plugin
+//! exposes. It compiles the same way, then checks the result before it ever
+//! leaves the app: syntax through `coilbox-springlua`, plus the cheap static
+//! checks `preflight` documents.
 
 mod compile;
 mod lua;
 mod model;
+mod preflight;
 
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use model::{GameEdits, ModProject};
+pub use preflight::{preflight, PreflightReport};
 
 use tauri::{
     plugin::{Builder, TauriPlugin},
@@ -33,8 +40,19 @@ fn workshop_compile(project: ModProject) -> CompiledMod {
     compile(&project)
 }
 
+/// Compile a saved project and check the result before it ever leaves the
+/// app (issue #1276).
+#[tauri::command]
+fn workshop_preflight(project: ModProject) -> PreflightReport {
+    let compiled = compile(&project);
+    preflight(&project, &compiled)
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
-        .invoke_handler(tauri::generate_handler![workshop_compile])
+        .invoke_handler(tauri::generate_handler![
+            workshop_compile,
+            workshop_preflight
+        ])
         .build()
 }
