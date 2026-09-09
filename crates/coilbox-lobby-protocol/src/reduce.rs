@@ -210,6 +210,38 @@ pub enum Delta {
     RegistrationDenied {
         reason: String,
     },
+    /// A recovery code has been emailed. Recovery is the one flow that runs
+    /// before there is an account signed in, so none of these touch state.
+    RecoveryCodeSent {
+        email: String,
+    },
+    RecoveryDenied {
+        reason: String,
+    },
+    /// The server reset the password and emailed it. `username` is the answer to
+    /// "I do not know my login" and is the reason this delta carries it.
+    PasswordReset {
+        email: String,
+        username: String,
+    },
+    ChangeEmailCodeSent,
+    ChangeEmailAccepted {
+        email: String,
+    },
+    ChangeEmailDenied {
+        reason: String,
+    },
+    ResendVerificationAccepted,
+    ResendVerificationDenied {
+        reason: String,
+    },
+    /// One labelled line of a `GETUSERINFO` answer. Each of the three arrives
+    /// separately, so every field is optional and the reader merges them.
+    AccountInfo {
+        registration_date: Option<String>,
+        email: Option<String>,
+        ingame_hours: Option<String>,
+    },
     /// A `SERVERMSG` (plain announcement) or `SERVERMSGBOX` (the server asked the
     /// client to show it prominently). `boxed` distinguishes the two so the
     /// frontend can render a toast vs. a dismissible dialog.
@@ -912,7 +944,14 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             vec![Delta::Ring { from: username }]
         }
         ServerMessage::ServerMsg { text } => {
-            vec![Delta::ServerMessage { text, boxed: false }]
+            let mut deltas = vec![Delta::ServerMessage {
+                text: text.clone(),
+                boxed: false,
+            }];
+            if let Some(info) = account_info_from(&text) {
+                deltas.push(info);
+            }
+            deltas
         }
         // Client-to-client bookkeeping, not an announcement to show. The raw line
         // is still in the protocol console for anyone who wants it.
@@ -935,6 +974,28 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::EndOfChannels => vec![Delta::ChannelListReceived],
         ServerMessage::RegistrationDenied { reason } => {
             vec![Delta::RegistrationDenied { reason }]
+        }
+        ServerMessage::ResetPasswordRequestAccepted { email } => {
+            vec![Delta::RecoveryCodeSent { email }]
+        }
+        ServerMessage::ResetPasswordRequestDenied { reason }
+        | ServerMessage::ResetPasswordDenied { reason } => {
+            vec![Delta::RecoveryDenied { reason }]
+        }
+        ServerMessage::ResetPasswordAccepted { email, username } => {
+            vec![Delta::PasswordReset { email, username }]
+        }
+        ServerMessage::ChangeEmailRequestAccepted => vec![Delta::ChangeEmailCodeSent],
+        ServerMessage::ChangeEmailRequestDenied { reason }
+        | ServerMessage::ChangeEmailDenied { reason } => {
+            vec![Delta::ChangeEmailDenied { reason }]
+        }
+        ServerMessage::ChangeEmailAccepted { email } => {
+            vec![Delta::ChangeEmailAccepted { email }]
+        }
+        ServerMessage::ResendVerificationAccepted => vec![Delta::ResendVerificationAccepted],
+        ServerMessage::ResendVerificationDenied { reason } => {
+            vec![Delta::ResendVerificationDenied { reason }]
         }
         ServerMessage::JoinFailed { channel, reason } => {
             vec![Delta::JoinChannelFailed { channel, reason }]
@@ -1017,16 +1078,6 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         | ServerMessage::AgreementEnd
         | ServerMessage::Json { .. }
         | ServerMessage::RegistrationAccepted
-        | ServerMessage::ResetPasswordRequestAccepted { .. }
-        | ServerMessage::ResetPasswordRequestDenied { .. }
-        | ServerMessage::ResetPasswordAccepted { .. }
-        | ServerMessage::ResetPasswordDenied { .. }
-        | ServerMessage::ChangeEmailRequestAccepted
-        | ServerMessage::ChangeEmailRequestDenied { .. }
-        | ServerMessage::ChangeEmailAccepted { .. }
-        | ServerMessage::ChangeEmailDenied { .. }
-        | ServerMessage::ResendVerificationAccepted
-        | ServerMessage::ResendVerificationDenied { .. }
         | ServerMessage::Unknown { .. } => vec![],
     }
 }
@@ -1078,6 +1129,24 @@ fn refusal_words(reason: String) -> String {
         return "no reason given".to_string();
     }
     reason
+}
+
+/// The three labels both uberserver and teiserver put on their `GETUSERINFO`
+/// answer. Neither gives the answer a reply token, so the label is all there is
+/// to recognise it by.
+fn account_info_from(text: &str) -> Option<Delta> {
+    let field = |label: &str| text.strip_prefix(label).map(str::trim).map(str::to_string);
+    let registration_date = field("Registration date: ");
+    let email = field("Email address: ");
+    let ingame_hours = field("Ingame time: ");
+    if registration_date.is_none() && email.is_none() && ingame_hours.is_none() {
+        return None;
+    }
+    Some(Delta::AccountInfo {
+        registration_date,
+        email,
+        ingame_hours,
+    })
 }
 
 /// Append a chat message to a channel (creating it if needed) and emit a delta
@@ -1368,6 +1437,89 @@ mod tests {
             d,
             vec![Delta::RegistrationDenied {
                 reason: "username taken".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn recovery_replies_become_deltas() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(&mut s, parse_line("RESETPASSWORDREQUESTACCEPTED a@b.c")),
+            vec![Delta::RecoveryCodeSent {
+                email: "a@b.c".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("RESETPASSWORDACCEPTED a@b.c alice")),
+            vec![Delta::PasswordReset {
+                email: "a@b.c".into(),
+                username: "alice".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("RESETPASSWORDDENIED wrong code")),
+            vec![Delta::RecoveryDenied {
+                reason: "wrong code".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn change_email_replies_become_deltas() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(&mut s, parse_line("CHANGEEMAILREQUESTACCEPTED")),
+            vec![Delta::ChangeEmailCodeSent]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("CHANGEEMAILACCEPTED new@b.c")),
+            vec![Delta::ChangeEmailAccepted {
+                email: "new@b.c".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("RESENDVERIFICATIONACCEPTED")),
+            vec![Delta::ResendVerificationAccepted]
+        );
+    }
+
+    /// GETUSERINFO has no reply token on either server, so the three labelled
+    /// SERVERMSG lines are the whole answer. Each still reaches the console as
+    /// before, because taking it away would remove something already visible.
+    #[test]
+    fn user_info_lines_produce_account_info_and_still_announce() {
+        let mut s = LobbyState::default();
+        let d = reduce(&mut s, parse_line("SERVERMSG Email address: a@b.c"));
+        assert_eq!(
+            d,
+            vec![
+                Delta::ServerMessage {
+                    text: "Email address: a@b.c".into(),
+                    boxed: false
+                },
+                Delta::AccountInfo {
+                    registration_date: None,
+                    email: Some("a@b.c".into()),
+                    ingame_hours: None
+                }
+            ]
+        );
+    }
+
+    /// An ordinary announcement must not be mistaken for account info, or every
+    /// server broadcast would rewrite the account panel.
+    #[test]
+    fn an_ordinary_servermsg_is_not_account_info() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(
+                &mut s,
+                parse_line("SERVERMSG Server going down for maintenance")
+            ),
+            vec![Delta::ServerMessage {
+                text: "Server going down for maintenance".into(),
+                boxed: false
             }]
         );
     }
