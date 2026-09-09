@@ -38,6 +38,7 @@ import {
   allServers,
   type LobbyAccount,
   type LobbyServer,
+  resolveRecoveredAccount,
   serverProtocol,
   type TlsStyle,
   useCustomServers,
@@ -110,6 +111,23 @@ export default function LobbyServersSettings() {
     });
     // A blank login is only editable through its drawer, so open it straight away.
     setEditingId(id);
+  };
+
+  // Recovery hands back a username, not a password (the server emailed that
+  // straight to the user), so this finds or creates the login and opens its
+  // editor for them to paste the emailed password into the keychain. Same
+  // "open the drawer straight away" pattern `addAccount` uses above.
+  const handleRecoverySignIn = (serverId: string, username: string) => {
+    const result = resolveRecoveredAccount(
+      accountsCfg.accounts,
+      serverId,
+      username,
+    );
+    if (result.accounts !== accountsCfg.accounts) {
+      setAccountsCfg({ accounts: result.accounts });
+    }
+    setRecoveryOpen(false);
+    setEditingId(result.id);
   };
 
   const updateAccount = (id: string, patch: Partial<LobbyAccount>) =>
@@ -323,6 +341,7 @@ export default function LobbyServersSettings() {
         open={recoveryOpen}
         servers={servers}
         onClose={() => setRecoveryOpen(false)}
+        onSignIn={handleRecoverySignIn}
       />
       <AccountDrawer
         account={accountsCfg.accounts.find((a) => a.id === editingId) ?? null}
@@ -520,24 +539,27 @@ function RegisterDrawer({
 
 /**
  * Password recovery in the same slide-in drawer as registration and the login
- * editor. `onSignIn` has nothing to sign in to from this page (there is no
- * connect UI here), so it just closes the drawer like `onCancel` does.
+ * editor. `onSignIn` is `handleRecoverySignIn`, which opens the account
+ * editor on the recovered login so the user can paste the emailed password
+ * into the keychain. The form itself never sees or asks for that password.
  */
 function RecoveryDrawer({
   open,
   servers,
   onClose,
+  onSignIn,
 }: {
   open: boolean;
   servers: LobbyServer[];
   onClose: () => void;
+  onSignIn: (serverId: string, username: string) => void;
 }) {
   return (
     <SlideDrawer open={open} title="Recover your password" onClose={onClose}>
       <div className="flex-1 overflow-y-auto p-4">
         <PasswordRecoveryForm
           servers={servers}
-          onSignIn={onClose}
+          onSignIn={onSignIn}
           onCancel={onClose}
         />
       </div>

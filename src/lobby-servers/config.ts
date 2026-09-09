@@ -331,6 +331,32 @@ export function useLobbyAccounts() {
 }
 
 /**
+ * The account to open the editor on after a password recovery succeeds
+ * (`PasswordRecoveryForm`'s `onSignIn`). Reuses an existing login for the same
+ * server and username if there is one, otherwise creates a new one with
+ * `hasSecret: false`. The server emailed a new password, but it has not been
+ * typed into the keychain yet, and claiming otherwise would make the next
+ * connect attempt fail with a confusing error. Pure, so the find-or-create
+ * decision is unit-testable without a live settings store. The caller only
+ * has to persist `accounts` when it differs from what it passed in.
+ */
+export function resolveRecoveredAccount(
+  accounts: LobbyAccount[],
+  serverId: string,
+  username: string,
+): { accounts: LobbyAccount[]; id: string } {
+  const existing = accounts.find(
+    (a) => a.serverId === serverId && a.username === username,
+  );
+  if (existing) return { accounts, id: existing.id };
+  const id = crypto.randomUUID();
+  return {
+    accounts: [...accounts, { id, serverId, username, hasSecret: false }],
+    id,
+  };
+}
+
+/**
  * The account last connected with (by `{serverId, username}`, not the account id so
  * it survives an account being re-created). Written on every successful connect;
  * read at startup by the opt-in auto-connect and by the login popover's one-click

@@ -420,7 +420,15 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           <span className="font-medium">{recovered.username}</span> on{" "}
           {resolveServer(recovered.serverId, customCfg.servers)?.name ??
             "that server"}
-          . Add a login for it above to save it.
+          .{" "}
+          <Link
+            to="/settings/lobby-servers"
+            onClick={onNavigate}
+            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+          >
+            Go to Settings, Lobby servers
+          </Link>{" "}
+          and add or update that login with the password from the email.
         </p>
       )}
       {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}

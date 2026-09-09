@@ -125,7 +125,7 @@ export function PasswordRecoveryForm({
           A new password has been emailed to you.
         </p>
         <p className="text-xs text-muted-foreground">
-          Sign in with it, then replace it with one of your own in Settings,
+          Save it in Coilbox, then replace it with one of your own in Settings,
           Account.
         </p>
         <div className="flex justify-end gap-2">
@@ -134,7 +134,7 @@ export function PasswordRecoveryForm({
             size="sm"
             onClick={() => onSignIn(serverId, username)}
           >
-            Sign in
+            Save your new password
           </Button>
         </div>
       </div>
