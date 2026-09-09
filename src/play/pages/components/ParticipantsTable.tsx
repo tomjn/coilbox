@@ -355,7 +355,10 @@ export function ParticipantsTable({
                       <OptionSelect
                         value={p.side}
                         size="sm"
-                        className="w-auto min-w-20"
+                        // Wide enough for a faction name beside its emblem: the
+                        // trigger spends 24px of its own on the logo and gap
+                        // before any text, which min-w-20 predates.
+                        className="w-auto min-w-28"
                         disabled={disabled || sides.length === 0}
                         options={sideOptions}
                         onValueChange={(v) => onUpdate(p.id, { side: v })}

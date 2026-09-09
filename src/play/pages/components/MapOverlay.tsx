@@ -65,7 +65,9 @@ export function MapLayerToggle({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs font-medium text-muted-foreground">Overlay</span>
+      <span className="text-xs font-medium text-muted-foreground">
+        Map overlay
+      </span>
       <ToggleGroup
         type="single"
         variant="outline"

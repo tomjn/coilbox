@@ -15,6 +15,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import { getProfile } from "../profile/profile";
 import {
   DEFAULT_HUB_URL,
+  hubAuthorMapsUrl,
   hubItemIdFromUrl,
   hubItemRoute,
   isHubItemPageReachable,
@@ -207,5 +208,25 @@ describe("hubItemRoute", () => {
   it("addresses the item page, escaping an id that is not a bare word", () => {
     expect(hubItemRoute("item-7")).toBe("/hub/item-7");
     expect(hubItemRoute("a/b")).toBe("/hub/a%2Fb");
+  });
+});
+
+describe("hubAuthorMapsUrl", () => {
+  it("addresses the hub's map listing filtered to one author", () => {
+    expect(hubAuthorMapsUrl("https://hub.test", "beherith")).toBe(
+      "https://hub.test/maps?author=beherith",
+    );
+  });
+
+  it("escapes a name with spaces or an ampersand in it", () => {
+    expect(hubAuthorMapsUrl("https://hub.test", "Bob & Alice")).toBe(
+      "https://hub.test/maps?author=Bob%20%26%20Alice",
+    );
+  });
+
+  it("keeps a hub served under a path prefix, without doubling the slash", () => {
+    expect(hubAuthorMapsUrl("https://hub.test/coilbox/", "someone")).toBe(
+      "https://hub.test/coilbox/maps?author=someone",
+    );
   });
 });
