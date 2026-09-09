@@ -7,14 +7,24 @@
 
 # Coilbox
 
-Desktop tooling for the [Recoil RTS](https://github.com/beyond-all-reason/RecoilEngine)
-engine / Beyond All Reason community, built on [picoframe](https://github.com/tomjn/picoframe).
+A desktop app for [Recoil RTS](https://github.com/beyond-all-reason/RecoilEngine) and
+Spring RTS games, aimed at the Beyond All Reason community and anyone else playing on
+or building for the engine.
 
 [Coilbox Hub](https://coilbox-hub.vercel.app) · [Discord](https://discord.gg/GUpRg6Wz3e) · [Documentation](https://tomjn.github.io/coilbox/)
 
-Coilbox is a [Tauri](https://tauri.app) v2 app that composes picoframe plugins. Its
-first tool is **pr-downloader**: browse the Spring/Recoil rapid content repositories
-and download a tag through a bundled `pr-downloader` sidecar.
+- Get games, maps and engines from the rapid repositories and springfiles, through a
+  bundled `pr-downloader` sidecar, including curated map packs in one click.
+- Play: a lobby client with chat channels, battle rooms, self-hosting and moderation
+  tools, plus singleplayer skirmish, campaigns, roguelite runs and galactic conquest.
+- Make: scenarios and missions, battle presets, base blueprints, unit tweaks, a unit
+  builder, and map compiling and decompiling.
+- Share what you make through the hub, and import anyone else's in one click.
+- Reskin and narrow the app for your own game with a distribution profile, or run it
+  portable from a folder.
+
+Coilbox is a [Tauri](https://tauri.app) v2 app that composes
+[picoframe](https://github.com/tomjn/picoframe) plugins.
 
 ## Install
 
