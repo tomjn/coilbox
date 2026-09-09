@@ -29,6 +29,16 @@ const wire = vi.hoisted(() => ({
   submitRecoveryCodeCalls: [] as { serverKey: string; code: string }[],
 }));
 
+// `vi.fn()` rather than a plain async function, so a test can make one send
+// fail with `mockRejectedValueOnce` to prove the store cleans up its waiter
+// rather than leaving it to block a retry or reject into nothing later.
+const bindingMocks = vi.hoisted(() => ({
+  changePassword: vi.fn(async () => ({ sent: true })),
+  changeEmailRequest: vi.fn(async () => ({ sent: true })),
+  changeEmail: vi.fn(async () => ({ sent: true })),
+  resendVerification: vi.fn(async () => ({ sent: true })),
+}));
+
 vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {
     onmessage?: (ev: LobbyEvent) => void;
@@ -121,10 +131,10 @@ vi.mock("./bindings", () => ({
     wire.submitRecoveryCodeCalls.push(args);
     return { sent: true };
   },
-  mpChangePassword: async () => ({ sent: true }),
-  mpChangeEmailRequest: async () => ({ sent: true }),
-  mpChangeEmail: async () => ({ sent: true }),
-  mpResendVerification: async () => ({ sent: true }),
+  mpChangePassword: bindingMocks.changePassword,
+  mpChangeEmailRequest: bindingMocks.changeEmailRequest,
+  mpChangeEmail: bindingMocks.changeEmail,
+  mpResendVerification: bindingMocks.resendVerification,
   mpGetUserInfo: async () => ({ sent: true }),
   mpSetStatus: async () => ({}),
   mpTachyonSignedIn: async () => ({ signedIn: true }),
@@ -135,7 +145,11 @@ vi.mock("../lobby-servers/bindings", () => ({
   lsGetCredential: async () => ({ secret: "hunter2" }),
 }));
 
-import { MultiplayerProvider, useMultiplayer } from "./store";
+import {
+  MultiplayerProvider,
+  SERVER_REPLY_TIMEOUT_MS,
+  useMultiplayer,
+} from "./store";
 
 const LOBBY: LobbyServer = {
   id: "bar-ssl",
@@ -154,6 +168,10 @@ beforeEach(() => {
   wire.channels.clear();
   wire.disconnected.length = 0;
   wire.submitRecoveryCodeCalls.length = 0;
+  bindingMocks.changePassword.mockClear();
+  bindingMocks.changeEmailRequest.mockClear();
+  bindingMocks.changeEmail.mockClear();
+  bindingMocks.resendVerification.mockClear();
 });
 
 afterEach(() => {
@@ -381,5 +399,149 @@ describe("account commands", () => {
       await result.current.cancelRecovery(RECOVERY_KEY);
     });
     expect(wire.disconnected).toContain(RECOVERY_KEY);
+  });
+});
+
+/**
+ * `CHANGEEMAILREQUEST`, `CHANGEEMAIL` and `RESENDVERIFICATION` do have their
+ * own accept/deny tokens, unlike `CHANGEPASSWORD` above. Before this, nothing
+ * in `src/` read the five deltas those tokens landed as, so the store
+ * resolved as soon as the command reached the wire and every one of these
+ * three refusals read as a success in the interface.
+ */
+describe("change email and resend verification are paired against their own deltas", () => {
+  it("resolves changeEmailRequest on changeEmailCodeSent", async () => {
+    const { result, emit } = await renderProvider();
+    const pending = result.current.changeEmailRequest("new@example.com");
+    await emit({ kind: "delta", delta: { kind: "changeEmailCodeSent" } });
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("rejects changeEmailRequest with the server's reason on a refusal", async () => {
+    const { result, emit } = await renderProvider();
+    const pending = result.current.changeEmailRequest("new@example.com");
+    const rejects = expect(pending).rejects.toThrow("already registered");
+    await emit({
+      kind: "delta",
+      delta: { kind: "changeEmailDenied", reason: "already registered" },
+    });
+    await rejects;
+  });
+
+  it("resolves changeEmail on changeEmailAccepted", async () => {
+    const { result, emit } = await renderProvider();
+    const pending = result.current.changeEmail("new@example.com", "12345678");
+    await emit({
+      kind: "delta",
+      delta: { kind: "changeEmailAccepted", email: "new@example.com" },
+    });
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("rejects changeEmail with the server's reason on a wrong code", async () => {
+    const { result, emit } = await renderProvider();
+    const pending = result.current.changeEmail("new@example.com", "00000000");
+    const rejects = expect(pending).rejects.toThrow("bad code");
+    await emit({
+      kind: "delta",
+      delta: { kind: "changeEmailDenied", reason: "bad code" },
+    });
+    await rejects;
+  });
+
+  it("resolves resendVerification on resendVerificationAccepted", async () => {
+    const { result, emit } = await renderProvider();
+    const pending = result.current.resendVerification("alice@example.com");
+    await emit({
+      kind: "delta",
+      delta: { kind: "resendVerificationAccepted" },
+    });
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("rejects resendVerification with the server's reason on a refusal", async () => {
+    const { result, emit } = await renderProvider();
+    const pending = result.current.resendVerification("alice@example.com");
+    const rejects = expect(pending).rejects.toThrow("verification is off");
+    await emit({
+      kind: "delta",
+      delta: {
+        kind: "resendVerificationDenied",
+        reason: "verification is off",
+      },
+    });
+    await rejects;
+  });
+});
+
+/**
+ * A command whose *send* fails never reaches the wire, so no reply is ever
+ * coming for it. Before this, that path left the waiter and its timer live:
+ * `changePassword` blocked every retry for `SERVER_REPLY_TIMEOUT_MS` behind a
+ * false "already in progress", and the orphaned promise it never returned
+ * rejected into nothing when its timer eventually fired.
+ */
+describe("a failed send cleans up its waiter rather than leaking it", () => {
+  it("changePassword: a failed send does not block a retry with a false 'already in progress'", async () => {
+    const { result, emit } = await renderProvider();
+    bindingMocks.changePassword.mockRejectedValueOnce(
+      new Error("not connected: AF_@server4.beyondallreason.info:8201"),
+    );
+    await expect(result.current.changePassword("old", "new")).rejects.toThrow(
+      "not connected",
+    );
+    // A leaked waiter would make this call throw synchronously with "A
+    // password change is already in progress." instead of reaching the
+    // binding for a genuine second attempt.
+    const retry = result.current.changePassword("old", "new2");
+    await emit({
+      kind: "delta",
+      delta: {
+        kind: "serverMessage",
+        text: "Password changed successfully.",
+        boxed: false,
+      },
+    });
+    await expect(retry).resolves.toEqual({
+      message: "Password changed successfully.",
+      succeeded: true,
+    });
+    expect(bindingMocks.changePassword).toHaveBeenCalledTimes(2);
+  });
+
+  it("changeEmailRequest: a failed send does not leave a waiter that answers a later, unrelated request", async () => {
+    const { result, emit } = await renderProvider();
+    bindingMocks.changeEmailRequest.mockRejectedValueOnce(
+      new Error("not connected"),
+    );
+    await expect(
+      result.current.changeEmailRequest("new@example.com"),
+    ).rejects.toThrow("not connected");
+    // If the first call's waiter had leaked, this delta would be ambiguous
+    // between the two: it is only correct once the first waiter is gone.
+    const retry = result.current.changeEmailRequest("new@example.com");
+    await emit({ kind: "delta", delta: { kind: "changeEmailCodeSent" } });
+    await expect(retry).resolves.toBeUndefined();
+    expect(bindingMocks.changeEmailRequest).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("account delta waiters time out when the server never answers", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("rejects changeEmailRequest after SERVER_REPLY_TIMEOUT_MS with no reply", async () => {
+    const { result } = await renderProvider();
+    const pending = result.current.changeEmailRequest("new@example.com");
+    const rejects = expect(pending).rejects.toThrow(
+      "The server did not answer.",
+    );
+    await vi.advanceTimersByTimeAsync(SERVER_REPLY_TIMEOUT_MS);
+    await rejects;
   });
 });

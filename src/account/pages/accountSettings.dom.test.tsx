@@ -300,3 +300,56 @@ it("resends verification to the known email address", async () => {
     expect(mp.resendVerification).toHaveBeenCalledWith("alice@example.com"),
   );
 });
+
+/**
+ * `changeEmailRequest` now rejects with the server's reason on a refusal
+ * (e.g. the address is already registered to somebody else) instead of
+ * resolving as soon as the command reached the wire. The form must stay on
+ * the email step and show that reason rather than asking for a code that
+ * will never arrive.
+ */
+it("stays on the email step and shows the reason when the server refuses the request", async () => {
+  renderPage({ connected: true, protocol: "tasserver", myUsername: "alice" });
+  mp.changeEmailRequest.mockRejectedValueOnce(new Error("already registered"));
+  fireEvent.click(screen.getByRole("button", { name: "Change email" }));
+  typeInto(screen.getByLabelText("New email address"), "new@example.com");
+  fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+  expect(await screen.findByText(/already registered/)).toBeTruthy();
+  expect(screen.queryByLabelText("Verification code")).toBeNull();
+});
+
+/**
+ * A refused code must not be shown as a completed change: the server's
+ * reason belongs on the code step, and the drawer must not advance to "Email
+ * address changed."
+ */
+it("shows the reason and does not claim the address changed when the server refuses the code", async () => {
+  renderPage({ connected: true, protocol: "tasserver", myUsername: "alice" });
+  mp.changeEmail.mockRejectedValueOnce(new Error("bad code"));
+  fireEvent.click(screen.getByRole("button", { name: "Change email" }));
+  typeInto(screen.getByLabelText("New email address"), "new@example.com");
+  fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+  typeInto(await screen.findByLabelText("Verification code"), "00000000");
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText(/bad code/)).toBeTruthy();
+  expect(screen.queryByText(/Email address changed/)).toBeNull();
+});
+
+/**
+ * A refused resend must not tell the user an email is on its way when the
+ * server said otherwise.
+ */
+it("does not say the verification email was sent when the server refuses the resend", async () => {
+  renderPage({
+    connected: true,
+    protocol: "tasserver",
+    myUsername: "alice",
+    accountEmail: "alice@example.com",
+  });
+  mp.resendVerification.mockRejectedValueOnce(new Error("verification is off"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Resend verification email" }),
+  );
+  expect(await screen.findByText(/verification is off/)).toBeTruthy();
+  expect(screen.queryByText(/Verification email sent/)).toBeNull();
+});

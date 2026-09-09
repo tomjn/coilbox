@@ -189,6 +189,57 @@ export const SERVER_REPLY_TIMEOUT_MS = 20_000;
 export const CHANGE_PASSWORD_SUCCESS = "Password changed successfully.";
 
 /**
+ * Wait for whichever of a pair of deltas answers a signed-in account command
+ * that does carry its own accept/deny token (`CHANGEEMAILREQUEST`,
+ * `CHANGEEMAIL`, `RESENDVERIFICATION`), unlike `CHANGEPASSWORD`, which has
+ * none and is paired against a bare `SERVERMSG` instead. Resolves on
+ * `acceptKind`, rejects with the delta's `reason` on `denyKind`, and times
+ * out after `SERVER_REPLY_TIMEOUT_MS` if neither arrives.
+ *
+ * `denyKind` is shared between a request step and its follow-up code step
+ * (the reducer folds e.g. `CHANGEEMAILREQUESTDENIED` and `CHANGEEMAILDENIED`
+ * into the one `changeEmailDenied` delta), which is fine as long as only one
+ * step is ever waiting at a time: whichever call is pending is the one the
+ * denial belongs to.
+ *
+ * `cleanup` is returned alongside the promise so a caller whose send failed,
+ * meaning the command never reached the wire and so no reply is coming, can
+ * remove the waiter and clear the timer immediately rather than leaving both
+ * live to reject into nothing `SERVER_REPLY_TIMEOUT_MS` later and, in the
+ * meantime, block a retry behind a stale waiter. Safe to call more than once
+ * and after the promise has already settled.
+ */
+function waitForAccountDelta(
+  waiters: { current: Set<(d: Delta) => void> },
+  acceptKind: Delta["kind"],
+  denyKind: Delta["kind"],
+): { promise: Promise<void>; cleanup: () => void } {
+  let waiter: (d: Delta) => void = () => {};
+  let timer: ReturnType<typeof setTimeout>;
+  const cleanup = () => {
+    clearTimeout(timer);
+    waiters.current.delete(waiter);
+  };
+  const promise = new Promise<void>((resolve, reject) => {
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("The server did not answer."));
+    }, SERVER_REPLY_TIMEOUT_MS);
+    waiter = (d) => {
+      if (d.kind !== acceptKind && d.kind !== denyKind) return;
+      cleanup();
+      if (d.kind === denyKind) {
+        reject(new Error("reason" in d ? d.reason : "Request refused."));
+      } else {
+        resolve();
+      }
+    };
+    waiters.current.add(waiter);
+  });
+  return { promise, cleanup };
+}
+
+/**
  * How long deltas accumulate before the mirror is refreshed once for all of
  * them. Short enough to read as immediate, long enough that a server announcing
  * a few hundred status changes at once costs one snapshot rather than hundreds.
@@ -678,6 +729,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // because nothing stops two such commands overlapping. Each is removed as soon
   // as it fires or times out.
   const serverMessageWaiters = useRef(new Set<(text: string) => void>());
+
+  // Callbacks waiting on one of the paired accept/deny deltas for a signed-in
+  // account command that does carry a token (CHANGEEMAILREQUEST, CHANGEEMAIL,
+  // RESENDVERIFICATION), unlike CHANGEPASSWORD above. Kept separate from
+  // `serverMessageWaiters` because these match on the delta's own kind rather
+  // than on SERVERMSG text.
+  const accountDeltaWaiters = useRef(new Set<(d: Delta) => void>());
 
   // The signed-in account's details, merged from the `accountInfo` deltas
   // `getUserInfo` triggers. Null until the first one arrives.
@@ -1411,6 +1469,20 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             ingameHours: d.ingameHours ?? prev?.ingameHours ?? null,
           }));
         }
+        // The paired accept/deny delta for whichever of `changeEmailRequest`,
+        // `changeEmail` or `resendVerification` is currently awaited. Fire
+        // every waiter rather than just the first, the same reasoning as
+        // `serverMessageWaiters` above: each filters to the pair it was
+        // registered for and ignores the rest.
+        else if (
+          d.kind === "changeEmailCodeSent" ||
+          d.kind === "changeEmailAccepted" ||
+          d.kind === "changeEmailDenied" ||
+          d.kind === "resendVerificationAccepted" ||
+          d.kind === "resendVerificationDenied"
+        ) {
+          for (const waiter of accountDeltaWaiters.current) waiter(d);
+        }
         queueSnapshot(d);
       }
       // The server can pause a new account's first login on the agreement/
@@ -2024,15 +2096,20 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     if (serverMessageWaiters.current.size > 0) {
       throw new Error("A password change is already in progress.");
     }
+    let waiter: (text: string) => void = () => {};
+    let timer: ReturnType<typeof setTimeout>;
+    const cleanup = () => {
+      clearTimeout(timer);
+      serverMessageWaiters.current.delete(waiter);
+    };
     const reply = new Promise<{ message: string; succeeded: boolean }>(
       (resolve, reject) => {
-        const timer = setTimeout(() => {
-          serverMessageWaiters.current.delete(waiter);
+        timer = setTimeout(() => {
+          cleanup();
           reject(new Error("The server did not answer."));
         }, SERVER_REPLY_TIMEOUT_MS);
-        const waiter = (text: string) => {
-          clearTimeout(timer);
-          serverMessageWaiters.current.delete(waiter);
+        waiter = (text: string) => {
+          cleanup();
           resolve({
             message: text,
             succeeded: text === CHANGE_PASSWORD_SUCCESS,
@@ -2041,30 +2118,72 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         serverMessageWaiters.current.add(waiter);
       },
     );
-    await mpChangePassword({
-      serverKey: key,
-      currentPassword: current,
-      newPassword: next,
-    });
+    // If the send itself fails (not connected by the time it reaches Rust, or
+    // the connection just closed), no reply is ever coming: clean up now
+    // rather than leaving the waiter live to block a retry behind "already in
+    // progress" and the timer to reject into a promise nobody is holding.
+    try {
+      await mpChangePassword({
+        serverKey: key,
+        currentPassword: current,
+        newPassword: next,
+      });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
     return reply;
   }, []);
 
   const changeEmailRequest = useCallback(async (email: string) => {
     const key = activeKeyRef.current;
     if (!key) throw new Error("Not connected.");
-    await mpChangeEmailRequest({ serverKey: key, email });
+    const { promise, cleanup } = waitForAccountDelta(
+      accountDeltaWaiters,
+      "changeEmailCodeSent",
+      "changeEmailDenied",
+    );
+    try {
+      await mpChangeEmailRequest({ serverKey: key, email });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    await promise;
   }, []);
 
   const changeEmail = useCallback(async (email: string, code: string) => {
     const key = activeKeyRef.current;
     if (!key) throw new Error("Not connected.");
-    await mpChangeEmail({ serverKey: key, email, code });
+    const { promise, cleanup } = waitForAccountDelta(
+      accountDeltaWaiters,
+      "changeEmailAccepted",
+      "changeEmailDenied",
+    );
+    try {
+      await mpChangeEmail({ serverKey: key, email, code });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    await promise;
   }, []);
 
   const resendVerification = useCallback(async (email: string) => {
     const key = activeKeyRef.current;
     if (!key) throw new Error("Not connected.");
-    await mpResendVerification({ serverKey: key, email });
+    const { promise, cleanup } = waitForAccountDelta(
+      accountDeltaWaiters,
+      "resendVerificationAccepted",
+      "resendVerificationDenied",
+    );
+    try {
+      await mpResendVerification({ serverKey: key, email });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    await promise;
   }, []);
 
   const getUserInfo = useCallback(() => {
