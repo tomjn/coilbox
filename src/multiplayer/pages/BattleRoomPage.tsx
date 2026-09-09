@@ -16,6 +16,11 @@ import { mergeGameAi } from "@/play/gameAi";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
+import { startPosNote } from "@/startbox/mode";
+import {
+  StartBoxControls,
+  useStartBoxAllies,
+} from "@/startbox/StartBoxControls";
 import { ApplySkirmishPresetPopover } from "../battle/ApplySkirmishPresetPopover";
 import { AutohostControls } from "../battle/AutohostControls";
 import { addHostSeedBots } from "../battle/applyHostSeed";
@@ -29,19 +34,15 @@ import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
+import { allyColorsFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { GameTypePresetsControls } from "../battle/GameTypePresetsControls";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { matchStartAction } from "../battle/matchStart";
 import { canRejoinMatch } from "../battle/rejoin";
-import {
-  StartBoxControls,
-  useStartBoxAllies,
-} from "../battle/StartBoxControls";
 import { StartPosOptions } from "../battle/StartPosOptions";
 import { unsyncedPlayers } from "../battle/startBlockers";
-import { useSavedStartBoxes } from "../battle/startBoxSaved";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
@@ -120,14 +121,17 @@ function BattleRoomPage() {
   );
   // Ally state for start-box editing, shared between the minimap's drag editor
   // and the controls under the start-position dropdown.
-  const boxAllies = useStartBoxAllies(room.rows, room.battle?.startRects ?? {});
+  const allyColors = allyColorsFromRows(room.rows);
+  const boxAllies = useStartBoxAllies(
+    allyColors,
+    room.battle?.startRects ?? {},
+  );
 
   // Skirmish presets (issue #373): the singleplayer preset store, distinct
   // from `useBattlePresets` above (options-only snapshots). Used both to host
   // a preset's own bots once a room WE opened from it comes up, and to let a
   // self-hosted room apply one in place.
   const skirmishPresets = useSkirmishPresets();
-  const [savedBoxes] = useSavedStartBoxes();
   const [hostSeedError, setHostSeedError] = useState<string | null>(null);
 
   // "Host as battle" (from a skirmish preset or the current Singleplayer setup)
@@ -200,12 +204,13 @@ function BattleRoomPage() {
       spectator: seed.self.spectator,
     });
     room.applyOptionTags(seed.scriptTags);
-    if (hostDraft.startPosType === 2) {
-      const boxes = savedBoxes[hostDraft.mapName];
-      if (boxes) {
-        for (const [ally, rect] of Object.entries(boxes))
-          room.setStartBox(Number(ally), rect);
-      }
+    // The draft carries the boxes the setup was actually holding, so hosting it
+    // opens the room on the layout you were looking at. This used to reach for
+    // whatever was last saved against the map, which is a different layout
+    // whenever you had drawn something and not saved it.
+    if (hostDraft.startPosType === 2 && hostDraft.startRects) {
+      for (const [ally, rect] of Object.entries(hostDraft.startRects))
+        room.setStartBox(Number(ally), rect);
     }
     if (seed.bots.length === 0 || !room.serverKey) return;
     const serverKey = room.serverKey;
@@ -218,7 +223,7 @@ function BattleRoomPage() {
         }
       },
     );
-  }, [hostDraft, room, savedBoxes]);
+  }, [hostDraft, room]);
 
   // Apply a saved skirmish preset to the current room in place (issue #373).
   // Only ever reachable while self-hosting (see the button below), so this
@@ -252,12 +257,11 @@ function BattleRoomPage() {
       spectator: seed.self.spectator,
     });
     room.applyOptionTags(seed.scriptTags);
-    if (preset.startPosType === 2) {
-      const boxes = savedBoxes[preset.mapName];
-      if (boxes) {
-        for (const [ally, rect] of Object.entries(boxes))
-          room.setStartBox(Number(ally), rect);
-      }
+    // The preset's own boxes, the ones saved with it, rather than whatever was
+    // last saved against the map.
+    if (preset.startPosType === 2 && preset.startRects) {
+      for (const [ally, rect] of Object.entries(preset.startRects))
+        room.setStartBox(Number(ally), rect);
     }
     skirmishPresets.touchPreset(preset.id);
     if (seed.bots.length === 0 || !room.serverKey) return;
@@ -562,6 +566,7 @@ function BattleRoomPage() {
             canEditBoxes={room.canEditBoxes}
             activeAlly={boxAllies.activeAlly}
             onSetBox={room.setStartBox}
+            onClearBox={room.clearStartBox}
             onSuggestMap={room.suggestMap}
             onChangeMap={room.setMap}
             onRescan={room.rescan}
@@ -604,21 +609,18 @@ function BattleRoomPage() {
             // than showing a default nobody chose (issue #1979).
             unavailable={room.startPositionsUnavailable}
             sendOption={room.sendOption}
-            note={
-              room.startPosType === 0
-                ? "Each team spawns at its numbered map position — pick a team in the player list to choose yours."
-                : room.startPosType === 2 &&
-                    Object.keys(battle.startRects).length === 0
-                  ? "The host hasn't set start boxes yet."
-                  : undefined
-            }
+            note={startPosNote({
+              startPosType: room.startPosType,
+              hasBoxes: Object.keys(battle.startRects).length > 0,
+              canEditBoxes: room.canEditBoxes,
+            })}
           >
             {room.canEditBoxes && (
               <StartBoxControls
                 mapName={battle.map}
                 rects={battle.startRects}
                 allyList={boxAllies.allyList}
-                allyColors={boxAllies.allyColors}
+                allyColors={allyColors}
                 activeAlly={boxAllies.activeAlly}
                 onPickAlly={boxAllies.pickAlly}
                 onSetBox={room.setStartBox}

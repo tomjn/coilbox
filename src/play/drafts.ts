@@ -1,4 +1,5 @@
 import { useSetting } from "@picoframe/frame";
+import type { StartRect } from "@/startbox/geometry";
 import { initialParticipants, type Participant } from "./config";
 
 /**
@@ -30,6 +31,15 @@ export interface SkirmishDraft {
   gameName: string;
   mapName: string;
   startPosType: number;
+  /**
+   * Ally start boxes for `startPosType` 2 (choose in-game), keyed by the ally
+   * number the participant list uses, on the 0..200 grid `@/startbox/geometry`
+   * defines. Optional: a draft written before boxes existed has none, and one
+   * under any other start-position mode never needs them. The mode keeps them
+   * when you switch away and back, so a box layout is not lost to a stray pick,
+   * but only mode 2 writes them into the start script.
+   */
+  startRects?: Record<string, StartRect>;
   modOptionValues: Record<string, string>;
   /** Faithful-replay restrictions from a captured conquest/warpath/MP battle. */
   restrictions?: BattleRestrictions;

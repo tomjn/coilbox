@@ -1,10 +1,12 @@
+import { allyLetter, readableText } from "@/lib/allyDisplay";
 import { randomTeamColorHex } from "@/lib/teamColor";
 import type { Battle, BattleStatus, Rating, User, Vote } from "../bindings";
 
-// Re-exported so existing call sites (and config.test.ts) keep importing the
-// random-colour helper from `./config` unchanged; the implementation now lives in
-// the shared hook-free core at `@/lib/teamColor`.
-export { randomTeamColorHex };
+// Re-exported so existing call sites (and config.test.ts) keep importing these
+// from `./config` unchanged. The implementations now live in the shared hook-free
+// cores at `@/lib/teamColor` and `@/lib/allyDisplay`, the latter because the
+// start-box editor is shared with singleplayer and must not import a lobby module.
+export { allyLetter, randomTeamColorHex, readableText };
 
 /**
  * Pure, unit-tested helpers for the battle room. No React, no bindings — the
@@ -60,9 +62,6 @@ export function usedColorsFromBattle(
   return out;
 }
 
-/** Ally-team letters (A, B, C…) mapped to 0-based indices. */
-export const allyLetter = (n: number): string => String.fromCharCode(65 + n);
-
 /**
  * Parse a unitsync hex CRC into the signed 32-bit int the OPENBATTLE /
  * UPDATEBATTLEINFO wire carries. `| 0` folds a >2^31 checksum into the signed
@@ -71,16 +70,6 @@ export const allyLetter = (n: number): string => String.fromCharCode(65 + n);
 export function hexToI32(hex?: string): number {
   if (!hex) return 0;
   return Number.parseInt(hex, 16) | 0;
-}
-
-/** Black or white text, whichever reads better on `hex` (perceived luminance). */
-export function readableText(hex: string): string {
-  const n = Number.parseInt(hex.replace("#", ""), 16);
-  const r = (n >> 16) & 0xff;
-  const g = (n >> 8) & 0xff;
-  const b = n & 0xff;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6 ? "#000000" : "#ffffff";
 }
 
 /** The start-position mode from the battle's script tags (0 fixed by default). */
@@ -139,6 +128,21 @@ export interface MemberRow {
   /** Bots only: the AI dll and its owning player. */
   aiDll?: string;
   owner?: string;
+}
+
+/**
+ * Each ally team's colour for the start-box editor: its lowest-numbered player's.
+ * Spectators are skipped because they hold no ally. Feeds `useStartBoxAllies`,
+ * which takes colours rather than a roster so a skirmish can supply its own.
+ */
+export function allyColorsFromRows(rows: MemberRow[]): Record<number, string> {
+  const out: Record<number, string> = {};
+  for (const r of [...rows]
+    .filter((r) => !r.spectator)
+    .sort((a, b) => a.teamId - b.teamId)) {
+    if (out[r.ally] == null) out[r.ally] = r.colorHex;
+  }
+  return out;
 }
 
 function rowFromStatus(

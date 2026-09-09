@@ -1,12 +1,23 @@
-import type { StartRect } from "../bindings";
-
 /**
- * Freeform start-box geometry on the lobby's 0..200 grid (200 = full map) — the
+ * Freeform start-box geometry on the lobby's 0..200 grid (200 = full map), the
  * inverse of `StartBoxOverlay`'s `pct()`. Pure so the interactive editor's
- * pointer→grid math is unit-testable without a DOM. `StartRect` is the wire shape
- * (`left/top/right/bottom` ints); a `Point` is one grid coordinate.
+ * pointer to grid math is unit-testable without a DOM. `StartRect` is the wire
+ * shape, four integer edges. A `Point` is one grid coordinate.
+ *
+ * The grid is the lobby protocol's (ADDSTARTRECT), and singleplayer stores boxes
+ * in it too so a layout drawn in either place means the same rectangle and the
+ * per-map saved layouts in `saved.ts` are interchangeable. The engine's start
+ * script wants 0..1 fractions instead, so the launch path divides by `GRID`.
  */
 export const GRID = 200;
+
+/** One ally's start box, in grid units. Mirrors the lobby wire shape. */
+export interface StartRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
 
 /**
  * Smallest allowed box edge on the grid. Guards against zero/paper-thin rects the

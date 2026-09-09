@@ -5,10 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { UnitRestrictions } from "@/campaign/pages/components/UnitRestrictions";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { ConfigOption } from "@/content/bindings";
-import {
-  ModOptionField,
-  START_POS_OPTIONS,
-} from "@/play/pages/components/GameOptionsPanel";
+import { ModOptionField } from "@/play/pages/components/GameOptionsPanel";
+import { START_POS_OPTIONS } from "@/startbox/mode";
 import type { Battle } from "../bindings";
 import { BattleTweakDecodeSection } from "./BattleTweakDecodeSection";
 import {

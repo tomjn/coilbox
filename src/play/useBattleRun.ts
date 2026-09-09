@@ -213,6 +213,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         mapName: draft.mapName,
         gameType: draft.gameName,
         startPosType: draft.startPosType,
+        startRects: draft.startRects,
         modOptions: draft.modOptionValues,
         optionSchema: await gameOptionSchema(
           target,

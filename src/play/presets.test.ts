@@ -101,6 +101,47 @@ describe("parsePresetJson restrictions", () => {
   });
 });
 
+describe("parsePresetJson start boxes", () => {
+  const box = { left: 0, top: 0, right: 60, bottom: 200 };
+
+  it("carries valid boxes through", () => {
+    const parsed = parsePresetJson(
+      JSON.stringify({ ...base, startRects: { "0": box } }),
+    );
+    expect(parsed?.startRects).toEqual({ "0": box });
+  });
+
+  it("leaves start boxes undefined when absent", () => {
+    const parsed = parsePresetJson(JSON.stringify(base));
+    expect(parsed).not.toBeNull();
+    expect(parsed?.startRects).toBeUndefined();
+  });
+
+  it("drops a box the engine would read as off-map or inside out", () => {
+    const parsed = parsePresetJson(
+      JSON.stringify({
+        ...base,
+        startRects: {
+          "0": box, // valid -> kept
+          "1": { ...box, right: 400 }, // past the grid -> dropped
+          "2": { ...box, left: 100, right: 40 }, // inverted -> dropped
+          "3": { ...box, top: 200, bottom: 200 }, // zero height -> dropped
+          "4": { left: 0, top: 0, right: 60 }, // missing an edge -> dropped
+          notAnAlly: box, // not an ally number -> dropped
+        },
+      }),
+    );
+    expect(parsed?.startRects).toEqual({ "0": box });
+  });
+
+  it("drops a set with nothing valid in it to undefined", () => {
+    const parsed = parsePresetJson(
+      JSON.stringify({ ...base, startRects: { "0": { left: "x" } } }),
+    );
+    expect(parsed?.startRects).toBeUndefined();
+  });
+});
+
 describe("parsePresetJson container handling", () => {
   it("reads a canonical container preset (issue #479)", () => {
     const container = JSON.stringify({

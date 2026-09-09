@@ -427,6 +427,60 @@ describe("toBattleConfig team slots", () => {
   });
 });
 
+describe("toBattleConfig start boxes", () => {
+  const base = {
+    mapName: "m",
+    gameType: "g",
+    modOptions: {},
+    optionSchema: [],
+    mapOptionSchema: [],
+  };
+  // A roster on allies 0 and 3, so the remap to a contiguous 0..1 range is not
+  // the identity and a box keyed by the wrong number would be visible.
+  const roster = [
+    { ...you(PALETTE[0]), allyTeam: 0 },
+    { ...ai("a", PALETTE[1]), allyTeam: 3 },
+  ];
+
+  it("writes each ally's box as script fractions under choose-in-game", () => {
+    const cfg = toBattleConfig({
+      ...base,
+      startPosType: 2,
+      participants: roster,
+      startRects: {
+        "0": { left: 0, top: 0, right: 60, bottom: 200 },
+        "3": { left: 140, top: 0, right: 200, bottom: 200 },
+      },
+    });
+    // [top, left, bottom, right] on 0..1, from the editor's 0..200 grid.
+    expect(cfg.allyTeams[0].startRect).toEqual([0, 0, 1, 0.3]);
+    expect(cfg.allyTeams[1].startRect).toEqual([0, 0.7, 1, 1]);
+  });
+
+  it("leaves an ally with no box unrestricted", () => {
+    const cfg = toBattleConfig({
+      ...base,
+      startPosType: 2,
+      participants: roster,
+      startRects: { "0": { left: 0, top: 0, right: 60, bottom: 200 } },
+    });
+    expect(cfg.allyTeams[0].startRect).toEqual([0, 0, 1, 0.3]);
+    expect(cfg.allyTeams[1].startRect).toBeUndefined();
+  });
+
+  it("ignores boxes under a start-position mode that does not use them", () => {
+    for (const startPosType of [0, 1]) {
+      const cfg = toBattleConfig({
+        ...base,
+        startPosType,
+        participants: roster,
+        startRects: { "0": { left: 0, top: 0, right: 60, bottom: 200 } },
+      });
+      expect(cfg.allyTeams.every((a) => a.startRect === undefined)).toBe(true);
+    }
+  });
+});
+
 describe("applyRestrictions", () => {
   const cfg = (): BattleConfig =>
     toBattleConfig({

@@ -9,7 +9,7 @@ import {
   normaliseBox,
   pxToGrid,
   resizeBox,
-} from "./startBoxGeometry";
+} from "./geometry";
 
 describe("startBoxGeometry", () => {
   it("clamps and rounds onto the 0..GRID grid", () => {

@@ -17,16 +17,6 @@ import {
   type OptionGroup,
 } from "@/play/modOptions";
 
-/** Start-position modes we expose (a subset of the engine's `StartPosType`). */
-export const START_POS_OPTIONS = [
-  { value: "0", label: "Fixed (map)" },
-  { value: "2", label: "Choose in-game" },
-  { value: "1", label: "Random" },
-];
-
-const startPosLabel = (v: number) =>
-  START_POS_OPTIONS.find((o) => o.value === String(v))?.label ?? "Fixed";
-
 /** The value in effect for an option, as a control-ready string. */
 const effective = (o: ConfigOption, value?: string) =>
   effectiveValue(o, value) ?? "";
@@ -41,23 +31,20 @@ const effective = (o: ConfigOption, value?: string) =>
 export type OptionChange = (value: string | undefined) => void;
 
 /**
- * Collapsible panel holding everything about the *game*: which game, the
- * start-position mode, and the game's mod options (rendered as checkboxes /
- * number / select / text inputs by type). Collapsed, its header shows a one-line
- * summary so the setup stays scannable.
+ * Collapsible panel holding everything about the *game*: which game, and the
+ * game's mod options (rendered as checkboxes / number / select / text inputs by
+ * type). Collapsed, its header shows a one-line summary so the setup stays
+ * scannable. Start positions are not here: the mode and the boxes it enables are
+ * read against the minimap, so `StartPosCard` sits under the map instead.
  */
 export function GameOptionsPanel({
   selectedGame,
-  startPosType,
-  onStartPosType,
   options,
   optionValues,
   onOptionChange,
   disabled,
 }: {
   selectedGame?: GameItem | null;
-  startPosType: number;
-  onStartPosType: (v: number) => void;
   options: ConfigOption[];
   optionValues: Record<string, string>;
   onOptionChange: (key: string, value: string | undefined) => void;
@@ -69,7 +56,6 @@ export function GameOptionsPanel({
   ).length;
   const summary = [
     selectedGame?.name ?? "No game",
-    startPosLabel(startPosType),
     changed > 0 ? `${changed} options changed` : "default options",
   ].join(" · ");
 
@@ -90,23 +76,16 @@ export function GameOptionsPanel({
 
       <CollapsibleContent>
         <div className="border-t border-border/40 px-4 pb-4 pt-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <span className="mb-1.5 block text-[11px] uppercase tracking-wide text-muted-foreground">
-                Start positions
-              </span>
-              <OptionSelect
-                value={String(startPosType)}
-                disabled={disabled}
-                options={START_POS_OPTIONS}
-                onValueChange={(v) => onStartPosType(Number(v))}
-              />
-            </div>
-          </div>
-
-          {groups.length > 0 && (
+          {/* Start positions used to fill this panel whatever the game, so with
+              them moved under the map a game declaring no options would open
+              onto nothing at all. Say so instead. */}
+          {groups.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              This game declares no options.
+            </p>
+          ) : (
             <>
-              <div className="mb-2 mt-5 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 Mod options
               </div>
               <div className="space-y-2">

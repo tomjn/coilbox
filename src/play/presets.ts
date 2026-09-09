@@ -1,4 +1,5 @@
 import { useSetting } from "@picoframe/frame";
+import { GRID, type StartRect } from "@/startbox/geometry";
 import {
   asContainer,
   CONTAINER_VERSION,
@@ -147,6 +148,7 @@ function draftKey(draft: SkirmishDraft): string {
       gameName: draft.gameName,
       mapName: draft.mapName,
       startPosType: draft.startPosType,
+      startRects: draft.startRects ?? null,
       modOptionValues: draft.modOptionValues,
       restrictions: draft.restrictions ?? null,
     }),
@@ -217,6 +219,7 @@ export function parsePresetJson(
     gameName,
     mapName: d.mapName,
     startPosType: d.startPosType,
+    startRects: parseStartRects(d.startRects),
     modOptionValues: d.modOptionValues as SkirmishDraft["modOptionValues"],
     restrictions: parseRestrictions(d.restrictions),
     name: typeof d.name === "string" ? d.name : undefined,
@@ -240,5 +243,31 @@ function parseRestrictions(value: unknown): BattleRestrictions | undefined {
   if (typeof r.advantage === "number") out.advantage = r.advantage;
   if (typeof r.incomeMultiplier === "number")
     out.incomeMultiplier = r.incomeMultiplier;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Validate the optional start boxes from imported preset JSON. An entry is kept
+ * only when all four edges are finite numbers inside the grid and the box is the
+ * right way round, because the engine takes these as raw map fractions and an
+ * inverted or off-map rect would spawn a team nowhere. Anything else is dropped
+ * rather than repaired: a box is quick to redraw and a silently moved one is not
+ * quick to notice. Returns undefined when nothing valid survives.
+ */
+function parseStartRects(
+  value: unknown,
+): Record<string, StartRect> | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const edge = (v: unknown): v is number =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= GRID;
+  const out: Record<string, StartRect> = {};
+  for (const [ally, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^\d+$/.test(ally)) continue;
+    if (typeof raw !== "object" || raw === null) continue;
+    const { left, top, right, bottom } = raw as Record<string, unknown>;
+    if (!edge(left) || !edge(top) || !edge(right) || !edge(bottom)) continue;
+    if (right <= left || bottom <= top) continue;
+    out[ally] = { left, top, right, bottom };
+  }
   return Object.keys(out).length > 0 ? out : undefined;
 }

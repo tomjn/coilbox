@@ -71,6 +71,7 @@ import { MapCard } from "@/play/pages/components/MapCard";
 import { ParticipantsTable } from "@/play/pages/components/ParticipantsTable";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
+import { StartPosCard } from "@/startbox/StartPosCard";
 import type { Scenario } from "../../model";
 import type { LoadedScenario } from "../../storage";
 import { defsMissingFrom, type MissionIssue, unitDefsIn } from "../../validate";
@@ -490,10 +491,6 @@ export function SetupPanel({
             ))}
             <GameOptionsPanel
               selectedGame={selectedGame}
-              startPosType={setup.startPosType}
-              onStartPosType={(startPosType) =>
-                onChange({ ...scenario, setup: { ...setup, startPosType } })
-              }
               options={modOptions}
               optionValues={options}
               onOptionChange={(key, value) =>
@@ -514,6 +511,13 @@ export function SetupPanel({
               env={minimap.env}
               mapsLoading={scan.loading && maps.length === 0}
               onSelectMap={askMap}
+            />
+            {/* Under the map, the same place skirmish and the battle room put it. */}
+            <StartPosCard
+              value={setup.startPosType}
+              onChange={(startPosType) =>
+                onChange({ ...scenario, setup: { ...setup, startPosType } })
+              }
             />
             <GameSelectCard
               game={selectedGame}

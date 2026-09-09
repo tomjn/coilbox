@@ -135,6 +135,11 @@ export function battleToSkirmishDraft(opts: {
     gameName: battle.modname,
     mapName: battle.map,
     startPosType: startPosTypeOf(battle),
+    // The battle's boxes are already on the grid a skirmish draws on, so a room
+    // played locally keeps the layout the host set rather than starting blank.
+    ...(Object.keys(battle.startRects).length > 0
+      ? { startRects: battle.startRects }
+      : {}),
     modOptionValues,
     ...(restrictions ? { restrictions } : {}),
   };
