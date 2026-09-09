@@ -243,6 +243,13 @@ pub enum Delta {
     },
     /// One labelled line of a `GETUSERINFO` answer. Each of the three arrives
     /// separately, so every field is optional and the reader merges them.
+    ///
+    /// `rename_all = "camelCase"` is repeated here on the variant itself,
+    /// because the container's `rename_all` on the `Delta` enum only renames
+    /// variant names, not the fields of a struct variant. Without it this
+    /// serialized as `registration_date`/`ingame_hours`, which `bindings.ts`
+    /// does not declare, so both silently deserialized as `undefined`.
+    #[serde(rename_all = "camelCase")]
     AccountInfo {
         registration_date: Option<String>,
         email: Option<String>,
@@ -1140,8 +1147,18 @@ fn refusal_words(reason: String) -> String {
 /// The three labels both uberserver and teiserver put on their `GETUSERINFO`
 /// answer. Neither gives the answer a reply token, so the label is all there is
 /// to recognise it by.
+///
+/// A label with nothing after it becomes `None` rather than `Some("")`.
+/// `AccountActions` in `SettingsSection.tsx` treats a non-null email as known
+/// enough to enable "Resend verification", so an empty string there would
+/// light the button up over an address that was never actually read.
 fn account_info_from(text: &str) -> Option<Delta> {
-    let field = |label: &str| text.strip_prefix(label).map(str::trim).map(str::to_string);
+    let field = |label: &str| {
+        text.strip_prefix(label)
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    };
     let registration_date = field("Registration date: ");
     let email = field("Email address: ");
     let ingame_hours = field("Ingame time: ");
@@ -1527,6 +1544,44 @@ mod tests {
                 text: "Server going down for maintenance".into(),
                 boxed: false
             }]
+        );
+    }
+
+    /// A label with nothing after it must become `None`, not `Some("")`. An
+    /// empty string is not null, so a naive reader would treat the field as
+    /// known and light up a control (e.g. "Resend verification") over an
+    /// address that was never actually read. With every field empty there is
+    /// nothing recognisable in the line at all, so no `AccountInfo` delta is
+    /// produced, the same as an ordinary announcement.
+    #[test]
+    fn an_empty_labelled_field_is_none_not_an_empty_string() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(&mut s, parse_line("SERVERMSG Email address: ")),
+            vec![Delta::ServerMessage {
+                text: "Email address: ".into(),
+                boxed: false
+            }]
+        );
+    }
+
+    /// `Delta`'s container-level `rename_all = "camelCase"` only renames enum
+    /// variant names, not the fields of a struct variant, so `AccountInfo`
+    /// needs its own `rename_all` or its fields serialize as
+    /// `registration_date`/`ingame_hours`, which `bindings.ts` never declares.
+    /// A Rust-value comparison cannot catch this: it round-trips through the
+    /// same (buggy) field names on both sides. Only asserting the actual JSON
+    /// string proves the wire shape.
+    #[test]
+    fn account_info_serializes_its_fields_in_camel_case() {
+        let delta = Delta::AccountInfo {
+            registration_date: Some("x".into()),
+            email: None,
+            ingame_hours: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&delta).unwrap(),
+            r#"{"kind":"accountInfo","registrationDate":"x","email":null,"ingameHours":null}"#
         );
     }
 
