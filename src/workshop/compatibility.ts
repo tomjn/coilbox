@@ -35,9 +35,32 @@
  * from here, and a suggestion built out of name similarity would be a guess
  * wearing a fix's clothing. The finding says the unit is gone and leaves the
  * matching to the person who knows.
+ *
+ * A path whose parent still resolves is not necessarily still read, though
+ * (issue #2758). `maxdamage` set on a unit is read whether or not the unit's
+ * own definition mentions it, because the engine substitutes its own default,
+ * but a key the engine has never read and the unit's own current definition
+ * no longer carries either is read by nothing at all: not the engine, which
+ * `unitFields.ts`'s generated registry lists exhaustively, and not any other
+ * Lua, because a def table unitsync did not read the key out of is a def
+ * table nothing else could have read it out of either. `deadKeyDetail` is
+ * that check. A key inside a table the engine reads whole is the one
+ * exception, because a game can leave any key out of one of those between
+ * patches without it meaning anything: `customParams` is read a key at a time
+ * by whatever Lua a game ships, so only the Lua consumer scan from issue
+ * #2661 can say whether one is still named anywhere, and every other such
+ * table has no such oracle and is never judged at all.
  */
+import type { CustomParamsResult } from "@/content/bindings";
+import {
+  type DefKind,
+  engineFields,
+  normaliseFieldPath,
+  openTables,
+} from "@/content/unitFields";
 import type { BuildMenuOp, BuildMenus } from "./buildMenus";
 import type { UnitClone } from "./clones";
+import { customParamKey } from "./customParamConsumers";
 import { readPath } from "./overrides";
 import type { GameEdits } from "./project";
 
@@ -103,6 +126,18 @@ export interface CompatInput {
   weaponDefs: Record<string, Record<string, unknown>>;
   /** For the sentences, so a finding reads as being about a game. */
   gameName: string;
+  /**
+   * Which of the game's own Lua files name each custom parameter (issue
+   * #2661), so a dead `customParams` key can be told from one no unit
+   * happens to carry today. `undefined` while the scan is still loading and
+   * `null` where a game has none to read, in which case a `customParams`
+   * finding simply does not appear yet rather than guessing from absence
+   * alone. Unlike the rest of this input this is not already paid for by
+   * rendering the unit list, though the page fetches it anyway for the field
+   * notes issue #2661 asks for, so this check adds nothing beyond what was
+   * already going to be read.
+   */
+  customParams?: CustomParamsResult | null;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) =>
@@ -203,6 +238,115 @@ function parentPath(path: string): string | null {
   return at < 0 ? null : path.slice(0, at);
 }
 
+/** A registry path, in the engine's own casing, joining section and key. */
+const registryPath = (section: string, key: string) =>
+  section === "" ? key : `${section}.${key}`;
+
+/**
+ * Every path each registry declares, lowercased so a game's own spelling
+ * matches it: `gamedata/defs.lua` hands back `maxdamage`, the registry writes
+ * `maxDamage`, and the engine's own readers are case insensitive, so this is
+ * the engine's behaviour rather than a way around it.
+ */
+const REGISTRY_PATHS_LOWER: Record<DefKind, Set<string>> = {
+  unit: new Set(
+    engineFields("unit").map((f) =>
+      registryPath(f.section, f.key).toLowerCase(),
+    ),
+  ),
+  weapon: new Set(
+    engineFields("weapon").map((f) =>
+      registryPath(f.section, f.key).toLowerCase(),
+    ),
+  ),
+};
+
+/**
+ * Every table a registry reads whole, split into segments and lowercased,
+ * apart from `customParams` itself: that one has a better oracle than absence
+ * and is judged separately by {@link deadKeyDetail}.
+ */
+const OTHER_OPEN_TABLES: Record<DefKind, string[][]> = {
+  unit: openTables("unit")
+    .filter((p) => p.toLowerCase() !== "customparams")
+    .map((p) => p.toLowerCase().split(".")),
+  weapon: openTables("weapon")
+    .filter((p) => p.toLowerCase() !== "customparams")
+    .map((p) => p.toLowerCase().split(".")),
+};
+
+/**
+ * Which registry an override path is read against, and the path within it.
+ *
+ * `weapondefs.<name>.*` is a unit's own inline weapon definitions, named
+ * however the mod likes, but what is inside one is a weapon definition and
+ * not a unit field: `weapondefs.armcomlaser.range` is `range` on the weapon
+ * registry, not a path the unit registry has ever heard of. Everything else
+ * is read against the unit registry, `weapons.*.mainDir` and all, because that
+ * is the table the page draws it from.
+ */
+function fieldKindAndLeaf(path: string): { kind: DefKind; leaf: string } {
+  const parts = path.split(".");
+  if (parts.length > 2 && parts[0].toLowerCase() === "weapondefs")
+    return { kind: "weapon", leaf: parts.slice(2).join(".") };
+  return { kind: "unit", leaf: path };
+}
+
+/** Whether the engine reads this path at all, in either registry. */
+function isEngineField(path: string): boolean {
+  const { kind, leaf } = fieldKindAndLeaf(path);
+  return REGISTRY_PATHS_LOWER[kind].has(normaliseFieldPath(leaf).toLowerCase());
+}
+
+/**
+ * Whether a path sits inside a table the engine reads whole and this module
+ * has no other way to judge, so nothing about the path can be reported.
+ */
+function insideUnjudgeableTable(path: string): boolean {
+  const { kind, leaf } = fieldKindAndLeaf(path);
+  const parts = normaliseFieldPath(leaf).toLowerCase().split(".");
+  return OTHER_OPEN_TABLES[kind].some(
+    (pattern) =>
+      parts.length > pattern.length &&
+      pattern.every((seg, i) => seg === "*" || seg === parts[i]),
+  );
+}
+
+/**
+ * What to say about a leaf key nothing reads any more, or `null` when there is
+ * nothing safe to say (issue #2758).
+ *
+ * A `customParams` key is judged by the Lua consumer scan alone, never by
+ * absence from the unit's own current definition: a game dropping one
+ * parameter off one unit between patches is an ordinary balance edit and
+ * proves nothing about whether the parameter itself is still read anywhere,
+ * where the scan is a real answer across every Lua file the game ships. A key
+ * inside any other table the engine reads whole has no such scan and is never
+ * reported. Everywhere else, a def table unitsync did not read the key out of
+ * is a def table nothing else could have read it out of either, so the key is
+ * dead when the exhaustive engine registry has never heard of it and the
+ * unit's own current definition does not carry it.
+ */
+function deadKeyDetail(
+  path: string,
+  def: Record<string, unknown> | undefined,
+  gameName: string,
+  scan: CustomParamsResult | null | undefined,
+): string | null {
+  const param = customParamKey(path);
+  if (param !== null) {
+    if (!scan || scan.truncated || scan.wholeTableFiles > 0) return null;
+    const consumers = scan.params[param];
+    if (consumers && consumers.files > 0) return null;
+    return `No Lua file in ${gameName} names the custom parameter ${param} any more, so the value set for ${path} is dead weight.`;
+  }
+  if (insideUnjudgeableTable(path)) return null;
+  if (isEngineField(path)) return null;
+  if (readPath(def, path) !== undefined) return null;
+  const key = path.split(".").at(-1) ?? path;
+  return `${gameName}'s engine has never read ${key}, and its own current definition no longer carries it either, so the value set for ${path} is dead weight.`;
+}
+
 /** Findings for units the project patches that the game no longer has. */
 function overrideFindings(
   input: CompatInput,
@@ -232,27 +376,47 @@ function overrideFindings(
       continue;
     }
     const def = defOf(unit);
+    // Dropping the value at one path costs the same whichever of the two
+    // reasons below fires, so the offer is built once and only the detail
+    // sentence and the id tell the two apart.
+    const removeFix = (path: string): CompatFix => ({
+      label: "Remove this change",
+      cost: `the value you set for ${path}`,
+      apply: (edits) => ({
+        ...edits,
+        overrides: {
+          ...edits.overrides,
+          [unit]: without(edits.overrides[unit] ?? {}, path),
+        },
+      }),
+    });
     for (const path of fields) {
       const parent = parentPath(path);
-      if (parent === null) continue;
-      if (readPath(def, parent) !== undefined) continue;
+      if (parent !== null && readPath(def, parent) === undefined) {
+        out.push({
+          id: `overrides:${unit}:${path}`,
+          store: "overrides",
+          severity: "review",
+          subject: `${unit}.${path}`,
+          detail: `${unit} no longer has ${parent}, so the value set for ${path} is written into a table nothing reads.`,
+          fix: removeFix(path),
+        });
+        continue;
+      }
+      const deadKey = deadKeyDetail(
+        path,
+        def,
+        input.gameName,
+        input.customParams,
+      );
+      if (deadKey === null) continue;
       out.push({
-        id: `overrides:${unit}:${path}`,
+        id: `overrides:${unit}:${path}:key`,
         store: "overrides",
         severity: "review",
         subject: `${unit}.${path}`,
-        detail: `${unit} no longer has ${parent}, so the value set for ${path} is written into a table nothing reads.`,
-        fix: {
-          label: "Remove this change",
-          cost: `the value you set for ${path}`,
-          apply: (edits) => ({
-            ...edits,
-            overrides: {
-              ...edits.overrides,
-              [unit]: without(edits.overrides[unit] ?? {}, path),
-            },
-          }),
-        },
+        detail: deadKey,
+        fix: removeFix(path),
       });
     }
   }

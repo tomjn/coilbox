@@ -824,6 +824,12 @@ export default function UnitPage() {
    * costs no read and cannot make opening a project slower. A project whose
    * game has moved opens and edits exactly as it always did, and this only
    * changes what the page can tell you about it.
+   *
+   * `consumers` is the one part of the input not already sitting on the page
+   * for this reason alone: it is the custom parameter scan issue #2661 fetches
+   * for the field notes regardless, so a dead `customParams` key (issue
+   * #2758) only fills in once that lands rather than this check waiting on a
+   * read of its own.
    */
   const compatibility = useMemo(
     () =>
@@ -833,9 +839,13 @@ export default function UnitPage() {
             units: defs.units,
             weaponDefs: defs.weaponDefs,
             gameName: game?.name ?? project.gameName,
+            // Already being fetched for issue #2661's field notes, so a dead
+            // `customParams` key only ever fills in once that scan lands
+            // rather than costing this check a read of its own.
+            customParams: consumers,
           })
         : null,
-    [project, defs, game?.name],
+    [project, defs, game?.name, consumers],
   );
   const moved = compatibility?.kind === "moved" ? compatibility.report : null;
 

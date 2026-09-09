@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { CustomParamsResult } from "@/content/bindings";
 import {
   type CompatInput,
   type CompatReport,
@@ -142,6 +143,133 @@ describe("fields that have moved inside a unit that is still there", () => {
       overrides: { supercom: { "weapondefs.bigger.range": 900 } },
     };
     expect(check(edits, { units }).findings).toEqual([]);
+  });
+});
+
+describe("field keys nothing reads any more (issue #2758)", () => {
+  const scan = (
+    params: CustomParamsResult["params"] = {},
+    rest: Partial<CustomParamsResult> = {},
+  ): CustomParamsResult => ({
+    params,
+    wholeTableFiles: 0,
+    filesScanned: 100,
+    truncated: false,
+    errors: [],
+    ...rest,
+  });
+
+  it("reports a key the engine has never read and the unit no longer carries", () => {
+    const edits = {
+      ...EMPTY_EDITS,
+      overrides: { armcom: { somekey: 1 } },
+    };
+    const found = only(check(edits, { units: { armcom: {} } }));
+    expect(found).toMatchObject({
+      id: "overrides:armcom:somekey:key",
+      severity: "review",
+    });
+    expect(found.detail).toContain("engine has never read somekey");
+    expect(found.fix?.cost).toBe("the value you set for somekey");
+    expect(found.fix?.apply(edits).overrides).toEqual({ armcom: {} });
+  });
+
+  it("says nothing about a key the unit's own current definition still carries", () => {
+    const edits = {
+      ...EMPTY_EDITS,
+      overrides: { armcom: { somekey: 10 } },
+    };
+    expect(
+      check(edits, { units: { armcom: { somekey: 5 } } }).findings,
+    ).toEqual([]);
+  });
+
+  it("never judges a key inside a table the engine reads whole, even absent", () => {
+    const edits = {
+      ...EMPTY_EDITS,
+      overrides: { armcom: { "buildoptions.5": "corak" } },
+    };
+    expect(
+      check(edits, { units: { armcom: { buildoptions: ["armlab"] } } })
+        .findings,
+    ).toEqual([]);
+  });
+
+  describe("a unit's own inline weapon definitions", () => {
+    const units = { armcom: { weapondefs: { armcomlaser: {} } } };
+
+    it("reads a weapondef's own leaf against the weapon registry, not the unit's", () => {
+      // `range` is a real weapon field the engine reads. Absent from this
+      // unit's current `armcomlaser` or not, checking it against the unit
+      // registry instead of the weapon one would have called it unknown and
+      // reported a live field as dead weight.
+      const edits = {
+        ...EMPTY_EDITS,
+        overrides: { armcom: { "weapondefs.armcomlaser.range": 320 } },
+      };
+      expect(check(edits, { units }).findings).toEqual([]);
+    });
+
+    it("still reports a key neither registry has ever heard of", () => {
+      const edits = {
+        ...EMPTY_EDITS,
+        overrides: { armcom: { "weapondefs.armcomlaser.notarealfield": 1 } },
+      };
+      const found = only(check(edits, { units }));
+      expect(found).toMatchObject({
+        id: "overrides:armcom:weapondefs.armcomlaser.notarealfield:key",
+        severity: "review",
+      });
+    });
+  });
+
+  describe("a custom parameter", () => {
+    const units = {
+      armcom: { customparams: { otherparam: 1 } },
+    };
+    const edits: GameEdits = {
+      ...EMPTY_EDITS,
+      overrides: { armcom: { "customparams.deadparam": 5 } },
+    };
+
+    it("says nothing while there is no scan to say it from", () => {
+      expect(check(edits, { units }).findings).toEqual([]);
+    });
+
+    it("says nothing while the scan is still incomplete", () => {
+      expect(
+        check(edits, { units, customParams: scan({}, { truncated: true }) })
+          .findings,
+      ).toEqual([]);
+    });
+
+    it("says nothing when a gadget may still read it without naming it", () => {
+      expect(
+        check(edits, { units, customParams: scan({}, { wholeTableFiles: 3 }) })
+          .findings,
+      ).toEqual([]);
+    });
+
+    it("says nothing about a parameter a file still names", () => {
+      const named = scan({
+        deadparam: {
+          sites: [{ file: "a.lua", reads: 1, writes: 0 }],
+          files: 1,
+        },
+      });
+      expect(check(edits, { units, customParams: named }).findings).toEqual([]);
+    });
+
+    it("reports a parameter a completed scan finds no file naming", () => {
+      const found = only(check(edits, { units, customParams: scan() }));
+      expect(found).toMatchObject({
+        id: "overrides:armcom:customparams.deadparam:key",
+        severity: "review",
+      });
+      expect(found.detail).toContain("No Lua file in Test Game names");
+      expect(found.detail).toContain("deadparam");
+      expect(found.fix?.apply(edits).overrides).toEqual({ armcom: {} });
+    });
   });
 });
 
@@ -401,6 +529,45 @@ describe("against real Balanced Annihilation definitions", () => {
     expect(checkCompatibility({ edits: project, ...game }).findings).toEqual(
       [],
     );
+  });
+
+  it("says nothing about a real custom parameter a scan still finds a reader for", () => {
+    const customParams = {
+      params: {
+        paralyzemultiplier: {
+          sites: [
+            { file: "luarules/gadgets/unit_paralyze.lua", reads: 2, writes: 0 },
+          ],
+          files: 1,
+        },
+      },
+      wholeTableFiles: 0,
+      filesScanned: 900,
+      truncated: false,
+      errors: [],
+    };
+    expect(
+      checkCompatibility({ edits: project, ...game, customParams }).findings,
+    ).toEqual([]);
+  });
+
+  it("reports a real custom parameter once a completed scan finds nothing naming it", () => {
+    const customParams = {
+      params: {},
+      wholeTableFiles: 0,
+      filesScanned: 900,
+      truncated: false,
+      errors: [],
+    };
+    const report = checkCompatibility({
+      edits: project,
+      ...game,
+      customParams,
+    });
+    expect(ids(report)).toEqual([
+      "overrides:armcom:customparams.paralyzemultiplier:key",
+    ]);
+    expect(report.findings[0].detail).toContain("paralyzemultiplier");
   });
 
   it("finds every reference to a unit the game has dropped", () => {
