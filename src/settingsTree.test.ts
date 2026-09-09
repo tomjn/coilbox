@@ -93,6 +93,7 @@ describe("settings declarations", () => {
       "lobby-servers",
       "chat-highlights",
       "ignored-users",
+      "account",
     ]);
     expect(childrenOf("library")).toEqual([
       "content-folders",

@@ -41,6 +41,9 @@ import {
   type LoginPhase,
   mpActiveKeys,
   mpCancelConnect,
+  mpChangeEmail,
+  mpChangeEmailRequest,
+  mpChangePassword,
   mpConfirmAgreement,
   mpConnect,
   mpConnectTachyon,
@@ -48,14 +51,18 @@ import {
   mpDisconnect,
   mpFriendList,
   mpFriendRequestList,
+  mpGetUserInfo,
   mpIgnore,
   mpIgnoreList,
   mpJoinBattle,
   mpJoinChannel,
   mpReattach,
+  mpRecoverPassword,
   mpRegister,
   mpRegisterZerok,
+  mpResendVerification,
   mpSnapshot,
+  mpSubmitRecoveryCode,
   mpTachyonSignedIn,
   mpTachyonSignIn,
   mpWaitUntilReady,
@@ -166,6 +173,71 @@ function incomingChatMsg(d: Delta, state: LobbyState): ChatMsg | null {
  * the attempt budget — after this many failed attempts the loop gives up.
  */
 export const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 20000];
+
+/**
+ * How long to wait for the server's answer to a command that has no reply of its
+ * own. `CHANGEPASSWORD` is answered by a bare `SERVERMSG`, so the only way to
+ * pair a reply with a request is to watch for the next one after asking.
+ *
+ * Matches the Rust `READY_TIMEOUT` (`conn.rs:122`) and for the same reason.
+ * Generous, because a real server behind a slow link is not a failure, and
+ * bounded, because nothing below this times out at all.
+ */
+export const SERVER_REPLY_TIMEOUT_MS = 20_000;
+
+/** uberserver's exact wording on a successful `CHANGEPASSWORD` (`Protocol.py:3327`). */
+export const CHANGE_PASSWORD_SUCCESS = "Password changed successfully.";
+
+/**
+ * Wait for whichever of a pair of deltas answers a signed-in account command
+ * that does carry its own accept/deny token (`CHANGEEMAILREQUEST`,
+ * `CHANGEEMAIL`, `RESENDVERIFICATION`), unlike `CHANGEPASSWORD`, which has
+ * none and is paired against a bare `SERVERMSG` instead. Resolves on
+ * `acceptKind`, rejects with the delta's `reason` on `denyKind`, and times
+ * out after `SERVER_REPLY_TIMEOUT_MS` if neither arrives.
+ *
+ * `denyKind` is shared between a request step and its follow-up code step
+ * (the reducer folds e.g. `CHANGEEMAILREQUESTDENIED` and `CHANGEEMAILDENIED`
+ * into the one `changeEmailDenied` delta), which is fine as long as only one
+ * step is ever waiting at a time: whichever call is pending is the one the
+ * denial belongs to.
+ *
+ * `cleanup` is returned alongside the promise so a caller whose send failed,
+ * meaning the command never reached the wire and so no reply is coming, can
+ * remove the waiter and clear the timer immediately rather than leaving both
+ * live to reject into nothing `SERVER_REPLY_TIMEOUT_MS` later and, in the
+ * meantime, block a retry behind a stale waiter. Safe to call more than once
+ * and after the promise has already settled.
+ */
+function waitForAccountDelta(
+  waiters: { current: Set<(d: Delta) => void> },
+  acceptKind: Delta["kind"],
+  denyKind: Delta["kind"],
+): { promise: Promise<void>; cleanup: () => void } {
+  let waiter: (d: Delta) => void = () => {};
+  let timer: ReturnType<typeof setTimeout>;
+  const cleanup = () => {
+    clearTimeout(timer);
+    waiters.current.delete(waiter);
+  };
+  const promise = new Promise<void>((resolve, reject) => {
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("The server did not answer."));
+    }, SERVER_REPLY_TIMEOUT_MS);
+    waiter = (d) => {
+      if (d.kind !== acceptKind && d.kind !== denyKind) return;
+      cleanup();
+      if (d.kind === denyKind) {
+        reject(new Error("reason" in d ? d.reason : "Request refused."));
+      } else {
+        resolve();
+      }
+    };
+    waiters.current.add(waiter);
+  });
+  return { promise, cleanup };
+}
 
 /**
  * How long deltas accumulate before the mirror is refreshed once for all of
@@ -420,6 +492,27 @@ export function mirrorReducer(
   }
 }
 
+/**
+ * The account's details as `mpGetUserInfo` answers them, merged from the three
+ * `accountInfo` deltas the server sends separately. A field stays at its last
+ * known value until its own line arrives, so a caller reading before the first
+ * answer sees every field null.
+ */
+export interface AccountInfo {
+  registrationDate: string | null;
+  email: string | null;
+  ingameHours: string | null;
+}
+
+/**
+ * How `recoverPassword` ended. uberserver emails a code and waits for
+ * `submitRecoveryCode`. teiserver has no in-lobby recovery and hands back a web
+ * address instead, with nothing further to send.
+ */
+export type RecoveryStart =
+  | { kind: "codeSent"; serverKey: string }
+  | { kind: "redirected"; url: string };
+
 interface MultiplayerContextValue {
   mirror: LobbyMirror;
   /** The connected `serverKey`, or null when not connected. */
@@ -480,6 +573,56 @@ interface MultiplayerContextValue {
     password: string,
     email?: string,
   ) => Promise<void>;
+  /**
+   * Start account recovery for `email` on a throwaway connection. Resolves with
+   * where the flow landed: a code was emailed and `submitRecoveryCode` is next,
+   * or the server redirected us to a web page and there is nothing further to
+   * do. The connection stays open on `codeSent` for `submitRecoveryCode` to
+   * finish and tear down. Rejects with the server's reason on denial.
+   */
+  recoverPassword: (
+    server: LobbyServer,
+    email: string,
+  ) => Promise<RecoveryStart>;
+  /**
+   * Finish account recovery with the emailed code, on the connection
+   * `recoverPassword` left open. Resolves with the username a locked-out user
+   * had no other way to learn, and disconnects. Rejects with the server's
+   * reason on a wrong code, but leaves the connection live for a retry
+   * (uberserver allows three attempts) rather than disconnecting. Call
+   * `cancelRecovery` to close it if the user gives up instead.
+   */
+  submitRecoveryCode: (
+    serverKey: string,
+    code: string,
+  ) => Promise<{ username: string }>;
+  /**
+   * Close a recovery connection left open by a refused code, for when the
+   * user abandons the flow rather than retrying. Safe to call on a
+   * connection that never parked awaiting a code, or one already gone.
+   */
+  cancelRecovery: (serverKey: string) => Promise<void>;
+  /**
+   * Change the signed-in account's password. `CHANGEPASSWORD` has no accept or
+   * deny reply of its own, so this resolves off the next `SERVERMSG` and reads
+   * `succeeded` to tell a refusal from the real answer.
+   */
+  changePassword: (
+    current: string,
+    next: string,
+  ) => Promise<{ message: string; succeeded: boolean }>;
+  /** Ask for a code to confirm a new email address on the signed-in account. */
+  changeEmailRequest: (email: string) => Promise<void>;
+  /** Confirm a new email address with the emailed code. */
+  changeEmail: (email: string, code: string) => Promise<void>;
+  /** Ask for the signup verification code again. */
+  resendVerification: (email: string) => Promise<void>;
+  /** Ask the server for the signed-in account's details, answered as
+   * `accountInfo` deltas that land in {@link accountInfo}. */
+  getUserInfo: () => void;
+  /** The signed-in account's details, merged from the deltas `getUserInfo`
+   * triggers, or null before any have arrived. */
+  accountInfo: AccountInfo | null;
   disconnect: () => Promise<void>;
   /** Abort a connect still in progress (the "Connecting…" state), returning to
    * disconnected without an error or an auto-reconnect. */
@@ -580,6 +723,23 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // queued (never dropped) rather than overwriting each other; the dialog shows the
   // front and dismissing pops it.
   const [serverMsgBoxes, setServerMsgBoxes] = useState<string[]>([]);
+
+  // Callbacks waiting on the next `SERVERMSG`, for a command like `CHANGEPASSWORD`
+  // that has no reply of its own to correlate on. A set rather than a single slot,
+  // because nothing stops two such commands overlapping. Each is removed as soon
+  // as it fires or times out.
+  const serverMessageWaiters = useRef(new Set<(text: string) => void>());
+
+  // Callbacks waiting on one of the paired accept/deny deltas for a signed-in
+  // account command that does carry a token (CHANGEEMAILREQUEST, CHANGEEMAIL,
+  // RESENDVERIFICATION), unlike CHANGEPASSWORD above. Kept separate from
+  // `serverMessageWaiters` because these match on the delta's own kind rather
+  // than on SERVERMSG text.
+  const accountDeltaWaiters = useRef(new Set<(d: Delta) => void>());
+
+  // The signed-in account's details, merged from the `accountInfo` deltas
+  // `getUserInfo` triggers. Null until the first one arrives.
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
 
   // The game whose result the debriefing drawer is open on, or null when it is
   // shut. The result itself lives in the snapshot, so this only decides whether
@@ -1280,6 +1440,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // ignored so a malformed line can't pop a contentless toast/modal. The raw
         // line is already in the protocol console for history.
         else if (d.kind === "serverMessage") {
+          // A command with no reply of its own (e.g. `CHANGEPASSWORD`) is
+          // answered by whatever `SERVERMSG` comes next, and this is the only
+          // place every one passes through. Fire every waiter rather than just
+          // the first, since nothing stops two such commands overlapping.
+          for (const waiter of serverMessageWaiters.current) waiter(d.text);
           const text = d.text.trim();
           if (text) {
             if (d.boxed) setServerMsgBoxes((q) => [...q, d.text]);
@@ -1292,6 +1457,31 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // (issue #2003).
         else if (d.kind === "debriefingReceived") {
           setDebriefingShown(d.battleId);
+        }
+        // One labelled line of a `GETUSERINFO` answer. The three arrive
+        // separately, so a field that arrives null keeps whatever this already
+        // held rather than blanking it.
+        else if (d.kind === "accountInfo") {
+          setAccountInfo((prev) => ({
+            registrationDate:
+              d.registrationDate ?? prev?.registrationDate ?? null,
+            email: d.email ?? prev?.email ?? null,
+            ingameHours: d.ingameHours ?? prev?.ingameHours ?? null,
+          }));
+        }
+        // The paired accept/deny delta for whichever of `changeEmailRequest`,
+        // `changeEmail` or `resendVerification` is currently awaited. Fire
+        // every waiter rather than just the first, the same reasoning as
+        // `serverMessageWaiters` above: each filters to the pair it was
+        // registered for and ignores the rest.
+        else if (
+          d.kind === "changeEmailCodeSent" ||
+          d.kind === "changeEmailAccepted" ||
+          d.kind === "changeEmailDenied" ||
+          d.kind === "resendVerificationAccepted" ||
+          d.kind === "resendVerificationDenied"
+        ) {
+          for (const waiter of accountDeltaWaiters.current) waiter(d);
         }
         queueSnapshot(d);
       }
@@ -1732,6 +1922,276 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // The recovery connection's event channel, kept while parked awaiting the
+  // emailed code, so `submitRecoveryCode` can take over listening on the same
+  // connection `recoverPassword` opened. A Tauri `Channel` has exactly one
+  // `onmessage` slot, so this is the only way a second call can observe
+  // anything on it. Do not remove this for looking redundant.
+  // Removed once the connection actually closes: a wrong code leaves the
+  // entry in place, since uberserver allows two more attempts and the
+  // connection is still there to retry on.
+  const recoveryChannelsRef = useRef<Map<string, Channel<LobbyEvent>>>(
+    new Map(),
+  );
+
+  // Start account recovery: open a throwaway connection that sends
+  // RESETPASSWORDREQUEST, then resolve on wherever the flow lands. Unlike
+  // `register`, the connection is torn down only on `redirected` or a denial.
+  // A `codeSent` outcome leaves it open (and handed to `submitRecoveryCode`)
+  // because the code step needs that same connection.
+  const recoverPassword = useCallback(
+    async (server: LobbyServer, email: string): Promise<RecoveryStart> => {
+      setBusy(true);
+      const serverKey = serverKeyFor(server, email);
+      const onEvent = new Channel<LobbyEvent>();
+      let outcome: RecoveryStart | null = null;
+      try {
+        outcome = await new Promise<RecoveryStart>((resolve, reject) => {
+          let settled = false;
+          onEvent.onmessage = (ev) => {
+            if (settled) return;
+            if (ev.kind === "phase" && ev.phase === "awaitRecoveryCode") {
+              settled = true;
+              recoveryChannelsRef.current.set(serverKey, onEvent);
+              resolve({ kind: "codeSent", serverKey });
+            } else if (ev.kind === "delta" && ev.delta.kind === "recoveryUrl") {
+              // teiserver's redirect: the phase that follows carries no
+              // payload, so the address is read off this delta instead.
+              settled = true;
+              resolve({ kind: "redirected", url: ev.delta.url });
+            } else if (
+              ev.kind === "delta" &&
+              ev.delta.kind === "recoveryDenied"
+            ) {
+              settled = true;
+              reject(new Error(ev.delta.reason));
+            } else if (ev.kind === "disconnected") {
+              settled = true;
+              reject(new Error(ev.reason ?? "Account recovery failed"));
+            }
+          };
+          mpRecoverPassword({
+            serverKey,
+            host: server.host,
+            port: server.port,
+            tlsMode: tlsModeFor(server),
+            allowSelfSigned: server.allowSelfSigned,
+            email,
+            clientId: clientIdRef.current,
+            compatFlags: ["u", "sp"],
+            onEvent,
+          }).catch(reject);
+        });
+        return outcome;
+      } finally {
+        // Only `codeSent` leaves the connection parked for `submitRecoveryCode`
+        // to finish and close. Every other outcome is torn down here, same as
+        // `register` always does.
+        if (outcome?.kind !== "codeSent") {
+          await mpDisconnect({ serverKey }).catch((e) =>
+            console.warn("multiplayer: disconnect cleanup failed", e),
+          );
+        }
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  // Finish account recovery with the emailed code, on the connection
+  // `recoverPassword` left open awaiting it. Resolves on a `passwordReset`
+  // delta with the username, the one time the protocol tells a locked-out
+  // user who they are, and disconnects. The server drops us there anyway.
+  //
+  // Rejects with the server's reason on `recoveryDenied`, but does NOT
+  // disconnect on that path. The login machine deliberately stays parked in
+  // `AwaitRecoveryCode` after a wrong code (uberserver allows three
+  // attempts), so the connection is left live and the channel stays in
+  // `recoveryChannelsRef` for a retry. Calling this again with a fresh code
+  // reaches the same connection rather than failing with "Not awaiting a
+  // recovery code." `cancelRecovery` is what closes it if the user gives up
+  // instead of retrying.
+  //
+  // Any other terminal failure (the connection dropping outright) still
+  // disconnects, since there is nothing left to talk to.
+  const submitRecoveryCode = useCallback(
+    async (serverKey: string, code: string) => {
+      const onEvent = recoveryChannelsRef.current.get(serverKey);
+      if (!onEvent) throw new Error("Not awaiting a recovery code.");
+      setBusy(true);
+      let disconnect = true;
+      try {
+        return await new Promise<{ username: string }>((resolve, reject) => {
+          let settled = false;
+          onEvent.onmessage = (ev) => {
+            if (settled) return;
+            if (ev.kind === "delta" && ev.delta.kind === "passwordReset") {
+              settled = true;
+              resolve({ username: ev.delta.username });
+            } else if (
+              ev.kind === "delta" &&
+              ev.delta.kind === "recoveryDenied"
+            ) {
+              settled = true;
+              disconnect = false;
+              reject(new Error(ev.delta.reason));
+            } else if (ev.kind === "disconnected") {
+              settled = true;
+              reject(new Error(ev.reason ?? "Account recovery failed"));
+            }
+          };
+          mpSubmitRecoveryCode({ serverKey, code }).catch(reject);
+        });
+      } finally {
+        if (disconnect) {
+          recoveryChannelsRef.current.delete(serverKey);
+          await mpDisconnect({ serverKey }).catch((e) =>
+            console.warn("multiplayer: disconnect cleanup failed", e),
+          );
+        }
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  // Tear down a recovery connection `recoverPassword` left open awaiting the
+  // emailed code. A refused code deliberately leaves that connection live
+  // (see `submitRecoveryCode`) so the user can retry, which means something
+  // has to own closing it for the case where they give up instead. Also
+  // fine to call on a connection that never reached that point, or one
+  // already gone.
+  const cancelRecovery = useCallback(async (serverKey: string) => {
+    recoveryChannelsRef.current.delete(serverKey);
+    await mpDisconnect({ serverKey }).catch((e) =>
+      console.warn("multiplayer: disconnect cleanup failed", e),
+    );
+  }, []);
+
+  // CHANGEPASSWORD is answered by a bare SERVERMSG with no token to correlate
+  // on, so the only place a reply can be paired with a request is where the
+  // request was made. Resolve on the next server message, and treat only
+  // uberserver's exact success string as success: a stale saved password can
+  // be retyped, one overwritten wrongly cannot.
+  //
+  // Guarded against a second call overlapping the first: with no token, two
+  // pending calls would each register a waiter, and a single SERVERMSG would
+  // resolve both, handing one command's answer to the other. Refusing a
+  // second call outright while one is already pending closes that off.
+  //
+  // What stays unguarded, because nothing at any layer can tell a
+  // CHANGEPASSWORD reply apart from any other SERVERMSG: an unrelated
+  // broadcast (server maintenance, some other announcement) arriving while
+  // this is the only pending call still resolves it. This is a known limit
+  // of the protocol, not an oversight. What actually protects the user is
+  // the exact-string check rather than any correlation. `succeeded` is only
+  // ever true for that one literal success string, so a stray broadcast can
+  // never read as a successful change, and so can never overwrite a good
+  // saved password with a wrong one. The worst it can do is show the wrong
+  // message while the real and saved passwords stay exactly as they were,
+  // which the user fixes by retyping it.
+  const changePassword = useCallback(async (current: string, next: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    if (serverMessageWaiters.current.size > 0) {
+      throw new Error("A password change is already in progress.");
+    }
+    let waiter: (text: string) => void = () => {};
+    let timer: ReturnType<typeof setTimeout>;
+    const cleanup = () => {
+      clearTimeout(timer);
+      serverMessageWaiters.current.delete(waiter);
+    };
+    const reply = new Promise<{ message: string; succeeded: boolean }>(
+      (resolve, reject) => {
+        timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("The server did not answer."));
+        }, SERVER_REPLY_TIMEOUT_MS);
+        waiter = (text: string) => {
+          cleanup();
+          resolve({
+            message: text,
+            succeeded: text === CHANGE_PASSWORD_SUCCESS,
+          });
+        };
+        serverMessageWaiters.current.add(waiter);
+      },
+    );
+    // If the send itself fails (not connected by the time it reaches Rust, or
+    // the connection just closed), no reply is ever coming: clean up now
+    // rather than leaving the waiter live to block a retry behind "already in
+    // progress" and the timer to reject into a promise nobody is holding.
+    try {
+      await mpChangePassword({
+        serverKey: key,
+        currentPassword: current,
+        newPassword: next,
+      });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    return reply;
+  }, []);
+
+  const changeEmailRequest = useCallback(async (email: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    const { promise, cleanup } = waitForAccountDelta(
+      accountDeltaWaiters,
+      "changeEmailCodeSent",
+      "changeEmailDenied",
+    );
+    try {
+      await mpChangeEmailRequest({ serverKey: key, email });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    await promise;
+  }, []);
+
+  const changeEmail = useCallback(async (email: string, code: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    const { promise, cleanup } = waitForAccountDelta(
+      accountDeltaWaiters,
+      "changeEmailAccepted",
+      "changeEmailDenied",
+    );
+    try {
+      await mpChangeEmail({ serverKey: key, email, code });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    await promise;
+  }, []);
+
+  const resendVerification = useCallback(async (email: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    const { promise, cleanup } = waitForAccountDelta(
+      accountDeltaWaiters,
+      "resendVerificationAccepted",
+      "resendVerificationDenied",
+    );
+    try {
+      await mpResendVerification({ serverKey: key, email });
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+    await promise;
+  }, []);
+
+  const getUserInfo = useCallback(() => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    mpGetUserInfo({ serverKey: key }).catch(() => {});
+  }, []);
+
   const submitAgreementCode = useCallback(
     async (code: string) => {
       if (!pendingAgreement) return;
@@ -1841,6 +2301,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         connectDirect,
         signIn,
         register,
+        recoverPassword,
+        submitRecoveryCode,
+        cancelRecovery,
+        changePassword,
+        changeEmailRequest,
+        changeEmail,
+        resendVerification,
+        getUserInfo,
+        accountInfo,
         disconnect,
         cancelConnect,
         pendingAgreement,

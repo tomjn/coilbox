@@ -260,6 +260,16 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                                     line::to_line(&register_command(&login, email.as_deref())),
                                     LoginPhase::AwaitRegistration,
                                 ),
+                                // Zero-K's protocol has no password recovery
+                                // message, so there is nothing to send here.
+                                // Say so now rather than failing later as
+                                // something that reads like a network fault.
+                                LoginMode::Recover { .. } => {
+                                    break 'conn Some(
+                                        "this server does not support password recovery"
+                                            .to_string(),
+                                    )
+                                }
                             };
                             match built {
                                 Ok(line) => {
@@ -404,6 +414,7 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                 // client. A private message is queued by a command that refuses
                 // this connection before it gets here.
                 Outbound::ConfirmAgreement { .. }
+                | Outbound::SubmitRecoveryCode { .. }
                 | Outbound::Tachyon(_)
                 | Outbound::SayPrivate { .. }
                 | Outbound::SayPrivateEx { .. } => {}

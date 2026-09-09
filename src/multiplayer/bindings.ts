@@ -379,7 +379,11 @@ export type LoginPhase =
   | "registered"
   | "denied"
   | "tachyonAuthorizing"
-  | "tachyonOpening";
+  | "tachyonOpening"
+  | "awaitRecoveryRequest"
+  | "awaitRecoveryCode"
+  | "recovered"
+  | "recoveryRedirected";
 
 // ---------------------------------------------------------------------------
 // Deltas and events (tagged unions on `kind`).
@@ -468,6 +472,29 @@ export type Delta =
   | { kind: "loggedIn"; username: string }
   | { kind: "loginDenied"; reason: string }
   | { kind: "registrationDenied"; reason: string }
+  | { kind: "recoveryCodeSent"; email: string }
+  | { kind: "recoveryUrl"; url: string }
+  | { kind: "recoveryDenied"; reason: string }
+  /**
+   * The server reset the password and emailed it. `username` is the only time the
+   * protocol tells a locked-out user who they are, which is why it is carried.
+   */
+  | { kind: "passwordReset"; email: string; username: string }
+  | { kind: "changeEmailCodeSent" }
+  | { kind: "changeEmailAccepted"; email: string }
+  | { kind: "changeEmailDenied"; reason: string }
+  | { kind: "resendVerificationAccepted" }
+  | { kind: "resendVerificationDenied"; reason: string }
+  /**
+   * One labelled line of a `GETUSERINFO` answer. The three arrive separately, so
+   * every field is optional and the reader merges them.
+   */
+  | {
+      kind: "accountInfo";
+      registrationDate: string | null;
+      email: string | null;
+      ingameHours: string | null;
+    }
   | { kind: "serverMessage"; text: string; boxed: boolean }
   | { kind: "motd"; line: string }
   | { kind: "ring"; from: string }
@@ -680,6 +707,70 @@ export const mpRegister = defineCommand<
   },
   { connected: boolean }
 >("coilbox-multiplayer", "mp_register");
+
+/**
+ * Start account recovery on a throwaway connection. Streams `LobbyEvent`s over
+ * `onEvent`. uberserver reaches the `awaitRecoveryCode` phase and waits for
+ * `mpSubmitRecoveryCode`. teiserver sends a `recoveryUrl` delta and reaches
+ * `recoveryRedirected`, where there is nothing further to send.
+ */
+export const mpRecoverPassword = defineCommand<
+  {
+    serverKey: string;
+    host: string;
+    port: number;
+    tlsMode: TlsMode;
+    allowSelfSigned: boolean;
+    email: string;
+    clientId: string;
+    compatFlags: string[];
+    onEvent: Channel<LobbyEvent>;
+  },
+  { connected: boolean }
+>("coilbox-multiplayer", "mp_recover_password");
+
+/**
+ * Finish account recovery with the emailed code. Success arrives as a
+ * `passwordReset` delta and the server then disconnects us, which is expected.
+ */
+export const mpSubmitRecoveryCode = defineCommand<
+  { serverKey: string; code: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_submit_recovery_code");
+
+/**
+ * Change the signed-in account's password. Passwords are hashed on the Rust side.
+ * There is no accept or deny reply, only a bare `SERVERMSG`, so the caller reads
+ * the next server message to learn what happened.
+ */
+export const mpChangePassword = defineCommand<
+  { serverKey: string; currentPassword: string; newPassword: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_change_password");
+
+/** Ask for a code to confirm a new email address. */
+export const mpChangeEmailRequest = defineCommand<
+  { serverKey: string; email: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_change_email_request");
+
+/** Confirm a new email address with the emailed code. */
+export const mpChangeEmail = defineCommand<
+  { serverKey: string; email: string; code: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_change_email");
+
+/** Ask for the signup verification code again. */
+export const mpResendVerification = defineCommand<
+  { serverKey: string; email: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_resend_verification");
+
+/** Request the account's details, answered as `accountInfo` deltas. */
+export const mpGetUserInfo = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_get_user_info");
 
 /**
  * Resume a login parked awaiting the emailed verification code: sends

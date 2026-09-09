@@ -210,6 +210,51 @@ pub enum Delta {
     RegistrationDenied {
         reason: String,
     },
+    /// A recovery code has been emailed. Recovery is the one flow that runs
+    /// before there is an account signed in, so none of these touch state.
+    RecoveryCodeSent {
+        email: String,
+    },
+    RecoveryDenied {
+        reason: String,
+    },
+    /// The address a server with no in-lobby recovery pointed us at. Emitted by
+    /// the connection task from the login machine rather than by the reducer,
+    /// because the machine is what recognises the redirect.
+    RecoveryUrl {
+        url: String,
+    },
+    /// The server reset the password and emailed it. `username` is the answer to
+    /// "I do not know my login" and is the reason this delta carries it.
+    PasswordReset {
+        email: String,
+        username: String,
+    },
+    ChangeEmailCodeSent,
+    ChangeEmailAccepted {
+        email: String,
+    },
+    ChangeEmailDenied {
+        reason: String,
+    },
+    ResendVerificationAccepted,
+    ResendVerificationDenied {
+        reason: String,
+    },
+    /// One labelled line of a `GETUSERINFO` answer. Each of the three arrives
+    /// separately, so every field is optional and the reader merges them.
+    ///
+    /// `rename_all = "camelCase"` is repeated here on the variant itself,
+    /// because the container's `rename_all` on the `Delta` enum only renames
+    /// variant names, not the fields of a struct variant. Without it this
+    /// serialized as `registration_date`/`ingame_hours`, which `bindings.ts`
+    /// does not declare, so both silently deserialized as `undefined`.
+    #[serde(rename_all = "camelCase")]
+    AccountInfo {
+        registration_date: Option<String>,
+        email: Option<String>,
+        ingame_hours: Option<String>,
+    },
     /// A `SERVERMSG` (plain announcement) or `SERVERMSGBOX` (the server asked the
     /// client to show it prominently). `boxed` distinguishes the two so the
     /// frontend can render a toast vs. a dismissible dialog.
@@ -912,7 +957,14 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             vec![Delta::Ring { from: username }]
         }
         ServerMessage::ServerMsg { text } => {
-            vec![Delta::ServerMessage { text, boxed: false }]
+            let mut deltas = vec![Delta::ServerMessage {
+                text: text.clone(),
+                boxed: false,
+            }];
+            if let Some(info) = account_info_from(&text) {
+                deltas.push(info);
+            }
+            deltas
         }
         // Client-to-client bookkeeping, not an announcement to show. The raw line
         // is still in the protocol console for anyone who wants it.
@@ -935,6 +987,28 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::EndOfChannels => vec![Delta::ChannelListReceived],
         ServerMessage::RegistrationDenied { reason } => {
             vec![Delta::RegistrationDenied { reason }]
+        }
+        ServerMessage::ResetPasswordRequestAccepted { email } => {
+            vec![Delta::RecoveryCodeSent { email }]
+        }
+        ServerMessage::ResetPasswordRequestDenied { reason }
+        | ServerMessage::ResetPasswordDenied { reason } => {
+            vec![Delta::RecoveryDenied { reason }]
+        }
+        ServerMessage::ResetPasswordAccepted { email, username } => {
+            vec![Delta::PasswordReset { email, username }]
+        }
+        ServerMessage::ChangeEmailRequestAccepted => vec![Delta::ChangeEmailCodeSent],
+        ServerMessage::ChangeEmailRequestDenied { reason }
+        | ServerMessage::ChangeEmailDenied { reason } => {
+            vec![Delta::ChangeEmailDenied { reason }]
+        }
+        ServerMessage::ChangeEmailAccepted { email } => {
+            vec![Delta::ChangeEmailAccepted { email }]
+        }
+        ServerMessage::ResendVerificationAccepted => vec![Delta::ResendVerificationAccepted],
+        ServerMessage::ResendVerificationDenied { reason } => {
+            vec![Delta::ResendVerificationDenied { reason }]
         }
         ServerMessage::JoinFailed { channel, reason } => {
             vec![Delta::JoinChannelFailed { channel, reason }]
@@ -1068,6 +1142,34 @@ fn refusal_words(reason: String) -> String {
         return "no reason given".to_string();
     }
     reason
+}
+
+/// The three labels both uberserver and teiserver put on their `GETUSERINFO`
+/// answer. Neither gives the answer a reply token, so the label is all there is
+/// to recognise it by.
+///
+/// A label with nothing after it becomes `None` rather than `Some("")`.
+/// `AccountActions` in `SettingsSection.tsx` treats a non-null email as known
+/// enough to enable "Resend verification", so an empty string there would
+/// light the button up over an address that was never actually read.
+fn account_info_from(text: &str) -> Option<Delta> {
+    let field = |label: &str| {
+        text.strip_prefix(label)
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    };
+    let registration_date = field("Registration date: ");
+    let email = field("Email address: ");
+    let ingame_hours = field("Ingame time: ");
+    if registration_date.is_none() && email.is_none() && ingame_hours.is_none() {
+        return None;
+    }
+    Some(Delta::AccountInfo {
+        registration_date,
+        email,
+        ingame_hours,
+    })
 }
 
 /// Append a chat message to a channel (creating it if needed) and emit a delta
@@ -1359,6 +1461,127 @@ mod tests {
             vec![Delta::RegistrationDenied {
                 reason: "username taken".into()
             }]
+        );
+    }
+
+    #[test]
+    fn recovery_replies_become_deltas() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(&mut s, parse_line("RESETPASSWORDREQUESTACCEPTED a@b.c")),
+            vec![Delta::RecoveryCodeSent {
+                email: "a@b.c".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("RESETPASSWORDACCEPTED a@b.c alice")),
+            vec![Delta::PasswordReset {
+                email: "a@b.c".into(),
+                username: "alice".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("RESETPASSWORDDENIED wrong code")),
+            vec![Delta::RecoveryDenied {
+                reason: "wrong code".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn change_email_replies_become_deltas() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(&mut s, parse_line("CHANGEEMAILREQUESTACCEPTED")),
+            vec![Delta::ChangeEmailCodeSent]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("CHANGEEMAILACCEPTED new@b.c")),
+            vec![Delta::ChangeEmailAccepted {
+                email: "new@b.c".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("RESENDVERIFICATIONACCEPTED")),
+            vec![Delta::ResendVerificationAccepted]
+        );
+    }
+
+    /// GETUSERINFO has no reply token on either server, so the three labelled
+    /// SERVERMSG lines are the whole answer. Each still reaches the console as
+    /// before, because taking it away would remove something already visible.
+    #[test]
+    fn user_info_lines_produce_account_info_and_still_announce() {
+        let mut s = LobbyState::default();
+        let d = reduce(&mut s, parse_line("SERVERMSG Email address: a@b.c"));
+        assert_eq!(
+            d,
+            vec![
+                Delta::ServerMessage {
+                    text: "Email address: a@b.c".into(),
+                    boxed: false
+                },
+                Delta::AccountInfo {
+                    registration_date: None,
+                    email: Some("a@b.c".into()),
+                    ingame_hours: None
+                }
+            ]
+        );
+    }
+
+    /// An ordinary announcement must not be mistaken for account info, or every
+    /// server broadcast would rewrite the account panel.
+    #[test]
+    fn an_ordinary_servermsg_is_not_account_info() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(
+                &mut s,
+                parse_line("SERVERMSG Server going down for maintenance")
+            ),
+            vec![Delta::ServerMessage {
+                text: "Server going down for maintenance".into(),
+                boxed: false
+            }]
+        );
+    }
+
+    /// A label with nothing after it must become `None`, not `Some("")`. An
+    /// empty string is not null, so a naive reader would treat the field as
+    /// known and light up a control (e.g. "Resend verification") over an
+    /// address that was never actually read. With every field empty there is
+    /// nothing recognisable in the line at all, so no `AccountInfo` delta is
+    /// produced, the same as an ordinary announcement.
+    #[test]
+    fn an_empty_labelled_field_is_none_not_an_empty_string() {
+        let mut s = LobbyState::default();
+        assert_eq!(
+            reduce(&mut s, parse_line("SERVERMSG Email address: ")),
+            vec![Delta::ServerMessage {
+                text: "Email address: ".into(),
+                boxed: false
+            }]
+        );
+    }
+
+    /// `Delta`'s container-level `rename_all = "camelCase"` only renames enum
+    /// variant names, not the fields of a struct variant, so `AccountInfo`
+    /// needs its own `rename_all` or its fields serialize as
+    /// `registration_date`/`ingame_hours`, which `bindings.ts` never declares.
+    /// A Rust-value comparison cannot catch this: it round-trips through the
+    /// same (buggy) field names on both sides. Only asserting the actual JSON
+    /// string proves the wire shape.
+    #[test]
+    fn account_info_serializes_its_fields_in_camel_case() {
+        let delta = Delta::AccountInfo {
+            registration_date: Some("x".into()),
+            email: None,
+            ingame_hours: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&delta).unwrap(),
+            r#"{"kind":"accountInfo","registrationDate":"x","email":null,"ingameHours":null}"#
         );
     }
 

@@ -112,6 +112,60 @@ pub fn confirm_agreement(code: Option<&str>) -> String {
     }
 }
 
+/// `RESETPASSWORDREQUEST <email>` - ask the server to start account recovery.
+///
+/// Usable before logging in. uberserver emails an 8 digit code and answers
+/// `RESETPASSWORDREQUESTACCEPTED`. teiserver ignores the address entirely and
+/// answers `OK cmd=<url>` pointing at its own reset page, so the caller has to
+/// handle both.
+pub fn reset_password_request(email: &str) -> String {
+    format!("RESETPASSWORDREQUEST {email}")
+}
+
+/// `RESETPASSWORD <email> <code>` - finish account recovery with the emailed code.
+///
+/// uberserver only. It generates a new password itself, emails it, answers
+/// `RESETPASSWORDACCEPTED <email> <username>` and then disconnects us, so there
+/// is no "choose your own password" step to offer.
+pub fn reset_password(email: &str, code: &str) -> String {
+    format!("RESETPASSWORD {email} {code}")
+}
+
+/// `CHANGEPASSWORD <old> <new>` - change the signed-in account's password.
+///
+/// Both arguments are already `BASE64(MD5(password))`. uberserver writes the
+/// second straight into the column a later login is compared against, so a raw
+/// password here sets one the user could never type.
+pub fn change_password(old_hash: &str, new_hash: &str) -> String {
+    format!("CHANGEPASSWORD {old_hash} {new_hash}")
+}
+
+/// `CHANGEEMAILREQUEST <email>` - ask for a code to confirm a new address.
+pub fn change_email_request(email: &str) -> String {
+    format!("CHANGEEMAILREQUEST {email}")
+}
+
+/// `CHANGEEMAIL <email> <code>` - confirm the new address with the emailed code.
+pub fn change_email(email: &str, code: &str) -> String {
+    format!("CHANGEEMAIL {email} {code}")
+}
+
+/// `RESENDVERIFICATION <email>` - ask for the signup verification code again.
+///
+/// uberserver lists this as available to everyone, but the handler reads the
+/// connection's user id, which an unauthenticated connection has not got. Treat
+/// it as a signed-in command.
+pub fn resend_verification(email: &str) -> String {
+    format!("RESENDVERIFICATION {email}")
+}
+
+/// `GETUSERINFO` - the signed-in account's registration date, email and playtime.
+///
+/// Answered as three `SERVERMSG` lines with no reply token, on both servers.
+pub fn get_user_info() -> String {
+    "GETUSERINFO".to_string()
+}
+
 /// `JOIN <chan> [key]`.
 pub fn join_channel(chan: &str, key: Option<&str>) -> String {
     match key {
@@ -909,5 +963,42 @@ mod tests {
         );
         assert_eq!(unignore("bob"), "UNIGNORE userName=bob");
         assert_eq!(ignore_list(), "IGNORELIST");
+    }
+
+    #[test]
+    fn builds_account_recovery_lines() {
+        assert_eq!(
+            reset_password_request("a@b.c"),
+            "RESETPASSWORDREQUEST a@b.c"
+        );
+        assert_eq!(
+            reset_password("a@b.c", "12345678"),
+            "RESETPASSWORD a@b.c 12345678"
+        );
+    }
+
+    #[test]
+    fn builds_account_management_lines() {
+        assert_eq!(
+            change_password("oldhash", "newhash"),
+            "CHANGEPASSWORD oldhash newhash"
+        );
+        assert_eq!(change_email_request("a@b.c"), "CHANGEEMAILREQUEST a@b.c");
+        assert_eq!(
+            change_email("a@b.c", "12345678"),
+            "CHANGEEMAIL a@b.c 12345678"
+        );
+        assert_eq!(resend_verification("a@b.c"), "RESENDVERIFICATION a@b.c");
+        assert_eq!(get_user_info(), "GETUSERINFO");
+    }
+
+    /// An email with a space in it would move every argument after it along one
+    /// slot. The caller has to refuse it where it is typed, so this only records
+    /// that the check is available and answers as expected.
+    #[test]
+    fn account_arguments_must_fit_one_field() {
+        assert!(fits_one_field("a@b.c"));
+        assert!(!fits_one_field("a b@c.d"));
+        assert!(is_wire_safe(&reset_password_request("a@b.c")));
     }
 }

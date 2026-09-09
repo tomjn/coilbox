@@ -2,6 +2,7 @@ import { Button, cn, Input, useSetting } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   ExternalLink,
+  KeyRound,
   Plus,
   RefreshCw,
   Server,
@@ -11,12 +12,11 @@ import {
   TriangleAlert,
   UserPlus,
   Users,
-  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
+import { SlideDrawer } from "@/components/SlideDrawer";
 import {
   AUTO_AWAY_ENABLED_KEY,
   AUTO_AWAY_MINUTES_KEY,
@@ -37,11 +37,13 @@ import {
   allServers,
   type LobbyAccount,
   type LobbyServer,
+  resolveRecoveredAccount,
   serverProtocol,
   type TlsStyle,
   useCustomServers,
   useLobbyAccounts,
 } from "../config";
+import { PasswordRecoveryForm } from "../PasswordRecoveryForm";
 import { RegisterForm } from "../RegisterForm";
 import { AutojoinChannels } from "./components/AutojoinChannels";
 
@@ -68,6 +70,7 @@ export default function LobbyServersSettings() {
   const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   // The account whose editor drawer is open (null = closed).
   const [editingId, setEditingId] = useState<string | null>(null);
   // The custom server whose editor drawer is open (null = closed). Built-ins never
@@ -107,6 +110,23 @@ export default function LobbyServersSettings() {
     });
     // A blank login is only editable through its drawer, so open it straight away.
     setEditingId(id);
+  };
+
+  // Recovery hands back a username, not a password (the server emailed that
+  // straight to the user), so this finds or creates the login and opens its
+  // editor for them to paste the emailed password into the keychain. Same
+  // "open the drawer straight away" pattern `addAccount` uses above.
+  const handleRecoverySignIn = (serverId: string, username: string) => {
+    const result = resolveRecoveredAccount(
+      accountsCfg.accounts,
+      serverId,
+      username,
+    );
+    if (result.accounts !== accountsCfg.accounts) {
+      setAccountsCfg({ accounts: result.accounts });
+    }
+    setRecoveryOpen(false);
+    setEditingId(result.id);
   };
 
   const updateAccount = (id: string, patch: Partial<LobbyAccount>) =>
@@ -256,6 +276,14 @@ export default function LobbyServersSettings() {
           >
             <Plus /> Add login
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRecoveryOpen((o) => !o)}
+            disabled={servers.length === 0}
+          >
+            <KeyRound /> Forgot password
+          </Button>
         </div>
       </section>
 
@@ -307,6 +335,12 @@ export default function LobbyServersSettings() {
         open={registerOpen}
         servers={servers}
         onClose={() => setRegisterOpen(false)}
+      />
+      <RecoveryDrawer
+        open={recoveryOpen}
+        servers={servers}
+        onClose={() => setRecoveryOpen(false)}
+        onSignIn={handleRecoverySignIn}
       />
       <AccountDrawer
         account={accountsCfg.accounts.find((a) => a.id === editingId) ?? null}
@@ -429,54 +463,6 @@ function AccountDrawer({
 }
 
 /**
- * Shared shell for this page's slide-in editors (login editor, registration):
- * the same viewport-anchored right drawer as `ConsoleDrawer`, with a titled
- * header and a click-away backdrop. Children mount only while open, so each
- * visit starts fresh. Portalled to `<body>` so `fixed inset-y-0` really means
- * the viewport — a transformed/filtered ancestor would otherwise become the
- * positioning box and cut the drawer short of the window bottom.
- */
-function SlideDrawer({
-  open,
-  title,
-  onClose,
-  children,
-}: {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return createPortal(
-    <>
-      {open && (
-        <button
-          type="button"
-          aria-label={`Close ${title}`}
-          className="fixed inset-0 z-40 bg-black/20"
-          onClick={onClose}
-        />
-      )}
-      <aside
-        className={`fixed inset-y-0 right-0 z-50 flex w-96 max-w-full flex-col border-l border-border bg-background shadow-lg transition-transform motion-reduce:transition-none ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-        inert={!open}
-      >
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
-            <X className="size-4" />
-          </Button>
-        </header>
-        {open && children}
-      </aside>
-    </>,
-    document.body,
-  );
-}
-
-/**
  * Account registration in the same slide-in drawer as the login editor, so the
  * whole Accounts section edits through drawers.
  */
@@ -495,6 +481,36 @@ function RegisterDrawer({
         <RegisterForm
           servers={servers}
           onSuccess={onClose}
+          onCancel={onClose}
+        />
+      </div>
+    </SlideDrawer>
+  );
+}
+
+/**
+ * Password recovery in the same slide-in drawer as registration and the login
+ * editor. `onSignIn` is `handleRecoverySignIn`, which opens the account
+ * editor on the recovered login so the user can paste the emailed password
+ * into the keychain. The form itself never sees or asks for that password.
+ */
+function RecoveryDrawer({
+  open,
+  servers,
+  onClose,
+  onSignIn,
+}: {
+  open: boolean;
+  servers: LobbyServer[];
+  onClose: () => void;
+  onSignIn: (serverId: string, username: string) => void;
+}) {
+  return (
+    <SlideDrawer open={open} title="Recover your password" onClose={onClose}>
+      <div className="flex-1 overflow-y-auto p-4">
+        <PasswordRecoveryForm
+          servers={servers}
+          onSignIn={onSignIn}
           onCancel={onClose}
         />
       </div>

@@ -27,6 +27,7 @@ import {
   type LobbyServer,
   OFFICIAL_ID,
   resolveProfileServerRules,
+  resolveRecoveredAccount,
   resolveServer,
   serverProtocol,
   sortAccountsByRecency,
@@ -419,5 +420,57 @@ describe("isLastLogin", () => {
       false,
     );
     expect(isLastLogin(account, null)).toBe(false);
+  });
+});
+
+// `PasswordRecoveryForm`'s `onSignIn` hands this a serverId + username with
+// no password (the server emailed that straight to the user), so the editor
+// it opens has to exist first: an existing login is reused, a new one is
+// created with `hasSecret: false` so the app doesn't claim a password it has
+// never seen.
+describe("resolveRecoveredAccount", () => {
+  it("creates a new account with hasSecret false when none exists", () => {
+    const result = resolveRecoveredAccount([], "bar", "alice");
+    expect(result.accounts).toHaveLength(1);
+    expect(result.accounts[0]).toMatchObject({
+      serverId: "bar",
+      username: "alice",
+      hasSecret: false,
+    });
+    expect(result.accounts[0].id).toBe(result.id);
+  });
+
+  it("reuses an existing account for the same server and username", () => {
+    const existing: LobbyAccount = {
+      id: "acc-1",
+      serverId: "bar",
+      username: "alice",
+      hasSecret: true,
+    };
+    const result = resolveRecoveredAccount([existing], "bar", "alice");
+    expect(result.accounts).toEqual([existing]);
+    expect(result.id).toBe("acc-1");
+  });
+
+  it("does not touch hasSecret on an account it reused", () => {
+    const existing: LobbyAccount = {
+      id: "acc-1",
+      serverId: "bar",
+      username: "alice",
+      hasSecret: true,
+    };
+    const result = resolveRecoveredAccount([existing], "bar", "alice");
+    expect(result.accounts[0].hasSecret).toBe(true);
+  });
+
+  it("does not match an account on the same server with a different username", () => {
+    const existing: LobbyAccount = {
+      id: "acc-1",
+      serverId: "bar",
+      username: "alice",
+    };
+    const result = resolveRecoveredAccount([existing], "bar", "bob");
+    expect(result.accounts).toHaveLength(2);
+    expect(result.id).not.toBe("acc-1");
   });
 });

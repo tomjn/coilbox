@@ -28,6 +28,14 @@
 //! emailed code; [`LoginMachine::submit_agreement_code`] then emits
 //! `CONFIRMAGREEMENT [code]` and re-sends `LOGIN` (the server does not log us in
 //! on `CONFIRMAGREEMENT` alone).
+//!
+//! Recovery ([`LoginMode::Recover`]) shares the same prelude, then on `COMPFLAGS`
+//! emits `RESETPASSWORDREQUEST`. uberserver emails a code and the machine parks in
+//! [`LoginPhase::AwaitRecoveryCode`] for [`LoginMachine::submit_recovery_code`],
+//! ending on `RESETPASSWORDACCEPTED` -> [`LoginPhase::Recovered`]. teiserver has no
+//! in-lobby recovery and answers `OK cmd=<url>` instead, ending on
+//! [`LoginPhase::RecoveryRedirected`] with the address in
+//! [`LoginMachine::recovery_url`].
 
 use serde::Serialize;
 
@@ -42,6 +50,12 @@ pub enum LoginMode {
     Login,
     Register {
         email: Option<String>,
+    },
+    /// Account recovery. Shares the prelude, then sends `RESETPASSWORDREQUEST`
+    /// instead of logging in. There is no account yet to name, so `username` and
+    /// `password_hash` on the config are unused and are passed empty.
+    Recover {
+        email: String,
     },
 }
 
@@ -97,6 +111,19 @@ pub enum LoginPhase {
     TachyonAuthorizing,
     /// Tachyon: the WebSocket upgrade is in flight.
     TachyonOpening,
+    /// Recover mode: `RESETPASSWORDREQUEST` sent, awaiting the server's answer.
+    /// The two servers answer differently, so all three of the next phases are
+    /// reachable from here.
+    AwaitRecoveryRequest,
+    /// Recover mode: a code has been emailed. Parked until the UI supplies it
+    /// (see [`LoginMachine::submit_recovery_code`]).
+    AwaitRecoveryCode,
+    /// Recover mode: the password was reset and emailed (terminal). The server
+    /// disconnects us straight afterwards.
+    Recovered,
+    /// Recover mode: the server has no in-lobby recovery and answered with a web
+    /// address instead (terminal). See [`LoginMachine::recovery_url`].
+    RecoveryRedirected,
 }
 
 /// The login handshake driver.
@@ -112,6 +139,9 @@ pub struct LoginMachine {
     /// sends one. That default is the safe one: it means no relay flag on the
     /// `LOGIN`, which is how every server behaves today.
     server_relays: bool,
+    /// The address from a `RecoveryRedirected` answer, held so the UI can offer
+    /// to open it. `LoginPhase` is `Copy`, so it cannot carry the string itself.
+    recovery_url: Option<String>,
 }
 
 impl LoginMachine {
@@ -122,6 +152,7 @@ impl LoginMachine {
             phase: LoginPhase::AwaitGreeting,
             agreement: Vec::new(),
             server_relays: false,
+            recovery_url: None,
         }
     }
 
@@ -171,6 +202,10 @@ impl LoginMachine {
                             email.as_deref(),
                         )]
                     }
+                    LoginMode::Recover { email } => {
+                        self.phase = LoginPhase::AwaitRecoveryRequest;
+                        vec![command::reset_password_request(email)]
+                    }
                 }
             }
             (LoginPhase::AwaitAccepted, ServerMessage::Accepted { .. }) => {
@@ -200,6 +235,40 @@ impl LoginMachine {
                 self.phase = LoginPhase::AwaitAgreement;
                 vec![]
             }
+            (
+                LoginPhase::AwaitRecoveryRequest,
+                ServerMessage::ResetPasswordRequestAccepted { .. },
+            ) => {
+                self.phase = LoginPhase::AwaitRecoveryCode;
+                vec![]
+            }
+            // teiserver answers `RESETPASSWORDREQUEST` with `OK cmd=<url>` for its
+            // own web page. `OK` is read this way here and nowhere else, because
+            // everywhere else it is a generic acknowledgement worth ignoring.
+            (LoginPhase::AwaitRecoveryRequest, ServerMessage::Ok { text }) => {
+                self.recovery_url = Some(
+                    text.strip_prefix("cmd=")
+                        .unwrap_or(text.as_str())
+                        .to_string(),
+                );
+                self.phase = LoginPhase::RecoveryRedirected;
+                vec![]
+            }
+            (
+                LoginPhase::AwaitRecoveryRequest,
+                ServerMessage::ResetPasswordRequestDenied { .. },
+            ) => {
+                self.phase = LoginPhase::Denied;
+                vec![]
+            }
+            (LoginPhase::AwaitRecoveryCode, ServerMessage::ResetPasswordAccepted { .. }) => {
+                self.phase = LoginPhase::Recovered;
+                vec![]
+            }
+            // Stay parked rather than ending the run: uberserver allows three
+            // attempts before it locks the request, and the other two are the
+            // user's to spend.
+            (LoginPhase::AwaitRecoveryCode, ServerMessage::ResetPasswordDenied { .. }) => vec![],
             (_, ServerMessage::Denied { reason }) => {
                 self.phase = LoginPhase::Denied;
                 let _ = reason;
@@ -252,6 +321,24 @@ impl LoginMachine {
         self.phase = LoginPhase::AwaitAccepted;
         vec![command::confirm_agreement(code), self.login_line()]
     }
+
+    /// The web address a `RecoveryRedirected` answer carried, if any.
+    pub fn recovery_url(&self) -> Option<&str> {
+        self.recovery_url.as_deref()
+    }
+
+    /// Supply the emailed recovery code and finish the reset. A no-op unless
+    /// parked in [`LoginPhase::AwaitRecoveryCode`]. The phase is left alone so a
+    /// refused code can be followed by another attempt.
+    pub fn submit_recovery_code(&mut self, code: &str) -> Vec<String> {
+        let LoginMode::Recover { email } = &self.config.mode else {
+            return vec![];
+        };
+        if self.phase != LoginPhase::AwaitRecoveryCode {
+            return vec![];
+        }
+        vec![command::reset_password(email, code)]
+    }
 }
 
 #[cfg(test)]
@@ -270,6 +357,90 @@ mod tests {
             use_stls,
             mode: LoginMode::Login,
         }
+    }
+
+    fn recover_cfg(email: &str) -> LoginConfig {
+        let mut c = cfg(false);
+        c.username = String::new();
+        c.password_hash = String::new();
+        c.mode = LoginMode::Recover {
+            email: email.to_string(),
+        };
+        c
+    }
+
+    #[test]
+    fn recovery_sends_the_request_after_compflags() {
+        let mut m = LoginMachine::new(recover_cfg("a@b.c"));
+        m.on_message(&parse_line("TASSERVER 0.38 104.0 8201 0"));
+        let out = m.on_message(&parse_line("COMPFLAGS u sp"));
+        assert_eq!(out, vec!["RESETPASSWORDREQUEST a@b.c".to_string()]);
+        assert_eq!(m.phase(), LoginPhase::AwaitRecoveryRequest);
+    }
+
+    #[test]
+    fn recovery_parks_for_the_emailed_code_then_sends_it() {
+        let mut m = LoginMachine::new(recover_cfg("a@b.c"));
+        m.on_message(&parse_line("TASSERVER 0.38 104.0 8201 0"));
+        m.on_message(&parse_line("COMPFLAGS u sp"));
+        m.on_message(&parse_line("RESETPASSWORDREQUESTACCEPTED a@b.c"));
+        assert_eq!(m.phase(), LoginPhase::AwaitRecoveryCode);
+        assert_eq!(
+            m.submit_recovery_code("12345678"),
+            vec!["RESETPASSWORD a@b.c 12345678".to_string()]
+        );
+        m.on_message(&parse_line("RESETPASSWORDACCEPTED a@b.c alice"));
+        assert_eq!(m.phase(), LoginPhase::Recovered);
+    }
+
+    /// uberserver allows three attempts before it locks the request, so a wrong code
+    /// has to leave the machine able to take another one rather than ending the run.
+    #[test]
+    fn a_wrong_code_leaves_the_machine_able_to_retry() {
+        let mut m = LoginMachine::new(recover_cfg("a@b.c"));
+        m.on_message(&parse_line("TASSERVER 0.38 104.0 8201 0"));
+        m.on_message(&parse_line("COMPFLAGS u sp"));
+        m.on_message(&parse_line("RESETPASSWORDREQUESTACCEPTED a@b.c"));
+        m.submit_recovery_code("00000000");
+        m.on_message(&parse_line("RESETPASSWORDDENIED wrong code"));
+        assert_eq!(m.phase(), LoginPhase::AwaitRecoveryCode);
+        assert_eq!(
+            m.submit_recovery_code("12345678"),
+            vec!["RESETPASSWORD a@b.c 12345678".to_string()]
+        );
+    }
+
+    /// teiserver answers the same command with its own web page and never takes a
+    /// code at all, so the machine has to end the run holding the address.
+    #[test]
+    fn teiserver_redirects_to_its_own_reset_page() {
+        let mut m = LoginMachine::new(recover_cfg("a@b.c"));
+        m.on_message(&parse_line("TASSERVER 0.38 104.0 8201 0"));
+        m.on_message(&parse_line("COMPFLAGS u sp"));
+        m.on_message(&parse_line("OK cmd=https://localhost/password_reset"));
+        assert_eq!(m.phase(), LoginPhase::RecoveryRedirected);
+        assert_eq!(m.recovery_url(), Some("https://localhost/password_reset"));
+    }
+
+    /// `OK` is a generic acknowledgement everywhere else. Reading it as an address
+    /// outside the one phase would turn every ack into a redirect.
+    #[test]
+    fn ok_outside_recovery_is_still_ignored() {
+        let mut m = LoginMachine::new(cfg(false));
+        m.on_message(&parse_line("TASSERVER 0.38 104.0 8201 0"));
+        m.on_message(&parse_line("COMPFLAGS u sp"));
+        let before = m.phase();
+        assert!(m
+            .on_message(&parse_line("OK cmd=https://localhost/password_reset"))
+            .is_empty());
+        assert_eq!(m.phase(), before);
+        assert_eq!(m.recovery_url(), None);
+    }
+
+    #[test]
+    fn submit_recovery_code_is_a_no_op_in_the_wrong_phase() {
+        let mut m = LoginMachine::new(recover_cfg("a@b.c"));
+        assert!(m.submit_recovery_code("12345678").is_empty());
     }
 
     #[test]
