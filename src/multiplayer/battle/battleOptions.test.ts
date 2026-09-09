@@ -9,6 +9,7 @@ import {
   reconcilePending,
   scriptTagKey,
   staleMapOptionTags,
+  tweakSetEntries,
 } from "./battleOptions";
 
 const opt = (over: Partial<ConfigOption> = {}): ConfigOption => ({
@@ -72,6 +73,48 @@ describe("battleOptions", () => {
     expect(displayedValue(pending, tags, "mod", "maxunits")).toBe("2000");
     expect(displayedValue({}, tags, "mod", "maxunits")).toBe("1000");
     expect(displayedValue({}, {}, "mod", "maxunits")).toBeUndefined();
+  });
+});
+
+describe("tweakSetEntries", () => {
+  const schema: ConfigOption[] = [
+    opt({ key: "maxunits", default: "1000" }),
+    opt({ key: "tweakdefs", default: "" }),
+    opt({ key: "tweakunits3", default: "" }),
+  ];
+
+  it("is empty for a battle that has set no tweak slot", () => {
+    expect(tweakSetEntries(schema, {})).toEqual({});
+    // The default a fresh hosted battle fills in (#1837) is still empty.
+    expect(
+      tweakSetEntries(schema, {
+        "game/modoptions/tweakdefs": "",
+        "game/modoptions/maxunits": "2000",
+      }),
+    ).toEqual({});
+  });
+
+  it("reads only the set tweak slots, keyed by their bare option name", () => {
+    expect(
+      tweakSetEntries(schema, {
+        "game/modoptions/maxunits": "2000",
+        "game/modoptions/tweakdefs": "QUJD",
+      }),
+    ).toEqual({ tweakdefs: "QUJD" });
+  });
+
+  it("matches a tag SPADS lowercased", () => {
+    expect(
+      tweakSetEntries(schema, { "GAME/MODOPTIONS/TweakDefs": "QUJD" }),
+    ).toEqual({ tweakdefs: "QUJD" });
+  });
+
+  it("is empty when the game declares no tweak slots at all", () => {
+    expect(
+      tweakSetEntries([opt({ key: "maxunits", default: "1000" })], {
+        "game/modoptions/maxunits": "2000",
+      }),
+    ).toEqual({});
   });
 });
 

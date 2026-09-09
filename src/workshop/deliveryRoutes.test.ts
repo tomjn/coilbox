@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
-import { deliveryRoutes, tweakSlotCounts } from "./deliveryRoutes";
+import {
+  deliveryRoutes,
+  tweakSlotCounts,
+  tweakSlotOptions,
+} from "./deliveryRoutes";
 
 /** A `ConfigOption` with only the fields these tests care about. */
 function opt(key: string): ConfigOption {
@@ -38,6 +42,25 @@ describe("tweakSlotCounts", () => {
       { key: "naval_balance_tweaks", name: "Proposed Naval Balance Tweaks" },
     ];
     expect(tweakSlotCounts(options)).toEqual({ defs: 0, units: 0 });
+  });
+});
+
+describe("tweakSlotOptions", () => {
+  it("keeps only the options that are tweak slots, in declared order", () => {
+    const options = [
+      opt("maxunits"),
+      opt("tweakdefs"),
+      opt("startmetal"),
+      opt("tweakunits3"),
+    ];
+    expect(tweakSlotOptions(options).map((o) => o.key)).toEqual([
+      "tweakdefs",
+      "tweakunits3",
+    ]);
+  });
+
+  it("is empty for a game with no tweak slots at all", () => {
+    expect(tweakSlotOptions([opt("maxunits")])).toEqual([]);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { ConfigOption } from "@/content/bindings";
 import { effectiveOptions } from "@/play/modOptions";
+import { tweakSlotOptions } from "@/workshop/deliveryRoutes";
 
 /** Engine script-tag prefixes for the two option scopes + the start-pos tag. */
 export const MODOPT_PREFIX = "game/modoptions/";
@@ -46,6 +47,32 @@ export function rawOptionEntries(
   return Object.entries(scriptTags)
     .filter(([k]) => k.toLowerCase().startsWith(prefix))
     .map(([k, value]) => ({ key: k.slice(prefix.length), value }));
+}
+
+/**
+ * The tweak slots a battle's host has actually set, keyed the way
+ * `workshop_decode_tweak_set` expects: bare mod option names (`tweakdefs`,
+ * `tweakunits3`), not the `game/modoptions/` script-tag keys they are stored
+ * under (issue #2756).
+ *
+ * Which options are tweak slots at all comes from `deliveryRoutes.ts`'s own
+ * `tweakSlotOptions`, not from matching key names again here. A slot the
+ * game declares but nobody has touched carries whatever default the schema
+ * gives it, ordinarily an empty string, and empty is filtered out: it is
+ * not a payload to decode, it is the absence of one, and a battle with no
+ * tweak slots set should end up with an empty map here rather than one full
+ * of nothing to show.
+ */
+export function tweakSetEntries(
+  modOptionsSchema: ConfigOption[],
+  scriptTags: Record<string, string>,
+): Record<string, string> {
+  const entries: Record<string, string> = {};
+  for (const option of tweakSlotOptions(modOptionsSchema)) {
+    const value = optionValue(scriptTags, "mod", option.key);
+    if (value) entries[option.key] = value;
+  }
+  return entries;
 }
 
 /**

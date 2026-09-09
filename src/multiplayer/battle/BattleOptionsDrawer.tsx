@@ -10,6 +10,7 @@ import {
   START_POS_OPTIONS,
 } from "@/play/pages/components/GameOptionsPanel";
 import type { Battle } from "../bindings";
+import { BattleTweakDecodeSection } from "./BattleTweakDecodeSection";
 import {
   changedCount,
   displayedValue,
@@ -164,6 +165,11 @@ export function BattleOptionsDrawer({
                 pending={pending}
                 canEdit={canEdit}
                 setOption={setOption}
+              />
+              <BattleTweakDecodeSection
+                gameName={battle.modname}
+                modOptionsSchema={modOptionsSchema}
+                scriptTags={battle.scriptTags}
               />
               <TweakProjectSection
                 gameName={battle.modname}

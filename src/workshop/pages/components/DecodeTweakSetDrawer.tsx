@@ -17,106 +17,27 @@
  * unrecognised is carried along as read-only Lua rather than dropped.
  */
 import { Button, Drawer } from "@picoframe/frame";
-import { Check, Copy, FileCode2 } from "lucide-react";
+import { FileCode2 } from "lucide-react";
 import { useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Textarea } from "@/components/ui/textarea";
 import {
   allSlots,
-  type DecodedSlot,
   type DecodedTweakSet,
   multiLineEntries,
   pastedEntry,
   planProjectFromDecoded,
-  slotTitle,
   workshopDecodeTweakSet,
 } from "../../decodeTweakSet";
 import type { NewProject } from "../../project";
+import { SlotCard } from "./DecodedSlotCard";
 
 type Phase =
   | { state: "idle" }
   | { state: "decoding" }
   | { state: "done"; set: DecodedTweakSet }
   | { state: "failed"; message: string };
-
-/** One press to put a slot's Lua on the clipboard. Local to this file the
- *  same way `PackageMutatorButton`'s own copy button is. */
-function CopyLuaButton({ lua }: { lua: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      className="h-6 shrink-0 gap-1 px-2"
-      aria-label="Copy this Lua"
-      onClick={() => {
-        navigator.clipboard
-          .writeText(lua)
-          .then(() => setCopied(true))
-          .catch(() => {});
-      }}
-    >
-      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      {copied ? "Copied" : "Copy"}
-    </Button>
-  );
-}
-
-/** What a slot turned out to be, in the same three-way split
- *  `decode.rs`'s own doc comment draws. */
-function FormBadge({ slot }: { slot: DecodedSlot }) {
-  if (slot.error) {
-    return (
-      <span className="shrink-0 text-xs text-destructive">Not decoded</span>
-    );
-  }
-  if (slot.form === "table") {
-    return (
-      <span className="shrink-0 text-xs text-emerald-600 dark:text-emerald-400">
-        Data table
-      </span>
-    );
-  }
-  if (slot.form === "block") {
-    return (
-      <span className="shrink-0 text-xs text-amber-600 dark:text-amber-400">
-        Program, read only
-      </span>
-    );
-  }
-  return (
-    <span className="shrink-0 text-xs text-muted-foreground">Unrecognised</span>
-  );
-}
-
-function SlotCard({ slot }: { slot: DecodedSlot }) {
-  return (
-    <li className="flex flex-col gap-1.5 rounded border border-border/60 p-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-sm font-medium" title={slot.key}>
-          {slotTitle(slot)}
-        </span>
-        <FormBadge slot={slot} />
-      </div>
-      {slot.error ? (
-        <p className="text-xs text-destructive">{slot.error}</p>
-      ) : (
-        <>
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 text-xs">
-            {slot.lua}
-          </pre>
-          {slot.lua ? (
-            <div className="flex justify-end">
-              <CopyLuaButton lua={slot.lua} />
-            </div>
-          ) : null}
-        </>
-      )}
-    </li>
-  );
-}
 
 export function DecodeTweakSetDrawer({
   games,
