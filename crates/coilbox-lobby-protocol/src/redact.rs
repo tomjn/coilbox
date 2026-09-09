@@ -62,6 +62,9 @@ fn secrets_removed(cmd: &str, rest: &str) -> Option<String> {
     match cmd {
         "TURNCREDENTIALS" => turn_credentials(rest),
         "LOGIN" | "REGISTER" => password_field(cmd, rest),
+        "CHANGEPASSWORD" => change_password(rest),
+        "RESETPASSWORD" => reset_password(rest),
+        "CHANGEEMAIL" => change_email(rest),
         "JOINBATTLE" => join_battle(rest),
         "OPENBATTLE" => open_battle(rest),
         "JOIN" => join_channel(rest),
@@ -125,6 +128,43 @@ fn password_field(cmd: &str, rest: &str) -> Option<String> {
         Some((_password, after)) => format!("{cmd} {user} {REDACTED} {after}"),
         None => format!("{cmd} {user} {REDACTED}"),
     })
+}
+
+/// `CHANGEPASSWORD <old> <new>`, as `command::change_password` builds it,
+/// without either hash. Both are `BASE64(MD5(password))`, the same hash a
+/// `LOGIN` sends. The old one is the account's current credential and the new
+/// one is about to become it, so both let anybody holding the console log in.
+/// Unlike `LOGIN`/`REGISTER` there is no username field ahead of them, so the
+/// whole of `rest` is secret and none of it is echoed back.
+fn change_password(rest: &str) -> Option<String> {
+    if rest.trim().is_empty() {
+        return None;
+    }
+    Some(format!("CHANGEPASSWORD {REDACTED} {REDACTED}"))
+}
+
+/// `RESETPASSWORD <email> <code>`, as `command::reset_password` builds it,
+/// without the code. The code is a live single-use recovery token. The email
+/// is not a secret and stays, because it is what tells someone reading the
+/// console which account the recovery was for.
+fn reset_password(rest: &str) -> Option<String> {
+    let (email, code) = rest.split_once(' ')?;
+    if code.is_empty() {
+        return None;
+    }
+    Some(format!("RESETPASSWORD {email} {REDACTED}"))
+}
+
+/// `CHANGEEMAIL <email> <code>`, as `command::change_email` builds it,
+/// without the code, for the same reason as `RESETPASSWORD` above. The code
+/// is a live single-use token and the email helps debugging, so only the
+/// code is hidden.
+fn change_email(rest: &str) -> Option<String> {
+    let (email, code) = rest.split_once(' ')?;
+    if code.is_empty() {
+        return None;
+    }
+    Some(format!("CHANGEEMAIL {email} {REDACTED}"))
 }
 
 /// `JOINBATTLE <id> [key] [scriptPassword]`, as `command::join_battle` builds
@@ -326,6 +366,12 @@ mod tests {
             "RELAYEDHOST 198.51.100.9 30001",
             "MOVERELAYEDHOST 198.51.100.9 30002",
             "BATTLEHOSTMOVED 9 198.51.100.9 30002",
+            // Neither carries a secret at all: `RESETPASSWORDREQUEST` and
+            // `CHANGEEMAILREQUEST` are just an email address, and each shares
+            // a prefix with a command above that does carry one, which is
+            // exactly the case a whole-command match has to get right.
+            "RESETPASSWORDREQUEST a@b.c",
+            "CHANGEEMAILREQUEST a@b.c",
         ] {
             assert!(
                 matches!(redact_line(line), Cow::Borrowed(kept) if kept == line),
@@ -402,6 +448,59 @@ mod tests {
             "LOGIN alice <redacted> 0 192.168.0.5 agent\t1\tu"
         );
         assert_eq!(redact_line("register bob hash"), "REGISTER bob <redacted>");
+    }
+
+    /// The line `command::change_password` builds, with the exact values
+    /// from its own test in `command.rs`. A user who changes their password
+    /// and then pastes the console into a bug report must not hand over
+    /// either hash: the old one is their current login, and the new one is
+    /// about to become it.
+    #[test]
+    fn a_change_password_line_loses_both_hashes() {
+        assert_eq!(
+            redact_line("CHANGEPASSWORD oldhash newhash"),
+            "CHANGEPASSWORD <redacted> <redacted>"
+        );
+    }
+
+    /// The line `command::reset_password` builds. The code is a live
+    /// single-use recovery token and is hidden, but the email is not a
+    /// secret and stays, since it says which account the recovery was for.
+    #[test]
+    fn a_reset_password_line_loses_its_code_and_keeps_the_email() {
+        assert_eq!(
+            redact_line("RESETPASSWORD a@b.c 12345678"),
+            "RESETPASSWORD a@b.c <redacted>"
+        );
+    }
+
+    /// The line `command::change_email` builds, the same shape as
+    /// `RESETPASSWORD` for the same reason: the code is a live single-use
+    /// token, the email is not a secret.
+    #[test]
+    fn a_change_email_line_loses_its_code_and_keeps_the_email() {
+        assert_eq!(
+            redact_line("CHANGEEMAIL new@b.c 87654321"),
+            "CHANGEEMAIL new@b.c <redacted>"
+        );
+    }
+
+    /// Commands are upper-cased before they are matched here too.
+    #[test]
+    fn change_password_reset_password_and_change_email_are_matched_the_way_the_parser_matches_them()
+    {
+        assert_eq!(
+            redact_line("changepassword oldhash newhash"),
+            "CHANGEPASSWORD <redacted> <redacted>"
+        );
+        assert_eq!(
+            redact_line("resetpassword a@b.c 12345678"),
+            "RESETPASSWORD a@b.c <redacted>"
+        );
+        assert_eq!(
+            redact_line("changeemail new@b.c 87654321"),
+            "CHANGEEMAIL new@b.c <redacted>"
+        );
     }
 
     /// The four shapes `join_battle_variants` in `command.rs` proves
