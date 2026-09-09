@@ -834,6 +834,88 @@ fn mp_confirm_agreement(
     }
 }
 
+/// `mp_change_password` - change the signed-in account's password.
+///
+/// Both passwords are hashed here rather than by the caller, so a raw password
+/// never crosses the bridge and the wire form is decided in one place. uberserver
+/// answers with a bare `SERVERMSG` and no accept or deny token, so the caller has
+/// to read the announcement to learn what happened.
+#[tauri::command]
+fn mp_change_password(
+    registry: State<'_, Registry>,
+    server_key: String,
+    current_password: String,
+    new_password: String,
+) -> CliResult {
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::change_password(
+            &password_hash(&current_password),
+            &password_hash(&new_password),
+        ),
+    )
+}
+
+/// `mp_change_email_request` - ask for a code to confirm a new email address.
+#[tauri::command]
+fn mp_change_email_request(
+    registry: State<'_, Registry>,
+    server_key: String,
+    email: String,
+) -> CliResult {
+    if !command::fits_one_field(&email) {
+        return CliResult::err("an email address cannot contain spaces");
+    }
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::change_email_request(&email),
+    )
+}
+
+/// `mp_change_email` - confirm a new email address with the emailed code.
+#[tauri::command]
+fn mp_change_email(
+    registry: State<'_, Registry>,
+    server_key: String,
+    email: String,
+    code: String,
+) -> CliResult {
+    if !command::fits_one_field(&email) || !command::fits_one_field(&code) {
+        return CliResult::err("an email address and a code cannot contain spaces");
+    }
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::change_email(&email, &code),
+    )
+}
+
+/// `mp_resend_verification` - ask for the signup verification code again.
+#[tauri::command]
+fn mp_resend_verification(
+    registry: State<'_, Registry>,
+    server_key: String,
+    email: String,
+) -> CliResult {
+    if !command::fits_one_field(&email) {
+        return CliResult::err("an email address cannot contain spaces");
+    }
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::resend_verification(&email),
+    )
+}
+
+/// `mp_get_user_info` - request the signed-in account's details. Answered as three
+/// labelled `SERVERMSG` lines, which the reducer turns into `accountInfo` deltas.
+#[tauri::command]
+fn mp_get_user_info(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    enqueue(registry.inner(), &server_key, command::get_user_info())
+}
+
 /// `mp_disconnect` — request a graceful logout: the connection task writes `EXIT`,
 /// flushes it, and exits (self-evicting). Evicting from the registry here as well
 /// makes it idempotent; the queued `Shutdown` still reaches the task's receiver.
@@ -3401,6 +3483,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_recover_password,
             mp_submit_recovery_code,
             mp_confirm_agreement,
+            mp_change_password,
+            mp_change_email_request,
+            mp_change_email,
+            mp_resend_verification,
+            mp_get_user_info,
             mp_disconnect,
             mp_cancel_connect,
             mp_wait_until_ready,
