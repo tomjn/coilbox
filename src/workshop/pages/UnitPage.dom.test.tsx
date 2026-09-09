@@ -43,12 +43,14 @@ const SELECTED = {
 const GAME = {
   name: "Test Game",
   primaryArchive: { name: "testgame.sdd", path: "/data/games/testgame.sdd" },
+  dependencyArchives: [],
 };
 
 /** A second, unrelated game that happens to name a unit the same thing. */
 const GAME_2 = {
   name: "Test Game 2",
   primaryArchive: { name: "testgame2.sdd", path: "/data/games/testgame2.sdd" },
+  dependencyArchives: [],
 };
 
 let mockDefs: UnitDefsResult = {

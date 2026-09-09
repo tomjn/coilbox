@@ -950,6 +950,9 @@ export default function UnitPage() {
             {game && status !== "error" && (
               <ChecksButton
                 gameName={game.name}
+                gameArchives={[game.primaryArchive, ...game.dependencyArchives]}
+                enginePath={selected?.enginePath}
+                dataDir={selected?.rootPath}
                 diagnosticErrors={defs?.unitErrors ?? []}
                 diagnosticsChecking={status !== "ready"}
                 routeOptions={gameInfo?.options}
