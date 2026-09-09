@@ -8,14 +8,14 @@
 <h1 align="center">Coilbox</h1>
 
 <p align="center">
-  A desktop app for playing and building games on the
-  <a href="https://github.com/beyond-all-reason/RecoilEngine">Recoil</a> and Spring RTS engines.
-</p>
-
-<p align="center">
   <a href="https://coilbox-hub.vercel.app">Coilbox Hub</a> ·
   <a href="https://discord.gg/GUpRg6Wz3e">Discord</a> ·
   <a href="https://tomjn.github.io/coilbox/">Documentation</a>
+</p>
+
+<p align="center">
+  A desktop app for playing and building games on the
+  <a href="https://github.com/beyond-all-reason/RecoilEngine">Recoil</a> and Spring RTS engines.
 </p>
 
 - Get games, maps and engines from the rapid repositories and springfiles, through a
