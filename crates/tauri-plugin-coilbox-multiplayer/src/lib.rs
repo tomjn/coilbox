@@ -533,6 +533,9 @@ async fn mp_recover_password<R: Runtime>(
     compat_flags: Vec<String>,
     on_event: Channel<LobbyEvent>,
 ) -> Result<CliResult, ()> {
+    if !command::fits_one_field(&email) {
+        return Ok(CliResult::err("an email address cannot contain spaces"));
+    }
     Ok(open_and_spawn(
         &app,
         registry.inner(),
@@ -561,6 +564,9 @@ fn mp_submit_recovery_code(
     server_key: String,
     code: String,
 ) -> CliResult {
+    if !command::fits_one_field(&code) {
+        return CliResult::err("a code cannot contain spaces");
+    }
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => match conn.tx.send(Outbound::SubmitRecoveryCode { code }) {
