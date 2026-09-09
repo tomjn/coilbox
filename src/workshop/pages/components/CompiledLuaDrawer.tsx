@@ -35,6 +35,15 @@ const FORM_LABEL: Record<CompiledChunk["form"], string> = {
   block: "do ... end",
 };
 
+/**
+ * What to colour a generated file as.
+ *
+ * Almost all of them are Lua. A game that keeps its unit names in a
+ * localisation file gets a JSON one too (issue #2743), and colouring that as
+ * Lua would mark every line of it an error in a file that is correct.
+ */
+const langOf = (path: string) => (path.endsWith(".json") ? "json" : "lua");
+
 export function CompiledLuaDrawer({
   open,
   onOpenChange,
@@ -75,11 +84,18 @@ export function CompiledLuaDrawer({
           </section>
         )}
 
-        {compiled && compiled.chunks.length === 0 && !loading && (
-          <p className="text-muted-foreground text-sm">
-            This project changes nothing yet, so there is nothing to compile.
-          </p>
-        )}
+        {/* Files rather than chunks: a project whose only edits are names and
+            descriptions compiles to a language file and no Lua at all (issue
+            #2743), and telling that user they have changed nothing would be
+            the same silence this drawer exists to break. */}
+        {compiled &&
+          compiled.chunks.length === 0 &&
+          compiled.files.length === 0 &&
+          !loading && (
+            <p className="text-muted-foreground text-sm">
+              This project changes nothing yet, so there is nothing to compile.
+            </p>
+          )}
 
         {compiled && compiled.chunks.length > 0 && (
           <section className="flex flex-col gap-2">
@@ -112,8 +128,8 @@ export function CompiledLuaDrawer({
             </h3>
             <CodeBlock
               code={file.contents}
-              lang="lua"
-              label={`${file.path} as Lua`}
+              lang={langOf(file.path)}
+              label={`${file.path} as ${langOf(file.path) === "json" ? "JSON" : "Lua"}`}
               className="max-h-96 rounded-lg border border-border/50"
             />
           </section>

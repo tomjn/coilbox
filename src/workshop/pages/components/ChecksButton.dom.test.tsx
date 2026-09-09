@@ -95,7 +95,7 @@ describe("the checks button", () => {
   it("counts a blocker and a review item together, blocker first", async () => {
     preflightResponse = {
       blockers: ["supercom is defined by 2 copies (first, second)."],
-      review: ["2 name and description edits are not compiled."],
+      review: ["2 blocks of read-only Lua are not compiled."],
       passes: [],
     };
     renderButton({ project });
@@ -154,7 +154,7 @@ describe("the checks button", () => {
     it("keeps a blocker, a review item and a pass in three separate groups", async () => {
       preflightResponse = {
         blockers: ["supercom is defined by 2 copies (first, second)."],
-        review: ["2 name and description edits are not compiled."],
+        review: ["2 blocks of read-only Lua are not compiled."],
         passes: ["2 table chunks compile to a Lua table."],
       };
       renderButton({ project });
@@ -170,7 +170,7 @@ describe("the checks button", () => {
         screen.getByText("supercom is defined by 2 copies (first, second)."),
       ).toBeTruthy();
       expect(
-        screen.getByText("2 name and description edits are not compiled."),
+        screen.getByText("2 blocks of read-only Lua are not compiled."),
       ).toBeTruthy();
       expect(
         screen.getByText("2 table chunks compile to a Lua table."),
@@ -377,6 +377,41 @@ describe("the checks button", () => {
         );
         expect(
           await screen.findByText(/too big for any BAR slot/),
+        ).toBeTruthy();
+      });
+
+      /**
+       * Issue #2743. A rename reaches the mutator's language file and no
+       * numbered slot, so the drawer has to show both: the file it can be
+       * read in, and the fact that the lobby export leaves it behind.
+       */
+      it("shows a rename's language file and says no slot carries it", async () => {
+        changeLedgerResponse = {
+          units: [
+            {
+              unit: "armcom",
+              changes: [
+                {
+                  description: "Name (en): Commander",
+                  fieldPath: null,
+                  files: ["language/en/zz_coilbox.json"],
+                  barSlot: null,
+                  barMiss: "noSlotForWords",
+                  uncompiledReason: null,
+                },
+              ],
+            },
+          ],
+          notes: [],
+        };
+        renderButton({ project });
+        fireEvent.click(
+          await screen.findByRole("button", { name: "No problems found" }),
+        );
+        expect(
+          await screen.findByText(
+            /language\/en\/zz_coilbox\.json · no BAR slot can carry words/,
+          ),
         ).toBeTruthy();
       });
 

@@ -65,8 +65,12 @@ describe("the generated Lua drawer", () => {
   /** A note is the compiler saying what it could not do. Burying it under the
    *  Lua would leave someone reading a file that is missing their rename. */
   it("shows a note the compiler raised", () => {
-    draw(compiled({ notes: ["Two name edits are not compiled."] }));
-    expect(screen.getByText("Two name edits are not compiled.")).toBeTruthy();
+    draw(
+      compiled({ notes: ["Two blocks of read-only Lua are not compiled."] }),
+    );
+    expect(
+      screen.getByText("Two blocks of read-only Lua are not compiled."),
+    ).toBeTruthy();
   });
 
   it("names each file it would write", () => {
@@ -85,6 +89,24 @@ describe("the generated Lua drawer", () => {
         "This project changes nothing yet, so there is nothing to compile.",
       ),
     ).toBeTruthy();
+  });
+
+  /** Issue #2743. A project whose only edits are names compiles to a language
+   *  file and no Lua, so "nothing to compile" would be a lie about work that
+   *  is in the drawer underneath it. */
+  it("does not claim a rename-only project changes nothing", () => {
+    draw(
+      compiled({
+        files: [
+          {
+            path: "language/en/zz_coilbox.json",
+            contents: '{ "units": {} }\n',
+          },
+        ],
+      }),
+    );
+    expect(screen.queryByText(/changes nothing yet/)).toBeNull();
+    expect(screen.getByText("language/en/zz_coilbox.json")).toBeTruthy();
   });
 
   it("reports a compiler that would not run", () => {

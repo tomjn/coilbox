@@ -17,9 +17,10 @@
 //!
 //! What each check actually validates:
 //!
-//!  - Every file the mutator archive route would write parses as Lua. This is
-//!    the syntax check the issue asks for first, run through the same sandbox
-//!    that reads a game's own config (`coilbox-springlua`).
+//!  - Every file the mutator archive route would write parses. This is the
+//!    syntax check the issue asks for first, run through the same sandbox
+//!    that reads a game's own config (`coilbox-springlua`), or through a JSON
+//!    parser for the one file that is not Lua (issue #2743).
 //!  - Every table-form chunk evaluates to a Lua table. Beyond All Reason's
 //!    `tweakunits` route gives a plain table payload a slot of its own, and
 //!    issue #1277 packs the transport. A chunk is what would go in one slot.
@@ -96,49 +97,78 @@ fn lua_root() -> std::path::PathBuf {
     std::env::temp_dir()
 }
 
-/// Every generated file has to be Lua the engine will load, or the mutator
+/// Every generated file has to be what its name says it is, or the mutator
 /// route delivers a game with none of the project's changes in it and no
 /// error a player can see.
 ///
-/// Wrapped in a function body rather than run directly, matching the
-/// integration test this mirrors (`tests/generated_lua_runs.rs`): a
+/// The Lua is wrapped in a function body rather than run directly, matching
+/// the integration test this mirrors (`tests/generated_lua_runs.rs`): a
 /// `modinfo.lua` returns a table and `gamedata/unitdefs_post.lua` returns
 /// nothing, so running either as a top-level chunk answers the wrong
 /// question. Whether the source compiles at all is the same question for
 /// both, and a function body answers only that.
+///
+/// A mutator's language file (issue #2743) is JSON rather than Lua, and a
+/// game reads it with a JSON decoder, so it is checked with one. Same
+/// failure either way: a file the game cannot read is a file the game acts as
+/// though were not there.
 fn check_files_parse(compiled: &CompiledMod, report: &mut PreflightReport) {
     if compiled.files.is_empty() {
         return;
     }
-    let lua = match SpringLua::new(lua_root()) {
-        Ok(lua) => lua,
-        Err(e) => {
-            report
-                .blockers
-                .push(format!("Could not start the Lua syntax check: {e}"));
-            return;
-        }
-    };
+    let lua_files: Vec<&crate::compile::CompiledFile> = compiled
+        .files
+        .iter()
+        .filter(|file| !file.path.ends_with(".json"))
+        .collect();
     let mut ok = true;
-    for file in &compiled.files {
-        let source = format!(
-            "local check = function()\n{}\nend\nreturn {{ ok = check ~= nil }}\n",
-            file.contents
-        );
-        if let Err(e) = lua.eval_value_raw(&source, &file.path) {
+
+    for file in compiled.files.iter().filter(|f| f.path.ends_with(".json")) {
+        if let Err(e) = serde_json::from_str::<serde_json::Value>(&file.contents) {
             ok = false;
             report.blockers.push(format!(
-                "{} does not parse as Lua, so the mutator route would ship a game with this file broken: {e}",
+                "{} does not parse as JSON, so the mutator route would ship a game that reads none of it: {e}",
                 file.path
             ));
         }
     }
+
+    if !lua_files.is_empty() {
+        let lua = match SpringLua::new(lua_root()) {
+            Ok(lua) => lua,
+            Err(e) => {
+                report
+                    .blockers
+                    .push(format!("Could not start the Lua syntax check: {e}"));
+                return;
+            }
+        };
+        for file in lua_files {
+            let source = format!(
+                "local check = function()\n{}\nend\nreturn {{ ok = check ~= nil }}\n",
+                file.contents
+            );
+            if let Err(e) = lua.eval_value_raw(&source, &file.path) {
+                ok = false;
+                report.blockers.push(format!(
+                    "{} does not parse as Lua, so the mutator route would ship a game with this file broken: {e}",
+                    file.path
+                ));
+            }
+        }
+    }
+
     if ok {
         report.passes.push(format!(
-            "{} generated file{} parse{} as valid Lua.",
+            "{} generated file{} parse{} as the engine will read {}.",
             compiled.files.len(),
             if compiled.files.len() == 1 { "" } else { "s" },
             if compiled.files.len() == 1 { "s" } else { "" },
+            if compiled.files.len() == 1 {
+                "it"
+            } else {
+                "them"
+            },
         ));
     }
 }

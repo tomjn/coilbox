@@ -180,6 +180,11 @@ fn each_block_runs_on_its_own() {
 /// The whole mutator, parsed. A file with a `do` and no `end` in it loads as
 /// nothing and takes the game's unit definitions with it, and the only symptom
 /// is a game that starts with none of the project's changes in it.
+///
+/// The language file (issue #2743) is the one file here that is not Lua. The
+/// game reads it with a JSON decoder, so it is checked with one, and the
+/// failure it is being held away from is the same: a file the game cannot
+/// read is a file the game acts as though were not there.
 #[test]
 fn every_generated_file_is_lua_that_parses() {
     let project: ModProject = serde_json::from_value(json!({
@@ -215,7 +220,18 @@ fn every_generated_file_is_lua_that_parses() {
     let compiled = compile(&project);
     assert!(compiled.files.len() >= 3);
 
+    assert!(compiled
+        .files
+        .iter()
+        .any(|f| f.path == "language/en/zz_coilbox.json"));
+
     for file in &compiled.files {
+        if file.path.ends_with(".json") {
+            let parsed: Value = serde_json::from_str(&file.contents)
+                .unwrap_or_else(|e| panic!("{} does not parse as JSON: {e}", file.path));
+            assert_eq!(parsed["units"]["names"]["armcom"], json!("Commander"));
+            continue;
+        }
         let root = tempfile::tempdir().expect("tempdir");
         let lua = SpringLua::new(root.path()).expect("vm");
         // Wrapped in a function body rather than run, because a `modinfo.lua`

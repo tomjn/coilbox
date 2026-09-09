@@ -20,6 +20,13 @@
 //! archive is these chunks written into files, and the BAR export (issue #1277)
 //! is the same chunks base64ed into numbered slots.
 //!
+//! One store is neither form, because it is not Lua. A game that keeps its
+//! unit names and descriptions in `language/<code>/units.json` rather than in
+//! its definitions gets a JSON file of its own beside that one, which is
+//! [`LANGUAGE_FILE`]. It is a file and never a chunk: no slot can carry it,
+//! since a slot's Lua runs in the definition parser and `Spring.I18N` is not
+//! there.
+//!
 //! The compiler never sees the game. That is deliberate: every decision it
 //! makes is a fact about the project, so compiling is deterministic, needs no
 //! unitsync scan, and produces the same bytes on the machine that made the
@@ -72,7 +79,8 @@ pub struct CompiledMod {
     /// The Lua, in the two forms, with the compiler's reasoning attached.
     pub chunks: Vec<Chunk>,
     /// The same Lua laid out as a mutator archive, which is the route every
-    /// Spring and Recoil game supports (issue #1268).
+    /// Spring and Recoil game supports (issue #1268), plus the language file
+    /// that has no chunk behind it.
     pub files: Vec<CompiledFile>,
     /// What the compiler could not do, and what to watch out for in what it
     /// did. Empty is the ordinary case.
@@ -101,6 +109,31 @@ pub struct CompiledMod {
 /// `units/*.lua` file has loaded, which is the only hook a mutator has for
 /// anything that reads the game's definitions.
 const POST_FILE: &str = "gamedata/unitdefs_post.lua";
+
+/// What a mutator calls the file it puts a unit's words in, inside each
+/// `language/<code>/` folder (issue #2743).
+///
+/// A game that keeps its unit names outside its definitions keeps them in
+/// `language/<code>/units.json`, and shipping a file of that name would take
+/// the place of the game's own and blank every unit the project never
+/// mentioned. It does not have to. Beyond All Reason's i18n module, which is
+/// the module every game of that lineage loads, reads
+/// `VFS.DirList(languageDir, '*.json')` and loads every file it gets back,
+/// setting one key at a time (`modules/i18n/i18n.lua`, and `i18n.set` in
+/// `modules/i18n/i18nlib/i18n/init.lua`). So a second file in the same folder
+/// is additive: the keys it names are set from it, and every other unit still
+/// reads the game's own.
+///
+/// The name itself decides whether that works, which is why it is a constant
+/// with an argument attached rather than a string in a `format!`. The engine
+/// returns a directory listing sorted by path and de-duplicated
+/// (`CVFSHandler::GetFilesInDir` stable-sorts `files[section]`, and
+/// `CFileHandler::DirList` sorts the result again), so the last file by name
+/// is the last one loaded and the last write to a key wins. `zz_coilbox.json`
+/// sorts after `units.json`. A name sorting before it would be overwritten by
+/// the game's own file and the rename would vanish, which is the bug this
+/// replaces rather than a new one.
+const LANGUAGE_FILE: &str = "zz_coilbox.json";
 
 /// A mutator archive's version for every route except packaging.
 ///
@@ -256,17 +289,26 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     }
 
     // The words a player reads, for a game that keeps them in a localisation
-    // file rather than in its unit definitions. A mutator archive can only
-    // replace that file whole, and replacing it would blank every unit the
-    // project never touched, so these do not compile to a mutator at all. The
-    // tweak slot route is where they belong, and that is issue #1277's.
-    if !edits.text.is_empty() {
-        let count = edits.text_edit_count();
+    // file rather than in its unit definitions. Added beside the game's own
+    // file rather than over it, for the reason [`LANGUAGE_FILE`] gives.
+    for code in edits.text.values().flat_map(|langs| langs.keys()) {
+        if !valid_language_code(code) {
+            notes.push(format!(
+                "Name and description edits in the language {code:?} were left out. A language code can only hold lowercase letters, digits, hyphens and underscores, and it becomes a folder name in the generated game."
+            ));
+        }
+    }
+    let (language_files, carried) = language_files(edits);
+    if carried > 0 {
+        let paths = language_files
+            .iter()
+            .map(|file| file.path.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
         notes.push(format!(
-            "{count} name and description edit{} {} not compiled. {} keeps them in language/<code>/units.json, and a mutator can only replace that file whole, which would blank every other unit's words.",
-            if count == 1 { "" } else { "s" },
-            if count == 1 { "is" } else { "are" },
-            if project.game_name.is_empty() { "This game" } else { &project.game_name },
+            "{carried} name and description edit{} {} in {paths}, added beside the game's own units.json rather than over it, so every unit the project does not name keeps the words the game gives it. Beyond All Reason's tweak slot route cannot carry these at all: that Lua runs in the definition parser, which has no Spring.I18N.",
+            if carried == 1 { "" } else { "s" },
+            if carried == 1 { "is" } else { "are" },
         ));
     }
 
@@ -293,6 +335,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         });
     }
     files.extend(unit_files);
+    files.extend(language_files);
 
     // Every block, in the order they were compiled, which is the order they have
     // to run in: a copy standing in for a game unit before a menu is replayed
@@ -653,6 +696,100 @@ fn header(project: &ModProject) -> String {
         comment_text(&project.name)
     };
     format!("-- Compiled by coilbox from the tweak project \"{name}\".\n-- Rewritten every time the project compiles, so edit the project, not this.\n")
+}
+
+/// Where one language's words go in the generated archive.
+fn language_file_path(code: &str) -> String {
+    format!("language/{code}/{LANGUAGE_FILE}")
+}
+
+/// Whether a code can name a language folder.
+///
+/// Checked for the reason [`valid_unit_key`] is: the code becomes a folder
+/// name under the generated archive, and a project arrives as JSON somebody
+/// may have written by hand or been sent. Every code coilbox reads comes out
+/// of an archive member path the worker already narrowed to a single segment
+/// (`language_code_of` in `dataset.rs`), so nothing the app itself produces is
+/// turned away here. Hyphens and underscores are allowed because real locales
+/// use both: Beyond All Reason ships a `test_unicode`, and `pt-br` is the
+/// shape the wider Spring scene writes a regional locale in.
+fn valid_language_code(code: &str) -> bool {
+    !code.is_empty()
+        && code
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+}
+
+/// One JSON file per language the project has words in, and how many edits
+/// they carry between them.
+///
+/// The count is the compiler's own rather than [`GameEdits::text_edit_count`],
+/// so that an edit in a language code this refused is not counted as carried.
+fn language_files(edits: &GameEdits) -> (Vec<CompiledFile>, usize) {
+    // Language code, then field, then unit: the shape the game reads, and
+    // `BTreeMap` all the way down so two compiles of one project are the same
+    // bytes.
+    type ByUnit = std::collections::BTreeMap<String, String>;
+    let mut by_language: std::collections::BTreeMap<String, (ByUnit, ByUnit)> =
+        std::collections::BTreeMap::new();
+    let mut carried = 0usize;
+
+    for (unit, languages) in &edits.text {
+        for (code, fields) in languages {
+            if !valid_language_code(code) {
+                continue;
+            }
+            let entry = by_language.entry(code.clone()).or_default();
+            if let Some(name) = &fields.name {
+                entry.0.insert(unit.clone(), name.clone());
+                carried += 1;
+            }
+            if let Some(description) = &fields.description {
+                entry.1.insert(unit.clone(), description.clone());
+                carried += 1;
+            }
+        }
+    }
+
+    let files = by_language
+        .into_iter()
+        .map(|(code, (names, descriptions))| {
+            let mut units = serde_json::Map::new();
+            if !names.is_empty() {
+                units.insert("names".to_string(), json_of(names));
+            }
+            if !descriptions.is_empty() {
+                units.insert("descriptions".to_string(), json_of(descriptions));
+            }
+            let body = Value::Object(
+                [("units".to_string(), Value::Object(units))]
+                    .into_iter()
+                    .collect(),
+            );
+            CompiledFile {
+                path: language_file_path(&code),
+                // Pretty printed and no header comment: JSON has no comment
+                // syntax, and a key holding one would become a translation
+                // the game loads. Which project wrote the file is what the
+                // archive's own `modinfo.lua` is for.
+                contents: format!(
+                    "{}\n",
+                    serde_json::to_string_pretty(&body).unwrap_or_else(|_| "{}".to_string())
+                ),
+            }
+        })
+        .collect();
+    (files, carried)
+}
+
+/// A map of unit to string as a JSON object.
+fn json_of(entries: std::collections::BTreeMap<String, String>) -> Value {
+    Value::Object(
+        entries
+            .into_iter()
+            .map(|(unit, text)| (unit, Value::String(text)))
+            .collect(),
+    )
 }
 
 /// One copy's own file, which is what a game's `units/` folder is full of.
@@ -1048,16 +1185,77 @@ mod tests {
         }
     }
 
-    /// A game that names its units in a localisation file cannot be patched by
-    /// a mutator, and a compiler that silently dropped those edits would be
-    /// worse than one that says so.
+    /// A game that names its units in a localisation file gets a file of its
+    /// own beside the game's, naming only the units the project renamed.
     #[test]
-    fn name_edits_for_a_localisation_game_are_reported_rather_than_dropped() {
+    fn name_edits_for_a_localisation_game_get_their_own_language_file() {
         let out = compile(&project(json!({
             "text": { "armcom": { "en": { "name": "Commander", "description": "Boss" } } }
         })));
+        let written = file(&out, "language/en/zz_coilbox.json");
+        let parsed: Value = serde_json::from_str(written).expect("json");
+        assert_eq!(parsed["units"]["names"]["armcom"], json!("Commander"));
+        assert_eq!(parsed["units"]["descriptions"]["armcom"], json!("Boss"));
+        // Only what the project said. A key for a unit it never touched would
+        // be the whole-file replacement this route exists to avoid.
+        assert_eq!(
+            parsed["units"]["names"].as_object().expect("names").len(),
+            1
+        );
         assert_eq!(out.notes.len(), 1);
-        assert!(out.notes[0].starts_with("2 name and description edits are not compiled."));
+        assert!(out.notes[0]
+            .starts_with("2 name and description edits are in language/en/zz_coilbox.json,"));
+    }
+
+    /// The name is the whole mechanism. Beyond All Reason's i18n module loads
+    /// every JSON file in a language folder in name order and lets the last
+    /// write to a key win, so a file sorting before `units.json` would be
+    /// overwritten by the game's own and the rename would never arrive.
+    #[test]
+    fn the_language_file_sorts_after_the_games_own() {
+        assert!(LANGUAGE_FILE > "units.json");
+        assert!(LANGUAGE_FILE.ends_with(".json"));
+    }
+
+    /// One file per language, and a locale the project says nothing in does
+    /// not get an empty one.
+    #[test]
+    fn each_language_gets_its_own_file_and_no_others() {
+        let out = compile(&project(json!({
+            "text": {
+                "armcom": { "en": { "name": "Commander" }, "de": { "name": "Kommandant" } },
+                "armflash": { "de": { "description": "Schnell" } }
+            }
+        })));
+        let paths: Vec<&str> = out.files.iter().map(|f| f.path.as_str()).collect();
+        assert!(paths.contains(&"language/en/zz_coilbox.json"));
+        assert!(paths.contains(&"language/de/zz_coilbox.json"));
+        assert_eq!(
+            paths.iter().filter(|p| p.starts_with("language/")).count(),
+            2
+        );
+        let de: Value =
+            serde_json::from_str(file(&out, "language/de/zz_coilbox.json")).expect("json");
+        assert_eq!(de["units"]["names"]["armcom"], json!("Kommandant"));
+        assert_eq!(de["units"]["descriptions"]["armflash"], json!("Schnell"));
+        // English said nothing about descriptions, so it carries no such key
+        // rather than an empty object.
+        let en: Value =
+            serde_json::from_str(file(&out, "language/en/zz_coilbox.json")).expect("json");
+        assert!(en["units"].get("descriptions").is_none());
+    }
+
+    /// The same check `a_copy_whose_key_is_not_a_unit_name_is_left_out` makes,
+    /// for the other value in a project that becomes a path.
+    #[test]
+    fn a_language_code_that_is_not_a_code_is_left_out_and_said_so() {
+        let out = compile(&project(json!({
+            "text": { "armcom": { "../../evil": { "name": "Commander" } } }
+        })));
+        assert!(out.files.iter().all(|f| !f.path.contains("..")));
+        assert!(out.files.iter().all(|f| !f.path.starts_with("language/")));
+        assert_eq!(out.notes.len(), 1);
+        assert!(out.notes[0].contains("left out"));
     }
 
     /// Read-only Lua carried on the project (issue #1280) is noted, never

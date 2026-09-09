@@ -23,8 +23,14 @@ export interface BarSlotRef {
   label: string;
 }
 
-/** Why a change did not land in a numbered BAR slot. */
-export type BarSlotMiss = "oversized" | "unplaced" | "unresolved";
+/** Why a change did not land in a numbered BAR slot. `noSlotForWords` is a
+ *  name or description edit, which the mutator carries in a language file and
+ *  no slot can carry at all (issue #2743). */
+export type BarSlotMiss =
+  | "oversized"
+  | "unplaced"
+  | "unresolved"
+  | "noSlotForWords";
 
 /** One traced change against one unit. */
 export interface LedgerChange {
