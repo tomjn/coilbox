@@ -1,6 +1,6 @@
 # Contributing to Coilbox
 
-Thanks for helping out. Coilbox is a [Tauri](https://tauri.app) v2 desktop app for the [Recoil RTS](https://github.com/beyond-all-reason/RecoilEngine) engine / Beyond All Reason community, built on [picoframe](https://github.com/tomjn/picoframe). This guide covers how to get set up, the project layout, and what a mergeable change looks like.
+Thanks for helping out. Coilbox is a [Tauri](https://tauri.app) v2 desktop app for playing and building games on the [Recoil](https://github.com/beyond-all-reason/RecoilEngine) and Spring RTS engines, built on [picoframe](https://github.com/tomjn/picoframe). This guide covers how to get set up, the project layout, and what a mergeable change looks like.
 
 By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
 

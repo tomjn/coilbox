@@ -7,9 +7,10 @@
 
 # Coilbox
 
-A desktop app for [Recoil RTS](https://github.com/beyond-all-reason/RecoilEngine) and
-Spring RTS games, aimed at the Beyond All Reason community and anyone else playing on
-or building for the engine.
+A desktop app for playing and building games on the
+[Recoil](https://github.com/beyond-all-reason/RecoilEngine) and Spring RTS engines. It
+isn't built around any one game. Beyond All Reason, Splinter Faction, Metal Factions,
+MechCommander: Legacy and whatever you're making yourself are all first-class.
 
 [Coilbox Hub](https://coilbox-hub.vercel.app) · [Discord](https://discord.gg/GUpRg6Wz3e) · [Documentation](https://tomjn.github.io/coilbox/)
 
