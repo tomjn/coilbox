@@ -1,6 +1,7 @@
 import { Button, useSetting } from "@picoframe/frame";
 import {
   ExternalLink,
+  KeyRound,
   Loader2,
   Plus,
   RefreshCw,
@@ -28,6 +29,7 @@ import {
   useLastLogin,
   useLobbyAccounts,
 } from "../lobby-servers/config";
+import { PasswordRecoveryForm } from "../lobby-servers/PasswordRecoveryForm";
 import { RegisterForm } from "../lobby-servers/RegisterForm";
 import type { LoginPhase } from "./bindings";
 import { useMultiplayer } from "./store";
@@ -143,6 +145,14 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LobbyAccount | null>(null);
   const [registering, setRegistering] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  // Set once recovery finishes, since there is nothing here to sign in to
+  // directly: the new password went to the user's email, not to us. Shown in
+  // the connect view as a pointer to add the login.
+  const [recovered, setRecovered] = useState<{
+    serverId: string;
+    username: string;
+  } | null>(null);
   // True while the user is off in their browser, which reads nothing like the
   // rest of a connect and takes as long as they take.
   const [signingIn, setSigningIn] = useState(false);
@@ -274,6 +284,24 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     );
   }
 
+  // Recovering owns the panel while its form is open, same as `registering`
+  // above and for the same reason.
+  if (recovering) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="px-1 text-sm font-medium">Recover your password</p>
+        <PasswordRecoveryForm
+          servers={allServers(customCfg.servers)}
+          onSignIn={(serverId, username) => {
+            setRecovering(false);
+            setRecovered({ serverId, username });
+          }}
+          onCancel={() => setRecovering(false)}
+        />
+      </div>
+    );
+  }
+
   if (busy) {
     const phase = mirror.phase ? PHASE_LABEL[mirror.phase] : undefined;
     return (
@@ -375,6 +403,26 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         <UserPlus className="size-4" />
         Register a new account
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          setRecovered(null);
+          setRecovering(true);
+        }}
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      >
+        <KeyRound className="size-4" />
+        Forgot password?
+      </button>
+      {recovered && (
+        <p className="px-2 pt-1 text-xs text-muted-foreground">
+          A new password has been emailed for{" "}
+          <span className="font-medium">{recovered.username}</span> on{" "}
+          {resolveServer(recovered.serverId, customCfg.servers)?.name ??
+            "that server"}
+          . Add a login for it above to save it.
+        </p>
+      )}
       {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}
       {needsSignIn && (
         <Button

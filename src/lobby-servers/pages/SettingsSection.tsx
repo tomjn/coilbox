@@ -2,6 +2,7 @@ import { Button, cn, Input, useSetting } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   ExternalLink,
+  KeyRound,
   Plus,
   RefreshCw,
   Server,
@@ -42,6 +43,7 @@ import {
   useCustomServers,
   useLobbyAccounts,
 } from "../config";
+import { PasswordRecoveryForm } from "../PasswordRecoveryForm";
 import { RegisterForm } from "../RegisterForm";
 import { AutojoinChannels } from "./components/AutojoinChannels";
 
@@ -68,6 +70,7 @@ export default function LobbyServersSettings() {
   const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   // The account whose editor drawer is open (null = closed).
   const [editingId, setEditingId] = useState<string | null>(null);
   // The custom server whose editor drawer is open (null = closed). Built-ins never
@@ -256,6 +259,14 @@ export default function LobbyServersSettings() {
           >
             <Plus /> Add login
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRecoveryOpen((o) => !o)}
+            disabled={servers.length === 0}
+          >
+            <KeyRound /> Forgot password
+          </Button>
         </div>
       </section>
 
@@ -307,6 +318,11 @@ export default function LobbyServersSettings() {
         open={registerOpen}
         servers={servers}
         onClose={() => setRegisterOpen(false)}
+      />
+      <RecoveryDrawer
+        open={recoveryOpen}
+        servers={servers}
+        onClose={() => setRecoveryOpen(false)}
       />
       <AccountDrawer
         account={accountsCfg.accounts.find((a) => a.id === editingId) ?? null}
@@ -495,6 +511,33 @@ function RegisterDrawer({
         <RegisterForm
           servers={servers}
           onSuccess={onClose}
+          onCancel={onClose}
+        />
+      </div>
+    </SlideDrawer>
+  );
+}
+
+/**
+ * Password recovery in the same slide-in drawer as registration and the login
+ * editor. `onSignIn` has nothing to sign in to from this page (there is no
+ * connect UI here), so it just closes the drawer like `onCancel` does.
+ */
+function RecoveryDrawer({
+  open,
+  servers,
+  onClose,
+}: {
+  open: boolean;
+  servers: LobbyServer[];
+  onClose: () => void;
+}) {
+  return (
+    <SlideDrawer open={open} title="Recover your password" onClose={onClose}>
+      <div className="flex-1 overflow-y-auto p-4">
+        <PasswordRecoveryForm
+          servers={servers}
+          onSignIn={onClose}
           onCancel={onClose}
         />
       </div>
