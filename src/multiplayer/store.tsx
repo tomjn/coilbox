@@ -41,6 +41,9 @@ import {
   type LoginPhase,
   mpActiveKeys,
   mpCancelConnect,
+  mpChangeEmail,
+  mpChangeEmailRequest,
+  mpChangePassword,
   mpConfirmAgreement,
   mpConnect,
   mpConnectTachyon,
@@ -48,14 +51,18 @@ import {
   mpDisconnect,
   mpFriendList,
   mpFriendRequestList,
+  mpGetUserInfo,
   mpIgnore,
   mpIgnoreList,
   mpJoinBattle,
   mpJoinChannel,
   mpReattach,
+  mpRecoverPassword,
   mpRegister,
   mpRegisterZerok,
+  mpResendVerification,
   mpSnapshot,
+  mpSubmitRecoveryCode,
   mpTachyonSignedIn,
   mpTachyonSignIn,
   mpWaitUntilReady,
@@ -166,6 +173,20 @@ function incomingChatMsg(d: Delta, state: LobbyState): ChatMsg | null {
  * the attempt budget — after this many failed attempts the loop gives up.
  */
 export const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 20000];
+
+/**
+ * How long to wait for the server's answer to a command that has no reply of its
+ * own. `CHANGEPASSWORD` is answered by a bare `SERVERMSG`, so the only way to
+ * pair a reply with a request is to watch for the next one after asking.
+ *
+ * Matches the Rust `READY_TIMEOUT` (`conn.rs:121`) and for the same reason.
+ * Generous, because a real server behind a slow link is not a failure, and
+ * bounded, because nothing below this times out at all.
+ */
+export const SERVER_REPLY_TIMEOUT_MS = 20_000;
+
+/** uberserver's exact wording on a successful `CHANGEPASSWORD` (`Protocol.py:3327`). */
+export const CHANGE_PASSWORD_SUCCESS = "Password changed successfully.";
 
 /**
  * How long deltas accumulate before the mirror is refreshed once for all of
@@ -420,6 +441,27 @@ export function mirrorReducer(
   }
 }
 
+/**
+ * The account's details as `mpGetUserInfo` answers them, merged from the three
+ * `accountInfo` deltas the server sends separately. A field stays at its last
+ * known value until its own line arrives, so a caller reading before the first
+ * answer sees every field null.
+ */
+export interface AccountInfo {
+  registrationDate: string | null;
+  email: string | null;
+  ingameHours: string | null;
+}
+
+/**
+ * How `recoverPassword` ended. uberserver emails a code and waits for
+ * `submitRecoveryCode`. teiserver has no in-lobby recovery and hands back a web
+ * address instead, with nothing further to send.
+ */
+export type RecoveryStart =
+  | { kind: "codeSent"; serverKey: string }
+  | { kind: "redirected"; url: string };
+
 interface MultiplayerContextValue {
   mirror: LobbyMirror;
   /** The connected `serverKey`, or null when not connected. */
@@ -480,6 +522,47 @@ interface MultiplayerContextValue {
     password: string,
     email?: string,
   ) => Promise<void>;
+  /**
+   * Start account recovery for `email` on a throwaway connection. Resolves with
+   * where the flow landed: a code was emailed and `submitRecoveryCode` is next,
+   * or the server redirected us to a web page and there is nothing further to
+   * do. The connection stays open on `codeSent` for `submitRecoveryCode` to
+   * finish and tear down. Rejects with the server's reason on denial.
+   */
+  recoverPassword: (
+    server: LobbyServer,
+    email: string,
+  ) => Promise<RecoveryStart>;
+  /**
+   * Finish account recovery with the emailed code, on the connection
+   * `recoverPassword` left open. Resolves with the username a locked-out user
+   * had no other way to learn. Tears the connection down whichever way it ends.
+   */
+  submitRecoveryCode: (
+    serverKey: string,
+    code: string,
+  ) => Promise<{ username: string }>;
+  /**
+   * Change the signed-in account's password. `CHANGEPASSWORD` has no accept or
+   * deny reply of its own, so this resolves off the next `SERVERMSG` and reads
+   * `succeeded` to tell a refusal from the real answer.
+   */
+  changePassword: (
+    current: string,
+    next: string,
+  ) => Promise<{ message: string; succeeded: boolean }>;
+  /** Ask for a code to confirm a new email address on the signed-in account. */
+  changeEmailRequest: (email: string) => Promise<void>;
+  /** Confirm a new email address with the emailed code. */
+  changeEmail: (email: string, code: string) => Promise<void>;
+  /** Ask for the signup verification code again. */
+  resendVerification: (email: string) => Promise<void>;
+  /** Ask the server for the signed-in account's details, answered as
+   * `accountInfo` deltas that land in {@link accountInfo}. */
+  getUserInfo: () => void;
+  /** The signed-in account's details, merged from the deltas `getUserInfo`
+   * triggers, or null before any have arrived. */
+  accountInfo: AccountInfo | null;
   disconnect: () => Promise<void>;
   /** Abort a connect still in progress (the "Connecting…" state), returning to
    * disconnected without an error or an auto-reconnect. */
@@ -580,6 +663,16 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // queued (never dropped) rather than overwriting each other; the dialog shows the
   // front and dismissing pops it.
   const [serverMsgBoxes, setServerMsgBoxes] = useState<string[]>([]);
+
+  // Callbacks waiting on the next `SERVERMSG`, for a command like `CHANGEPASSWORD`
+  // that has no reply of its own to correlate on. A set rather than a single slot,
+  // because nothing stops two such commands overlapping. Each is removed as soon
+  // as it fires or times out.
+  const serverMessageWaiters = useRef(new Set<(text: string) => void>());
+
+  // The signed-in account's details, merged from the `accountInfo` deltas
+  // `getUserInfo` triggers. Null until the first one arrives.
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
 
   // The game whose result the debriefing drawer is open on, or null when it is
   // shut. The result itself lives in the snapshot, so this only decides whether
@@ -1280,6 +1373,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // ignored so a malformed line can't pop a contentless toast/modal. The raw
         // line is already in the protocol console for history.
         else if (d.kind === "serverMessage") {
+          // A command with no reply of its own (e.g. `CHANGEPASSWORD`) is
+          // answered by whatever `SERVERMSG` comes next, and this is the only
+          // place every one passes through. Fire every waiter rather than just
+          // the first, since nothing stops two such commands overlapping.
+          for (const waiter of serverMessageWaiters.current) waiter(d.text);
           const text = d.text.trim();
           if (text) {
             if (d.boxed) setServerMsgBoxes((q) => [...q, d.text]);
@@ -1292,6 +1390,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // (issue #2003).
         else if (d.kind === "debriefingReceived") {
           setDebriefingShown(d.battleId);
+        }
+        // One labelled line of a `GETUSERINFO` answer. The three arrive
+        // separately, so a field that arrives null keeps whatever this already
+        // held rather than blanking it.
+        else if (d.kind === "accountInfo") {
+          setAccountInfo((prev) => ({
+            registrationDate:
+              d.registrationDate ?? prev?.registrationDate ?? null,
+            email: d.email ?? prev?.email ?? null,
+            ingameHours: d.ingameHours ?? prev?.ingameHours ?? null,
+          }));
         }
         queueSnapshot(d);
       }
@@ -1732,6 +1841,178 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // The recovery connection's event channel, kept only while parked awaiting the
+  // emailed code, so `submitRecoveryCode` can take over listening on the same
+  // connection `recoverPassword` opened rather than opening a second one.
+  // Removed once the code step settles.
+  const recoveryChannelsRef = useRef<Map<string, Channel<LobbyEvent>>>(
+    new Map(),
+  );
+
+  // Start account recovery: open a throwaway connection that sends
+  // RESETPASSWORDREQUEST, then resolve on wherever the flow lands. Unlike
+  // `register`, the connection is torn down only on `redirected` or a denial.
+  // A `codeSent` outcome leaves it open (and handed to `submitRecoveryCode`)
+  // because the code step needs that same connection.
+  const recoverPassword = useCallback(
+    async (server: LobbyServer, email: string): Promise<RecoveryStart> => {
+      setBusy(true);
+      const serverKey = serverKeyFor(server, email);
+      const onEvent = new Channel<LobbyEvent>();
+      let outcome: RecoveryStart | null = null;
+      try {
+        outcome = await new Promise<RecoveryStart>((resolve, reject) => {
+          let settled = false;
+          onEvent.onmessage = (ev) => {
+            if (settled) return;
+            if (ev.kind === "phase" && ev.phase === "awaitRecoveryCode") {
+              settled = true;
+              recoveryChannelsRef.current.set(serverKey, onEvent);
+              resolve({ kind: "codeSent", serverKey });
+            } else if (ev.kind === "delta" && ev.delta.kind === "recoveryUrl") {
+              // teiserver's redirect: the phase that follows carries no
+              // payload, so the address is read off this delta instead.
+              settled = true;
+              resolve({ kind: "redirected", url: ev.delta.url });
+            } else if (
+              ev.kind === "delta" &&
+              ev.delta.kind === "recoveryDenied"
+            ) {
+              settled = true;
+              reject(new Error(ev.delta.reason));
+            } else if (ev.kind === "disconnected") {
+              settled = true;
+              reject(new Error(ev.reason ?? "Account recovery failed"));
+            }
+          };
+          mpRecoverPassword({
+            serverKey,
+            host: server.host,
+            port: server.port,
+            tlsMode: tlsModeFor(server),
+            allowSelfSigned: server.allowSelfSigned,
+            email,
+            clientId: clientIdRef.current,
+            compatFlags: ["u", "sp"],
+            onEvent,
+          }).catch(reject);
+        });
+        return outcome;
+      } finally {
+        // Only `codeSent` leaves the connection parked for `submitRecoveryCode`
+        // to finish and close. Every other outcome is torn down here, same as
+        // `register` always does.
+        if (outcome?.kind !== "codeSent") {
+          await mpDisconnect({ serverKey }).catch((e) =>
+            console.warn("multiplayer: disconnect cleanup failed", e),
+          );
+        }
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  // Finish account recovery with the emailed code, on the connection
+  // `recoverPassword` left open awaiting it. Resolves on a `passwordReset`
+  // delta with the username, the one time the protocol tells a locked-out
+  // user who they are. Rejects with the server's reason on `recoveryDenied`.
+  // Tears the connection down whichever way it ends, which is the step
+  // `recoverPassword` deliberately left undone.
+  const submitRecoveryCode = useCallback(
+    async (serverKey: string, code: string) => {
+      const onEvent = recoveryChannelsRef.current.get(serverKey);
+      if (!onEvent) throw new Error("Not awaiting a recovery code.");
+      recoveryChannelsRef.current.delete(serverKey);
+      setBusy(true);
+      try {
+        return await new Promise<{ username: string }>((resolve, reject) => {
+          let settled = false;
+          onEvent.onmessage = (ev) => {
+            if (settled) return;
+            if (ev.kind === "delta" && ev.delta.kind === "passwordReset") {
+              settled = true;
+              resolve({ username: ev.delta.username });
+            } else if (
+              ev.kind === "delta" &&
+              ev.delta.kind === "recoveryDenied"
+            ) {
+              settled = true;
+              reject(new Error(ev.delta.reason));
+            } else if (ev.kind === "disconnected") {
+              settled = true;
+              reject(new Error(ev.reason ?? "Account recovery failed"));
+            }
+          };
+          mpSubmitRecoveryCode({ serverKey, code }).catch(reject);
+        });
+      } finally {
+        await mpDisconnect({ serverKey }).catch((e) =>
+          console.warn("multiplayer: disconnect cleanup failed", e),
+        );
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  // CHANGEPASSWORD is answered by a bare SERVERMSG with no token to correlate on,
+  // so the only place a reply can be paired with a request is where the request
+  // was made. Resolve on the next server message, and treat only uberserver's
+  // exact success string as success: a stale saved password can be retyped, one
+  // overwritten wrongly cannot.
+  const changePassword = useCallback(async (current: string, next: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    const reply = new Promise<{ message: string; succeeded: boolean }>(
+      (resolve, reject) => {
+        const timer = setTimeout(() => {
+          serverMessageWaiters.current.delete(waiter);
+          reject(new Error("The server did not answer."));
+        }, SERVER_REPLY_TIMEOUT_MS);
+        const waiter = (text: string) => {
+          clearTimeout(timer);
+          serverMessageWaiters.current.delete(waiter);
+          resolve({
+            message: text,
+            succeeded: text === CHANGE_PASSWORD_SUCCESS,
+          });
+        };
+        serverMessageWaiters.current.add(waiter);
+      },
+    );
+    await mpChangePassword({
+      serverKey: key,
+      currentPassword: current,
+      newPassword: next,
+    });
+    return reply;
+  }, []);
+
+  const changeEmailRequest = useCallback(async (email: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    await mpChangeEmailRequest({ serverKey: key, email });
+  }, []);
+
+  const changeEmail = useCallback(async (email: string, code: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    await mpChangeEmail({ serverKey: key, email, code });
+  }, []);
+
+  const resendVerification = useCallback(async (email: string) => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    await mpResendVerification({ serverKey: key, email });
+  }, []);
+
+  const getUserInfo = useCallback(() => {
+    const key = activeKeyRef.current;
+    if (!key) throw new Error("Not connected.");
+    void mpGetUserInfo({ serverKey: key });
+  }, []);
+
   const submitAgreementCode = useCallback(
     async (code: string) => {
       if (!pendingAgreement) return;
@@ -1841,6 +2122,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         connectDirect,
         signIn,
         register,
+        recoverPassword,
+        submitRecoveryCode,
+        changePassword,
+        changeEmailRequest,
+        changeEmail,
+        resendVerification,
+        getUserInfo,
+        accountInfo,
         disconnect,
         cancelConnect,
         pendingAgreement,
