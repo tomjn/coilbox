@@ -20,21 +20,17 @@ import { type LobbyServer, serverProtocol } from "./config";
  */
 export function PasswordRecoveryForm({
   servers,
-  defaultServerId,
   onSignIn,
   onCancel,
 }: {
   servers: LobbyServer[];
-  defaultServerId?: string;
   onSignIn: (serverId: string, username: string) => void;
   onCancel: () => void;
 }) {
   const { recoverPassword, submitRecoveryCode, cancelRecovery, busy } =
     useMultiplayer();
   const recoverable = servers.filter((s) => serverProtocol(s) === "tasserver");
-  const [serverId, setServerId] = useState(
-    defaultServerId ?? recoverable[0]?.id ?? "",
-  );
+  const [serverId, setServerId] = useState(recoverable[0]?.id ?? "");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [stage, setStage] = useState<"email" | "code" | "redirected" | "done">(

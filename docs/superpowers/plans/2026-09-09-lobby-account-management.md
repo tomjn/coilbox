@@ -27,6 +27,8 @@ The spec listed a `changePasswordResult` Rust delta produced by matching `SERVER
 
 `accountInfo` stays in `reduce.rs` as the spec has it, because its three labels are distinctive enough to match without correlation.
 
+The spec's "Reset" state asks for "a Sign in button that prefills the server and username in the connect popover". The connect popover has no password field to prefill: a stored login connects from its keychain secret, not from a typed one, and the freshly emailed password is not in the keychain yet. So the Sign in entry point instead opens the account editor on the recovered account, and the connect popover carries a note pointing at settings for the account whose password was just reset.
+
 ---
 
 ### Task 1: Command builders
