@@ -42,6 +42,22 @@ use std::collections::{BTreeSet, HashMap};
 /// here is allowed to change what that module exposes.
 const POST_FILE: &str = "gamedata/unitdefs_post.lua";
 
+/// Mirrors `compile::language_file_path`, for the reason `POST_FILE` is
+/// mirrored. `a_language_edits_file_is_the_one_the_compiler_wrote` holds the
+/// two together, since this is the one mirrored fact here that would send
+/// somebody to a file that does not exist if it drifted.
+fn language_file_path(code: &str) -> String {
+    format!("language/{code}/zz_coilbox.json")
+}
+
+/// Mirrors `compile::valid_language_code`, for the same reason.
+fn valid_language_code(code: &str) -> bool {
+    !code.is_empty()
+        && code
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+}
+
 /// Mirrors `compile::valid_unit_key`, for the same reason `POST_FILE` does: a
 /// stable, already-duplicated invariant (see that function's own comment
 /// about `checkCloneName` in `src/workshop/clones.ts`) rather than a new one
@@ -78,6 +94,13 @@ pub enum BarSlotMiss {
     /// be missing. See this module's own doc comment for why that is refused
     /// rather than guessed.
     Unresolved,
+    /// A name or description edit, which the mutator carries in a language
+    /// file and no slot can carry at all: a slot's Lua runs in the definition
+    /// parser, where `Spring.I18N` does not exist (issue #2743). Not a
+    /// packing failure like the two above, and said out loud rather than left
+    /// blank, because a rename that reaches the mutator and not the lobby
+    /// export is exactly the difference somebody needs to be told about.
+    NoSlotForWords,
 }
 
 /// One traced change: what happened, the field it came from when it names
@@ -472,34 +495,34 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
 
         if let Some(languages) = edits.text.get(&unit) {
             for (lang, fields) in languages {
-                if let Some(name) = &fields.name {
-                    changes.push(LedgerChange {
-                        description: format!("Name ({lang}): {name}"),
-                        field_path: None,
-                        files: Vec::new(),
-                        bar_slot: None,
-                        bar_miss: None,
-                        uncompiled_reason: Some(
-                            "A mutator can only replace this game's whole localisation file, \
-                             which would blank every other unit's words, so name and \
-                             description edits are not compiled."
+                let (files, uncompiled_reason, bar_miss) = if valid_language_code(lang) {
+                    (
+                        vec![language_file_path(lang)],
+                        None,
+                        Some(BarSlotMiss::NoSlotForWords),
+                    )
+                } else {
+                    (
+                        Vec::new(),
+                        Some(
+                            "This language code can only hold lowercase letters, digits, \
+                             hyphens and underscores, and it becomes a folder name in the \
+                             generated game."
                                 .to_string(),
                         ),
-                    });
-                }
-                if let Some(description) = &fields.description {
+                        None,
+                    )
+                };
+                for (label, value) in [("Name", &fields.name), ("Description", &fields.description)]
+                {
+                    let Some(value) = value else { continue };
                     changes.push(LedgerChange {
-                        description: format!("Description ({lang}): {description}"),
+                        description: format!("{label} ({lang}): {value}"),
                         field_path: None,
-                        files: Vec::new(),
+                        files: files.clone(),
                         bar_slot: None,
-                        bar_miss: None,
-                        uncompiled_reason: Some(
-                            "A mutator can only replace this game's whole localisation file, \
-                             which would blank every other unit's words, so name and \
-                             description edits are not compiled."
-                                .to_string(),
-                        ),
+                        bar_miss,
+                        uncompiled_reason: uncompiled_reason.clone(),
                     });
                 }
             }
@@ -694,18 +717,47 @@ mod tests {
         assert_eq!(changes[0].files, vec![POST_FILE.to_string()]);
     }
 
-    /// A name edit is the one change compile.rs already declines to carry at
-    /// all, and the ledger has to say that rather than naming a file nothing
-    /// wrote it into.
+    /// A name edit reaches the mutator's own language file and no BAR slot,
+    /// and the ledger has to say both: the file it can be read in, and the
+    /// route it will not travel by (issue #2743).
     #[test]
-    fn a_name_edit_is_reported_as_uncompiled_with_no_file() {
+    fn a_name_edit_names_its_language_file_and_no_bar_slot() {
         let ledger = build_ledger(&project(json!({
             "text": { "armcom": { "en": { "name": "Commander" } } }
         })));
         let changes = changes_for(&ledger, "armcom");
         assert_eq!(changes.len(), 1);
-        assert!(changes[0].files.is_empty());
+        assert_eq!(changes[0].files, vec!["language/en/zz_coilbox.json"]);
         assert!(changes[0].bar_slot.is_none());
+        assert_eq!(changes[0].bar_miss, Some(BarSlotMiss::NoSlotForWords));
+        assert!(changes[0].uncompiled_reason.is_none());
+    }
+
+    /// The one path this module mirrors rather than reads off `compile.rs`.
+    /// A drift here sends somebody to a file the archive does not hold.
+    #[test]
+    fn a_language_edits_file_is_the_one_the_compiler_wrote() {
+        let project = project(json!({
+            "text": { "armcom": { "en": { "name": "Commander" } } }
+        }));
+        let ledger = build_ledger(&project);
+        let traced = &changes_for(&ledger, "armcom")[0].files[0];
+        assert!(
+            compile(&project).files.iter().any(|f| &f.path == traced),
+            "the ledger names {traced}, which the compiler did not write"
+        );
+    }
+
+    /// A language code that cannot be a folder name is left out of the
+    /// compile, and the ledger agrees rather than naming a file.
+    #[test]
+    fn a_name_edit_in_an_impossible_language_is_reported_as_left_out() {
+        let ledger = build_ledger(&project(json!({
+            "text": { "armcom": { "../evil": { "name": "Commander" } } }
+        })));
+        let changes = changes_for(&ledger, "armcom");
+        assert_eq!(changes.len(), 1);
+        assert!(changes[0].files.is_empty());
         assert!(changes[0].uncompiled_reason.is_some());
     }
 

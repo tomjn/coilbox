@@ -330,6 +330,8 @@ function ChangeDestination({ change }: { change: LedgerChange }) {
     parts.push("no BAR slot left to hold it");
   else if (change.barMiss === "unresolved")
     parts.push("BAR slot not traced for this project");
+  else if (change.barMiss === "noSlotForWords")
+    parts.push("no BAR slot can carry words");
   if (change.uncompiledReason) parts.push(change.uncompiledReason);
   if (parts.length === 0) return null;
   return (

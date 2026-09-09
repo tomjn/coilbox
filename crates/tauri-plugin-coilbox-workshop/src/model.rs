@@ -92,8 +92,9 @@ impl GameEdits {
     }
 
     /// How many name and description edits the project holds, across every
-    /// unit and every language. Reported in the note that says they are not
-    /// compiled, so the number is the user's own count.
+    /// unit and every language. A German name and an English name are two,
+    /// matching `textEditCount` in `src/workshop/unitText.ts`, so the number
+    /// is the user's own count.
     pub fn text_edit_count(&self) -> usize {
         self.text
             .values()
