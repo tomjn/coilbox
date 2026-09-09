@@ -1,8 +1,6 @@
-import type { StartRect } from "../bindings";
-import { allyLetter, readableText } from "./config";
+import { allyLetter, readableText } from "@/lib/allyDisplay";
+import { GRID, type StartRect } from "./geometry";
 
-/** TASServer ADDSTARTRECT coordinates are on a 0..200 grid (200 = full map). */
-const GRID = 200;
 const pct = (v: number) => (v / GRID) * 100;
 
 /**
@@ -10,8 +8,8 @@ const pct = (v: number) => (v / GRID) * 100;
  * integers on a 0..200 grid, normalised to `%` inside the aspect-correct image
  * box. Each box gets a dark hairline (so it reads on light *and* dark maps), a
  * gently pulsing ally-coloured fill, and a solid ally-coloured label pill with
- * contrasting text — keeping many boxes distinguishable. Editing is a host
- * concern and out of scope for the joiner room.
+ * contrasting text, keeping many boxes distinguishable. This is the read-only
+ * half: `StartBoxEditor` is the variant shown to whoever may change the boxes.
  */
 export function StartBoxOverlay({
   rects,

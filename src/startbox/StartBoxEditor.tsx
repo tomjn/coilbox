@@ -1,6 +1,6 @@
+import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { StartRect } from "../bindings";
-import { allyLetter, readableText } from "./config";
+import { allyLetter, readableText } from "@/lib/allyDisplay";
 import {
   boxFromPoints,
   type Edge,
@@ -11,7 +11,8 @@ import {
   type Point,
   pxToGrid,
   resizeBox,
-} from "./startBoxGeometry";
+  type StartRect,
+} from "./geometry";
 
 const pct = (v: number) => (v / GRID) * 100;
 
@@ -62,7 +63,7 @@ function boxOf(d: Drag): StartRect {
 }
 
 /**
- * Interactive host variant of `StartBoxOverlay`: drag empty map to CREATE the
+ * Interactive variant of `StartBoxOverlay`: drag empty map to CREATE the
  * active ally's box, drag a box body to MOVE it, drag a handle to RESIZE. Freeform
  * (no grid snap), one box per ally, colour-matched to the roster. We hold no
  * committed state — the box the drag draws is shown live, then `onCommit` fires
@@ -75,13 +76,16 @@ export function StartBoxEditor({
   allyColors,
   activeAlly,
   onCommit,
+  onClear,
 }: {
   rects: Record<string, StartRect>;
   allyColors: Record<number, string>;
   /** Ally a new box (drag on empty map) is assigned to. */
   activeAlly: number;
-  /** Commit one ally's box on release; `ally` is 0-based (protocol). */
+  /** Commit one ally's box on release. `ally` is 0-based (protocol). */
   onCommit: (ally: number, rect: StartRect) => void;
+  /** Delete one ally's box, from the button on the box itself. */
+  onClear: (ally: number) => void;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -89,9 +93,10 @@ export function StartBoxEditor({
   // Optimistic hold: keep showing a just-committed rect until the server echoes it
   // back into `rects`, so the box doesn't flash to its previous size for one
   // round-trip between pointer-up and the ADDSTARTRECT / `!addbox` echo. Any
-  // incoming `rects` update is the server's latest word, so it clears the hold
-  // (covering edits, clears and rejections alike); the timer is a backstop for an
-  // edit the server never echoes.
+  // incoming `rects` update is the server's latest word, so it clears the hold,
+  // covering edits, clears and rejections alike. The timer is a backstop for an
+  // edit the server never echoes. A skirmish owns its own rects and answers on
+  // the next render, which clears the hold the same way.
   const [optimistic, setOptimistic] = useState<Record<string, StartRect>>({});
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally keyed on `rects` changing (the server's latest word) to drop the hold; the body reads none of it.
@@ -224,12 +229,33 @@ export function StartBoxEditor({
               style={{ background: `${color}33` }}
               onPointerDown={(e) => startMove(e, ally, rect)}
             />
-            <span
-              className="pointer-events-none absolute left-0 top-0 m-0.5 rounded px-1 text-[10px] font-bold leading-tight shadow"
-              style={{ background: color, color: readableText(color) }}
-            >
-              {allyLetter(ally)}
-            </span>
+            {/* The ally's name and its delete button, together in the corner
+                furthest from any resize handle's reach. A real button rather
+                than a pointer-only glyph, so clearing one ally is still
+                reachable by keyboard now that the panel's own button is gone. */}
+            <div className="absolute left-0 top-0 m-0.5 flex items-center gap-0.5">
+              <span
+                className="pointer-events-none rounded px-1 text-[10px] font-bold leading-tight shadow"
+                style={{ background: color, color: readableText(color) }}
+              >
+                {allyLetter(ally)}
+              </span>
+              <button
+                type="button"
+                aria-label={`Clear ally ${allyLetter(ally)}'s start box`}
+                title={`Clear ally ${allyLetter(ally)}'s start box`}
+                // The drag surface below reads pointerdown, so the press must
+                // stop here or clearing a box starts by moving it.
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear(ally);
+                }}
+                className="flex size-4 items-center justify-center rounded-full border border-black/60 bg-white text-black/70 shadow hover:bg-red-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
             {HANDLES.map((h) => (
               <div
                 key={h.className}

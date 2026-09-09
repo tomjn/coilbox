@@ -144,6 +144,22 @@ export function hubItemIdFromUrl(
   }
 }
 
+/**
+ * The hub website's map listing filtered to one map author, for opening in a
+ * browser. `/maps?author=<name>` is a real route on the hub (`app/maps/page.tsx`),
+ * and it resolves the spelling to that person's author keys itself, so the name
+ * as the map's own mapinfo spells it is what to hand it: somebody who signed two
+ * maps differently still gets both.
+ *
+ * A page on the website rather than a screen in the app, because the app only
+ * knows the maps this machine has and the question "what else did they make" is
+ * about the ones it does not.
+ */
+export function hubAuthorMapsUrl(hubUrl: string, author: string): string {
+  const base = hubUrl.replace(/\/+$/, "");
+  return `${base}/maps?author=${encodeURIComponent(author)}`;
+}
+
 /** Where an item's page lives in the app. Here rather than in the plugin's
  * `index.tsx`, so the deep-link handler can address it without importing a
  * plugin definition to get at one string. */

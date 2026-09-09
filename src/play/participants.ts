@@ -1,4 +1,5 @@
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
+import { GRID, type StartRect } from "@/startbox/geometry";
 import type { ConfigOption, SkirmishAi } from "../content/bindings";
 import type { BattleConfig } from "./bindings";
 import type { BattleRestrictions } from "./drafts";
@@ -327,6 +328,15 @@ export function rgbToHex([r, g, b]: Rgb): string {
  * own from `mapOptionSchema`, so every screen that launches a game writes the
  * same `[modoptions]` and `[mapoptions]` blocks for the same choices.
  */
+/**
+ * One start box from the editor's 0..200 grid to the start script's
+ * `[top, left, bottom, right]` in 0..1. The engine reads the four `StartRect*`
+ * keys as map fractions, which is the one place the two coordinate systems meet.
+ */
+function rectToScript(r: StartRect): [number, number, number, number] {
+  return [r.top / GRID, r.left / GRID, r.bottom / GRID, r.right / GRID];
+}
+
 export function toBattleConfig(opts: {
   participants: Participant[];
   mapName: string;
@@ -354,6 +364,13 @@ export function toBattleConfig(opts: {
    * is: a new launch path should not be able to quietly skip it.
    */
   mapOptionSchema: ConfigOption[];
+  /**
+   * Ally start boxes on the 0..200 grid, keyed by the ally number the
+   * participants carry. Written only under `startPosType` 2, the mode that draws
+   * boxes: any other mode ignores whatever the setup happens to be holding, so a
+   * saved layout can survive a change of mind without leaking into the script.
+   */
+  startRects?: Record<string, StartRect>;
   /** Units to disable entirely (rendered as `[RESTRICT]` limit 0). */
   disabledUnits?: string[];
 }): BattleConfig {
@@ -364,6 +381,7 @@ export function toBattleConfig(opts: {
     startPosType,
     optionSchema,
     mapOptionSchema,
+    startRects,
     disabledUnits,
   } = opts;
   const modOptions = effectiveOptions(optionSchema, opts.modOptions);
@@ -421,7 +439,16 @@ export function toBattleConfig(opts: {
     ],
     ais,
     teams,
-    allyTeams: allyValues.map(() => ({ numAllies: 0 })),
+    // An ally's box is keyed by the ally number the setup shows, which is not
+    // its index here: `allyValues` drops the ally numbers nobody picked and
+    // renumbers the rest from 0. Look the box up by the original number so a
+    // roster on allies A and C still writes two boxes rather than one.
+    allyTeams: allyValues.map((value) => {
+      const rect = startPosType === 2 ? startRects?.[String(value)] : undefined;
+      return rect
+        ? { numAllies: 0, startRect: rectToScript(rect) }
+        : { numAllies: 0 };
+    }),
     modOptions: Object.keys(modOptions).length > 0 ? modOptions : undefined,
     mapOptions: Object.keys(mapOptions).length > 0 ? mapOptions : undefined,
     restrictedUnits:

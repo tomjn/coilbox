@@ -16,11 +16,12 @@ import {
   MapOverlayImage,
   useMapOverlayLayer,
 } from "@/play/pages/components/MapOverlay";
-import type { Battle, StartRect } from "../bindings";
+import type { StartRect } from "@/startbox/geometry";
+import { StartBoxEditor } from "@/startbox/StartBoxEditor";
+import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
+import type { Battle } from "../bindings";
 import { hexToI32, type MemberRow } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
-import { StartBoxEditor } from "./StartBoxEditor";
-import { StartBoxOverlay } from "./StartBoxOverlay";
 
 /**
  * The battle's map, rendered through the shared singleplayer `MapCard` so it
@@ -44,6 +45,7 @@ export function BattleMapCard({
   canEditBoxes,
   activeAlly,
   onSetBox,
+  onClearBox,
   onSuggestMap,
   onChangeMap,
   onRescan,
@@ -67,6 +69,8 @@ export function BattleMapCard({
   activeAlly: number;
   /** Commit one ally's box (0-based) on drag release. */
   onSetBox: (ally: number, rect: StartRect) => void;
+  /** Delete one ally's box, from the cross on the box itself. */
+  onClearBox: (ally: number) => void;
   onSuggestMap: (name: string) => void;
   onChangeMap: (name: string, maphash: number) => void;
   onRescan: () => Promise<void>;
@@ -208,6 +212,7 @@ export function BattleMapCard({
                 allyColors={allyColors}
                 activeAlly={activeAlly}
                 onCommit={onSetBox}
+                onClear={onClearBox}
               />
             ) : showBoxes ? (
               <StartBoxOverlay

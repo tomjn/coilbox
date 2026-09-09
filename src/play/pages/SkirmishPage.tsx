@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, History, Play, Swords } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -43,6 +43,15 @@ import { mostRecentOpen } from "@/lib/recency";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { useMultiplayer } from "@/multiplayer/store";
 import { notify } from "@/notify/notify";
+import type { StartRect } from "@/startbox/geometry";
+import { isBoxMode, startPosNote } from "@/startbox/mode";
+import {
+  StartBoxControls,
+  useStartBoxAllies,
+} from "@/startbox/StartBoxControls";
+import { StartBoxEditor } from "@/startbox/StartBoxEditor";
+import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
+import { StartPosCard } from "@/startbox/StartPosCard";
 import { contentListReplays } from "../../content/bindings";
 import { useBrandingEntry } from "../../content/branding";
 import { useReplayUserState } from "../../content/replayUserState";
@@ -151,6 +160,12 @@ export default function SkirmishPage() {
   const [gameName, setGameName] = useState(() => draft.gameName);
   const [mapName, setMapName] = useState(() => draft.mapName);
   const [startPosType, setStartPosType] = useState(() => draft.startPosType);
+  // Ally start boxes for choose-in-game, on the same 0..200 grid the battle room
+  // draws on. Kept while another start-position mode is picked so switching back
+  // returns the layout you drew. Only mode 2 reaches the start script.
+  const [startRects, setStartRects] = useState<Record<string, StartRect>>(
+    () => draft.startRects ?? {},
+  );
   const [modOptionValues, setModOptionValues] = useState<
     Record<string, string>
   >(() => draft.modOptionValues);
@@ -364,6 +379,7 @@ export default function SkirmishPage() {
         gameName,
         mapName,
         startPosType,
+        startRects,
         modOptionValues,
         restrictions,
         touchedAt: Date.now(),
@@ -375,6 +391,7 @@ export default function SkirmishPage() {
     gameName,
     mapName,
     startPosType,
+    startRects,
     modOptionValues,
     restrictions,
     setDraft,
@@ -390,6 +407,33 @@ export default function SkirmishPage() {
       return p ? rgbToHex(p.color) : [];
     });
   }, [participants]);
+
+  // Each ally's colour for the start-box editor, taken from the first row on it
+  // so a box is drawn in the colour of the side that will spawn in it. A
+  // spectating "you" holds no ally, so it contributes none.
+  const allyColors = useMemo(() => {
+    const out: Record<number, string> = {};
+    for (const p of participants) {
+      if (p.kind === "you" && p.spectator) continue;
+      if (out[p.allyTeam] == null) out[p.allyTeam] = rgbToHex(p.color);
+    }
+    return out;
+  }, [participants]);
+  // Ally state shared between the minimap's drag editor and the controls under
+  // the start-position dropdown, exactly as the battle room shares it.
+  const boxAllies = useStartBoxAllies(allyColors, startRects);
+  const boxMode = isBoxMode(startPosType);
+
+  const setStartBox = useCallback((ally: number, rect: StartRect) => {
+    setStartRects((r) => ({ ...r, [String(ally)]: rect }));
+  }, []);
+  const clearStartBox = useCallback((ally: number) => {
+    setStartRects((r) => {
+      const next = { ...r };
+      delete next[String(ally)];
+      return next;
+    });
+  }, []);
 
   const you = participants.find((p) => p.kind === "you");
   const activeCount = participants.filter(
@@ -452,6 +496,7 @@ export default function SkirmishPage() {
         mapName: selectedMap.name,
         gameType: selectedGame.name,
         startPosType,
+        startRects,
         modOptions: modOptionValues,
         optionSchema: modOptions,
         // Read here rather than off a hook: the map's option list settles a
@@ -472,6 +517,7 @@ export default function SkirmishPage() {
     gameName,
     mapName,
     startPosType,
+    startRects,
     modOptionValues,
     restrictions,
   });
@@ -587,6 +633,7 @@ export default function SkirmishPage() {
     setGameName(p.gameName);
     setMapName(p.mapName);
     setStartPosType(p.startPosType);
+    setStartRects(p.startRects ?? {});
     setModOptionValues(p.modOptionValues);
     setRestrictions(p.restrictions);
     touchPreset(p.id);
@@ -907,7 +954,10 @@ export default function SkirmishPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      {/* 22rem to the side, the width the battle room's aside is fixed at, so the
+          map and the start-box editor under it are the same size in both places.
+          It still stacks below md, which the battle room's flex row never does. */}
+      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-5">
           {aiNotice && (
             <Alert className="p-3">
@@ -956,8 +1006,6 @@ export default function SkirmishPage() {
           />
           <GameOptionsPanel
             selectedGame={selectedGame}
-            startPosType={startPosType}
-            onStartPosType={setStartPosType}
             options={modOptions}
             optionValues={modOptionValues}
             onOptionChange={(key, value) =>
@@ -973,7 +1021,9 @@ export default function SkirmishPage() {
             maps={maps}
             thumbs={thumbs}
             minimapUrl={minimap.url}
-            startPositions={minimap.startPositions}
+            // The map's own positions are not what a box-mode game spawns from,
+            // so the dots go while boxes are in play (as `BattleMapCard` does).
+            startPositions={boxMode ? [] : minimap.startPositions}
             minimapLoading={minimap.loading}
             markerColors={activeColors}
             env={minimap.env}
@@ -981,15 +1031,56 @@ export default function SkirmishPage() {
             onSelectMap={setMapName}
             disabled={running}
             dimBase={!!overlay.overlayUrl}
+            overlayInteractive={boxMode && !running}
             overlay={
-              overlay.overlayUrl ? (
-                <MapOverlayImage src={overlay.overlayUrl} />
-              ) : undefined
+              <>
+                {overlay.overlayUrl && (
+                  <MapOverlayImage src={overlay.overlayUrl} />
+                )}
+                {boxMode &&
+                  (running ? (
+                    <StartBoxOverlay
+                      rects={startRects}
+                      allyColors={allyColors}
+                    />
+                  ) : (
+                    <StartBoxEditor
+                      rects={startRects}
+                      allyColors={allyColors}
+                      activeAlly={boxAllies.activeAlly}
+                      onCommit={setStartBox}
+                      onClear={clearStartBox}
+                    />
+                  ))}
+              </>
             }
           />
           {canOverlay && (
             <MapLayerToggle layer={overlay.layer} onChange={overlay.setLayer} />
           )}
+          <StartPosCard
+            value={startPosType}
+            onChange={setStartPosType}
+            disabled={running}
+            note={startPosNote({
+              startPosType,
+              hasBoxes: Object.keys(startRects).length > 0,
+              canEditBoxes: !running,
+            })}
+          >
+            {boxMode && !running && (
+              <StartBoxControls
+                mapName={mapName}
+                rects={startRects}
+                allyList={boxAllies.allyList}
+                allyColors={allyColors}
+                activeAlly={boxAllies.activeAlly}
+                onPickAlly={boxAllies.pickAlly}
+                onSetBox={setStartBox}
+                onClearBox={clearStartBox}
+              />
+            )}
+          </StartPosCard>
           <GameSelectCard
             game={selectedGame}
             games={games}

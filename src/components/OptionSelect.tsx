@@ -55,9 +55,13 @@ function renderOption(o: Option) {
       disabled={o.disabled}
     >
       {o.icon ? (
-        <span className="flex items-center gap-2">
-          {o.icon}
-          {o.label}
+        // `min-w-0` plus `truncate` so a label too wide for the trigger ends in
+        // an ellipsis rather than being sliced through a letter. The icon is
+        // mirrored into the trigger, where the space is tightest, and without
+        // these the text is what the trigger's hidden overflow cuts.
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="flex shrink-0 items-center">{o.icon}</span>
+          <span className="truncate">{o.label}</span>
         </span>
       ) : (
         o.label

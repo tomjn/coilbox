@@ -1,5 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
+import type { StartRect } from "@/startbox/geometry";
 import type { TlsMode } from "../lobby-servers/config";
 import type { BattleConfig } from "../play/bindings";
 
@@ -118,13 +119,11 @@ export interface Bot {
   teamColor: number;
 }
 
-/** Ally start rectangle; bounds are integers on a 0..200 grid (200 = full map). */
-export interface StartRect {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
+// Ally start rectangle, bounds as integers on a 0..200 grid (200 = full map).
+// Declared in `@/startbox/geometry` rather than here because singleplayer draws
+// the same boxes and must not import a lobby binding. Re-exported so existing
+// call sites keep taking it from the bindings that carry it on the wire.
+export type { StartRect };
 
 export interface Battle {
   id: number;
