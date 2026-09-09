@@ -36,6 +36,11 @@
  * button reads the same way, live off the document rather than gated on a
  * drawer.
  *
+ * The post-processing check (issue #2744) is the fifth, and it reads live for
+ * the same reason preflight does. It asks one question the other four cannot:
+ * whether the file the compiler writes its executable Lua into is a file this
+ * particular game already uses. `postHook.ts` holds the engine reasoning.
+ *
  * The change ledger (issue #2653) is last, beside preflight rather than
  * folded into the verdict: it does not say whether the project is fit to
  * use, it says where each of its edits went once compiled, which is only
@@ -60,11 +65,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ConfigOption } from "@/content/bindings";
+import type { Archive, ConfigOption } from "@/content/bindings";
 import type { ChangeLedger, LedgerChange } from "../../changeLedger";
 import { ledgerByOutput, useChangeLedger } from "../../changeLedger";
 import type { CompatFinding, CompatState } from "../../compatibility";
+import { useCompiledProject } from "../../compile";
 import { deliveryRoutes } from "../../deliveryRoutes";
+import type { PostHookState } from "../../postHook";
+import { POST_FILE, usePostHookCheck } from "../../postHook";
 import type { PreflightReport } from "../../preflight";
 import { usePreflightReport } from "../../preflight";
 import type { ModProject } from "../../project";
@@ -254,6 +262,80 @@ function RoutesSection({
             </li>
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Whether the mutator would cover the game's own unit post-processing (issue
+ * #2744).
+ *
+ * Fourth in the drawer, straight after delivery routes, because it is the
+ * same subject read one level down: routes says the mutator is available, and
+ * this says what taking it would cost against this particular game. The two
+ * belong next to each other, since the answer to a covered post file is
+ * usually "take the other route".
+ *
+ * Silent for a project that writes no post file at all, which is most of
+ * them. See `postHook.ts` for why both halves have to be true before there is
+ * anything worth saying.
+ */
+function PostHookSection({
+  gameName,
+  primaryArchive,
+  state,
+  loading,
+}: {
+  gameName: string;
+  primaryArchive: string;
+  state: PostHookState | null;
+  loading: boolean;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="font-medium text-sm">Post-processing</h3>
+      {loading || !state ? (
+        <p className="text-muted-foreground text-sm">
+          {loading
+            ? `Reading whether ${gameName} post-processes its own units…`
+            : "No game is picked yet, so there is nothing to read."}
+        </p>
+      ) : state.kind === "unwritten" ? (
+        <p className="text-muted-foreground text-sm">
+          Nothing in this project needs {POST_FILE}, so the mutator covers
+          nothing of {gameName}'s.
+        </p>
+      ) : state.kind === "unknown" ? (
+        <p className="text-muted-foreground text-sm">
+          {gameName}'s archives could not be read, so whether the mutator would
+          cover its own post-processing is not known: {state.detail}
+        </p>
+      ) : state.kind === "clear" ? (
+        <p className="text-muted-foreground text-sm">
+          This project's mutator writes {POST_FILE}, and {gameName} has no file
+          of its own there for it to cover.
+        </p>
+      ) : (
+        <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+          <CircleX className="mt-0.5 size-4 shrink-0" />
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span>
+              {state.archive === primaryArchive
+                ? `${gameName} post-processes its own units in ${POST_FILE}.`
+                : `${gameName} inherits a ${POST_FILE} from ${state.archive}.`}{" "}
+              This project's mutator writes a file at that path, which takes its
+              place.
+            </span>
+            <span className="text-xs">
+              The engine's definition parser gives a mutator no way to run the
+              file it covered, so playing this mutator skips whatever {gameName}{" "}
+              does there, from a few missing values to a game that does not
+              start. Deliver it through the tweak slots instead, if this game
+              has them.
+            </span>
+          </div>
+        </div>
       )}
     </section>
   );
@@ -522,6 +604,9 @@ function verdict(
 
 export function ChecksButton({
   gameName,
+  gameArchives,
+  enginePath,
+  dataDir,
   diagnosticErrors,
   diagnosticsChecking,
   routeOptions,
@@ -531,6 +616,14 @@ export function ChecksButton({
   onApplyFix,
 }: {
   gameName: string;
+  /** The game's own archives, its primary one first, for the post-processing
+   *  check to read (issue #2744). The engine's base content is deliberately
+   *  not among them: see `postHook.ts`. */
+  gameArchives: Archive[];
+  /** Where to read those archives from. Undefined before a scan target is
+   *  picked, in which case the post-processing check has nothing to read. */
+  enginePath: string | undefined;
+  dataDir: string | undefined;
   /** What unitsync said reading the game's definitions. */
   diagnosticErrors: string[];
   /** The game's own read is still going, so the count is not known yet. */
@@ -556,6 +649,17 @@ export function ChecksButton({
   // Only while the drawer is open: see the module doc comment for why the
   // change ledger does not need the same always-on read preflight does.
   const changeLedger = useChangeLedger(project, open);
+  // Also live, for the same reason preflight is: the post-processing check
+  // reaches the button's face, and it needs the compiler's own answer about
+  // which files this project produces rather than a second guess at the rule.
+  // One more compile per edit alongside the one preflight already runs.
+  const compile = useCompiledProject(project, true);
+  const postHook = usePostHookCheck(
+    enginePath,
+    dataDir,
+    gameArchives,
+    compile.compiled,
+  );
 
   // A reference that names nothing is blocker-grade even though it stops no
   // export: the project compiles, ships, and then does not do what it says.
@@ -563,8 +667,11 @@ export function ChecksButton({
   // it must not sit behind a tick.
   const moved =
     compatibility?.kind === "moved" ? compatibility.report : undefined;
+  // A covered post file is blocker-grade for the same reason a dead reference
+  // is: nothing stops the export, and the game it produces is wrong.
+  const covered = postHook.state?.kind === "covered" ? 1 : 0;
   const blockers =
-    (preflight.report?.blockers.length ?? 0) + (moved?.broken ?? 0);
+    (preflight.report?.blockers.length ?? 0) + (moved?.broken ?? 0) + covered;
   const review = (preflight.report?.review.length ?? 0) + (moved?.review ?? 0);
   const diagnostics = diagnosticErrors.length;
   // A command that failed to answer is not a clean project, it is a question
@@ -574,7 +681,11 @@ export function ChecksButton({
   const preflightFailed = !!project && !!preflight.error;
 
   const preflightChecking = !!project && preflight.loading && !preflight.report;
-  const checking = diagnosticsChecking || routesChecking || preflightChecking;
+  const checking =
+    diagnosticsChecking ||
+    routesChecking ||
+    preflightChecking ||
+    postHook.loading;
   const attention =
     !checking &&
     (preflightFailed || blockers > 0 || review > 0 || diagnostics > 0);
@@ -629,7 +740,7 @@ export function ChecksButton({
         open={open}
         onOpenChange={setOpen}
         title="Checks"
-        description={`Whether ${gameName} is in a fit state to use: the game's own definitions, whether the project still fits them, how an edit reaches it, what is wrong with what you have written, and which output each edit ended up in.`}
+        description={`Whether ${gameName} is in a fit state to use: the game's own definitions, whether the project still fits them, how an edit reaches it, what a mutator would cover of the game's own post-processing, what is wrong with what you have written, and which output each edit ended up in.`}
         width="34rem"
       >
         <div className="flex flex-col gap-5">
@@ -643,6 +754,12 @@ export function ChecksButton({
             gameName={gameName}
             options={routeOptions}
             checking={routesChecking}
+          />
+          <PostHookSection
+            gameName={gameName}
+            primaryArchive={gameArchives[0]?.name ?? ""}
+            state={postHook.state}
+            loading={postHook.loading}
           />
           <PreflightSection
             project={project}

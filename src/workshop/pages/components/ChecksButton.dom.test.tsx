@@ -15,11 +15,31 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 let preflightResponse: unknown = { blockers: [], review: [], passes: [] };
 let changeLedgerResponse: unknown = { units: [], notes: [] };
+let compileResponse: unknown = {
+  chunks: [],
+  files: [],
+  notes: [],
+  barTweakdefs: null,
+};
+/** Which archives the fake unitsync says hold a post file, by archive name.
+ *  Keyed rather than one shared answer, so a dependency can hold one while the
+ *  game's own archive does not. */
+let archivesWithPostFile: string[] = [];
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
-    (_plugin: string, command: string) => async (_args: unknown) => {
+    (_plugin: string, command: string) => async (args: unknown) => {
       if (command === "workshop_preflight") return preflightResponse;
       if (command === "workshop_change_ledger") return changeLedgerResponse;
+      if (command === "workshop_compile") return compileResponse;
+      if (command === "unitsync_archive_tree") {
+        const archive = (args as { archive: string }).archive;
+        return {
+          files: archivesWithPostFile.includes(archive)
+            ? [{ path: "gamedata/unitdefs_post.lua", size: 1755 }]
+            : [],
+          errors: [],
+        };
+      }
       throw new Error(`unexpected command ${command}`);
     },
 }));
@@ -41,6 +61,8 @@ afterEach(() => {
   cleanup();
   preflightResponse = { blockers: [], review: [], passes: [] };
   changeLedgerResponse = { units: [], notes: [] };
+  compileResponse = { chunks: [], files: [], notes: [], barTweakdefs: null };
+  archivesWithPostFile = [];
 });
 
 /** The single toolbar button, whichever state it is asked to render in. */
@@ -49,6 +71,9 @@ function renderButton(props: Partial<Parameters<typeof ChecksButton>[0]> = {}) {
     <MemoryRouter>
       <ChecksButton
         gameName="Balanced Annihilation V15.9.8"
+        gameArchives={[{ name: "balanced_annihilation-v15.9.8.sdz" }]}
+        enginePath="/engines/recoil"
+        dataDir="/spring"
         diagnosticErrors={[]}
         diagnosticsChecking={false}
         routeOptions={[]}
@@ -116,7 +141,7 @@ describe("the checks button", () => {
   });
 
   describe("the drawer", () => {
-    it("orders its sections definitions, compatibility, routes, preflight, then the change ledger", async () => {
+    it("orders its sections definitions, compatibility, routes, post-processing, preflight, then the change ledger", async () => {
       renderButton({
         diagnosticErrors: ["could not read units/armcom.lua"],
       });
@@ -128,6 +153,7 @@ describe("the checks button", () => {
         "Game definitions",
         "Still fits Balanced Annihilation V15.9.8",
         "Delivery routes",
+        "Post-processing",
         "Preflight",
         "Change ledger",
       ]);
@@ -293,6 +319,80 @@ describe("the checks button", () => {
       });
     });
 
+    /**
+     * The post-processing section (issue #2744). `postHook.test.ts` owns the
+     * two facts it combines. This is about the one thing a person has to be
+     * able to tell apart: a mutator that covers the game's own file, and one
+     * that covers nothing.
+     */
+    describe("post-processing", () => {
+      const withPostFile = {
+        chunks: [],
+        files: [{ path: "gamedata/unitdefs_post.lua", contents: "-- edits" }],
+        notes: [],
+        barTweakdefs: null,
+      };
+
+      it("is silent for a project that writes no post file", async () => {
+        archivesWithPostFile = ["balanced_annihilation-v15.9.8.sdz"];
+        renderButton({ project });
+        fireEvent.click(
+          await screen.findByRole("button", { name: "No problems found" }),
+        );
+        expect(screen.getByText(/the mutator covers nothing of/)).toBeTruthy();
+      });
+
+      it("counts a covered post file as a blocker, so no tick hides it", async () => {
+        compileResponse = withPostFile;
+        archivesWithPostFile = ["balanced_annihilation-v15.9.8.sdz"];
+        renderButton({ project });
+        expect(
+          await screen.findByRole("button", { name: "1 blocker found" }),
+        ).toBeTruthy();
+      });
+
+      it("names the game's own file and points at the other route", async () => {
+        compileResponse = withPostFile;
+        archivesWithPostFile = ["balanced_annihilation-v15.9.8.sdz"];
+        renderButton({ project });
+        fireEvent.click(await screen.findByRole("button", { name: /blocker/ }));
+        expect(
+          screen.getByText(
+            /post-processes its own units in gamedata\/unitdefs_post\.lua/,
+          ),
+        ).toBeTruthy();
+        expect(
+          screen.getByText(/Deliver it through the tweak slots instead/),
+        ).toBeTruthy();
+      });
+
+      it("names the archive it is inherited from when a dependency holds it", async () => {
+        compileResponse = withPostFile;
+        archivesWithPostFile = ["base.sdz"];
+        renderButton({
+          project,
+          gameArchives: [{ name: "some-mutator.sdz" }, { name: "base.sdz" }],
+        });
+        fireEvent.click(await screen.findByRole("button", { name: /blocker/ }));
+        expect(
+          screen.getByText(
+            /inherits a gamedata\/unitdefs_post\.lua from base\.sdz/,
+          ),
+        ).toBeTruthy();
+      });
+
+      it("stays a tick when the mutator writes the file and the game has none", async () => {
+        compileResponse = withPostFile;
+        renderButton({ project });
+        fireEvent.click(
+          await screen.findByRole("button", { name: "No problems found" }),
+        );
+        expect(
+          screen.getByText(/has no file of its own there for it to cover/),
+        ).toBeTruthy();
+      });
+    });
+
     it("says there is nothing compiled to check when no project is open", () => {
       renderButton({ diagnosticErrors: ["could not read units/armcom.lua"] });
       fireEvent.click(screen.getByRole("button", { name: /to review/ }));
@@ -348,8 +448,12 @@ describe("the checks button", () => {
         expect(link.getAttribute("href")).toBe(
           "/workshop/p1?unit=armcom&field=maxDamage",
         );
-        expect(screen.getByText(/gamedata\/unitdefs_post\.lua/)).toBeTruthy();
-        expect(screen.getByText(/!bset tweakunits/)).toBeTruthy();
+        // The whole destination line, rather than each half on its own: the
+        // post-processing section names the same path, so a loose match finds
+        // two elements.
+        expect(
+          screen.getByText("gamedata/unitdefs_post.lua · !bset tweakunits"),
+        ).toBeTruthy();
       });
 
       it("says why a change reached no BAR slot", async () => {
