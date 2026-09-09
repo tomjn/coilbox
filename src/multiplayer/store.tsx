@@ -179,7 +179,7 @@ export const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 20000];
  * own. `CHANGEPASSWORD` is answered by a bare `SERVERMSG`, so the only way to
  * pair a reply with a request is to watch for the next one after asking.
  *
- * Matches the Rust `READY_TIMEOUT` (`conn.rs:121`) and for the same reason.
+ * Matches the Rust `READY_TIMEOUT` (`conn.rs:122`) and for the same reason.
  * Generous, because a real server behind a slow link is not a failure, and
  * bounded, because nothing below this times out at all.
  */
@@ -1996,14 +1996,34 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  // CHANGEPASSWORD is answered by a bare SERVERMSG with no token to correlate on,
-  // so the only place a reply can be paired with a request is where the request
-  // was made. Resolve on the next server message, and treat only uberserver's
-  // exact success string as success: a stale saved password can be retyped, one
-  // overwritten wrongly cannot.
+  // CHANGEPASSWORD is answered by a bare SERVERMSG with no token to correlate
+  // on, so the only place a reply can be paired with a request is where the
+  // request was made. Resolve on the next server message, and treat only
+  // uberserver's exact success string as success: a stale saved password can
+  // be retyped, one overwritten wrongly cannot.
+  //
+  // Guarded against a second call overlapping the first: with no token, two
+  // pending calls would each register a waiter, and a single SERVERMSG would
+  // resolve both, handing one command's answer to the other. Refusing a
+  // second call outright while one is already pending closes that off.
+  //
+  // What stays unguarded, because nothing at any layer can tell a
+  // CHANGEPASSWORD reply apart from any other SERVERMSG: an unrelated
+  // broadcast (server maintenance, some other announcement) arriving while
+  // this is the only pending call still resolves it. This is a known limit
+  // of the protocol, not an oversight. What actually protects the user is
+  // the exact-string check rather than any correlation. `succeeded` is only
+  // ever true for that one literal success string, so a stray broadcast can
+  // never read as a successful change, and so can never overwrite a good
+  // saved password with a wrong one. The worst it can do is show the wrong
+  // message while the real and saved passwords stay exactly as they were,
+  // which the user fixes by retyping it.
   const changePassword = useCallback(async (current: string, next: string) => {
     const key = activeKeyRef.current;
     if (!key) throw new Error("Not connected.");
+    if (serverMessageWaiters.current.size > 0) {
+      throw new Error("A password change is already in progress.");
+    }
     const reply = new Promise<{ message: string; succeeded: boolean }>(
       (resolve, reject) => {
         const timer = setTimeout(() => {
@@ -2050,7 +2070,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const getUserInfo = useCallback(() => {
     const key = activeKeyRef.current;
     if (!key) throw new Error("Not connected.");
-    void mpGetUserInfo({ serverKey: key });
+    mpGetUserInfo({ serverKey: key }).catch(() => {});
   }, []);
 
   const submitAgreementCode = useCallback(

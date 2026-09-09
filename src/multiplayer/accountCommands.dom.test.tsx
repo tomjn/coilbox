@@ -259,6 +259,31 @@ describe("account commands", () => {
     });
   });
 
+  // CHANGEPASSWORD carries no token, so a single SERVERMSG resolves whichever
+  // waiter is registered. Two pending calls would each register one and both
+  // would be settled by the same message, so the second call has to be
+  // refused outright rather than allowed to queue.
+  it("rejects a second change password call while one is already in progress", async () => {
+    const { result, emit } = await renderProvider();
+    const first = result.current.changePassword("old", "new");
+    await expect(
+      result.current.changePassword("old", "different"),
+    ).rejects.toThrow("A password change is already in progress.");
+
+    await emit({
+      kind: "delta",
+      delta: {
+        kind: "serverMessage",
+        text: "Password changed successfully.",
+        boxed: false,
+      },
+    });
+    await expect(first).resolves.toEqual({
+      message: "Password changed successfully.",
+      succeeded: true,
+    });
+  });
+
   it("merges the three account info lines into one record", async () => {
     const { result, emit } = await renderProvider();
     await emit({
