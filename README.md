@@ -5,12 +5,18 @@
   </picture>
 </p>
 
-# Coilbox
+<h1 align="center">Coilbox</h1>
 
-A desktop app for playing and building games on the
-[Recoil](https://github.com/beyond-all-reason/RecoilEngine) and Spring RTS engines.
+<p align="center">
+  A desktop app for playing and building games on the
+  <a href="https://github.com/beyond-all-reason/RecoilEngine">Recoil</a> and Spring RTS engines.
+</p>
 
-[Coilbox Hub](https://coilbox-hub.vercel.app) · [Discord](https://discord.gg/GUpRg6Wz3e) · [Documentation](https://tomjn.github.io/coilbox/)
+<p align="center">
+  <a href="https://coilbox-hub.vercel.app">Coilbox Hub</a> ·
+  <a href="https://discord.gg/GUpRg6Wz3e">Discord</a> ·
+  <a href="https://tomjn.github.io/coilbox/">Documentation</a>
+</p>
 
 - Get games, maps and engines from the rapid repositories and springfiles, through a
   bundled `pr-downloader` sidecar, including curated map packs in one click.
