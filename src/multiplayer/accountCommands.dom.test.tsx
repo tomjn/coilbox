@@ -23,6 +23,10 @@ interface FakeChannel {
 const wire = vi.hoisted(() => ({
   /** The event channel each connect handed the Rust side, by server key. */
   channels: new Map<string, FakeChannel>(),
+  /** Keys `mp_disconnect` was called with, in call order. */
+  disconnected: [] as string[],
+  /** Arguments `mp_submit_recovery_code` was called with, in call order. */
+  submitRecoveryCodeCalls: [] as { serverKey: string; code: string }[],
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -89,7 +93,10 @@ vi.mock("./bindings", () => ({
   mpConnectTachyon: async () => ({ connected: true }),
   mpConnectZerok: async () => ({ connected: true }),
   mpSnapshot: async () => ({ state: emptyState() }),
-  mpDisconnect: async () => ({ disconnected: true }),
+  mpDisconnect: async (args: { serverKey: string }) => {
+    wire.disconnected.push(args.serverKey);
+    return { disconnected: true };
+  },
   mpWaitUntilReady: async () => ({ ready: true }),
   mpActiveKeys: async () => ({ keys: [] as string[] }),
   mpReattach: async () => ({ reattached: true }),
@@ -103,8 +110,17 @@ vi.mock("./bindings", () => ({
   mpJoinChannel: async () => ({}),
   mpRegister: async () => ({}),
   mpRegisterZerok: async () => ({}),
-  mpRecoverPassword: async () => ({ connected: true }),
-  mpSubmitRecoveryCode: async () => ({ sent: true }),
+  mpRecoverPassword: async (args: {
+    serverKey: string;
+    onEvent: FakeChannel;
+  }) => {
+    wire.channels.set(args.serverKey, args.onEvent);
+    return { connected: true };
+  },
+  mpSubmitRecoveryCode: async (args: { serverKey: string; code: string }) => {
+    wire.submitRecoveryCodeCalls.push(args);
+    return { sent: true };
+  },
   mpChangePassword: async () => ({ sent: true }),
   mpChangeEmailRequest: async () => ({ sent: true }),
   mpChangeEmail: async () => ({ sent: true }),
@@ -131,9 +147,13 @@ const LOBBY: LobbyServer = {
   allowSelfSigned: false,
 };
 const LOBBY_KEY = "AF_@server4.beyondallreason.info:8201";
+const RECOVERY_EMAIL = "person@example.com";
+const RECOVERY_KEY = `${RECOVERY_EMAIL}@server4.beyondallreason.info:8201`;
 
 beforeEach(() => {
   wire.channels.clear();
+  wire.disconnected.length = 0;
+  wire.submitRecoveryCodeCalls.length = 0;
 });
 
 afterEach(() => {
@@ -156,6 +176,46 @@ async function renderProvider() {
   });
   const channel = wire.channels.get(LOBBY_KEY);
   if (!channel) throw new Error(`no channel for ${LOBBY_KEY}`);
+  const emit = async (ev: LobbyEvent) => {
+    await act(async () => {
+      channel.onmessage?.(ev);
+    });
+  };
+  return { result, emit };
+}
+
+/**
+ * The provider, mounted, with `recoverPassword` already parked at
+ * `awaitRecoveryCode` on a throwaway connection to `RECOVERY_EMAIL`. Returns
+ * the same `emit` shape as `renderProvider`, pushing events on the recovery
+ * connection's channel rather than a logged-in one.
+ */
+async function renderRecovery() {
+  const { result } = renderHook(() => useMultiplayer(), {
+    wrapper: MultiplayerProvider,
+  });
+  await act(async () => {});
+  let pending!: Promise<unknown>;
+  // `recoverPassword` sets `busy` synchronously before its first await, so the
+  // call itself needs to be inside `act`, but the returned promise is held
+  // rather than awaited by it: it doesn't settle until the phase event below.
+  act(() => {
+    pending = result.current.recoverPassword(LOBBY, RECOVERY_EMAIL);
+  });
+  await act(async () => {});
+  const channel = wire.channels.get(RECOVERY_KEY);
+  if (!channel) throw new Error(`no channel for ${RECOVERY_KEY}`);
+  await act(async () => {
+    channel.onmessage?.({
+      kind: "phase",
+      phase: "awaitRecoveryCode",
+      agreement: null,
+    });
+  });
+  await expect(pending).resolves.toEqual({
+    kind: "codeSent",
+    serverKey: RECOVERY_KEY,
+  });
   const emit = async (ev: LobbyEvent) => {
     await act(async () => {
       channel.onmessage?.(ev);
@@ -224,5 +284,77 @@ describe("account commands", () => {
       email: "a@b.c",
       ingameHours: null,
     });
+  });
+
+  // uberserver allows three attempts at the recovery code and the login
+  // machine stays parked in `AwaitRecoveryCode` on a wrong one, so
+  // disconnecting on the first refusal would throw away two working
+  // attempts. This is the one place this matters enough to prove directly:
+  // a refusal must reject with the server's reason, must not disconnect, and
+  // a second `submitRecoveryCode` call must still reach the binding rather
+  // than fail with "Not awaiting a recovery code."
+  it("leaves the connection open on a refused code so a retry still reaches the binding", async () => {
+    const { result, emit } = await renderRecovery();
+
+    let firstAttempt!: Promise<{ username: string }>;
+    act(() => {
+      firstAttempt = result.current.submitRecoveryCode(RECOVERY_KEY, "000000");
+    });
+    // Attach the rejection assertion before the delta that triggers the
+    // reject, so the promise is never briefly unhandled between the two.
+    const firstRejects = expect(firstAttempt).rejects.toThrow(
+      "Wrong code entered too many times",
+    );
+    await emit({
+      kind: "delta",
+      delta: {
+        kind: "recoveryDenied",
+        reason: "Wrong code entered too many times",
+      },
+    });
+    await firstRejects;
+    expect(wire.disconnected).not.toContain(RECOVERY_KEY);
+
+    let secondAttempt!: Promise<{ username: string }>;
+    act(() => {
+      secondAttempt = result.current.submitRecoveryCode(RECOVERY_KEY, "111111");
+    });
+    await act(async () => {});
+    expect(wire.submitRecoveryCodeCalls).toContainEqual({
+      serverKey: RECOVERY_KEY,
+      code: "111111",
+    });
+
+    await emit({
+      kind: "delta",
+      delta: {
+        kind: "passwordReset",
+        email: RECOVERY_EMAIL,
+        username: "AF",
+      },
+    });
+    await expect(secondAttempt).resolves.toEqual({ username: "AF" });
+    expect(wire.disconnected).toContain(RECOVERY_KEY);
+  });
+
+  it("cancelRecovery closes a connection a refused code left open", async () => {
+    const { result, emit } = await renderRecovery();
+
+    let attempt!: Promise<{ username: string }>;
+    act(() => {
+      attempt = result.current.submitRecoveryCode(RECOVERY_KEY, "000000");
+    });
+    const attemptRejects = expect(attempt).rejects.toThrow("Wrong code");
+    await emit({
+      kind: "delta",
+      delta: { kind: "recoveryDenied", reason: "Wrong code" },
+    });
+    await attemptRejects;
+    expect(wire.disconnected).not.toContain(RECOVERY_KEY);
+
+    await act(async () => {
+      await result.current.cancelRecovery(RECOVERY_KEY);
+    });
+    expect(wire.disconnected).toContain(RECOVERY_KEY);
   });
 });

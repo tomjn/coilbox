@@ -536,12 +536,21 @@ interface MultiplayerContextValue {
   /**
    * Finish account recovery with the emailed code, on the connection
    * `recoverPassword` left open. Resolves with the username a locked-out user
-   * had no other way to learn. Tears the connection down whichever way it ends.
+   * had no other way to learn, and disconnects. Rejects with the server's
+   * reason on a wrong code, but leaves the connection live for a retry
+   * (uberserver allows three attempts) rather than disconnecting. Call
+   * `cancelRecovery` to close it if the user gives up instead.
    */
   submitRecoveryCode: (
     serverKey: string,
     code: string,
   ) => Promise<{ username: string }>;
+  /**
+   * Close a recovery connection left open by a refused code, for when the
+   * user abandons the flow rather than retrying. Safe to call on a
+   * connection that never parked awaiting a code, or one already gone.
+   */
+  cancelRecovery: (serverKey: string) => Promise<void>;
   /**
    * Change the signed-in account's password. `CHANGEPASSWORD` has no accept or
    * deny reply of its own, so this resolves off the next `SERVERMSG` and reads
@@ -1841,10 +1850,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // The recovery connection's event channel, kept only while parked awaiting the
+  // The recovery connection's event channel, kept while parked awaiting the
   // emailed code, so `submitRecoveryCode` can take over listening on the same
-  // connection `recoverPassword` opened rather than opening a second one.
-  // Removed once the code step settles.
+  // connection `recoverPassword` opened. A Tauri `Channel` has exactly one
+  // `onmessage` slot, so this is the only way a second call can observe
+  // anything on it. Do not remove this for looking redundant.
+  // Removed once the connection actually closes: a wrong code leaves the
+  // entry in place, since uberserver allows two more attempts and the
+  // connection is still there to retry on.
   const recoveryChannelsRef = useRef<Map<string, Channel<LobbyEvent>>>(
     new Map(),
   );
@@ -1916,15 +1929,25 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // Finish account recovery with the emailed code, on the connection
   // `recoverPassword` left open awaiting it. Resolves on a `passwordReset`
   // delta with the username, the one time the protocol tells a locked-out
-  // user who they are. Rejects with the server's reason on `recoveryDenied`.
-  // Tears the connection down whichever way it ends, which is the step
-  // `recoverPassword` deliberately left undone.
+  // user who they are, and disconnects. The server drops us there anyway.
+  //
+  // Rejects with the server's reason on `recoveryDenied`, but does NOT
+  // disconnect on that path. The login machine deliberately stays parked in
+  // `AwaitRecoveryCode` after a wrong code (uberserver allows three
+  // attempts), so the connection is left live and the channel stays in
+  // `recoveryChannelsRef` for a retry. Calling this again with a fresh code
+  // reaches the same connection rather than failing with "Not awaiting a
+  // recovery code." `cancelRecovery` is what closes it if the user gives up
+  // instead of retrying.
+  //
+  // Any other terminal failure (the connection dropping outright) still
+  // disconnects, since there is nothing left to talk to.
   const submitRecoveryCode = useCallback(
     async (serverKey: string, code: string) => {
       const onEvent = recoveryChannelsRef.current.get(serverKey);
       if (!onEvent) throw new Error("Not awaiting a recovery code.");
-      recoveryChannelsRef.current.delete(serverKey);
       setBusy(true);
+      let disconnect = true;
       try {
         return await new Promise<{ username: string }>((resolve, reject) => {
           let settled = false;
@@ -1938,6 +1961,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               ev.delta.kind === "recoveryDenied"
             ) {
               settled = true;
+              disconnect = false;
               reject(new Error(ev.delta.reason));
             } else if (ev.kind === "disconnected") {
               settled = true;
@@ -1947,14 +1971,30 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           mpSubmitRecoveryCode({ serverKey, code }).catch(reject);
         });
       } finally {
-        await mpDisconnect({ serverKey }).catch((e) =>
-          console.warn("multiplayer: disconnect cleanup failed", e),
-        );
+        if (disconnect) {
+          recoveryChannelsRef.current.delete(serverKey);
+          await mpDisconnect({ serverKey }).catch((e) =>
+            console.warn("multiplayer: disconnect cleanup failed", e),
+          );
+        }
         setBusy(false);
       }
     },
     [],
   );
+
+  // Tear down a recovery connection `recoverPassword` left open awaiting the
+  // emailed code. A refused code deliberately leaves that connection live
+  // (see `submitRecoveryCode`) so the user can retry, which means something
+  // has to own closing it for the case where they give up instead. Also
+  // fine to call on a connection that never reached that point, or one
+  // already gone.
+  const cancelRecovery = useCallback(async (serverKey: string) => {
+    recoveryChannelsRef.current.delete(serverKey);
+    await mpDisconnect({ serverKey }).catch((e) =>
+      console.warn("multiplayer: disconnect cleanup failed", e),
+    );
+  }, []);
 
   // CHANGEPASSWORD is answered by a bare SERVERMSG with no token to correlate on,
   // so the only place a reply can be paired with a request is where the request
@@ -2124,6 +2164,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         register,
         recoverPassword,
         submitRecoveryCode,
+        cancelRecovery,
         changePassword,
         changeEmailRequest,
         changeEmail,
