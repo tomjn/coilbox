@@ -58,6 +58,18 @@ export function tweakSlotCounts(options: ConfigOption[]): TweakSlotCounts {
   return { defs, units };
 }
 
+/**
+ * The game's own declared tweak-slot options, for a caller that wants each
+ * one's current value rather than just the count (issue #2756): a battle
+ * room reading what its host has already set has to know which of a game's
+ * mod options are tweak slots at all, and this is the one place that already
+ * knows the key shape, so it answers that rather than leaving another
+ * caller to match key names of its own.
+ */
+export function tweakSlotOptions(options: ConfigOption[]): ConfigOption[] {
+  return options.filter((o) => TWEAK_KEY.test(o.key));
+}
+
 /** One route, whether the selected game supports it, and why when it does not. */
 export interface RouteAvailability {
   route: DeliveryRoute;
