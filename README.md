@@ -1,7 +1,16 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/public/coil-mark-dark.svg">
+    <img src="docs/public/coil-mark-light.svg" alt="Coilbox" width="112" height="112">
+  </picture>
+</p>
+
 # Coilbox
 
 Desktop tooling for the [Recoil RTS](https://github.com/beyond-all-reason/RecoilEngine)
 engine / Beyond All Reason community, built on [picoframe](https://github.com/tomjn/picoframe).
+
+[Coilbox Hub](https://coilbox-hub.vercel.app) · [Discord](https://discord.gg/GUpRg6Wz3e) · [Documentation](https://tomjn.github.io/coilbox/)
 
 Coilbox is a [Tauri](https://tauri.app) v2 app that composes picoframe plugins. Its
 first tool is **pr-downloader**: browse the Spring/Recoil rapid content repositories
