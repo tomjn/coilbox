@@ -1,8 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
-import { X } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { Field } from "@/components/Field";
+import { SlideDrawer } from "@/components/SlideDrawer";
 import { lsStoreCredential } from "../../lobby-servers/bindings";
 import { useLastLogin } from "../../lobby-servers/config";
 import { useMultiplayer } from "../../multiplayer/store";
@@ -163,9 +162,11 @@ function AccountActions({ email }: { email: string | null }) {
  * says is shown verbatim rather than interpreted. The saved keychain entry is
  * only touched when `succeeded` is true and the drawer can tell which saved
  * login this session came from (`lastLogin`, written on every successful
- * connect) — a stale saved password is fixed by retyping it, but one
+ * connect). A stale saved password is fixed by retyping it, but one
  * overwritten on a change that did not happen locks the user out of their own
- * saved login.
+ * saved login. A change that succeeded but whose keychain write then fails is
+ * a third case: the server-side password is now correct and the saved one is
+ * wrong, so that failure is surfaced rather than swallowed (see `submit`).
  */
 function ChangePasswordDrawer({
   open,
@@ -195,6 +196,7 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
   const [next, setNext] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [succeeded, setSucceeded] = useState<boolean | null>(null);
+  const [keychainWarning, setKeychainWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -202,6 +204,7 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setKeychainWarning(null);
     try {
       const result = await changePassword(current, next);
       setMessage(result.message);
@@ -211,11 +214,22 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
         lastLogin &&
         lastLogin.username === mirror.state?.myUsername
       ) {
-        lsStoreCredential({
-          serverId: lastLogin.serverId,
-          username: lastLogin.username,
-          secret: next,
-        }).catch(() => {});
+        try {
+          await lsStoreCredential({
+            serverId: lastLogin.serverId,
+            username: lastLogin.username,
+            secret: next,
+          });
+        } catch {
+          // The password really did change on the server, so this must not
+          // read as a failed change (it would send the user to retry a
+          // change that already happened). It does need surfacing though:
+          // the saved copy is now wrong rather than merely stale, and the
+          // next reconnect will fail with it until the user retypes it.
+          setKeychainWarning(
+            "Your password changed on the server, but coilbox could not save it. Enter the new one under Settings, Lobby servers.",
+          );
+        }
       }
     } catch (err) {
       setError(String(err));
@@ -251,6 +265,9 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
           {succeeded === false &&
             " Your saved password has been left as it was."}
         </p>
+      )}
+      {keychainWarning && (
+        <p className="text-xs text-destructive">{keychainWarning}</p>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="mt-auto flex justify-end gap-2 border-t border-border pt-3">
@@ -413,53 +430,5 @@ function ChangeEmailForm({
         </Button>
       </div>
     </form>
-  );
-}
-
-/**
- * This page's slide-in drawer shell: the same viewport-anchored right drawer as
- * `lobby-servers/pages/SettingsSection.tsx`'s `SlideDrawer`, duplicated rather
- * than shared because it is not exported and each settings section here builds
- * its own. Children mount only while open, so each visit starts fresh.
- * Portalled to `<body>` so `fixed inset-y-0` means the viewport rather than a
- * transformed/filtered ancestor.
- */
-function SlideDrawer({
-  open,
-  title,
-  onClose,
-  children,
-}: {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return createPortal(
-    <>
-      {open && (
-        <button
-          type="button"
-          aria-label={`Close ${title}`}
-          className="fixed inset-0 z-40 bg-black/20"
-          onClick={onClose}
-        />
-      )}
-      <aside
-        className={`fixed inset-y-0 right-0 z-50 flex w-96 max-w-full flex-col border-l border-border bg-background shadow-lg transition-transform motion-reduce:transition-none ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-        inert={!open}
-      >
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
-            <X className="size-4" />
-          </Button>
-        </header>
-        {open && children}
-      </aside>
-    </>,
-    document.body,
   );
 }

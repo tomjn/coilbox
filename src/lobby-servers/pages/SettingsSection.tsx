@@ -12,12 +12,11 @@ import {
   TriangleAlert,
   UserPlus,
   Users,
-  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
+import { SlideDrawer } from "@/components/SlideDrawer";
 import {
   AUTO_AWAY_ENABLED_KEY,
   AUTO_AWAY_MINUTES_KEY,
@@ -460,54 +459,6 @@ function AccountDrawer({
         />
       )}
     </SlideDrawer>
-  );
-}
-
-/**
- * Shared shell for this page's slide-in editors (login editor, registration):
- * the same viewport-anchored right drawer as `ConsoleDrawer`, with a titled
- * header and a click-away backdrop. Children mount only while open, so each
- * visit starts fresh. Portalled to `<body>` so `fixed inset-y-0` really means
- * the viewport — a transformed/filtered ancestor would otherwise become the
- * positioning box and cut the drawer short of the window bottom.
- */
-function SlideDrawer({
-  open,
-  title,
-  onClose,
-  children,
-}: {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return createPortal(
-    <>
-      {open && (
-        <button
-          type="button"
-          aria-label={`Close ${title}`}
-          className="fixed inset-0 z-40 bg-black/20"
-          onClick={onClose}
-        />
-      )}
-      <aside
-        className={`fixed inset-y-0 right-0 z-50 flex w-96 max-w-full flex-col border-l border-border bg-background shadow-lg transition-transform motion-reduce:transition-none ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-        inert={!open}
-      >
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
-            <X className="size-4" />
-          </Button>
-        </header>
-        {open && children}
-      </aside>
-    </>,
-    document.body,
   );
 }
 

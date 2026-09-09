@@ -214,6 +214,55 @@ it("stores the changed password under the signed-in login's own server id", asyn
   );
 });
 
+/**
+ * The server-side password really did change here. Losing that message and
+ * reporting a plain failure would send the user to retry a change that
+ * already happened. But the saved copy is now actively wrong rather than
+ * merely stale, so the user still needs telling.
+ */
+it("tells the user their saved password is stale when the server confirmed the change but the keychain write fails", async () => {
+  const { lsStoreCredential } = renderPage({
+    connected: true,
+    protocol: "tasserver",
+    myUsername: "alice",
+    changePasswordResult: {
+      message: "Password changed successfully.",
+      succeeded: true,
+    },
+  });
+  lsStoreCredential.mockRejectedValueOnce(new Error("keychain locked"));
+  fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+  typeInto(screen.getByLabelText("Current password"), "old");
+  typeInto(screen.getByLabelText("New password"), "new");
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText(/could not save it/)).toBeTruthy();
+  // The server's own success message still shows: the change genuinely
+  // happened, so this must not read as a failed attempt.
+  expect(screen.getByText(/changed successfully/)).toBeTruthy();
+});
+
+/**
+ * `changePassword` rejects outright (rather than resolving with
+ * `succeeded: false`) when one is already pending. That is a different code
+ * path to a refusal, and only a refusal was covered before this test.
+ */
+it("does not save a password change that was rejected as already in progress", async () => {
+  const { lsStoreCredential } = renderPage({
+    connected: true,
+    protocol: "tasserver",
+    myUsername: "alice",
+  });
+  mp.changePassword.mockRejectedValueOnce(
+    new Error("A password change is already in progress."),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+  typeInto(screen.getByLabelText("Current password"), "old");
+  typeInto(screen.getByLabelText("New password"), "new");
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText(/already in progress/)).toBeTruthy();
+  expect(lsStoreCredential).not.toHaveBeenCalled();
+});
+
 it("requests a code then submits it to change the email address", async () => {
   renderPage({ connected: true, protocol: "tasserver", myUsername: "alice" });
   fireEvent.click(screen.getByRole("button", { name: "Change email" }));
