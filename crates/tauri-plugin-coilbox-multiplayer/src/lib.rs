@@ -509,6 +509,68 @@ async fn mp_register<R: Runtime>(
     .await)
 }
 
+/// `mp_recover_password` - open a connection and start account recovery
+/// (`RESETPASSWORDREQUEST` instead of `LOGIN`). Streams the same events. uberserver
+/// answers with the `awaitRecoveryCode` phase and the caller then calls
+/// `mp_submit_recovery_code`. teiserver answers with a `recoveryUrl` delta and the
+/// `recoveryRedirected` phase, and there is nothing further to send.
+///
+/// There is no account named yet, so the username and password the handshake
+/// config wants are passed empty and never reach the wire.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn mp_recover_password<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+    pending: State<'_, PendingConnects>,
+    server_key: String,
+    host: String,
+    port: u16,
+    tls_mode: TlsMode,
+    allow_self_signed: bool,
+    email: String,
+    client_id: String,
+    compat_flags: Vec<String>,
+    on_event: Channel<LobbyEvent>,
+) -> Result<CliResult, ()> {
+    Ok(open_and_spawn(
+        &app,
+        registry.inner(),
+        pending.inner(),
+        server_key,
+        host,
+        port,
+        tls_mode,
+        allow_self_signed,
+        String::new(),
+        String::new(),
+        client_id,
+        compat_flags,
+        LoginMode::Recover { email },
+        on_event,
+    )
+    .await)
+}
+
+/// `mp_submit_recovery_code` - finish account recovery with the emailed code on a
+/// connection parked awaiting it. Sends `RESETPASSWORD <email> <code>`. The server
+/// disconnects us on success, which is expected rather than a failure.
+#[tauri::command]
+fn mp_submit_recovery_code(
+    registry: State<'_, Registry>,
+    server_key: String,
+    code: String,
+) -> CliResult {
+    let map = lock_or_recover(&registry);
+    match map.get(&server_key) {
+        Some(conn) => match conn.tx.send(Outbound::SubmitRecoveryCode { code }) {
+            Ok(()) => CliResult::ok(json!({ "sent": true })),
+            Err(_) => CliResult::err("connection is closed"),
+        },
+        None => CliResult::err(format!("not connected: {server_key}")),
+    }
+}
+
 /// `mp_connect_tachyon`: open a lobby connection to a Tachyon server.
 ///
 /// The counterpart to [`mp_connect`], and deliberately a separate command. There is
@@ -3336,6 +3398,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_connect_zerok,
             mp_register_zerok,
             mp_register,
+            mp_recover_password,
+            mp_submit_recovery_code,
             mp_confirm_agreement,
             mp_disconnect,
             mp_cancel_connect,

@@ -414,6 +414,7 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                 // client. A private message is queued by a command that refuses
                 // this connection before it gets here.
                 Outbound::ConfirmAgreement { .. }
+                | Outbound::SubmitRecoveryCode { .. }
                 | Outbound::Tachyon(_)
                 | Outbound::SayPrivate { .. }
                 | Outbound::SayPrivateEx { .. } => {}

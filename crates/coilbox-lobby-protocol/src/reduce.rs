@@ -218,6 +218,12 @@ pub enum Delta {
     RecoveryDenied {
         reason: String,
     },
+    /// The address a server with no in-lobby recovery pointed us at. Emitted by
+    /// the connection task from the login machine rather than by the reducer,
+    /// because the machine is what recognises the redirect.
+    RecoveryUrl {
+        url: String,
+    },
     /// The server reset the password and emailed it. `username` is the answer to
     /// "I do not know my login" and is the reason this delta carries it.
     PasswordReset {

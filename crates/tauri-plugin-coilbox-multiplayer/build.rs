@@ -8,6 +8,8 @@ const COMMANDS: &[&str] = &[
     "mp_connect_zerok",
     "mp_register_zerok",
     "mp_register",
+    "mp_recover_password",
+    "mp_submit_recovery_code",
     "mp_confirm_agreement",
     "mp_disconnect",
     "mp_cancel_connect",

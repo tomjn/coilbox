@@ -56,6 +56,7 @@ pub enum Outbound {
     SayPrivate { peer: String, text: String },
     SayPrivateEx { peer: String, text: String },
     ConfirmAgreement { code: Option<String> },
+    SubmitRecoveryCode { code: String },
     Tachyon(TachyonAction),
     Zerok(crate::zerok_conn::ZerokAction),
     Shutdown,
@@ -469,6 +470,18 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                                 agreement,
                             },
                         );
+                        if login.phase() == LoginPhase::RecoveryRedirected {
+                            if let Some(url) = login.recovery_url() {
+                                emit(
+                                    &sink,
+                                    LobbyEvent::Delta {
+                                        delta: Delta::RecoveryUrl {
+                                            url: url.to_string(),
+                                        },
+                                    },
+                                );
+                            }
+                        }
                     }
 
                     // A rejected login (e.g. wrong password) leaves the socket open
@@ -672,6 +685,12 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                             },
                         );
                     }
+                }
+                // `submit_recovery_code` deliberately leaves the phase alone, so a
+                // refused code can be retried with the attempts the server has left.
+                // The phase changes when the server answers, on the read side above.
+                Outbound::SubmitRecoveryCode { code } => {
+                    outbound.extend(login.submit_recovery_code(&code));
                 }
                 // Only queued for a connection whose protocol it belongs to, so
                 // a TASServer one never sees either.

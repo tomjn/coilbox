@@ -8,6 +8,8 @@ permissions = [
   "allow-mp-connect-zerok",
   "allow-mp-register-zerok",
   "allow-mp-register",
+  "allow-mp-recover-password",
+  "allow-mp-submit-recovery-code",
   "allow-mp-confirm-agreement",
   "allow-mp-disconnect",
   "allow-mp-cancel-connect",

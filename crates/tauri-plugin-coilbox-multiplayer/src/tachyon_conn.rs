@@ -598,6 +598,7 @@ async fn run_loop(mut socket: TachyonSocket, ctx: TachyonConnContext) {
                     not_sent(&sink, &format!("SAYPRIVATEEX {peer}"))
                 }
                 Outbound::ConfirmAgreement { .. } => not_sent(&sink, "CONFIRMAGREEMENT"),
+                Outbound::SubmitRecoveryCode { .. } => not_sent(&sink, "RESETPASSWORD"),
                 // Queued only for a Zero-K connection, so this one never sees
                 // it. Reported rather than dropped, for the same reason as the
                 // lines above it.
