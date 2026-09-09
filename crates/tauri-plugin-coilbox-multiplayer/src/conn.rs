@@ -917,6 +917,7 @@ mod tests {
         let terminal = match mode {
             LoginMode::Login => LoginPhase::Ready,
             LoginMode::Register { .. } => LoginPhase::Registered,
+            LoginMode::Recover { .. } => LoginPhase::Recovered,
         };
 
         let logs = crate::dmlog::ScratchLogs::new();
