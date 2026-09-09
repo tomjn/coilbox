@@ -1017,6 +1017,16 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         | ServerMessage::AgreementEnd
         | ServerMessage::Json { .. }
         | ServerMessage::RegistrationAccepted
+        | ServerMessage::ResetPasswordRequestAccepted { .. }
+        | ServerMessage::ResetPasswordRequestDenied { .. }
+        | ServerMessage::ResetPasswordAccepted { .. }
+        | ServerMessage::ResetPasswordDenied { .. }
+        | ServerMessage::ChangeEmailRequestAccepted
+        | ServerMessage::ChangeEmailRequestDenied { .. }
+        | ServerMessage::ChangeEmailAccepted { .. }
+        | ServerMessage::ChangeEmailDenied { .. }
+        | ServerMessage::ResendVerificationAccepted
+        | ServerMessage::ResendVerificationDenied { .. }
         | ServerMessage::Unknown { .. } => vec![],
     }
 }

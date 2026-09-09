@@ -329,6 +329,28 @@ pub enum ServerMessage {
     RegistrationAccepted,
     /// `REGISTRATIONDENIED <reason>`
     RegistrationDenied { reason: String },
+    /// `RESETPASSWORDREQUESTACCEPTED <email>` - a recovery code is on its way.
+    ResetPasswordRequestAccepted { email: String },
+    /// `RESETPASSWORDREQUESTDENIED <reason>`
+    ResetPasswordRequestDenied { reason: String },
+    /// `RESETPASSWORDACCEPTED <email> <username>` - the password has been reset
+    /// and emailed. The username is the only time the protocol tells a locked-out
+    /// user who they are.
+    ResetPasswordAccepted { email: String, username: String },
+    /// `RESETPASSWORDDENIED <reason>`
+    ResetPasswordDenied { reason: String },
+    /// `CHANGEEMAILREQUESTACCEPTED`
+    ChangeEmailRequestAccepted,
+    /// `CHANGEEMAILREQUESTDENIED <reason>`
+    ChangeEmailRequestDenied { reason: String },
+    /// `CHANGEEMAILACCEPTED <email>`
+    ChangeEmailAccepted { email: String },
+    /// `CHANGEEMAILDENIED <reason>`
+    ChangeEmailDenied { reason: String },
+    /// `RESENDVERIFICATIONACCEPTED`
+    ResendVerificationAccepted,
+    /// `RESENDVERIFICATIONDENIED <reason>`
+    ResendVerificationDenied { reason: String },
     /// `IGNORE userName=<name>[\treason=<reason>]` — ack that an ignore was stored.
     Ignore {
         username: String,
@@ -786,6 +808,36 @@ pub fn parse_line(line: &str) -> ServerMessage {
         "JSON" => parse_json_frame(rest),
         "REGISTRATIONACCEPTED" => ServerMessage::RegistrationAccepted,
         "REGISTRATIONDENIED" => ServerMessage::RegistrationDenied {
+            reason: rest.to_string(),
+        },
+        "RESETPASSWORDREQUESTACCEPTED" => ServerMessage::ResetPasswordRequestAccepted {
+            email: rest.to_string(),
+        },
+        "RESETPASSWORDREQUESTDENIED" => ServerMessage::ResetPasswordRequestDenied {
+            reason: rest.to_string(),
+        },
+        "RESETPASSWORDACCEPTED" => match rest.split_once(' ') {
+            Some((email, username)) => ServerMessage::ResetPasswordAccepted {
+                email: email.to_string(),
+                username: username.to_string(),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
+        "RESETPASSWORDDENIED" => ServerMessage::ResetPasswordDenied {
+            reason: rest.to_string(),
+        },
+        "CHANGEEMAILREQUESTACCEPTED" => ServerMessage::ChangeEmailRequestAccepted,
+        "CHANGEEMAILREQUESTDENIED" => ServerMessage::ChangeEmailRequestDenied {
+            reason: rest.to_string(),
+        },
+        "CHANGEEMAILACCEPTED" => ServerMessage::ChangeEmailAccepted {
+            email: rest.to_string(),
+        },
+        "CHANGEEMAILDENIED" => ServerMessage::ChangeEmailDenied {
+            reason: rest.to_string(),
+        },
+        "RESENDVERIFICATIONACCEPTED" => ServerMessage::ResendVerificationAccepted,
+        "RESENDVERIFICATIONDENIED" => ServerMessage::ResendVerificationDenied {
             reason: rest.to_string(),
         },
         "IGNORE" => {
@@ -1607,5 +1659,81 @@ mod tests {
                 token: Some("tok1".into())
             }
         );
+    }
+
+    #[test]
+    fn parses_recovery_replies() {
+        assert_eq!(
+            parse_line("RESETPASSWORDREQUESTACCEPTED a@b.c"),
+            ServerMessage::ResetPasswordRequestAccepted {
+                email: "a@b.c".into()
+            }
+        );
+        assert_eq!(
+            parse_line("RESETPASSWORDREQUESTDENIED no such user"),
+            ServerMessage::ResetPasswordRequestDenied {
+                reason: "no such user".into()
+            }
+        );
+        assert_eq!(
+            parse_line("RESETPASSWORDACCEPTED a@b.c alice"),
+            ServerMessage::ResetPasswordAccepted {
+                email: "a@b.c".into(),
+                username: "alice".into()
+            }
+        );
+        assert_eq!(
+            parse_line("RESETPASSWORDDENIED wrong code"),
+            ServerMessage::ResetPasswordDenied {
+                reason: "wrong code".into()
+            }
+        );
+    }
+
+    #[test]
+    fn parses_account_management_replies() {
+        assert_eq!(
+            parse_line("CHANGEEMAILREQUESTACCEPTED"),
+            ServerMessage::ChangeEmailRequestAccepted
+        );
+        assert_eq!(
+            parse_line("CHANGEEMAILREQUESTDENIED already registered"),
+            ServerMessage::ChangeEmailRequestDenied {
+                reason: "already registered".into()
+            }
+        );
+        assert_eq!(
+            parse_line("CHANGEEMAILACCEPTED new@b.c"),
+            ServerMessage::ChangeEmailAccepted {
+                email: "new@b.c".into()
+            }
+        );
+        assert_eq!(
+            parse_line("CHANGEEMAILDENIED bad code"),
+            ServerMessage::ChangeEmailDenied {
+                reason: "bad code".into()
+            }
+        );
+        assert_eq!(
+            parse_line("RESENDVERIFICATIONACCEPTED"),
+            ServerMessage::ResendVerificationAccepted
+        );
+        assert_eq!(
+            parse_line("RESENDVERIFICATIONDENIED off"),
+            ServerMessage::ResendVerificationDenied {
+                reason: "off".into()
+            }
+        );
+    }
+
+    /// `RESETPASSWORDACCEPTED` is the only place the protocol ever tells a locked-out
+    /// user what their username is, so a missing second field must not silently
+    /// produce an empty one that the interface then shows as the answer.
+    #[test]
+    fn reset_password_accepted_without_a_username_is_unknown() {
+        assert!(matches!(
+            parse_line("RESETPASSWORDACCEPTED a@b.c"),
+            ServerMessage::Unknown { .. }
+        ));
     }
 }
