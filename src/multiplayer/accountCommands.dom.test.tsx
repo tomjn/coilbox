@@ -509,7 +509,19 @@ describe("a failed send cleans up its waiter rather than leaking it", () => {
     expect(bindingMocks.changePassword).toHaveBeenCalledTimes(2);
   });
 
-  it("changeEmailRequest: a failed send does not leave a waiter that answers a later, unrelated request", async () => {
+  /**
+   * The dispatch loop fires every registered waiter on a matching delta, not
+   * just the first, so a second call's own waiter resolving correctly proves
+   * nothing about whether the first call's waiter was also still there: both
+   * would fire on the same delta either way. The only thing a leaked waiter
+   * does that a cleaned-up one does not is sit registered for its deny kind
+   * and reject its own orphaned promise, which nothing ever awaits, the
+   * moment an unrelated delta of that kind arrives later. Nobody attaches a
+   * handler to that promise, so Node reports it as an unhandled rejection,
+   * caught here directly with a temporary listener rather than relied on to
+   * surface through Vitest's own (approximate) attribution.
+   */
+  it("changeEmailRequest: a failed send removes its waiter, so a later unrelated delta settles nothing", async () => {
     const { result, emit } = await renderProvider();
     bindingMocks.changeEmailRequest.mockRejectedValueOnce(
       new Error("not connected"),
@@ -517,12 +529,24 @@ describe("a failed send cleans up its waiter rather than leaking it", () => {
     await expect(
       result.current.changeEmailRequest("new@example.com"),
     ).rejects.toThrow("not connected");
-    // If the first call's waiter had leaked, this delta would be ambiguous
-    // between the two: it is only correct once the first waiter is gone.
-    const retry = result.current.changeEmailRequest("new@example.com");
-    await emit({ kind: "delta", delta: { kind: "changeEmailCodeSent" } });
-    await expect(retry).resolves.toBeUndefined();
-    expect(bindingMocks.changeEmailRequest).toHaveBeenCalledTimes(2);
+
+    const unhandled: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandledRejection);
+    try {
+      await emit({
+        kind: "delta",
+        delta: { kind: "changeEmailDenied", reason: "unrelated" },
+      });
+      // Node reports an unhandled rejection on a later tick than the one
+      // that caused it, so give it one before checking.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      process.off("unhandledRejection", onUnhandledRejection);
+    }
+    expect(unhandled).toEqual([]);
   });
 });
 
