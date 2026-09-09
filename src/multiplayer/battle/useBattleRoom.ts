@@ -70,6 +70,8 @@ import {
 } from "./config";
 import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";
+import { optionTagSlots } from "./tweakDelivery";
+import { type TweakDelivery, useTweakDelivery } from "./useTweakDelivery";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
 const mpErr = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -129,9 +131,17 @@ export interface BattleRoomView {
   canEditOptions: boolean;
   /** Dispatch one option edit: founder → SETSCRIPTTAGS, autohost → `!bSet`. */
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
-  /** Apply a whole preset's option tags at once (founder batch-set + prune omitted;
-   * autohost `!bSet` per value). */
+  /** Apply a whole preset's option tags at once. Founder: batch-set and prune
+   * omitted. Autohost: `!bSet` per value, paced the same way as a workshop
+   * project's tweak slots. */
   applyOptionTags: (tags: Record<string, string>) => void;
+  /**
+   * Progress of the paced autohost delivery `applyOptionTags` starts on a
+   * SPADS battle (issue #2761). Stays empty on a battle we founded, where
+   * applying a preset is one batched script-tag write rather than a run to
+   * report on.
+   */
+  presetDelivery: TweakDelivery;
   /**
    * Whether the local user may edit unit restrictions: only the actual battle
    * founder (we own the `game/restrict/*` script tags — there's no autohost path).
@@ -353,6 +363,16 @@ export function useBattleRoom(): BattleRoomView {
   const me = state?.myUsername ?? null;
   const myStatus = me ? battle?.members[me] : undefined;
   const isFounder = !!battle && !!me && battle.host === me;
+
+  // Paced delivery for a whole preset's `!bSet` commands into an autohost
+  // battle (issue #2761), reusing the same pacing and script-tag confirmation
+  // #1279 built for a workshop project's tweak slots rather than a second
+  // copy of it. `applyOptionTags`'s founder branch below never touches this:
+  // writing every tag as one script-tag batch has nothing to pace.
+  const presetDelivery = useTweakDelivery({
+    battleId: battle?.id ?? null,
+    isFounder,
+  });
 
   const { target, loading: targetLoading } = usePreferredTarget();
   const enginePath = target?.enginePath;
@@ -959,10 +979,11 @@ export function useBattleRoom(): BattleRoomView {
           );
         }
       } else {
-        for (const [k, v] of Object.entries(tags)) {
-          const spadsName = k.slice(k.lastIndexOf("/") + 1);
-          autohostSend(`!bSet ${spadsName} ${v}`);
-        }
+        // Firing every `!bSet` at once trips SPADS' flood ban after the third
+        // one, leaving the room holding part of a preset (issue #2761). Route
+        // through the same paced, confirmed run #1279 built for tweak slots
+        // instead of a second copy of that mistake.
+        void presetDelivery.start(optionTagSlots(tags));
       }
     },
     [
@@ -971,9 +992,9 @@ export function useBattleRoom(): BattleRoomView {
       isFounder,
       modOptionsSchema,
       mapOptionsSchema,
-      autohostSend,
       clearErr,
       setErr,
+      presetDelivery.start,
     ],
   );
 
@@ -1169,6 +1190,7 @@ export function useBattleRoom(): BattleRoomView {
     canEditOptions,
     sendOption,
     applyOptionTags,
+    presetDelivery,
     canEditRestrictions: isFounder && !restrictionsRefused,
     restrictionsUnavailable: restrictionsRefused,
     startPositionsUnavailable: startPositionsRefused,

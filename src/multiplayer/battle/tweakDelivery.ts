@@ -131,6 +131,22 @@ export function deliverySlots(pack: BarSlotPack): TweakSlot[] {
 }
 
 /**
+ * Turn a preset's (or any other batch of already-decided) option script tags
+ * into the slots to send, one `!bSet` per tag (issue #2761).
+ *
+ * A preset holds tag/value pairs directly rather than pre-built `!bset`
+ * lines, so this builds each line itself instead of parsing one back out the
+ * way `deliverySlots` does. `applyOptionTags`'s founder branch never reaches
+ * here: writing every tag as one script-tag batch has nothing to pace.
+ */
+export function optionTagSlots(tags: Record<string, string>): TweakSlot[] {
+  return Object.entries(tags).map(([tagKey, value]) => {
+    const name = tagKey.slice(tagKey.lastIndexOf("/") + 1);
+    return { name, value, tagKey, bytes: `!bSet ${name} ${value}`.length };
+  });
+}
+
+/**
  * The key `ledgerByOutput` files a slot's changes under, so a report about a
  * slot that did not land can name the edits that went with it.
  *

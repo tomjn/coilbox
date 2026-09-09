@@ -26,47 +26,13 @@ import { Send, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { ConfigOption } from "@/content/bindings";
-import { cn } from "@/lib/utils";
 import { barSlotFit, workshopPackBarSlots } from "@/workshop/barPack";
 import { ledgerByOutput, useChangeLedger } from "@/workshop/changeLedger";
 import { deliveryRoutes } from "@/workshop/deliveryRoutes";
 import { type ModProject, useModProjects } from "@/workshop/project";
-import {
-  deliverySlots,
-  deliverySummary,
-  ledgerKeyFor,
-  type SlotProgress,
-} from "./tweakDelivery";
+import { DeliveryProgressPanel } from "./DeliveryProgressPanel";
+import { deliverySlots, ledgerKeyFor } from "./tweakDelivery";
 import { useTweakDelivery } from "./useTweakDelivery";
-
-const STATE_LABEL: Record<SlotProgress["state"], string> = {
-  waiting: "queued",
-  "already-set": "already set",
-  sending: "sending",
-  confirming: "waiting for the battle",
-  confirmed: "set",
-  failed: "did not land",
-  skipped: "not sent",
-};
-
-function SlotRow({ entry }: { entry: SlotProgress }) {
-  const bad = entry.state === "failed";
-  const grey = entry.state === "skipped" || entry.state === "waiting";
-  return (
-    <li className="flex items-baseline justify-between gap-3 text-xs">
-      <code className="shrink-0">{entry.slot.name}</code>
-      <span
-        className={cn(
-          "text-right",
-          bad && "text-destructive",
-          grey && "text-muted-foreground",
-        )}
-      >
-        {STATE_LABEL[entry.state]}
-      </span>
-    </li>
-  );
-}
 
 export function TweakProjectSection({
   gameName,
@@ -220,52 +186,11 @@ export function TweakProjectSection({
           {error && <p className="text-xs text-destructive">{error}</p>}
 
           {delivery.progress && (
-            <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
-              <ul className="flex flex-col gap-1">
-                {delivery.progress.slots.map((entry) => (
-                  <SlotRow key={entry.slot.name} entry={entry} />
-                ))}
-              </ul>
-              {delivery.progress.done && (
-                <p
-                  className={cn(
-                    "text-xs",
-                    delivery.progress.stoppedAt == null
-                      ? "text-muted-foreground"
-                      : "text-destructive",
-                  )}
-                >
-                  {deliverySummary(delivery.progress)}
-                </p>
-              )}
-              {failed && (
-                <div className="flex flex-col gap-2 text-xs text-destructive">
-                  <p>{failed.reason}</p>
-                  {failed.hostSaid?.map((said) => (
-                    <p key={said} className="break-all">
-                      The host said: {said}
-                    </p>
-                  ))}
-                  {failed.serverSaid?.map((said) => (
-                    <p key={said} className="break-all">
-                      The server said: {said}
-                    </p>
-                  ))}
-                  {!failed.hostSaid && !failed.serverSaid && (
-                    <p>
-                      Nothing said why. The usual causes are not being the
-                      room's boss, the autohost ignoring you for sending too
-                      much too fast, and a lobby server that drops a line this
-                      long.
-                    </p>
-                  )}
-                  <p>
-                    Do not start the match on what is set now. Running it again
-                    finishes the set and skips the slots this battle already
-                    holds, so a second run only sends what is missing.
-                  </p>
-                </div>
-              )}
+            <>
+              <DeliveryProgressPanel
+                progress={delivery.progress}
+                retryHint="Do not start the match on what is set now. Running it again finishes the set and skips the slots this battle already holds, so a second run only sends what is missing."
+              />
               {strandedEdits.length > 0 && (
                 <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                   <p>These edits are not in the battle:</p>
@@ -285,7 +210,7 @@ export function TweakProjectSection({
                   </ul>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {!delivery.progress && project && (
