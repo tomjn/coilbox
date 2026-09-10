@@ -26,7 +26,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useCallback, useEffect, useState } from "react";
@@ -50,6 +50,7 @@ import {
   legoExportStale,
   legoGameLanguage,
   legoOpenPath,
+  legoSaveGlb,
   legoTexturePng,
 } from "../../bindings";
 import { exportGlb } from "../../exportGlb";
@@ -135,6 +136,13 @@ type Result =
     }
   | { state: "failed"; message: string };
 
+/** The standalone "Save GLB…" button, independent of the export above. */
+type GlbSave =
+  | { state: "idle" }
+  | { state: "working" }
+  | { state: "done"; path: string }
+  | { state: "failed"; message: string };
+
 /**
  * Where the chosen folder's game keeps the words a player reads (issue #2683).
  *
@@ -187,6 +195,7 @@ export function ExportDrawer({
   const [withGlb, setWithGlb] = useState(project.exportGlb === true);
   const [withObj, setWithObj] = useState(project.exportObj === true);
   const [result, setResult] = useState<Result>({ state: "idle" });
+  const [glbSave, setGlbSave] = useState<GlbSave>({ state: "idle" });
   const [gameText, setGameText] = useState<GameText>({ state: "unread" });
 
   // Asked of the folder as soon as there is one, so the drawer can say where
@@ -349,6 +358,50 @@ export function ExportDrawer({
     setResult({ state: "idle" });
   }
 
+  // What the GLB's material samples: an imported unit's own picture, decoded
+  // out of the store, or the atlas a built one shares. Shared by the full
+  // export below and by the standalone "Save GLB…" button, which both need
+  // the same answer to the same question.
+  async function glbColourUrl(): Promise<string | null> {
+    if (blender) {
+      return blender.colour
+        ? (await decodedTexture(blender.colour)).dataUrl
+        : null;
+    }
+    return installed ? atlasUrl(installed) : null;
+  }
+
+  async function saveGlb() {
+    const target = await save({
+      title: "Save the .glb",
+      defaultPath: `${project.unitName}.glb`,
+      filters: [{ name: "glTF Binary", extensions: ["glb"] }],
+    });
+    if (typeof target !== "string") return;
+    setGlbSave({ state: "working" });
+    try {
+      const colourUrl = await glbColourUrl();
+      const bytes = await exportGlb(project, pack, raw, colourUrl);
+      if (!bytes) {
+        setGlbSave({
+          state: "failed",
+          message: "This unit has no root piece.",
+        });
+        return;
+      }
+      const written = await legoSaveGlb({
+        path: target,
+        bytes: Array.from(new Uint8Array(bytes)),
+      });
+      setGlbSave({ state: "done", path: written.path });
+    } catch (error) {
+      setGlbSave({
+        state: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   async function runExport() {
     // The s3o header names the atlas whether or not this export copies it, so a
     // unit exported without the texture still finds one already installed.
@@ -417,16 +470,7 @@ export function ExportDrawer({
         const place = blender?.mask ? [blender.mask] : [];
 
         if (withGlb && (blender || installed)) {
-          // What the material samples: an imported unit's own picture, decoded
-          // out of the store, or the atlas a built one shares. Asked for only
-          // here, since this is the one file that carries the image itself.
-          const colourUrl = blender
-            ? blender.colour
-              ? (await decodedTexture(blender.colour)).dataUrl
-              : null
-            : installed
-              ? atlasUrl(installed)
-              : null;
+          const colourUrl = await glbColourUrl();
           const bytes = await exportGlb(project, pack, raw, colourUrl);
           if (bytes) {
             const glbWritten = await legoExportGlb({
@@ -784,6 +828,40 @@ export function ExportDrawer({
                   .
                 </p>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pl-6">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    (!blender && !installed) || glbSave.state === "working"
+                  }
+                  onClick={() => void saveGlb()}
+                >
+                  {glbSave.state === "working" ? "Saving" : "Save GLB…"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Builds a .glb on its own and saves it wherever you like,
+                  without touching the game folder.
+                </span>
+              </div>
+              {glbSave.state === "done" ? (
+                <div className="flex items-center gap-2 text-xs">
+                  <code className="break-all">{glbSave.path}</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void legoOpenPath({ path: glbSave.path })}
+                  >
+                    Show me
+                  </Button>
+                </div>
+              ) : null}
+              {glbSave.state === "failed" ? (
+                <p className="text-xs text-destructive">{glbSave.message}</p>
+              ) : null}
             </div>
 
             <div className="flex items-start gap-2">

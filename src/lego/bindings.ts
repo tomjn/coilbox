@@ -334,6 +334,16 @@ export const legoSaveS3o = defineCommand<
   { path: string }
 >("coilbox-lego", "lego_save_s3o");
 
+/**
+ * Write a `.glb`'s bytes to an exact path the user chose, and nothing else:
+ * no game folder, and no texture beside it, since the picture is already
+ * embedded in the bytes. `path` must be absolute.
+ */
+export const legoSaveGlb = defineCommand<
+  { path: string; bytes: number[] },
+  { path: string }
+>("coilbox-lego", "lego_save_glb");
+
 /** One piece of an imported model. The vertices are in the sidecar, not here. */
 export interface ImportedPiece {
   name: string;

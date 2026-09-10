@@ -875,6 +875,31 @@ async fn lego_save_s3o(path: String, model: ExportModel) -> CliResult {
     CliResult::ok(json!({ "path": file.to_string_lossy() }))
 }
 
+/// `lego_save_glb` writes a `.glb`'s bytes to an exact path the user chose,
+/// and nothing else.
+///
+/// `lego_export_glb` only ever writes under a game folder's own
+/// `blender/<unit>.glb`, alongside the rest of an export. This is for saving a
+/// `.glb` on its own wherever the user likes, without touching a game folder at
+/// all, so there is no texture to place beside it either: the picture is
+/// already embedded in the bytes the frontend built.
+#[tauri::command]
+async fn lego_save_glb(path: String, bytes: Vec<u8>) -> CliResult {
+    let file = PathBuf::from(&path);
+    if !file.is_absolute() {
+        return CliResult::err(format!("not an absolute path: {path}"));
+    }
+    if let Some(parent) = file.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            return CliResult::err(format!("could not create {}: {e}", parent.display()));
+        }
+    }
+    if let Err(e) = std::fs::write(&file, &bytes) {
+        return CliResult::err(format!("could not write {}: {e}", file.display()));
+    }
+    CliResult::ok(json!({ "path": file.to_string_lossy() }))
+}
+
 /// A texture the model header names, once the import has looked for it.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2391,6 +2416,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_packs,
             lego_read_s3o,
             lego_save_s3o,
+            lego_save_glb,
             lego_import_s3o,
             lego_read_3do,
             lego_import_3do,
