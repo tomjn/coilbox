@@ -394,6 +394,24 @@ pub struct BlenderPng {
 /// was is the caller's to add: the store names files by content hash, so the
 /// path in here means nothing to anybody.
 pub fn blender_png(source: &Path, role: TextureRole) -> Result<BlenderPng, String> {
+    stored_png(source, role == TextureRole::Mask)
+}
+
+/// The texture a unit is painted with, for the `.glb` export, with its
+/// team-colour mask still in the alpha.
+///
+/// The frontend needs that alpha. `exportGlb.ts` mixes the team colour in by
+/// it and makes every pixel opaque before `GLTFExporter`'s canvas sees the
+/// image, so the canvas has no alpha left to premultiply by. Handed
+/// [`blender_png`]'s colour texture, which has no alpha, it reads every pixel
+/// as full team colour and bakes a unit in nothing but the player's colour.
+pub fn glb_png(source: &Path) -> Result<BlenderPng, String> {
+    stored_png(source, true)
+}
+
+/// Decode a stored texture, scale it to fit [`BLENDER_MAX`], and encode it as
+/// a PNG, with or without its alpha.
+fn stored_png(source: &Path, keep_alpha: bool) -> Result<BlenderPng, String> {
     let bytes = std::fs::read(source)
         .map_err(|e| format!("could not read it from coilbox's texture store: {e}"))?;
     let ext = extension(source);
@@ -408,9 +426,10 @@ pub fn blender_png(source: &Path, role: TextureRole) -> Result<BlenderPng, Strin
         image::DynamicImage::ImageRgba8(img)
     };
     let (width, height) = (img.width(), img.height());
-    let bytes = match role {
-        TextureRole::Colour => coilbox_texture::encode_rgb_png(&img.to_rgb8()),
-        TextureRole::Mask => coilbox_texture::encode_png(&img.to_rgba8()),
+    let bytes = if keep_alpha {
+        coilbox_texture::encode_png(&img.to_rgba8())
+    } else {
+        coilbox_texture::encode_rgb_png(&img.to_rgb8())
     }
     .ok_or_else(|| "could not re-encode it as a PNG".to_string())?;
     Ok(BlenderPng {
@@ -829,6 +848,24 @@ mod tests {
         // The colour is the file's own, not the file's own multiplied by an
         // alpha that never meant transparency.
         assert_eq!(back.get_pixel(0, 0).0, [0x10, 0x20, 0x30, 0xff]);
+    }
+
+    /// The `.glb` bakes the team colour in itself, by the mask in the alpha, so
+    /// its copy of the colour texture keeps that alpha. Without it every pixel
+    /// reads as full team colour.
+    #[test]
+    fn the_glb_colour_texture_keeps_its_team_colour_mask() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("Beacon_1.dds");
+        std::fs::write(&source, one_pixel_dds(0x30, 0x20, 0x10, 0x08)).expect("write");
+
+        let png = glb_png(&source).expect("should decode");
+
+        assert_eq!(png.bytes[25], 6, "should be truecolour with alpha");
+        let back = image::load_from_memory(&png.bytes)
+            .expect("decode")
+            .to_rgba8();
+        assert_eq!(back.get_pixel(0, 0).0, [0x10, 0x20, 0x30, 0x08]);
     }
 
     /// The mask keeps every channel, alpha included: the engine reads that one

@@ -1447,9 +1447,10 @@ fn sniff_image(bytes: &[u8]) -> Option<&'static str> {
 ///
 /// A picture out of a `.glb` is fully opaque nearly every time, because a glTF
 /// material's base colour is a picture and its alpha is transparency. Coilbox's
-/// own `.glb` export drops the alpha outright, since `GLTFExporter` puts the
-/// image through a premultiplied canvas that would eat the colour under it (see
-/// `texture::TextureRole::Colour`). So an all-opaque picture is written to alpha
+/// own `.glb` export bakes the team colour into the picture and writes it fully
+/// opaque, since `GLTFExporter` puts the image through a premultiplied canvas
+/// that would eat the colour under any alpha (see `texture::glb_png`). So an
+/// all-opaque picture is written to alpha
 /// zero, which is no team colour anywhere and the unit's own colours kept. That
 /// is the same call `set_team_mask` makes for a `.3do` tile, for the same
 /// reason.
@@ -1547,7 +1548,9 @@ async fn lego_texture_png<R: Runtime>(app: AppHandle<R>, key: String) -> CliResu
     };
     // Always the texture the unit is painted with: the `.glb` embeds that one
     // and nothing else, because a glTF material has nowhere to put the other.
-    match texture::blender_png(&source, texture::TextureRole::Colour) {
+    // Its alpha stays in, because that is the team-colour mask the frontend
+    // bakes by (see `texture::glb_png`).
+    match texture::glb_png(&source) {
         Ok(png) => CliResult::ok(json!({
             "dataUrl": coilbox_texture::png_data_url(&png.bytes),
             "width": png.width,
