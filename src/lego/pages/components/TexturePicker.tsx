@@ -47,6 +47,7 @@ import {
 import { legoTextureUrl } from "@/lib/assetUrl";
 import { TEAM_COLOUR } from "@/lib/springTexture";
 import { textureHasAlpha } from "@/lib/textureAlpha";
+import { readTexturePixels } from "@/lib/texturePixels";
 import {
   forceOpaqueInto,
   hexToRgb,
@@ -314,10 +315,17 @@ const PREVIEW_MAX = 128;
 /**
  * A texture, drawn small.
  *
- * Loaded through a canvas rather than a plain `<img>`, for two reasons: the
- * team-colour mix in `textureTeamColour.ts` needs the raw pixels, and a
- * format the webview cannot decode (`.dds`, `.tga`) fails the same way either
- * element would, without the broken-image icon an `<img>` would show for it.
+ * Read through `readTexturePixels` rather than a plain `<img>` or a 2D
+ * canvas's own `getImageData`, both of which hand back *premultiplied*
+ * alpha: an alpha-0 pixel comes back as rgb 0, whatever colour the file
+ * actually stored there. Spring's team-colour mask is alpha-0 over most of a
+ * texture, so that path turned most of a unit's own colour black before the
+ * mix in `textureTeamColour.ts` ever ran. `readTexturePixels` reads the file
+ * unpremultiplied over WebGL instead, so the mix sees the real colour.
+ *
+ * Once mixed, the pixels are opaque (both mixers force alpha to 255), so
+ * they are safe to hand to an ordinary 2D canvas from there: only the read
+ * back of a still-transparent pixel is where premultiplication bites.
  */
 function TexturePreview({
   url,
@@ -337,42 +345,37 @@ function TexturePreview({
   useEffect(() => {
     let live = true;
     setState("loading");
-    // `window.Image`, not the bare constructor: `Image` is already bound
-    // above to lucide-react's icon of the same name.
-    const image = new window.Image();
-    // The asset protocol answers every request with
-    // `Access-Control-Allow-Origin: *`, which is what lets a cross-origin
-    // load like this stay untainted for the `getImageData` below.
-    image.crossOrigin = "anonymous";
-    image.onload = () => {
-      if (!live) return;
-      const canvas = canvasRef.current;
-      const context = canvas?.getContext("2d");
-      if (!canvas || !context) {
-        setState("error");
-        return;
-      }
-      const scale = Math.min(
-        1,
-        PREVIEW_MAX / Math.max(image.naturalWidth, image.naturalHeight),
-      );
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      try {
-        const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-        if (teamColour) mixTeamColourInto(pixels.data, hexToRgb(TEAM_COLOUR));
-        else forceOpaqueInto(pixels.data);
-        context.putImageData(pixels, 0, 0);
+    readTexturePixels(url)
+      .then(({ width, height, data }) => {
+        if (!live) return;
+        const canvas = canvasRef.current;
+        const context = canvas?.getContext("2d");
+        if (!canvas || !context) {
+          setState("error");
+          return;
+        }
+        if (teamColour) mixTeamColourInto(data, hexToRgb(TEAM_COLOUR));
+        else forceOpaqueInto(data);
+
+        // Full resolution first, opaque throughout, then downscaled by an
+        // ordinary drawImage: safe now that there is no alpha left for it to
+        // premultiply away.
+        const full = document.createElement("canvas");
+        full.width = width;
+        full.height = height;
+        full
+          .getContext("2d")
+          ?.putImageData(new ImageData(data, width, height), 0, 0);
+
+        const scale = Math.min(1, PREVIEW_MAX / Math.max(width, height));
+        canvas.width = Math.max(1, Math.round(width * scale));
+        canvas.height = Math.max(1, Math.round(height * scale));
+        context.drawImage(full, 0, 0, canvas.width, canvas.height);
         setState("ready");
-      } catch {
-        setState("error");
-      }
-    };
-    image.onerror = () => {
-      if (live) setState("error");
-    };
-    image.src = url;
+      })
+      .catch(() => {
+        if (live) setState("error");
+      });
     return () => {
       live = false;
     };
