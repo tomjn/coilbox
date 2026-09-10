@@ -24,33 +24,32 @@ export interface TexturePixels {
 }
 
 /**
- * Decode `url` to a source WebGL can upload from, preferring
- * `createImageBitmap` because it can be told not to premultiply on decode.
- * An `<img>` element has no such option, but it also does no premultiply of
- * its own on decode (a browser only composites, and premultiplies, when it
- * paints), so it is a safe fallback for a decoder that does not support the
- * option, or for a format `createImageBitmap` gives up on.
+ * Decode `url` to a source WebGL can upload from, preferring an `<img>`
+ * element, which is what three.js's `TextureLoader` uploads and why the 3D
+ * viewport shows a texture's colour under its mask. WebGL has to hand over an
+ * image element's pixels unpremultiplied when asked. The webview coilbox runs
+ * in ignores `premultiplyAlpha: "none"` on `createImageBitmap`, so a bitmap
+ * comes back black wherever alpha is 0, which is why it is only the fallback.
  */
 async function loadImageSource(
   url: string,
 ): Promise<ImageBitmap | HTMLImageElement> {
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-    const blob = await response.blob();
-    return await createImageBitmap(blob, {
-      premultiplyAlpha: "none",
-      colorSpaceConversion: "none",
-    });
-  } catch {
     return await new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
       image.crossOrigin = "anonymous";
       image.onload = () => resolve(image);
       image.onerror = () => reject(new Error(`Could not load ${url}`));
       image.src = url;
+    });
+  } catch {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    return await createImageBitmap(await response.blob(), {
+      premultiplyAlpha: "none",
+      colorSpaceConversion: "none",
     });
   }
 }
