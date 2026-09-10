@@ -20,6 +20,9 @@
 
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+import { TEAM_COLOUR } from "../lib/springTexture";
+import { readTexturePixels } from "../lib/texturePixels";
+import { hexToRgb, mixTeamColourInto } from "../lib/textureTeamColour";
 import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
@@ -88,6 +91,35 @@ function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
 }
 
 /**
+ * Bake the team-colour mask into a texture's own pixels, so the GLB's plain
+ * `MeshStandardMaterial` draws it without the viewport's shader patch that
+ * `paintTeamColour` (springTexture.ts) gives the live viewport.
+ *
+ * Reads `url` through `readTexturePixels` rather than a 2D canvas's
+ * `drawImage` and `getImageData`: that path hands back premultiplied alpha,
+ * which loses the colour under every alpha-0 team-colour pixel before the mix
+ * ever sees it (see texturePixels.ts, and the same bug the texture popover
+ * preview had). The mixed pixels are opaque by the time they are written back
+ * with `putImageData`, so that half is safe: the premultiply problem is only
+ * ever a read problem.
+ */
+async function bakeTeamColourTexture(url: string): Promise<HTMLCanvasElement> {
+  const { width, height, data } = await readTexturePixels(url);
+  mixTeamColourInto(data, hexToRgb(TEAM_COLOUR));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("could not get a 2D canvas context");
+  ctx.putImageData(
+    new ImageData(new Uint8ClampedArray(data), width, height),
+    0,
+    0,
+  );
+  return canvas;
+}
+
+/**
  * The unit as a `.glb`'s bytes, with the texture it draws with embedded.
  *
  * `textureUrl` is passed in rather than worked out here, because where the
@@ -96,13 +128,13 @@ function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
  * stands. A unit imported from somebody else's model draws with the game's own
  * file, usually a compressed `.dds` no browser decodes, so Rust decodes it and
  * hands it over as a `data:` URL. Either way what arrives here is an image
- * three.js can load, which is all `GLTFExporter` can embed.
+ * `bakeTeamColourTexture` can read, which is all `GLTFExporter` needs to embed.
  *
  * `null` for a unit whose texture could not be found. The geometry is still
  * worth having in Blender, and a grey model says more than a failed export.
  *
- * Not unit tested: `GLTFExporter` needs a DOM to rasterise the texture, which
- * this reaches for the moment it runs and vitest cannot provide.
+ * Not unit tested: both the bake and `GLTFExporter` need a DOM, which this
+ * reaches for the moment it runs and vitest cannot provide.
  */
 export async function exportGlb(
   project: LegoProject,
@@ -114,7 +146,7 @@ export async function exportGlb(
   if (!scene) return null;
 
   const texture = textureUrl
-    ? await new THREE.TextureLoader().loadAsync(textureUrl)
+    ? new THREE.CanvasTexture(await bakeTeamColourTexture(textureUrl))
     : null;
   if (texture) {
     texture.colorSpace = THREE.SRGBColorSpace;

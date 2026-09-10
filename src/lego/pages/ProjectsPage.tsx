@@ -1,4 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
+import { ask } from "@tauri-apps/plugin-dialog";
 import {
   Blocks,
   Boxes,
@@ -142,7 +143,11 @@ export default function ProjectsPage() {
   }
 
   async function remove(id: string, name: string) {
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    const yes = await ask(`Delete "${name}"? This cannot be undone.`, {
+      title: "Delete model?",
+      kind: "warning",
+    });
+    if (!yes) return;
     await deleteProject(id);
   }
 

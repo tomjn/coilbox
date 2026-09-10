@@ -59,3 +59,23 @@ export const animBos2cob = defineCommand<
   { path: string; output?: string; overwrite?: boolean },
   { output: string; bytes: number; needsOverwrite: boolean }
 >("coilbox-anim", "anim_bos2cob");
+
+/**
+ * Convert BOS source to a Lua unit script that runs as it is, comments and all.
+ *
+ * `includes` is the files it may `#include`, keyed by path. `pieces` is the
+ * model's piece names, so the Lua asks for each by the model's own spelling.
+ * `cob` is the compiled script beside the source, when there is one, which
+ * settles how long `[1]` is: Scriptor, which built the older games, made it two
+ * and a half elmos. `warnings` is anything the Lua may do differently.
+ */
+export const animBos2lua = defineCommand<
+  {
+    source: string;
+    name: string;
+    includes?: Record<string, string>;
+    pieces?: string[];
+    cob?: number[];
+  },
+  { lua: string; warnings: string[]; linearScale: number }
+>("coilbox-anim", "anim_bos2lua");

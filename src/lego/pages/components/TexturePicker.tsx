@@ -37,7 +37,7 @@
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, RefreshCw, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   Popover,
@@ -45,7 +45,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { legoTextureUrl } from "@/lib/assetUrl";
+import { TEAM_COLOUR } from "@/lib/springTexture";
 import { textureHasAlpha } from "@/lib/textureAlpha";
+import { readTexturePixels } from "@/lib/texturePixels";
+import {
+  forceOpaqueInto,
+  hexToRgb,
+  mixTeamColourInto,
+} from "@/lib/textureTeamColour";
 import { legoTextureImport } from "../../bindings";
 import type { LegoImported, LegoTexture } from "../../model";
 import { maskLoss, maskLossNote } from "../../textureMask";
@@ -156,6 +163,7 @@ export function TexturePicker({ imported, onChange }: Props) {
               missing={imported.missingTexture}
               note={note}
               busy={busy === "texture"}
+              previewTeamColour
               onChoose={() => void choose("texture")}
               onRefresh={() => void refresh("texture")}
             />
@@ -165,6 +173,7 @@ export function TexturePicker({ imported, onChange }: Props) {
               texture={imported.texture2}
               missing={imported.missingTexture2}
               busy={busy === "texture2"}
+              previewTeamColour={false}
               onChoose={() => void choose("texture2")}
               onRefresh={() => void refresh("texture2")}
             />
@@ -225,6 +234,7 @@ function TextureSlot({
   missing,
   note,
   busy,
+  previewTeamColour,
   onChoose,
   onRefresh,
 }: {
@@ -235,6 +245,10 @@ function TextureSlot({
   /** Something wrong with the stored file itself, as against with finding it. */
   note?: string | null;
   busy: boolean;
+  /** Whether the engine reads this texture's alpha as a team-colour mask, so
+   *  its preview should mix that colour in the way the 3D viewport does,
+   *  rather than draw the file as-is (the shading map). */
+  previewTeamColour: boolean;
   onChoose: () => void;
   onRefresh: () => void;
 }) {
@@ -244,6 +258,11 @@ function TextureSlot({
       <p className="text-xs text-muted-foreground">{hint}</p>
       {texture ? (
         <>
+          <TexturePreview
+            url={legoTextureUrl(texture.key)}
+            teamColour={previewTeamColour}
+            label={title}
+          />
           <code className="break-all text-xs">{texture.name}</code>
           {texture.source ? (
             <p className="break-all text-xs text-muted-foreground">
@@ -284,5 +303,103 @@ function TextureSlot({
         </Button>
       </div>
     </div>
+  );
+}
+
+/** The internal canvas resolution a preview is drawn at, in pixels on its
+ *  longer side. A shared unit atlas is 8192 square; the preview only ever
+ *  needs to look small, so it is downscaled once here rather than costing a
+ *  full-resolution `getImageData` on every open. */
+const PREVIEW_MAX = 128;
+
+/**
+ * A texture, drawn small.
+ *
+ * Read through `readTexturePixels` rather than a plain `<img>` or a 2D
+ * canvas's own `getImageData`, both of which hand back *premultiplied*
+ * alpha: an alpha-0 pixel comes back as rgb 0, whatever colour the file
+ * actually stored there. Spring's team-colour mask is alpha-0 over most of a
+ * texture, so that path turned most of a unit's own colour black before the
+ * mix in `textureTeamColour.ts` ever ran. `readTexturePixels` reads the file
+ * unpremultiplied over WebGL instead, so the mix sees the real colour.
+ *
+ * Once mixed, the pixels are opaque (both mixers force alpha to 255), so
+ * they are safe to hand to an ordinary 2D canvas from there: only the read
+ * back of a still-transparent pixel is where premultiplication bites.
+ */
+function TexturePreview({
+  url,
+  teamColour,
+  label,
+}: {
+  url: string;
+  /** Whether to mix in the builder's team colour the way the 3D viewport
+   *  does, or just force the image opaque (the shading map). */
+  teamColour: boolean;
+  /** The slot's own title, so the preview has something to be announced by. */
+  label: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let live = true;
+    setState("loading");
+    readTexturePixels(url)
+      .then(({ width, height, data }) => {
+        if (!live) return;
+        const canvas = canvasRef.current;
+        const context = canvas?.getContext("2d");
+        if (!canvas || !context) {
+          setState("error");
+          return;
+        }
+        if (teamColour) mixTeamColourInto(data, hexToRgb(TEAM_COLOUR));
+        else forceOpaqueInto(data);
+
+        // Full resolution first, opaque throughout, then downscaled by an
+        // ordinary drawImage: safe now that there is no alpha left for it to
+        // premultiply away.
+        const full = document.createElement("canvas");
+        full.width = width;
+        full.height = height;
+        full
+          .getContext("2d")
+          ?.putImageData(new ImageData(data, width, height), 0, 0);
+
+        const scale = Math.min(1, PREVIEW_MAX / Math.max(width, height));
+        canvas.width = Math.max(1, Math.round(width * scale));
+        canvas.height = Math.max(1, Math.round(height * scale));
+        context.drawImage(full, 0, 0, canvas.width, canvas.height);
+        setState("ready");
+      })
+      .catch(() => {
+        if (live) setState("error");
+      });
+    return () => {
+      live = false;
+    };
+  }, [url, teamColour]);
+
+  if (state === "error")
+    return (
+      <p className="text-xs text-muted-foreground">
+        Coilbox cannot draw a preview of this texture.
+      </p>
+    );
+
+  return (
+    <canvas
+      ref={canvasRef}
+      role="img"
+      aria-label={
+        teamColour
+          ? `Preview of the ${label.toLowerCase()}, with its team-colour areas shown in the builder's own colour`
+          : `Preview of the ${label.toLowerCase()}`
+      }
+      aria-busy={state === "loading"}
+      className="h-32 w-full rounded border border-border/50 bg-muted object-contain"
+      style={{ imageRendering: "pixelated" }}
+    />
   );
 }

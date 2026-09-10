@@ -103,6 +103,12 @@ export const legoExport = defineCommand<
     unitName: string;
     /** What to place in `unittextures`. Null to write no texture at all. */
     textures: ExportTextures | null;
+    /**
+     * Replace a texture already at that name rather than leaving it alone.
+     * Off by default. Has no bearing on the script or the unit definition,
+     * which are always write-once.
+     */
+    overwriteTexture: boolean;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
     /**
@@ -327,6 +333,16 @@ export const legoSaveS3o = defineCommand<
   { path: string; model: S3oBuild },
   { path: string }
 >("coilbox-lego", "lego_save_s3o");
+
+/**
+ * Write a `.glb`'s bytes to an exact path the user chose, and nothing else:
+ * no game folder, and no texture beside it, since the picture is already
+ * embedded in the bytes. `path` must be absolute.
+ */
+export const legoSaveGlb = defineCommand<
+  { path: string; bytes: number[] },
+  { path: string }
+>("coilbox-lego", "lego_save_glb");
 
 /** One piece of an imported model. The vertices are in the sidecar, not here. */
 export interface ImportedPiece {

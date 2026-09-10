@@ -3,10 +3,10 @@ import { Binary, BookOpen, Code2, FileCode2, ScrollText } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 
 /**
- * The animation plugin: tools for Spring/Recoil unit-script animation. v0.4
- * ships a client-side BOS → Lua converter (a port of CarRepairer's bos2lua) and
- * a BOS → COB compiler + COB disassembler (Rust crate `coilbox-anim`, a
- * byte-exact port of BARScriptCompiler).
+ * The animation plugin: tools for Spring/Recoil unit-script animation. It
+ * ships a BOS → Lua converter (Rust crate `coilbox-bos2lua`) and a BOS → COB
+ * compiler + COB disassembler (Rust crate `coilbox-anim`, a byte-exact port of
+ * BARScriptCompiler).
  */
 const animationPlugin: FramePlugin = {
   id: "animation",

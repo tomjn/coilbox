@@ -29,7 +29,7 @@ import {
 } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
 import { exportTextureName, unitAtlas } from "../../atlas";
-import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
+import { legoExport, legoScratchGame } from "../../bindings";
 import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
@@ -44,6 +44,7 @@ import {
   SCRATCH_SIDE,
 } from "../../scratchGame";
 import { buildUnitDef } from "../../unitDef";
+import { ShowMe } from "./ShowMe";
 
 interface Props {
   open: boolean;
@@ -169,6 +170,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
               : null,
           stored: imported?.place ?? [],
         },
+        // The scratch game always rewrites regardless (see `is_scratch_dir`),
+        // so this has no effect here: the drawer's own checkbox is the only
+        // thing that reads it for a real export.
+        overwriteTexture: false,
         script: unitScript(project),
         pieceCollision: buildPieceCollisionScript(
           project,
@@ -325,13 +330,9 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
             {scratchDir ? (
               <div className="flex flex-col gap-2 text-xs">
                 <code className="break-all">{scratchDir}</code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void legoOpenPath({ path: scratchDir })}
-                >
+                <ShowMe path={scratchDir}>
                   <FolderOpen className="size-4" /> Show me the scratch game
-                </Button>
+                </ShowMe>
               </div>
             ) : null}
           </div>

@@ -1,0 +1,16 @@
+[package]
+name = "coilbox-bos2lua"
+version = "0.0.0"
+description = "Converts BOS unit scripts to Lua unit scripts, keeping their comments."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# The engine's unit value names, so `set INBUILDSTANCE to 1` can come out as
+# `COB.INBUILDSTANCE` rather than a bare 5.
+coilbox-unitpose = { path = "../coilbox-unitpose" }
+
+[dev-dependencies]
+# Every conversion in the tests is loaded and run, because Lua that only looks
+# right is the failure this crate exists to end.
+coilbox-springlua = { path = "../coilbox-springlua" }

@@ -19,3 +19,10 @@ picoframe-core = "0.0.4"
 # Where the pieces are and how they move, shared with the Lua unit script
 # runtime so a preview means the same thing for a `.cob` as for a `.lua`.
 coilbox-unitpose = { path = "../coilbox-unitpose" }
+# BOS to Lua, for a unit opened out of a game that ships only BOS and COB.
+coilbox-bos2lua = { path = "../coilbox-bos2lua" }
+
+[dev-dependencies]
+# The converter's Lua, run beside a game's own COB to check they move a unit
+# the same way. See src/bos2lua_parity.rs.
+coilbox-springlua = { path = "../coilbox-springlua" }

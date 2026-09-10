@@ -199,24 +199,75 @@ async fn lego_thumb_save<R: Runtime>(app: AppHandle<R>, id: String, png: Vec<u8>
     }
 }
 
-/// `lego_open_path` reveals an exported unit in the file manager.
+/// `lego_open_path` shows an exported file, or the scratch game's folder, in
+/// the file manager.
 #[tauri::command]
 async fn lego_open_path(path: String) -> CliResult {
     let target = PathBuf::from(&path);
     if !target.exists() {
         return CliResult::err(format!("path does not exist: {path}"));
     }
-    #[cfg(target_os = "macos")]
-    let spawned = Command::new("open").arg(&target).spawn();
-    #[cfg(target_os = "windows")]
-    let spawned = Command::new("explorer").arg(&target).spawn();
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let spawned = Command::new("xdg-open").arg(&target).spawn();
-
-    match spawned {
-        Ok(_) => CliResult::ok(json!({ "opened": true })),
-        Err(e) => CliResult::err(format!("could not open path: {e}")),
+    match reveal(&target) {
+        Ok(()) => CliResult::ok(json!({ "opened": true })),
+        Err(e) => CliResult::err(format!("could not show {path}: {e}")),
     }
+}
+
+/// The file manager command that shows `target`: a folder opened, a file
+/// selected inside its folder. Opening a file instead hands it to whatever app
+/// claims its type, and on macOS nothing claims an `.s3o`, so the export
+/// drawer's "Show me" did nothing at all.
+#[cfg(target_os = "macos")]
+fn reveal_command(target: &Path) -> Command {
+    let mut open = Command::new("open");
+    if target.is_file() {
+        open.arg("-R");
+    }
+    open.arg(target);
+    open
+}
+
+#[cfg(target_os = "windows")]
+fn reveal_command(target: &Path) -> Command {
+    use std::os::windows::process::CommandExt;
+    let mut explorer = Command::new("explorer");
+    if target.is_file() {
+        // Explorer reads `/select,` and the quoted path as one argument, which
+        // the standard quoting would split at the comma.
+        explorer.raw_arg(format!("/select,\"{}\"", target.display()));
+    } else {
+        explorer.arg(target);
+    }
+    explorer
+}
+
+/// No call selects a file in every Linux file manager, so a file's folder is
+/// opened instead.
+#[cfg(all(unix, not(target_os = "macos")))]
+fn reveal_command(target: &Path) -> Command {
+    let folder = match target.parent() {
+        Some(parent) if target.is_file() => parent,
+        _ => target,
+    };
+    let mut open = Command::new("xdg-open");
+    open.arg(folder);
+    open
+}
+
+/// Run [`reveal_command`]. `open` exits once the Finder has the request, and
+/// with a failure it can explain, so macOS waits for it. Elsewhere only a
+/// command that will not start is reported: Explorer exits with 1 whether or
+/// not it worked, and `xdg-open` can wait on the app it launched.
+fn reveal(target: &Path) -> Result<(), String> {
+    let mut command = reveal_command(target);
+    if cfg!(target_os = "macos") {
+        let out = command.output().map_err(|e| e.to_string())?;
+        if out.status.success() {
+            return Ok(());
+        }
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    command.spawn().map(drop).map_err(|e| e.to_string())
 }
 
 /// Where the bundled pack can sit inside the resource directory, in the order we
@@ -431,10 +482,12 @@ fn atlas_target(dir: &Path, atlas: &AtlasRef) -> Result<PathBuf, String> {
 /// Once a game folder holds one, it is the game author's: hand edits to a
 /// script, a unit definition or a texture have to survive a re-export, and a
 /// file the export never wrote must not be overwritten at all. The scratch game
-/// is the one exception (see [`is_scratch_dir`]): it has no hand edits worth
-/// keeping and has to show the unit as it stands now.
-fn keep_existing(target: &Path, scratch: bool) -> bool {
-    target.exists() && !scratch
+/// is one exception (see [`is_scratch_dir`]): it has no hand edits worth
+/// keeping and has to show the unit as it stands now. `overwrite` is the other,
+/// and applies only to a texture: the export drawer's own checkbox for when a
+/// stale texture is exactly the problem being fixed.
+fn keep_existing(target: &Path, scratch: bool, overwrite: bool) -> bool {
+    target.exists() && !scratch && !overwrite
 }
 
 /// Where a game keeps the words a player reads, when it keeps them outside its
@@ -862,6 +915,31 @@ async fn lego_save_s3o(path: String, model: ExportModel) -> CliResult {
         Ok(bytes) => bytes,
         Err(e) => return CliResult::err(format!("could not build the model: {e}")),
     };
+    if let Some(parent) = file.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            return CliResult::err(format!("could not create {}: {e}", parent.display()));
+        }
+    }
+    if let Err(e) = std::fs::write(&file, &bytes) {
+        return CliResult::err(format!("could not write {}: {e}", file.display()));
+    }
+    CliResult::ok(json!({ "path": file.to_string_lossy() }))
+}
+
+/// `lego_save_glb` writes a `.glb`'s bytes to an exact path the user chose,
+/// and nothing else.
+///
+/// `lego_export_glb` only ever writes under a game folder's own
+/// `blender/<unit>.glb`, alongside the rest of an export. This is for saving a
+/// `.glb` on its own wherever the user likes, without touching a game folder at
+/// all, so there is no texture to place beside it either: the picture is
+/// already embedded in the bytes the frontend built.
+#[tauri::command]
+async fn lego_save_glb(path: String, bytes: Vec<u8>) -> CliResult {
+    let file = PathBuf::from(&path);
+    if !file.is_absolute() {
+        return CliResult::err(format!("not an absolute path: {path}"));
+    }
     if let Some(parent) = file.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             return CliResult::err(format!("could not create {}: {e}", parent.display()));
@@ -1420,9 +1498,10 @@ fn sniff_image(bytes: &[u8]) -> Option<&'static str> {
 ///
 /// A picture out of a `.glb` is fully opaque nearly every time, because a glTF
 /// material's base colour is a picture and its alpha is transparency. Coilbox's
-/// own `.glb` export drops the alpha outright, since `GLTFExporter` puts the
-/// image through a premultiplied canvas that would eat the colour under it (see
-/// `texture::TextureRole::Colour`). So an all-opaque picture is written to alpha
+/// own `.glb` export bakes the team colour into the picture and writes it fully
+/// opaque, since `GLTFExporter` puts the image through a premultiplied canvas
+/// that would eat the colour under any alpha (see `texture::glb_png`). So an
+/// all-opaque picture is written to alpha
 /// zero, which is no team colour anywhere and the unit's own colours kept. That
 /// is the same call `set_team_mask` makes for a `.3do` tile, for the same
 /// reason.
@@ -1520,7 +1599,9 @@ async fn lego_texture_png<R: Runtime>(app: AppHandle<R>, key: String) -> CliResu
     };
     // Always the texture the unit is painted with: the `.glb` embeds that one
     // and nothing else, because a glTF material has nowhere to put the other.
-    match texture::blender_png(&source, texture::TextureRole::Colour) {
+    // Its alpha stays in, because that is the team-colour mask the frontend
+    // bakes by (see `texture::glb_png`).
+    match texture::glb_png(&source) {
         Ok(png) => CliResult::ok(json!({
             "dataUrl": coilbox_texture::png_data_url(&png.bytes),
             "width": png.width,
@@ -1715,6 +1796,10 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
 /// and then left alone: a re-export never overwrites one that is already there
 /// (see [`keep_existing`]). Only the model and the per-piece collision file are
 /// rewritten every time, because those are the files the builder alone owns.
+/// `overwrite_texture` is the one way round that rule: with it set, a texture
+/// already at that name is replaced rather than kept, for a stale copy the
+/// drawer's ordinary write-once behaviour has no other way to clear. It has no
+/// bearing on the script or the definition, which stay write-once regardless.
 ///
 /// `text` is the unit's name and description for a game that reads neither from
 /// the definition, and goes to [`coilbox_language_file`]. `None` for a game
@@ -1729,6 +1814,10 @@ async fn lego_export<R: Runtime>(
     dir: String,
     unit_name: String,
     textures: Option<ExportTextures>,
+    // The export drawer's "replace textures already there" checkbox. Only a
+    // texture reads it: the script and the unit definition below keep their
+    // own write-once rule regardless.
+    overwrite_texture: bool,
     script: Option<String>,
     piece_collision: Option<String>,
     unit_def: Option<String>,
@@ -1792,7 +1881,7 @@ async fn lego_export<R: Runtime>(
             Ok(path) => path,
             Err(e) => return CliResult::err(e),
         };
-        if keep_existing(&target, scratch) {
+        if keep_existing(&target, scratch, overwrite_texture) {
             texture_kept = true;
         } else if let Err(e) = std::fs::copy(&source, &target) {
             return CliResult::err(format!("could not copy the texture: {e}"));
@@ -1827,7 +1916,7 @@ async fn lego_export<R: Runtime>(
                 Ok(path) => path,
                 Err(e) => return CliResult::err(e),
             };
-            if keep_existing(&target, scratch) {
+            if keep_existing(&target, scratch, overwrite_texture) {
                 stored_kept.push(stored.write_as);
             } else if let Err(e) = std::fs::copy(&source, &target) {
                 return CliResult::err(format!(
@@ -1852,7 +1941,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", scripts.display()));
         }
         let target = scripts.join(format!("{unit_name}.lua"));
-        if keep_existing(&target, scratch) {
+        if keep_existing(&target, scratch, false) {
             script_kept = true;
         } else if let Err(e) = std::fs::write(&target, &script) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -1902,7 +1991,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", units.display()));
         }
         let target = units.join(format!("{unit_name}.lua"));
-        if keep_existing(&target, scratch) {
+        if keep_existing(&target, scratch, false) {
             unit_def_kept = true;
         } else if let Err(e) = std::fs::write(&target, &unit_def) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -2381,6 +2470,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_packs,
             lego_read_s3o,
             lego_save_s3o,
+            lego_save_glb,
             lego_import_s3o,
             lego_read_3do,
             lego_import_3do,
@@ -2638,6 +2728,40 @@ mod glb_picture {
 mod tests {
     use super::*;
 
+    fn reveal_args(target: &Path) -> Vec<std::ffi::OsString> {
+        reveal_command(target)
+            .get_args()
+            .map(|arg| arg.to_os_string())
+            .collect()
+    }
+
+    /// A file is selected in the Finder rather than opened, because opening
+    /// hands it to whatever app claims its type and nothing claims an `.s3o`.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn show_me_selects_a_file_in_the_finder_and_opens_a_folder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("unit.s3o");
+        std::fs::write(&file, b"s3o").expect("write");
+
+        assert_eq!(
+            reveal_args(&file),
+            vec!["-R".into(), file.clone().into_os_string()]
+        );
+        assert_eq!(reveal_args(dir.path()), vec![dir.path().as_os_str()]);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn show_me_opens_the_folder_a_file_is_in_and_a_folder_itself() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("unit.s3o");
+        std::fs::write(&file, b"s3o").expect("write");
+
+        assert_eq!(reveal_args(&file), vec![dir.path().as_os_str()]);
+        assert_eq!(reveal_args(dir.path()), vec![dir.path().as_os_str()]);
+    }
+
     #[test]
     fn only_the_two_known_kinds_resolve_to_a_folder() {
         assert_eq!(folder_for("project"), Some("projects"));
@@ -2748,18 +2872,23 @@ mod tests {
     }
 
     #[test]
-    fn a_file_the_game_already_has_is_kept_unless_the_target_is_scratch() {
+    fn a_file_the_game_already_has_is_kept_unless_the_target_is_scratch_or_overwrite_is_on() {
         let dir = tempfile::tempdir().expect("tempdir");
         let existing = dir.path().join("atlas.png");
         std::fs::write(&existing, "the game's own").expect("write");
         let missing = dir.path().join("coilbox_atlas.png");
 
-        // A real game folder: what is there stays, what is not is written.
-        assert!(keep_existing(&existing, false));
-        assert!(!keep_existing(&missing, false));
+        // A real game folder with overwrite off: what is there stays, what is
+        // not is written.
+        assert!(keep_existing(&existing, false, false));
+        assert!(!keep_existing(&missing, false, false));
         // The scratch game has nothing worth keeping, so it is always rewritten.
-        assert!(!keep_existing(&existing, true));
-        assert!(!keep_existing(&missing, true));
+        assert!(!keep_existing(&existing, true, false));
+        assert!(!keep_existing(&missing, true, false));
+        // The drawer's "replace textures already there" checkbox does the same
+        // in a real game folder, without needing the scratch exception.
+        assert!(!keep_existing(&existing, false, true));
+        assert!(!keep_existing(&missing, false, true));
     }
 
     /// Beyond All Reason's own file, trimmed to the parts anything reads. The

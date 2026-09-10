@@ -19,7 +19,9 @@
 //! A Lua script also brings back the library files it `include`s, because a
 //! game that keeps half its animation in a shared library has a script that
 //! does nothing without it. They are read here, where the archive is already
-//! open, so that nothing downstream needs to reach back into the game.
+//! open, so that nothing downstream needs to reach back into the game. The same
+//! goes for the files a `.bos` pulls in with `#include`, which the converter
+//! needs as the compiler did.
 
 use std::collections::{HashSet, VecDeque};
 use std::path::Path;
@@ -79,7 +81,7 @@ pub struct UnitScriptOutput {
     /// half of "this unit has no script here".
     pub declared: Option<String>,
     /// The library files the script `include`s, and the libraries those
-    /// include. Empty for a `.cob`, which has no such thing.
+    /// include. For a `.cob`, the files its `.bos` pulls in with `#include`.
     pub includes: Vec<ScriptInclude>,
     pub errors: Vec<String>,
 }
@@ -93,7 +95,8 @@ pub struct ScriptInclude {
     pub name: String,
     /// The archive member it resolved to, so the caller can say where from.
     pub member: String,
-    /// The source. Lua, always: `include` reads nothing else.
+    /// The source: Lua for a Lua script's `include`, BOS or a header for a
+    /// `.bos` file's `#include`.
     pub text: String,
 }
 
@@ -179,7 +182,9 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
     if out.kind.as_deref() == Some("cob") {
         if let Some(member) = find_bos(&list, &want) {
             if let Some((_, bytes)) = us.read_archive_member(handle, &member, SCRIPT_CAP) {
-                out.bos_text = Some(String::from_utf8_lossy(&bytes).into_owned());
+                let text = String::from_utf8_lossy(&bytes).into_owned();
+                out.includes = read_bos_includes(&us, handle, &list, &member, &text);
+                out.bos_text = Some(text);
                 out.bos_member = Some(member);
             }
         }
@@ -299,13 +304,14 @@ fn unit_def_json(us: &Unitsync, unit_name: &str) -> Option<String> {
          local ud = defs.unitdefs or defs.unitDefs\n\
          if type(ud) ~= 'table' then return __cb_chunk('') end\n\
          local want = '{unit_name}'\n\
-         local d = ud[want]\n\
+         local key, d = want, ud[want]\n\
          if type(d) ~= 'table' then\n\
          \x20 for k, v in pairs(ud) do\n\
-         \x20   if type(k) == 'string' and string.lower(k) == string.lower(want) then d = v break end\n\
+         \x20   if type(k) == 'string' and string.lower(k) == string.lower(want) then key, d = k, v break end\n\
          \x20 end\n\
          end\n\
          if type(d) ~= 'table' then return __cb_chunk('') end\n\
+         if d.unitname == nil then d.unitname = string.lower(key) end\n\
          return __cb_chunk(enc(d, {DEF_DEPTH}) or '')\n",
         crate::lua::CHUNKED_RESULT,
         crate::lua::DEFS_ENV_SHIM
@@ -483,6 +489,79 @@ fn read_includes(
     found
 }
 
+/// The files a `.bos` pulls in with `#include`, and the files those pull in.
+///
+/// Looked for beside the file that asks and then under `scripts/`, the two
+/// places the BOS compilers look, regardless of case and of which way the
+/// slashes lean: Total Annihilation's scripts write `animations\walk.bos`.
+fn read_bos_includes(
+    us: &Unitsync,
+    handle: i32,
+    list: &[(String, String)],
+    member: &str,
+    text: &str,
+) -> Vec<ScriptInclude> {
+    let mut found = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut queue: VecDeque<(String, String, u32)> = bos_include_names(text)
+        .into_iter()
+        .map(|name| (name, member.to_string(), 1))
+        .collect();
+
+    while let Some((name, from, depth)) = queue.pop_front() {
+        if found.len() >= MAX_INCLUDES {
+            break;
+        }
+        let want = name.trim().replace('\\', "/").to_lowercase();
+        let dir = from
+            .to_lowercase()
+            .rsplit_once('/')
+            .map(|(dir, _)| format!("{dir}/"))
+            .unwrap_or_default();
+        let Some(member) = [format!("{dir}{want}"), format!("{SCRIPT_DIR}/{want}")]
+            .iter()
+            .find_map(|candidate| exact(list, candidate))
+        else {
+            continue;
+        };
+        if !seen.insert(member.to_lowercase()) {
+            continue;
+        }
+        let Some((_, bytes)) = us.read_archive_member(handle, &member, SCRIPT_CAP) else {
+            continue;
+        };
+        let source = String::from_utf8_lossy(&bytes).into_owned();
+        if depth < INCLUDE_DEPTH {
+            queue.extend(
+                bos_include_names(&source)
+                    .into_iter()
+                    .map(|n| (n, member.clone(), depth + 1)),
+            );
+        }
+        found.push(ScriptInclude {
+            name,
+            member,
+            text: source,
+        });
+    }
+    found
+}
+
+/// The names a `.bos` asks for with `#include`, in the order it asks. Only a
+/// directive at the start of a line counts, so one commented out with `//` is
+/// not read.
+fn bos_include_names(text: &str) -> Vec<String> {
+    let Ok(pattern) = regex::Regex::new(r#"(?m)^[ \t]*#[ \t]*include[ \t]*[<"]([^">\r\n]+)[">]"#)
+    else {
+        return Vec::new();
+    };
+    pattern
+        .captures_iter(text)
+        .filter_map(|hit| hit.get(1))
+        .map(|name| name.as_str().to_string())
+        .collect()
+}
+
 /// The names one file asks for, in the order it asks.
 ///
 /// A literal string is all this looks for, because it is all a preview can
@@ -494,8 +573,10 @@ fn read_includes(
 /// the script turns out not to want is a much smaller fault than missing one it
 /// does.
 fn include_names(text: &str) -> Vec<String> {
-    // Both quote styles, since Lua has no preference and games use each.
-    let Ok(pattern) = regex::Regex::new(r#"\binclude\s*\(\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')"#)
+    // Both quote styles, since Lua has no preference and games use each. The
+    // parentheses are optional too, because Lua lets a call with one string
+    // argument drop them, and Zero-K writes `include "constants.lua"`.
+    let Ok(pattern) = regex::Regex::new(r#"\binclude\s*(?:\(\s*)?(?:"([^"\r\n]*)"|'([^'\r\n]*)')"#)
     else {
         return Vec::new();
     };
@@ -515,6 +596,15 @@ mod tests {
             .iter()
             .map(|p| (p.to_lowercase(), (*p).to_string()))
             .collect()
+    }
+
+    #[test]
+    fn reads_the_includes_a_bos_asks_for_and_not_the_commented_ones() {
+        let bos = "#include \"sfxtype.h\"\r\n  # include <exptype.h>\n// #include \"old.h\"\n#include \"animations\\walk.bos\"\n";
+        assert_eq!(
+            bos_include_names(bos),
+            ["sfxtype.h", "exptype.h", "animations\\walk.bos"]
+        );
     }
 
     #[test]
@@ -654,6 +744,16 @@ mod tests {
         assert_eq!(
             include_names("common = include ( 'headers/common_lus.lua' )"),
             vec!["headers/common_lus.lua"]
+        );
+    }
+
+    /// Zero-K's house style. Lua lets a call whose one argument is a string
+    /// leave out the parentheses, and most of Zero-K's scripts do.
+    #[test]
+    fn finds_a_library_named_without_parentheses() {
+        assert_eq!(
+            include_names("include \"constants.lua\"\ninclude 'pieceControl.lua'\n"),
+            vec!["constants.lua", "pieceControl.lua"]
         );
     }
 

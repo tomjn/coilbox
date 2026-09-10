@@ -1309,8 +1309,8 @@ export const WRECK_POSE: AnimPreset = {
     };
   },
   /**
-   * Killed is the real death callin (`bos2lua.ts` keeps its name unchanged
-   * converting BOS to Lua, the same evidence that placed recoil on `Shot1`).
+   * Killed is the real death callin (the BOS to Lua converter keeps its name,
+   * the same evidence that placed recoil on `Shot1`).
    * It already runs once, so this needs no thread and no signal, unlike a
    * looping preset or one that might restart mid-flight.
    *

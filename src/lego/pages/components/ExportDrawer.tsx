@@ -26,7 +26,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useCallback, useEffect, useState } from "react";
@@ -49,7 +49,7 @@ import {
   legoExportObj,
   legoExportStale,
   legoGameLanguage,
-  legoOpenPath,
+  legoSaveGlb,
   legoTexturePng,
 } from "../../bindings";
 import { exportGlb } from "../../exportGlb";
@@ -71,6 +71,7 @@ import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef, legoUnitDef, unitWords } from "../../unitDef";
+import { ShowMe } from "./ShowMe";
 
 interface Props {
   open: boolean;
@@ -85,6 +86,7 @@ interface Props {
   onRemember: (settings: {
     exportDir: string;
     exportTexture: boolean;
+    exportOverwriteTexture: boolean;
     exportScript: boolean;
     exportGlb: boolean;
     exportObj: boolean;
@@ -134,6 +136,13 @@ type Result =
     }
   | { state: "failed"; message: string };
 
+/** The standalone "Save GLB…" button, independent of the export above. */
+type GlbSave =
+  | { state: "idle" }
+  | { state: "working" }
+  | { state: "done"; path: string }
+  | { state: "failed"; message: string };
+
 /**
  * Where the chosen folder's game keeps the words a player reads (issue #2683).
  *
@@ -179,10 +188,14 @@ export function ExportDrawer({
   const [withTexture, setWithTexture] = useState(
     project.exportTexture !== false,
   );
+  const [withOverwriteTexture, setWithOverwriteTexture] = useState(
+    project.exportOverwriteTexture === true,
+  );
   const [withScript, setWithScript] = useState(project.exportScript !== false);
   const [withGlb, setWithGlb] = useState(project.exportGlb === true);
   const [withObj, setWithObj] = useState(project.exportObj === true);
   const [result, setResult] = useState<Result>({ state: "idle" });
+  const [glbSave, setGlbSave] = useState<GlbSave>({ state: "idle" });
   const [gameText, setGameText] = useState<GameText>({ state: "unread" });
 
   // Asked of the folder as soon as there is one, so the drawer can say where
@@ -345,6 +358,50 @@ export function ExportDrawer({
     setResult({ state: "idle" });
   }
 
+  // What the GLB's material samples: an imported unit's own picture, decoded
+  // out of the store, or the atlas a built one shares. Shared by the full
+  // export below and by the standalone "Save GLB…" button, which both need
+  // the same answer to the same question.
+  async function glbColourUrl(): Promise<string | null> {
+    if (blender) {
+      return blender.colour
+        ? (await decodedTexture(blender.colour)).dataUrl
+        : null;
+    }
+    return installed ? atlasUrl(installed) : null;
+  }
+
+  async function saveGlb() {
+    const target = await save({
+      title: "Save the .glb",
+      defaultPath: `${project.unitName}.glb`,
+      filters: [{ name: "glTF Binary", extensions: ["glb"] }],
+    });
+    if (typeof target !== "string") return;
+    setGlbSave({ state: "working" });
+    try {
+      const colourUrl = await glbColourUrl();
+      const bytes = await exportGlb(project, pack, raw, colourUrl);
+      if (!bytes) {
+        setGlbSave({
+          state: "failed",
+          message: "This unit has no root piece.",
+        });
+        return;
+      }
+      const written = await legoSaveGlb({
+        path: target,
+        bytes: Array.from(new Uint8Array(bytes)),
+      });
+      setGlbSave({ state: "done", path: written.path });
+    } catch (error) {
+      setGlbSave({
+        state: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   async function runExport() {
     // The s3o header names the atlas whether or not this export copies it, so a
     // unit exported without the texture still finds one already installed.
@@ -376,6 +433,7 @@ export function ExportDrawer({
               stored: imported ? imported.place : [],
             }
           : null,
+        overwriteTexture: withOverwriteTexture,
         script: withScript ? unitScript(project) : null,
         // Not behind the script checkbox. That one is about not clobbering a
         // game's own hand-written script, and this file is coilbox's: it is
@@ -412,16 +470,7 @@ export function ExportDrawer({
         const place = blender?.mask ? [blender.mask] : [];
 
         if (withGlb && (blender || installed)) {
-          // What the material samples: an imported unit's own picture, decoded
-          // out of the store, or the atlas a built one shares. Asked for only
-          // here, since this is the one file that carries the image itself.
-          const colourUrl = blender
-            ? blender.colour
-              ? (await decodedTexture(blender.colour)).dataUrl
-              : null
-            : installed
-              ? atlasUrl(installed)
-              : null;
+          const colourUrl = await glbColourUrl();
           const bytes = await exportGlb(project, pack, raw, colourUrl);
           if (bytes) {
             const glbWritten = await legoExportGlb({
@@ -481,6 +530,7 @@ export function ExportDrawer({
       onRemember({
         exportDir: dir,
         exportTexture: withTexture,
+        exportOverwriteTexture: withOverwriteTexture,
         exportScript: withScript,
         exportGlb: withGlb,
         exportObj: withObj,
@@ -532,7 +582,7 @@ export function ExportDrawer({
             </DialogPrimitive.Close>
           </div>
 
-          <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
+          <div className="flex flex-col gap-5 overflow-y-auto px-5 pt-4 pb-8">
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Game folder</span>
               <p className="text-xs text-muted-foreground">
@@ -649,39 +699,70 @@ export function ExportDrawer({
               </p>
             </div>
 
-            <div className="flex items-start gap-2">
-              <Checkbox
-                id="lego-export-texture"
-                checked={withTexture && (imported ? true : !!installed)}
-                disabled={!imported && !installed}
-                onCheckedChange={(checked) => setWithTexture(checked === true)}
-                className="mt-0.5"
-              />
-              <div>
-                <Label htmlFor="lego-export-texture">
-                  Also place the {imported ? "textures" : "texture"}
-                </Label>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {imported ? (
-                    <>
-                      Copies this unit's own{" "}
-                      {imported.place.length === 1 ? "texture" : "textures"}{" "}
-                      into <code>unittextures</code>, under the{" "}
-                      {imported.place.length === 1 ? "name" : "names"} the model
-                      already gives{" "}
-                      {imported.place.length === 1 ? "it" : "them"}. A file
-                      already at that name is never overwritten, since it is the
-                      game's own.
-                    </>
-                  ) : (
-                    <>
-                      Copies the atlas into <code>unittextures</code> as{" "}
-                      <code>{atlasFile}</code>. Every unit sampling this atlas
-                      uses it, so this only needs doing once per game, and a
-                      file already at that name is never overwritten.
-                    </>
-                  )}
-                </p>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">
+                {imported ? "Textures" : "Texture"}
+              </span>
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="lego-export-texture"
+                  checked={withTexture && (imported ? true : !!installed)}
+                  disabled={!imported && !installed}
+                  onCheckedChange={(checked) =>
+                    setWithTexture(checked === true)
+                  }
+                  className="mt-0.5"
+                />
+                <div>
+                  <Label htmlFor="lego-export-texture">
+                    Also place the {imported ? "textures" : "texture"}
+                  </Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {imported ? (
+                      <>
+                        Copies this unit's own{" "}
+                        {imported.place.length === 1 ? "texture" : "textures"}{" "}
+                        into <code>unittextures</code>, under the{" "}
+                        {imported.place.length === 1 ? "name" : "names"} the
+                        model already gives{" "}
+                        {imported.place.length === 1 ? "it" : "them"}. A file
+                        already at that name is left alone unless "Replace
+                        textures already there" below is checked, since it may
+                        be the game's own.
+                      </>
+                    ) : (
+                      <>
+                        Copies the atlas into <code>unittextures</code> as{" "}
+                        <code>{atlasFile}</code>. Every unit sampling this atlas
+                        uses it, so this only needs doing once per game. A file
+                        already at that name is left alone unless "Replace
+                        textures already there" below is checked.
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="lego-export-texture-overwrite"
+                  checked={withOverwriteTexture}
+                  disabled={!imported && !installed}
+                  onCheckedChange={(checked) =>
+                    setWithOverwriteTexture(checked === true)
+                  }
+                  className="mt-0.5"
+                />
+                <div>
+                  <Label htmlFor="lego-export-texture-overwrite">
+                    Replace {imported ? "textures" : "a texture"} already there
+                  </Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Off by default, so a file the game already has under that
+                    name is left alone, since it may be the game's own. Turn
+                    this on to overwrite it with this export's copy instead.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -747,6 +828,34 @@ export function ExportDrawer({
                   .
                 </p>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pl-6">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    (!blender && !installed) || glbSave.state === "working"
+                  }
+                  onClick={() => void saveGlb()}
+                >
+                  {glbSave.state === "working" ? "Saving" : "Save GLB…"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Builds a .glb on its own and saves it wherever you like,
+                  without touching the game folder.
+                </span>
+              </div>
+              {glbSave.state === "done" ? (
+                <div className="flex items-center gap-2 text-xs">
+                  <code className="break-all">{glbSave.path}</code>
+                  <ShowMe path={glbSave.path} variant="ghost" />
+                </div>
+              ) : null}
+              {glbSave.state === "failed" ? (
+                <p className="text-xs text-destructive">{glbSave.message}</p>
+              ) : null}
             </div>
 
             <div className="flex items-start gap-2">
@@ -840,17 +949,10 @@ export function ExportDrawer({
                             : `Remove the ${entry.ours.length} file${entry.ours.length === 1 ? "" : "s"}`}
                         </Button>
                       ) : null}
-                      <Button
+                      <ShowMe
+                        path={entry.ours[0] ?? entry.kept[0]}
                         variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          void legoOpenPath({
-                            path: entry.ours[0] ?? entry.kept[0],
-                          })
-                        }
-                      >
-                        Show me
-                      </Button>
+                      />
                     </div>
                   </div>
                 ))}
@@ -876,8 +978,8 @@ export function ExportDrawer({
                 {result.textureKept ? (
                   <p className="text-muted-foreground">
                     A texture called <code>{atlasFile}</code> was already there
-                    and has been left alone. Delete it and export again to
-                    replace it.
+                    and has been left alone. Turn on "Replace textures already
+                    there" and export again to replace it.
                   </p>
                 ) : null}
                 {result.textures.map((written) => (
@@ -888,8 +990,9 @@ export function ExportDrawer({
                 {result.texturesKept.length > 0 ? (
                   <p className="text-muted-foreground">
                     {result.texturesKept.join(", ")} was already there and has
-                    been left alone, since that name is the game's own. Delete
-                    it and export again to replace it.
+                    been left alone, since that name is the game's own. Turn on
+                    "Replace textures already there" and export again to replace
+                    it.
                   </p>
                 ) : null}
                 {result.script ? (
@@ -947,13 +1050,7 @@ export function ExportDrawer({
                     {result.blenderProblem}
                   </p>
                 ) : null}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void legoOpenPath({ path: result.model })}
-                >
-                  Show me
-                </Button>
+                <ShowMe path={result.model} />
               </div>
             ) : null}
 

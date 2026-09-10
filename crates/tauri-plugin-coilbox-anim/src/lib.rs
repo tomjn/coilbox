@@ -3,10 +3,14 @@
 //! animation scripts. ACL identifier: `coilbox-anim`. See `PORTING.md` for the
 //! byte-exact porting spec and golden-test harness.
 //!
-//! Implemented: `anim_cob_disasm` (disassemble a `.cob`) and `anim_bos2cob`
+//! Implemented: `anim_cob_disasm` (disassemble a `.cob`), `anim_bos2cob`
 //! (compile a `.bos` to `.cob`, byte-exact vs the Python reference's `--nopcpp`
-//! mode). See PORTING.md for the porting spec and golden-test harness.
+//! mode), `anim_cob_run` (play a `.cob`) and `anim_bos2lua` (convert a `.bos` to
+//! a Lua unit script, through `coilbox-bos2lua`). See PORTING.md for the porting
+//! spec and golden-test harness.
 
+#[cfg(test)]
+mod bos2lua_parity;
 mod cob;
 mod cobrun;
 mod compiler;
@@ -20,6 +24,7 @@ mod tokenizer;
 
 use picoframe_core::CliResult;
 use serde_json::json;
+use std::collections::HashMap;
 use std::path::Path;
 use tauri::{
     plugin::{Builder, TauriPlugin},
@@ -149,6 +154,53 @@ async fn anim_cob_run(
     }
 }
 
+/// `anim_bos2lua`: a `.bos` as a Lua unit script that runs as it is.
+///
+/// `includes` is the files it may `#include`, by path, and `pieces` the model's
+/// piece names, so the Lua asks for each piece by the model's own spelling.
+/// `cob` is the compiled script beside the source when there is one, which
+/// settles how long `[1]` is: Scriptor, which built the older games, made it two
+/// and a half elmos, and today's compilers make it one.
+///
+/// Nothing is read or written. Source in, Lua and what it could not carry over
+/// out.
+#[tauri::command]
+async fn anim_bos2lua(
+    source: String,
+    name: String,
+    includes: Option<HashMap<String, String>>,
+    pieces: Option<Vec<String>>,
+    cob: Option<Vec<u8>>,
+) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let includes = includes.unwrap_or_default();
+        let linear_scale = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))
+            .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
+        coilbox_bos2lua::convert(
+            &source,
+            &coilbox_bos2lua::Options {
+                name: &name,
+                includes: &includes,
+                pieces: pieces.as_deref(),
+                linear_scale,
+            },
+        )
+        .map(|conversion| (conversion, linear_scale))
+    })
+    .await;
+    match result {
+        Ok(Ok((conversion, linear_scale))) => CliResult::ok(json!({
+            "lua": conversion.lua,
+            "warnings": conversion.warnings,
+            "linearScale": linear_scale,
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("conversion task failed: {e}")),
+    }
+}
+
 #[tauri::command]
 async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bool>) -> CliResult {
     let overwrite = overwrite.unwrap_or(false);
@@ -191,7 +243,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             anim_cob_disasm,
             anim_cob_disasm_bytes,
             anim_cob_run,
-            anim_bos2cob
+            anim_bos2cob,
+            anim_bos2lua
         ])
         .build()
 }

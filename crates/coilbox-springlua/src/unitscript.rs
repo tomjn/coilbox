@@ -113,8 +113,13 @@ pub struct Probes {
 #[derive(Debug, Default)]
 struct Sim {
     model: Model,
-    /// Threads a running thread asked for. Started before the frame ends.
-    spawned: Vec<(Thread, Vec<Value>)>,
+    /// Threads a running thread asked for, with the signal mask each is born
+    /// with. Started before the frame ends.
+    spawned: Vec<(Thread, Vec<Value>, u32)>,
+    /// The mask of the thread running now, as it stands at this moment. A
+    /// thread started with `StartThread` is born carrying it, as the unit
+    /// script framework hands it on, so a later `Signal` reaches the child too.
+    current_mask: u32,
     /// Signal masks the running thread raised while it was running.
     signalled: Vec<u32>,
     /// The mask the running thread set for itself, if it did.
@@ -436,6 +441,7 @@ impl Run {
                 thread,
                 event.args.iter().map(|arg| Value::Number(*arg)).collect(),
                 event.callin.clone(),
+                0,
             )?;
         }
         Ok(())
@@ -446,6 +452,7 @@ impl Run {
         thread: Thread,
         args: Vec<Value>,
         origin: String,
+        mask: u32,
     ) -> Result<(), String> {
         if self.runners.iter().filter(|r| !r.is_dead()).count() >= MAX_THREADS {
             // The ceiling is what stops a script that starts a thread per frame
@@ -459,7 +466,7 @@ impl Run {
             thread,
             args,
             state: State::Ready,
-            mask: 0,
+            mask,
             origin,
         });
         Ok(())
@@ -523,6 +530,7 @@ impl Run {
         // not left looking runnable.
         self.runners[index].state = State::Dead;
 
+        self.sim.borrow_mut().current_mask = self.runners[index].mask;
         let yielded: MultiValue = self.runners[index]
             .thread
             .resume(MultiValue::from_iter(args))
@@ -563,9 +571,9 @@ impl Run {
         if let Some(mask) = mask {
             self.runners[index].mask = mask;
         }
-        for (thread, args) in spawned {
+        for (thread, args, mask) in spawned {
             let origin = self.runners[index].origin.clone();
-            self.add_runner(thread, args, origin)?;
+            self.add_runner(thread, args, origin, mask)?;
         }
         Ok(())
     }
@@ -691,11 +699,18 @@ fn sandbox(
     globals.set("script", lua.create_table()?)?;
     globals.set("Spring", lua.create_table()?)?;
     globals.set("SFX", sfx_table(&lua)?)?;
+    // The table a game's gadgets share. Zero-K's `scripts/constants.lua` fills
+    // it with the helpers nearly every one of its unit scripts calls, and reads
+    // it on its first line. Empty here, since the preview runs no gadgets, so
+    // what is in it is what the script's own libraries put there.
+    globals.set("GG", lua.create_table()?)?;
 
     install_pieces(&lua, sim)?;
     install_motion(&lua, sim)?;
     install_threading(&lua, sim)?;
     install_stubs(&lua, sim)?;
+    install_bits(&lua)?;
+    install_random(&lua)?;
     install_unit_value(&lua, sim)?;
     install_include(&lua, sim, includes)?;
     bootstrap(&lua)?;
@@ -744,6 +759,14 @@ fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
         let held: Value = globals.get(name)?;
         table.set(name, held)?;
     }
+    // The framework's own helper, which a script converted from BOS uses to
+    // give its SetMaxReloadTime what the engine gives a COB one. The preview
+    // has no weapons to time, so the longest reload is none, which is also
+    // what the compiled runtime tells a `.cob`.
+    table.set(
+        "GetLongestReloadTime",
+        lua.create_function(|_, _: MultiValue| Ok(0))?,
+    )?;
     globals.set("UnitScript", table)
 }
 
@@ -774,6 +797,16 @@ fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
 /// file, gets an empty one and a note the first time the script reads anything
 /// off it. That is the honest shape: the script runs, and whoever is watching
 /// is told that a branch may have gone the way it did for want of an answer.
+///
+/// The rest of the engine's tables are built from the same definition, laid out
+/// the way the engine lays them out rather than the way a def file does.
+/// `UnitDefNames` holds this unit under its own name. `WeaponDefs` and
+/// `WeaponDefNames` hold the weapons the definition declares, named
+/// `<unit>_<weapon>`, with the def file's `weapontype` as `type` and its `name`
+/// as `description`, and each of the unit's weapons carries its `weaponDef`
+/// number. Zero-K's commanders read all three as they load. Another unit's
+/// definition, or a weapon this one does not declare, reads as an empty one
+/// with a note, the same as a unit with no definition at all.
 fn install_unit_def(
     lua: &Lua,
     sim: &Rc<RefCell<Sim>>,
@@ -797,18 +830,34 @@ fn install_unit_def(
             Ok(())
         })?,
     )?;
+    let state = Rc::clone(sim);
+    globals.set(
+        "__note",
+        lua.create_function(move |_, message: String| {
+            state.borrow_mut().model.note(message);
+            Ok(())
+        })?,
+    )?;
     globals.set("__rawdef", def)?;
     globals.set("__hasdef", unit_def.is_some())?;
 
     lua.load(
         r#"
+        local note = __note
         local function insensitive(value, missing)
           if type(value) ~= 'table' then return value end
           local out, lower = {}, {}
           for key, held in pairs(value) do
             local wrapped = insensitive(held, missing)
-            out[key] = wrapped
-            if type(key) == 'string' then lower[string.lower(key)] = wrapped end
+            -- A table the game numbered with gaps, such as a commander's
+            -- weapons in slots 1 and 5, arrives with its numbers as strings,
+            -- because that is how JSON keeps them. The engine keeps numbers,
+            -- and a script asks for weapons[1].
+            local at = key
+            local number = type(key) == 'string' and tonumber(key)
+            if number and tostring(number) == key then at = number end
+            out[at] = wrapped
+            if type(at) == 'string' then lower[string.lower(at)] = wrapped end
           end
           return setmetatable(out, {
             __index = function(_, key)
@@ -834,9 +883,120 @@ fn install_unit_def(
           end
           if not has then __rawdef.customParams = {} end
         end
+
+        -- A key off the raw definition, whatever case the def file used.
+        local function field(t, name)
+          if type(t) ~= 'table' then return nil end
+          for key, value in pairs(t) do
+            if type(key) == 'string' and string.lower(key) == name then return value end
+          end
+        end
+        local raw = __rawdef
+        local unitName = field(raw, 'unitname')
+        if type(unitName) ~= 'string' then unitName = nil end
+
+        -- The engine's names for what a def file calls `unitname` and `name`.
+        if unitName and type(raw) == 'table' then
+          raw.humanName = field(raw, 'name')
+          for key in pairs(raw) do
+            if type(key) == 'string' and string.lower(key) == 'name' then raw[key] = nil end
+          end
+          raw.name = unitName
+        end
+
+        -- Another unit's definition, or a weapon this one does not declare. The
+        -- engine has it and the preview does not, so it reads as empty, once.
+        local function elsewhere(what)
+          return setmetatable({}, {
+            __index = function(names, name)
+              if type(name) ~= 'string' then return nil end
+              note('This script reads ' .. what .. ' ' .. name .. ', which the preview does not have because it only has this unit\'s own definition, so it read an empty one.')
+              local empty = insensitive({ customParams = {} })
+              rawset(names, name, empty)
+              return empty
+            end,
+          })
+        end
+
+        WeaponDefs, WeaponDefNames = {}, elsewhere('the weapon')
+        local weaponIDs = {}
+        local weapondefs = field(raw, 'weapondefs')
+        if type(weapondefs) == 'table' then
+          local keys = {}
+          for key in pairs(weapondefs) do
+            if type(key) == 'string' then keys[#keys + 1] = key end
+          end
+          -- Sorted so that a weapon has the same number every run.
+          table.sort(keys)
+          for _, key in ipairs(keys) do
+            local def = weapondefs[key]
+            if type(def) == 'table' then
+              local id = #WeaponDefs + 1
+              local full = string.lower(unitName and (unitName .. '_' .. key) or key)
+              local copy = {}
+              for k, v in pairs(def) do copy[k] = v end
+              copy.description = field(def, 'name')
+              for k in pairs(def) do
+                if type(k) == 'string' and string.lower(k) == 'name' then copy[k] = nil end
+              end
+              -- Cannon is the engine's default for a def with no weaponType.
+              copy.id, copy.name, copy.type = id, full, field(def, 'weapontype') or 'Cannon'
+              if field(def, 'customparams') == nil then copy.customParams = {} end
+              local wrapped = insensitive(copy)
+              WeaponDefs[id] = wrapped
+              rawset(WeaponDefNames, full, wrapped)
+              weaponIDs[full] = id
+              weaponIDs[string.lower(key)] = id
+            end
+          end
+        end
+
+        -- Each of the unit's weapons names its definition, `corcom4_fakelaser`
+        -- once the game's def scripts have run or `def = "FAKELASER"` before,
+        -- and the engine hands a script the number instead. It also packs the
+        -- slots, as `UnitDef::ParseWeaponsTable` does: an empty slot among the
+        -- first four is skipped, the first empty one after that ends the list,
+        -- and each weapon takes the next number. The engine pads a skipped slot
+        -- with NOWEAPON only when the game defines one, and neither Zero-K nor
+        -- the engine's base content does.
+        local MAX_WEAPONS_PER_UNIT = 32 -- GlobalConstants.h
+        local weaponsKey, weapons
+        for key, value in pairs(type(raw) == 'table' and raw or {}) do
+          if type(key) == 'string' and string.lower(key) == 'weapons' then
+            weaponsKey, weapons = key, value
+          end
+        end
+        if type(weapons) == 'table' then
+          local packed = {}
+          for slot = 1, MAX_WEAPONS_PER_UNIT do
+            local weapon = weapons[slot] or weapons[tostring(slot)]
+            local named = type(weapon) == 'string' and weapon
+              or field(weapon, 'name') or field(weapon, 'def')
+            if type(named) ~= 'string' or named == '' then
+              if slot > 4 then break end
+            else
+              if type(weapon) ~= 'table' then weapon = { name = named } end
+              local id = weaponIDs[string.lower(named)]
+              if not id then
+                -- A definition from outside this unit, which the engine finds
+                -- and the preview cannot. The script still gets a number, and
+                -- the number leads to a table with the name in it.
+                note('This unit\'s weapon ' .. named .. ' is not in its own definition, so the preview cannot say what it is.')
+                id = #WeaponDefs + 1
+                WeaponDefs[id] = insensitive({ id = id, name = string.lower(named), customParams = {} })
+              end
+              weapon.weaponDef = id
+              packed[#packed + 1] = weapon
+            end
+          end
+          raw[weaponsKey] = packed
+        end
+
         unitDefID = 1
         UnitDefs = { insensitive(__rawdef, missing) }
-        __rawdef, __hasdef, __nodef = nil, nil, nil
+        UnitDefNames = elsewhere('the unit')
+        if unitName then rawset(UnitDefNames, string.lower(unitName), UnitDefs[1]) end
+        __rawdef, __hasdef, __nodef, __note = nil, nil, nil, nil
         "#,
     )
     .set_name("unitscript:unitdef")
@@ -1295,10 +1455,9 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     globals.set(
         "__spawn",
         lua.create_function(move |_, (thread, args): (Thread, MultiValue)| {
-            state
-                .borrow_mut()
-                .spawned
-                .push((thread, args.into_iter().collect()));
+            let mut sim = state.borrow_mut();
+            let mask = sim.current_mask;
+            sim.spawned.push((thread, args.into_iter().collect(), mask));
             Ok(())
         })?,
     )?;
@@ -1334,7 +1493,9 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     globals.set(
         "SetSignalMask",
         lua.create_function(move |_, mask: i64| {
-            state.borrow_mut().mask = Some(mask as u32);
+            let mut sim = state.borrow_mut();
+            sim.mask = Some(mask as u32);
+            sim.current_mask = mask as u32;
             Ok(())
         })?,
     )?;
@@ -1368,6 +1529,85 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         )?;
     }
 
+    Ok(())
+}
+
+/// The engine's bitwise functions, which Lua 5.1 has no operators for. Kept to
+/// 24 bits as `LuaMathExtra.cpp` keeps them, because a Lua number holds whole
+/// numbers exactly only that far.
+fn install_bits(lua: &Lua) -> mlua::Result<()> {
+    const MASK: u32 = 0x00FF_FFFF;
+    let math: Table = lua.globals().get("math")?;
+    let fold = |start: u32, op: fn(u32, u32) -> u32| {
+        move |_: &Lua, args: MultiValue| {
+            let mut result = start;
+            for arg in args {
+                let n = match arg {
+                    Value::Integer(n) => n as i32 as u32,
+                    Value::Number(n) => n as i32 as u32,
+                    _ => {
+                        return Err(mlua::Error::RuntimeError(
+                            "the bit functions take numbers".into(),
+                        ))
+                    }
+                };
+                result = op(result, n);
+            }
+            Ok(result & MASK)
+        }
+    };
+    math.set("bit_or", lua.create_function(fold(0, |a, b| a | b))?)?;
+    math.set(
+        "bit_and",
+        lua.create_function(fold(u32::MAX, |a, b| a & b))?,
+    )?;
+    math.set("bit_xor", lua.create_function(fold(0, |a, b| a ^ b))?)?;
+    math.set(
+        "bit_inv",
+        lua.create_function(|_, n: f64| Ok(!(n as i32 as u32) & MASK))?,
+    )?;
+    Ok(())
+}
+
+/// `math.random`, drawing from the same generator, seed and sequence as the
+/// compiled runtime's `RAND`, so a script converted from BOS rolls the same
+/// numbers in both previews and they can be compared. Deterministic for the
+/// same reason the compiled one is: a preview that changed every time it was
+/// played would be impossible to look at.
+fn install_random(lua: &Lua) -> mlua::Result<()> {
+    let state = Rc::new(Cell::new(0x2545_F491_4F6C_DD1D_u64));
+    let next = {
+        let state = Rc::clone(&state);
+        move || {
+            let mut x = state.get();
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            state.set(x);
+            x
+        }
+    };
+    let math: Table = lua.globals().get("math")?;
+    math.set(
+        "random",
+        lua.create_function(move |_, (low, high): (Option<f64>, Option<f64>)| {
+            let (low, high) = match (low, high) {
+                (None, _) => return Ok(Value::Number((next() >> 11) as f64 / (1u64 << 53) as f64)),
+                (Some(m), None) => (1, m as i64),
+                (Some(m), Some(n)) => (m as i64, n as i64),
+            };
+            let span = (high - low + 1).max(1) as u64;
+            Ok(Value::Integer(low + (next() % span) as i64))
+        })?,
+    )?;
+    math.set(
+        "randomseed",
+        lua.create_function(move |_, seed: f64| {
+            // Zero would leave the generator stuck at zero for good.
+            state.set((seed as u64).max(1));
+            Ok(())
+        })?,
+    )?;
     Ok(())
 }
 
@@ -1530,7 +1770,6 @@ fn bootstrap(lua: &Lua) -> mlua::Result<()> {
             if __needswait(piece, axis, "move") then coroutine.yield("move", piece, axis) end
         end
         function StartThread(fn, ...) __spawn(coroutine.create(fn), ...) end
-        math.randomseed(0)
         "#,
     )
     .set_name("unitscript:bootstrap")

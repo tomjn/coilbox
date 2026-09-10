@@ -134,9 +134,9 @@ describe("a unit whose game ships compiled bytecode", () => {
 
 /**
  * The case the compiled-script note used to end at. What matters is that the
- * offer never reads as the game's own file: the converter is a set of text
- * substitutions, and a unit animating subtly wrongly with nobody warned is
- * worse than one standing still.
+ * offer never reads as the game's own file. The conversion runs as it is, but
+ * it is still a reading of the game's script, and whatever it could not carry
+ * over is listed rather than left for somebody to find.
  */
 describe("a unit whose game ships the source beside the bytecode", () => {
   const converted = adopted({
@@ -159,8 +159,10 @@ describe("a unit whose game ships the source beside the bytecode", () => {
   it("says outright that this is a conversion rather than the game's file", () => {
     show(converted);
 
-    expect(screen.getByText(/not the game's own file/)).toBeTruthy();
-    expect(screen.getByText(/needs checking/)).toBeTruthy();
+    expect(
+      screen.getByText(/a conversion rather than the game's own file/),
+    ).toBeTruthy();
+    expect(screen.getByText(/could not carry over/)).toBeTruthy();
   });
 
   it("offers it, and asks before taking it", () => {

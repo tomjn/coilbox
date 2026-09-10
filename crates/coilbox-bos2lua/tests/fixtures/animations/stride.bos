@@ -1,0 +1,27 @@
+// stride.bos -- a two step walk shared by the fixture's units.
+// ANIM_VARIABLE is the static the including script moves by.
+
+stride()
+{
+	if( ANIM_VARIABLE )
+	{
+		// left leg forward
+		turn lthigh to x-axis <-30> speed <180>;
+		turn rthigh to x-axis <20> speed <180>;
+		sleep 150;
+	}
+	if( ANIM_VARIABLE )
+	{
+		// right leg forward
+		turn lthigh to x-axis <20> speed <180>;
+		turn rthigh to x-axis <-30> speed <180>;
+		sleep 150;
+	}
+}
+
+standstill()
+{
+	turn lthigh to x-axis <0> speed <120>;
+	turn rthigh to x-axis <0> speed <120>;
+	sleep 100;
+}
