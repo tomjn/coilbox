@@ -113,8 +113,13 @@ pub struct Probes {
 #[derive(Debug, Default)]
 struct Sim {
     model: Model,
-    /// Threads a running thread asked for. Started before the frame ends.
-    spawned: Vec<(Thread, Vec<Value>)>,
+    /// Threads a running thread asked for, with the signal mask each is born
+    /// with. Started before the frame ends.
+    spawned: Vec<(Thread, Vec<Value>, u32)>,
+    /// The mask of the thread running now, as it stands at this moment. A
+    /// thread started with `StartThread` is born carrying it, as the unit
+    /// script framework hands it on, so a later `Signal` reaches the child too.
+    current_mask: u32,
     /// Signal masks the running thread raised while it was running.
     signalled: Vec<u32>,
     /// The mask the running thread set for itself, if it did.
@@ -436,6 +441,7 @@ impl Run {
                 thread,
                 event.args.iter().map(|arg| Value::Number(*arg)).collect(),
                 event.callin.clone(),
+                0,
             )?;
         }
         Ok(())
@@ -446,6 +452,7 @@ impl Run {
         thread: Thread,
         args: Vec<Value>,
         origin: String,
+        mask: u32,
     ) -> Result<(), String> {
         if self.runners.iter().filter(|r| !r.is_dead()).count() >= MAX_THREADS {
             // The ceiling is what stops a script that starts a thread per frame
@@ -459,7 +466,7 @@ impl Run {
             thread,
             args,
             state: State::Ready,
-            mask: 0,
+            mask,
             origin,
         });
         Ok(())
@@ -523,6 +530,7 @@ impl Run {
         // not left looking runnable.
         self.runners[index].state = State::Dead;
 
+        self.sim.borrow_mut().current_mask = self.runners[index].mask;
         let yielded: MultiValue = self.runners[index]
             .thread
             .resume(MultiValue::from_iter(args))
@@ -563,9 +571,9 @@ impl Run {
         if let Some(mask) = mask {
             self.runners[index].mask = mask;
         }
-        for (thread, args) in spawned {
+        for (thread, args, mask) in spawned {
             let origin = self.runners[index].origin.clone();
-            self.add_runner(thread, args, origin)?;
+            self.add_runner(thread, args, origin, mask)?;
         }
         Ok(())
     }
@@ -696,6 +704,8 @@ fn sandbox(
     install_motion(&lua, sim)?;
     install_threading(&lua, sim)?;
     install_stubs(&lua, sim)?;
+    install_bits(&lua)?;
+    install_random(&lua)?;
     install_unit_value(&lua, sim)?;
     install_include(&lua, sim, includes)?;
     bootstrap(&lua)?;
@@ -744,6 +754,14 @@ fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
         let held: Value = globals.get(name)?;
         table.set(name, held)?;
     }
+    // The framework's own helper, which a script converted from BOS uses to
+    // give its SetMaxReloadTime what the engine gives a COB one. The preview
+    // has no weapons to time, so the longest reload is none, which is also
+    // what the compiled runtime tells a `.cob`.
+    table.set(
+        "GetLongestReloadTime",
+        lua.create_function(|_, _: MultiValue| Ok(0))?,
+    )?;
     globals.set("UnitScript", table)
 }
 
@@ -1295,10 +1313,9 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     globals.set(
         "__spawn",
         lua.create_function(move |_, (thread, args): (Thread, MultiValue)| {
-            state
-                .borrow_mut()
-                .spawned
-                .push((thread, args.into_iter().collect()));
+            let mut sim = state.borrow_mut();
+            let mask = sim.current_mask;
+            sim.spawned.push((thread, args.into_iter().collect(), mask));
             Ok(())
         })?,
     )?;
@@ -1334,7 +1351,9 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     globals.set(
         "SetSignalMask",
         lua.create_function(move |_, mask: i64| {
-            state.borrow_mut().mask = Some(mask as u32);
+            let mut sim = state.borrow_mut();
+            sim.mask = Some(mask as u32);
+            sim.current_mask = mask as u32;
             Ok(())
         })?,
     )?;
@@ -1368,6 +1387,85 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         )?;
     }
 
+    Ok(())
+}
+
+/// The engine's bitwise functions, which Lua 5.1 has no operators for. Kept to
+/// 24 bits as `LuaMathExtra.cpp` keeps them, because a Lua number holds whole
+/// numbers exactly only that far.
+fn install_bits(lua: &Lua) -> mlua::Result<()> {
+    const MASK: u32 = 0x00FF_FFFF;
+    let math: Table = lua.globals().get("math")?;
+    let fold = |start: u32, op: fn(u32, u32) -> u32| {
+        move |_: &Lua, args: MultiValue| {
+            let mut result = start;
+            for arg in args {
+                let n = match arg {
+                    Value::Integer(n) => n as i32 as u32,
+                    Value::Number(n) => n as i32 as u32,
+                    _ => {
+                        return Err(mlua::Error::RuntimeError(
+                            "the bit functions take numbers".into(),
+                        ))
+                    }
+                };
+                result = op(result, n);
+            }
+            Ok(result & MASK)
+        }
+    };
+    math.set("bit_or", lua.create_function(fold(0, |a, b| a | b))?)?;
+    math.set(
+        "bit_and",
+        lua.create_function(fold(u32::MAX, |a, b| a & b))?,
+    )?;
+    math.set("bit_xor", lua.create_function(fold(0, |a, b| a ^ b))?)?;
+    math.set(
+        "bit_inv",
+        lua.create_function(|_, n: f64| Ok(!(n as i32 as u32) & MASK))?,
+    )?;
+    Ok(())
+}
+
+/// `math.random`, drawing from the same generator, seed and sequence as the
+/// compiled runtime's `RAND`, so a script converted from BOS rolls the same
+/// numbers in both previews and they can be compared. Deterministic for the
+/// same reason the compiled one is: a preview that changed every time it was
+/// played would be impossible to look at.
+fn install_random(lua: &Lua) -> mlua::Result<()> {
+    let state = Rc::new(Cell::new(0x2545_F491_4F6C_DD1D_u64));
+    let next = {
+        let state = Rc::clone(&state);
+        move || {
+            let mut x = state.get();
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            state.set(x);
+            x
+        }
+    };
+    let math: Table = lua.globals().get("math")?;
+    math.set(
+        "random",
+        lua.create_function(move |_, (low, high): (Option<f64>, Option<f64>)| {
+            let (low, high) = match (low, high) {
+                (None, _) => return Ok(Value::Number((next() >> 11) as f64 / (1u64 << 53) as f64)),
+                (Some(m), None) => (1, m as i64),
+                (Some(m), Some(n)) => (m as i64, n as i64),
+            };
+            let span = (high - low + 1).max(1) as u64;
+            Ok(Value::Integer(low + (next() % span) as i64))
+        })?,
+    )?;
+    math.set(
+        "randomseed",
+        lua.create_function(move |_, seed: f64| {
+            // Zero would leave the generator stuck at zero for good.
+            state.set((seed as u64).max(1));
+            Ok(())
+        })?,
+    )?;
     Ok(())
 }
 
@@ -1530,7 +1628,6 @@ fn bootstrap(lua: &Lua) -> mlua::Result<()> {
             if __needswait(piece, axis, "move") then coroutine.yield("move", piece, axis) end
         end
         function StartThread(fn, ...) __spawn(coroutine.create(fn), ...) end
-        math.randomseed(0)
         "#,
     )
     .set_name("unitscript:bootstrap")
