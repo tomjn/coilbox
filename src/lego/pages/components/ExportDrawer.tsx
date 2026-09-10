@@ -49,7 +49,6 @@ import {
   legoExportObj,
   legoExportStale,
   legoGameLanguage,
-  legoOpenPath,
   legoSaveGlb,
   legoTexturePng,
 } from "../../bindings";
@@ -72,6 +71,7 @@ import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef, legoUnitDef, unitWords } from "../../unitDef";
+import { ShowMe } from "./ShowMe";
 
 interface Props {
   open: boolean;
@@ -582,7 +582,7 @@ export function ExportDrawer({
             </DialogPrimitive.Close>
           </div>
 
-          <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
+          <div className="flex flex-col gap-5 overflow-y-auto px-5 pt-4 pb-8">
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Game folder</span>
               <p className="text-xs text-muted-foreground">
@@ -850,13 +850,7 @@ export function ExportDrawer({
               {glbSave.state === "done" ? (
                 <div className="flex items-center gap-2 text-xs">
                   <code className="break-all">{glbSave.path}</code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void legoOpenPath({ path: glbSave.path })}
-                  >
-                    Show me
-                  </Button>
+                  <ShowMe path={glbSave.path} variant="ghost" />
                 </div>
               ) : null}
               {glbSave.state === "failed" ? (
@@ -955,17 +949,10 @@ export function ExportDrawer({
                             : `Remove the ${entry.ours.length} file${entry.ours.length === 1 ? "" : "s"}`}
                         </Button>
                       ) : null}
-                      <Button
+                      <ShowMe
+                        path={entry.ours[0] ?? entry.kept[0]}
                         variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          void legoOpenPath({
-                            path: entry.ours[0] ?? entry.kept[0],
-                          })
-                        }
-                      >
-                        Show me
-                      </Button>
+                      />
                     </div>
                   </div>
                 ))}
@@ -1063,13 +1050,7 @@ export function ExportDrawer({
                     {result.blenderProblem}
                   </p>
                 ) : null}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void legoOpenPath({ path: result.model })}
-                >
-                  Show me
-                </Button>
+                <ShowMe path={result.model} />
               </div>
             ) : null}
 

@@ -199,24 +199,75 @@ async fn lego_thumb_save<R: Runtime>(app: AppHandle<R>, id: String, png: Vec<u8>
     }
 }
 
-/// `lego_open_path` reveals an exported unit in the file manager.
+/// `lego_open_path` shows an exported file, or the scratch game's folder, in
+/// the file manager.
 #[tauri::command]
 async fn lego_open_path(path: String) -> CliResult {
     let target = PathBuf::from(&path);
     if !target.exists() {
         return CliResult::err(format!("path does not exist: {path}"));
     }
-    #[cfg(target_os = "macos")]
-    let spawned = Command::new("open").arg(&target).spawn();
-    #[cfg(target_os = "windows")]
-    let spawned = Command::new("explorer").arg(&target).spawn();
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let spawned = Command::new("xdg-open").arg(&target).spawn();
-
-    match spawned {
-        Ok(_) => CliResult::ok(json!({ "opened": true })),
-        Err(e) => CliResult::err(format!("could not open path: {e}")),
+    match reveal(&target) {
+        Ok(()) => CliResult::ok(json!({ "opened": true })),
+        Err(e) => CliResult::err(format!("could not show {path}: {e}")),
     }
+}
+
+/// The file manager command that shows `target`: a folder opened, a file
+/// selected inside its folder. Opening a file instead hands it to whatever app
+/// claims its type, and on macOS nothing claims an `.s3o`, so the export
+/// drawer's "Show me" did nothing at all.
+#[cfg(target_os = "macos")]
+fn reveal_command(target: &Path) -> Command {
+    let mut open = Command::new("open");
+    if target.is_file() {
+        open.arg("-R");
+    }
+    open.arg(target);
+    open
+}
+
+#[cfg(target_os = "windows")]
+fn reveal_command(target: &Path) -> Command {
+    use std::os::windows::process::CommandExt;
+    let mut explorer = Command::new("explorer");
+    if target.is_file() {
+        // Explorer reads `/select,` and the quoted path as one argument, which
+        // the standard quoting would split at the comma.
+        explorer.raw_arg(format!("/select,\"{}\"", target.display()));
+    } else {
+        explorer.arg(target);
+    }
+    explorer
+}
+
+/// No call selects a file in every Linux file manager, so a file's folder is
+/// opened instead.
+#[cfg(all(unix, not(target_os = "macos")))]
+fn reveal_command(target: &Path) -> Command {
+    let folder = match target.parent() {
+        Some(parent) if target.is_file() => parent,
+        _ => target,
+    };
+    let mut open = Command::new("xdg-open");
+    open.arg(folder);
+    open
+}
+
+/// Run [`reveal_command`]. `open` exits once the Finder has the request, and
+/// with a failure it can explain, so macOS waits for it. Elsewhere only a
+/// command that will not start is reported: Explorer exits with 1 whether or
+/// not it worked, and `xdg-open` can wait on the app it launched.
+fn reveal(target: &Path) -> Result<(), String> {
+    let mut command = reveal_command(target);
+    if cfg!(target_os = "macos") {
+        let out = command.output().map_err(|e| e.to_string())?;
+        if out.status.success() {
+            return Ok(());
+        }
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    command.spawn().map(drop).map_err(|e| e.to_string())
 }
 
 /// Where the bundled pack can sit inside the resource directory, in the order we
@@ -2676,6 +2727,40 @@ mod glb_picture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn reveal_args(target: &Path) -> Vec<std::ffi::OsString> {
+        reveal_command(target)
+            .get_args()
+            .map(|arg| arg.to_os_string())
+            .collect()
+    }
+
+    /// A file is selected in the Finder rather than opened, because opening
+    /// hands it to whatever app claims its type and nothing claims an `.s3o`.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn show_me_selects_a_file_in_the_finder_and_opens_a_folder() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("unit.s3o");
+        std::fs::write(&file, b"s3o").expect("write");
+
+        assert_eq!(
+            reveal_args(&file),
+            vec!["-R".into(), file.clone().into_os_string()]
+        );
+        assert_eq!(reveal_args(dir.path()), vec![dir.path().as_os_str()]);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn show_me_opens_the_folder_a_file_is_in_and_a_folder_itself() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("unit.s3o");
+        std::fs::write(&file, b"s3o").expect("write");
+
+        assert_eq!(reveal_args(&file), vec![dir.path().as_os_str()]);
+        assert_eq!(reveal_args(dir.path()), vec![dir.path().as_os_str()]);
+    }
 
     #[test]
     fn only_the_two_known_kinds_resolve_to_a_folder() {

@@ -29,7 +29,7 @@ import {
 } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
 import { exportTextureName, unitAtlas } from "../../atlas";
-import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
+import { legoExport, legoScratchGame } from "../../bindings";
 import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
@@ -44,6 +44,7 @@ import {
   SCRATCH_SIDE,
 } from "../../scratchGame";
 import { buildUnitDef } from "../../unitDef";
+import { ShowMe } from "./ShowMe";
 
 interface Props {
   open: boolean;
@@ -329,13 +330,9 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
             {scratchDir ? (
               <div className="flex flex-col gap-2 text-xs">
                 <code className="break-all">{scratchDir}</code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void legoOpenPath({ path: scratchDir })}
-                >
+                <ShowMe path={scratchDir}>
                   <FolderOpen className="size-4" /> Show me the scratch game
-                </Button>
+                </ShowMe>
               </div>
             ) : null}
           </div>
