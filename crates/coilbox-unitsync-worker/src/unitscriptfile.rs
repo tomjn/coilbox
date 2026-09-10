@@ -304,13 +304,14 @@ fn unit_def_json(us: &Unitsync, unit_name: &str) -> Option<String> {
          local ud = defs.unitdefs or defs.unitDefs\n\
          if type(ud) ~= 'table' then return __cb_chunk('') end\n\
          local want = '{unit_name}'\n\
-         local d = ud[want]\n\
+         local key, d = want, ud[want]\n\
          if type(d) ~= 'table' then\n\
          \x20 for k, v in pairs(ud) do\n\
-         \x20   if type(k) == 'string' and string.lower(k) == string.lower(want) then d = v break end\n\
+         \x20   if type(k) == 'string' and string.lower(k) == string.lower(want) then key, d = k, v break end\n\
          \x20 end\n\
          end\n\
          if type(d) ~= 'table' then return __cb_chunk('') end\n\
+         if d.unitname == nil then d.unitname = string.lower(key) end\n\
          return __cb_chunk(enc(d, {DEF_DEPTH}) or '')\n",
         crate::lua::CHUNKED_RESULT,
         crate::lua::DEFS_ENV_SHIM
@@ -572,8 +573,10 @@ fn bos_include_names(text: &str) -> Vec<String> {
 /// the script turns out not to want is a much smaller fault than missing one it
 /// does.
 fn include_names(text: &str) -> Vec<String> {
-    // Both quote styles, since Lua has no preference and games use each.
-    let Ok(pattern) = regex::Regex::new(r#"\binclude\s*\(\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')"#)
+    // Both quote styles, since Lua has no preference and games use each. The
+    // parentheses are optional too, because Lua lets a call with one string
+    // argument drop them, and Zero-K writes `include "constants.lua"`.
+    let Ok(pattern) = regex::Regex::new(r#"\binclude\s*(?:\(\s*)?(?:"([^"\r\n]*)"|'([^'\r\n]*)')"#)
     else {
         return Vec::new();
     };
@@ -741,6 +744,16 @@ mod tests {
         assert_eq!(
             include_names("common = include ( 'headers/common_lus.lua' )"),
             vec!["headers/common_lus.lua"]
+        );
+    }
+
+    /// Zero-K's house style. Lua lets a call whose one argument is a string
+    /// leave out the parentheses, and most of Zero-K's scripts do.
+    #[test]
+    fn finds_a_library_named_without_parentheses() {
+        assert_eq!(
+            include_names("include \"constants.lua\"\ninclude 'pieceControl.lua'\n"),
+            vec!["constants.lua", "pieceControl.lua"]
         );
     }
 
