@@ -117,9 +117,9 @@ export function GameScriptPanel({
                 The unit animates either way. Coilbox runs the compiled file,
                 which is exactly what the game plays. Taking the converted
                 source instead gives you a Lua script you can edit and export.
-                It keeps the source's comments and the files it includes, and
-                it runs as it is, but it is a conversion rather than the game's
-                own file, so anything it could not carry over is listed below.
+                It keeps the source's comments and the files it includes, and it
+                runs as it is, but it is a conversion rather than the game's own
+                file, so anything it could not carry over is listed below.
               </p>
               <div className="flex items-center justify-between gap-3">
                 <Label
