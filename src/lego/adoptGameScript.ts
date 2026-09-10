@@ -13,11 +13,11 @@
  * listing, so a compiled unit is legible as well as watchable.
  *
  * Most games that compiled a script shipped the `.bos` source they compiled it
- * from, and that source is text coilbox already converts. So a compiled unit
- * still gets an animation, out of the source rather than the bytecode. The
- * converter is a textual transform whose output needs hand-fixing, so what
- * comes back is marked as a conversion and offered rather than taken on: a unit
- * animating subtly wrongly with nobody warned is worse than one standing still.
+ * from, and that source is text coilbox converts. So a compiled unit still
+ * gets an animation, out of the source rather than the bytecode, with the
+ * source's comments and the files it `#include`s. What comes back is marked as
+ * a conversion and offered rather than taken on, because it is still a reading
+ * of the game's script rather than the file the game runs.
  *
  * Nothing is ever written to a game. The `.cob` is read out of the archive as
  * bytes and disassembled in memory, so the file itself is never opened for
@@ -29,8 +29,7 @@
  * script and use the presets" is the way back.
  */
 
-import { animCobDisasmBytes } from "../animation/bindings";
-import { bos2lua } from "../animation/bos2lua";
+import { animBos2lua, animCobDisasmBytes } from "../animation/bindings";
 import { unitsyncUnitScript } from "../content/bindings";
 import { inferRoles, type RoleFindings } from "./inferRoles";
 import type { LegoProject } from "./model";
@@ -158,6 +157,40 @@ async function disassemble(
 }
 
 /**
+ * The `.bos` beside a `.cob`, as Lua, or null and a note saying why not.
+ *
+ * Handed the files the source `#include`s, so its constants and animation
+ * libraries come with it, the model's piece names, so the Lua asks for each by
+ * the model's spelling, and the `.cob`, which settles how long `[1]` is.
+ */
+async function convert(
+  result: Awaited<ReturnType<typeof unitsyncUnitScript>>,
+  project: LegoProject,
+  notes: string[],
+): Promise<string | null> {
+  try {
+    const { lua, warnings } = await animBos2lua({
+      source: result.bosText ?? "",
+      name: result.bosMember ?? "",
+      includes: Object.fromEntries(
+        result.includes.map((file) => [file.member, file.text]),
+      ),
+      pieces: project.pieces.map((piece) => piece.name),
+      ...(result.bytes?.length ? { cob: result.bytes } : {}),
+    });
+    notes.push(...warnings);
+    return lua;
+  } catch (error) {
+    notes.push(
+      `${result.bosMember} could not be converted: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return null;
+  }
+}
+
+/**
  * Read the script for a unit imported out of a game, and ask it what its pieces
  * are for.
  *
@@ -221,26 +254,30 @@ export async function adoptGameScript(
     const source = result.bosText?.trim() ? result.bosMember : null;
     notes.push(
       source
-        ? `${result.member} is compiled bytecode rather than Lua. Coilbox runs it, so the unit animates either way. What is on offer here is ${source} converted, which is a script you can edit at the cost of accuracy: the converter is a set of text substitutions rather than a compiler, so read the result before trusting it.`
+        ? `${result.member} is compiled bytecode rather than Lua. Coilbox runs it, so the unit animates either way. What is on offer here is ${source} converted to Lua, comments and all, which is a script you can edit and export.`
         : `${result.member} is compiled bytecode rather than Lua. Coilbox runs it, so the unit animates, but an export writes Lua and does not write this.`,
     );
+    const script =
+      source && result.bosText ? await convert(result, project, notes) : null;
     return {
       // Roles are deliberately not inferred from a conversion. Inferring them
       // means running the script and reading what moved, and calling that "the
-      // script named these" would present a reading of a best-effort transform
-      // as the game's own answer.
-      script: source ? bos2lua(result.bosText ?? "") : null,
+      // script named these" would present a reading of a conversion as the
+      // game's own answer.
+      script,
       member: result.member,
       kind: "cob",
       declared: result.declared,
       findings: null,
       listing: await disassemble(result.bytes, notes),
-      converted: source ? { member: source } : null,
+      converted: script && source ? { member: source } : null,
       compiled: result.bytes?.length
         ? { member: result.member, bytes: result.bytes }
         : null,
       unitDef,
-      includes,
+      // The files a `.bos` includes are for converting it, not for the Lua,
+      // which includes nothing.
+      includes: {},
       notes,
     };
   }

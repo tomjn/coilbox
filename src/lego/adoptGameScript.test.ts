@@ -19,6 +19,7 @@ import {
 const readScript = vi.fn();
 const infer = vi.fn();
 const disasm = vi.fn();
+const convertBos = vi.fn();
 
 vi.mock("../content/bindings", () => ({
   unitsyncUnitScript: (args: unknown) => readScript(args),
@@ -26,6 +27,7 @@ vi.mock("../content/bindings", () => ({
 
 vi.mock("../animation/bindings", () => ({
   animCobDisasmBytes: (args: unknown) => disasm(args),
+  animBos2lua: (args: unknown) => convertBos(args),
 }));
 
 vi.mock("./inferRoles", () => ({
@@ -92,6 +94,12 @@ beforeEach(() => {
   infer.mockResolvedValue({ proposals: [], notes: [], error: null });
   disasm.mockReset();
   disasm.mockResolvedValue({ listing: "; COB v4\n" });
+  convertBos.mockReset();
+  convertBos.mockResolvedValue({
+    lua: "-- converted\n",
+    warnings: [],
+    linearScale: 65536,
+  });
 });
 
 describe("a unit opened out of a game", () => {
@@ -284,9 +292,10 @@ describe("a compiled script", () => {
 
 /**
  * Most games that compiled a script shipped the source they compiled it from,
- * and coilbox can already turn that source into Lua. The converter is textual
- * and its output needs hand-fixing, so what matters here is that the result is
- * marked as a conversion rather than passed off as the game's own file.
+ * and coilbox turns that source into Lua. The Lua runs as it is, but it is
+ * still a conversion, so what matters here is that it is handed everything the
+ * converter needs and marked as a conversion rather than passed off as the
+ * game's own file.
  */
 describe("a compiled script whose game ships its source", () => {
   const withSource = () =>
@@ -304,8 +313,74 @@ describe("a compiled script whose game ships its source", () => {
 
     const adopted = await adoptGameScript(project(), ENGINE);
 
-    expect(adopted.script).toContain("local base = piece 'base'");
-    expect(adopted.script).toContain("local turret = piece 'turret'");
+    expect(adopted.script).toBe("-- converted\n");
+  });
+
+  /** The model's piece names so the Lua spells them as the model does, and
+   *  the `.cob`, which says how long the source's distances are. */
+  it("hands the converter the source, the model's pieces and the compiled file", async () => {
+    readScript.mockResolvedValue(withSource());
+
+    await adoptGameScript(project(), ENGINE);
+
+    expect(convertBos).toHaveBeenCalledWith({
+      source: "piece base, turret;\n",
+      name: "scripts/armcom.bos",
+      includes: {},
+      pieces: ["base", "turret"],
+      cob: [1, 2, 3],
+    });
+  });
+
+  /** A source whose constants are in `sfxtype.h` converts to Lua that stops
+   *  on the first one without it. They go to the converter by archive path,
+   *  and not onto the project, because the Lua includes nothing. */
+  it("hands the converter the files the source includes", async () => {
+    readScript.mockResolvedValue(
+      found({
+        ...withSource(),
+        includes: [
+          {
+            name: "sfxtype.h",
+            member: "scripts/sfxtype.h",
+            text: "#define SHATTER 1\n",
+          },
+        ],
+      }),
+    );
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(convertBos.mock.calls[0][0].includes).toEqual({
+      "scripts/sfxtype.h": "#define SHATTER 1\n",
+    });
+    expect(adopted.includes).toEqual({});
+  });
+
+  it("passes on what the converter says it could not carry over", async () => {
+    readScript.mockResolvedValue(withSource());
+    convertBos.mockResolvedValue({
+      lua: "-- converted\n",
+      warnings: ["could not find sfxtype.h"],
+      linearScale: 65536,
+    });
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.notes).toContain("could not find sfxtype.h");
+  });
+
+  /** The model still imported, so a source that will not convert is a note
+   *  rather than a failed import. */
+  it("says so when the source will not convert", async () => {
+    readScript.mockResolvedValue(withSource());
+    convertBos.mockRejectedValue(new Error("line 3: expected a name"));
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.script).toBeNull();
+    expect(adopted.converted).toBeNull();
+    expect(adopted.notes.join(" ")).toContain("line 3: expected a name");
   });
 
   it("names the file the conversion came from", async () => {
@@ -329,9 +404,9 @@ describe("a compiled script whose game ships its source", () => {
   });
 
   /**
-   * A converted script is a best-effort textual transform. Watching it move
-   * pieces and calling that "the script named these" would dress a guess about
-   * a guess as the game's own answer.
+   * A converted script is a reading of the game's script. Watching it move
+   * pieces and calling that "the script named these" would dress a reading as
+   * the game's own answer.
    */
   it("is not asked about roles", async () => {
     readScript.mockResolvedValue(withSource());
@@ -342,7 +417,7 @@ describe("a compiled script whose game ships its source", () => {
     expect(adopted.findings).toBeNull();
   });
 
-  it("says the conversion needs checking rather than leaving it implied", async () => {
+  it("says the script is a conversion rather than leaving it implied", async () => {
     readScript.mockResolvedValue(withSource());
 
     const adopted = await adoptGameScript(project(), ENGINE);
