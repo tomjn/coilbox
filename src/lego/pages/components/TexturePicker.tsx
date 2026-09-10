@@ -37,7 +37,7 @@
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, RefreshCw, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   Popover,
@@ -45,7 +45,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { legoTextureUrl } from "@/lib/assetUrl";
+import { TEAM_COLOUR } from "@/lib/springTexture";
 import { textureHasAlpha } from "@/lib/textureAlpha";
+import {
+  forceOpaqueInto,
+  hexToRgb,
+  mixTeamColourInto,
+} from "@/lib/textureTeamColour";
 import { legoTextureImport } from "../../bindings";
 import type { LegoImported, LegoTexture } from "../../model";
 import { maskLoss, maskLossNote } from "../../textureMask";
@@ -156,6 +162,7 @@ export function TexturePicker({ imported, onChange }: Props) {
               missing={imported.missingTexture}
               note={note}
               busy={busy === "texture"}
+              previewTeamColour
               onChoose={() => void choose("texture")}
               onRefresh={() => void refresh("texture")}
             />
@@ -165,6 +172,7 @@ export function TexturePicker({ imported, onChange }: Props) {
               texture={imported.texture2}
               missing={imported.missingTexture2}
               busy={busy === "texture2"}
+              previewTeamColour={false}
               onChoose={() => void choose("texture2")}
               onRefresh={() => void refresh("texture2")}
             />
@@ -225,6 +233,7 @@ function TextureSlot({
   missing,
   note,
   busy,
+  previewTeamColour,
   onChoose,
   onRefresh,
 }: {
@@ -235,6 +244,10 @@ function TextureSlot({
   /** Something wrong with the stored file itself, as against with finding it. */
   note?: string | null;
   busy: boolean;
+  /** Whether the engine reads this texture's alpha as a team-colour mask, so
+   *  its preview should mix that colour in the way the 3D viewport does,
+   *  rather than draw the file as-is (the shading map). */
+  previewTeamColour: boolean;
   onChoose: () => void;
   onRefresh: () => void;
 }) {
@@ -244,6 +257,11 @@ function TextureSlot({
       <p className="text-xs text-muted-foreground">{hint}</p>
       {texture ? (
         <>
+          <TexturePreview
+            url={legoTextureUrl(texture.key)}
+            teamColour={previewTeamColour}
+            label={title}
+          />
           <code className="break-all text-xs">{texture.name}</code>
           {texture.source ? (
             <p className="break-all text-xs text-muted-foreground">
@@ -284,5 +302,101 @@ function TextureSlot({
         </Button>
       </div>
     </div>
+  );
+}
+
+/** The internal canvas resolution a preview is drawn at, in pixels on its
+ *  longer side. A shared unit atlas is 8192 square; the preview only ever
+ *  needs to look small, so it is downscaled once here rather than costing a
+ *  full-resolution `getImageData` on every open. */
+const PREVIEW_MAX = 128;
+
+/**
+ * A texture, drawn small.
+ *
+ * Loaded through a canvas rather than a plain `<img>`, for two reasons: the
+ * team-colour mix in `textureTeamColour.ts` needs the raw pixels, and a
+ * format the webview cannot decode (`.dds`, `.tga`) fails the same way either
+ * element would, without the broken-image icon an `<img>` would show for it.
+ */
+function TexturePreview({
+  url,
+  teamColour,
+  label,
+}: {
+  url: string;
+  /** Whether to mix in the builder's team colour the way the 3D viewport
+   *  does, or just force the image opaque (the shading map). */
+  teamColour: boolean;
+  /** The slot's own title, so the preview has something to be announced by. */
+  label: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let live = true;
+    setState("loading");
+    // `window.Image`, not the bare constructor: `Image` is already bound
+    // above to lucide-react's icon of the same name.
+    const image = new window.Image();
+    // The asset protocol answers every request with
+    // `Access-Control-Allow-Origin: *`, which is what lets a cross-origin
+    // load like this stay untainted for the `getImageData` below.
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      if (!live) return;
+      const canvas = canvasRef.current;
+      const context = canvas?.getContext("2d");
+      if (!canvas || !context) {
+        setState("error");
+        return;
+      }
+      const scale = Math.min(
+        1,
+        PREVIEW_MAX / Math.max(image.naturalWidth, image.naturalHeight),
+      );
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      try {
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+        if (teamColour) mixTeamColourInto(pixels.data, hexToRgb(TEAM_COLOUR));
+        else forceOpaqueInto(pixels.data);
+        context.putImageData(pixels, 0, 0);
+        setState("ready");
+      } catch {
+        setState("error");
+      }
+    };
+    image.onerror = () => {
+      if (live) setState("error");
+    };
+    image.src = url;
+    return () => {
+      live = false;
+    };
+  }, [url, teamColour]);
+
+  if (state === "error")
+    return (
+      <p className="text-xs text-muted-foreground">
+        Coilbox cannot draw a preview of this texture.
+      </p>
+    );
+
+  return (
+    <canvas
+      ref={canvasRef}
+      role="img"
+      aria-label={
+        teamColour
+          ? `Preview of the ${label.toLowerCase()}, with its team-colour areas shown in the builder's own colour`
+          : `Preview of the ${label.toLowerCase()}`
+      }
+      aria-busy={state === "loading"}
+      className="h-32 w-full rounded border border-border/50 bg-muted object-contain"
+      style={{ imageRendering: "pixelated" }}
+    />
   );
 }
