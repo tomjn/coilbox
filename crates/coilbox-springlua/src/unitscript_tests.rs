@@ -959,6 +959,81 @@ mod unit_definition {
         assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
     }
 
+    /// Zero-K's commanders scale their walk by another unit's speed. The
+    /// preview only has this unit's own definition, so another one reads as
+    /// empty and the script's own fallback applies, which is what it wrote the
+    /// fallback for.
+    #[test]
+    fn reads_units_by_name_and_another_unit_as_empty() {
+        let timeline = with_def(
+            r#"
+            local base = UnitDefNames.corcom1.speed or 37.5
+            local own = UnitDefNames.corcom4.speed
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, own / base)
+                Turn(turret, x_axis, UnitDefs[unitDefID].name == "corcom4" and 1.0 or 0.5)
+            end
+            "#,
+            serde_json::json!({ "unitname": "corcom4", "name": "Battle Commander", "speed": 75.0 }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 2.0).abs() < 1e-6);
+        assert!(
+            timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("corcom1")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The loop out of Zero-K's `corcom4.lua`. A def file names each weapon,
+    /// here in slots 1, 5 and 6. The engine packs them into 1, 2 and 3 and
+    /// hands the script a number to look up in `WeaponDefs`, whose `type` is
+    /// the def file's `weapontype`. A weapon defined outside the unit still
+    /// gets a number, which leads to its name.
+    #[test]
+    fn numbers_the_weapons_the_way_the_engine_does() {
+        let timeline = with_def(
+            r#"
+            local starburst = {}
+            local weapons = UnitDefs[unitDefID].weapons
+            weapons.n = nil
+            for index = 1, #weapons do
+                local weaponDef = WeaponDefs[weapons[index].weaponDef]
+                if weaponDef.type == "StarburstLauncher" then starburst[index] = true end
+            end
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            function script.Create()
+                Turn(turret, y_axis, starburst[2] and 1.0 or 0.5)
+                Turn(turret, x_axis, WeaponDefNames.corcom4_laser.description == "Laser" and 1.0 or 0.5)
+                Turn(barrel, y_axis, WeaponDefs[weapons[3].weaponDef].name == "commweapon_shared" and 1.0 or 0.5)
+            end
+            "#,
+            serde_json::json!({
+                "unitname": "corcom4",
+                "weapons": {
+                    "1": { "name": "corcom4_laser" },
+                    "5": { "name": "corcom4_missile" },
+                    "6": { "name": "commweapon_shared" }
+                },
+                "weapondefs": {
+                    "laser": { "weapontype": "BeamLaser", "name": "Laser" },
+                    "missile": { "weapontype": "StarburstLauncher", "name": "Missile" }
+                }
+            }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+        assert!((rot_x(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+        assert!((rot_y(&timeline, 0, "barrel") - 1.0).abs() < 1e-6);
+    }
+
     /// Every definition the engine builds carries a `customParams` table
     /// whether the game declared one or not, so the commonest thing a script
     /// reads is always there to read.
@@ -995,6 +1070,28 @@ mod includes {
             ..Unit::new(&pieces)
         };
         run(script, "test.lua", &unit, &create(), 3)
+    }
+
+    /// Zero-K's shape. The library fills the table the game's gadgets share,
+    /// and reads it on its first line, so it needs that table to be there.
+    #[test]
+    fn a_library_fills_the_table_the_gadgets_share() {
+        let timeline = with_library(
+            r#"
+            include "constants.lua"
+            local turret = piece("turret")
+            function script.Create() StartThread(GG.Script.Spin, turret) end
+            "#,
+            "constants.lua",
+            r#"
+            if GG.Script then return end
+            GG.Script = {}
+            function GG.Script.Spin(p) Turn(p, y_axis, 1.0) end
+            "#,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
     }
 
     /// The shape of `coralab.lua`: a library defines the function, the script
