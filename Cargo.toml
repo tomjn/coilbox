@@ -11,6 +11,7 @@ members = [
   "crates/coilbox-tachyon-protocol",
   "crates/coilbox-zerok-protocol",
   "crates/coilbox-springlua",
+  "crates/coilbox-bos2lua",
   "crates/coilbox-unitpose",
   "crates/coilbox-assets",
   "crates/coilbox-map-catalog",

@@ -653,6 +653,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-bos2lua"
+version = "0.0.0"
+dependencies = [
+ "coilbox-springlua",
+ "coilbox-unitpose",
+]
+
+[[package]]
 name = "coilbox-lobby-protocol"
 version = "0.0.0"
 dependencies = [
@@ -5549,6 +5557,8 @@ dependencies = [
 name = "tauri-plugin-coilbox-anim"
 version = "0.0.0"
 dependencies = [
+ "coilbox-bos2lua",
+ "coilbox-springlua",
  "coilbox-unitpose",
  "picoframe-core",
  "serde",

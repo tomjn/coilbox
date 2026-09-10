@@ -1,0 +1,147 @@
+#define TA			// This is a TA script
+
+#include "flags.h"
+
+piece  base, body, turret, sleeve, barrel, flare, lthigh, rthigh, nano1, nano2, pad;
+
+static-var  moving, spray, restore_delay, gun_ready, aim_count;
+
+// Signal definitions
+#define SIG_AIM				2
+#define SIG_MOVE			4
+
+#define ANIM_VARIABLE moving
+#include "animations/stride.bos"
+#undef ANIM_VARIABLE
+
+/* The walk loop. It runs for the life of the unit and
+   asks the stride library for one step at a time. */
+WalkLoop()
+{
+	while( TRUE )
+	{
+		IF (moving)
+		{
+			CALL-SCRIPT stride();
+		}
+		else
+		{
+			CALL-SCRIPT standstill();
+		}
+	}
+}
+
+RestoreAfterDelay()
+{
+	sleep restore_delay;
+	turn turret to y-axis <0> speed <90>;
+	turn sleeve to x-axis <0> speed <45>;
+}
+
+Count(amount, unused)
+{
+	aim_count = aim_count + amount;
+	++aim_count;
+}
+
+Create()
+{
+	moving = FALSE;
+	spray = base;
+	gun_ready = base;
+	restore_delay = 3000;
+	move pad to x-axis [-2.5] now;
+	turn pad to y-axis <180> now;
+	while( get BUILD_PERCENT_LEFT )
+	{
+		sleep 400;
+	}
+	start-script WalkLoop();
+}
+
+SetMaxReloadTime(time)
+{
+	restore_delay = time * 2;
+}
+
+StartMoving()
+{
+	moving = TRUE;
+}
+
+StopMoving()
+{
+	moving = FALSE;
+}
+
+AimWeapon1(heading, pitch)
+{
+	signal SIG_AIM;
+	set-signal-mask SIG_AIM;
+	call-script Count(1);
+	turn turret to y-axis heading speed <180>;
+	turn sleeve to x-axis <0> - pitch speed <90>;
+	wait-for-turn turret around y-axis;
+	wait-for-turn sleeve around x-axis;
+	start-script RestoreAfterDelay();
+	return (1);
+}
+
+FireWeapon1()
+{
+	gun_ready = !gun_ready;
+	move barrel to z-axis [-1] now;
+	sleep 100;
+	move barrel to z-axis [0] speed [2];
+}
+
+QueryWeapon1(piecenum)
+{
+	piecenum = flare;
+}
+
+AimFromWeapon1(piecenum)
+{
+	piecenum = turret;
+}
+
+StartBuilding(heading, pitch)
+{
+	turn turret to y-axis heading speed <160>;
+	wait-for-turn turret around y-axis;
+	set INBUILDSTANCE to 1;
+}
+
+StopBuilding()
+{
+	set INBUILDSTANCE to 0;
+	turn turret to y-axis <0> speed <160>;
+}
+
+// Alternates nozzles. spray holds a piece as a number, and base is piece 0.
+QueryNanoPiece(piecenum)
+{
+	if( spray == 0 )
+	{
+		piecenum = nano1;
+	}
+	else if( spray == 1 )
+	{
+		piecenum = nano2;
+	}
+	spray = !spray;
+}
+
+Killed(severity, corpsetype)
+{
+	if( severity <= 50 )
+	{
+		corpsetype = 1;
+		explode barrel type BITMAPONLY | BITMAP1;
+		return (0);
+	}
+	corpsetype = 2;
+	explode barrel type FALL | SMOKE | BITMAP2;
+	explode turret type SHATTER | BITMAP1;
+	return (0);
+}
