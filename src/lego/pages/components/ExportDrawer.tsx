@@ -649,39 +649,46 @@ export function ExportDrawer({
               </p>
             </div>
 
-            <div className="flex items-start gap-2">
-              <Checkbox
-                id="lego-export-texture"
-                checked={withTexture && (imported ? true : !!installed)}
-                disabled={!imported && !installed}
-                onCheckedChange={(checked) => setWithTexture(checked === true)}
-                className="mt-0.5"
-              />
-              <div>
-                <Label htmlFor="lego-export-texture">
-                  Also place the {imported ? "textures" : "texture"}
-                </Label>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {imported ? (
-                    <>
-                      Copies this unit's own{" "}
-                      {imported.place.length === 1 ? "texture" : "textures"}{" "}
-                      into <code>unittextures</code>, under the{" "}
-                      {imported.place.length === 1 ? "name" : "names"} the model
-                      already gives{" "}
-                      {imported.place.length === 1 ? "it" : "them"}. A file
-                      already at that name is never overwritten, since it is the
-                      game's own.
-                    </>
-                  ) : (
-                    <>
-                      Copies the atlas into <code>unittextures</code> as{" "}
-                      <code>{atlasFile}</code>. Every unit sampling this atlas
-                      uses it, so this only needs doing once per game, and a
-                      file already at that name is never overwritten.
-                    </>
-                  )}
-                </p>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">
+                {imported ? "Textures" : "Texture"}
+              </span>
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="lego-export-texture"
+                  checked={withTexture && (imported ? true : !!installed)}
+                  disabled={!imported && !installed}
+                  onCheckedChange={(checked) =>
+                    setWithTexture(checked === true)
+                  }
+                  className="mt-0.5"
+                />
+                <div>
+                  <Label htmlFor="lego-export-texture">
+                    Also place the {imported ? "textures" : "texture"}
+                  </Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {imported ? (
+                      <>
+                        Copies this unit's own{" "}
+                        {imported.place.length === 1 ? "texture" : "textures"}{" "}
+                        into <code>unittextures</code>, under the{" "}
+                        {imported.place.length === 1 ? "name" : "names"} the
+                        model already gives{" "}
+                        {imported.place.length === 1 ? "it" : "them"}. A file
+                        already at that name is never overwritten, since it is
+                        the game's own.
+                      </>
+                    ) : (
+                      <>
+                        Copies the atlas into <code>unittextures</code> as{" "}
+                        <code>{atlasFile}</code>. Every unit sampling this atlas
+                        uses it, so this only needs doing once per game, and a
+                        file already at that name is never overwritten.
+                      </>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
 
