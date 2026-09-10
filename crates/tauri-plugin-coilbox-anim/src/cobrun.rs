@@ -396,6 +396,24 @@ impl Run {
             thread.data = event.args.iter().map(|arg| (arg * scale) as i32).collect();
             thread.params = thread.data.len() as i32;
             self.add(thread)?;
+
+            // The engine tells a script its longest reload straight after
+            // Create (`CCobInstance::Create`), and scripts that wait on a
+            // restore delay read it there. The preview has no weapons, so the
+            // longest reload is none.
+            if event.callin.eq_ignore_ascii_case("Create") {
+                if let Some(reload) = self.program.script("SetMaxReloadTime") {
+                    let mut thread = Thread::new(
+                        reload,
+                        self.program.offsets[reload],
+                        0,
+                        "SetMaxReloadTime".into(),
+                    );
+                    thread.data = vec![0];
+                    thread.params = 1;
+                    self.add(thread)?;
+                }
+            }
         }
         Ok(())
     }
