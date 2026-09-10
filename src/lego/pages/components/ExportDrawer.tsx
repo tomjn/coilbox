@@ -85,6 +85,7 @@ interface Props {
   onRemember: (settings: {
     exportDir: string;
     exportTexture: boolean;
+    exportOverwriteTexture: boolean;
     exportScript: boolean;
     exportGlb: boolean;
     exportObj: boolean;
@@ -178,6 +179,9 @@ export function ExportDrawer({
   const [dir, setDir] = useState(project.exportDir ?? "");
   const [withTexture, setWithTexture] = useState(
     project.exportTexture !== false,
+  );
+  const [withOverwriteTexture, setWithOverwriteTexture] = useState(
+    project.exportOverwriteTexture === true,
   );
   const [withScript, setWithScript] = useState(project.exportScript !== false);
   const [withGlb, setWithGlb] = useState(project.exportGlb === true);
@@ -376,6 +380,7 @@ export function ExportDrawer({
               stored: imported ? imported.place : [],
             }
           : null,
+        overwriteTexture: withOverwriteTexture,
         script: withScript ? unitScript(project) : null,
         // Not behind the script checkbox. That one is about not clobbering a
         // game's own hand-written script, and this file is coilbox's: it is
@@ -481,6 +486,7 @@ export function ExportDrawer({
       onRemember({
         exportDir: dir,
         exportTexture: withTexture,
+        exportOverwriteTexture: withOverwriteTexture,
         exportScript: withScript,
         exportGlb: withGlb,
         exportObj: withObj,
@@ -676,17 +682,41 @@ export function ExportDrawer({
                         {imported.place.length === 1 ? "name" : "names"} the
                         model already gives{" "}
                         {imported.place.length === 1 ? "it" : "them"}. A file
-                        already at that name is never overwritten, since it is
-                        the game's own.
+                        already at that name is left alone unless "Replace
+                        textures already there" below is checked, since it may
+                        be the game's own.
                       </>
                     ) : (
                       <>
                         Copies the atlas into <code>unittextures</code> as{" "}
                         <code>{atlasFile}</code>. Every unit sampling this atlas
-                        uses it, so this only needs doing once per game, and a
-                        file already at that name is never overwritten.
+                        uses it, so this only needs doing once per game. A file
+                        already at that name is left alone unless "Replace
+                        textures already there" below is checked.
                       </>
                     )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="lego-export-texture-overwrite"
+                  checked={withOverwriteTexture}
+                  disabled={!imported && !installed}
+                  onCheckedChange={(checked) =>
+                    setWithOverwriteTexture(checked === true)
+                  }
+                  className="mt-0.5"
+                />
+                <div>
+                  <Label htmlFor="lego-export-texture-overwrite">
+                    Replace {imported ? "textures" : "a texture"} already there
+                  </Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Off by default, so a file the game already has under that
+                    name is left alone, since it may be the game's own. Turn
+                    this on to overwrite it with this export's copy instead.
                   </p>
                 </div>
               </div>
@@ -883,8 +913,8 @@ export function ExportDrawer({
                 {result.textureKept ? (
                   <p className="text-muted-foreground">
                     A texture called <code>{atlasFile}</code> was already there
-                    and has been left alone. Delete it and export again to
-                    replace it.
+                    and has been left alone. Turn on "Replace textures already
+                    there" and export again to replace it.
                   </p>
                 ) : null}
                 {result.textures.map((written) => (
@@ -895,8 +925,9 @@ export function ExportDrawer({
                 {result.texturesKept.length > 0 ? (
                   <p className="text-muted-foreground">
                     {result.texturesKept.join(", ")} was already there and has
-                    been left alone, since that name is the game's own. Delete
-                    it and export again to replace it.
+                    been left alone, since that name is the game's own. Turn on
+                    "Replace textures already there" and export again to replace
+                    it.
                   </p>
                 ) : null}
                 {result.script ? (

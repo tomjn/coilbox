@@ -431,10 +431,12 @@ fn atlas_target(dir: &Path, atlas: &AtlasRef) -> Result<PathBuf, String> {
 /// Once a game folder holds one, it is the game author's: hand edits to a
 /// script, a unit definition or a texture have to survive a re-export, and a
 /// file the export never wrote must not be overwritten at all. The scratch game
-/// is the one exception (see [`is_scratch_dir`]): it has no hand edits worth
-/// keeping and has to show the unit as it stands now.
-fn keep_existing(target: &Path, scratch: bool) -> bool {
-    target.exists() && !scratch
+/// is one exception (see [`is_scratch_dir`]): it has no hand edits worth
+/// keeping and has to show the unit as it stands now. `overwrite` is the other,
+/// and applies only to a texture: the export drawer's own checkbox for when a
+/// stale texture is exactly the problem being fixed.
+fn keep_existing(target: &Path, scratch: bool, overwrite: bool) -> bool {
+    target.exists() && !scratch && !overwrite
 }
 
 /// Where a game keeps the words a player reads, when it keeps them outside its
@@ -1715,6 +1717,10 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
 /// and then left alone: a re-export never overwrites one that is already there
 /// (see [`keep_existing`]). Only the model and the per-piece collision file are
 /// rewritten every time, because those are the files the builder alone owns.
+/// `overwrite_texture` is the one way round that rule: with it set, a texture
+/// already at that name is replaced rather than kept, for a stale copy the
+/// drawer's ordinary write-once behaviour has no other way to clear. It has no
+/// bearing on the script or the definition, which stay write-once regardless.
 ///
 /// `text` is the unit's name and description for a game that reads neither from
 /// the definition, and goes to [`coilbox_language_file`]. `None` for a game
@@ -1729,6 +1735,10 @@ async fn lego_export<R: Runtime>(
     dir: String,
     unit_name: String,
     textures: Option<ExportTextures>,
+    // The export drawer's "replace textures already there" checkbox. Only a
+    // texture reads it: the script and the unit definition below keep their
+    // own write-once rule regardless.
+    overwrite_texture: bool,
     script: Option<String>,
     piece_collision: Option<String>,
     unit_def: Option<String>,
@@ -1792,7 +1802,7 @@ async fn lego_export<R: Runtime>(
             Ok(path) => path,
             Err(e) => return CliResult::err(e),
         };
-        if keep_existing(&target, scratch) {
+        if keep_existing(&target, scratch, overwrite_texture) {
             texture_kept = true;
         } else if let Err(e) = std::fs::copy(&source, &target) {
             return CliResult::err(format!("could not copy the texture: {e}"));
@@ -1827,7 +1837,7 @@ async fn lego_export<R: Runtime>(
                 Ok(path) => path,
                 Err(e) => return CliResult::err(e),
             };
-            if keep_existing(&target, scratch) {
+            if keep_existing(&target, scratch, overwrite_texture) {
                 stored_kept.push(stored.write_as);
             } else if let Err(e) = std::fs::copy(&source, &target) {
                 return CliResult::err(format!(
@@ -1852,7 +1862,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", scripts.display()));
         }
         let target = scripts.join(format!("{unit_name}.lua"));
-        if keep_existing(&target, scratch) {
+        if keep_existing(&target, scratch, false) {
             script_kept = true;
         } else if let Err(e) = std::fs::write(&target, &script) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -1902,7 +1912,7 @@ async fn lego_export<R: Runtime>(
             return CliResult::err(format!("could not create {}: {e}", units.display()));
         }
         let target = units.join(format!("{unit_name}.lua"));
-        if keep_existing(&target, scratch) {
+        if keep_existing(&target, scratch, false) {
             unit_def_kept = true;
         } else if let Err(e) = std::fs::write(&target, &unit_def) {
             return CliResult::err(format!("could not write {}: {e}", target.display()));
@@ -2748,18 +2758,23 @@ mod tests {
     }
 
     #[test]
-    fn a_file_the_game_already_has_is_kept_unless_the_target_is_scratch() {
+    fn a_file_the_game_already_has_is_kept_unless_the_target_is_scratch_or_overwrite_is_on() {
         let dir = tempfile::tempdir().expect("tempdir");
         let existing = dir.path().join("atlas.png");
         std::fs::write(&existing, "the game's own").expect("write");
         let missing = dir.path().join("coilbox_atlas.png");
 
-        // A real game folder: what is there stays, what is not is written.
-        assert!(keep_existing(&existing, false));
-        assert!(!keep_existing(&missing, false));
+        // A real game folder with overwrite off: what is there stays, what is
+        // not is written.
+        assert!(keep_existing(&existing, false, false));
+        assert!(!keep_existing(&missing, false, false));
         // The scratch game has nothing worth keeping, so it is always rewritten.
-        assert!(!keep_existing(&existing, true));
-        assert!(!keep_existing(&missing, true));
+        assert!(!keep_existing(&existing, true, false));
+        assert!(!keep_existing(&missing, true, false));
+        // The drawer's "replace textures already there" checkbox does the same
+        // in a real game folder, without needing the scratch exception.
+        assert!(!keep_existing(&existing, false, true));
+        assert!(!keep_existing(&missing, false, true));
     }
 
     /// Beyond All Reason's own file, trimmed to the parts anything reads. The

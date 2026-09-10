@@ -418,6 +418,12 @@ export interface LegoProject {
   exportDir?: string;
   /** Whether that export also placed the shared atlas. Defaults to true. */
   exportTexture?: boolean;
+  /**
+   * Whether that export replaces a texture already at that name, rather than
+   * leaving it alone. Off by default: a texture the game already has under
+   * that name may be its own.
+   */
+  exportOverwriteTexture?: boolean;
   /** Whether it also wrote a unit script when the game had none. */
   exportScript?: boolean;
   /** Whether that export also wrote a .glb, for taking the unit into Blender. */
@@ -848,6 +854,9 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
     ...(typeof d.exportTexture === "boolean"
       ? { exportTexture: d.exportTexture }
+      : {}),
+    ...(typeof d.exportOverwriteTexture === "boolean"
+      ? { exportOverwriteTexture: d.exportOverwriteTexture }
       : {}),
     ...(typeof d.exportScript === "boolean"
       ? { exportScript: d.exportScript }

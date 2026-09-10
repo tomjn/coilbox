@@ -103,6 +103,12 @@ export const legoExport = defineCommand<
     unitName: string;
     /** What to place in `unittextures`. Null to write no texture at all. */
     textures: ExportTextures | null;
+    /**
+     * Replace a texture already at that name rather than leaving it alone.
+     * Off by default. Has no bearing on the script or the unit definition,
+     * which are always write-once.
+     */
+    overwriteTexture: boolean;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
     /**

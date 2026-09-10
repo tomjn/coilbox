@@ -169,6 +169,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
               : null,
           stored: imported?.place ?? [],
         },
+        // The scratch game always rewrites regardless (see `is_scratch_dir`),
+        // so this has no effect here: the drawer's own checkbox is the only
+        // thing that reads it for a real export.
+        overwriteTexture: false,
         script: unitScript(project),
         pieceCollision: buildPieceCollisionScript(
           project,
