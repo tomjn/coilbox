@@ -303,15 +303,15 @@ function readout(
             {report.wanted.length > 1 ? "aren't" : "isn't"} open
           </>
         ),
-        // Why the fix is worth doing, which depends on what happens without
-        // it. With the relay carrying the battle it buys a direct connection,
-        // and without one it is the only way in from outside.
-        note: relayWillCarry
-          ? "Fix this so players outside your network can connect without the relay."
-          : "Fix this so players outside your network can join.",
+        // One line: why the fix is worth doing, which depends on what happens
+        // without it, then the fix. With the relay carrying the battle it buys
+        // a direct connection, and without one it is the only way in.
         fix: (
           <>
-            Turn on UPnP or NAT-PMP in your router, or forward{" "}
+            {relayWillCarry
+              ? "Fix this so players outside your network can connect without the relay."
+              : "Fix this so players outside your network can join."}{" "}
+            Enable UPnP or NAT-PMP in your router, or forward{" "}
             <Ports ports={report.wanted} />
             {lan ? (
               <>
@@ -324,12 +324,7 @@ function readout(
             .
           </>
         ),
-        // Folded away rather than said to everybody. Coilbox is a desktop app
-        // and a cloud server is a rare place to run it, but its report reads
-        // exactly like a home router with UPnP off (issue #2114).
-        more: [
-          "On a cloud server there is no router, so open the port in the provider's firewall instead.",
-        ],
+        more: [],
       };
   }
 }

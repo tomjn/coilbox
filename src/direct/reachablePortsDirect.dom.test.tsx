@@ -179,18 +179,16 @@ describe("the reachability panel for a host behind a router", () => {
  * A cloud instance behind its provider's one to one NAT (issue #2114).
  *
  * Nothing in the report separates this host from the one above, so the panel
- * cannot draw them differently and does not try. Coilbox is a desktop app and a
- * cloud server is a rare place to run it, so the firewall rule this host can act
- * on sits behind Details rather than in front of everybody.
+ * cannot draw them differently and does not try. Coilbox is a desktop app, so it
+ * offers this host no advice of its own. What it must not do is name a router
+ * as the cause, because this host has none.
  */
 describe("the reachability panel for a host on a cloud instance", () => {
-  it("keeps the firewall rule this host can change one press away", () => {
+  it("says which ports are shut, as it would for anybody", () => {
     show(ON_A_CLOUD_INSTANCE);
-    fireEvent.click(screen.getByRole("button", { name: "Details" }));
     expect(document.body.textContent).toContain(
       "TCP 8200 and UDP 8452 aren't open",
     );
-    expect(document.body.textContent).toContain("provider's firewall");
     expect(document.body.textContent).toContain("TCP 8200 and UDP 8452");
   });
 
