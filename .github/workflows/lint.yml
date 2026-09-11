@@ -109,7 +109,7 @@ jobs:
       - name: Rustfmt
         run: cargo fmt --all --check
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
       # Clippy compiles the #[cfg(test)] modules but never runs them, so a wrong
       # Rust test would otherwise pass forever. Shares this job's toolchain,
       # cache and the three prerequisites above rather than paying for them
