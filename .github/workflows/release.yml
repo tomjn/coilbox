@@ -123,9 +123,12 @@ jobs:
       # relay agent is pure Rust with tokio as its only dependency. One cargo
       # call plans both dependency graphs together, so shared deps build once
       # and the two crates compile in parallel instead of in turn.
+      #
+      # --timings writes target/cargo-timings/cargo-timing-<timestamp>.html,
+      # uploaded below alongside the app build's own report (issue #2801).
       - name: Build unitsync worker and relay agent sidecars
         shell: bash
-        run: bash scripts/build-sidecars.sh coilbox-unitsync-worker coilbox-relay-agent
+        run: bash scripts/build-sidecars.sh --timings coilbox-unitsync-worker coilbox-relay-agent
 
       # Assemble the pr-downloader resource folder for this runner's platform:
       # the committed prebuilt binary beside its Windows DLLs. Bundled as a
@@ -134,6 +137,12 @@ jobs:
         shell: bash
         run: bash scripts/assemble-prdownloader.sh
 
+      # args forwards to `tauri build`, whose own [ARGS]... after `--` go to
+      # the runner (cargo by default) rather than the tauri CLI itself - a
+      # bare `--timings` here errors with "unexpected argument", confirmed
+      # locally against `bunx tauri build --help`. --timings writes
+      # target/cargo-timings/cargo-timing-<timestamp>.html plus a
+      # cargo-timing.html copy of the latest run (issue #2801).
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -149,6 +158,19 @@ jobs:
           releaseName: "v${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
+          args: -- --timings
+
+      # The sidecar build above and tauri-action's app build both run cargo
+      # against the same workspace target/, so this one glob picks up both
+      # timestamped reports. Named per platform so the three uploads don't
+      # collide (issue #2801).
+      - name: Upload cargo timings report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cargo-timings-${{ matrix.platform }}
+          path: target/cargo-timings/*.html
+          if-no-files-found: warn
 
   # Every platform has now uploaded to the same draft; publish it in one step so
   # the release only ever goes live with all artifacts attached. This is the
