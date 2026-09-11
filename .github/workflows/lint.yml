@@ -99,8 +99,13 @@ jobs:
       # built for the runner's triple before clippy compiles the app crate.
       # One cargo call plans both dependency graphs together, so shared deps
       # build once and the two crates compile in parallel instead of in turn.
+      # --profile dev: nothing else in this job runs the release profile, and
+      # `cargo test --workspace` below runs the unitsync worker straight out
+      # of target/debug/, so a release build here would be both wasted and a
+      # risk of a release binary landing on that debug path instead of a dev
+      # one (issue #2807).
       - name: Build unitsync worker and relay agent sidecars
-        run: bash scripts/build-sidecars.sh coilbox-unitsync-worker coilbox-relay-agent
+        run: bash scripts/build-sidecars.sh --profile dev coilbox-unitsync-worker coilbox-relay-agent
       - name: Rustfmt
         run: cargo fmt --all --check
       - name: Clippy
