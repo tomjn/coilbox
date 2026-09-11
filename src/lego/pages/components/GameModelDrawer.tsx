@@ -160,7 +160,7 @@ export function GameModelDrawer({
     setTakenRoles(new Set());
     setTakeScript(true);
     try {
-      const staged = await stageModel(target, picked);
+      const staged = await stageModel(target, picked, tree.files);
       const read = await readModel({
         path: staged.path,
         name: row.label,
@@ -337,6 +337,7 @@ export function GameModelDrawer({
                     shown={Math.min(matched.length, ROW_CAP)}
                     matched={matched.length}
                     unresolved={models.unresolvedUnits}
+                    unopenable={models.unopenableUnits}
                   />
                 </>
               )}
@@ -488,10 +489,12 @@ function Footnotes({
   shown,
   matched,
   unresolved,
+  unopenable,
 }: {
   shown: number;
   matched: number;
   unresolved: number;
+  unopenable: number;
 }) {
   const notes: string[] = [];
   if (matched > shown) {
@@ -501,7 +504,15 @@ function Footnotes({
   }
   if (unresolved > 0) {
     notes.push(
-      `${unresolved} name a model this archive does not hold at all, usually one that lives in a game this one depends on.`,
+      `${unresolved} ${unresolved === 1 ? "unit names" : "units name"} a model this archive does not hold at all, usually one that lives in a game this one depends on.`,
+    );
+  }
+  // A different sentence from the one above on purpose. Saying a model is
+  // absent when it is sitting in the archive sends somebody looking for a file
+  // that is already there.
+  if (unopenable > 0) {
+    notes.push(
+      `${unopenable} ${unopenable === 1 ? "unit names a model" : "units name models"} in a format the builder cannot open, which the archive does hold.`,
     );
   }
   if (notes.length === 0) return null;

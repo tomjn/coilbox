@@ -171,12 +171,14 @@ function ModelPreview({
           that two buttons leave a path with four characters of room, and this
           line is the whole answer to what `objectname = "ARMCOM"` resolved to. */}
       <Resolved member={member} />
-      {/* Said only where it is a surprise: a model in one of the seven formats
-          the engine loads and the builder does not. A field with no model at
-          all says nothing here, because the row's own warning already has. */}
+      {/* Said only where it is a surprise: a model the engine draws with a
+          parser of its own, which the builder has no reader for. A field with
+          no model at all says nothing here, because the row's own warning
+          already has. Worded without a list of what the builder does read,
+          since that list has grown once already. */}
       {!openable && (
         <span className="text-[10px] text-muted-foreground">
-          The builder reads .s3o and .3do, so it cannot open this one.
+          The engine draws this one, and the builder cannot open it.
         </span>
       )}
       {open &&

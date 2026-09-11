@@ -20,6 +20,7 @@ import { join, tempDir } from "@tauri-apps/api/path";
 
 import type { ArchiveFileEntry } from "../content/bindings";
 import { unitsyncArchiveExtract } from "../content/bindings";
+import { isAssimpModel } from "./archiveOpen";
 import { isLooseArchive } from "./model";
 
 /** The extensions `find_beside_model` will accept in place of the one a model's
@@ -158,6 +159,7 @@ function searchFolders(member: string): string[] {
 export async function stageModel(
   target: UnitsyncTarget,
   picked: PickedModel,
+  files: ArchiveFileEntry[],
 ): Promise<StagedModel> {
   if (isLooseArchive(picked.archive) && picked.archivePath) {
     return {
@@ -171,7 +173,44 @@ export async function stageModel(
   );
   const path = await join(staged, "objects3d", modelFileName(picked.member));
   await extract(target, picked.archive, picked.member, path);
+  // A model read through Assimp names its texture in a Lua file beside it
+  // rather than in the model itself, so that file has to come out of the
+  // archive too. Without it the import finds a model naming nothing and the
+  // unit opens untextured.
+  const meta = metafileMember(files, picked.member);
+  if (meta) {
+    const name = meta.split("/").at(-1) ?? meta;
+    await extract(
+      target,
+      picked.archive,
+      meta,
+      await join(staged, "objects3d", name),
+    );
+  }
   return { path, staged };
+}
+
+/**
+ * The archive member holding a model's metafile, if this is a format that has
+ * one and the archive holds it.
+ *
+ * Both spellings the engine accepts: the model's own name with `.lua` on the
+ * end, then its name with the extension replaced. flove writes one of each.
+ */
+export function metafileMember(
+  files: ArchiveFileEntry[],
+  member: string,
+): string | null {
+  const lower = member.replace(/\\/g, "/").toLowerCase();
+  if (!isAssimpModel(lower)) return null;
+  const wanted = [`${lower}.lua`, lower.replace(/\.[^./]+$/, ".lua")];
+  for (const want of wanted) {
+    const hit = files.find(
+      (file) => file.path.replace(/\\/g, "/").toLowerCase() === want,
+    );
+    if (hit) return hit.path;
+  }
+  return null;
 }
 
 /** Where the Total Annihilation palette lives in every installed game: the
