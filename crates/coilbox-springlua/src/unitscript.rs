@@ -148,6 +148,43 @@ impl Mask {
     }
 }
 
+/// A rules parameter's value.
+///
+/// The engine keeps numbers and strings, and turns a string that is really a
+/// number into one, so a script that stores `"4"` and adds to what it reads back
+/// gets four rather than a type error.
+#[derive(Debug, Clone)]
+enum RuleValue {
+    Number(f64),
+    Text(String),
+}
+
+impl RuleValue {
+    fn of(value: &Value) -> Self {
+        match value {
+            Value::Integer(number) => RuleValue::Number(*number as f64),
+            Value::Number(number) => RuleValue::Number(*number),
+            Value::Boolean(flag) => RuleValue::Number(f64::from(u8::from(*flag))),
+            Value::String(text) => {
+                let text = text.to_string_lossy();
+                match text.parse::<f64>() {
+                    Ok(number) => RuleValue::Number(number),
+                    Err(_) => RuleValue::Text(text),
+                }
+            }
+            // The engine takes a number, a string or a boolean and nothing else.
+            _ => RuleValue::Number(0.0),
+        }
+    }
+
+    fn to_value(&self, lua: &Lua) -> mlua::Result<Value> {
+        match self {
+            RuleValue::Number(number) => Ok(Value::Number(*number)),
+            RuleValue::Text(text) => Ok(Value::String(lua.create_string(text)?)),
+        }
+    }
+}
+
 /// Everything the Lua-facing functions read or write. Shared with them through
 /// an `Rc<RefCell<_>>`, so every borrow is short and none is held across a call
 /// back into Lua.
@@ -179,6 +216,11 @@ struct Sim {
     /// A factory does exactly that: it asks for its yard to open and then waits
     /// for the yard to be open, which never comes and never ends.
     values: HashMap<i32, i32>,
+    /// Rules parameters the script set, which it reads back for the same reason
+    /// it reads back a unit value. The engine keeps a unit's on the unit and the
+    /// game's on the game, so one name used for both is two values here too.
+    unit_rules: HashMap<String, RuleValue>,
+    game_rules: HashMap<String, RuleValue>,
     /// How many lines the script has printed, so a script printing every frame
     /// does not bury everything else the run has to say.
     printed: usize,
@@ -1367,6 +1409,14 @@ fn install_spring(
         "SetUnitCloak",
         "SetUnitArmored",
         "DestroyUnit",
+        // The world outside the model, which a preview has none of. Answering
+        // nothing is also what the engine does when it cannot make a unit, so a
+        // script that checks what `CreateUnit` gave it back reads a failure
+        // rather than something that is not there.
+        "CreateUnit",
+        "PlaySoundFile",
+        "SetUnitCollisionVolumeData",
+        "SetUnitPieceCollisionVolumeData",
     ] {
         let state = Rc::clone(sim);
         let label = name.to_string();
@@ -1381,6 +1431,65 @@ fn install_spring(
             })?,
         )?;
     }
+
+    // One unit on its own, which is the team the preview has.
+    spring.set(
+        "GetUnitTeam",
+        lua.create_function(|_, _: MultiValue| Ok(0))?,
+    )?;
+
+    // Rules parameters, kept rather than dropped for the reason `SetUnitValue`
+    // is kept: a script stores one and reads it back a moment later, and a
+    // preview that always answered nothing would tell it nothing it did had
+    // happened. An unset one still reads as nothing, as the engine leaves it.
+    let state = Rc::clone(sim);
+    spring.set(
+        "SetUnitRulesParam",
+        lua.create_function(move |_, (_unit, name, value): (Value, String, Value)| {
+            state
+                .borrow_mut()
+                .unit_rules
+                .insert(name, RuleValue::of(&value));
+            Ok(())
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitRulesParam",
+        lua.create_function(move |lua, (_unit, name): (Value, String)| {
+            let sim = state.borrow();
+            match sim.unit_rules.get(&name) {
+                Some(value) => value.to_value(lua),
+                None => Ok(Value::Nil),
+            }
+        })?,
+    )?;
+
+    // The game's own, which take no unit and live in their own store.
+    let state = Rc::clone(sim);
+    spring.set(
+        "SetGameRulesParam",
+        lua.create_function(move |_, (name, value): (String, Value)| {
+            state
+                .borrow_mut()
+                .game_rules
+                .insert(name, RuleValue::of(&value));
+            Ok(())
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetGameRulesParam",
+        lua.create_function(move |lua, name: String| {
+            let sim = state.borrow();
+            match sim.game_rules.get(&name) {
+                Some(value) => value.to_value(lua),
+                None => Ok(Value::Nil),
+            }
+        })?,
+    )?;
 
     install_echo(lua, sim, &spring)
 }

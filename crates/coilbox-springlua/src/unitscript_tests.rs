@@ -465,6 +465,55 @@ fn a_weapon_that_says_nothing_points_forward_and_is_slaved_to_nothing() {
     assert_close(pose(&timeline, 0, "turret")[2], 1.0);
 }
 
+/// A script stores a rules parameter and reads it back, which is why the preview
+/// keeps them rather than dropping them. One name means two values, because the
+/// unit's store and the game's are separate in the engine, and a parameter
+/// nobody set still reads as nothing.
+#[test]
+fn a_rules_parameter_reads_back_as_it_was_set() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            Spring.SetUnitRulesParam(unitID, "grown", 3)
+            Spring.SetGameRulesParam("grown", "4")
+            if Spring.GetUnitRulesParam(unitID, "never") ~= nil then
+                error("a parameter nobody set should read as nothing")
+            end
+            local mine = Spring.GetUnitRulesParam(unitID, "grown")
+            local theirs = Spring.GetGameRulesParam("grown")
+            Move(piece("turret"), z_axis, mine + theirs)
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    // Three, plus the four that was stored as text and comes back as a number.
+    assert_close(pose(&timeline, 0, "turret")[2], 7.0);
+}
+
+/// What flove's flowers open with. None of it can move a piece, but a preview
+/// that stops on any of it shows nothing at all.
+#[test]
+fn the_world_calls_a_flower_opens_with_do_not_stop_it() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            Spring.SetUnitCollisionVolumeData(unitID, 0, 0, 0, 0, 0, 0, -1, 0, 0)
+            Spring.PlaySoundFile("bloom.wav")
+            if Spring.CreateUnit("flower", 0, 0, 0, 0, 0) ~= nil then
+                error("the preview has no second unit to make")
+            end
+            Move(piece("turret"), z_axis, Spring.GetUnitTeam(unitID) + 5)
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 5.0);
+}
+
 /// A definition that gives only the older `maxvelocity`, which counts per frame
 /// where `speed` counts per second. Every flove unit is written that way, and
 /// reading past it played the walk cycle twenty times too slowly.
