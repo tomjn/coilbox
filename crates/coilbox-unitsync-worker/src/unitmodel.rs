@@ -228,6 +228,14 @@ pub(crate) fn read_model(
         },
     };
 
+    // A `.dae` carries no Spring texture binding, so unlike the other two
+    // formats the name is not in the model file at all. It comes from the Lua
+    // metafile beside it, which needs the archive and so cannot be settled
+    // inside `build`.
+    if coilbox_assimp::EXTENSIONS.contains(&out.format.as_str()) {
+        apply_assimp_textures(us, list, &mut out);
+    }
+
     let format = out.format.clone();
     for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
         resolve_texture(us, handle, list, &format, teamtex, cache, tex);
@@ -562,6 +570,130 @@ fn s3o_piece(piece: &coilbox_s3o::Piece, texture: Option<&str>) -> ModelPiece {
 }
 
 // ---------------------------------------------------------------- assimp
+
+/// VFS modes for the parser: raw, map, mod and base, the same set the defs
+/// reader and the archive Lua console use.
+const VFS_ALL_MODES: &str = "rmMbe";
+
+/// Read `tex1` and `tex2` out of the Lua file beside an Assimp model.
+///
+/// Both names come back tab separated, and either can be empty. The keys sit at
+/// the top level of whatever the file returns, which is where the engine reads
+/// them from (`modelTable.GetString("tex1", ...)` on the parser's root table).
+const METAFILE_SCRIPT: &str = r#"
+local __cb_ok, __cb_t = pcall(VFS.Include, __cb_file)
+if not __cb_ok then
+  return __cb_chunk(nil, { __error = tostring(__cb_t) })
+end
+if type(__cb_t) ~= 'table' then return __cb_chunk('') end
+local function __cb_s(v) return (type(v) == 'string') and v or '' end
+return __cb_chunk(__cb_s(__cb_t.tex1) .. '\t' .. __cb_s(__cb_t.tex2))
+"#;
+
+/// The metafile beside a model, by the engine's two spellings: `<path>.lua`
+/// first, then the model's name with its extension replaced
+/// (`AssParser.cpp:522-534`). flove uses both, so neither can be dropped.
+/// `model_path` arrives with the archive's own casing, and [`find_member`]
+/// matches against an already lowercased target, so it is lowered here. Without
+/// that, `Objects3d/spire.dae.lua` matches nothing and every model silently
+/// looks like one with no metafile.
+fn find_metafile(list: &[(String, String)], model_path: &str) -> Option<String> {
+    let lower = model_path.to_lowercase();
+    if let Some(hit) = find_member(list, &format!("{lower}.lua")) {
+        return Some(hit);
+    }
+    let stem = lower.rsplit_once('.').map(|(s, _)| s)?;
+    find_member(list, &format!("{stem}.lua"))
+}
+
+/// Run the metafile through unitsync's Lua parser, which is the engine's own
+/// parser with the archive already mounted.
+///
+/// Reading the bytes and scanning them for `tex1` would be the wrong shape: the
+/// file is Lua, and a game is free to compute the name rather than write it as a
+/// literal. A file that raises is treated as a file that names nothing, which is
+/// what the engine does with one it cannot parse.
+fn metafile_textures(
+    us: &Unitsync,
+    list: &[(String, String)],
+    model_path: &str,
+) -> Option<(String, String)> {
+    let member = find_metafile(list, model_path)?;
+    // A long bracket rather than a quoted string, so a path needs no escaping.
+    // Archive member paths do not contain `]==]`.
+    let script = format!(
+        "{}local __cb_file = [==[{member}]==]\n{METAFILE_SCRIPT}",
+        crate::lua::CHUNKED_RESULT
+    );
+    let raw = us.run_lua_source(&script, VFS_ALL_MODES).ok()?;
+    let (tex1, tex2) = raw.split_once('\t').unwrap_or((raw.as_str(), ""));
+    Some((tex1.trim().to_string(), tex2.trim().to_string()))
+}
+
+/// Settle which texture an Assimp model draws with, in the engine's own
+/// ascending priority order (`FindTextures` in `AssParser.cpp`): a file named
+/// after the model, then whatever the material named, then the metafile. Each
+/// overwrites the one before it when it has something to say.
+///
+/// This runs before [`resolve_texture`], which turns the winning name into a
+/// file the viewer can load.
+fn apply_assimp_textures(us: &Unitsync, list: &[(String, String)], out: &mut UnitModelOutput) {
+    let file = out.path.rsplit('/').next().unwrap_or(&out.path);
+    let stem = file
+        .rsplit_once('.')
+        .map(|(s, _)| s)
+        .unwrap_or(file)
+        .to_lowercase();
+
+    // Lowest priority. `find_with_ext` hands back the member it found, and what
+    // is wanted here is the bare file name, because `resolve_texture` looks it
+    // up under `unittextures/` itself.
+    let mut tex1 = find_with_ext(list, S3O_TEXTURE_DIR, &stem)
+        .map(|member| member.rsplit('/').next().unwrap_or(&member).to_string());
+    let mut tex2: Option<String> = None;
+
+    if let Some(named) = out.textures.first().map(|t| t.name.clone()) {
+        if !named.trim().is_empty() {
+            tex1 = Some(named);
+        }
+    }
+
+    if let Some((m1, m2)) = metafile_textures(us, list, &out.path) {
+        if !m1.is_empty() {
+            tex1 = Some(m1);
+        }
+        if !m2.is_empty() {
+            tex2 = Some(m2);
+        }
+    }
+
+    out.textures = tex1
+        .iter()
+        .map(|name| ModelTexture {
+            name: name.clone(),
+            ..Default::default()
+        })
+        .collect();
+    out.texture2 = tex2.map(|name| ModelTexture {
+        name,
+        ..Default::default()
+    });
+    if let Some(root) = &mut out.root {
+        set_group_textures(root, tex1.as_deref());
+    }
+}
+
+/// Point every batch at the model's one texture. `ModelGroup::texture` is a key
+/// into `UnitModelOutput::textures` by contract, so the two cannot be allowed to
+/// disagree after the name has been settled above.
+fn set_group_textures(piece: &mut ModelPiece, texture: Option<&str>) {
+    for group in &mut piece.groups {
+        group.texture = texture.map(str::to_string);
+    }
+    for child in &mut piece.children {
+        set_group_textures(child, texture);
+    }
+}
 
 /// Flatten one of the formats read through Assimp.
 ///
@@ -1110,6 +1242,73 @@ mod tests {
             find_model(&list, "ARMCOM").as_deref(),
             Some("Objects3D/ARMCOM.s3o")
         );
+    }
+
+    #[test]
+    fn objectname_without_extension_finds_a_dae() {
+        let list = listing(&["Objects3d/spire.dae"]);
+        assert_eq!(
+            find_model(&list, "Spire").as_deref(),
+            Some("Objects3d/spire.dae")
+        );
+    }
+
+    /// `.3do` and `.s3o` are registered before the Assimp formats, so a game
+    /// shipping the same model twice is drawn from the one the engine picks.
+    #[test]
+    fn a_3do_wins_over_a_dae_of_the_same_name() {
+        let list = listing(&["Objects3d/tree.dae", "Objects3d/tree.3do"]);
+        assert_eq!(
+            find_model(&list, "tree").as_deref(),
+            Some("Objects3d/tree.3do")
+        );
+    }
+
+    /// An `objectname` that already names the file is taken as written, which is
+    /// how the archive browser previews the member somebody clicked.
+    #[test]
+    fn an_objectname_naming_a_dae_is_taken_as_written() {
+        let list = listing(&["Objects3d/spire.dae"]);
+        assert_eq!(
+            find_model(&list, "spire.dae").as_deref(),
+            Some("Objects3d/spire.dae")
+        );
+    }
+
+    /// flove writes both spellings the engine accepts: `spire.dae.lua` beside
+    /// `spire.dae`, and `MushroomCluster.lua` beside `MushroomCluster.dae`.
+    #[test]
+    fn a_metafile_is_found_by_either_spelling() {
+        let beside = listing(&["Objects3d/spire.dae", "Objects3d/spire.dae.lua"]);
+        assert_eq!(
+            find_metafile(&beside, "Objects3d/spire.dae").as_deref(),
+            Some("Objects3d/spire.dae.lua")
+        );
+        let replacing = listing(&[
+            "Objects3d/MushroomCluster.dae",
+            "Objects3d/MushroomCluster.lua",
+        ]);
+        assert_eq!(
+            find_metafile(&replacing, "Objects3d/MushroomCluster.dae").as_deref(),
+            Some("Objects3d/MushroomCluster.lua")
+        );
+    }
+
+    /// The model path carries the archive's own casing while the listing is
+    /// matched lowercased, so passing it straight through found nothing and
+    /// every model read as one with no metafile.
+    #[test]
+    fn a_metafile_is_found_whatever_case_the_archive_used() {
+        let list = listing(&["Objects3D/Spire.DAE.lua"]);
+        assert!(find_metafile(&list, "Objects3D/Spire.DAE").is_some());
+    }
+
+    /// A model with nothing beside it is the common case for the other two
+    /// formats, and must not be mistaken for one whose metafile failed.
+    #[test]
+    fn a_model_with_no_metafile_finds_nothing() {
+        let list = listing(&["Objects3d/spire.dae"]);
+        assert!(find_metafile(&list, "Objects3d/spire.dae").is_none());
     }
 
     #[test]
