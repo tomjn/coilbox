@@ -6,9 +6,10 @@ import {
   hostingRoute,
   hostingRouteSummary,
   NAT_TYPE_DIRECT,
+  RELAY_EXPLAINED,
   recordHostingRoute,
   relayModeFrom,
-  relayModeHelp,
+  relayModeMeaning,
 } from "./hostingRoute";
 import {
   type DirectReachability,
@@ -540,13 +541,15 @@ describe("relayModeFrom", () => {
   });
 });
 
-describe("relayModeHelp", () => {
-  // The price is said wherever the relay might be used, and not where it will
-  // not be.
-  it("names the cost on the two answers that relay", () => {
-    expect(relayModeHelp("auto")).toContain("extra hop");
-    expect(relayModeHelp("always")).toContain("extra hop");
-    expect(relayModeHelp("never")).not.toContain("extra hop");
+describe("what the relay choice says", () => {
+  // The price is said where the choice is made.
+  it("names the cost in the explanation", () => {
+    expect(RELAY_EXPLAINED).toContain("extra hop");
+  });
+
+  it("gives each mode its own few words", () => {
+    const said = (["auto", "always", "never"] as const).map(relayModeMeaning);
+    expect(new Set(said).size).toBe(3);
   });
 });
 

@@ -90,17 +90,22 @@ export function relayModeFrom(
 }
 
 /**
- * What a {@link RelayMode} means for the people joining, and what it costs, said
- * next to the choice because that is where somebody is deciding. Pure.
+ * What a server relay is and what it costs, for a host deciding whether to use
+ * one. Folded away under the choice, because it is read once and then known.
  */
-export function relayModeHelp(mode: RelayMode): string {
+export const RELAY_EXPLAINED =
+  "A server relay passes every player's traffic through the lobby server, so they can join even when your router will not let them in. It costs the server bandwidth and puts an extra hop between you and every player, so pings are a little worse than a direct game.";
+
+/** What each {@link RelayMode} does, in a few words, under that explanation.
+ *  Pure. */
+export function relayModeMeaning(mode: RelayMode): string {
   switch (mode) {
     case "auto":
-      return "Players connect straight to you when your router lets them in, and through the server's relay when it will not. A relay costs the server bandwidth and puts an extra hop between you and every player, so pings are a little worse than a direct game.";
+      return "Only when players cannot reach you directly.";
     case "always":
-      return "Every battle goes through the server's relay, even when your router would let players in. Pick this when players cannot join you directly. It puts an extra hop between you and every player, so pings are a little worse than a direct game.";
+      return "Every battle, for when players cannot join even though the check says they can.";
     case "never":
-      return "Players always connect straight to you, so only those who can already reach this machine can join.";
+      return "Players connect straight to you or not at all.";
   }
 }
 /**

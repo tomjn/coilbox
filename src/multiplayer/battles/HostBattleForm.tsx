@@ -1,8 +1,13 @@
 import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
-import { Loader2 } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   advertisedGamePort,
@@ -10,11 +15,12 @@ import {
   hostingRoute,
   hostingRouteSummary,
   NAT_TYPE_DIRECT,
+  RELAY_EXPLAINED,
   RELAY_MODE_KEY,
   type RelayMode,
   recordHostingRoute,
   relayModeFrom,
-  relayModeHelp,
+  relayModeMeaning,
 } from "../../direct/hostingRoute";
 import { ReachablePorts } from "../../direct/ReachablePorts";
 import {
@@ -347,9 +353,34 @@ export function HostBattleForm({
                 <ToggleGroupItem value="always">Always</ToggleGroupItem>
                 <ToggleGroupItem value="never">Never</ToggleGroupItem>
               </ToggleGroup>
-              <span className="text-xs text-muted-foreground">
-                {relayModeHelp(relayMode)}
-              </span>
+              <Collapsible>
+                <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                  <ChevronRight
+                    aria-hidden
+                    className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
+                  />
+                  What are server relays?
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-1.5 flex flex-col gap-1.5 pl-4 text-xs text-muted-foreground">
+                  <p>{RELAY_EXPLAINED}</p>
+                  <ul className="flex flex-col gap-0.5">
+                    {(
+                      [
+                        ["auto", "Automatic"],
+                        ["always", "Always"],
+                        ["never", "Never"],
+                      ] as const
+                    ).map(([mode, name]) => (
+                      <li key={mode}>
+                        <span className="font-medium text-foreground">
+                          {name}
+                        </span>{" "}
+                        {relayModeMeaning(mode)}
+                      </li>
+                    ))}
+                  </ul>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           )}
 

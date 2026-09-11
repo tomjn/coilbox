@@ -215,9 +215,16 @@ describe("the relay choice in the hosting form", () => {
     expect(screen.getByText("No ports asked for")).toBeTruthy();
   });
 
-  // The cost, said once, where the choice is made.
-  it("says what a relay costs next to the choice", () => {
+  // The cost, said once where the choice is made, and folded away until the
+  // host asks, because it is read once and then known.
+  it("explains relays, and what they cost, when asked", () => {
     form();
+    expect(
+      screen.queryByText(/puts an extra hop between you and every player/),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "What are server relays?" }),
+    );
     expect(
       screen.getByText(/puts an extra hop between you and every player/),
     ).toBeTruthy();
