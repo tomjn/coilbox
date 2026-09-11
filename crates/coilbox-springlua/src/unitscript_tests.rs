@@ -1629,6 +1629,47 @@ mod world {
         assert_close(pose(&timeline, 0, "turret")[2], 12.0);
     }
 
+    /// One walk cycle shared between units built from different models, which
+    /// is what the piece map is for. A name the unit does not have must read as
+    /// nothing, so that asking is safe.
+    #[test]
+    fn the_piece_map_numbers_pieces_the_way_piece_does() {
+        let timeline = play(
+            r#"
+            function script.Create()
+                local pieces = Spring.GetUnitPieceMap(unitID)
+                if pieces.turret ~= piece("turret") then error("numbering disagrees") end
+                if pieces.nostril ~= nil then error("found a piece this unit has not got") end
+                Turn(piece("turret"), y_axis, pieces.turret)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        // The unit is base, turret, barrel, flare, so turret is the second.
+        assert_close(rot_y(&timeline, 0, "turret"), 2.0);
+    }
+
+    /// The spelling problem `piece()` already has. A unit opened out of a game
+    /// carries lower case piece names while the game's own script asks for the
+    /// spelling its model file uses, and flove's `Trunk` is where that showed.
+    #[test]
+    fn the_piece_map_answers_whatever_case_the_script_asks_in() {
+        let timeline = play(
+            r#"
+            function script.Create()
+                local pieces = Spring.GetUnitPieceMap(unitID)
+                Turn(piece("turret"), y_axis, pieces.Turret)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 2.0);
+    }
+
     /// A unit nobody said the shape of. Answering the origin in silence would
     /// have a script decide its pieces are all at the unit's feet.
     #[test]

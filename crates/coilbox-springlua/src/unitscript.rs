@@ -1183,6 +1183,50 @@ fn install_spring(
         })?,
     )?;
 
+    // Every piece by name, numbered as `piece()` numbers them. The engine's own
+    // map is where those numbers come from: the unit script framework builds its
+    // piece table out of this callout and `piece(name)` reads it, so the two
+    // cannot disagree.
+    //
+    // Games use it to ask whether a piece exists before animating it, which is
+    // how one walk cycle is shared between units built from different models.
+    // flove does exactly that with its mushrooms.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPieceMap",
+        lua.create_function(move |lua, _: MultiValue| {
+            let sim = state.borrow();
+            let map = lua.create_table()?;
+            let mut numbered: Vec<(String, i64)> = Vec::with_capacity(sim.model.pieces.len());
+            for (index, piece) in sim.model.pieces.iter().enumerate() {
+                let number = index as i64 + 1;
+                map.set(piece.name.as_str(), number)?;
+                numbered.push((piece.name.to_lowercase(), number));
+            }
+            // Ignoring case on the way in, exactly as `piece()` does and for the
+            // same reason: a unit opened out of a game carries lower case names,
+            // while the game's own script asks for the spelling its model file
+            // uses. A name the unit does not have still reads as nothing, so
+            // `if pieces[name]` stays a real question.
+            let meta = lua.create_table()?;
+            meta.set(
+                "__index",
+                lua.create_function(move |_, (_, key): (Value, Value)| {
+                    let Value::String(key) = key else {
+                        return Ok(Value::Nil);
+                    };
+                    let key = key.to_string_lossy().to_lowercase();
+                    Ok(numbered
+                        .iter()
+                        .find(|(name, _)| *name == key)
+                        .map_or(Value::Nil, |(_, number)| Value::Integer(*number)))
+                })?,
+            )?;
+            map.set_metatable(Some(meta))?;
+            Ok(map)
+        })?,
+    )?;
+
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitNearestEnemy",
