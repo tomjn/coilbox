@@ -121,6 +121,31 @@ fn a_rotation_reaches_the_vertices_themselves() {
     );
 }
 
+/// The counters are what lets whatever opens a model say what reading it cost,
+/// rather than the difference turning up later as lost geometry.
+#[test]
+fn counts_what_reading_had_to_change() {
+    let plain = read(CUBE, "dae").expect("the fixture should parse");
+    let turned = read(ROTATED, "dae").expect("the fixture should parse");
+
+    assert_eq!(
+        plain.notes.dropped_faces, 0,
+        "the cube is triangles throughout, so nothing should be dropped"
+    );
+    assert_eq!(
+        plain.notes.materials, 1,
+        "one material is what a Spring unit can carry"
+    );
+    // Counted rather than pinned to a number, because how many nodes Assimp's
+    // Collada importer produces for a file is its business and not this test's.
+    assert!(
+        turned.notes.transformed > plain.notes.transformed,
+        "the turned fixture should report baked nodes, got {:?} against {:?}",
+        turned.notes,
+        plain.notes
+    );
+}
+
 #[test]
 fn a_file_that_is_not_a_model_fails_rather_than_returning_an_empty_model() {
     let err = read(b"this is not a model", "dae").unwrap_err();
