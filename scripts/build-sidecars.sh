@@ -7,18 +7,48 @@
 # by CI per platform, and produced locally by this script before
 # `tauri dev`/`build`.
 #
-# Pass every crate you want in one call: a single `cargo build --release`
-# plans all of them together, so shared dependencies build once and the final
-# crates compile in parallel, instead of one `cargo build` per crate in turn.
+# Pass every crate you want in one call: a single `cargo build` plans all of
+# them together, so shared dependencies build once and the final crates
+# compile in parallel, instead of one `cargo build` per crate in turn.
 #
-# Usage: build-sidecars.sh <crate-name>...
+# Usage: build-sidecars.sh [--profile release|dev] <crate-name>...
+#
+# Defaults to the release profile, which is what a real bundle needs
+# (`tauri dev`/`build`, release.yml). lint.yml passes --profile dev: clippy
+# and `cargo test --workspace` only ever exercise the dev and test profiles,
+# and `cargo test --workspace` already builds the dev worker at
+# target/debug/coilbox-unitsync-worker, the same path the sidecar tests in
+# crates/tauri-plugin-coilbox-unitsync/src/sidecar.rs run it from. Building
+# release there compiled an optimised copy nothing in the job ever used, and
+# risked a release binary landing at that debug path (issue #2807).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+PROFILE="release"
+if [ "${1:-}" = "--profile" ]; then
+  PROFILE="${2:?--profile needs a value}"
+  shift 2
+fi
+
 if [ "$#" -eq 0 ]; then
-  echo "Usage: $0 <crate-name>..." >&2
+  echo "Usage: $0 [--profile release|dev] <crate-name>..." >&2
   exit 1
 fi
+
+case "$PROFILE" in
+release)
+  CARGO_PROFILE_ARGS=(--release)
+  TARGET_SUBDIR="release"
+  ;;
+dev)
+  CARGO_PROFILE_ARGS=()
+  TARGET_SUBDIR="debug"
+  ;;
+*)
+  echo "Unknown profile: $PROFILE (expected release or dev)" >&2
+  exit 1
+  ;;
+esac
 
 TRIPLE="$(rustc -Vv | sed -n 's/^host: //p')"
 EXE=""
@@ -31,10 +61,10 @@ for CRATE in "$@"; do
   CARGO_ARGS+=(-p "$CRATE")
 done
 
-cargo build "${CARGO_ARGS[@]}" --release
+cargo build "${CARGO_ARGS[@]}" "${CARGO_PROFILE_ARGS[@]}"
 mkdir -p src-tauri/binaries
 for CRATE in "$@"; do
-  cp "target/release/${CRATE}${EXE}" \
+  cp "target/${TARGET_SUBDIR}/${CRATE}${EXE}" \
     "src-tauri/binaries/${CRATE}-${TRIPLE}${EXE}"
   echo "Built src-tauri/binaries/${CRATE}-${TRIPLE}${EXE}"
 done
