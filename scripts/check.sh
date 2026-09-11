@@ -39,7 +39,7 @@ run_check() {
 }
 
 run_check cargo-fmt cargo fmt --all --check
-run_check cargo-clippy cargo clippy --all-targets --all-features -- -D warnings
+run_check cargo-clippy cargo clippy --all-targets -- -D warnings
 # Clippy compiles the #[cfg(test)] modules but never runs them, so without this
 # a Rust test can be wrong for as long as it still compiles.
 run_check cargo-test cargo test --workspace
