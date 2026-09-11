@@ -172,8 +172,8 @@ export function advertisedGamePort(
  * is the whole story. On a LAN room it is half of one, because a room announces
  * a single address to everybody in it and that address is this machine on this
  * network. So the ports opening lets somebody outside reach the room and does
- * not let them into the game, and a host who ticked "Reachable over the
- * internet" and read only the first half would send a friend an address that
+ * not let them into the game, and a host who ticked "Open ports on my router"
+ * and read only the first half would send a friend an address that
  * gets them as far as the chat (issue #2055).
  *
  * The bottom two routes name no router, and the mapped one does. A mapping only
@@ -206,8 +206,8 @@ export function hostingRouteSummary(
         : "Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join.";
     case "unchecked":
       return lanRoom
-        ? "People on this network can join. Turn on “Reachable over the internet” above to find out whether anybody outside can."
-        : "Players connect straight to this machine, which only works if the port is already open. Turn on “Reachable over the internet” above to find out.";
+        ? 'People on this network can join. Turn on "Open ports on my router" above to find out whether anybody outside can.'
+        : 'Players connect straight to this machine, which only works if the port is already open. Turn on "Open ports on my router" above to find out.';
   }
 }
 

@@ -32,7 +32,7 @@ That is enough to open an issue from. "It did not work" is not, because most of 
 
 ### 1. A starts a room
 
-Do: on A, open Battles, press Host on LAN, leave the port at 8200, leave Advertise on the local network ticked, leave Reachable over the internet and Approve joins unticked, press Start room.
+Do: on A, open Battles, press Host on LAN, leave the port at 8200, leave Advertise on the local network ticked, leave Open ports on my router and Approve joins unticked, press Start room.
 
 Look for: A lands in the battle room, and the sidebar gains an item named after the room.
 
@@ -188,7 +188,7 @@ Needs a real home router, and only the host's machine.
 
 ### 18. The ports open
 
-Do: on A, start a room with Reachable over the internet ticked.
+Do: on A, start a room with Open ports on my router ticked.
 
 Look for: a line beginning "Open.", naming what forwarded the ports and which ports, with an address to give people outside the network and a Copy beside it. It takes a few seconds.
 
@@ -196,7 +196,7 @@ If it says the router refused: that is a valid result, not a failed test. Record
 
 ### 19. The failure path
 
-Do: turn UPnP off in the router's admin page. Restart the room on A with Reachable over the internet ticked.
+Do: turn UPnP off in the router's admin page. Restart the room on A with Open ports on my router ticked.
 
 Look for: "Your router would not open the ports", and instructions naming both the room port and 8452, rather than a spinner or silence.
 

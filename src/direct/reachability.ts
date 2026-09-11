@@ -178,7 +178,7 @@ export function isOnPublicAddress(report: DirectReachability): boolean {
  * a private one, which is right on a LAN and picks Docker's bridge on a VPS, so
  * a host who is directly reachable handed every joiner 172.17.0.1 (issue #2130).
  *
- * Null when the host never ticked "Reachable over the internet", when no STUN
+ * Null when the host never ticked "Open ports on my router", when no STUN
  * server answered, and when there is a router in front. In all three there is
  * nothing measured to send and the room goes on working the address out for
  * itself.

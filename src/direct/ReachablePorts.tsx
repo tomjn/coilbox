@@ -11,8 +11,13 @@ import {
 import { type PortSpec, useReachablePorts } from "./useReachablePorts";
 
 /**
- * "Reachable over the internet": the toggle that asks the host's router to open
- * the ports, and the answer, in the place they asked.
+ * "Open ports on my router": the toggle that asks the host's router to open the
+ * ports, and the answer, in the place they asked.
+ *
+ * Named for what it does. It used to be "Reachable over the internet", which
+ * read as though unticking it kept a battle off the internet. It never did. An
+ * unticked host is still advertised at their own address, with nobody having
+ * checked that anybody can reach it.
  *
  * Off by default, in both places it appears. Ticking it opens a port on a home
  * router, which changes what the rest of the internet can reach, and that is not
@@ -65,7 +70,7 @@ export function ReachablePorts({
           className="mt-0.5"
         />
         <span className="flex flex-col gap-0.5">
-          <span className="font-medium">Reachable over the internet</span>
+          <span className="font-medium">Open ports on my router</span>
           <span className="text-xs text-muted-foreground">{help}</span>
         </span>
       </label>
