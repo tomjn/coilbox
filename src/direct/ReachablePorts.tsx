@@ -147,29 +147,32 @@ function Answer({
   report: DirectReachability | null;
   relayWillCarry: boolean;
 }) {
+  // Every state sits in the same card, looking included, so the panel keeps
+  // its shape from the moment it starts to the moment it has an answer, and the
+  // answer arrives where the host is already looking.
+  const card = "flex flex-col gap-1.5 rounded-md border p-2 text-xs";
+  const quiet = "border-border bg-muted/40 text-muted-foreground";
+  const alarm = "border-destructive/50 bg-destructive/10 text-destructive";
+
   if (busy || (!report && !error)) {
     return (
-      <p
-        role="status"
-        className="flex items-start gap-1.5 text-xs text-muted-foreground"
-      >
-        <Loader2
-          className="mt-px size-3.5 shrink-0 motion-safe:animate-spin"
-          aria-hidden
-        />
-        <span>
-          Looking for a way in… This takes a few seconds, and longer when
-          nothing is going to answer.
+      <div role="status" className={`${card} ${quiet}`}>
+        <span className="flex items-center gap-1.5 font-medium">
+          <Loader2
+            className="size-3.5 shrink-0 motion-safe:animate-spin"
+            aria-hidden
+          />
+          Looking for a way in…
         </span>
-      </p>
+        <span>
+          This takes a few seconds, and longer when nothing is going to answer.
+        </span>
+      </div>
     );
   }
   if (error) {
     return (
-      <p
-        role="alert"
-        className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive"
-      >
+      <p role="alert" className={`${card} ${alarm}`}>
         {error}
       </p>
     );
@@ -183,13 +186,7 @@ function Answer({
   const advice = reachabilityAdvice(report);
   const address = joinAddress(report);
   return (
-    <div
-      className={`flex flex-col gap-1.5 rounded-md border p-2 text-xs ${
-        alarming
-          ? "border-destructive/50 bg-destructive/10 text-destructive"
-          : "border-border bg-muted/40 text-muted-foreground"
-      }`}
-    >
+    <div className={`${card} ${alarming ? alarm : quiet}`}>
       <span className="font-medium">{reachabilityHeadline(report)}</span>
       {address && <CopyableAddress address={address} />}
       {advice && <span>{advice}</span>}
