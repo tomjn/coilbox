@@ -1361,12 +1361,22 @@ export const mpProbeHost = defineCommand<
  * current figure. Zero is a real answer and a different one: the relay is there
  * and nothing is going through it.
  *
+ * `letThrough` and `heardFrom` are who the relay is carrying: how many addresses
+ * coilbox has let through it, and how many players it has heard from in the
+ * last 15 seconds. Both are null whenever coilbox cannot read a current count,
+ * which includes a relay it is reading off disk.
+ *
  * No server key, because there is at most one relay sidecar on the machine
  * whatever is connected. The Rust command's doc says why.
  */
 export const mpRelayTraffic = defineCommand<
   Record<string, never>,
-  { relaying: boolean; bytesPerSecond: number | null }
+  {
+    relaying: boolean;
+    bytesPerSecond: number | null;
+    letThrough: number | null;
+    heardFrom: number | null;
+  }
 >("coilbox-multiplayer", "mp_relay_traffic");
 
 /**

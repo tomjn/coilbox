@@ -172,11 +172,11 @@ impl Running {
         let deadline = Instant::now() + PATIENCE;
         while Instant::now() < deadline {
             let line = self.next_line();
-            if let Some(rest) = line.strip_prefix("{\"type\":\"traffic\",\"bytesPerSecond\":") {
-                return rest
-                    .trim_end_matches('}')
-                    .parse()
-                    .unwrap_or_else(|_| panic!("a number in the agent's meter, got: {line}"));
+            if let Ok(coilbox_relay_protocol::Event::Traffic {
+                bytes_per_second, ..
+            }) = coilbox_relay_protocol::read_event(&line)
+            {
+                return bytes_per_second;
             }
         }
         panic!("the agent never said how much it was carrying");

@@ -2024,6 +2024,15 @@ fn relay_traffic(registry: &Registry) -> Option<u64> {
     })
 }
 
+/// Who the relay is carrying right now, on the same terms as [`relay_traffic`].
+fn relay_peers(registry: &Registry) -> Option<relay_agent::Peers> {
+    lock_or_recover(registry).values().find_map(|conn| {
+        lock_or_recover(&conn.relay)
+            .as_ref()
+            .and_then(|host| host.agent.peers())
+    })
+}
+
 /// What coilbox can say about the relay carrying the game that is running.
 ///
 /// Two answers, because they go missing separately and the in-game pill uses
@@ -2037,6 +2046,10 @@ struct RelayBehindTheGame {
     relaying: bool,
     /// What it last said it was carrying, or `None` if it has not said.
     bytes_per_second: Option<u64>,
+    /// Who it said it was carrying, or `None` if it has not said. Only the
+    /// relay this coilbox is hosting through says, because the record a
+    /// leftover sidecar writes down carries the rate and nothing else.
+    peers: Option<relay_agent::Peers>,
 }
 
 /// The relay behind the running game: from the handle while coilbox holds one,
@@ -2063,6 +2076,7 @@ fn relay_behind_the_game(registry: &Registry, run_file: Option<&Path>) -> RelayB
         return RelayBehindTheGame {
             relaying: true,
             bytes_per_second: relay_traffic(registry),
+            peers: relay_peers(registry),
         };
     }
     // The outer `Option` is whether a sidecar is there, the inner one is
@@ -2075,6 +2089,7 @@ fn relay_behind_the_game(registry: &Registry, run_file: Option<&Path>) -> RelayB
     RelayBehindTheGame {
         relaying: left_running.is_some(),
         bytes_per_second: left_running.flatten(),
+        peers: None,
     }
 }
 
@@ -2091,6 +2106,10 @@ fn relay_behind_the_game(registry: &Registry, run_file: Option<&Path>) -> RelayB
 /// `bytesPerSecond` is null when there is no figure to give, which includes a
 /// relay that is up and has not been heard from lately. Zero is a different
 /// answer and a real one, and means the relay is there and carrying nothing.
+///
+/// `letThrough` and `heardFrom` are who the relay is carrying, for the panel
+/// behind the host's relay pill. Null on the same terms as the rate, and null
+/// for a relay coilbox is reading off disk.
 #[tauri::command]
 fn mp_relay_traffic<R: Runtime>(
     app: tauri::AppHandle<R>,
@@ -2101,6 +2120,8 @@ fn mp_relay_traffic<R: Runtime>(
     CliResult::ok(json!({
         "relaying": relay.relaying,
         "bytesPerSecond": relay.bytes_per_second,
+        "letThrough": relay.peers.map(|p| p.let_through),
+        "heardFrom": relay.peers.map(|p| p.heard_from),
     }))
 }
 
@@ -5392,12 +5413,20 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(5));
         }
+        assert_eq!(
+            relay_peers(&registry),
+            Some(relay_agent::Peers {
+                let_through: 2,
+                heard_from: 1,
+            }),
+            "who the relay said it was carrying has to reach the command beside the rate"
+        );
     }
 
     /// A relay held against a connection that is already in `registry`, put
     /// together the way `mp_open_battle` does: an agent that has reported
-    /// `bytes_per_second` if it has reported anything at all, and a relay it
-    /// said was open.
+    /// `bytes_per_second`, with two addresses let through and one heard from,
+    /// if it has reported anything at all, and a relay it said was open.
     ///
     /// The writer comes back because dropping it closes the agent's pipe, so
     /// the caller has to hold it for as long as it reads anything off the
@@ -5414,6 +5443,8 @@ mod tests {
                 &mut agent_said,
                 coilbox_relay_protocol::to_line(&coilbox_relay_protocol::Event::Traffic {
                     bytes_per_second,
+                    let_through: Some(2),
+                    heard_from: Some(1),
                 })
                 .as_bytes(),
             )
@@ -5711,6 +5742,7 @@ mod tests {
             RelayBehindTheGame {
                 relaying: true,
                 bytes_per_second: Some(41_984),
+                peers: None,
             }
         );
     }
@@ -5731,6 +5763,7 @@ mod tests {
             RelayBehindTheGame {
                 relaying: true,
                 bytes_per_second: None,
+                peers: None,
             }
         );
     }
@@ -5751,6 +5784,7 @@ mod tests {
             RelayBehindTheGame {
                 relaying: false,
                 bytes_per_second: None,
+                peers: None,
             }
         );
     }
@@ -5774,6 +5808,7 @@ mod tests {
             RelayBehindTheGame {
                 relaying: true,
                 bytes_per_second: None,
+                peers: None,
             }
         );
     }

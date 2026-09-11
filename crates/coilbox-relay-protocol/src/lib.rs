@@ -240,8 +240,23 @@ pub enum Event {
     /// traffic both ways or neither, since the engine at the far end answers
     /// what it is sent, so splitting it would offer a distinction that does not
     /// arise and put a second number in a pill that has room for one.
+    ///
+    /// `let_through` and `heard_from` say who the relay is carrying, for the
+    /// panel behind the host's relay pill. The rate says whether anything is
+    /// moving, and these say whether the players the lobby named are the ones
+    /// it is moving for. Both are `None` from an agent built before they
+    /// existed, and that has to read as not knowing rather than as zero.
     #[serde(rename_all = "camelCase")]
-    Traffic { bytes_per_second: u64 },
+    Traffic {
+        bytes_per_second: u64,
+        /// How many addresses coilbox has let through the relay, one per IP.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        let_through: Option<usize>,
+        /// How many peer endpoints the relay has carried a datagram from
+        /// within the engine's reconnect timeout.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        heard_from: Option<usize>,
+    },
     /// The request with this id is done.
     #[serde(rename_all = "camelCase")]
     Done { id: RequestId },
@@ -680,8 +695,10 @@ mod tests {
         assert_eq!(
             to_line(&Event::Traffic {
                 bytes_per_second: 41_984,
+                let_through: Some(2),
+                heard_from: Some(1),
             }),
-            "{\"type\":\"traffic\",\"bytesPerSecond\":41984}\n"
+            "{\"type\":\"traffic\",\"bytesPerSecond\":41984,\"letThrough\":2,\"heardFrom\":1}\n"
         );
         assert_eq!(
             to_line(&Event::Done { id: 7 }),
@@ -703,6 +720,21 @@ mod tests {
             ip: IpAddr::V4(Ipv4Addr::new(203, 0, 113, 9)),
         };
         assert_eq!(read_request(to_line(&asked).trim()), Ok(asked));
+    }
+
+    /// A sidecar from before the counts existed, read by a coilbox from after.
+    /// The rate still arrives, and the counts come out as not known rather
+    /// than as a relay nobody has been let through.
+    #[test]
+    fn a_traffic_report_without_counts_reads_as_not_knowing_them() {
+        assert_eq!(
+            read_event("{\"type\":\"traffic\",\"bytesPerSecond\":41984}"),
+            Ok(Event::Traffic {
+                bytes_per_second: 41_984,
+                let_through: None,
+                heard_from: None,
+            })
+        );
     }
 
     #[test]

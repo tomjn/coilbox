@@ -377,9 +377,10 @@ impl<R: RelayLink + Sync> RelayLink for Counted<'_, R> {
         let arrived = self.relay.recv_from(buf).await;
         // Only a datagram counts. A read that failed is the relay breaking,
         // which says nothing about whether anybody is still playing.
-        if let Ok((read, _)) = arrived {
+        if let Ok((read, peer)) = arrived {
             self.stopping.carried_something();
             self.traffic.carried(read);
+            self.traffic.came_from(peer);
             // And a datagram that arrived is a player, where one that went out
             // might have been the agent's own permission probe. That is the
             // difference between "a game has run through this relay" and "the

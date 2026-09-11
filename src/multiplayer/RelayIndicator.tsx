@@ -41,13 +41,19 @@ export default function RelayIndicator() {
   const ours = useOurRelay(hosting);
   const leftover = useRelayLeftRunning(ours !== null);
   if (running && relayed) return null;
-  if (ours) return <OurRelay bytesPerSecond={ours.bytesPerSecond} />;
+  if (ours) return <OurRelay {...ours} />;
   if (leftover) return <LeftRelay bytesPerSecond={leftover.bytesPerSecond} />;
   return null;
 }
 
 /** What a relay says it is carrying, or null when it has not said. */
 type Carrying = { bytesPerSecond: number | null };
+
+/** Our own relay's figure and who it is carrying, null when it has not said. */
+type OurCarrying = Carrying & {
+  letThrough: number | null;
+  heardFrom: number | null;
+};
 
 const QUIET_PILL =
   "flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground";
@@ -64,8 +70,8 @@ const WARM_PILL =
  * session never asks, and a relayed one asks for as long as the backend says
  * the relay is there and stops the moment it is not.
  */
-function useOurRelay(hosting: boolean): Carrying | null {
-  const [relay, setRelay] = useState<Carrying | null>(null);
+function useOurRelay(hosting: boolean): OurCarrying | null {
+  const [relay, setRelay] = useState<OurCarrying | null>(null);
   useEffect(() => {
     if (!hosting) {
       setRelay(null);
@@ -86,7 +92,11 @@ function useOurRelay(hosting: boolean): Carrying | null {
         setRelay(null);
         return;
       }
-      setRelay({ bytesPerSecond: answer.bytesPerSecond });
+      setRelay({
+        bytesPerSecond: answer.bytesPerSecond,
+        letThrough: answer.letThrough ?? null,
+        heardFrom: answer.heardFrom ?? null,
+      });
       asking = setTimeout(ask, ASK_EVERY_MS);
     };
     void ask();
@@ -149,7 +159,7 @@ function useRelayLeftRunning(ours: boolean): Carrying | null {
  * Closing asks first, in the words the battle room's own Close uses, because it
  * removes everybody in the battle.
  */
-function OurRelay({ bytesPerSecond }: Carrying) {
+function OurRelay({ bytesPerSecond, letThrough, heardFrom }: OurCarrying) {
   const { activeKey } = useMultiplayer();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -215,6 +225,9 @@ function OurRelay({ bytesPerSecond }: Carrying) {
               Your battle goes through the server's relay, so players reach it
               through the lobby server rather than connecting to you directly.
             </p>
+            {letThrough !== null && heardFrom !== null && (
+              <RelayPeers letThrough={letThrough} heardFrom={heardFrom} />
+            )}
             <div className="flex justify-end gap-2">
               <Button
                 variant="secondary"
@@ -238,6 +251,39 @@ function OurRelay({ bytesPerSecond }: Carrying) {
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * Who the relay is carrying: how many addresses the lobby named and coilbox let
+ * through, and how many players the relay has heard from.
+ *
+ * The second stays at zero until the game starts, because only the game itself
+ * sends through the relay. The window is `QUIET_ENOUGH_TO_RECLAIM` in
+ * `coilbox-relay-agent`, which is the engine's own reconnect timeout.
+ */
+function RelayPeers({
+  letThrough,
+  heardFrom,
+}: {
+  letThrough: number;
+  heardFrom: number;
+}) {
+  return (
+    <div className="space-y-1">
+      <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-sm">
+        <dt className="text-muted-foreground">Addresses let through</dt>
+        <dd className="tabular-nums">{letThrough}</dd>
+        <dt className="text-muted-foreground">
+          Heard from in the last 15 seconds
+        </dt>
+        <dd className="tabular-nums">{heardFrom}</dd>
+      </dl>
+      <p className="text-xs text-muted-foreground">
+        Nobody is heard from until the game starts, because only the game itself
+        sends through the relay.
+      </p>
+    </div>
   );
 }
 

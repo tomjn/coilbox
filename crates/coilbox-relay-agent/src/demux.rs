@@ -120,7 +120,10 @@ const UPLINK_QUEUE: usize = 256;
 /// simply gets another socket, and the engine puts them back exactly as it puts
 /// back a player whose address changed. The cost of being wrong is the
 /// reconnect they were already going to make.
-const QUIET_ENOUGH_TO_RECLAIM: Duration = Duration::from_secs(15);
+///
+/// [`crate::traffic`] uses the same window for who the relay has heard from,
+/// for the same reason.
+pub(crate) const QUIET_ENOUGH_TO_RECLAIM: Duration = Duration::from_secs(15);
 
 /// One datagram the engine sent, tagged with the peer whose socket it arrived
 /// on. That tag is the whole reason for a socket per peer: the socket a reply
