@@ -42,26 +42,21 @@ const REFUSED: DirectReachability = {
 };
 
 // Stands in for the panel that asks the router. A button rather than a report
-// on mount, so the refusal arrives at a moment the test chooses. A second button
-// shows whether the router check is on and turns it over, which is the other
-// answer this form keeps.
+// on mount, so the refusal arrives at a moment the test chooses. It also says
+// whether the form asked for the check without a checkbox.
 vi.mock("../../direct/ReachablePorts", () => ({
   ReachablePorts: ({
     onReport,
-    enabled,
-    onEnabledChange,
+    always,
   }: {
     onReport?: (report: DirectReachability | null) => void;
-    enabled?: boolean;
-    onEnabledChange?: (enabled: boolean) => void;
+    always?: boolean;
   }) => (
     <>
       <button type="button" onClick={() => onReport?.(REFUSED)}>
         Pretend the router refused
       </button>
-      <button type="button" onClick={() => onEnabledChange?.(!enabled)}>
-        {enabled ? "Router check on" : "Router check off"}
-      </button>
+      <span>{always ? "Checks the router" : "Asks before checking"}</span>
     </>
   ),
 }));
@@ -201,25 +196,14 @@ describe("the relay preference in the hosting form", () => {
 });
 
 /**
- * The router check beside it. On by default, because without it the ladder has
+ * The router check beside it. Always on, because without it the ladder has
  * nothing to go on and the relay is never reached. The port it opens belongs to
  * the battle, so a form closed without one hands it back.
  */
 describe("the router check in the hosting form", () => {
-  const toggle = () => screen.getByRole("button", { name: /Router check/ });
-
-  it("is on by default", () => {
+  it("checks the router without asking", () => {
     form();
-    expect(toggle().textContent).toBe("Router check on");
-  });
-
-  it("remembers being turned off", () => {
-    form();
-    fireEvent.click(toggle());
-    cleanup();
-
-    form();
-    expect(toggle().textContent).toBe("Router check off");
+    expect(screen.getByText("Checks the router")).toBeTruthy();
   });
 
   it("hands the port back when the form closes without a battle", () => {

@@ -200,3 +200,16 @@ describe("the reachability panel for a host on a cloud instance", () => {
     expect(document.body.textContent).not.toContain("Your router");
   });
 });
+
+/**
+ * The panel in the lobby hosting form, which checks without asking. There is no
+ * toggle to turn the check off, so the answer is there from the start.
+ */
+describe("the reachability panel that always checks", () => {
+  it("shows the answer with no checkbox to tick", () => {
+    report.current = REFUSED;
+    render(<ReachablePorts ports={[]} help="Opens the ports" always />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText("Nothing would open the ports.")).toBeTruthy();
+  });
+});

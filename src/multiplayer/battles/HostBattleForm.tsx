@@ -9,7 +9,6 @@ import {
   hostingRoute,
   hostingRouteSummary,
   NAT_TYPE_DIRECT,
-  OPEN_ROUTER_PORTS_KEY,
   recordHostingRoute,
 } from "../../direct/hostingRoute";
 import { ReachablePorts } from "../../direct/ReachablePorts";
@@ -118,14 +117,6 @@ export function HostBattleForm({
   // least able to work out why hosting failed (issue #2023).
   const [wantsRelay, setWantsRelay] = useSetting<boolean>(
     HOST_THROUGH_RELAY_KEY,
-    true,
-  );
-  // Whether to ask the router to open the game port. Stored, and on by default,
-  // because it is the only evidence the ladder has. Without it a host behind a
-  // router is advertised at an address nobody has tested and the relay below is
-  // never reached.
-  const [checkRouter, setCheckRouter] = useSetting<boolean>(
-    OPEN_ROUTER_PORTS_KEY,
     true,
   );
   // Whether the battle this form was opened for has been opened. The port the
@@ -304,10 +295,9 @@ export function HostBattleForm({
 
           <ReachablePorts
             ports={battlePorts(port)}
-            help={`Asks your router to forward UDP ${port}, which is the port the engine hosts the game on. One port, because the lobby is somebody else's server and coilbox listens on nothing.`}
+            help={`Coilbox asks your router to forward UDP ${port}, the port the engine hosts the game on, and hands it back if you close this without hosting.`}
             onReport={setReachability}
-            enabled={checkRouter}
-            onEnabledChange={setCheckRouter}
+            always
           />
 
           {/* The bottom rung of the ladder, asked about next to the answer

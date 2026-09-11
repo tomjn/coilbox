@@ -20,11 +20,11 @@ import { type PortSpec, useReachablePorts } from "./useReachablePorts";
  * checked that anybody can reach it.
  *
  * Off by default in a LAN room, which needs none of it, and the join approval
- * toggle next to it is off for the same reason. The lobby hosting form turns it
- * on by default and holds the answer itself through `enabled`, because a battle
- * on a lobby server only works if the internet can reach the game port, and
- * without the check the relay is never reached either. That form hands the port
- * back when it is closed without hosting, so opening it to look costs nothing.
+ * toggle next to it is off for the same reason. The lobby hosting form has no
+ * toggle at all and checks through `always`, because a battle on a lobby server
+ * only works if the internet can reach the game port, and without the check the
+ * relay is never reached either. That form hands the port back when it is
+ * closed without hosting, so opening it to look costs nothing.
  *
  * The answer appears here rather than as a toast because failure is the normal
  * outcome and the way out of it is a set of instructions with two port numbers
@@ -38,8 +38,7 @@ export function ReachablePorts({
   ports,
   help,
   onReport,
-  enabled: enabledProp,
-  onEnabledChange,
+  always = false,
 }: {
   /** The ports to open, or null to close whatever is open. The caller builds
    *  this from its own port fields, so a host who moves their room takes the
@@ -55,28 +54,44 @@ export function ReachablePorts({
    *  Must keep the same identity between renders, or this notifies on every
    *  one. A `useState` setter is the intended argument. */
   onReport?: (report: DirectReachability | null) => void;
-  /** Whether the toggle is on, for a caller that keeps the answer itself. Left
-   *  out, the toggle holds its own and starts off. */
-  enabled?: boolean;
-  /** Hear the host change the toggle. Paired with `enabled`. */
-  onEnabledChange?: (enabled: boolean) => void;
+  /** Check without asking, and show no toggle. For a form with no reason not
+   *  to check, which is the lobby hosting form: a battle on a lobby server only
+   *  works if the internet can reach the game port, and the check is the only
+   *  evidence the route ladder has. Left out, the toggle is there and starts
+   *  off. */
+  always?: boolean;
 }) {
-  const [ownEnabled, setOwnEnabled] = useState(false);
-  const enabled = enabledProp ?? ownEnabled;
-  const setEnabled = onEnabledChange ?? setOwnEnabled;
+  const [ticked, setTicked] = useState(false);
+  const enabled = always || ticked;
   const net = useReachablePorts(enabled ? ports : null);
 
   useEffect(() => {
     onReport?.(net.report);
   }, [net.report, onReport]);
 
+  const answer = enabled && (
+    <Answer busy={net.busy} error={net.error} report={net.report} />
+  );
+
+  if (always) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <span className="flex flex-col gap-0.5 text-sm">
+          <span className="font-medium">Your router</span>
+          <span className="text-xs text-muted-foreground">{help}</span>
+        </span>
+        {answer}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-1.5">
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
       <label className="flex items-start gap-2 text-sm">
         <Checkbox
-          checked={enabled}
-          onCheckedChange={(checked) => setEnabled(checked === true)}
+          checked={ticked}
+          onCheckedChange={(checked) => setTicked(checked === true)}
           className="mt-0.5"
         />
         <span className="flex flex-col gap-0.5">
@@ -85,9 +100,8 @@ export function ReachablePorts({
         </span>
       </label>
 
-      {enabled && (
-        <Answer busy={net.busy} error={net.error} report={net.report} />
-      )}
+      {/* Indented under the checkbox's words, which are what it answers. */}
+      {answer && <div className="pl-6">{answer}</div>}
     </div>
   );
 }
@@ -107,7 +121,7 @@ function Answer({
 }) {
   if (busy || (!report && !error)) {
     return (
-      <p className="pl-6 text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Looking for a way in… This takes a few seconds, and longer when nothing
         is going to answer.
       </p>
@@ -117,7 +131,7 @@ function Answer({
     return (
       <p
         role="alert"
-        className="ml-6 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive"
+        className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive"
       >
         {error}
       </p>
@@ -130,7 +144,7 @@ function Answer({
   const address = joinAddress(report);
   return (
     <div
-      className={`ml-6 flex flex-col gap-1.5 rounded-md border p-2 text-xs ${
+      className={`flex flex-col gap-1.5 rounded-md border p-2 text-xs ${
         problem
           ? "border-destructive/50 bg-destructive/10 text-destructive"
           : "border-border bg-muted/40 text-muted-foreground"
