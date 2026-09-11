@@ -10,28 +10,17 @@
  * catch. So each test reads the battle that came out of the form, or the words
  * on screen, rather than the route the form worked out.
  *
- * Radix's popover, the content scan and the port opener are all stood in for.
+ * The content scan and the port opener are stood in for.
  * None of them is what is being asked about, and the port opener's stand-in is
  * how the router's refusal gets into the form, which is the only way to reach
  * the rung the preference sits on.
  */
 
-import { PersistentStoreProvider } from "@picoframe/frame";
+import { DrawerProvider, PersistentStoreProvider } from "@picoframe/frame";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DirectReachability } from "../../direct/reachability";
-import { HostBattlePopover, type OpenBattleArgs } from "./HostBattlePopover";
-
-vi.mock("@/components/ui/popover", () => ({
-  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
+import { HostBattleForm, type OpenBattleArgs } from "./HostBattleForm";
 
 vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({ value }: { value: string }) => <span>{value}</span>,
@@ -114,14 +103,14 @@ function form(relayAvailable = true) {
   const opened: OpenBattleArgs[] = [];
   render(
     <PersistentStoreProvider>
-      <HostBattlePopover
-        disabled={false}
-        relayAvailable={relayAvailable}
-        autoOpen
-        onHost={async (args) => {
-          opened.push(args);
-        }}
-      />
+      <DrawerProvider>
+        <HostBattleForm
+          relayAvailable={relayAvailable}
+          onHost={async (args) => {
+            opened.push(args);
+          }}
+        />
+      </DrawerProvider>
     </PersistentStoreProvider>,
   );
   fireEvent.click(screen.getByText("Pretend the router refused"));

@@ -42,10 +42,8 @@ import {
   type CreateLobbyArgs,
   CreateLobbyPopover,
 } from "../battles/CreateLobbyPopover";
-import {
-  HostBattlePopover,
-  type OpenBattleArgs,
-} from "../battles/HostBattlePopover";
+import { HostBattleButton } from "../battles/HostBattleButton";
+import type { OpenBattleArgs } from "../battles/HostBattleForm";
 import {
   HostZerokBattlePopover,
   type ZerokOpenBattleArgs,
@@ -478,7 +476,7 @@ function BattlesPage() {
         autoOpen={!!hostMap || !!hostDraft}
       />
     ) : (
-      <HostBattlePopover
+      <HostBattleButton
         disabled={!canJoin}
         relayAvailable={relayHostingAvailable(mirror.state)}
         onHost={onHost}

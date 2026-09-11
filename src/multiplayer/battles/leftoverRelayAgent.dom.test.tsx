@@ -20,12 +20,11 @@
  * and then refused again.
  */
 
-import { PersistentStoreProvider } from "@picoframe/frame";
+import { DrawerProvider, PersistentStoreProvider } from "@picoframe/frame";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DirectReachability } from "../../direct/reachability";
-import { HostBattlePopover } from "./HostBattlePopover";
+import { HostBattleForm } from "./HostBattleForm";
 import { type StopOutcome, stopOutcomeMessage } from "./LeftoverRelayAgent";
 
 const leftoverRelayAgent = vi.fn();
@@ -36,16 +35,6 @@ vi.mock("../bindings", () => ({
     leftoverRelayAgent(args),
   mpAskLeftoverRelayToStop: (args: Record<string, never>) =>
     askLeftoverRelayToStop(args),
-}));
-
-vi.mock("@/components/ui/popover", () => ({
-  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
 }));
 
 vi.mock("@/components/OptionSelect", () => ({
@@ -112,14 +101,14 @@ function aRefusedRelayedAttempt(
 ) {
   render(
     <PersistentStoreProvider>
-      <HostBattlePopover
-        disabled={false}
-        relayAvailable
-        autoOpen
-        onHost={async () => {
-          throw new Error(refusal);
-        }}
-      />
+      <DrawerProvider>
+        <HostBattleForm
+          relayAvailable
+          onHost={async () => {
+            throw new Error(refusal);
+          }}
+        />
+      </DrawerProvider>
     </PersistentStoreProvider>,
   );
   fireEvent.click(screen.getByText("Pretend the router refused"));
@@ -224,14 +213,14 @@ describe("a relay agent left over from a previous session", () => {
   it("does not look for one when the battle was not going through the relay", async () => {
     render(
       <PersistentStoreProvider>
-        <HostBattlePopover
-          disabled={false}
-          relayAvailable
-          autoOpen
-          onHost={async () => {
-            throw new Error("the lobby refused the battle");
-          }}
-        />
+        <DrawerProvider>
+          <HostBattleForm
+            relayAvailable
+            onHost={async () => {
+              throw new Error("the lobby refused the battle");
+            }}
+          />
+        </DrawerProvider>
       </PersistentStoreProvider>,
     );
     // No router report, so the route is still the direct one.

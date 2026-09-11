@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   DEFAULT_HOST_PORT,
   type OpenBattleArgs,
-} from "../multiplayer/battles/HostBattlePopover";
+} from "../multiplayer/battles/HostBattleForm";
 import {
   hashFailureMessage,
   useHostContent,
