@@ -9,6 +9,15 @@
 //! (`rts/Rendering/Models/AssParser.cpp`), so what comes back here is what the
 //! engine draws. Where this deliberately differs from the engine, the reason is
 //! written at the point it happens.
+//!
+//! # Transforms are baked
+//!
+//! A node in these formats carries a full transform, and a Spring piece carries
+//! a position and nothing else. So each node's rotation and scale are applied to
+//! its own vertices here, leaving every [`Piece::offset`] a plain translation.
+//! Without that, a model whose pieces are rotated draws with every one of them
+//! straight: 24 of flove's 27 models turned out to carry a rotation, so this is
+//! the common case rather than an exotic one.
 
 use russimp::material::{PropertyTypeInfo, TextureType};
 use russimp::node::Node;
@@ -61,7 +70,11 @@ pub struct Vertex {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Piece {
     pub name: String,
-    /// Translation from the parent piece, taken from the node's own transform.
+    /// Translation from the parent piece.
+    ///
+    /// Only a translation, because that is all a Spring piece can hold. The
+    /// node's rotation and scale live in this piece's vertices instead, and the
+    /// parent's are already applied to this offset.
     pub offset: [f32; 3],
     pub meshes: Vec<Mesh>,
     pub children: Vec<Piece>,
@@ -105,8 +118,7 @@ pub fn read(bytes: &[u8], hint: &str) -> Result<Model, String> {
         .as_ref()
         .ok_or_else(|| "the file parsed but holds no nodes".to_string())?;
 
-    let meshes: Vec<Mesh> = scene.meshes.iter().map(mesh_of).collect();
-    let mut piece = piece_of(root, &meshes);
+    let mut piece = walk(root, &IDENTITY, [0.0; 3], &scene.meshes);
     // Assimp's own root node carries the file's overall transform. The engine
     // treats that node as the model root rather than shifting the model by it,
     // so its offset stays where it is and every child stays relative to it.
@@ -155,22 +167,127 @@ fn import_flags() -> Vec<PostProcess> {
     ]
 }
 
-fn mesh_of(m: &russimp::mesh::Mesh) -> Mesh {
+/// A transform as Assimp hands it over: row major, translation in the fourth
+/// column. Kept in that layout rather than converted, so the field names in
+/// Assimp's own documentation still describe it.
+type Mat4 = [[f32; 4]; 4];
+
+const IDENTITY: Mat4 = [
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+];
+
+/// The 3x3 identity, row major, as [`linear_part`] returns one.
+const IDENTITY_LINEAR: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+
+fn mat4_of(m: &russimp::Matrix4x4) -> Mat4 {
+    [
+        [m.a1, m.a2, m.a3, m.a4],
+        [m.b1, m.b2, m.b3, m.b4],
+        [m.c1, m.c2, m.c3, m.c4],
+        [m.d1, m.d2, m.d3, m.d4],
+    ]
+}
+
+fn multiply(a: &Mat4, b: &Mat4) -> Mat4 {
+    let mut out = [[0.0f32; 4]; 4];
+    for (i, row) in out.iter_mut().enumerate() {
+        for (j, cell) in row.iter_mut().enumerate() {
+            *cell = (0..4).map(|k| a[i][k] * b[k][j]).sum();
+        }
+    }
+    out
+}
+
+/// A transform's rotation and scale without its translation, row major.
+fn linear_part(m: &Mat4) -> [f32; 9] {
+    [
+        m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2],
+    ]
+}
+
+fn apply(m: &[f32; 9], v: [f32; 3]) -> [f32; 3] {
+    [
+        m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+        m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+        m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+    ]
+}
+
+fn determinant(m: &[f32; 9]) -> f32 {
+    m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6])
+        + m[2] * (m[3] * m[7] - m[4] * m[6])
+}
+
+/// The matrix a normal goes through, which is the inverse transpose of the one
+/// a position goes through, because a non-uniform scale skews a normal if the
+/// position's matrix is applied to it directly.
+///
+/// This is the cofactor matrix over the determinant, which is the inverse
+/// transpose in one step. A node scaled flat to nothing has no inverse, and its
+/// normals are left alone rather than turned into infinities.
+fn inverse_transpose(m: &[f32; 9]) -> [f32; 9] {
+    let det = determinant(m);
+    if det.abs() < f32::EPSILON {
+        return *m;
+    }
+    let inv = 1.0 / det;
+    [
+        (m[4] * m[8] - m[5] * m[7]) * inv,
+        -(m[3] * m[8] - m[5] * m[6]) * inv,
+        (m[3] * m[7] - m[4] * m[6]) * inv,
+        -(m[1] * m[8] - m[2] * m[7]) * inv,
+        (m[0] * m[8] - m[2] * m[6]) * inv,
+        -(m[0] * m[7] - m[1] * m[6]) * inv,
+        (m[1] * m[5] - m[2] * m[4]) * inv,
+        -(m[0] * m[5] - m[2] * m[3]) * inv,
+        (m[0] * m[4] - m[1] * m[3]) * inv,
+    ]
+}
+
+fn normalise(v: [f32; 3]) -> [f32; 3] {
+    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if length > 0.0 {
+        [v[0] / length, v[1] / length, v[2] / length]
+    } else {
+        v
+    }
+}
+
+fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9]) -> Mesh {
     let uvs = m.texture_coords.first().and_then(|c| c.as_ref());
+    let normal_matrix = inverse_transpose(linear);
+    // An untransformed node's vertices are copied rather than recomputed, so a
+    // normal that is not quite unit length is left as the file wrote it instead
+    // of being changed for no reason.
+    let plain = *linear == IDENTITY_LINEAR;
     let vertices = m
         .vertices
         .iter()
         .enumerate()
         .map(|(i, v)| Vertex {
-            pos: [v.x, v.y, v.z],
+            pos: if plain {
+                [v.x, v.y, v.z]
+            } else {
+                apply(linear, [v.x, v.y, v.z])
+            },
             // `GenerateSmoothNormals` fills these in when the file has none, so
             // a missing normal here means the mesh had no vertex at all to
             // generate one from. Straight up matches the engine's own fallback.
-            normal: m
-                .normals
-                .get(i)
-                .map(|n| [n.x, n.y, n.z])
-                .unwrap_or([0.0, 1.0, 0.0]),
+            normal: {
+                let n = m
+                    .normals
+                    .get(i)
+                    .map(|n| [n.x, n.y, n.z])
+                    .unwrap_or([0.0, 1.0, 0.0]);
+                if plain {
+                    n
+                } else {
+                    normalise(apply(&normal_matrix, n))
+                }
+            },
             uv: uvs
                 .and_then(|c| c.get(i))
                 .map(|t| [t.x, t.y])
@@ -180,32 +297,62 @@ fn mesh_of(m: &russimp::mesh::Mesh) -> Mesh {
     // Faces that are not triangles are dropped rather than repaired, which is
     // what the engine does. `Triangulate` and `SortByPrimitiveType` mean the
     // only things left to drop are lines and points.
+    // A mirroring transform turns every triangle inside out, so the winding is
+    // reversed to match. Without it the piece draws back to front, and is lit
+    // from inside.
+    let mirrored = determinant(linear) < 0.0;
     let indices = m
         .faces
         .iter()
         .filter(|f| f.0.len() == 3)
-        .flat_map(|f| f.0.iter().copied())
+        .flat_map(|f| {
+            if mirrored {
+                [f.0[0], f.0[2], f.0[1]]
+            } else {
+                [f.0[0], f.0[1], f.0[2]]
+            }
+        })
         .collect();
     Mesh { vertices, indices }
 }
 
-fn piece_of(node: &Rc<Node>, meshes: &[Mesh]) -> Piece {
-    let t = node.transformation;
+/// Flatten one node and everything under it.
+///
+/// `parent_world` carries every transform above this node, so the rotation and
+/// scale baked into a mesh here are the ones it is actually drawn with rather
+/// than only its own. A mesh named by two nodes is built twice for that reason,
+/// once per node, since each may sit under a different transform.
+fn walk(
+    node: &Rc<Node>,
+    parent_world: &Mat4,
+    parent_translation: [f32; 3],
+    scene_meshes: &[russimp::mesh::Mesh],
+) -> Piece {
+    let world = multiply(parent_world, &mat4_of(&node.transformation));
+    // Row major, so the translation is the fourth column.
+    let translation = [world[0][3], world[1][3], world[2][3]];
+    let linear = linear_part(&world);
     Piece {
         name: node.name.clone(),
-        // Assimp's matrix is row major, so the translation is the fourth
-        // column: a4, b4, c4.
-        offset: [t.a4, t.b4, t.c4],
+        // Both translations are in model space, so their difference is where
+        // this piece sits relative to its parent, with the parent's own
+        // rotation already accounted for.
+        offset: [
+            translation[0] - parent_translation[0],
+            translation[1] - parent_translation[1],
+            translation[2] - parent_translation[2],
+        ],
         meshes: node
             .meshes
             .iter()
-            .filter_map(|i| meshes.get(*i as usize).cloned())
+            .filter_map(|i| scene_meshes.get(*i as usize))
+            .map(|m| mesh_of(m, &linear))
             .collect(),
         children: node
             .children
             .borrow()
             .iter()
-            .map(|c| piece_of(c, meshes))
+            .map(|c| walk(c, &world, translation, scene_meshes))
             .collect(),
     }
 }
