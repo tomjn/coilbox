@@ -20,6 +20,7 @@
 //! Registered as `"coilbox-lego"`, so the frontend invokes
 //! `plugin:coilbox-lego|<cmd>`.
 
+mod assimp;
 mod geometry;
 mod glb;
 mod import;
@@ -1100,6 +1101,143 @@ async fn lego_read_3do(path: String) -> CliResult {
         }
     }
     CliResult::ok(json!({ "textures": names }))
+}
+
+/// The extension a model file carries, lower cased, which is the hint Assimp
+/// takes to pick an importer.
+fn model_extension(path: &std::path::Path) -> String {
+    path.extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default()
+}
+
+/// `lego_read_dae` names the textures one of the Assimp formats asks for,
+/// before anything imports it.
+///
+/// The pair to `lego_read_3do`, and it exists for the same reason: a model
+/// unpacked out of a packed archive needs its textures put beside it before the
+/// import goes looking for them. Where the other two probes read the model
+/// itself, this mostly reads the Lua file beside it, because a Collada file
+/// carries no Spring texture binding of its own.
+///
+/// Both sources are reported rather than only the winning one. Staging a
+/// texture that turns out not to be used costs one extracted file, and staging
+/// none because the guess was wrong costs the unit its picture.
+#[tauri::command]
+async fn lego_read_dae(path: String) -> CliResult {
+    let file = PathBuf::from(&path);
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let model = match coilbox_assimp::read(&bytes, &model_extension(&file)) {
+        Ok(model) => model,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let meta = match assimp::metafile_textures(&file) {
+        Ok(meta) => meta,
+        Err(e) => return CliResult::err(e),
+    };
+    let mut names = meta.named();
+    if let Some(from_material) = model.material_texture {
+        if !from_material.trim().is_empty() && !names.contains(&from_material) {
+            names.push(from_material);
+        }
+    }
+    CliResult::ok(json!({ "textures": names }))
+}
+
+/// `lego_import_dae` imports one of the formats the engine loads through
+/// Assimp, as raw geometry.
+///
+/// Its own command rather than a branch inside `lego_import_s3o` for the same
+/// reason a `.3do` has one: opening it is a conversion. What it converts is
+/// smaller though, because the reader already produces triangles with a normal
+/// and a coordinate per vertex, and a piece tree carrying only translations.
+///
+/// The texture comes from the Lua file beside the model where there is one, and
+/// from the model's own material where there is not. That is the engine's own
+/// order of preference, with the metafile winning, and it matters because
+/// Collada names no texture in the model at all.
+#[tauri::command]
+async fn lego_import_dae<R: Runtime>(app: AppHandle<R>, path: String, id: String) -> CliResult {
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    let file = PathBuf::from(&path);
+    let size = match std::fs::metadata(&file) {
+        Ok(meta) => meta.len(),
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    if size > MAX_MODEL_BYTES {
+        return CliResult::err(format!(
+            "{path} is {size} bytes, which is far larger than any unit model"
+        ));
+    }
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let model = match coilbox_assimp::read(&bytes, &model_extension(&file)) {
+        Ok(model) => model,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let meta = match assimp::metafile_textures(&file) {
+        Ok(meta) => meta,
+        Err(e) => return CliResult::err(e),
+    };
+    let tex1 = if meta.tex1.is_empty() {
+        model.material_texture.clone().unwrap_or_default()
+    } else {
+        meta.tex1.clone()
+    };
+
+    let converted = assimp::to_s3o(&model, &tex1, &meta.tex2);
+    let imported = match import::import(&converted) {
+        Ok(imported) => imported,
+        Err(e) => return CliResult::err(e),
+    };
+    if imported.meshes == 0 {
+        return CliResult::err(format!(
+            "{path} has no geometry in it, so there is nothing to import."
+        ));
+    }
+
+    let base = match lego_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    let geometry = base.join("geometry");
+    if let Err(e) = std::fs::create_dir_all(&geometry) {
+        return CliResult::err(format!("could not create the geometry folder: {e}"));
+    }
+    if let Err(e) = std::fs::write(geometry.join(format!("{id}.bin.gz")), &imported.blob) {
+        return CliResult::err(format!("could not store the geometry: {e}"));
+    }
+
+    let store = base.join("textures");
+    let out = json!({
+        "radius": converted.radius,
+        "height": converted.height,
+        "mid": converted.mid,
+        "root": imported.root,
+        "texture": import_texture(&store, &file, &tex1),
+        "texture2": import_texture(&store, &file, &meta.tex2),
+        "meshes": imported.meshes,
+        "vertices": imported.vertices,
+        "triangles": imported.triangles,
+        "converted": imported.converted,
+        "bytes": imported.blob.len(),
+        // What the format can hold and a Spring model cannot, counted by the
+        // reader so this can say it rather than lose it quietly.
+        "transformed": model.notes.transformed,
+        "droppedFaces": model.notes.dropped_faces,
+        "imagesUsed": model.notes.materials,
+    });
+    match serde_json::to_value(out) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not describe {path}: {e}")),
+    }
 }
 
 /// `lego_import_3do` imports a `.3do`, the older model format, as raw geometry.
@@ -2475,6 +2613,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_read_3do,
             lego_import_3do,
             lego_import_glb,
+            lego_read_dae,
+            lego_import_dae,
             lego_texture_import,
             lego_texture_png,
             lego_texture_prune,

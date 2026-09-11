@@ -28,6 +28,11 @@ coilbox-3do-convert = { path = "../coilbox-3do-convert" }
 # Playing a unit's own script in the viewport: the runtime lives beside the
 # config evaluator, in the crate that already carries Lua.
 coilbox-springlua = { path = "../coilbox-springlua" }
+# The five formats the engine loads through Assimp, so a game's Collada models
+# can be opened here the way a `.3do` is. Unlike the readers above it builds
+# Assimp's C++ statically, which is why the workspace pins its binding to a git
+# commit and sets a C flag for it.
+coilbox-assimp = { path = "../coilbox-assimp" }
 # Imported geometry ships gzipped, the same as the parts pack's blob, which the
 # frontend already inflates with fflate.
 flate2 = "1"
