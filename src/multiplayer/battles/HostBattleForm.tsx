@@ -316,8 +316,8 @@ export function HostBattleForm({
             ports={relayAlways ? null : battlePorts(port)}
             help={
               relayAlways
-                ? "Not asked, because every battle you host goes through the server's relay."
-                : `Coilbox asks your router to forward UDP ${port}, the port the engine hosts the game on, and hands it back if you close this without hosting.`
+                ? "Not checked, because every battle you host goes through the server's relay."
+                : undefined
             }
             onReport={setReachability}
             always

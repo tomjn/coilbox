@@ -227,14 +227,6 @@ export function methodLabel(method: DirectReachability["method"]): string {
   return method === "natPmp" ? "NAT-PMP" : "UPnP";
 }
 
-/** Every port that has to be forwarded by hand, as "TCP 8200" and "UDP 8452".
- *  Pure. */
-export function portList(ports: DirectPort[]): string {
-  return ports
-    .map((p) => `${p.transport.toUpperCase()} ${p.port}`)
-    .join(" and ");
-}
-
 /** How the outcome should read. */
 export type ReachabilityState =
   | "direct"
@@ -269,82 +261,6 @@ export function reachabilityState(
   if (report.method === null) return "refused";
   if (!report.publicAddress) return "noAddress";
   return "open";
-}
-
-/**
- * The headline the host reads. Pure.
- *
- * Leads with what happened rather than with what was tried, and never says
- * "reachable" about a mapping that is sitting behind the ISP's own NAT.
- *
- * The direct one names the address instead of the ports, because there are no
- * ports to name and the address is the fact that proves the rest of the
- * sentence. It says nothing about the router: this host has none to speak of,
- * and the old wording blamed one that was never there.
- *
- * The refused one names no router either, and for a weaker reason: coilbox does
- * not know whether there is one. What it observed is that two requests to open a
- * port went unanswered, which is what a router with UPnP switched off looks like
- * and equally what a cloud instance behind its provider's one to one NAT looks
- * like. Saying "your router would not" asserted a cause and a device, and the
- * cloud host has neither (issue #2114).
- */
-export function reachabilityHeadline(report: DirectReachability): string {
-  switch (reachabilityState(report)) {
-    case "direct":
-      return `Open. This machine is on the internet at ${report.publicAddress}, so there was nothing to forward.`;
-    case "open":
-      return `Open. ${methodLabel(report.method)} forwarded ${portList(report.ports)}.`;
-    case "doubleNat":
-      return "Your router opened the ports, but your internet provider is between you and the internet, so nobody outside can reach you.";
-    case "noAddress":
-      return `${methodLabel(report.method)} forwarded ${portList(report.ports)}, but nothing on the internet would say what your address is.`;
-    case "refused":
-      return "Nothing would open the ports.";
-  }
-}
-
-/**
- * What to do about it, in one sentence, or null when there is nothing to do.
- * Pure.
- *
- * `forwardTo` is the address a router's port forwarding page asks for, which is
- * this machine on its own network rather than the address anybody outside sees.
- *
- * The refused case has two readers and cannot tell which one is reading. One is
- * behind a home router with UPnP switched off, and every word about UPnP is for
- * them. The other is on a cloud instance whose public address the provider
- * translates one to one, so no gateway exists to have answered, and the thing
- * that decides whether anybody can reach them is a firewall rule in a browser
- * (issue #2114). Nothing coilbox can measure separates the two: the reflexive
- * port survives a one to one NAT, but plenty of home routers preserve the source
- * port as well, so a guess would send home users to a console they have not got.
- * Both are named instead, the home router first because that is most people.
- */
-export function reachabilityAdvice(report: DirectReachability): string | null {
-  const to = report.lanAddress ? ` to ${report.lanAddress}` : "";
-  const ports = portList(report.wanted);
-  switch (reachabilityState(report)) {
-    // Both of the ways of being reachable. There is nothing to do about good
-    // news, and a host who is already on the internet is the one who most needs
-    // to be left alone: every word of the refusal advice below is a router
-    // setting, and they have no router to set it on.
-    case "direct":
-    case "open":
-      return null;
-    case "doubleNat":
-      return `This is carrier grade NAT and no setting on your router fixes it. Ask your provider for a public address, or play on a lobby server instead.${
-        report.routerAddress
-          ? ` Your router's own address is ${report.routerAddress}, which is not one the internet routes to.`
-          : ""
-      }`;
-    case "noAddress":
-      return `The ports are open. Find your public address another way and send it with the port, or on this network use ${
-        report.lanAddress ?? "your local address"
-      }.`;
-    case "refused":
-      return `Whatever is between this machine and the internet has to let ${ports} through${to}. On a home router, turn on UPnP or NAT-PMP and try again, or forward the ports by hand. On a cloud instance there is no router to set, so open them in the provider's firewall or security group.`;
-  }
 }
 
 /**

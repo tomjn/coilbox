@@ -6,9 +6,6 @@ import {
   isReachabilityProblem,
   isReachable,
   joinAddress,
-  portList,
-  reachabilityAdvice,
-  reachabilityHeadline,
   reachabilityState,
   roomPorts,
 } from "./reachability";
@@ -312,127 +309,6 @@ describe("isReachable", () => {
   // one and is reachable anyway.
   it("counts a machine on its own public address as reachable", () => {
     expect(isReachable(onPublicAddress())).toBe(true);
-  });
-});
-
-describe("portList", () => {
-  it("names the transport with the number, because a router asks for both", () => {
-    expect(
-      portList([
-        { port: 8200, externalPort: 8200, transport: "tcp" },
-        { port: 8452, externalPort: 8452, transport: "udp" },
-      ]),
-    ).toBe("TCP 8200 and UDP 8452");
-  });
-
-  it("reads properly with one port", () => {
-    expect(
-      portList([{ port: 8452, externalPort: 8452, transport: "udp" }]),
-    ).toBe("UDP 8452");
-  });
-});
-
-describe("reachabilityHeadline", () => {
-  it("names the protocol that worked and the ports it opened", () => {
-    expect(reachabilityHeadline(opened())).toBe(
-      "Open. UPnP forwarded TCP 8200 and UDP 8452.",
-    );
-    expect(reachabilityHeadline(opened({ method: "natPmp" }))).toContain(
-      "NAT-PMP",
-    );
-  });
-
-  it("does not call a double NAT open", () => {
-    const said = reachabilityHeadline(opened({ doubleNat: true }));
-    expect(said).not.toContain("Open.");
-    expect(said).toContain("nobody outside can reach you");
-  });
-
-  // Two hosts, one report. Coilbox observed that nothing opened the ports and
-  // did not observe a router, so the headline says the first and not the second
-  // (issue #2114).
-  it("says nothing opened the ports rather than naming a device it did not find", () => {
-    expect(reachabilityHeadline(report())).toBe(
-      "Nothing would open the ports.",
-    );
-    expect(reachabilityHeadline(onCloudInstance())).toBe(
-      "Nothing would open the ports.",
-    );
-  });
-
-  it("tells a machine on its own public address that it is already reachable", () => {
-    expect(reachabilityHeadline(onPublicAddress())).toBe(
-      "Open. This machine is on the internet at 209.35.91.246, so there was nothing to forward.",
-    );
-  });
-
-  it("does not blame the router of a host who has none", () => {
-    expect(reachabilityHeadline(onPublicAddress())).not.toContain("router");
-  });
-});
-
-describe("reachabilityAdvice", () => {
-  // The failure path is the one most people hit, and both port numbers plus the
-  // address to forward to are what makes it actionable.
-  it("names both ports and the machine to forward them to", () => {
-    const said = reachabilityAdvice(report());
-    expect(said).toContain("TCP 8200 and UDP 8452");
-    expect(said).toContain("192.168.1.45");
-    expect(said).toContain("UPnP or NAT-PMP");
-  });
-
-  /**
-   * The issue. Two hosts read this one sentence and coilbox cannot tell them
-   * apart, so it has to be true for both (issue #2114).
-   *
-   * The home host's way out is UPnP or a forwarding page. The cloud host's is a
-   * firewall rule in their provider's console, and every word of the old advice
-   * was a router setting they have not got. The reports are identical, so the
-   * advice names both rather than picking one and being wrong about half of
-   * them.
-   */
-  it("names the cloud firewall as well as the router setting, since it cannot tell which host is reading", () => {
-    const said = reachabilityAdvice(onCloudInstance()) ?? "";
-    expect(said).toContain("UPnP or NAT-PMP");
-    expect(said).toContain("firewall or security group");
-    expect(said).toContain("TCP 8200 and UDP 8452");
-    // And the identical report from a home connection reads the same, which is
-    // the whole reason this wording exists.
-    expect(reachabilityAdvice(report({ lanAddress: "172.31.14.9" }))).toBe(
-      said,
-    );
-  });
-
-  // A machine on no network at all still gets instructions worth reading.
-  it("leaves out the address when this machine is on no network", () => {
-    const said = reachabilityAdvice(report({ lanAddress: null }));
-    expect(said).toContain("TCP 8200 and UDP 8452");
-    expect(said).not.toContain("undefined");
-    expect(said).not.toContain("null");
-  });
-
-  it("says a double NAT is not fixable on the router", () => {
-    const said = reachabilityAdvice(
-      opened({ doubleNat: true, routerAddress: "100.88.1.2" }),
-    );
-    expect(said).toContain("carrier grade NAT");
-    expect(said).toContain("100.88.1.2");
-  });
-
-  it("points an open port with no known address at the local one", () => {
-    expect(reachabilityAdvice(opened({ publicAddress: null }))).toContain(
-      "192.168.1.45",
-    );
-  });
-
-  it("has nothing to advise when everything worked", () => {
-    expect(reachabilityAdvice(opened())).toBeNull();
-  });
-
-  // The point of the issue: every word of the refusal advice is a router
-  // setting, and this host has no router to set it on.
-  it("asks a machine on its own public address to change nothing", () => {
-    expect(reachabilityAdvice(onPublicAddress())).toBeNull();
   });
 });
 

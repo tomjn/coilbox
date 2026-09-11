@@ -1,13 +1,26 @@
-import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  Info,
+  Loader2,
+} from "lucide-react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import { CopyButton } from "./CopyButton";
 import {
   type DirectReachability,
+  type DirectTransport,
   isReachabilityProblem,
   joinAddress,
-  reachabilityAdvice,
-  reachabilityHeadline,
+  methodLabel,
+  reachabilityState,
 } from "./reachability";
 import { type PortSpec, useReachablePorts } from "./useReachablePorts";
 
@@ -48,8 +61,9 @@ export function ReachablePorts({
    *  mapping with them. */
   ports: PortSpec[] | null;
   /** What ticking this does, in the caller's own terms. The two host paths open
-   *  a different number of ports for different reasons. */
-  help: string;
+   *  a different number of ports for different reasons. With `always` there is
+   *  nothing to tick, so it is only for a note the card cannot give. */
+  help?: string;
   /** Hear what the router and the internet said, so the form above can pick a
    *  hosting route from it (issue #2020). Null while this is switched off,
    *  which is a route decision in its own right: nothing was measured.
@@ -96,16 +110,15 @@ export function ReachablePorts({
       error={net.error}
       report={net.report}
       relayWillCarry={relayWillCarry}
+      asked={ports}
     />
   );
 
   if (always) {
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="flex flex-col gap-0.5 text-sm">
-          <span className="font-medium">Your router</span>
-          <span className="text-xs text-muted-foreground">{help}</span>
-        </span>
+        <span className="text-sm font-medium">Game port</span>
+        {help && <span className="text-xs text-muted-foreground">{help}</span>}
         {answer}
       </div>
     );
@@ -132,49 +145,52 @@ export function ReachablePorts({
   );
 }
 
-/** What the router and the internet said. Five outcomes, and the way out of the
- *  three that are not success. A host who was already on the internet is one of
- *  the other two, and is told so rather than being sent to a router that is not
- *  there (issue #2054). */
+/**
+ * What the check found, as one card: a verdict that reads at a glance, the one
+ * thing to do about it when there is something, and the router's own reply
+ * folded away for whoever is writing a bug report.
+ *
+ * The verdict never names a router as the cause of a refusal. Coilbox saw two
+ * requests go unanswered, which is also what a machine with no router at all
+ * looks like (issue #2114). A machine on its own public address is told it can
+ * be reached without a word about routers, because it has none (issue #2054).
+ */
 function Answer({
   busy,
   error,
   report,
   relayWillCarry,
+  asked,
 }: {
   busy: boolean;
   error: string | null;
   report: DirectReachability | null;
   relayWillCarry: boolean;
+  /** The ports being asked for, named while the check runs. */
+  asked: PortSpec[] | null;
 }) {
-  // Every state sits in the same card, looking included, so the panel keeps
-  // its shape from the moment it starts to the moment it has an answer, and the
-  // answer arrives where the host is already looking.
-  const card = "flex flex-col gap-1.5 rounded-md border p-2 text-xs";
-  const quiet = "border-border bg-muted/40 text-muted-foreground";
-  const alarm = "border-destructive/50 bg-destructive/10 text-destructive";
-
   if (busy || (!report && !error)) {
     return (
-      <div role="status" className={`${card} ${quiet}`}>
-        <span className="flex items-center gap-1.5 font-medium">
-          <Loader2
-            className="size-3.5 shrink-0 motion-safe:animate-spin"
-            aria-hidden
-          />
-          Looking for a way in…
-        </span>
-        <span>
-          This takes a few seconds, and longer when nothing is going to answer.
-        </span>
-      </div>
+      <Card tone="quiet" role="status">
+        <Verdict
+          icon={
+            <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" />
+          }
+        >
+          Asking your router to open{" "}
+          {asked && asked.length > 0 ? <Ports ports={asked} /> : "the ports"}…
+        </Verdict>
+      </Card>
     );
   }
   if (error) {
     return (
-      <p role="alert" className={`${card} ${alarm}`}>
-        {error}
-      </p>
+      <Card tone="alarm" role="alert">
+        <Verdict icon={<CircleX className="size-3.5 shrink-0" />}>
+          Could not check your router
+        </Verdict>
+        <Details lines={[error]} />
+      </Card>
     );
   }
   if (!report) return null;
@@ -183,23 +199,230 @@ function Answer({
   // Still a problem, and still explained, but not a fault to draw in red when
   // the relay is about to carry the battle anyway.
   const alarming = problem && !relayWillCarry;
-  const advice = reachabilityAdvice(report);
   const address = joinAddress(report);
+  const said = readout(report);
+  // The router's own words, only under an outcome they explain. A host already
+  // on the internet has "no UPnP gateway answered" against their name because
+  // there is no gateway to answer, and that reads as a fault they have not got.
+  const lines = [
+    ...said.more,
+    ...(problem && report.problem ? [report.problem] : []),
+  ];
+  const icon = !problem ? (
+    <CircleCheck className="size-3.5 shrink-0 text-emerald-500" />
+  ) : alarming ? (
+    <CircleX className="size-3.5 shrink-0" />
+  ) : (
+    <Info className="size-3.5 shrink-0" />
+  );
+
   return (
-    <div className={`${card} ${alarming ? alarm : quiet}`}>
-      <span className="font-medium">{reachabilityHeadline(report)}</span>
-      {address && <CopyableAddress address={address} />}
-      {advice && <span>{advice}</span>}
-      {/* The router's own words, kept but not led with. They are the only thing
-          that helps when the plain English above does not, and they are also
-          the only thing a bug report can be written from. Only under an outcome
-          they explain: a host already on the internet has "no UPnP gateway
-          answered" against their name because there is no gateway to answer,
-          and under "Open." that reads as a fault they have not got. */}
-      {problem && report.problem && (
-        <span className="opacity-70">{report.problem}</span>
+    <Card tone={alarming ? "alarm" : "quiet"}>
+      <Verdict icon={icon} strong={!alarming}>
+        {said.title}
+      </Verdict>
+      {said.note && <span className="pl-5">{said.note}</span>}
+      {address && (
+        <span className="pl-5">
+          <CopyableAddress address={address} />
+        </span>
       )}
+      {said.fix && <span className="pl-5">{said.fix}</span>}
+      <Details lines={lines} />
+    </Card>
+  );
+}
+
+/** What one outcome says: the verdict, a line under it, what to do, and what
+ *  goes behind Details. Pure. */
+function readout(report: DirectReachability): {
+  title: ReactNode;
+  note?: ReactNode;
+  fix?: ReactNode;
+  more: string[];
+} {
+  const lan = report.lanAddress;
+  switch (reachabilityState(report)) {
+    case "direct":
+      return {
+        title: "Players can reach you",
+        note: "This machine is on the internet under its own address.",
+        more: [],
+      };
+    case "open":
+      return {
+        title: "Players can reach you",
+        note: (
+          <>
+            {methodLabel(report.method)} opened <Ports ports={report.ports} />.
+          </>
+        ),
+        more: [],
+      };
+    case "noAddress":
+      return {
+        title: (
+          <>
+            <Ports ports={report.ports} /> {isOrAre(report.ports)} open
+          </>
+        ),
+        note: "No server would say what your public address is.",
+        fix: lan ? (
+          <>
+            Find it another way, or on this network use <Code>{lan}</Code>.
+          </>
+        ) : (
+          "Find it another way to share it."
+        ),
+        more: [],
+      };
+    case "doubleNat":
+      return {
+        title: "Your internet provider blocks the way in",
+        note: (
+          <>
+            Your router opened <Ports ports={report.ports} />, but your
+            provider's own NAT sits in front of it.
+          </>
+        ),
+        fix: "No router setting fixes this. Ask your provider for a public address.",
+        more: report.routerAddress
+          ? [
+              `Your router's own address is ${report.routerAddress}, which the internet does not route to.`,
+            ]
+          : [],
+      };
+    case "refused":
+      return {
+        title: (
+          <>
+            <Ports ports={report.wanted} />{" "}
+            {report.wanted.length > 1 ? "aren't" : "isn't"} open
+          </>
+        ),
+        fix: (
+          <>
+            Turn on UPnP or NAT-PMP in your router, or forward{" "}
+            <Ports ports={report.wanted} />
+            {lan ? (
+              <>
+                {" "}
+                to <Code>{lan}</Code>
+              </>
+            ) : (
+              " by hand"
+            )}
+            .
+          </>
+        ),
+        // Folded away rather than said to everybody. Coilbox is a desktop app
+        // and a cloud server is a rare place to run it, but its report reads
+        // exactly like a home router with UPnP off (issue #2114).
+        more: [
+          "On a cloud server there is no router, so open the port in the provider's firewall instead.",
+        ],
+      };
+  }
+}
+
+function isOrAre(ports: { port: number }[]): string {
+  return ports.length > 1 ? "are" : "is";
+}
+
+/** The card every state sits in, looking included, so the panel keeps its shape
+ *  from the moment it starts to the moment it has an answer. */
+function Card({
+  tone,
+  role,
+  children,
+}: {
+  tone: "quiet" | "alarm";
+  role?: "status" | "alert";
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role={role}
+      className={cn(
+        "flex flex-col gap-1.5 rounded-md border p-2.5 text-xs",
+        tone === "alarm"
+          ? "border-destructive/50 bg-destructive/10 text-destructive"
+          : "border-border bg-muted/40 text-muted-foreground",
+      )}
+    >
+      {children}
     </div>
+  );
+}
+
+/** The one line to read first. Everything under it lines up with its words,
+ *  not its icon. */
+function Verdict({
+  icon,
+  strong = true,
+  children,
+}: {
+  icon: ReactNode;
+  /** Drawn in the foreground colour, which a red card overrides. */
+  strong?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-1.5 text-sm font-medium",
+        strong && "text-foreground",
+      )}
+    >
+      <span aria-hidden className="contents">
+        {icon}
+      </span>
+      <span>{children}</span>
+    </span>
+  );
+}
+
+/** Ports as a router's settings page names them, each one set as code. */
+function Ports({
+  ports,
+}: {
+  ports: { port: number; transport: DirectTransport }[];
+}) {
+  return ports.map((p, i) => (
+    <Fragment key={`${p.transport}-${p.port}`}>
+      {i > 0 && " and "}
+      <Code>{`${p.transport.toUpperCase()} ${p.port}`}</Code>
+    </Fragment>
+  ));
+}
+
+function Code({ children }: { children: ReactNode }) {
+  return (
+    <code className="rounded bg-background px-1 py-px font-mono text-foreground">
+      {children}
+    </code>
+  );
+}
+
+/** What only a bug report needs, one press from view. Nothing at all when there
+ *  is nothing to show. */
+function Details({ lines }: { lines: string[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <Collapsible className="pl-5">
+      <CollapsibleTrigger className="group flex items-center gap-1 opacity-80 hover:opacity-100">
+        <ChevronRight
+          aria-hidden
+          className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
+        />
+        Details
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1 flex flex-col gap-1 font-mono text-[11px] opacity-80">
+        {lines.map((line) => (
+          <span key={line}>{line}</span>
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
