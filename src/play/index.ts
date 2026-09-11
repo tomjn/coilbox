@@ -3,7 +3,6 @@ import { Clapperboard, FileText, Save, Swords } from "lucide-react";
 import InGameBadge from "./InGameBadge";
 import { PlayProvider } from "./PlayProvider";
 import EngineLogSection from "./pages/EngineLogSection";
-import RelayLeftRunning from "./RelayLeftRunning";
 
 /**
  * The Play plugin's frontend half — a **Play** sidebar section whose first screen
@@ -89,14 +88,7 @@ const playPlugin: FramePlugin = {
     },
   ],
   Provider: PlayProvider,
-  slots: [
-    { slot: "topbar.right", order: -10, Component: InGameBadge },
-    // A pill of its own rather than a branch inside the one above, because the
-    // two are about different games. This one is for a relay left running by a
-    // coilbox that has closed, and a host can be playing a skirmish while one
-    // is still carrying somebody else's match (issue #2074).
-    { slot: "topbar.right", order: -9, Component: RelayLeftRunning },
-  ],
+  slots: [{ slot: "topbar.right", order: -10, Component: InGameBadge }],
 };
 
 export default playPlugin;

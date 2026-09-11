@@ -396,6 +396,31 @@ pub fn spawn_connection(
     );
 }
 
+/// Take a connection that has ended out of the registry, and let go of the
+/// relay it was hosting through.
+///
+/// Only its own entry. One registered under the same key since is somebody
+/// else's, and removing it would log that one out too. `relay` is how the entry is
+/// recognised, because the connection and its entry share that slot and nothing
+/// else has it.
+///
+/// The lobby closes a battle with the connection it was opened on, so the relay
+/// behind it is carrying a battle nobody can join any more. It is told what
+/// leaving the battle tells it, which is not a stop: a game already running
+/// through it carries on.
+pub(crate) fn unregister(registry: &Registry, server_key: &str, relay: &HostedRelay) {
+    {
+        let mut held = lock_or_recover(registry);
+        let ours = held
+            .get(server_key)
+            .is_some_and(|conn| Arc::ptr_eq(&conn.relay, relay));
+        if ours {
+            held.remove(server_key);
+        }
+    }
+    crate::relay_host::release(relay);
+}
+
 /// Everything [`run_loop`] needs beyond the socket and the login config: the
 /// registry it registers into, the channels it drives, and the per-connection
 /// state slots the rest of the plugin shares with it.
@@ -764,7 +789,7 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
     };
 
     emit(&sink, LobbyEvent::Disconnected { reason });
-    lock_or_recover(&registry).remove(&server_key);
+    unregister(&registry, &server_key, &relay);
 }
 
 #[cfg(test)]
