@@ -15,7 +15,7 @@ import {
 import { groupOf, morphGroups } from "../morphGraph";
 import { encyclopediaSections, unitLabel } from "../unitEncyclopedia";
 import { unitIconSrc } from "../unitIcon";
-import { countPieces, countTriangles } from "../unitModel";
+import { countPieces, countTriangles, modelFormatLabel } from "../unitModel";
 import { StatusBadge } from "./components/StatusBadge";
 import { DetailError, DetailLoading, NotFound } from "./components/states";
 import { UnitHero } from "./components/UnitHero";
@@ -500,9 +500,7 @@ export default function GameUnitPage() {
             <dd className="break-all font-mono">{model.path}</dd>
 
             <dt className="text-muted-foreground">Format</dt>
-            <dd>
-              {model.format === "3do" ? "3do (Total Annihilation)" : "s3o"}
-            </dd>
+            <dd>{modelFormatLabel(model.format)}</dd>
 
             <dt className="text-muted-foreground">Size</dt>
             <dd>

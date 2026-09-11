@@ -21,7 +21,7 @@ import {
   modelTooLargeToPreview,
 } from "../../archiveModel";
 import { useUnitsyncUnitModel } from "../../config";
-import { countPieces, countTriangles } from "../../unitModel";
+import { countPieces, countTriangles, modelFormatLabel } from "../../unitModel";
 import { ModelNotes, ModelViewport } from "./ModelViewport";
 import { Centered } from "./states";
 
@@ -97,7 +97,7 @@ export function ArchiveModelPreview({
       <ModelViewport model={model} className="min-h-56 flex-1" />
       <dl className="grid shrink-0 grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 border-t border-border/50 px-3 py-2 text-xs">
         <dt className="text-muted-foreground">Format</dt>
-        <dd>{format === "3do" ? "3do (Total Annihilation)" : "s3o"}</dd>
+        <dd>{modelFormatLabel(format)}</dd>
 
         <dt className="text-muted-foreground">Size</dt>
         <dd>

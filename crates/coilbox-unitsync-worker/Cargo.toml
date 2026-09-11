@@ -63,6 +63,12 @@ coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
 # dependency-free and read-only here.
 coilbox-s3o = { path = "../coilbox-s3o" }
 coilbox-3do = { path = "../coilbox-3do" }
+# The five formats the engine loads through Assimp, so a game whose units are
+# Collada files can be viewed like any other. Unlike the two above this one is
+# not dependency-free: it builds Assimp's C++ statically. The C++ stops here in
+# the same way the WebP encoder above does, because this crate is a sidecar
+# binary and the app never links it.
+coilbox-assimp = { path = "../coilbox-assimp" }
 # Turning a whole game's `.3do` roster into `.s3o` (issue #2573). The packer and
 # the geometry rules are shared with the unit builder's single model import, so
 # a unit converted here and the same unit opened there cannot disagree.

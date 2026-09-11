@@ -29,9 +29,8 @@ vi.mock("@/lib/springTexture", () => ({
   },
 }));
 
-const { buildModel, missingTextures, prepareTextureAtlas } = await import(
-  "./unitModel"
-);
+const { buildModel, missingTextures, modelFormatLabel, prepareTextureAtlas } =
+  await import("./unitModel");
 type UnitTextureAtlas = NonNullable<
   Awaited<ReturnType<typeof prepareTextureAtlas>>
 >;
@@ -284,6 +283,21 @@ function bothInOneSheet(): UnitTextureAtlas {
 function uvsOf(mesh: THREE.Mesh): number[] {
   return [...(mesh.geometry.getAttribute("uv").array as Float32Array)];
 }
+
+describe("modelFormatLabel", () => {
+  it("expands the format names a reader would not recognise", () => {
+    expect(modelFormatLabel("3do")).toBe("3do (Total Annihilation)");
+    expect(modelFormatLabel("dae")).toBe("dae (Collada)");
+  });
+
+  it("names a format it has no expansion for rather than calling it s3o", () => {
+    // Every panel used to ask whether the format was `3do` and call everything
+    // else `s3o`. That held while coilbox read two formats and was wrong the
+    // moment it read a third.
+    expect(modelFormatLabel("obj")).toBe("obj");
+    expect(modelFormatLabel("s3o")).toBe("s3o");
+  });
+});
 
 describe("missingTextures", () => {
   /**

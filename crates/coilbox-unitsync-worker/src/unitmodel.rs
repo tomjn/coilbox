@@ -62,6 +62,25 @@ const TEXTURE_CACHE_BUDGET: usize = 256 * 1024 * 1024;
 /// Where the engine looks for a unitdef's `objectname`.
 pub(crate) const MODEL_DIR: &str = "objects3d";
 
+/// Model extensions tried for an `objectname` written without one, in the order
+/// the engine registers their parsers (`RegisterModelFormats` in
+/// `rts/Rendering/Models/IModelParser.cpp`). Order decides which file wins when
+/// a game ships the same model twice.
+///
+/// The engine registers `gltf` and `glb` between `s3o` and the Assimp formats,
+/// and they are missing here because it reads those with a parser of its own
+/// rather than through Assimp. A game shipping one gets the same answer it got
+/// before: no model.
+const MODEL_EXTS: [&str; 7] = ["3do", "s3o", "3ds", "dae", "lwo", "obj", "blend"];
+
+/// Whether a name already carries a model extension, rather than being a bare
+/// `objectname` the engine would append one to.
+fn is_model_file(lower: &str) -> bool {
+    MODEL_EXTS
+        .iter()
+        .any(|ext| lower.ends_with(&format!(".{ext}")))
+}
+
 /// Where an `.s3o` header's texture name resolves against.
 const S3O_TEXTURE_DIR: &str = "unittextures";
 
@@ -201,13 +220,30 @@ pub(crate) fn read_model(
                 ..Default::default()
             },
         },
+        // "No model" and "a model coilbox cannot read" are the same thing to
+        // every caller, and they are not the same thing to a reader. Flove spent
+        // this whole feature being told it had no models while 27 of them sat in
+        // its archive, so the difference is worth the lookup.
         None => UnitModelOutput {
-            errors: vec![format!(
-                "{game_archive} has no model for {object_name:?} under {MODEL_DIR}/"
-            )],
+            errors: vec![match find_unreadable_model(list, object_name) {
+                Some(member) => format!(
+                    "{game_archive} holds {member}, which the engine draws and coilbox cannot read"
+                ),
+                None => {
+                    format!("{game_archive} has no model for {object_name:?} under {MODEL_DIR}/")
+                }
+            }],
             ..Default::default()
         },
     };
+
+    // A `.dae` carries no Spring texture binding, so unlike the other two
+    // formats the name is not in the model file at all. It comes from the Lua
+    // metafile beside it, which needs the archive and so cannot be settled
+    // inside `build`.
+    if coilbox_assimp::EXTENSIONS.contains(&out.format.as_str()) {
+        apply_assimp_textures(us, list, &mut out);
+    }
 
     let format = out.format.clone();
     for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
@@ -442,23 +478,37 @@ fn source_digest_with(
 }
 
 /// Parse `bytes` by the extension of `path` and flatten the result.
+///
+/// The last arm matters as much as the others. An extension nothing here reads
+/// used to fall through to the `.s3o` reader and fail as though the file were a
+/// broken `.s3o`, which said nothing useful about a `.gltf` sitting in the
+/// archive intact.
 fn build(path: &str, bytes: &[u8], palette: Option<&coilbox_3do::Palette>) -> UnitModelOutput {
-    if path.to_lowercase().ends_with(".3do") {
-        match coilbox_3do::read(bytes) {
+    let lower = path.to_lowercase();
+    let ext = lower.rsplit('.').next().unwrap_or_default();
+    let read_error = |e: String| UnitModelOutput {
+        errors: vec![format!("could not read {path}: {e}")],
+        ..Default::default()
+    };
+    match ext {
+        "3do" => match coilbox_3do::read(bytes) {
             Ok(m) => from_3do(path, &m, palette),
-            Err(e) => UnitModelOutput {
-                errors: vec![format!("could not read {path}: {e}")],
-                ..Default::default()
-            },
-        }
-    } else {
-        match coilbox_s3o::read(bytes) {
+            Err(e) => read_error(e.to_string()),
+        },
+        "s3o" => match coilbox_s3o::read(bytes) {
             Ok(m) => from_s3o(path, &m),
-            Err(e) => UnitModelOutput {
-                errors: vec![format!("could not read {path}: {e}")],
-                ..Default::default()
-            },
-        }
+            Err(e) => read_error(e.to_string()),
+        },
+        e if coilbox_assimp::EXTENSIONS.contains(&e) => match coilbox_assimp::read(bytes, e) {
+            Ok(m) => from_assimp(path, &m, e),
+            Err(e) => read_error(e),
+        },
+        _ => UnitModelOutput {
+            errors: vec![format!(
+                "{path} is in a model format coilbox cannot read, though the archive does hold it"
+            )],
+            ..Default::default()
+        },
     }
 }
 
@@ -524,6 +574,205 @@ fn s3o_piece(piece: &coilbox_s3o::Piece, texture: Option<&str>) -> ModelPiece {
             .children
             .iter()
             .map(|c| s3o_piece(c, texture))
+            .collect(),
+    }
+}
+
+// ---------------------------------------------------------------- assimp
+
+/// VFS modes for the parser: raw, map, mod and base, the same set the defs
+/// reader and the archive Lua console use.
+const VFS_ALL_MODES: &str = "rmMbe";
+
+/// Read `tex1` and `tex2` out of the Lua file beside an Assimp model.
+///
+/// Both names come back tab separated, and either can be empty. The keys sit at
+/// the top level of whatever the file returns, which is where the engine reads
+/// them from (`modelTable.GetString("tex1", ...)` on the parser's root table).
+const METAFILE_SCRIPT: &str = r#"
+local __cb_ok, __cb_t = pcall(VFS.Include, __cb_file)
+if not __cb_ok then
+  return __cb_chunk(nil, { __error = tostring(__cb_t) })
+end
+if type(__cb_t) ~= 'table' then return __cb_chunk('') end
+local function __cb_s(v) return (type(v) == 'string') and v or '' end
+return __cb_chunk(__cb_s(__cb_t.tex1) .. '\t' .. __cb_s(__cb_t.tex2))
+"#;
+
+/// The metafile beside a model, by the engine's two spellings: `<path>.lua`
+/// first, then the model's name with its extension replaced
+/// (`AssParser.cpp:522-534`). flove uses both, so neither can be dropped.
+/// `model_path` arrives with the archive's own casing, and [`find_member`]
+/// matches against an already lowercased target, so it is lowered here. Without
+/// that, `Objects3d/spire.dae.lua` matches nothing and every model silently
+/// looks like one with no metafile.
+fn find_metafile(list: &[(String, String)], model_path: &str) -> Option<String> {
+    let lower = model_path.to_lowercase();
+    if let Some(hit) = find_member(list, &format!("{lower}.lua")) {
+        return Some(hit);
+    }
+    let stem = lower.rsplit_once('.').map(|(s, _)| s)?;
+    find_member(list, &format!("{stem}.lua"))
+}
+
+/// Run the metafile through unitsync's Lua parser, which is the engine's own
+/// parser with the archive already mounted.
+///
+/// Reading the bytes and scanning them for `tex1` would be the wrong shape: the
+/// file is Lua, and a game is free to compute the name rather than write it as a
+/// literal. A file that raises is treated as a file that names nothing, which is
+/// what the engine does with one it cannot parse.
+fn metafile_textures(
+    us: &Unitsync,
+    list: &[(String, String)],
+    model_path: &str,
+) -> Option<(String, String)> {
+    let member = find_metafile(list, model_path)?;
+    // A long bracket rather than a quoted string, so a path needs no escaping.
+    // Archive member paths do not contain `]==]`.
+    let script = format!(
+        "{}local __cb_file = [==[{member}]==]\n{METAFILE_SCRIPT}",
+        crate::lua::CHUNKED_RESULT
+    );
+    let raw = us.run_lua_source(&script, VFS_ALL_MODES).ok()?;
+    let (tex1, tex2) = raw.split_once('\t').unwrap_or((raw.as_str(), ""));
+    Some((tex1.trim().to_string(), tex2.trim().to_string()))
+}
+
+/// Settle which texture an Assimp model draws with, in the engine's own
+/// ascending priority order (`FindTextures` in `AssParser.cpp`): a file named
+/// after the model, then whatever the material named, then the metafile. Each
+/// overwrites the one before it when it has something to say.
+///
+/// This runs before [`resolve_texture`], which turns the winning name into a
+/// file the viewer can load.
+fn apply_assimp_textures(us: &Unitsync, list: &[(String, String)], out: &mut UnitModelOutput) {
+    let file = out.path.rsplit('/').next().unwrap_or(&out.path);
+    let stem = file
+        .rsplit_once('.')
+        .map(|(s, _)| s)
+        .unwrap_or(file)
+        .to_lowercase();
+
+    // Lowest priority. `find_with_ext` hands back the member it found, and what
+    // is wanted here is the bare file name, because `resolve_texture` looks it
+    // up under `unittextures/` itself.
+    let mut tex1 = find_with_ext(list, S3O_TEXTURE_DIR, &stem)
+        .map(|member| member.rsplit('/').next().unwrap_or(&member).to_string());
+    let mut tex2: Option<String> = None;
+
+    if let Some(named) = out.textures.first().map(|t| t.name.clone()) {
+        if !named.trim().is_empty() {
+            tex1 = Some(named);
+        }
+    }
+
+    if let Some((m1, m2)) = metafile_textures(us, list, &out.path) {
+        if !m1.is_empty() {
+            tex1 = Some(m1);
+        }
+        if !m2.is_empty() {
+            tex2 = Some(m2);
+        }
+    }
+
+    out.textures = tex1
+        .iter()
+        .map(|name| ModelTexture {
+            name: name.clone(),
+            ..Default::default()
+        })
+        .collect();
+    out.texture2 = tex2.map(|name| ModelTexture {
+        name,
+        ..Default::default()
+    });
+    if let Some(root) = &mut out.root {
+        set_group_textures(root, tex1.as_deref());
+    }
+}
+
+/// Point every batch at the model's one texture. `ModelGroup::texture` is a key
+/// into `UnitModelOutput::textures` by contract, so the two cannot be allowed to
+/// disagree after the name has been settled above.
+fn set_group_textures(piece: &mut ModelPiece, texture: Option<&str>) {
+    for group in &mut piece.groups {
+        group.texture = texture.map(str::to_string);
+    }
+    for child in &mut piece.children {
+        set_group_textures(child, texture);
+    }
+}
+
+/// Flatten one of the formats read through Assimp.
+///
+/// Closer to `.s3o` than to `.3do`: vertices carry their own UV, and one
+/// texture covers the whole model. What differs is where that texture name
+/// comes from. A `.dae` holds no Spring texture binding, and flove's models
+/// name none in their materials either, so most of the time this arrives
+/// empty and the Lua metafile beside the model is the only source. The caller
+/// applies that, because reading it needs the archive.
+///
+/// `format` is the real extension rather than a word covering all five, so the
+/// unit page can name the format and `locate_texture` keeps its one `.3do`
+/// branch instead of gaining a list.
+fn from_assimp(path: &str, model: &coilbox_assimp::Model, format: &str) -> UnitModelOutput {
+    let texture = model
+        .material_texture
+        .clone()
+        .filter(|name| !name.trim().is_empty());
+    UnitModelOutput {
+        format: format.to_string(),
+        path: path.to_string(),
+        radius: model.radius,
+        height: model.height,
+        mid: model.mid,
+        root: Some(assimp_piece(&model.root, texture.as_deref())),
+        textures: texture
+            .map(|name| {
+                vec![ModelTexture {
+                    name,
+                    ..Default::default()
+                }]
+            })
+            .unwrap_or_default(),
+        texture2: None,
+        palette_faces: 0,
+        errors: Vec::new(),
+    }
+}
+
+fn assimp_piece(piece: &coilbox_assimp::Piece, texture: Option<&str>) -> ModelPiece {
+    let groups = piece
+        .meshes
+        .iter()
+        .filter(|mesh| !mesh.indices.is_empty())
+        .map(|mesh| {
+            let mut positions = Vec::with_capacity(mesh.vertices.len() * 3);
+            let mut normals = Vec::with_capacity(mesh.vertices.len() * 3);
+            let mut uvs = Vec::with_capacity(mesh.vertices.len() * 2);
+            for v in &mesh.vertices {
+                positions.extend_from_slice(&v.pos);
+                normals.extend_from_slice(&v.normal);
+                uvs.extend_from_slice(&v.uv);
+            }
+            ModelGroup {
+                texture: texture.map(str::to_string),
+                positions,
+                normals,
+                uvs,
+                indices: mesh.indices.clone(),
+            }
+        })
+        .collect();
+    ModelPiece {
+        name: piece.name.clone(),
+        offset: piece.offset,
+        groups,
+        children: piece
+            .children
+            .iter()
+            .map(|c| assimp_piece(c, texture))
             .collect(),
     }
 }
@@ -682,15 +931,18 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     if want.is_empty() {
         return None;
     }
-    if want.ends_with(".s3o") || want.ends_with(".3do") {
+    if is_model_file(&want) {
         if let Some((_, real)) = list.iter().find(|(lower, _)| *lower == want) {
             return Some(real.clone());
         }
     }
-    let candidates: Vec<String> = if want.ends_with(".s3o") || want.ends_with(".3do") {
+    let candidates: Vec<String> = if is_model_file(&want) {
         vec![want]
     } else {
-        vec![format!("{want}.3do"), format!("{want}.s3o")]
+        MODEL_EXTS
+            .iter()
+            .map(|ext| format!("{want}.{ext}"))
+            .collect()
     };
     // The declared folder first, then the same name anywhere, which catches the
     // games that put models under their own subfolders.
@@ -709,6 +961,36 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Formats the engine draws but coilbox does not read. It has a parser of its
+/// own for these rather than going through Assimp, so adding them here would be
+/// a second reader rather than another extension in [`MODEL_EXTS`].
+///
+/// They are listed at all so a model in one of them can be named. A file that is
+/// present, valid, and drawn in the game is not "no model", and reporting it as
+/// one sends somebody looking for a file that is sitting in the archive.
+const UNREADABLE_MODEL_EXTS: [&str; 2] = ["gltf", "glb"];
+
+/// The model a unitdef meant, when coilbox has no reader for its format.
+///
+/// Only consulted once [`find_model`] has come back empty, so it costs nothing
+/// in the normal case.
+fn find_unreadable_model(list: &[(String, String)], object_name: &str) -> Option<String> {
+    let want = object_name.trim().replace('\\', "/").to_lowercase();
+    if want.is_empty() {
+        return None;
+    }
+    let already_named = UNREADABLE_MODEL_EXTS
+        .iter()
+        .any(|ext| want.ends_with(&format!(".{ext}")));
+    if already_named {
+        return find_member(list, &want)
+            .or_else(|| find_member(list, &format!("{MODEL_DIR}/{want}")));
+    }
+    UNREADABLE_MODEL_EXTS
+        .iter()
+        .find_map(|ext| find_member(list, &format!("{MODEL_DIR}/{want}.{ext}")))
 }
 
 /// Read `unittextures/tatex/teamtex.txt`: the names a `.3do` face can use.
@@ -1002,6 +1284,96 @@ mod tests {
             find_model(&list, "ARMCOM").as_deref(),
             Some("Objects3D/ARMCOM.s3o")
         );
+    }
+
+    #[test]
+    fn objectname_without_extension_finds_a_dae() {
+        let list = listing(&["Objects3d/spire.dae"]);
+        assert_eq!(
+            find_model(&list, "Spire").as_deref(),
+            Some("Objects3d/spire.dae")
+        );
+    }
+
+    /// `.3do` and `.s3o` are registered before the Assimp formats, so a game
+    /// shipping the same model twice is drawn from the one the engine picks.
+    #[test]
+    fn a_3do_wins_over_a_dae_of_the_same_name() {
+        let list = listing(&["Objects3d/tree.dae", "Objects3d/tree.3do"]);
+        assert_eq!(
+            find_model(&list, "tree").as_deref(),
+            Some("Objects3d/tree.3do")
+        );
+    }
+
+    /// An `objectname` that already names the file is taken as written, which is
+    /// how the archive browser previews the member somebody clicked.
+    #[test]
+    fn an_objectname_naming_a_dae_is_taken_as_written() {
+        let list = listing(&["Objects3d/spire.dae"]);
+        assert_eq!(
+            find_model(&list, "spire.dae").as_deref(),
+            Some("Objects3d/spire.dae")
+        );
+    }
+
+    /// flove writes both spellings the engine accepts: `spire.dae.lua` beside
+    /// `spire.dae`, and `MushroomCluster.lua` beside `MushroomCluster.dae`.
+    #[test]
+    fn a_metafile_is_found_by_either_spelling() {
+        let beside = listing(&["Objects3d/spire.dae", "Objects3d/spire.dae.lua"]);
+        assert_eq!(
+            find_metafile(&beside, "Objects3d/spire.dae").as_deref(),
+            Some("Objects3d/spire.dae.lua")
+        );
+        let replacing = listing(&[
+            "Objects3d/MushroomCluster.dae",
+            "Objects3d/MushroomCluster.lua",
+        ]);
+        assert_eq!(
+            find_metafile(&replacing, "Objects3d/MushroomCluster.dae").as_deref(),
+            Some("Objects3d/MushroomCluster.lua")
+        );
+    }
+
+    /// The model path carries the archive's own casing while the listing is
+    /// matched lowercased, so passing it straight through found nothing and
+    /// every model read as one with no metafile.
+    #[test]
+    fn a_metafile_is_found_whatever_case_the_archive_used() {
+        let list = listing(&["Objects3D/Spire.DAE.lua"]);
+        assert!(find_metafile(&list, "Objects3D/Spire.DAE").is_some());
+    }
+
+    /// A model with nothing beside it is the common case for the other two
+    /// formats, and must not be mistaken for one whose metafile failed.
+    #[test]
+    fn a_model_with_no_metafile_finds_nothing() {
+        let list = listing(&["Objects3d/spire.dae"]);
+        assert!(find_metafile(&list, "Objects3d/spire.dae").is_none());
+    }
+
+    /// A `.gltf` is drawn by the engine and unreadable here, so it has to be
+    /// named rather than reported as a missing file.
+    #[test]
+    fn a_model_in_an_unreadable_format_is_found_so_it_can_be_named() {
+        let list = listing(&["Objects3d/hover.gltf"]);
+        assert_eq!(
+            find_unreadable_model(&list, "hover").as_deref(),
+            Some("Objects3d/hover.gltf")
+        );
+        assert_eq!(
+            find_unreadable_model(&list, "hover.gltf").as_deref(),
+            Some("Objects3d/hover.gltf")
+        );
+    }
+
+    /// A unit naming a model nothing in the archive answers to keeps the older
+    /// message, which is the honest one for that case.
+    #[test]
+    fn a_unit_with_no_model_at_all_finds_no_unreadable_one_either() {
+        let list = listing(&["Objects3d/other.s3o"]);
+        assert!(find_unreadable_model(&list, "hover").is_none());
     }
 
     #[test]
