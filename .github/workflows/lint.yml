@@ -97,10 +97,10 @@ jobs:
       # prebuilts, so they are already here. The unitsync worker and the relay
       # agent are our own crates (gitignored build artifacts) and have to be
       # built for the runner's triple before clippy compiles the app crate.
-      - name: Build unitsync worker sidecar
-        run: bash scripts/build-unitsync-worker.sh
-      - name: Build relay agent sidecar
-        run: bash scripts/build-relay-agent.sh
+      # One cargo call plans both dependency graphs together, so shared deps
+      # build once and the two crates compile in parallel instead of in turn.
+      - name: Build unitsync worker and relay agent sidecars
+        run: bash scripts/build-sidecars.sh coilbox-unitsync-worker coilbox-relay-agent
       - name: Rustfmt
         run: cargo fmt --all --check
       - name: Clippy
