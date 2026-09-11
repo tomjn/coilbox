@@ -163,7 +163,20 @@ const STALE_AFTER: Duration = TRAFFIC_EVERY.saturating_mul(3);
 #[derive(Clone, Copy, Debug)]
 struct Carrying {
     bytes_per_second: u64,
+    /// Who the agent said it was carrying, or `None` from an agent built
+    /// before it said.
+    peers: Option<Peers>,
     said_at: Instant,
+}
+
+/// Who the relay is carrying, as the agent last counted them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Peers {
+    /// How many addresses coilbox has let through the relay, one per IP.
+    pub let_through: usize,
+    /// How many peer endpoints the relay has heard from within the engine's
+    /// reconnect timeout.
+    pub heard_from: usize,
 }
 
 /// The relay agent, as coilbox talks to it.
@@ -372,8 +385,25 @@ impl RelayAgent {
     /// Split out so the staleness rule can be asserted without a test that
     /// sleeps for the three seconds it takes to become true.
     fn carrying_at(&self, now: Instant) -> Option<u64> {
+        self.fresh_at(now).map(|carrying| carrying.bytes_per_second)
+    }
+
+    /// Who the relay is carrying, on the same terms as [`RelayAgent::carrying`].
+    /// Also `None` for an agent that reports a rate and no counts, which is one
+    /// built before it counted.
+    pub fn peers(&self) -> Option<Peers> {
+        self.peers_at(Instant::now())
+    }
+
+    /// The same, against a clock the caller names.
+    fn peers_at(&self, now: Instant) -> Option<Peers> {
+        self.fresh_at(now)?.peers
+    }
+
+    /// The agent's last report, if it is recent enough to repeat.
+    fn fresh_at(&self, now: Instant) -> Option<Carrying> {
         let carrying = (*self.carrying.lock().unwrap())?;
-        (now.duration_since(carrying.said_at) < STALE_AFTER).then_some(carrying.bytes_per_second)
+        (now.duration_since(carrying.said_at) < STALE_AFTER).then_some(carrying)
     }
 
     /// Let `ip` through the relay, and wait to hear that it worked.
@@ -462,9 +492,19 @@ fn read_events<R: Read>(
             Event::Failed { id, reason } => {
                 hand_over(waiting, id, Err(NotAllowed::Refused(reason)))
             }
-            Event::Traffic { bytes_per_second } => {
+            Event::Traffic {
+                bytes_per_second,
+                let_through,
+                heard_from,
+            } => {
                 *carrying.lock().unwrap() = Some(Carrying {
                     bytes_per_second,
+                    peers: let_through
+                        .zip(heard_from)
+                        .map(|(let_through, heard_from)| Peers {
+                            let_through,
+                            heard_from,
+                        }),
                     said_at: Instant::now(),
                 });
             }
@@ -815,6 +855,8 @@ mod tests {
 
         scripted.line(to_line(&Event::Traffic {
             bytes_per_second: 41_984,
+            let_through: None,
+            heard_from: None,
         }));
         assert_eq!(eventually_carrying(&agent), Some(41_984));
 
@@ -822,6 +864,8 @@ mod tests {
         // figure is what is going through the relay now.
         scripted.line(to_line(&Event::Traffic {
             bytes_per_second: 0,
+            let_through: None,
+            heard_from: None,
         }));
         let deadline = std::time::Instant::now() + PATIENCE;
         while agent.carrying() != Some(0) {
@@ -845,6 +889,8 @@ mod tests {
 
         scripted.line(to_line(&Event::Traffic {
             bytes_per_second: 41_984,
+            let_through: None,
+            heard_from: None,
         }));
         assert_eq!(eventually_carrying(&agent), Some(41_984));
 
@@ -854,6 +900,51 @@ mod tests {
             "a rate nothing has repeated is no news, and showing it would be coilbox vouching \
              for a sidecar it has not heard from"
         );
+        drop(scripted);
+    }
+
+    /// The panel's supply beside the rate: who the agent said it was carrying,
+    /// read back as it was said, and gone once the report is stale.
+    #[test]
+    fn who_the_agent_says_it_is_carrying_is_read_back_and_goes_stale() {
+        let (scripted, reading) = Scripted::new();
+        let agent = RelayAgent::driving(reading, Written::default(), |_| {});
+
+        scripted.line(to_line(&Event::Traffic {
+            bytes_per_second: 41_984,
+            let_through: Some(3),
+            heard_from: Some(2),
+        }));
+        assert_eq!(eventually_carrying(&agent), Some(41_984));
+        assert_eq!(
+            agent.peers(),
+            Some(Peers {
+                let_through: 3,
+                heard_from: 2,
+            })
+        );
+        assert_eq!(
+            agent.peers_at(std::time::Instant::now() + STALE_AFTER),
+            None,
+            "counts nothing has repeated are no news, the same as the rate"
+        );
+        drop(scripted);
+    }
+
+    /// An agent from before the counts existed still reports a rate, and the
+    /// counts read as not known rather than as nobody.
+    #[test]
+    fn an_agent_that_does_not_count_has_a_rate_and_no_counts() {
+        let (scripted, reading) = Scripted::new();
+        let agent = RelayAgent::driving(reading, Written::default(), |_| {});
+
+        scripted.line(to_line(&Event::Traffic {
+            bytes_per_second: 41_984,
+            let_through: None,
+            heard_from: None,
+        }));
+        assert_eq!(eventually_carrying(&agent), Some(41_984));
+        assert_eq!(agent.peers(), None);
         drop(scripted);
     }
 
@@ -871,6 +962,8 @@ mod tests {
 
         scripted.line(to_line(&Event::Traffic {
             bytes_per_second: 41_984,
+            let_through: None,
+            heard_from: None,
         }));
         // Read back through `carrying` rather than by sleeping, so the rate has
         // certainly been handled by the time the listener is asked about it.

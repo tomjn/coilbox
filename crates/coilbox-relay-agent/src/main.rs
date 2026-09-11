@@ -550,11 +550,13 @@ async fn carry<R: RelayLink>(
 /// The relay it has open lives in `open` rather than in a local, because the
 /// cancellation above is exactly the moment somebody else needs to reach it. See
 /// [`OpenRelay`].
+#[allow(clippy::too_many_arguments)]
 async fn relay_until_it_gives_up(
     args: &Args,
     turn: &HeldCredential,
     stopping: &Stopping,
     traffic: &Traffic,
+    allowlist: &Allowlist,
     open: &OpenRelay<Transport>,
     requests: &mut Requests,
     reporter: &Reporter,
@@ -565,12 +567,6 @@ async fn relay_until_it_gives_up(
     // this process gets through, because the engine reads a changed source port
     // as a different player and will not have one mid-game.
     let mut agent = Agent::new(engine, args.max_peers);
-
-    // Outside the loop for the same reason as the peer table. A permission
-    // belongs to one allocation, so everybody coilbox has vouched for has to be
-    // let through again every time a relay is rebuilt, and this is the only
-    // record of who that is.
-    let allowlist = Allowlist::new();
 
     let mut backoff = FIRST_BACKOFF;
     loop {
@@ -626,7 +622,7 @@ async fn relay_until_it_gives_up(
             stopping,
             traffic,
         };
-        let stopped = carry(&counted, &mut agent, &allowlist, requests, reporter).await;
+        let stopped = carry(&counted, &mut agent, allowlist, requests, reporter).await;
         let down = match relay.failure() {
             Some(failure) => {
                 eprintln!("coilbox-relay-agent: allocation lost: {failure}");
@@ -740,12 +736,19 @@ async fn main() -> ExitCode {
     // is the only way a coilbox that was closed and reopened can read it: this
     // process's stdout belongs to the coilbox that has gone (issue #2074).
     let traffic = Arc::new(Traffic::new());
+    // Everybody coilbox has vouched for. Outside the relay loop because a
+    // permission belongs to one allocation, so everybody on it has to be let
+    // through again every time a relay is rebuilt, and this is the only record
+    // of who that is. Up here rather than at the top of that loop so the meter
+    // can say how many there are.
+    let allowlist = Arc::new(Allowlist::new());
     tokio::spawn({
         let traffic = Arc::clone(&traffic);
+        let allowlist = Arc::clone(&allowlist);
         let reporter = Arc::clone(&reporter);
         let run_file = args.run_file.clone();
         async move {
-            traffic::report_forever(&traffic, &reporter, run_file.as_deref()).await;
+            traffic::report_forever(&traffic, &allowlist, &reporter, run_file.as_deref()).await;
         }
     });
 
@@ -759,7 +762,7 @@ async fn main() -> ExitCode {
     // dropping it tells the relay server nothing, which is why it lives in
     // `open` and is given back by hand.
     tokio::select! {
-        gave_up = relay_until_it_gives_up(&args, &turn, &stopping, &traffic, &open, &mut requests, &reporter) => gave_up,
+        gave_up = relay_until_it_gives_up(&args, &turn, &stopping, &traffic, &allowlist, &open, &mut requests, &reporter) => gave_up,
         _ = until_nobody_needs_it(&stopping, &open, &reporter) => ExitCode::SUCCESS,
     }
 }

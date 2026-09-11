@@ -102,6 +102,11 @@ impl Allowlist {
     pub fn everybody(&self) -> Vec<IpAddr> {
         self.allowed.lock().unwrap().iter().copied().collect()
     }
+
+    /// How many addresses are on the list, for the host's relay panel.
+    pub fn count(&self) -> usize {
+        self.allowed.lock().unwrap().len()
+    }
 }
 
 /// Everything one "let this address through" request means: put `ip` on the

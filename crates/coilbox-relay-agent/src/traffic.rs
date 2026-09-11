@@ -36,13 +36,18 @@
 //! [`coilbox_relay_protocol::Carrying`] is the record and carries the rest of
 //! the reasoning.
 
+use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use coilbox_relay_protocol::{carrying_path, Carrying, Event, TRAFFIC_EVERY};
 use tokio::time::Instant;
 
+use crate::allowlist::Allowlist;
 use crate::control::Reporter;
+use crate::demux::QUIET_ENOUGH_TO_RECLAIM;
 
 /// Bytes carried since the last time anybody asked.
 ///
@@ -52,6 +57,10 @@ use crate::control::Reporter;
 #[derive(Default)]
 pub struct Traffic {
     since_last_report: AtomicU64,
+    /// Every peer the relay has carried a datagram from, and when it last did.
+    /// Pruned to [`QUIET_ENOUGH_TO_RECLAIM`] each time it is counted, so it
+    /// holds the peers heard from lately rather than everybody ever seen.
+    heard: Mutex<HashMap<SocketAddr, Instant>>,
 }
 
 impl Traffic {
@@ -71,6 +80,28 @@ impl Traffic {
     /// Everything carried since the last call, and start counting again.
     pub(crate) fn take(&self) -> u64 {
         self.since_last_report.swap(0, Ordering::Relaxed)
+    }
+
+    /// A datagram arrived through the relay from `peer`.
+    ///
+    /// Arrivals only. What the agent sends out includes its own permission
+    /// probes, which go to players who may not be there yet.
+    pub fn came_from(&self, peer: SocketAddr) {
+        self.heard.lock().unwrap().insert(peer, Instant::now());
+    }
+
+    /// How many peers the relay has heard from within
+    /// [`QUIET_ENOUGH_TO_RECLAIM`], forgetting the rest.
+    ///
+    /// That window is the engine's own `ReconnectTimeout`. A connected engine
+    /// sends whenever 200 ms pass without a send, even with nothing to say, at
+    /// the default `NetworkLossFactor` (`rts/System/Net/UDPConnection.cpp:850`
+    /// and `:908`). So a player still in the game is never quiet for that long,
+    /// and one who is has already been given up on by the engine.
+    pub(crate) fn heard_from_lately(&self) -> usize {
+        let mut heard = self.heard.lock().unwrap();
+        heard.retain(|_, last| last.elapsed() <= QUIET_ENOUGH_TO_RECLAIM);
+        heard.len()
     }
 }
 
@@ -93,8 +124,12 @@ impl Traffic {
 ///
 /// `run_file` is optional because the agent runs perfectly well without one,
 /// which is how the tests drive it. coilbox always passes one.
+///
+/// `allowlist` is read for how many addresses coilbox has let through, which
+/// goes out beside the rate and the count of who was heard from.
 pub async fn report_forever(
     traffic: &Traffic,
+    allowlist: &Allowlist,
     reporter: &Reporter,
     run_file: Option<&Path>,
 ) -> std::convert::Infallible {
@@ -109,7 +144,13 @@ pub async fn report_forever(
         if let Some(run_file) = run_file {
             write_down(run_file, bytes_per_second);
         }
-        reporter.say(Event::Traffic { bytes_per_second }).await;
+        reporter
+            .say(Event::Traffic {
+                bytes_per_second,
+                let_through: Some(allowlist.count()),
+                heard_from: Some(traffic.heard_from_lately()),
+            })
+            .await;
     }
 }
 
@@ -210,17 +251,26 @@ mod tests {
     /// Run the reporter until it says something, or until it has plainly
     /// decided not to.
     async fn first_report(traffic: &Traffic) -> Event {
-        first_report_beside(traffic, None).await
+        first_report_from(traffic, &Allowlist::new(), None).await
     }
 
     /// The same, with somewhere to write the figure down as well as say it.
     async fn first_report_beside(traffic: &Traffic, run_file: Option<&Path>) -> Event {
+        first_report_from(traffic, &Allowlist::new(), run_file).await
+    }
+
+    /// The same, with a list of who coilbox has let through.
+    async fn first_report_from(
+        traffic: &Traffic,
+        allowlist: &Allowlist,
+        run_file: Option<&Path>,
+    ) -> Event {
         let (out, read) = tokio::io::duplex(4096);
         let mut said = BufReader::new(read).lines();
         let reporter = Reporter::writing(out);
 
         let line = tokio::select! {
-            _ = report_forever(traffic, &reporter, run_file) => unreachable!("it never returns"),
+            _ = report_forever(traffic, allowlist, &reporter, run_file) => unreachable!("it never returns"),
             line = said.next_line() => line,
             () = tokio::time::sleep(TRAFFIC_EVERY * REPORTS_WITHIN) => panic!(
                 "the agent said nothing in {REPORTS_WITHIN} reporting intervals, so a host \
@@ -247,7 +297,9 @@ mod tests {
         assert_eq!(
             first_report(&traffic).await,
             Event::Traffic {
-                bytes_per_second: 6144
+                bytes_per_second: 6144,
+                let_through: Some(0),
+                heard_from: Some(0),
             }
         );
     }
@@ -261,7 +313,9 @@ mod tests {
         assert_eq!(
             first_report(&Traffic::new()).await,
             Event::Traffic {
-                bytes_per_second: 0
+                bytes_per_second: 0,
+                let_through: Some(0),
+                heard_from: Some(0),
             }
         );
     }
@@ -283,7 +337,9 @@ mod tests {
         assert_eq!(
             said,
             Event::Traffic {
-                bytes_per_second: 41_984
+                bytes_per_second: 41_984,
+                let_through: Some(0),
+                heard_from: Some(0),
             }
         );
         assert_eq!(
@@ -332,5 +388,51 @@ mod tests {
             !carrying_path(&run_file).with_extension("tmp").exists(),
             "the half written record has to be renamed into place, not copied and left"
         );
+    }
+
+    /// Who the relay is carrying, beside how much. Two datagrams from one peer
+    /// are one peer, and the list is counted by address.
+    #[tokio::test(start_paused = true)]
+    async fn the_report_says_who_was_let_through_and_who_was_heard_from() {
+        let traffic = Traffic::new();
+        let player: SocketAddr = "198.51.100.4:8452".parse().expect("an address");
+        traffic.came_from(player);
+        traffic.came_from(player);
+        traffic.came_from("203.0.113.9:8452".parse().expect("an address"));
+        let allowlist = Allowlist::new();
+        for ip in ["198.51.100.4", "203.0.113.9", "192.0.2.1"] {
+            allowlist.remember(ip.parse().expect("an address"));
+        }
+
+        assert_eq!(
+            first_report_from(&traffic, &allowlist, None).await,
+            Event::Traffic {
+                bytes_per_second: 0,
+                let_through: Some(3),
+                heard_from: Some(2),
+            }
+        );
+    }
+
+    /// A peer quiet for longer than the engine waits before giving up on them
+    /// drops out of the count, and comes back the moment they are heard again.
+    #[tokio::test(start_paused = true)]
+    async fn a_peer_quiet_for_longer_than_the_engine_waits_is_no_longer_counted() {
+        let traffic = Traffic::new();
+        let player: SocketAddr = "198.51.100.4:8452".parse().expect("an address");
+        traffic.came_from(player);
+
+        tokio::time::advance(QUIET_ENOUGH_TO_RECLAIM).await;
+        assert_eq!(
+            traffic.heard_from_lately(),
+            1,
+            "quiet for exactly the window is still counted"
+        );
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(traffic.heard_from_lately(), 0);
+
+        traffic.came_from(player);
+        assert_eq!(traffic.heard_from_lately(), 1);
     }
 }
