@@ -32,7 +32,7 @@ import { startAnywayWarning } from "./startBlockers";
  * in-game (driven by lobby protocol, not this button).
  *
  * When we host the battle ourselves (`selfHost`), the bar also carries a native
- * Lock toggle, and Leave becomes "Close battle" (leaving tears the battle down
+ * Lock toggle, and Leave becomes "Close" (leaving tears the battle down
  * for everyone, so it confirms first). In a LAN room of our own it takes the
  * room down too, and says so, because the room and the battle in it were started
  * together and are read as one thing (issue #2057).
@@ -221,7 +221,9 @@ export function BattleRoomHeader({
                   </button>
                 </Badge>
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs text-left leading-snug">
+              {/* Pretty rather than the tooltip's balanced wrap, which evens the
+                  lines out and leaves the box wider than the words in it. */}
+              <TooltipContent className="max-w-xs text-left leading-snug text-pretty">
                 {routeLabel.detail}
               </TooltipContent>
             </Tooltip>
@@ -276,7 +278,7 @@ export function BattleRoomHeader({
               <PopoverTrigger asChild>
                 <Button variant="outline">
                   <LogOut className="size-4" />
-                  Close battle
+                  Close
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 space-y-3">
