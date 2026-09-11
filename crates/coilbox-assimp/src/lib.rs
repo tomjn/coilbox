@@ -130,6 +130,15 @@ pub fn read(bytes: &[u8], hint: &str) -> Result<Model, String> {
     // Nul terminated because `set_integer` takes the raw bytes of a C string.
     // The key is `AI_CONFIG_PP_RVC_FLAGS` from Assimp's `config.h`.
     props.set_integer(b"PP_RVC_FLAGS\0", REMOVE_COMPONENTS);
+    // A Collada file states the size of its own unit, and Assimp multiplies the
+    // root node's transform by it. The engine keeps that scale on the root piece
+    // alone: it never lets a parent's scale into a child's offset, and it sizes a
+    // model from raw vertex bounds, so the model stays in the units it was
+    // modelled in. This reader composes transforms down the tree instead, so the
+    // same scale would shrink every piece and every vertex. flove's models say
+    // `meter="0.01875"`, which made a mushroom 1.7 elmos tall rather than 90 and
+    // turned a walk cycle's four elmo bob into a leap over its own head.
+    props.set_integer(b"IMPORT_COLLADA_IGNORE_UNIT_SIZE\0", 1);
 
     let scene = Scene::from_buffer_with_props(bytes, import_flags(), hint, &props)
         .map_err(|e| e.to_string())?;
