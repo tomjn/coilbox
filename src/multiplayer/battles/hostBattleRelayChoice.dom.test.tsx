@@ -41,22 +41,39 @@ const REFUSED: DirectReachability = {
   problem: "no UPnP gateway answered",
 };
 
-// Stands in for the panel that asks the router. A button rather than a report
-// on mount, so the refusal arrives at a moment the test chooses. It also says
-// whether the form asked for the check without a checkbox.
+// The router opened the port, so nothing about this host needs a relay.
+const OPENED: DirectReachability = {
+  ...REFUSED,
+  method: "upnp",
+  ports: [{ port: 8452, externalPort: 8452, transport: "udp" }],
+  routerAddress: "209.35.91.246",
+  confirmedPort: 8452,
+  problem: null,
+};
+
+// Stands in for the panel that asks the router. Buttons rather than a report on
+// mount, so the answer arrives at a moment the test chooses. It also says
+// whether the form asked for the check without a checkbox, and whether it asked
+// for any ports at all.
 vi.mock("../../direct/ReachablePorts", () => ({
   ReachablePorts: ({
     onReport,
     always,
+    ports,
   }: {
     onReport?: (report: DirectReachability | null) => void;
     always?: boolean;
+    ports: unknown[] | null;
   }) => (
     <>
       <button type="button" onClick={() => onReport?.(REFUSED)}>
         Pretend the router refused
       </button>
+      <button type="button" onClick={() => onReport?.(OPENED)}>
+        Pretend the router opened the port
+      </button>
       <span>{always ? "Checks the router" : "Asks before checking"}</span>
+      <span>{ports === null ? "No ports asked for" : "Ports asked for"}</span>
     </>
   ),
 }));
@@ -112,13 +129,14 @@ function form(relayAvailable = true) {
   return opened;
 }
 
-const checkbox = () =>
-  screen.getByRole("checkbox", {
-    name: /Use the server's relay when nothing else works/,
-  });
+type Mode = "Automatic" | "Always" | "Never";
+
+/** One of the three relay choices, which Radix draws as radio buttons. */
+const mode = (name: Mode) => screen.getByRole("radio", { name });
 
 /** Radix says so with `aria-checked`, and there is no jest-dom here to read it. */
-const isTicked = () => checkbox().getAttribute("aria-checked") === "true";
+const isPicked = (name: Mode) =>
+  mode(name).getAttribute("aria-checked") === "true";
 
 const host = () =>
   fireEvent.click(screen.getByRole("button", { name: "Host battle" }));
@@ -132,30 +150,49 @@ beforeEach(() => {
   closePorts.mockClear();
 });
 
-describe("the relay preference in the hosting form", () => {
+describe("the relay choice in the hosting form", () => {
   // The default the issue asks for, and the reason for it: the hosts who reach
   // this rung are the ones least able to work out why hosting failed.
-  it("relays by default", async () => {
+  it("relays by default when the router refused", async () => {
     const opened = form();
-    expect(isTicked()).toBe(true);
+    expect(isPicked("Automatic")).toBe(true);
     host();
     await vi.waitFor(() => expect(opened).toHaveLength(1));
     expect(opened[0].relay).toBe(true);
   });
 
-  // The acceptance criterion. Turning it off has to reach the battle that is
-  // opened, not only the sentence on screen.
-  it("opens a battle that is not relayed once the host turns it off", async () => {
+  // Turning it off has to reach the battle that is opened, not only the
+  // sentence on screen.
+  it("opens a battle that is not relayed once the host picks Never", async () => {
     const opened = form();
-    fireEvent.click(checkbox());
-    expect(isTicked()).toBe(false);
+    fireEvent.click(mode("Never"));
+    expect(isPicked("Never")).toBe(true);
     host();
     await vi.waitFor(() => expect(opened).toHaveLength(1));
     expect(opened[0].relay).toBe(false);
   });
 
+  // The case the router check cannot help with. The router says players can
+  // get in, and the host knows they cannot.
+  it("relays a host the router would have let in once they pick Always", async () => {
+    const opened = form();
+    fireEvent.click(screen.getByText("Pretend the router opened the port"));
+    fireEvent.click(mode("Always"));
+    host();
+    await vi.waitFor(() => expect(opened).toHaveLength(1));
+    expect(opened[0].relay).toBe(true);
+  });
+
+  // A relayed battle has no use for a port on the router, so none is asked for.
+  it("does not ask the router for a port when every battle is relayed", () => {
+    form();
+    expect(screen.getByText("Ports asked for")).toBeTruthy();
+    fireEvent.click(mode("Always"));
+    expect(screen.getByText("No ports asked for")).toBeTruthy();
+  });
+
   // The cost, said once, where the choice is made.
-  it("says what a relay costs next to the checkbox", () => {
+  it("says what a relay costs next to the choice", () => {
     form();
     expect(
       screen.getByText(/puts an extra hop between you and every player/),
@@ -164,9 +201,9 @@ describe("the relay preference in the hosting form", () => {
 
   // The two ways to end up with no route need different words. A host who said
   // no themselves must not be sent looking for a fault in somebody's server.
-  it("does not blame the server when the host turned the relay off", () => {
+  it("does not blame the server when the host picked Never", () => {
     form();
-    fireEvent.click(checkbox());
+    fireEvent.click(mode("Never"));
     expect(screen.getByText(/you have asked not to be relayed/)).toBeTruthy();
     expect(screen.queryByText(/this server has no relay/)).toBeNull();
   });
@@ -176,21 +213,21 @@ describe("the relay preference in the hosting form", () => {
   // key is renamed and still fails if the answer silently reverts.
   it("remembers the answer for the next battle", async () => {
     form();
-    fireEvent.click(checkbox());
+    fireEvent.click(mode("Never"));
     cleanup();
 
     const opened = form();
-    expect(isTicked()).toBe(false);
+    expect(isPicked("Never")).toBe(true);
     host();
     await vi.waitFor(() => expect(opened).toHaveLength(1));
     expect(opened[0].relay).toBe(false);
   });
 
-  // A server with no relay had nothing to refuse, so the host's answer changed
-  // nothing there and the sentence has to keep naming the server.
-  it("keeps naming the missing relay on a server that has none", () => {
+  // A server with no relay has nothing to choose between, so there is no choice
+  // to show, and the sentence under the form names the missing relay instead.
+  it("offers no choice on a server that has none", () => {
     form(false);
-    fireEvent.click(checkbox());
+    expect(screen.queryByRole("radio")).toBeNull();
     expect(screen.getByText(/this server has no relay/)).toBeTruthy();
   });
 });

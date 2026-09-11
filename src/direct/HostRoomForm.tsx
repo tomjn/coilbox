@@ -117,9 +117,9 @@ export function HostRoomForm({
   // change a single thing about the room they are starting, which is worse than
   // not asking. Nothing is lost by leaving it out, because the preference only
   // ever decides whether an available relay is used, and there is never one
-  // here. Passed as true rather than as the stored answer for the same reason
+  // here. Passed as "auto" rather than as the stored answer for the same reason
   // the false above is not a bare constant: it says what this call means.
-  const route = hostingRoute(reachability, false, true);
+  const route = hostingRoute(reachability, false, "auto");
 
   const trimmedName = name.trim();
   const nameProblem = playerNameProblem(name);

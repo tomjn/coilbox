@@ -7,6 +7,8 @@ import {
   hostingRouteSummary,
   NAT_TYPE_DIRECT,
   recordHostingRoute,
+  relayModeFrom,
+  relayModeHelp,
 } from "./hostingRoute";
 import {
   type DirectReachability,
@@ -65,7 +67,7 @@ describe("hostingRoute", () => {
         publicAddressIsLocal: true,
       }),
       true,
-      true,
+      "auto",
     );
     expect(out).toBe("direct");
   });
@@ -74,14 +76,14 @@ describe("hostingRoute", () => {
   // answer knows nothing about itself, and calling that "direct" would advertise
   // a battle nobody can reach.
   it("does not read two unknown addresses as a public one", () => {
-    expect(hostingRoute(report({ lanAddress: null }), false, true)).toBe(
+    expect(hostingRoute(report({ lanAddress: null }), false, "auto")).toBe(
       "unreachable",
     );
   });
 
   // Rung two.
   it("takes the port mapping when the router opened the port", () => {
-    expect(hostingRoute(opened(), true, true)).toBe("portMapped");
+    expect(hostingRoute(opened(), true, "auto")).toBe("portMapped");
   });
 
   // The ladder is ordered, not scored. A host who needs nothing opened is not
@@ -95,10 +97,10 @@ describe("hostingRoute", () => {
           publicAddressIsLocal: true,
         }),
         true,
-        true,
+        "auto",
       ),
     ).toBe("direct");
-    expect(hostingRoute(opened(), true, true)).toBe("portMapped");
+    expect(hostingRoute(opened(), true, "auto")).toBe("portMapped");
   });
 
   // The whole reason this milestone exists. The router says yes and means it,
@@ -107,21 +109,21 @@ describe("hostingRoute", () => {
     const out = hostingRoute(
       opened({ routerAddress: "100.88.1.2", doubleNat: true }),
       true,
-      true,
+      "auto",
     );
     expect(out).toBe("relay");
   });
 
   // Rung three, in the ordinary case: a home router that would not open a port.
   it("relays when the router refused and the server has a relay", () => {
-    expect(hostingRoute(refused(), true, true)).toBe("relay");
+    expect(hostingRoute(refused(), true, "auto")).toBe("relay");
   });
 
   // The end of the ladder. Not every server has a relay, and one that does not
   // leaves nothing to step down to, so this has to be a state of its own rather
   // than a relay that will never happen.
   it("has nowhere to go when the router refused and there is no relay", () => {
-    expect(hostingRoute(refused(), false, true)).toBe("unreachable");
+    expect(hostingRoute(refused(), false, "auto")).toBe("unreachable");
   });
 
   it("has nowhere to go behind the provider's NAT with no relay", () => {
@@ -129,7 +131,7 @@ describe("hostingRoute", () => {
       hostingRoute(
         opened({ routerAddress: "100.88.1.2", doubleNat: true }),
         false,
-        true,
+        "auto",
       ),
     ).toBe("unreachable");
   });
@@ -139,19 +141,18 @@ describe("hostingRoute", () => {
   // holding, so what STUN was missing is the host's own copy of it, not the
   // route.
   it("keeps the port mapping when the ports opened and STUN did not answer", () => {
-    expect(hostingRoute(opened({ publicAddress: null }), true, true)).toBe(
+    expect(hostingRoute(opened({ publicAddress: null }), true, "auto")).toBe(
       "portMapped",
     );
   });
 
-  // The toggle that opens ports is off by default and opening a port on
-  // somebody's router is not a thing to do because they opened a form. With it
-  // off nothing has been measured, so there is no evidence to step down the
-  // ladder on, and a host who never asked coilbox to look must not be relayed
-  // for it.
+  // A LAN room's toggle that opens ports is off by default, and the lobby form's
+  // check has not always answered yet. Either way nothing has been measured, so
+  // there is no evidence to step down the ladder on, and a host must not be
+  // relayed on none.
   it("says nothing is known when nobody asked the router anything", () => {
-    expect(hostingRoute(null, true, true)).toBe("unchecked");
-    expect(hostingRoute(null, false, true)).toBe("unchecked");
+    expect(hostingRoute(null, true, "auto")).toBe("unchecked");
+    expect(hostingRoute(null, false, "auto")).toBe("unchecked");
   });
 
   // Issue #2054. The ladder and the panel a few pixels above it read the same
@@ -165,7 +166,7 @@ describe("hostingRoute", () => {
       publicAddressIsLocal: true,
       problem: "no UPnP gateway answered",
     });
-    expect(hostingRoute(host, true, true)).toBe("direct");
+    expect(hostingRoute(host, true, "auto")).toBe("direct");
     expect(reachabilityState(host)).toBe("direct");
   });
 
@@ -179,7 +180,7 @@ describe("hostingRoute", () => {
       publicAddressIsLocal: true,
       problem: "no UPnP gateway answered",
     });
-    expect(hostingRoute(host, true, true)).toBe("direct");
+    expect(hostingRoute(host, true, "auto")).toBe("direct");
     expect(reachabilityState(host)).toBe("direct");
   });
 
@@ -194,7 +195,7 @@ describe("hostingRoute", () => {
       publicAddressIsLocal: true,
     });
     expect(isReachable(host)).toBe(true);
-    expect(hostingRoute(host, true, true)).toBe("direct");
+    expect(hostingRoute(host, true, "auto")).toBe("direct");
   });
 });
 
@@ -205,7 +206,7 @@ describe("hostingRoute", () => {
 // they already had.
 describe("hostingRoute with the relay turned off", () => {
   it("stops at unreachable where it would have relayed", () => {
-    expect(hostingRoute(refused(), true, false)).toBe("unreachable");
+    expect(hostingRoute(refused(), true, "never")).toBe("unreachable");
   });
 
   it("stops at unreachable behind the provider's own NAT", () => {
@@ -213,7 +214,7 @@ describe("hostingRoute with the relay turned off", () => {
       hostingRoute(
         opened({ routerAddress: "100.88.1.2", doubleNat: true }),
         true,
-        false,
+        "never",
       ),
     ).toBe("unreachable");
   });
@@ -238,10 +239,10 @@ describe("hostingRoute with the relay turned off", () => {
     ];
     for (const each of reports) {
       for (const relayAvailable of [true, false]) {
-        const withRelay = hostingRoute(each, relayAvailable, true);
+        const withRelay = hostingRoute(each, relayAvailable, "auto");
         // Only the rung that the preference is on may move, and only downwards.
         const expected = withRelay === "relay" ? "unreachable" : withRelay;
-        expect(hostingRoute(each, relayAvailable, false)).toBe(expected);
+        expect(hostingRoute(each, relayAvailable, "never")).toBe(expected);
       }
     }
   });
@@ -250,7 +251,7 @@ describe("hostingRoute with the relay turned off", () => {
   // has not asked the router anything gets the same answer either way, and a
   // preference that changed this would be answering a question nobody asked.
   it("says nothing is known when nobody asked the router anything", () => {
-    expect(hostingRoute(null, true, false)).toBe("unchecked");
+    expect(hostingRoute(null, true, "never")).toBe("unchecked");
   });
 });
 
@@ -488,5 +489,74 @@ describe("the recorded route", () => {
     recordHostingRoute("portMapped");
     recordHostingRoute(null);
     expect(chosenHostingRoute()).toBe(null);
+  });
+});
+
+describe("hostingRoute when the host asks for the relay every time", () => {
+  // The case the router check cannot see. It says players can get in, and the
+  // host knows they cannot.
+  it("relays a host the router would have let in", () => {
+    expect(hostingRoute(opened(), true, "always")).toBe("relay");
+    expect(
+      hostingRoute(
+        report({
+          lanAddress: "209.35.91.246",
+          publicAddress: "209.35.91.246",
+          publicAddressIsLocal: true,
+        }),
+        true,
+        "always",
+      ),
+    ).toBe("relay");
+  });
+
+  it("relays before the router has answered", () => {
+    expect(hostingRoute(null, true, "always")).toBe("relay");
+  });
+
+  // Asking for a relay the server does not have changes nothing.
+  it("takes the ladder as it is on a server with no relay", () => {
+    expect(hostingRoute(opened(), false, "always")).toBe("portMapped");
+    expect(hostingRoute(refused(), false, "always")).toBe("unreachable");
+    expect(hostingRoute(null, false, "always")).toBe("unchecked");
+  });
+});
+
+describe("relayModeFrom", () => {
+  it("uses the host's own pick", () => {
+    expect(relayModeFrom("always", false)).toBe("always");
+    expect(relayModeFrom("never", true)).toBe("never");
+  });
+
+  // A host who turned the relay off before there were three answers is not
+  // switched back on by being given more of them.
+  it("keeps a host who turned the old preference off on never", () => {
+    expect(relayModeFrom(null, false)).toBe("never");
+  });
+
+  it("starts everybody else on automatic", () => {
+    expect(relayModeFrom(null, true)).toBe("auto");
+    expect(relayModeFrom(null, null)).toBe("auto");
+  });
+});
+
+describe("relayModeHelp", () => {
+  // The price is said wherever the relay might be used, and not where it will
+  // not be.
+  it("names the cost on the two answers that relay", () => {
+    expect(relayModeHelp("auto")).toContain("extra hop");
+    expect(relayModeHelp("always")).toContain("extra hop");
+    expect(relayModeHelp("never")).not.toContain("extra hop");
+  });
+});
+
+describe("hostingRouteSummary for a host who asked for the relay", () => {
+  it("says it was asked for rather than blaming the router", () => {
+    const said = hostingRouteSummary("relay", {
+      lanRoom: false,
+      relayAlways: true,
+    });
+    expect(said).toContain("as you asked");
+    expect(said).not.toContain("Nothing would open the ports");
   });
 });

@@ -69,7 +69,9 @@ export function ReachablePorts({
     onReport?.(net.report);
   }, [net.report, onReport]);
 
-  const answer = enabled && (
+  // Nothing to answer with no ports asked for, which is a form that has decided
+  // it does not need the router at all.
+  const answer = enabled && ports !== null && (
     <Answer busy={net.busy} error={net.error} report={net.report} />
   );
 

@@ -41,17 +41,68 @@ import {
 export const NAT_TYPE_DIRECT = 0;
 
 /**
- * Settings key: host through the lobby server's relay when nothing else worked.
+ * How a host wants the server's relay used, when there is one.
  *
- * Default on, because the hosts who end up on the bottom rung are the ones least
- * able to work out why hosting failed, and a battle with a slightly worse ping
- * is better than a battle nobody can join (issue #2023).
+ * `auto` relays only when nothing else would let players in. It is the ladder
+ * as it has always been, and it is where everybody starts, because the hosts
+ * who end up on the bottom rung are the ones least able to work out why hosting
+ * failed, and a battle with a slightly worse ping is better than a battle
+ * nobody can join (issue #2023).
  *
- * Stored rather than asked again each time. Somebody who turns this off is
- * saying something about how they play, not about this one battle, and making
- * them say it again every time they host is how a preference becomes a chore.
+ * `always` relays whatever the router check says. It is for the host the check
+ * says can be reached and whose players still cannot get in, behind a firewall
+ * prompt nobody answered or a router that claims a mapping it does not forward.
+ * Nothing on this machine can see either, so the host is the only one who can
+ * say so.
+ *
+ * `never` stops at the second rung, for somebody who minds their ping or has
+ * forwarded their port by hand.
+ */
+export type RelayMode = "auto" | "always" | "never";
+
+/**
+ * Settings key: the host's {@link RelayMode}.
+ *
+ * Stored rather than asked again each time. Somebody who picks one is saying
+ * something about how they play, not about this one battle, and making them say
+ * it again every time they host is how a preference becomes a chore.
+ */
+export const RELAY_MODE_KEY = "multiplayer.relayMode";
+
+/**
+ * Settings key: the true or false relay preference that came before
+ * {@link RelayMode}. Nothing writes it any more. It is read so that a host who
+ * turned the relay off stays off, through {@link relayModeFrom}.
  */
 export const HOST_THROUGH_RELAY_KEY = "multiplayer.hostThroughRelay";
+
+/**
+ * The relay mode a host is on. Their own pick when they have made one, and
+ * otherwise whatever the old preference said, so a host who turned the relay
+ * off before there were three answers is not switched back on. Pure.
+ */
+export function relayModeFrom(
+  picked: RelayMode | null,
+  before: boolean | null,
+): RelayMode {
+  if (picked) return picked;
+  return before === false ? "never" : "auto";
+}
+
+/**
+ * What a {@link RelayMode} means for the people joining, and what it costs, said
+ * next to the choice because that is where somebody is deciding. Pure.
+ */
+export function relayModeHelp(mode: RelayMode): string {
+  switch (mode) {
+    case "auto":
+      return "Players connect straight to you when your router lets them in, and through the server's relay when it will not. A relay costs the server bandwidth and puts an extra hop between you and every player, so pings are a little worse than a direct game.";
+    case "always":
+      return "Every battle goes through the server's relay, even when your router would let players in. Pick this when players cannot join you directly. It puts an extra hop between you and every player, so pings are a little worse than a direct game.";
+    case "never":
+      return "Players always connect straight to you, so only those who can already reach this machine can join.";
+  }
+}
 /**
  * How a hosted battle is reachable, or why it is not.
  *
@@ -93,17 +144,22 @@ export type HostingRoute =
  * reading two contradictory answers about their own router is worse off than one
  * reading a single answer that is sometimes optimistic.
  *
- * `wantsRelay` is the host's own answer, from `HOST_THROUGH_RELAY_KEY`. It sits
- * on the step from the second rung to the third and nowhere else, because a host
- * who can be reached directly was never going to be relayed, and refusing the
- * relay must not cost them the route they already had. There is no default here:
- * the default belongs to the checkbox that asks the question (issue #2023).
+ * `relayMode` is the host's own answer, from {@link RELAY_MODE_KEY}. `never`
+ * sits on the step from the second rung to the third and nowhere else, because
+ * a host who can be reached directly was never going to be relayed, and
+ * refusing the relay must not cost them the route they already had. `always`
+ * sits above every rung, because it is the host saying the check's answer is
+ * wrong about them. There is no default here. The default belongs to the
+ * control that asks the question (issue #2023).
  */
 export function hostingRoute(
   report: DirectReachability | null,
   relayAvailable: boolean,
-  wantsRelay: boolean,
+  relayMode: RelayMode,
 ): HostingRoute {
+  // Asked before the report, including one that has not arrived yet. A host
+  // who has said to relay has said the router's answer does not decide it.
+  if (relayAvailable && relayMode === "always") return "relay";
   if (!report) return "unchecked";
   // Rung one, and it asks nothing about the router on purpose. A machine already
   // on the internet has no gateway to answer a port mapping request, so its
@@ -115,7 +171,7 @@ export function hostingRoute(
   // question here and tell this host their router had refused (issue #2054).
   if (isOnPublicAddress(report)) return "direct";
   if (isReachable(report)) return "portMapped";
-  return relayAvailable && wantsRelay ? "relay" : "unreachable";
+  return relayAvailable && relayMode !== "never" ? "relay" : "unreachable";
 }
 
 /**
@@ -186,7 +242,11 @@ export function advertisedGamePort(
  */
 export function hostingRouteSummary(
   route: HostingRoute,
-  { lanRoom, relayDeclined }: { lanRoom: boolean; relayDeclined?: boolean },
+  {
+    lanRoom,
+    relayDeclined,
+    relayAlways,
+  }: { lanRoom: boolean; relayDeclined?: boolean; relayAlways?: boolean },
 ): string {
   switch (route) {
     case "direct":
@@ -196,7 +256,9 @@ export function hostingRouteSummary(
         return "Your router opened the ports, so somebody outside can reach this room. They still will not get into the game, because the room gives everybody in it this machine's address on this network, and nothing outside this network can dial that.";
       return "Your router opened the port, so players connect straight to this machine.";
     case "relay":
-      return "Nothing would open the ports, so this battle goes through the server's relay.";
+      return relayAlways
+        ? "This battle goes through the server's relay, as you asked."
+        : "Nothing would open the ports, so this battle goes through the server's relay.";
     case "unreachable":
       if (lanRoom)
         return "Nobody outside this network can reach this room, so it is for the people on this network.";
@@ -264,10 +326,13 @@ export function battleRouteLabel(
           "Your router opened the port, so players connect straight to this machine.",
       };
     case "relay":
+      // Says nothing about why. The recorded route cannot tell a router that
+      // refused from a host who asked for the relay, and both are relayed the
+      // same way.
       return {
         word: "Relayed",
         detail:
-          "Nothing would open the ports, so this battle goes through the server's relay. That adds a hop, so pings here are a little worse than a direct game.",
+          "This battle goes through the server's relay. That adds a hop, so pings here are a little worse than a direct game.",
       };
     case "unreachable":
       // Said without naming which of the two ways the ladder ended here, because

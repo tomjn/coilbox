@@ -2,14 +2,18 @@ import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   advertisedGamePort,
   HOST_THROUGH_RELAY_KEY,
   hostingRoute,
   hostingRouteSummary,
   NAT_TYPE_DIRECT,
+  RELAY_MODE_KEY,
+  type RelayMode,
   recordHostingRoute,
+  relayModeFrom,
+  relayModeHelp,
 } from "../../direct/hostingRoute";
 import { ReachablePorts } from "../../direct/ReachablePorts";
 import {
@@ -111,14 +115,20 @@ export function HostBattleForm({
     pid: number;
     ours: boolean;
   } | null>(null);
-  // Whether to fall through to the relay when the router has refused. Stored, so
-  // somebody who cares about their ping says it once rather than every time they
-  // host, and on by default because the hosts who reach that rung are the ones
-  // least able to work out why hosting failed (issue #2023).
-  const [wantsRelay, setWantsRelay] = useSetting<boolean>(
+  // How to use the relay, when the server has one. Stored, so somebody who cares
+  // about their ping says it once rather than every time they host (issue
+  // #2023). A host who has never picked is on whatever the old true or false
+  // preference said, so turning the relay off before there were three answers
+  // still counts.
+  const [relayBefore] = useSetting<boolean | null>(
     HOST_THROUGH_RELAY_KEY,
-    true,
+    null,
   );
+  const [relayPicked, setRelayMode] = useSetting<RelayMode | null>(
+    RELAY_MODE_KEY,
+    null,
+  );
+  const relayMode = relayModeFrom(relayPicked, relayBefore);
   // Whether the battle this form was opened for has been opened. The port the
   // check asked for belongs to that battle. Closing the drawer unmounts the
   // form, and a form that goes without a battle hands the port back, rather
@@ -142,11 +152,14 @@ export function HostBattleForm({
 
   const noEngine = content.noEngine;
   const canHost = content.ready;
-  const route = hostingRoute(reachability, relayAvailable, wantsRelay);
+  const route = hostingRoute(reachability, relayAvailable, relayMode);
   // Only when there was a relay to refuse. On a server with none the host's
   // answer changed nothing, and crediting them for an outcome that was never
-  // theirs would send them to a checkbox that cannot fix it.
-  const relayDeclined = relayAvailable && !wantsRelay;
+  // theirs would send them to a choice that cannot fix it.
+  const relayDeclined = relayAvailable && relayMode === "never";
+  // Every battle goes through the relay, so the router is not asked for a port
+  // the battle would never use.
+  const relayAlways = relayAvailable && relayMode === "always";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -294,47 +307,54 @@ export function HostBattleForm({
           </label>
 
           <ReachablePorts
-            ports={battlePorts(port)}
-            help={`Coilbox asks your router to forward UDP ${port}, the port the engine hosts the game on, and hands it back if you close this without hosting.`}
+            ports={relayAlways ? null : battlePorts(port)}
+            help={
+              relayAlways
+                ? "Not asked, because every battle you host goes through the server's relay."
+                : `Coilbox asks your router to forward UDP ${port}, the port the engine hosts the game on, and hands it back if you close this without hosting.`
+            }
             onReport={setReachability}
             always
           />
 
-          {/* The bottom rung of the ladder, asked about next to the answer
-                  that decides whether it is reached. This is the one place the
-                  relay's cost is written down: the route sentence below says
-                  which way the battle is going, not what that is worth, because
-                  somebody choosing needs the price and somebody reading the
-                  outcome has already paid it (issue #2023). */}
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
-          <label className="flex items-start gap-2 text-sm">
-            <Checkbox
-              checked={wantsRelay}
-              onCheckedChange={(checked) => setWantsRelay(checked === true)}
-              className="mt-0.5"
-            />
-            <span className="flex flex-col gap-0.5">
-              <span className="font-medium">
-                Use the server's relay when nothing else works
-              </span>
+          {/* How the relay is used, next to the answer that decides it in the
+              automatic case. Only on a server that has one. On a server without,
+              there is nothing to choose, and the route sentence below says so.
+              This is the one place the relay's cost is written down, because
+              somebody choosing needs the price and somebody reading the outcome
+              has already paid it (issue #2023). */}
+          {relayAvailable && (
+            <div className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Server relay</span>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                value={relayMode}
+                onValueChange={(v) => v && setRelayMode(v as RelayMode)}
+                aria-label="Server relay"
+                className="self-start"
+              >
+                <ToggleGroupItem value="auto">Automatic</ToggleGroupItem>
+                <ToggleGroupItem value="always">Always</ToggleGroupItem>
+                <ToggleGroupItem value="never">Never</ToggleGroupItem>
+              </ToggleGroup>
               <span className="text-xs text-muted-foreground">
-                Only asked for once your own router has refused. A relay costs
-                the lobby server bandwidth and puts an extra hop between you and
-                every player, so pings are worse than a direct game. Turn it off
-                and a battle that would have been relayed can only be joined by
-                players who can already reach this machine.
-                {!relayAvailable &&
-                  " This server has no relay, so nothing is relayed here either way."}
+                {relayModeHelp(relayMode)}
               </span>
-            </span>
-          </label>
+            </div>
+          )}
 
-          {/* What hosting is about to do, in the place where the answer it
-                  is reading appears. Not the same thing as issue #2022, which
-                  tells the people already in a battle why their ping is what it
-                  is. This is the host, before they commit to anything. */}
+          {/* What hosting is about to do, in the place where the answer it is
+              reading appears. Not the same thing as issue #2022, which tells
+              the people already in a battle why their ping is what it is. This
+              is the host, before they commit to anything. */}
           <p className="text-xs text-muted-foreground">
-            {hostingRouteSummary(route, { lanRoom: false, relayDeclined })}
+            {hostingRouteSummary(route, {
+              lanRoom: false,
+              relayDeclined,
+              relayAlways,
+            })}
           </p>
 
           {(gameFailed || mapFailed) && (
