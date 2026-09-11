@@ -334,6 +334,92 @@ fn a_started_thread_takes_its_arguments() {
     assert_close(rot_y(&timeline, 0, "turret"), 0.25);
 }
 
+/// The mask a table stands for, which the engine allows and flove relies on: it
+/// gives each shared animation library a fresh table so that one unit's walk
+/// cycle cannot signal another's. Two tables are two masks however alike they
+/// look, so the sweep has to survive a signal raised with the other one.
+#[test]
+fn a_table_is_a_mask_of_its_own() {
+    // The turn is on the far side of a sleep, so it happens only if the thread
+    // is still alive to reach it. A turn already running would not do: killing
+    // the thread that asked for one does not stop the engine finishing it.
+    let script = r#"
+        local turret = piece("turret")
+        local SIG, OTHER = {}, {}
+        local function sweep()
+            SetSignalMask(SIG)
+            Sleep(100)
+            Turn(turret, y_axis, 1.5)
+        end
+        function script.Create() StartThread(sweep) end
+        function script.StopMoving() Signal(RAISED) end
+        "#;
+    let events = [
+        ScriptEvent {
+            frame: 0,
+            callin: "Create".to_string(),
+            args: Vec::new(),
+            ambient: false,
+        },
+        ScriptEvent {
+            frame: 1,
+            callin: "StopMoving".to_string(),
+            args: Vec::new(),
+            ambient: false,
+        },
+    ];
+    let names = pieces();
+
+    // Signalled with the sweep's own table, it never wakes.
+    let killed = run(
+        &script.replace("RAISED", "SIG"),
+        "test.lua",
+        &Unit::new(&names),
+        &events,
+        10,
+    );
+    assert_eq!(killed.error, None);
+    assert_close(rot_y(&killed, 9, "turret"), 0.0);
+
+    // Signalled with the other table, it wakes and turns.
+    let spared = run(
+        &script.replace("RAISED", "OTHER"),
+        "test.lua",
+        &Unit::new(&names),
+        &events,
+        10,
+    );
+    assert_eq!(spared.error, None);
+    assert_close(rot_y(&spared, 9, "turret"), 1.5);
+}
+
+/// Scripts work out how fast to play a walk cycle from the unit's top speed, so
+/// the preview has to answer with the definition's own rather than a zero they
+/// would divide by.
+#[test]
+fn the_move_type_reports_the_speed_the_definition_gives() {
+    let def = serde_json::json!({ "speed": 60.0 });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local data = Spring.GetUnitMoveTypeData(unitID)
+            Turn(piece("turret"), y_axis, data.maxSpeed / 30)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 0, "turret"), 2.0);
+}
+
 #[test]
 fn a_signal_kills_the_thread_carrying_its_mask() {
     let timeline = run(

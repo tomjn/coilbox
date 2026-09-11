@@ -103,6 +103,51 @@ pub struct Probes {
     pub error: Option<String>,
 }
 
+/// A signal mask: a number to match bit by bit, or any other Lua value to match
+/// by identity.
+///
+/// The engine takes either. Its `Signal` matches two numbers on a shared bit and
+/// compares anything else with `==`, and its `SetSignalMask` stores whatever it
+/// is given without looking at it. Games use both. flove hands each of its
+/// shared animation libraries a fresh empty table, so one unit's walk cycle
+/// cannot signal another's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mask {
+    Bits(u32),
+    /// Anything that is not a number, by identity. Lua 5.1 keeps one copy of
+    /// each string, so two equal strings are one pointer here, which is the
+    /// `==` the engine would have done. Nil and the two booleans have no
+    /// pointer of their own, so they take low numbers no real address can be.
+    Other(usize),
+}
+
+impl Default for Mask {
+    fn default() -> Self {
+        Mask::Bits(0)
+    }
+}
+
+impl Mask {
+    fn of(value: &Value) -> Self {
+        match value {
+            Value::Integer(number) => Mask::Bits(*number as u32),
+            Value::Number(number) => Mask::Bits(*number as u32),
+            Value::Nil => Mask::Other(0),
+            Value::Boolean(flag) => Mask::Other(1 + usize::from(*flag)),
+            other => Mask::Other(other.to_pointer() as usize),
+        }
+    }
+
+    /// Whether a thread carrying this mask dies when `signal` is raised. Two
+    /// numbers need only share a bit. Anything else has to be the same thing.
+    fn hit_by(self, signal: Mask) -> bool {
+        match (self, signal) {
+            (Mask::Bits(mine), Mask::Bits(signal)) => mine & signal != 0,
+            (mine, signal) => mine == signal,
+        }
+    }
+}
+
 /// Everything the Lua-facing functions read or write. Shared with them through
 /// an `Rc<RefCell<_>>`, so every borrow is short and none is held across a call
 /// back into Lua.
@@ -115,15 +160,15 @@ struct Sim {
     model: Model,
     /// Threads a running thread asked for, with the signal mask each is born
     /// with. Started before the frame ends.
-    spawned: Vec<(Thread, Vec<Value>, u32)>,
+    spawned: Vec<(Thread, Vec<Value>, Mask)>,
     /// The mask of the thread running now, as it stands at this moment. A
     /// thread started with `StartThread` is born carrying it, as the unit
     /// script framework hands it on, so a later `Signal` reaches the child too.
-    current_mask: u32,
+    current_mask: Mask,
     /// Signal masks the running thread raised while it was running.
-    signalled: Vec<u32>,
+    signalled: Vec<Mask>,
     /// The mask the running thread set for itself, if it did.
-    mask: Option<u32>,
+    mask: Option<Mask>,
     /// The frame being run, for a script that asks what time it is.
     frame: u32,
     /// What the script has told the engine about its unit, by the numbered id
@@ -147,7 +192,7 @@ struct Runner {
     args: Vec<Value>,
     state: State,
     /// The mask set with `SetSignalMask`, which is what `Signal` kills by.
-    mask: u32,
+    mask: Mask,
     /// What started it, so an error can say which call-in was to blame.
     origin: String,
 }
@@ -441,7 +486,7 @@ impl Run {
                 thread,
                 event.args.iter().map(|arg| Value::Number(*arg)).collect(),
                 event.callin.clone(),
-                0,
+                Mask::default(),
             )?;
         }
         Ok(())
@@ -452,7 +497,7 @@ impl Run {
         thread: Thread,
         args: Vec<Value>,
         origin: String,
-        mask: u32,
+        mask: Mask,
     ) -> Result<(), String> {
         if self.runners.iter().filter(|r| !r.is_dead()).count() >= MAX_THREADS {
             // The ceiling is what stops a script that starts a thread per frame
@@ -563,7 +608,7 @@ impl Run {
         };
         for signal in signalled {
             for (other, runner) in self.runners.iter_mut().enumerate() {
-                if other != index && runner.mask & signal != 0 {
+                if other != index && runner.mask.hit_by(signal) {
                     runner.state = State::Dead;
                 }
             }
@@ -1100,6 +1145,28 @@ fn install_spring(
             Ok((health, health, 0.0, 0.0, 1.0))
         })?,
     )?;
+
+    // Elmos a second, which is what the engine reports here: it holds the speed
+    // per frame and multiplies by the frame rate on the way out. Scripts divide
+    // it back down to decide how fast to play a walk cycle, so a zero would
+    // leave one standing still or dividing by nothing. flove's mushrooms do
+    // exactly that division.
+    let top_speed = speed * f64::from(FPS);
+    spring.set(
+        "GetUnitMoveTypeData",
+        lua.create_function(move |lua, _: MultiValue| {
+            let data = lua.create_table()?;
+            data.set("maxSpeed", top_speed)?;
+            data.set("maxWantedSpeed", top_speed)?;
+            // Standing at the origin with nowhere to be, which is the unit the
+            // preview has.
+            data.set("goalx", 0.0)?;
+            data.set("goaly", 0.0)?;
+            data.set("goalz", 0.0)?;
+            data.set("progressState", "done")?;
+            Ok(data)
+        })?,
+    )?;
     spring.set(
         "GetUnitIsBeingBuilt",
         // beingBuilt, buildProgress. A preview shows a finished unit, and a
@@ -1546,8 +1613,8 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let state = Rc::clone(sim);
     globals.set(
         "Signal",
-        lua.create_function(move |_, mask: i64| {
-            state.borrow_mut().signalled.push(mask as u32);
+        lua.create_function(move |_, mask: Value| {
+            state.borrow_mut().signalled.push(Mask::of(&mask));
             Ok(())
         })?,
     )?;
@@ -1555,10 +1622,11 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let state = Rc::clone(sim);
     globals.set(
         "SetSignalMask",
-        lua.create_function(move |_, mask: i64| {
+        lua.create_function(move |_, mask: Value| {
             let mut sim = state.borrow_mut();
-            sim.mask = Some(mask as u32);
-            sim.current_mask = mask as u32;
+            let mask = Mask::of(&mask);
+            sim.mask = Some(mask);
+            sim.current_mask = mask;
             Ok(())
         })?,
     )?;
