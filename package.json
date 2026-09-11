@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "bun scripts/tauri.mjs",
     "heal:perm-cache": "bun scripts/heal-perm-cache.mjs",
     "sidecar:unitsync": "bash scripts/build-sidecars.sh coilbox-unitsync-worker",
     "sidecar:prdownloader": "bash scripts/assemble-prdownloader.sh",
