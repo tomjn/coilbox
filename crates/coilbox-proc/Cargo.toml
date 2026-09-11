@@ -8,14 +8,15 @@ license = "MIT"
 [dependencies]
 
 # Only for `is_running`, which asks the OS about a process this one did not
-# spawn and so has no `Child` for. Both were already in `Cargo.lock` before
-# this: `libc` arrives under tokio and `windows` is what `src-tauri` builds its
-# job object with, at this same version.
+# spawn and so has no `Child` for. Neither adds a crate to the build: `libc`
+# arrives under tokio, and `windows-sys` 0.61 arrives under tauri, mio and
+# socket2. The higher-level `windows` crate would, because Tauri pins 0.61 of
+# that one and we wanted 0.62, so a Windows build compiled both (issue #2808).
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = [
+windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_System_Threading",
 ] }

@@ -744,7 +744,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
- "windows 0.62.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -832,7 +832,7 @@ version = "0.0.0"
 dependencies = [
  "libc",
  "tempfile",
- "windows 0.62.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
