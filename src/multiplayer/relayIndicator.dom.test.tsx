@@ -134,6 +134,32 @@ describe("our own relayed battle", () => {
     expect(pill()?.textContent).toBe("Relaying 41 KB/s");
   });
 
+  // The lobby names each joiner and coilbox lets them through, and the relay
+  // hears from them once their game starts. The panel shows both.
+  it("says who has been let through and who has been heard from", async () => {
+    traffic.mockResolvedValue({
+      relaying: true,
+      bytesPerSecond: 0,
+      letThrough: 3,
+      heardFrom: 1,
+    });
+    await draw();
+    expect(
+      screen.getByText("Addresses let through").nextElementSibling?.textContent,
+    ).toBe("3");
+    expect(
+      screen.getByText("Heard from in the last 15 seconds").nextElementSibling
+        ?.textContent,
+    ).toBe("1");
+  });
+
+  // A relay with no counts to give, and a zero here would read as nobody
+  // having been let through.
+  it("leaves the counts out when the relay has not given any", async () => {
+    await draw();
+    expect(screen.queryByText("Addresses let through")).toBeNull();
+  });
+
   it("takes the host back to the battle", async () => {
     await draw();
     fireEvent.click(screen.getByRole("button", { name: "Go to battle" }));
