@@ -1,0 +1,12 @@
+[package]
+name = "coilbox-assimp"
+version = "0.0.0"
+description = "Reader for the five model formats Spring/Recoil loads through Assimp: .dae, .obj, .3ds, .lwo and .blend. Read only, and the caller passes the bytes because a game's models sit inside a packed archive."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# Static, so the worker sidecar carries Assimp rather than asking the machine it
+# runs on for a copy. See the workspace `[patch.crates-io]` entry for why
+# russimp-sys comes from git: the published package ships no Assimp source.
+russimp = { version = "3.2.1", features = ["static-link"] }

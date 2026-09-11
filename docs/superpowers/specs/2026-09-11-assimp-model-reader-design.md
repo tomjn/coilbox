@@ -47,7 +47,11 @@ Input is the file bytes plus an extension hint, because archives are packed and 
 
 The post-processing flags match the engine's `ASS_POSTPROCESS_OPTIONS` (`rts/Rendering/Models/AssParser.cpp:51-63`) in full: remove component, find invalid data, calculate tangent space, generate smooth normals, triangulate, generate UV coords, sort by primitive type, join identical vertices, limit bone weights and split large meshes. `ImproveCacheLocality` stays off, as it is in the engine, where a comment records it crashing an old Assimp assert.
 
-Two of those need a decision rather than a copy. `RemoveComponent` is driven by `AI_CONFIG_PP_RVC_FLAGS`, which the engine sets to strip cameras, lights, textures, animations and materials (`AssParser.cpp:65-71`), and flove's `spire.dae` does carry a camera node. `SplitLargeMeshes` is bounded by limits the engine reads from the GPU at runtime, which a headless worker has no equivalent for, so it takes a fixed generous limit instead. Neither changes the geometry we keep.
+Two of those need a decision rather than a copy.
+
+`RemoveComponent` is driven by `AI_CONFIG_PP_RVC_FLAGS`, which the engine sets to strip cameras, lights, textures, animations and materials (`AssParser.cpp:65-71`). We set the same value. Note what it does not do: flove's `spire.dae` carries a camera, and with the flag on, a piece called `Camera` still comes back, because the flag discards the camera object rather than the node that referenced it. Measured, not assumed. The engine keeps that node too, so this is parity rather than a defect, and flove's models arrive with a handful of pieces named after cameras and texture groups.
+
+`SplitLargeMeshes` is left out entirely. The engine bounds it with limits it reads from the GPU at runtime, and a headless reader has no GPU to ask. Splitting exists to keep one draw call inside what a driver accepts, which is a drawing concern rather than a reading one, and choosing a limit here would mean inventing a number the engine never used.
 
 ## 3. Worker wiring
 

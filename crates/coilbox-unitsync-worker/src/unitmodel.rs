@@ -62,6 +62,25 @@ const TEXTURE_CACHE_BUDGET: usize = 256 * 1024 * 1024;
 /// Where the engine looks for a unitdef's `objectname`.
 pub(crate) const MODEL_DIR: &str = "objects3d";
 
+/// Model extensions tried for an `objectname` written without one, in the order
+/// the engine registers their parsers (`RegisterModelFormats` in
+/// `rts/Rendering/Models/IModelParser.cpp`). Order decides which file wins when
+/// a game ships the same model twice.
+///
+/// The engine registers `gltf` and `glb` between `s3o` and the Assimp formats,
+/// and they are missing here because it reads those with a parser of its own
+/// rather than through Assimp. A game shipping one gets the same answer it got
+/// before: no model.
+const MODEL_EXTS: [&str; 7] = ["3do", "s3o", "3ds", "dae", "lwo", "obj", "blend"];
+
+/// Whether a name already carries a model extension, rather than being a bare
+/// `objectname` the engine would append one to.
+fn is_model_file(lower: &str) -> bool {
+    MODEL_EXTS
+        .iter()
+        .any(|ext| lower.ends_with(&format!(".{ext}")))
+}
+
 /// Where an `.s3o` header's texture name resolves against.
 const S3O_TEXTURE_DIR: &str = "unittextures";
 
@@ -442,23 +461,37 @@ fn source_digest_with(
 }
 
 /// Parse `bytes` by the extension of `path` and flatten the result.
+///
+/// The last arm matters as much as the others. An extension nothing here reads
+/// used to fall through to the `.s3o` reader and fail as though the file were a
+/// broken `.s3o`, which said nothing useful about a `.gltf` sitting in the
+/// archive intact.
 fn build(path: &str, bytes: &[u8], palette: Option<&coilbox_3do::Palette>) -> UnitModelOutput {
-    if path.to_lowercase().ends_with(".3do") {
-        match coilbox_3do::read(bytes) {
+    let lower = path.to_lowercase();
+    let ext = lower.rsplit('.').next().unwrap_or_default();
+    let read_error = |e: String| UnitModelOutput {
+        errors: vec![format!("could not read {path}: {e}")],
+        ..Default::default()
+    };
+    match ext {
+        "3do" => match coilbox_3do::read(bytes) {
             Ok(m) => from_3do(path, &m, palette),
-            Err(e) => UnitModelOutput {
-                errors: vec![format!("could not read {path}: {e}")],
-                ..Default::default()
-            },
-        }
-    } else {
-        match coilbox_s3o::read(bytes) {
+            Err(e) => read_error(e.to_string()),
+        },
+        "s3o" => match coilbox_s3o::read(bytes) {
             Ok(m) => from_s3o(path, &m),
-            Err(e) => UnitModelOutput {
-                errors: vec![format!("could not read {path}: {e}")],
-                ..Default::default()
-            },
-        }
+            Err(e) => read_error(e.to_string()),
+        },
+        e if coilbox_assimp::EXTENSIONS.contains(&e) => match coilbox_assimp::read(bytes, e) {
+            Ok(m) => from_assimp(path, &m, e),
+            Err(e) => read_error(e),
+        },
+        _ => UnitModelOutput {
+            errors: vec![format!(
+                "{path} is in a model format coilbox cannot read, though the archive does hold it"
+            )],
+            ..Default::default()
+        },
     }
 }
 
@@ -524,6 +557,81 @@ fn s3o_piece(piece: &coilbox_s3o::Piece, texture: Option<&str>) -> ModelPiece {
             .children
             .iter()
             .map(|c| s3o_piece(c, texture))
+            .collect(),
+    }
+}
+
+// ---------------------------------------------------------------- assimp
+
+/// Flatten one of the formats read through Assimp.
+///
+/// Closer to `.s3o` than to `.3do`: vertices carry their own UV, and one
+/// texture covers the whole model. What differs is where that texture name
+/// comes from. A `.dae` holds no Spring texture binding, and flove's models
+/// name none in their materials either, so most of the time this arrives
+/// empty and the Lua metafile beside the model is the only source. The caller
+/// applies that, because reading it needs the archive.
+///
+/// `format` is the real extension rather than a word covering all five, so the
+/// unit page can name the format and `locate_texture` keeps its one `.3do`
+/// branch instead of gaining a list.
+fn from_assimp(path: &str, model: &coilbox_assimp::Model, format: &str) -> UnitModelOutput {
+    let texture = model
+        .material_texture
+        .clone()
+        .filter(|name| !name.trim().is_empty());
+    UnitModelOutput {
+        format: format.to_string(),
+        path: path.to_string(),
+        radius: model.radius,
+        height: model.height,
+        mid: model.mid,
+        root: Some(assimp_piece(&model.root, texture.as_deref())),
+        textures: texture
+            .map(|name| {
+                vec![ModelTexture {
+                    name,
+                    ..Default::default()
+                }]
+            })
+            .unwrap_or_default(),
+        texture2: None,
+        palette_faces: 0,
+        errors: Vec::new(),
+    }
+}
+
+fn assimp_piece(piece: &coilbox_assimp::Piece, texture: Option<&str>) -> ModelPiece {
+    let groups = piece
+        .meshes
+        .iter()
+        .filter(|mesh| !mesh.indices.is_empty())
+        .map(|mesh| {
+            let mut positions = Vec::with_capacity(mesh.vertices.len() * 3);
+            let mut normals = Vec::with_capacity(mesh.vertices.len() * 3);
+            let mut uvs = Vec::with_capacity(mesh.vertices.len() * 2);
+            for v in &mesh.vertices {
+                positions.extend_from_slice(&v.pos);
+                normals.extend_from_slice(&v.normal);
+                uvs.extend_from_slice(&v.uv);
+            }
+            ModelGroup {
+                texture: texture.map(str::to_string),
+                positions,
+                normals,
+                uvs,
+                indices: mesh.indices.clone(),
+            }
+        })
+        .collect();
+    ModelPiece {
+        name: piece.name.clone(),
+        offset: piece.offset,
+        groups,
+        children: piece
+            .children
+            .iter()
+            .map(|c| assimp_piece(c, texture))
             .collect(),
     }
 }
@@ -682,15 +790,15 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     if want.is_empty() {
         return None;
     }
-    if want.ends_with(".s3o") || want.ends_with(".3do") {
+    if is_model_file(&want) {
         if let Some((_, real)) = list.iter().find(|(lower, _)| *lower == want) {
             return Some(real.clone());
         }
     }
-    let candidates: Vec<String> = if want.ends_with(".s3o") || want.ends_with(".3do") {
+    let candidates: Vec<String> = if is_model_file(&want) {
         vec![want]
     } else {
-        vec![format!("{want}.3do"), format!("{want}.s3o")]
+        MODEL_EXTS.iter().map(|ext| format!("{want}.{ext}")).collect()
     };
     // The declared folder first, then the same name anywhere, which catches the
     // games that put models under their own subfolders.
