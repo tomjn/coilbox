@@ -174,6 +174,21 @@ export default function GameDetailPage() {
     contentOpenPath({ path: target }).catch(() => {});
   };
 
+  // A game can ship a full roster and declare no sides at all: flove's
+  // GameData/SideData.lua returns an empty table, so unitsync reports its 30
+  // units and no side. Gating this whole section on sides took the unit count
+  // and the All units link off with them, and that link is the only route to
+  // the units page. Only the per-faction list needs sides, so only it drops
+  // out. `!gameInfo` counts as having sides so the heading does not read
+  // "Units" for the length of the read and then change.
+  const hasSides = !gameInfo || gameInfo.sides.length > 0;
+  const unitCount = gameInfo?.unitCount ?? 0;
+  // "Units · 30" rather than "Units · 30 units", which the sides heading can
+  // say because its own noun is different.
+  const sectionHeading = hasSides
+    ? `Sides${unitCount > 0 ? ` · ${unitCount} units` : ""}`
+    : `Units${unitCount > 0 ? ` · ${unitCount}` : ""}`;
+
   // Gated on "ready" (a genuine read, checksum and all) rather than just
   // `dataset` being non-null, or this reads true for a heartbeat while the
   // dataset is still loading and every side's count is 0 because there are no
@@ -231,15 +246,12 @@ export default function GameDetailPage() {
         <WarningBanner warnings={game.warnings} noun="game" />
       ) : null}
 
-      {(gameInfoLoading || (gameInfo && gameInfo.sides.length > 0)) && (
+      {(gameInfoLoading ||
+        (gameInfo &&
+          (gameInfo.sides.length > 0 || gameInfo.unitCount > 0))) && (
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium">
-              Sides
-              {gameInfo && gameInfo.unitCount > 0
-                ? ` · ${gameInfo.unitCount} units`
-                : ""}
-            </h2>
+            <h2 className="text-sm font-medium">{sectionHeading}</h2>
             {/* Per-faction browsing (FactionBuildList) never reaches the units no
                 faction's build tree reaches, so this is the one way back to all
                 of them, "Other units" included, unless the read that would
@@ -295,7 +307,7 @@ export default function GameDetailPage() {
               <Loader2 className="size-4 animate-spin" />
               Loading sides…
             </div>
-          ) : (
+          ) : hasSides ? (
             <FactionBuildList
               enginePath={selected.enginePath}
               dataDir={selected.rootPath}
@@ -307,7 +319,7 @@ export default function GameDetailPage() {
               factionLogos={factionLogos}
               branding={brand}
             />
-          )}
+          ) : null}
         </section>
       )}
 
