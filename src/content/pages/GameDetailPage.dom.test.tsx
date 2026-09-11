@@ -202,6 +202,23 @@ describe("GameDetailPage's Sides section", () => {
       false,
     );
   });
+
+  it("keeps the unit count and All units for a game that declares no sides (flove)", async () => {
+    // flove's GameData/SideData.lua returns an empty table, so unitsync reports
+    // its units and no side at all. The section used to be gated on sides, so
+    // the whole thing went, taking the only link to the units page with it.
+    renderPage({
+      sides: [],
+      units: [unit("spire"), unit("treelevel1")],
+      datasetStatus: "ready",
+    });
+    const allUnits = await screen.findByText("All units");
+    expect(allUnits.closest("a")).not.toBeNull();
+    expect(screen.getByText("Units · 2")).toBeTruthy();
+    // No sides means no per-faction list to render.
+    expect(screen.queryByText("Build tree")).toBeNull();
+    expect(screen.queryByText(/sides resolve to a start unit/)).toBeNull();
+  });
 });
 
 describe("GameDetailPage's Game options section", () => {
