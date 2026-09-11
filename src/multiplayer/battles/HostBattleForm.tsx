@@ -1,4 +1,5 @@
 import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -57,8 +58,8 @@ export function HostBattleForm({
   initialTitle,
 }: {
   /** Whether this lobby server has a relay to host through, from
-   *  `relayHostingAvailable`. False everywhere today, and the bottom rung of the
-   *  ladder does not exist without it. */
+   *  `relayHostingAvailable`. The bottom rung of the ladder does not exist
+   *  without it. */
   relayAvailable: boolean;
   /** Rejects when the battle did not open, which is what this form shows. */
   onHost: (args: OpenBattleArgs) => Promise<void>;
@@ -107,6 +108,10 @@ export function HostBattleForm({
   // (issue #1591).
   const [error, setError] = useState<string | null>(null);
   const [hosting, setHosting] = useState(false);
+  // The router check is still running. Host waits for it, because until it
+  // answers there is no evidence to pick a route with, and a press in that gap
+  // would advertise the host's own address untested.
+  const [checking, setChecking] = useState(false);
   // A relay agent from an earlier session, which is the one hosting failure the
   // host cannot act on from the error alone: it names a process id and nothing
   // else (issue #2062). Only ever looked for after a relayed attempt failed,
@@ -143,6 +148,7 @@ export function HostBattleForm({
 
   function hostButtonLabel(): string {
     if (hosting) return "Hosting…";
+    if (checking) return "Checking your router…";
     if (!gameName || !mapName || checksumsReady) return "Host battle";
     if (gameInfo.status === "loading") return "Hashing game…";
     if (mapInfo.status === "loading") return "Hashing map…";
@@ -163,7 +169,7 @@ export function HostBattleForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canHost || !target || hosting) return;
+    if (!canHost || !target || hosting || checking) return;
     setError(null);
     setLeftover(null);
     setHosting(true);
@@ -316,6 +322,7 @@ export function HostBattleForm({
             onReport={setReachability}
             always
             relayWillCarry={route === "relay"}
+            onCheckingChange={setChecking}
           />
 
           {/* How the relay is used, next to the answer that decides it in the
@@ -350,13 +357,17 @@ export function HostBattleForm({
               reading appears. Not the same thing as issue #2022, which tells
               the people already in a battle why their ping is what it is. This
               is the host, before they commit to anything. */}
-          <p className="text-xs text-muted-foreground">
-            {hostingRouteSummary(route, {
-              lanRoom: false,
-              relayDeclined,
-              relayAlways,
-            })}
-          </p>
+          {/* Held back while the check runs, because until it answers the
+              sentence would describe a route nobody has picked. */}
+          {!checking && (
+            <p className="text-xs text-muted-foreground">
+              {hostingRouteSummary(route, {
+                lanRoom: false,
+                relayDeclined,
+                relayAlways,
+              })}
+            </p>
+          )}
 
           {(gameFailed || mapFailed) && (
             <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">
@@ -426,8 +437,14 @@ export function HostBattleForm({
             <Button
               type="submit"
               className="h-9"
-              disabled={!canHost || hosting}
+              disabled={!canHost || hosting || checking}
             >
+              {(hosting || checking) && (
+                <Loader2
+                  className="size-4 motion-safe:animate-spin"
+                  aria-hidden
+                />
+              )}
               {hostButtonLabel()}
             </Button>
           </div>

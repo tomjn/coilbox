@@ -230,4 +230,37 @@ describe("the reachability panel that always checks", () => {
     expect(document.querySelector(".text-destructive")).toBeNull();
     expect(document.body.textContent).toContain("UPnP or NAT-PMP");
   });
+
+  // A check takes seconds, so it has to look like something is happening, and
+  // the form above has to know it is not finished.
+  it("shows it is still looking, and tells the form", () => {
+    report.current = null;
+    const checking = vi.fn();
+    render(
+      <ReachablePorts
+        ports={[]}
+        help="Opens the ports"
+        always
+        onCheckingChange={checking}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Looking for a way in",
+    );
+    expect(checking).toHaveBeenLastCalledWith(true);
+  });
+
+  it("tells the form the check has finished once there is an answer", () => {
+    report.current = REFUSED;
+    const checking = vi.fn();
+    render(
+      <ReachablePorts
+        ports={[]}
+        help="Opens the ports"
+        always
+        onCheckingChange={checking}
+      />,
+    );
+    expect(checking).toHaveBeenLastCalledWith(false);
+  });
 });

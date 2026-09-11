@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CopyButton } from "./CopyButton";
@@ -40,6 +41,7 @@ export function ReachablePorts({
   onReport,
   always = false,
   relayWillCarry = false,
+  onCheckingChange,
 }: {
   /** The ports to open, or null to close whatever is open. The caller builds
    *  this from its own port fields, so a host who moves their room takes the
@@ -65,6 +67,10 @@ export function ReachablePorts({
    *  refusal is not a fault to draw in red. The ways to fix it are still shown,
    *  because a direct game has the better ping. */
   relayWillCarry?: boolean;
+  /** Hear whether the check is still running, so the form can hold its submit
+   *  button until there is an answer to pick a route from. Must keep the same
+   *  identity between renders, like `onReport`. */
+  onCheckingChange?: (checking: boolean) => void;
 }) {
   const [ticked, setTicked] = useState(false);
   const enabled = always || ticked;
@@ -73,6 +79,14 @@ export function ReachablePorts({
   useEffect(() => {
     onReport?.(net.report);
   }, [net.report, onReport]);
+
+  // The same test the answer below uses to show it is still looking, so the
+  // form and the panel cannot disagree about whether there is an answer yet.
+  const checking =
+    enabled && ports !== null && (net.busy || (!net.report && !net.error));
+  useEffect(() => {
+    onCheckingChange?.(checking);
+  }, [checking, onCheckingChange]);
 
   // Nothing to answer with no ports asked for, which is a form that has decided
   // it does not need the router at all.
@@ -135,9 +149,18 @@ function Answer({
 }) {
   if (busy || (!report && !error)) {
     return (
-      <p className="text-xs text-muted-foreground">
-        Looking for a way in… This takes a few seconds, and longer when nothing
-        is going to answer.
+      <p
+        role="status"
+        className="flex items-start gap-1.5 text-xs text-muted-foreground"
+      >
+        <Loader2
+          className="mt-px size-3.5 shrink-0 motion-safe:animate-spin"
+          aria-hidden
+        />
+        <span>
+          Looking for a way in… This takes a few seconds, and longer when
+          nothing is going to answer.
+        </span>
       </p>
     );
   }

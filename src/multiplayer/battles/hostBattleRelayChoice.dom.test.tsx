@@ -1,19 +1,20 @@
 // @vitest-environment happy-dom
 
 /**
- * The relay preference in the "Host a battle" form (issue #2023).
+ * The relay choice and the router check in the "Host a battle" form (issue
+ * #2023).
  *
  * `hostingRoute` is tested on its own and proves the ladder steps where it
- * should. What it cannot prove is that the checkbox is joined to it. Passing a
+ * should. What it cannot prove is that the choice is joined to it. Passing a
  * literal in place of the host's answer would leave every ladder test green and
  * ship a control that does nothing, which is the failure this file exists to
  * catch. So each test reads the battle that came out of the form, or the words
  * on screen, rather than the route the form worked out.
  *
- * The content scan and the port opener are stood in for.
- * None of them is what is being asked about, and the port opener's stand-in is
- * how the router's refusal gets into the form, which is the only way to reach
- * the rung the preference sits on.
+ * The content scan and the port opener are stood in for. Neither is what is
+ * being asked about, and the port opener's stand-in is how the router's answer
+ * gets into the form, which is the only way to reach the rung the choice sits
+ * on.
  */
 
 import { DrawerProvider, PersistentStoreProvider } from "@picoframe/frame";
@@ -58,18 +59,41 @@ const OPENED: DirectReachability = {
 vi.mock("../../direct/ReachablePorts", () => ({
   ReachablePorts: ({
     onReport,
+    onCheckingChange,
     always,
     ports,
   }: {
     onReport?: (report: DirectReachability | null) => void;
+    onCheckingChange?: (checking: boolean) => void;
     always?: boolean;
     ports: unknown[] | null;
   }) => (
     <>
-      <button type="button" onClick={() => onReport?.(REFUSED)}>
+      <button
+        type="button"
+        onClick={() => {
+          onReport?.(null);
+          onCheckingChange?.(true);
+        }}
+      >
+        Pretend the router is still looking
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onReport?.(REFUSED);
+          onCheckingChange?.(false);
+        }}
+      >
         Pretend the router refused
       </button>
-      <button type="button" onClick={() => onReport?.(OPENED)}>
+      <button
+        type="button"
+        onClick={() => {
+          onReport?.(OPENED);
+          onCheckingChange?.(false);
+        }}
+      >
         Pretend the router opened the port
       </button>
       <span>{always ? "Checks the router" : "Asks before checking"}</span>
@@ -241,6 +265,21 @@ describe("the router check in the hosting form", () => {
   it("checks the router without asking", () => {
     form();
     expect(screen.getByText("Checks the router")).toBeTruthy();
+  });
+
+  // Until the router answers there is nothing to pick a route with, so Host
+  // waits rather than advertising an address nobody has tested.
+  it("holds Host until the router has answered", () => {
+    form();
+    fireEvent.click(screen.getByText("Pretend the router is still looking"));
+    const waiting = screen.getByRole("button", {
+      name: "Checking your router…",
+    });
+    expect(waiting.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.click(screen.getByText("Pretend the router refused"));
+    const ready = screen.getByRole("button", { name: "Host battle" });
+    expect(ready.hasAttribute("disabled")).toBe(false);
   });
 
   it("hands the port back when the form closes without a battle", () => {
