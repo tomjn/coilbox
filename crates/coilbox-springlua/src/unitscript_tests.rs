@@ -48,6 +48,49 @@ fn assert_close(actual: f64, expected: f64) {
     );
 }
 
+/// A unit opened out of a game carries two spellings of each piece name: the
+/// one its model file uses, and the lower case one coilbox gives its pieces so
+/// that a generated script's locals are valid Lua identifiers. A game's own
+/// script names the first.
+///
+/// flove is where this showed. Its models name a piece `Trunk`, its unit
+/// definitions ask for `Trunk`, and every animation raised against a piece list
+/// holding `trunk`.
+#[test]
+fn a_script_may_name_a_piece_in_the_case_its_model_file_used() {
+    let timeline = play(
+        r#"
+        local turret = piece("Turret")
+        function script.Create()
+            Turn(turret, y_axis, 1.0)
+        end
+        "#,
+        3,
+    );
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+}
+
+/// A second look rather than a loose one. A name no piece answers to in any
+/// case still says so, because a script naming a piece that is genuinely not
+/// there is a script the engine refuses to load.
+#[test]
+fn a_piece_that_is_not_there_in_any_case_still_fails() {
+    let timeline = play(
+        r#"
+        local ghost = piece("ghost")
+        function script.Create()
+            Turn(ghost, y_axis, 1.0)
+        end
+        "#,
+        3,
+    );
+    assert!(
+        timeline.error.is_some(),
+        "a piece that does not exist should still be reported"
+    );
+}
+
 #[test]
 fn turns_toward_the_target_at_the_speed_given() {
     // One radian a second: a tenth of a radian after three frames.

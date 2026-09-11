@@ -1318,7 +1318,26 @@ fn install_pieces(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                 ));
             };
             let name = name.to_string_lossy();
-            let index = sim.model.pieces.iter().position(|piece| piece.name == name);
+            // Exactly first, then ignoring case. The engine matches exactly and
+            // only ever sees one spelling, the one its model file carries. A
+            // unit opened out of a game here has two: the file's own name, and
+            // the lower case one coilbox gives its pieces so that a generated
+            // script's locals are valid Lua identifiers. A game's own script
+            // names the first and a generated script names the second, and both
+            // mean this piece. flove is where this showed: its models name a
+            // piece `Trunk` and its unit definitions ask for `Trunk`, so every
+            // animation raised against a piece list holding `trunk`.
+            let index = sim
+                .model
+                .pieces
+                .iter()
+                .position(|piece| piece.name == name)
+                .or_else(|| {
+                    sim.model
+                        .pieces
+                        .iter()
+                        .position(|piece| piece.name.eq_ignore_ascii_case(&name))
+                });
             let Some(index) = index else {
                 return Err(mlua::Error::RuntimeError(format!(
                     "this unit has no piece called \"{name}\""
