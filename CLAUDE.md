@@ -10,7 +10,7 @@ Before pushing, run the **full** check suite locally and confirm it passes. CI (
 
 - Frontend job: `bunx biome ci .`, `bun run typecheck`, `bun run test`
 - Lua job: `scripts/mission-tests.sh`
-- Rust job: `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --workspace`
+- Rust job: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace`
 
 The two easiest to miss are `scripts/mission-tests.sh` and `cargo test --workspace`. The Lua job is a whole third job with no lint in it at all: the mission runtime and the blueprint widget are Lua the engine runs, so neither of the other jobs compiles them and a break would otherwise reach a game. `cargo test --workspace` is tucked inside the Rust job because clippy compiles `#[cfg(test)]` modules but never runs them, so a wrong Rust test would otherwise pass forever.
 
