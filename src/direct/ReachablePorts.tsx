@@ -200,7 +200,7 @@ function Answer({
   // the relay is about to carry the battle anyway.
   const alarming = problem && !relayWillCarry;
   const address = joinAddress(report);
-  const said = readout(report);
+  const said = readout(report, relayWillCarry);
   // The router's own words, only under an outcome they explain. A host already
   // on the internet has "no UPnP gateway answered" against their name because
   // there is no gateway to answer, and that reads as a fault they have not got.
@@ -235,7 +235,10 @@ function Answer({
 
 /** What one outcome says: the verdict, a line under it, what to do, and what
  *  goes behind Details. Pure. */
-function readout(report: DirectReachability): {
+function readout(
+  report: DirectReachability,
+  relayWillCarry: boolean,
+): {
   title: ReactNode;
   note?: ReactNode;
   fix?: ReactNode;
@@ -300,6 +303,12 @@ function readout(report: DirectReachability): {
             {report.wanted.length > 1 ? "aren't" : "isn't"} open
           </>
         ),
+        // Why the fix is worth doing, which depends on what happens without
+        // it. With the relay carrying the battle it buys a direct connection,
+        // and without one it is the only way in from outside.
+        note: relayWillCarry
+          ? "Fix this so players outside your network can connect without the relay."
+          : "Fix this so players outside your network can join.",
         fix: (
           <>
             Turn on UPnP or NAT-PMP in your router, or forward{" "}

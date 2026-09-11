@@ -156,6 +156,9 @@ describe("the reachability panel for a host behind a router", () => {
     );
     expect(document.body.textContent).toContain("UPnP or NAT-PMP");
     expect(document.body.textContent).toContain("192.168.1.45");
+    expect(document.body.textContent).toContain(
+      "Fix this so players outside your network can join.",
+    );
   });
 
   // Folded away, because only a bug report needs it, and one press from view.
@@ -236,6 +239,9 @@ describe("the reachability panel that always checks", () => {
     );
     expect(document.querySelector(".text-destructive")).toBeNull();
     expect(document.body.textContent).toContain("UPnP or NAT-PMP");
+    expect(document.body.textContent).toContain(
+      "Fix this so players outside your network can connect without the relay.",
+    );
   });
 
   // A check takes seconds, so it has to look like something is happening, and
