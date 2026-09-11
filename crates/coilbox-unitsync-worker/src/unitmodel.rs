@@ -220,10 +220,19 @@ pub(crate) fn read_model(
                 ..Default::default()
             },
         },
+        // "No model" and "a model coilbox cannot read" are the same thing to
+        // every caller, and they are not the same thing to a reader. Flove spent
+        // this whole feature being told it had no models while 27 of them sat in
+        // its archive, so the difference is worth the lookup.
         None => UnitModelOutput {
-            errors: vec![format!(
-                "{game_archive} has no model for {object_name:?} under {MODEL_DIR}/"
-            )],
+            errors: vec![match find_unreadable_model(list, object_name) {
+                Some(member) => format!(
+                    "{game_archive} holds {member}, which the engine draws and coilbox cannot read"
+                ),
+                None => {
+                    format!("{game_archive} has no model for {object_name:?} under {MODEL_DIR}/")
+                }
+            }],
             ..Default::default()
         },
     };
@@ -930,7 +939,10 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     let candidates: Vec<String> = if is_model_file(&want) {
         vec![want]
     } else {
-        MODEL_EXTS.iter().map(|ext| format!("{want}.{ext}")).collect()
+        MODEL_EXTS
+            .iter()
+            .map(|ext| format!("{want}.{ext}"))
+            .collect()
     };
     // The declared folder first, then the same name anywhere, which catches the
     // games that put models under their own subfolders.
@@ -949,6 +961,36 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Formats the engine draws but coilbox does not read. It has a parser of its
+/// own for these rather than going through Assimp, so adding them here would be
+/// a second reader rather than another extension in [`MODEL_EXTS`].
+///
+/// They are listed at all so a model in one of them can be named. A file that is
+/// present, valid, and drawn in the game is not "no model", and reporting it as
+/// one sends somebody looking for a file that is sitting in the archive.
+const UNREADABLE_MODEL_EXTS: [&str; 2] = ["gltf", "glb"];
+
+/// The model a unitdef meant, when coilbox has no reader for its format.
+///
+/// Only consulted once [`find_model`] has come back empty, so it costs nothing
+/// in the normal case.
+fn find_unreadable_model(list: &[(String, String)], object_name: &str) -> Option<String> {
+    let want = object_name.trim().replace('\\', "/").to_lowercase();
+    if want.is_empty() {
+        return None;
+    }
+    let already_named = UNREADABLE_MODEL_EXTS
+        .iter()
+        .any(|ext| want.ends_with(&format!(".{ext}")));
+    if already_named {
+        return find_member(list, &want)
+            .or_else(|| find_member(list, &format!("{MODEL_DIR}/{want}")));
+    }
+    UNREADABLE_MODEL_EXTS
+        .iter()
+        .find_map(|ext| find_member(list, &format!("{MODEL_DIR}/{want}.{ext}")))
 }
 
 /// Read `unittextures/tatex/teamtex.txt`: the names a `.3do` face can use.
@@ -1309,6 +1351,29 @@ mod tests {
     fn a_model_with_no_metafile_finds_nothing() {
         let list = listing(&["Objects3d/spire.dae"]);
         assert!(find_metafile(&list, "Objects3d/spire.dae").is_none());
+    }
+
+    /// A `.gltf` is drawn by the engine and unreadable here, so it has to be
+    /// named rather than reported as a missing file.
+    #[test]
+    fn a_model_in_an_unreadable_format_is_found_so_it_can_be_named() {
+        let list = listing(&["Objects3d/hover.gltf"]);
+        assert_eq!(
+            find_unreadable_model(&list, "hover").as_deref(),
+            Some("Objects3d/hover.gltf")
+        );
+        assert_eq!(
+            find_unreadable_model(&list, "hover.gltf").as_deref(),
+            Some("Objects3d/hover.gltf")
+        );
+    }
+
+    /// A unit naming a model nothing in the archive answers to keeps the older
+    /// message, which is the honest one for that case.
+    #[test]
+    fn a_unit_with_no_model_at_all_finds_no_unreadable_one_either() {
+        let list = listing(&["Objects3d/other.s3o"]);
+        assert!(find_unreadable_model(&list, "hover").is_none());
     }
 
     #[test]

@@ -12,8 +12,8 @@
 
 use russimp::material::{PropertyTypeInfo, TextureType};
 use russimp::node::Node;
-use russimp::scene::{PostProcess, Scene};
 use russimp::property::PropertyStore;
+use russimp::scene::{PostProcess, Scene};
 use std::rc::Rc;
 
 /// The extensions the engine hands to Assimp, from `CheckAssimpWhitelist` in
@@ -249,7 +249,11 @@ fn bounds(piece: &Piece, parent: [f32; 3]) -> ([f32; 3], [f32; 3]) {
 fn material_texture(scene: &Scene) -> Option<String> {
     let material = scene.materials.first()?;
     let mut found = None;
-    for want in [TextureType::Specular, TextureType::Unknown, TextureType::Diffuse] {
+    for want in [
+        TextureType::Specular,
+        TextureType::Unknown,
+        TextureType::Diffuse,
+    ] {
         for p in &material.properties {
             if p.semantic != want || p.key != "$tex.file" {
                 continue;
