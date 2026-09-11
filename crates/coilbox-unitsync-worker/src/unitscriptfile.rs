@@ -569,17 +569,6 @@ fn bos_include_names(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// The names one file asks for, in the order it asks.
-///
-/// A literal string is all this looks for, because it is all that can be read
-/// out of text: a name a script works out at run time is not in its source at
-/// all. Those are picked up separately, by [`unit_def_includes`], from the unit
-/// definition the script reads them from.
-///
-/// A commented-out `include` is matched too, which costs one file read and
-/// nothing else. Telling the difference means lexing Lua, and reading a file
-/// the script turns out not to want is a much smaller fault than missing one it
-/// does.
 /// The Lua files a unit definition names, for a script that loads a library by
 /// asking its own definition rather than by writing the path down.
 ///
@@ -615,6 +604,17 @@ fn unit_def_includes(unit_def: Option<&str>) -> Vec<String> {
         .collect()
 }
 
+/// The names one file asks for, in the order it asks.
+///
+/// A literal string is all this looks for, because it is all that can be read
+/// out of text: a name a script works out at run time is not in its source at
+/// all. Those are picked up separately, by [`unit_def_includes`], from the unit
+/// definition the script reads them from.
+///
+/// A commented-out `include` is matched too, which costs one file read and
+/// nothing else. Telling the difference means lexing Lua, and reading a file
+/// the script turns out not to want is a much smaller fault than missing one it
+/// does.
 fn include_names(text: &str) -> Vec<String> {
     // Both quote styles, since Lua has no preference and games use each. The
     // parentheses are optional too, because Lua lets a call with one string
