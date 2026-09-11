@@ -54,6 +54,24 @@ export const NAT_TYPE_DIRECT = 0;
 export const HOST_THROUGH_RELAY_KEY = "multiplayer.hostThroughRelay";
 
 /**
+ * Settings key: check the router, and ask it to open the game port, when
+ * hosting a battle on a lobby server.
+ *
+ * Default on. The ladder has nothing to go on without this check, so a host who
+ * never ticked it was advertised at their own address and never relayed,
+ * however unreachable they were. That is the outcome relay hosting exists to
+ * prevent, and it was what every host got by default.
+ *
+ * Stored for the same reason as {@link HOST_THROUGH_RELAY_KEY}. A host who has
+ * forwarded their port by hand and turns this off is saying something about
+ * their network, not about one battle.
+ *
+ * Only the lobby form reads it. A LAN room has no relay to fall back to, and
+ * starts with the check off.
+ */
+export const OPEN_ROUTER_PORTS_KEY = "multiplayer.openRouterPorts";
+
+/**
  * How a hosted battle is reachable, or why it is not.
  *
  * The first three are the ladder from issue #2020. The last two are its two
@@ -76,12 +94,12 @@ export type HostingRoute =
 /**
  * Which route hosting takes. Pure.
  *
- * `report` is null when the host has not turned on "Reachable over the
- * internet", which is its default in both hosting forms. That is not a failed
- * check, it is the absence of one, and it is why "unchecked" exists: opening a
- * port on somebody's router changes what the rest of the internet can reach, so
- * coilbox only does it when asked, and a host who never asked must not be
- * quietly put through a relay on no evidence.
+ * `report` is null when "Open ports on my router" is off, which is the default
+ * in a LAN room and the host's own choice in the lobby form. That is not a
+ * failed check, it is the absence of one, and it is why "unchecked" exists.
+ * Opening a port on somebody's router changes what the rest of the internet can
+ * reach, so coilbox does not do it to a host who turned it off, and that host
+ * must not be quietly put through a relay on no evidence.
  *
  * `relayAvailable` comes from the lobby server's own compatibility flags, via
  * `relayHostingAvailable` in `src/multiplayer/protocol.ts`. It is false on every
@@ -234,8 +252,9 @@ export function hostingRouteSummary(
  *
  * # What is deliberately silent
  *
- * "unchecked" is the common case, because the port check is off by default in
- * both hosting forms. Nothing is known about the route, and a word that means
+ * "unchecked" is the common case in a LAN room, where the port check is off by
+ * default, and the lobby form's case once a host has turned the check off.
+ * Nothing is known about the route, and a word that means
  * "we did not look" would be noise on every battle anybody hosts. The hosting
  * form is where that is worth offering, and it already does.
  *

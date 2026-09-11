@@ -1,5 +1,5 @@
 import { Button, Input, useSetting } from "@picoframe/frame";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,12 +14,14 @@ import {
   hostingRoute,
   hostingRouteSummary,
   NAT_TYPE_DIRECT,
+  OPEN_ROUTER_PORTS_KEY,
   recordHostingRoute,
 } from "../../direct/hostingRoute";
 import { ReachablePorts } from "../../direct/ReachablePorts";
 import {
   battlePorts,
   type DirectReachability,
+  directClosePorts,
 } from "../../direct/reachability";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
@@ -101,7 +103,8 @@ export function HostBattlePopover({
   const [port, setPort] = useState(DEFAULT_HOST_PORT);
   const [password, setPassword] = useState("");
   // What the router and the internet said, handed up by ReachablePorts below.
-  // Null until the host asks it to look, which is a route decision of its own.
+  // Null until the check answers, and for as long as the host has it turned off,
+  // which is a route decision of its own.
   const [reachability, setReachability] = useState<DirectReachability | null>(
     null,
   );
@@ -126,6 +129,25 @@ export function HostBattlePopover({
     HOST_THROUGH_RELAY_KEY,
     true,
   );
+  // Whether to ask the router to open the game port. Stored, and on by default,
+  // because it is the only evidence the ladder has. Without it a host behind a
+  // router is advertised at an address nobody has tested and the relay below is
+  // never reached.
+  const [checkRouter, setCheckRouter] = useSetting<boolean>(
+    OPEN_ROUTER_PORTS_KEY,
+    true,
+  );
+  // Whether the battle this form was opened for has been opened. The port the
+  // check asked for belongs to that battle. A form closed without one hands the
+  // port back, rather than leaving it on the router until coilbox quits.
+  const hosted = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    hosted.current = false;
+    return () => {
+      if (!hosted.current) directClosePorts({}).catch(() => {});
+    };
+  }, [open]);
 
   function hostButtonLabel(): string {
     if (hosting) return "Hosting…";
@@ -178,6 +200,7 @@ export function HostBattlePopover({
       // route for a battle that never happened. Read back by the battle room
       // (issue #2022).
       recordHostingRoute(route);
+      hosted.current = true;
       setOpen(false);
     } catch (err) {
       // Left open on purpose: the answer is in here, and the fields that need
@@ -301,6 +324,8 @@ export function HostBattlePopover({
                 ports={battlePorts(port)}
                 help={`Asks your router to forward UDP ${port}, which is the port the engine hosts the game on. One port, because the lobby is somebody else's server and coilbox listens on nothing.`}
                 onReport={setReachability}
+                enabled={checkRouter}
+                onEnabledChange={setCheckRouter}
               />
 
               {/* The bottom rung of the ladder, asked about next to the answer

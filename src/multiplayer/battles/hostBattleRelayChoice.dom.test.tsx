@@ -53,17 +53,37 @@ const REFUSED: DirectReachability = {
 };
 
 // Stands in for the panel that asks the router. A button rather than a report
-// on mount, so the refusal arrives at a moment the test chooses.
+// on mount, so the refusal arrives at a moment the test chooses. A second button
+// shows whether the router check is on and turns it over, which is the other
+// answer this form keeps.
 vi.mock("../../direct/ReachablePorts", () => ({
   ReachablePorts: ({
     onReport,
+    enabled,
+    onEnabledChange,
   }: {
     onReport?: (report: DirectReachability | null) => void;
+    enabled?: boolean;
+    onEnabledChange?: (enabled: boolean) => void;
   }) => (
-    <button type="button" onClick={() => onReport?.(REFUSED)}>
-      Pretend the router refused
-    </button>
+    <>
+      <button type="button" onClick={() => onReport?.(REFUSED)}>
+        Pretend the router refused
+      </button>
+      <button type="button" onClick={() => onEnabledChange?.(!enabled)}>
+        {enabled ? "Router check on" : "Router check off"}
+      </button>
+    </>
   ),
+}));
+
+// Handing the port back is a call to the router, so it is counted here rather
+// than made.
+const closePorts = vi.hoisted(() => vi.fn(async () => ({ closed: true })));
+
+vi.mock("../../direct/reachability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../direct/reachability")>()),
+  directClosePorts: closePorts,
 }));
 
 vi.mock("./useHostContent", () => ({
@@ -125,6 +145,7 @@ beforeEach(() => {
   // The preference is stored, so one test's answer would otherwise be the next
   // one's starting point.
   localStorage.clear();
+  closePorts.mockClear();
 });
 
 describe("the relay preference in the hosting form", () => {
@@ -187,5 +208,45 @@ describe("the relay preference in the hosting form", () => {
     form(false);
     fireEvent.click(checkbox());
     expect(screen.getByText(/this server has no relay/)).toBeTruthy();
+  });
+});
+
+/**
+ * The router check beside it. On by default, because without it the ladder has
+ * nothing to go on and the relay is never reached. The port it opens belongs to
+ * the battle, so a form closed without one hands it back.
+ */
+describe("the router check in the hosting form", () => {
+  const toggle = () => screen.getByRole("button", { name: /Router check/ });
+
+  it("is on by default", () => {
+    form();
+    expect(toggle().textContent).toBe("Router check on");
+  });
+
+  it("remembers being turned off", () => {
+    form();
+    fireEvent.click(toggle());
+    cleanup();
+
+    form();
+    expect(toggle().textContent).toBe("Router check off");
+  });
+
+  it("hands the port back when the form closes without a battle", () => {
+    form();
+    cleanup();
+    expect(closePorts).toHaveBeenCalledTimes(1);
+  });
+
+  // Waits for the attempt to finish, not only for the battle to be sent, because
+  // the form marks the battle as its own after `onHost` resolves.
+  it("keeps the port for the battle it opened", async () => {
+    const opened = form();
+    host();
+    await vi.waitFor(() => expect(opened).toHaveLength(1));
+    await vi.waitFor(() => expect(screen.queryByText("Hosting…")).toBeNull());
+    cleanup();
+    expect(closePorts).not.toHaveBeenCalled();
   });
 });

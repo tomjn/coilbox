@@ -19,11 +19,12 @@ import { type PortSpec, useReachablePorts } from "./useReachablePorts";
  * unticked host is still advertised at their own address, with nobody having
  * checked that anybody can reach it.
  *
- * Off by default, in both places it appears. Ticking it opens a port on a home
- * router, which changes what the rest of the internet can reach, and that is not
- * a thing to do to somebody because they opened a form. The LAN case this
- * milestone exists for needs none of it, and the join approval toggle next to it
- * is off for the same reason and says so in its own words.
+ * Off by default in a LAN room, which needs none of it, and the join approval
+ * toggle next to it is off for the same reason. The lobby hosting form turns it
+ * on by default and holds the answer itself through `enabled`, because a battle
+ * on a lobby server only works if the internet can reach the game port, and
+ * without the check the relay is never reached either. That form hands the port
+ * back when it is closed without hosting, so opening it to look costs nothing.
  *
  * The answer appears here rather than as a toast because failure is the normal
  * outcome and the way out of it is a set of instructions with two port numbers
@@ -37,6 +38,8 @@ export function ReachablePorts({
   ports,
   help,
   onReport,
+  enabled: enabledProp,
+  onEnabledChange,
 }: {
   /** The ports to open, or null to close whatever is open. The caller builds
    *  this from its own port fields, so a host who moves their room takes the
@@ -52,8 +55,15 @@ export function ReachablePorts({
    *  Must keep the same identity between renders, or this notifies on every
    *  one. A `useState` setter is the intended argument. */
   onReport?: (report: DirectReachability | null) => void;
+  /** Whether the toggle is on, for a caller that keeps the answer itself. Left
+   *  out, the toggle holds its own and starts off. */
+  enabled?: boolean;
+  /** Hear the host change the toggle. Paired with `enabled`. */
+  onEnabledChange?: (enabled: boolean) => void;
 }) {
-  const [enabled, setEnabled] = useState(false);
+  const [ownEnabled, setOwnEnabled] = useState(false);
+  const enabled = enabledProp ?? ownEnabled;
+  const setEnabled = onEnabledChange ?? setOwnEnabled;
   const net = useReachablePorts(enabled ? ports : null);
 
   useEffect(() => {
