@@ -216,8 +216,11 @@ fn main() {
 
     // Dev-only: expose an MCP socket server so AI agents can drive the app
     // (screenshots, DOM, input). The `tauri-mcp` server in .mcp.json connects
-    // over this socket. Never registered in release builds.
-    #[cfg(debug_assertions)]
+    // over this socket. Never registered in release builds. Also gated on the
+    // `mcp` feature, which is off by default so the plugin and its dependencies
+    // are absent from a release build entirely. `bun tauri dev` enables it via
+    // scripts/tauri.mjs.
+    #[cfg(all(debug_assertions, feature = "mcp"))]
     {
         builder = builder.plugin(tauri_plugin_mcp::init_with_config(
             tauri_plugin_mcp::PluginConfig::new("Coilbox".to_string())
