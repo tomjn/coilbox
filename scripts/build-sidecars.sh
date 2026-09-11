@@ -11,12 +11,21 @@
 # plans all of them together, so shared dependencies build once and the final
 # crates compile in parallel, instead of one `cargo build` per crate in turn.
 #
-# Usage: build-sidecars.sh <crate-name>...
+# Usage: build-sidecars.sh [--timings] <crate-name>...
+#
+# --timings writes a build-time report to target/cargo-timings/ (issue #2801),
+# so a release run can show which sidecar crate holds up the job.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+TIMINGS=0
+if [ "${1:-}" = "--timings" ]; then
+  TIMINGS=1
+  shift
+fi
+
 if [ "$#" -eq 0 ]; then
-  echo "Usage: $0 <crate-name>..." >&2
+  echo "Usage: $0 [--timings] <crate-name>..." >&2
   exit 1
 fi
 
@@ -31,7 +40,12 @@ for CRATE in "$@"; do
   CARGO_ARGS+=(-p "$CRATE")
 done
 
-cargo build "${CARGO_ARGS[@]}" --release
+TIMING_ARGS=()
+if [ "$TIMINGS" -eq 1 ]; then
+  TIMING_ARGS+=(--timings)
+fi
+
+cargo build "${CARGO_ARGS[@]}" --release "${TIMING_ARGS[@]}"
 mkdir -p src-tauri/binaries
 for CRATE in "$@"; do
   cp "target/release/${CRATE}${EXE}" \
