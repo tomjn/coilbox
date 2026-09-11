@@ -48,6 +48,49 @@ fn assert_close(actual: f64, expected: f64) {
     );
 }
 
+/// A unit opened out of a game carries two spellings of each piece name: the
+/// one its model file uses, and the lower case one coilbox gives its pieces so
+/// that a generated script's locals are valid Lua identifiers. A game's own
+/// script names the first.
+///
+/// flove is where this showed. Its models name a piece `Trunk`, its unit
+/// definitions ask for `Trunk`, and every animation raised against a piece list
+/// holding `trunk`.
+#[test]
+fn a_script_may_name_a_piece_in_the_case_its_model_file_used() {
+    let timeline = play(
+        r#"
+        local turret = piece("Turret")
+        function script.Create()
+            Turn(turret, y_axis, 1.0)
+        end
+        "#,
+        3,
+    );
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+}
+
+/// A second look rather than a loose one. A name no piece answers to in any
+/// case still says so, because a script naming a piece that is genuinely not
+/// there is a script the engine refuses to load.
+#[test]
+fn a_piece_that_is_not_there_in_any_case_still_fails() {
+    let timeline = play(
+        r#"
+        local ghost = piece("ghost")
+        function script.Create()
+            Turn(ghost, y_axis, 1.0)
+        end
+        "#,
+        3,
+    );
+    assert!(
+        timeline.error.is_some(),
+        "a piece that does not exist should still be reported"
+    );
+}
+
 #[test]
 fn turns_toward_the_target_at_the_speed_given() {
     // One radian a second: a tenth of a radian after three frames.
@@ -289,6 +332,240 @@ fn a_started_thread_takes_its_arguments() {
     );
     assert_eq!(timeline.error, None);
     assert_close(rot_y(&timeline, 0, "turret"), 0.25);
+}
+
+/// The mask a table stands for, which the engine allows and flove relies on: it
+/// gives each shared animation library a fresh table so that one unit's walk
+/// cycle cannot signal another's. Two tables are two masks however alike they
+/// look, so the sweep has to survive a signal raised with the other one.
+#[test]
+fn a_table_is_a_mask_of_its_own() {
+    // The turn is on the far side of a sleep, so it happens only if the thread
+    // is still alive to reach it. A turn already running would not do: killing
+    // the thread that asked for one does not stop the engine finishing it.
+    let script = r#"
+        local turret = piece("turret")
+        local SIG, OTHER = {}, {}
+        local function sweep()
+            SetSignalMask(SIG)
+            Sleep(100)
+            Turn(turret, y_axis, 1.5)
+        end
+        function script.Create() StartThread(sweep) end
+        function script.StopMoving() Signal(RAISED) end
+        "#;
+    let events = [
+        ScriptEvent {
+            frame: 0,
+            callin: "Create".to_string(),
+            args: Vec::new(),
+            ambient: false,
+        },
+        ScriptEvent {
+            frame: 1,
+            callin: "StopMoving".to_string(),
+            args: Vec::new(),
+            ambient: false,
+        },
+    ];
+    let names = pieces();
+
+    // Signalled with the sweep's own table, it never wakes.
+    let killed = run(
+        &script.replace("RAISED", "SIG"),
+        "test.lua",
+        &Unit::new(&names),
+        &events,
+        10,
+    );
+    assert_eq!(killed.error, None);
+    assert_close(rot_y(&killed, 9, "turret"), 0.0);
+
+    // Signalled with the other table, it wakes and turns.
+    let spared = run(
+        &script.replace("RAISED", "OTHER"),
+        "test.lua",
+        &Unit::new(&names),
+        &events,
+        10,
+    );
+    assert_eq!(spared.error, None);
+    assert_close(rot_y(&spared, 9, "turret"), 1.5);
+}
+
+/// The fields the engine builds for each of a unit's weapons, which are not the
+/// ones the definition file writes. A weapon mount reads `slavedTo` to find out
+/// which weapon it follows and `mainDirZ` to find out which way it faces, and
+/// both were missing, which stopped the thread that sets up the animations.
+#[test]
+fn a_weapon_carries_the_fields_the_engine_builds() {
+    let def = serde_json::json!({
+        "unitname": "mushroom",
+        "weapondefs": { "spray": { "weapontype": "Cannon" } },
+        "weapons": {
+            "1": { "name": "spray", "maindir": "0 0 -1", "maxangledif": 180, "slaveto": 2 },
+        },
+    });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local weapon = UnitDefs[unitDefID].weapons[1]
+            if weapon.slavedTo ~= 2 then error("slavedTo is " .. tostring(weapon.slavedTo)) end
+            -- The file gives the full arc and the engine keeps the cosine of
+            -- half of it, so 180 degrees arrives as the cosine of 90, or zero.
+            if math.abs(weapon.maxAngleDif) > 0.0001 then
+                error("maxAngleDif is " .. tostring(weapon.maxAngleDif))
+            end
+            -- Moved rather than turned: a rotation is reported inside one turn,
+            -- so a direction of -1 would come back as one turn less one.
+            Move(piece("turret"), z_axis, weapon.mainDirZ)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], -1.0);
+}
+
+/// A weapon that says none of it. Forward and slaved to nothing, which is what
+/// the engine fills in, and what the `slavedTo ~= 0` a mount opens with needs.
+#[test]
+fn a_weapon_that_says_nothing_points_forward_and_is_slaved_to_nothing() {
+    let def = serde_json::json!({
+        "unitname": "mushroom",
+        "weapons": { "1": { "name": "spray" } },
+    });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local weapon = UnitDefs[unitDefID].weapons[1]
+            if weapon.slavedTo ~= 0 then error("slavedTo is " .. tostring(weapon.slavedTo)) end
+            Move(piece("turret"), z_axis, weapon.mainDirZ)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 1.0);
+}
+
+/// A script stores a rules parameter and reads it back, which is why the preview
+/// keeps them rather than dropping them. One name means two values, because the
+/// unit's store and the game's are separate in the engine, and a parameter
+/// nobody set still reads as nothing.
+#[test]
+fn a_rules_parameter_reads_back_as_it_was_set() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            Spring.SetUnitRulesParam(unitID, "grown", 3)
+            Spring.SetGameRulesParam("grown", "4")
+            if Spring.GetUnitRulesParam(unitID, "never") ~= nil then
+                error("a parameter nobody set should read as nothing")
+            end
+            local mine = Spring.GetUnitRulesParam(unitID, "grown")
+            local theirs = Spring.GetGameRulesParam("grown")
+            Move(piece("turret"), z_axis, mine + theirs)
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    // Three, plus the four that was stored as text and comes back as a number.
+    assert_close(pose(&timeline, 0, "turret")[2], 7.0);
+}
+
+/// What flove's flowers open with. None of it can move a piece, but a preview
+/// that stops on any of it shows nothing at all.
+#[test]
+fn the_world_calls_a_flower_opens_with_do_not_stop_it() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            Spring.SetUnitCollisionVolumeData(unitID, 0, 0, 0, 0, 0, 0, -1, 0, 0)
+            Spring.PlaySoundFile("bloom.wav")
+            if Spring.CreateUnit("flower", 0, 0, 0, 0, 0) ~= nil then
+                error("the preview has no second unit to make")
+            end
+            Move(piece("turret"), z_axis, Spring.GetUnitTeam(unitID) + 5)
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 5.0);
+}
+
+/// A definition that gives only the older `maxvelocity`, which counts per frame
+/// where `speed` counts per second. Every flove unit is written that way, and
+/// reading past it played the walk cycle twenty times too slowly.
+#[test]
+fn the_move_type_falls_back_to_the_definitions_max_velocity() {
+    let def = serde_json::json!({ "maxvelocity": 20.0 });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local data = Spring.GetUnitMoveTypeData(unitID)
+            Move(piece("turret"), z_axis, data.maxSpeed / 30)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 20.0);
+}
+
+/// Scripts work out how fast to play a walk cycle from the unit's top speed, so
+/// the preview has to answer with the definition's own rather than a zero they
+/// would divide by.
+#[test]
+fn the_move_type_reports_the_speed_the_definition_gives() {
+    let def = serde_json::json!({ "speed": 60.0 });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local data = Spring.GetUnitMoveTypeData(unitID)
+            Turn(piece("turret"), y_axis, data.maxSpeed / 30)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 0, "turret"), 2.0);
 }
 
 #[test]
@@ -1584,6 +1861,47 @@ mod world {
 
         assert_eq!(timeline.error, None);
         assert_close(pose(&timeline, 0, "turret")[2], 12.0);
+    }
+
+    /// One walk cycle shared between units built from different models, which
+    /// is what the piece map is for. A name the unit does not have must read as
+    /// nothing, so that asking is safe.
+    #[test]
+    fn the_piece_map_numbers_pieces_the_way_piece_does() {
+        let timeline = play(
+            r#"
+            function script.Create()
+                local pieces = Spring.GetUnitPieceMap(unitID)
+                if pieces.turret ~= piece("turret") then error("numbering disagrees") end
+                if pieces.nostril ~= nil then error("found a piece this unit has not got") end
+                Turn(piece("turret"), y_axis, pieces.turret)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        // The unit is base, turret, barrel, flare, so turret is the second.
+        assert_close(rot_y(&timeline, 0, "turret"), 2.0);
+    }
+
+    /// The spelling problem `piece()` already has. A unit opened out of a game
+    /// carries lower case piece names while the game's own script asks for the
+    /// spelling its model file uses, and flove's `Trunk` is where that showed.
+    #[test]
+    fn the_piece_map_answers_whatever_case_the_script_asks_in() {
+        let timeline = play(
+            r#"
+            function script.Create()
+                local pieces = Spring.GetUnitPieceMap(unitID)
+                Turn(piece("turret"), y_axis, pieces.Turret)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 2.0);
     }
 
     /// A unit nobody said the shape of. Answering the origin in silence would

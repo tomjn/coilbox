@@ -24,13 +24,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { basename } from "@/lib/helpers";
+import { isAssimpModel } from "../../archiveOpen";
 import type { LegoAtlas } from "../../atlas";
 import {
+  type DaeImport,
   type GlbImport,
   legoImport3do,
+  legoImportDae,
   legoImportGlb,
   legoImportS3o,
   legoRead3do,
+  legoReadDae,
   legoReadS3o,
   type ThreeDoImport,
 } from "../../bindings";
@@ -123,6 +127,7 @@ export async function readModel(options: {
   const { path } = options;
   if (/\.3do$/i.test(path)) return readThreeDo(options);
   if (/\.glb$/i.test(path)) return readGlb(options);
+  if (isAssimpModel(path)) return readDae(options);
 
   const [model, pack] = await Promise.all([legoReadS3o({ path }), loadPack()]);
   const name = options.name ?? baseName(path);
@@ -270,6 +275,84 @@ async function readGlb(options: {
       newId: () => crypto.randomUUID(),
     }),
   };
+}
+
+/**
+ * The same again, for one of the formats the engine loads through Assimp.
+ *
+ * Nearest to the `.3do` path, because opening one is a conversion: there is no
+ * recovery step, since coilbox has never written one of these and it can never
+ * be a unit coming home. And the textures it names have to be found before the
+ * import goes looking for them, which is what the probe is for. Where a `.3do`
+ * names its tiles inside the model, a Collada file names its texture in a Lua
+ * file beside it.
+ */
+async function readDae(options: {
+  path: string;
+  name?: string;
+  unitName?: string;
+  source?: string;
+  game?: LegoImportedGame;
+  unpacked?: boolean;
+  beforeImport?: (textures: string[]) => Promise<void>;
+}): Promise<ImportStage> {
+  const { path } = options;
+  const [{ textures }, pack] = await Promise.all([
+    legoReadDae({ path }),
+    loadPack(),
+  ]);
+  await options.beforeImport?.(textures);
+
+  const name = options.name ?? baseName(path);
+  const unitName = normalisePieceName(options.unitName ?? name);
+  const id = crypto.randomUUID();
+  const result = await legoImportDae({ path, id });
+
+  return {
+    state: "imported",
+    refused:
+      "It was not made here: this is one of the formats the engine reads through Assimp, and coilbox has never written one, so it cannot be a unit coming home as parts. Its nodes have been read as pieces as they stand.",
+    notes: daeNotes(result),
+    imported: projectFromImport(result, {
+      id,
+      source: options.source ?? path,
+      ...(options.game ? { game: options.game } : {}),
+      ...(options.unpacked ? { unpacked: true } : {}),
+      name,
+      unitName,
+      packId: pack.manifest.id,
+      packVersion: pack.manifest.version,
+      now: new Date().toISOString(),
+      newId: () => crypto.randomUUID(),
+    }),
+  };
+}
+
+/**
+ * What reading one of the Assimp formats had to change.
+ *
+ * Each of these is a difference between what the format can hold and what a
+ * Spring model can, and each would otherwise look like the import having
+ * quietly lost something.
+ */
+function daeNotes(result: DaeImport): string[] {
+  const notes: string[] = [];
+  if (result.transformed > 0) {
+    notes.push(
+      `${result.transformed} ${result.transformed === 1 ? "node carries" : "nodes carry"} a rotation or a scale, which an .s3o piece cannot, so ${result.transformed === 1 ? "it has" : "they have"} been baked into the vertices. Blender writes its own up-axis turn that way, so a model exported from it reports at least one.`,
+    );
+  }
+  if (result.imagesUsed > 1) {
+    notes.push(
+      `The file paints with ${result.imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it.`,
+    );
+  }
+  if (result.droppedFaces > 0) {
+    notes.push(
+      `${result.droppedFaces} ${result.droppedFaces === 1 ? "face was a point or a line" : "faces were points or lines"}, which a Spring model has no way to hold, so ${result.droppedFaces === 1 ? "it was" : "they were"} left out.`,
+    );
+  }
+  return notes;
 }
 
 /**

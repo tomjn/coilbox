@@ -16,6 +16,8 @@ permissions = [
   "allow-lego-read-3do",
   "allow-lego-import-3do",
   "allow-lego-import-glb",
+  "allow-lego-read-dae",
+  "allow-lego-import-dae",
   "allow-lego-texture-import",
   "allow-lego-texture-png",
   "allow-lego-texture-prune",

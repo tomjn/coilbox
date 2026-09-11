@@ -462,6 +462,46 @@ export const legoImport3do = defineCommand<
   ThreeDoImport
 >("coilbox-lego", "lego_import_3do");
 
+/**
+ * Name the textures one of the Assimp formats asks for, before importing it.
+ *
+ * The pair to `legoRead3do`, for the same reason: a model unpacked out of a
+ * packed archive needs its textures put beside it first. Where that one reads
+ * the model, this mostly reads the Lua file next to it, since Collada carries
+ * no texture binding of its own.
+ */
+export const legoReadDae = defineCommand<
+  { path: string },
+  { textures: string[] }
+>("coilbox-lego", "lego_read_dae");
+
+/** What one import of an Assimp format produced, on top of what any import
+ *  produces. */
+export interface DaeImport extends S3oImport {
+  /** Nodes carrying a rotation or a scale, which an `.s3o` piece cannot, so
+   *  theirs was baked into their own vertices. */
+  transformed: number;
+  /** Faces dropped for not being triangles, which is points and lines. A Spring
+   *  model has no way to hold either. */
+  droppedFaces: number;
+  /** How many materials the file's meshes paint with. A Spring unit has one
+   *  texture, so anything above one means the first was taken. */
+  imagesUsed: number;
+}
+
+/**
+ * Import one of the formats the engine loads through Assimp, as raw geometry.
+ *
+ * A conversion rather than a read, as a `.3do` is, though a smaller one: the
+ * reader hands back triangles with a normal and a coordinate per vertex. What
+ * it cannot hand back is a texture, which comes from the Lua file beside the
+ * model, or failing that from the model's own material.
+ */
+export const legoImportDae = defineCommand<
+  { path: string; id: string },
+  DaeImport
+>("coilbox-lego", "lego_import_dae");
+
 /** What one import of a `.glb` produced, on top of what any import produces. */
 export interface GlbImport extends S3oImport {
   /** Parts of the file that draw points or lines, which a Spring model has no

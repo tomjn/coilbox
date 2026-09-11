@@ -55,6 +55,48 @@ afterEach(() => {
   cleanup();
 });
 
+/**
+ * A unit opened out of a game carries two spellings of every piece name: the
+ * one its model file uses, kept on `originalName`, and the lower case one
+ * coilbox gives its pieces so a generated script's locals are valid Lua
+ * identifiers. Such a unit usually arrives carrying its game's own script,
+ * which names the first.
+ *
+ * flove is where this showed. Its models name a piece `Trunk` and its unit
+ * definitions ask for `Trunk`, and the check was reading the lower case list.
+ */
+describe("a unit whose pieces have two spellings", () => {
+  /** Asserted against the whole document, because the warning is built from a
+   *  sentence and a list of names rather than one text node. */
+  function warned(): boolean {
+    return (document.body.textContent ?? "").includes("has no piece called");
+  }
+
+  it("does not warn when a script names a piece as its model file spells it", () => {
+    const [root] = unit().pieces;
+    show(
+      unit({
+        script: 'local trunk = piece("Trunk")\n',
+        pieces: [{ ...root, name: "trunk", originalName: "Trunk" }],
+        rootPieceId: root.id,
+      }),
+    );
+    expect(warned()).toBe(false);
+  });
+
+  it("still warns about a piece that is there under neither spelling", () => {
+    const [root] = unit().pieces;
+    show(
+      unit({
+        script: 'local ghost = piece("ghost")\n',
+        pieces: [{ ...root, name: "trunk", originalName: "Trunk" }],
+        rootPieceId: root.id,
+      }),
+    );
+    expect(warned()).toBe(true);
+  });
+});
+
 describe("a unit still on the generated script", () => {
   // By role, not by label: the drawer's own title is `walker.lua` too, and
   // Radix points the dialog's `aria-labelledby` at it.

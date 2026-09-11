@@ -80,6 +80,26 @@ pub struct Piece {
     pub children: Vec<Piece>,
 }
 
+/// What reading had to change or leave behind.
+///
+/// Each of these is a difference between what these formats can hold and what a
+/// Spring model can. They are counted rather than papered over, so whatever
+/// opens the model can say what happened instead of the difference showing up
+/// later as the reader having lost something.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Notes {
+    /// Nodes carrying a rotation or a scale, which a Spring piece cannot, so
+    /// theirs was baked into their own vertices.
+    pub transformed: usize,
+    /// Faces dropped for not being triangles. After `Triangulate` and
+    /// `SortByPrimitiveType` the only things left to drop are points and lines,
+    /// which a Spring model has no way to hold.
+    pub dropped_faces: usize,
+    /// Distinct materials the file's meshes paint with. A Spring unit has one
+    /// texture, so anything above one means only the first can be used.
+    pub materials: usize,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Model {
     /// Radius of the sphere around the whole model, measured from `mid`. None
@@ -97,6 +117,7 @@ pub struct Model {
     /// the engine consults, and the caller applies the other two: the Lua
     /// metafile beside the model, and a search by model name.
     pub material_texture: Option<String>,
+    pub notes: Notes,
     pub root: Piece,
 }
 
@@ -109,6 +130,15 @@ pub fn read(bytes: &[u8], hint: &str) -> Result<Model, String> {
     // Nul terminated because `set_integer` takes the raw bytes of a C string.
     // The key is `AI_CONFIG_PP_RVC_FLAGS` from Assimp's `config.h`.
     props.set_integer(b"PP_RVC_FLAGS\0", REMOVE_COMPONENTS);
+    // A Collada file states the size of its own unit, and Assimp multiplies the
+    // root node's transform by it. The engine keeps that scale on the root piece
+    // alone: it never lets a parent's scale into a child's offset, and it sizes a
+    // model from raw vertex bounds, so the model stays in the units it was
+    // modelled in. This reader composes transforms down the tree instead, so the
+    // same scale would shrink every piece and every vertex. flove's models say
+    // `meter="0.01875"`, which made a mushroom 1.7 elmos tall rather than 90 and
+    // turned a walk cycle's four elmo bob into a leap over its own head.
+    props.set_integer(b"IMPORT_COLLADA_IGNORE_UNIT_SIZE\0", 1);
 
     let scene = Scene::from_buffer_with_props(bytes, import_flags(), hint, &props)
         .map_err(|e| e.to_string())?;
@@ -118,7 +148,11 @@ pub fn read(bytes: &[u8], hint: &str) -> Result<Model, String> {
         .as_ref()
         .ok_or_else(|| "the file parsed but holds no nodes".to_string())?;
 
-    let mut piece = walk(root, &IDENTITY, [0.0; 3], &scene.meshes);
+    let mut notes = Notes {
+        materials: distinct_materials(&scene),
+        ..Notes::default()
+    };
+    let mut piece = walk(root, &IDENTITY, [0.0; 3], &scene.meshes, &mut notes);
     // Assimp's own root node carries the file's overall transform. The engine
     // treats that node as the model root rather than shifting the model by it,
     // so its offset stays where it is and every child stays relative to it.
@@ -139,8 +173,20 @@ pub fn read(bytes: &[u8], hint: &str) -> Result<Model, String> {
             (maxs[2] + mins[2]) * 0.5,
         ],
         material_texture: material_texture(&scene),
+        notes,
         root: piece,
     })
+}
+
+/// How many materials the file's meshes paint with between them.
+///
+/// Counted off the meshes rather than off `scene.materials`, because a file can
+/// declare a material nothing uses and that is not a difference worth reporting.
+fn distinct_materials(scene: &Scene) -> usize {
+    let mut used: Vec<u32> = scene.meshes.iter().map(|m| m.material_index).collect();
+    used.sort_unstable();
+    used.dedup();
+    used.len()
 }
 
 /// The engine's `ASS_POSTPROCESS_OPTIONS`, with two deliberate differences.
@@ -256,7 +302,7 @@ fn normalise(v: [f32; 3]) -> [f32; 3] {
     }
 }
 
-fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9]) -> Mesh {
+fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9], notes: &mut Notes) -> Mesh {
     let uvs = m.texture_coords.first().and_then(|c| c.as_ref());
     let normal_matrix = inverse_transpose(linear);
     // An untransformed node's vertices are copied rather than recomputed, so a
@@ -296,7 +342,9 @@ fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9]) -> Mesh {
         .collect();
     // Faces that are not triangles are dropped rather than repaired, which is
     // what the engine does. `Triangulate` and `SortByPrimitiveType` mean the
-    // only things left to drop are lines and points.
+    // only things left to drop are lines and points, and they are counted so
+    // whatever opens the model can say that some of it was left out.
+    notes.dropped_faces += m.faces.iter().filter(|f| f.0.len() != 3).count();
     // A mirroring transform turns every triangle inside out, so the winding is
     // reversed to match. Without it the piece draws back to front, and is lit
     // from inside.
@@ -327,11 +375,30 @@ fn walk(
     parent_world: &Mat4,
     parent_translation: [f32; 3],
     scene_meshes: &[russimp::mesh::Mesh],
+    notes: &mut Notes,
 ) -> Piece {
     let world = multiply(parent_world, &mat4_of(&node.transformation));
     // Row major, so the translation is the fourth column.
     let translation = [world[0][3], world[1][3], world[2][3]];
     let linear = linear_part(&world);
+    if linear != IDENTITY_LINEAR {
+        notes.transformed += 1;
+    }
+
+    // Built as statements rather than inside the struct below, so that the
+    // meshes and then the children each take their turn with `notes` instead of
+    // two closures reaching for it at once.
+    let mut meshes = Vec::new();
+    for index in &node.meshes {
+        if let Some(mesh) = scene_meshes.get(*index as usize) {
+            meshes.push(mesh_of(mesh, &linear, notes));
+        }
+    }
+    let mut children = Vec::new();
+    for child in node.children.borrow().iter() {
+        children.push(walk(child, &world, translation, scene_meshes, notes));
+    }
+
     Piece {
         name: node.name.clone(),
         // Both translations are in model space, so their difference is where
@@ -342,18 +409,8 @@ fn walk(
             translation[1] - parent_translation[1],
             translation[2] - parent_translation[2],
         ],
-        meshes: node
-            .meshes
-            .iter()
-            .filter_map(|i| scene_meshes.get(*i as usize))
-            .map(|m| mesh_of(m, &linear))
-            .collect(),
-        children: node
-            .children
-            .borrow()
-            .iter()
-            .map(|c| walk(c, &world, translation, scene_meshes))
-            .collect(),
+        meshes,
+        children,
     }
 }
 

@@ -174,7 +174,7 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
     // Only for Lua, because `include` is a Lua call. A `.cob` was compiled with
     // whatever it needed already inside it.
     if let Some(text) = out.text.clone() {
-        out.includes = read_includes(&us, handle, &list, &text);
+        out.includes = read_includes(&us, handle, &list, &text, unit_def.as_deref());
     }
 
     // Only for a `.cob`. A game shipping Lua has nothing to convert, and the
@@ -451,11 +451,18 @@ fn read_includes(
     handle: i32,
     list: &[(String, String)],
     text: &str,
+    unit_def: Option<&str>,
 ) -> Vec<ScriptInclude> {
     let mut found = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
+    // The names the script writes down, then the ones its definition holds. A
+    // script that decides which library to load by reading its own unit
+    // definition asks for a name that is nowhere in its text, and flove's do:
+    // every mushroom shares one script and takes its movement, mount and death
+    // animations out of `customparams`.
     let mut queue: VecDeque<(String, u32)> = include_names(text)
         .into_iter()
+        .chain(unit_def_includes(unit_def))
         .map(|name| (name, 1))
         .collect();
 
@@ -562,11 +569,47 @@ fn bos_include_names(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// The Lua files a unit definition names, for a script that loads a library by
+/// asking its own definition rather than by writing the path down.
+///
+/// Any `customparams` value ending in `.lua` counts, which is broader than
+/// reading the particular keys flove uses and deliberately so: those key names
+/// are the game's own invention, and a value naming a Lua file is worth reading
+/// whatever it is called. A name that resolves to no archive member is dropped
+/// by the caller, so a wrong guess costs one lookup and nothing else.
+fn unit_def_includes(unit_def: Option<&str>) -> Vec<String> {
+    let Some(raw) = unit_def else {
+        return Vec::new();
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return Vec::new();
+    };
+    let Some(params) = value
+        .as_object()
+        .and_then(|def| {
+            def.iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case("customparams"))
+        })
+        .map(|(_, params)| params)
+        .and_then(|params| params.as_object())
+    else {
+        return Vec::new();
+    };
+    params
+        .values()
+        .filter_map(|value| value.as_str())
+        .map(str::trim)
+        .filter(|name| name.to_lowercase().ends_with(".lua"))
+        .map(str::to_string)
+        .collect()
+}
+
 /// The names one file asks for, in the order it asks.
 ///
-/// A literal string is all this looks for, because it is all a preview can
-/// follow: a name a script builds at run time is not a name until the script
-/// runs. Every `include` in the games to hand is a literal.
+/// A literal string is all this looks for, because it is all that can be read
+/// out of text: a name a script works out at run time is not in its source at
+/// all. Those are picked up separately, by [`unit_def_includes`], from the unit
+/// definition the script reads them from.
 ///
 /// A commented-out `include` is matched too, which costs one file read and
 /// nothing else. Telling the difference means lexing Lua, and reading a file
@@ -604,6 +647,32 @@ mod tests {
         assert_eq!(
             bos_include_names(bos),
             ["sfxtype.h", "exptype.h", "animations\\walk.bos"]
+        );
+    }
+
+    /// flove's mushrooms share one script and choose their animations out of
+    /// the unit definition, so the file names appear nowhere in the script's
+    /// own text and a scan of it finds nothing to read.
+    #[test]
+    fn reads_the_lua_files_a_definition_names_in_its_custom_params() {
+        let def = r#"{"name":"Big Mushroom","customparams":{
+            "moveanim":"headers/bipedal_heavymushroom_movement.lua",
+            "basepiece":"Trunk",
+            "turnaccel":500
+        }}"#;
+        assert_eq!(
+            unit_def_includes(Some(def)),
+            ["headers/bipedal_heavymushroom_movement.lua"]
+        );
+    }
+
+    #[test]
+    fn a_definition_naming_no_lua_asks_for_nothing() {
+        assert!(unit_def_includes(None).is_empty());
+        assert!(unit_def_includes(Some("not json at all")).is_empty());
+        assert!(
+            unit_def_includes(Some(r#"{"customparams":{"basepiece":"Trunk"}}"#)).is_empty(),
+            "a custom param that is not a file is not a file"
         );
     }
 

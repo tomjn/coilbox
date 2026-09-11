@@ -109,9 +109,17 @@ describe("a model field", () => {
   });
 
   it("does not offer the builder a format it cannot open", () => {
-    draw("model", "objects3d/thing.dae");
+    // A `.gltf` is drawn by the engine through a parser of its own, and there
+    // is no reader for it here. A `.dae` stood in this test until the builder
+    // learned to convert one, which is the case below.
+    draw("model", "objects3d/thing.gltf");
     expect(screen.queryByRole("link")).toBeNull();
-    expect(screen.getByText(/reads .s3o and .3do/)).toBeTruthy();
+    expect(screen.getByText(/cannot open it/)).toBeTruthy();
+  });
+
+  it("offers the builder a Collada model, which it converts on the way in", () => {
+    draw("model", "objects3d/thing.dae");
+    expect(screen.queryByRole("link")).not.toBeNull();
   });
 });
 

@@ -133,7 +133,14 @@ export const SCENARIOS: Scenario[] = [
     id: "moving",
     label: "Moving",
     description: "Created, then told to move and left moving.",
-    events: [...CREATED, { frame: 0, callin: "StartMoving" }],
+    // Half a second in, not on the frame the unit was made. A `Create` that
+    // sleeps is suspended mid-way through setting the unit up, and what it
+    // writes after the sleep is often what the move animation reads: flove's
+    // mushrooms set their rest pose in a sleeping call and then work out how
+    // fast to walk. Told to move first, the unit reads what is not written yet.
+    // The engine never has the two together either, since a move order comes
+    // from a player long after the unit exists.
+    events: [...CREATED, { frame: at(0.5), callin: "StartMoving" }],
   },
   {
     id: "starting-stopping",
@@ -141,7 +148,8 @@ export const SCENARIOS: Scenario[] = [
     description: "Moves for half the preview, then stops, so both are visible.",
     events: [
       ...CREATED,
-      { frame: 0, callin: "StartMoving" },
+      // After `Create` has finished, for the reason the scenario above gives.
+      { frame: at(0.5), callin: "StartMoving" },
       { frame: at(PREVIEW_SECONDS / 2), callin: "StopMoving" },
     ],
   },

@@ -214,6 +214,12 @@ export function isImported(project: LegoProject): boolean {
  * texture's own `source`).
  */
 export function writableSource(imported: LegoImported): string | null {
+  // The builder writes an `.s3o`, so a model converted on the way in has
+  // nowhere to go back to even when its game is a folder on disk. Saving over
+  // a `.dae` would leave a game holding a file whose own extension lies about
+  // what is in it. The same is true of a `.3do` opened by hand, which this
+  // used to hand back as writable.
+  if (!imported.source.toLowerCase().endsWith(".s3o")) return null;
   if (!imported.game) return imported.source;
   return isLooseArchive(imported.game.archive) ? imported.source : null;
 }

@@ -74,6 +74,31 @@ fn sizes_the_model_from_its_geometry() {
     );
 }
 
+const SCALED: &[u8] = include_bytes!("fixtures/scaled.dae");
+
+/// A Collada file states how large its own unit is, and Assimp multiplies the
+/// root node by it. A model has to come back in the units it was modelled in
+/// anyway, because that is what the engine reports and what a script's moves are
+/// counted in. flove's models say `meter="0.01875"`, which shrank a mushroom to
+/// a fiftieth of its size, and a walk cycle that lifts it four elmos then threw
+/// it over its own head.
+#[test]
+fn a_files_own_unit_scale_does_not_shrink_the_model() {
+    let model = read(SCALED, "dae").expect("the fixture should parse");
+    assert!(
+        (model.height - 2.0).abs() < 0.001,
+        "expected the cube's own height of 2, got {}",
+        model.height
+    );
+
+    let branch = find(&model.root, "branch").expect("the child node should be a piece");
+    assert!(
+        (branch.offset[0] - 10.0).abs() < 0.001,
+        "expected the offset the file writes, got {:?}",
+        branch.offset
+    );
+}
+
 const ROTATED: &[u8] = include_bytes!("fixtures/rotated.dae");
 
 /// A piece can only hold a position, so a parent's rotation has to reach its
@@ -118,6 +143,31 @@ fn a_rotation_reaches_the_vertices_themselves() {
     assert!(
         (before[0] - after[0]).abs() > 0.5 || (before[2] - after[2]).abs() > 0.5,
         "the cube's own vertices should have turned, got {before:?} then {after:?}"
+    );
+}
+
+/// The counters are what lets whatever opens a model say what reading it cost,
+/// rather than the difference turning up later as lost geometry.
+#[test]
+fn counts_what_reading_had_to_change() {
+    let plain = read(CUBE, "dae").expect("the fixture should parse");
+    let turned = read(ROTATED, "dae").expect("the fixture should parse");
+
+    assert_eq!(
+        plain.notes.dropped_faces, 0,
+        "the cube is triangles throughout, so nothing should be dropped"
+    );
+    assert_eq!(
+        plain.notes.materials, 1,
+        "one material is what a Spring unit can carry"
+    );
+    // Counted rather than pinned to a number, because how many nodes Assimp's
+    // Collada importer produces for a file is its business and not this test's.
+    assert!(
+        turned.notes.transformed > plain.notes.transformed,
+        "the turned fixture should report baked nodes, got {:?} against {:?}",
+        turned.notes,
+        plain.notes
     );
 }
 

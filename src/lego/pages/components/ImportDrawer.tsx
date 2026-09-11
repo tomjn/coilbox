@@ -22,6 +22,7 @@ import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useState } from "react";
 
+import { BUILDER_MODEL_EXTS } from "../../archiveOpen";
 import type { LegoProject } from "../../model";
 import {
   ImportResult,
@@ -53,7 +54,12 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
       const picked = await open({
         multiple: false,
         title: "Choose a model",
-        filters: [{ name: "Model", extensions: ["s3o", "3do", "glb"] }],
+        // `.glb` on the end rather than in the shared list: the builder opens
+        // one picked by hand, as the way back from Blender, but no game ships
+        // one for the engine to draw, so the game picker never offers it.
+        filters: [
+          { name: "Model", extensions: [...BUILDER_MODEL_EXTS, "glb"] },
+        ],
       });
       if (!live) return;
       // Nothing was chosen, so there is nothing to report and no reason to

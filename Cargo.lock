@@ -6352,6 +6352,7 @@ dependencies = [
  "base64 0.22.1",
  "coilbox-3do",
  "coilbox-3do-convert",
+ "coilbox-assimp",
  "coilbox-portable",
  "coilbox-s3o",
  "coilbox-springlua",

@@ -129,7 +129,7 @@ export default function OpenFromArchivePage() {
     setStage({ state: "reading" });
     void (async () => {
       try {
-        const staged = await stageModel(target, picked);
+        const staged = await stageModel(target, picked, tree.files);
         const result = await readModel({
           path: staged.path,
           name,

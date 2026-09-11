@@ -20,6 +20,12 @@
  */
 
 import type { UnitDatasetEntry } from "../content/bindings";
+import {
+  isAssimpModel,
+  isBuilderModel,
+  isEngineOnlyModel,
+  withoutModelExtension,
+} from "./archiveOpen";
 import type { LegoProject } from "./model";
 
 /** Where a game keeps its models. Anything outside it is not one, whatever it
@@ -49,6 +55,11 @@ export interface GameModels {
    *  rather than per file, because a unit is what somebody came looking for and
    *  most of the files are wrecks and features nobody named. */
   unresolvedUnits: number;
+  /** Units whose model the archive does hold, in a format the builder cannot
+   *  open. Worth its own count and its own sentence: the one above sends
+   *  somebody looking for a file that is missing, and this one is about a file
+   *  sitting right there. */
+  unopenableUnits: number;
 }
 
 /**
@@ -63,12 +74,12 @@ export interface GameModels {
 export function modelKey(name: string): string {
   let key = name.trim().replace(/\\/g, "/").toLowerCase();
   if (key.startsWith(MODELS_DIR)) key = key.slice(MODELS_DIR.length);
-  return key.replace(/\.(s3o|3do)$/, "");
+  return withoutModelExtension(key);
 }
 
 /** A model's own name, for a row no unitdef speaks for. */
 function fileLabel(member: string): string {
-  return (member.split("/").at(-1) ?? member).replace(/\.(s3o|3do)$/i, "");
+  return withoutModelExtension(member.split("/").at(-1) ?? member);
 }
 
 /**
@@ -90,14 +101,24 @@ export function gameModelRows(input: {
   const { archive, archivePath } = input;
 
   const models = new Map<string, string>();
+  // Models the engine draws and this cannot open, kept apart so a unit naming
+  // one can be told from a unit naming nothing at all.
+  const unopenable = new Set<string>();
   for (const file of input.files) {
     const path = file.path.replace(/\\/g, "/");
     if (!path.toLowerCase().startsWith(MODELS_DIR)) continue;
-    if (!/\.(s3o|3do)$/i.test(path)) continue;
+    if (isEngineOnlyModel(path)) {
+      unopenable.add(modelKey(path));
+      continue;
+    }
+    if (!isBuilderModel(path)) continue;
     const key = modelKey(path);
     // An `.s3o` and a `.3do` of the same name is a game that replaced its
     // model and left the old one behind, and the engine takes the `.s3o`.
     if (/\.3do$/i.test(path) && models.has(key)) continue;
+    // A format read through Assimp never displaces either native one, for the
+    // same reason: where a game ships both, the older file is the leftover.
+    if (isAssimpModel(path) && models.has(key)) continue;
     models.set(key, path);
   }
 
@@ -105,13 +126,15 @@ export function gameModelRows(input: {
   const rows: GameModelRow[] = [];
   const named = new Set<string>();
   let unresolvedUnits = 0;
+  let unopenableUnits = 0;
 
   for (const unit of input.units) {
     if (!unit.objectName) continue;
     const key = modelKey(unit.objectName);
     const member = models.get(key);
     if (!member) {
-      unresolvedUnits += 1;
+      if (unopenable.has(key)) unopenableUnits += 1;
+      else unresolvedUnits += 1;
       continue;
     }
     named.add(key);
@@ -137,7 +160,7 @@ export function gameModelRows(input: {
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }) ||
       a.member.localeCompare(b.member),
   );
-  return { rows, unresolvedUnits };
+  return { rows, unresolvedUnits, unopenableUnits };
 }
 
 /**

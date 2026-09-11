@@ -109,6 +109,44 @@ describe("gameModelRows", () => {
     expect(row?.member).toBe("objects3d/peewee.s3o");
   });
 
+  /**
+   * The case this whole thing started from. flove's units are Collada files,
+   * and a picker that dropped them showed an empty list for a game holding 27
+   * models, under a note saying the archive held none.
+   */
+  it("lists a dae unit, because the builder converts one now", () => {
+    const withDae = [...files, { path: "objects3d/spire.dae", size: 1 }];
+    const { rows, unresolvedUnits } = gameModelRows({
+      files: withDae,
+      units: [unit("spire", "spire.dae")],
+      projects: [],
+      archive: "Game.sdd",
+    });
+
+    const row = rows.find((r) => r.member.endsWith(".dae"));
+    expect(row?.unit).toBe("spire");
+    // Not missing either: the file is right there.
+    expect(unresolvedUnits).toBe(0);
+  });
+
+  /**
+   * A `.gltf` is drawn by the engine and cannot be opened here. Counting it as
+   * a model the archive does not hold sends somebody looking for a file that is
+   * sitting in front of them, so the two are counted apart.
+   */
+  it("tells a model it cannot open from one the archive does not hold", () => {
+    const withGltf = [...files, { path: "objects3d/hover.gltf", size: 1 }];
+    const { unresolvedUnits, unopenableUnits } = gameModelRows({
+      files: withGltf,
+      units: [unit("hover", "hover"), unit("ghost", "nothing/here")],
+      projects: [],
+      archive: "Game.sdd",
+    });
+
+    expect(unopenableUnits).toBe(1);
+    expect(unresolvedUnits).toBe(1);
+  });
+
   it("counts a unit whose model this archive does not hold at all", () => {
     const { unresolvedUnits } = gameModelRows({
       files,

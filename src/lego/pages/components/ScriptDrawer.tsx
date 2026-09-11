@@ -54,9 +54,17 @@ export function ScriptDrawer({
   useEffect(() => setDraft(project.script ?? ""), [project.script]);
 
   const shown = owned ? draft : unitScript(project);
+  // Both spellings of every piece, because a script may legitimately name
+  // either. The engine takes a model's piece names exactly as the file writes
+  // them, so a game's own script names `Trunk`, while coilbox lowercases them
+  // and the generated script names `trunk`. An imported unit keeps the file's
+  // spelling on `originalName`, and a unit opened out of a game is usually
+  // carrying that game's script rather than a generated one.
   const missing = missingPieces(
     shown,
-    project.pieces.map((piece) => piece.name),
+    project.pieces.flatMap((piece) =>
+      piece.originalName ? [piece.name, piece.originalName] : [piece.name],
+    ),
   );
   const unsaved = owned && draft !== project.script;
   // The case that made handing it back necessary: an owned script with nothing

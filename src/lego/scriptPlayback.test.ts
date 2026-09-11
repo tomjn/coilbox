@@ -67,6 +67,21 @@ describe("scenarios", () => {
   });
 
   /**
+   * A `Create` that sleeps is suspended part way through setting the unit up,
+   * and the lines after the sleep are often the ones the move animation reads.
+   * flove's mushrooms set their rest pose in a sleeping call and then work out
+   * how fast to walk, so a unit told to move on the frame it was made reads a
+   * speed that has not been written yet.
+   */
+  it("never tell a unit to move before it has finished being created", () => {
+    for (const scenario of SCENARIOS) {
+      const moving = scenario.events.find((e) => e.callin === "StartMoving");
+      if (!moving) continue;
+      expect(moving.frame, scenario.id).toBeGreaterThan(1);
+    }
+  });
+
+  /**
    * A factory and a mobile builder are driven differently. A factory is opened
    * with `Activate` first and then told to build with no arguments at all, and
    * most factory scripts will not animate until the yard is open.

@@ -103,6 +103,88 @@ pub struct Probes {
     pub error: Option<String>,
 }
 
+/// A signal mask: a number to match bit by bit, or any other Lua value to match
+/// by identity.
+///
+/// The engine takes either. Its `Signal` matches two numbers on a shared bit and
+/// compares anything else with `==`, and its `SetSignalMask` stores whatever it
+/// is given without looking at it. Games use both. flove hands each of its
+/// shared animation libraries a fresh empty table, so one unit's walk cycle
+/// cannot signal another's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mask {
+    Bits(u32),
+    /// Anything that is not a number, by identity. Lua 5.1 keeps one copy of
+    /// each string, so two equal strings are one pointer here, which is the
+    /// `==` the engine would have done. Nil and the two booleans have no
+    /// pointer of their own, so they take low numbers no real address can be.
+    Other(usize),
+}
+
+impl Default for Mask {
+    fn default() -> Self {
+        Mask::Bits(0)
+    }
+}
+
+impl Mask {
+    fn of(value: &Value) -> Self {
+        match value {
+            Value::Integer(number) => Mask::Bits(*number as u32),
+            Value::Number(number) => Mask::Bits(*number as u32),
+            Value::Nil => Mask::Other(0),
+            Value::Boolean(flag) => Mask::Other(1 + usize::from(*flag)),
+            other => Mask::Other(other.to_pointer() as usize),
+        }
+    }
+
+    /// Whether a thread carrying this mask dies when `signal` is raised. Two
+    /// numbers need only share a bit. Anything else has to be the same thing.
+    fn hit_by(self, signal: Mask) -> bool {
+        match (self, signal) {
+            (Mask::Bits(mine), Mask::Bits(signal)) => mine & signal != 0,
+            (mine, signal) => mine == signal,
+        }
+    }
+}
+
+/// A rules parameter's value.
+///
+/// The engine keeps numbers and strings, and turns a string that is really a
+/// number into one, so a script that stores `"4"` and adds to what it reads back
+/// gets four rather than a type error.
+#[derive(Debug, Clone)]
+enum RuleValue {
+    Number(f64),
+    Text(String),
+}
+
+impl RuleValue {
+    fn of(value: &Value) -> Self {
+        match value {
+            Value::Integer(number) => RuleValue::Number(*number as f64),
+            Value::Number(number) => RuleValue::Number(*number),
+            Value::Boolean(flag) => RuleValue::Number(f64::from(u8::from(*flag))),
+            Value::String(text) => {
+                let text = text.to_string_lossy();
+                match text.parse::<f64>() {
+                    Ok(number) => RuleValue::Number(number),
+                    Err(_) => RuleValue::Text(text),
+                }
+            }
+            // The engine takes a number, a string or a boolean and nothing else.
+            _ => RuleValue::Number(0.0),
+        }
+    }
+
+    fn to_value(&self, lua: &Lua) -> mlua::Result<Value> {
+        match self {
+            RuleValue::Number(number) => Ok(Value::Number(*number)),
+            RuleValue::Text(text) => Ok(Value::String(lua.create_string(text)?)),
+        }
+    }
+}
+
 /// Everything the Lua-facing functions read or write. Shared with them through
 /// an `Rc<RefCell<_>>`, so every borrow is short and none is held across a call
 /// back into Lua.
@@ -115,15 +197,15 @@ struct Sim {
     model: Model,
     /// Threads a running thread asked for, with the signal mask each is born
     /// with. Started before the frame ends.
-    spawned: Vec<(Thread, Vec<Value>, u32)>,
+    spawned: Vec<(Thread, Vec<Value>, Mask)>,
     /// The mask of the thread running now, as it stands at this moment. A
     /// thread started with `StartThread` is born carrying it, as the unit
     /// script framework hands it on, so a later `Signal` reaches the child too.
-    current_mask: u32,
+    current_mask: Mask,
     /// Signal masks the running thread raised while it was running.
-    signalled: Vec<u32>,
+    signalled: Vec<Mask>,
     /// The mask the running thread set for itself, if it did.
-    mask: Option<u32>,
+    mask: Option<Mask>,
     /// The frame being run, for a script that asks what time it is.
     frame: u32,
     /// What the script has told the engine about its unit, by the numbered id
@@ -134,6 +216,11 @@ struct Sim {
     /// A factory does exactly that: it asks for its yard to open and then waits
     /// for the yard to be open, which never comes and never ends.
     values: HashMap<i32, i32>,
+    /// Rules parameters the script set, which it reads back for the same reason
+    /// it reads back a unit value. The engine keeps a unit's on the unit and the
+    /// game's on the game, so one name used for both is two values here too.
+    unit_rules: HashMap<String, RuleValue>,
+    game_rules: HashMap<String, RuleValue>,
     /// How many lines the script has printed, so a script printing every frame
     /// does not bury everything else the run has to say.
     printed: usize,
@@ -147,7 +234,7 @@ struct Runner {
     args: Vec<Value>,
     state: State,
     /// The mask set with `SetSignalMask`, which is what `Signal` kills by.
-    mask: u32,
+    mask: Mask,
     /// What started it, so an error can say which call-in was to blame.
     origin: String,
 }
@@ -441,7 +528,7 @@ impl Run {
                 thread,
                 event.args.iter().map(|arg| Value::Number(*arg)).collect(),
                 event.callin.clone(),
-                0,
+                Mask::default(),
             )?;
         }
         Ok(())
@@ -452,7 +539,7 @@ impl Run {
         thread: Thread,
         args: Vec<Value>,
         origin: String,
-        mask: u32,
+        mask: Mask,
     ) -> Result<(), String> {
         if self.runners.iter().filter(|r| !r.is_dead()).count() >= MAX_THREADS {
             // The ceiling is what stops a script that starts a thread per frame
@@ -563,7 +650,7 @@ impl Run {
         };
         for signal in signalled {
             for (other, runner) in self.runners.iter_mut().enumerate() {
-                if other != index && runner.mask & signal != 0 {
+                if other != index && runner.mask.hit_by(signal) {
                     runner.state = State::Dead;
                 }
             }
@@ -966,6 +1053,24 @@ fn install_unit_def(
             weaponsKey, weapons = key, value
           end
         end
+        -- A weapon's aim direction, which a definition writes as three numbers
+        -- in a string or a table. Forward when it says nothing, and normalised,
+        -- both as the engine does. A direction with no length is left as it is,
+        -- since there is nothing to point it at.
+        local function direction(value)
+          local x, y, z
+          if type(value) == 'string' then
+            x, y, z = value:match('([^%s,]+)[%s,]+([^%s,]+)[%s,]+([^%s,]+)')
+          elseif type(value) == 'table' then
+            x, y, z = value[1], value[2], value[3]
+          end
+          x, y, z = tonumber(x), tonumber(y), tonumber(z)
+          if not (x and y and z) then return 0, 0, 1 end
+          local length = math.sqrt(x * x + y * y + z * z)
+          if length > 1e-4 then return x / length, y / length, z / length end
+          return x, y, z
+        end
+
         if type(weapons) == 'table' then
           local packed = {}
           for slot = 1, MAX_WEAPONS_PER_UNIT do
@@ -985,8 +1090,28 @@ fn install_unit_def(
                 id = #WeaponDefs + 1
                 WeaponDefs[id] = insensitive({ id = id, name = string.lower(named), customParams = {} })
               end
-              weapon.weaponDef = id
-              packed[#packed + 1] = weapon
+              -- What the engine builds, rather than what the file wrote. It
+              -- reads `slaveTo`, `maxAngleDif` and `mainDir` and gives a script
+              -- `slavedTo`, the cosine of half that arc, and the direction as
+              -- three numbers, keeping none of the file's own keys. flove's
+              -- weapon mounts read `slavedTo` and `mainDirZ`, and both were
+              -- missing here, which stopped the thread that sets up the rest of
+              -- the unit's animations.
+              -- Read into locals first. `field` returns nothing at all when it
+              -- finds nothing, and `tonumber()` with no argument is an error
+              -- rather than a nil.
+              local slaveTo = field(weapon, 'slaveto')
+              local arc = field(weapon, 'maxangledif')
+              local mainDir = field(weapon, 'maindir')
+              local dirX, dirY, dirZ = direction(mainDir)
+              packed[#packed + 1] = {
+                weaponDef = id,
+                slavedTo = tonumber(slaveTo) or 0,
+                maxAngleDif = math.cos(math.rad((tonumber(arc) or 360) * 0.5)),
+                mainDirX = dirX,
+                mainDirY = dirY,
+                mainDirZ = dirZ,
+              }
             end
           end
           raw[weaponsKey] = packed
@@ -1087,17 +1212,45 @@ fn install_spring(
     // Full health, in whatever the definition counts health in, so a script
     // reading the pair back gets a unit that has taken no damage.
     let health = def_number(unit_def, "health").unwrap_or(100.0);
-    // Elmos per frame, which is what the engine's velocity is in, from a
-    // definition that counts its speed per second. A unit with no definition
-    // behind it gets one elmo a frame, the same as the compiled runtime
-    // answers when it is asked for `CURRENT_SPEED` without one.
-    let speed = def_number(unit_def, "speed").map_or(1.0, |per_second| per_second / f64::from(FPS));
+    // Elmos per frame, which is what the engine's velocity is in. A definition
+    // gives it either way round: `speed` counts per second, and the older
+    // `maxvelocity` counts per frame, which is the one the engine falls back to
+    // and the only one flove's units write. Reading past it left a mushroom
+    // walking at one elmo a frame rather than twenty. A unit with no definition
+    // behind it gets one elmo a frame, the same as the compiled runtime answers
+    // when it is asked for `CURRENT_SPEED` without one.
+    let speed = def_number(unit_def, "speed")
+        .map(|per_second| per_second / f64::from(FPS))
+        .or_else(|| def_number(unit_def, "maxvelocity").map(f64::abs))
+        .unwrap_or(1.0);
 
     spring.set(
         "GetUnitHealth",
         lua.create_function(move |_, _: MultiValue| {
             // health, maxHealth, paralyzeDamage, captureProgress, buildProgress
             Ok((health, health, 0.0, 0.0, 1.0))
+        })?,
+    )?;
+
+    // Elmos a second, which is what the engine reports here: it holds the speed
+    // per frame and multiplies by the frame rate on the way out. Scripts divide
+    // it back down to decide how fast to play a walk cycle, so a zero would
+    // leave one standing still or dividing by nothing. flove's mushrooms do
+    // exactly that division.
+    let top_speed = speed * f64::from(FPS);
+    spring.set(
+        "GetUnitMoveTypeData",
+        lua.create_function(move |lua, _: MultiValue| {
+            let data = lua.create_table()?;
+            data.set("maxSpeed", top_speed)?;
+            data.set("maxWantedSpeed", top_speed)?;
+            // Standing at the origin with nowhere to be, which is the unit the
+            // preview has.
+            data.set("goalx", 0.0)?;
+            data.set("goaly", 0.0)?;
+            data.set("goalz", 0.0)?;
+            data.set("progressState", "done")?;
+            Ok(data)
         })?,
     )?;
     spring.set(
@@ -1183,6 +1336,50 @@ fn install_spring(
         })?,
     )?;
 
+    // Every piece by name, numbered as `piece()` numbers them. The engine's own
+    // map is where those numbers come from: the unit script framework builds its
+    // piece table out of this callout and `piece(name)` reads it, so the two
+    // cannot disagree.
+    //
+    // Games use it to ask whether a piece exists before animating it, which is
+    // how one walk cycle is shared between units built from different models.
+    // flove does exactly that with its mushrooms.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPieceMap",
+        lua.create_function(move |lua, _: MultiValue| {
+            let sim = state.borrow();
+            let map = lua.create_table()?;
+            let mut numbered: Vec<(String, i64)> = Vec::with_capacity(sim.model.pieces.len());
+            for (index, piece) in sim.model.pieces.iter().enumerate() {
+                let number = index as i64 + 1;
+                map.set(piece.name.as_str(), number)?;
+                numbered.push((piece.name.to_lowercase(), number));
+            }
+            // Ignoring case on the way in, exactly as `piece()` does and for the
+            // same reason: a unit opened out of a game carries lower case names,
+            // while the game's own script asks for the spelling its model file
+            // uses. A name the unit does not have still reads as nothing, so
+            // `if pieces[name]` stays a real question.
+            let meta = lua.create_table()?;
+            meta.set(
+                "__index",
+                lua.create_function(move |_, (_, key): (Value, Value)| {
+                    let Value::String(key) = key else {
+                        return Ok(Value::Nil);
+                    };
+                    let key = key.to_string_lossy().to_lowercase();
+                    Ok(numbered
+                        .iter()
+                        .find(|(name, _)| *name == key)
+                        .map_or(Value::Nil, |(_, number)| Value::Integer(*number)))
+                })?,
+            )?;
+            map.set_metatable(Some(meta))?;
+            Ok(map)
+        })?,
+    )?;
+
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitNearestEnemy",
@@ -1212,6 +1409,14 @@ fn install_spring(
         "SetUnitCloak",
         "SetUnitArmored",
         "DestroyUnit",
+        // The world outside the model, which a preview has none of. Answering
+        // nothing is also what the engine does when it cannot make a unit, so a
+        // script that checks what `CreateUnit` gave it back reads a failure
+        // rather than something that is not there.
+        "CreateUnit",
+        "PlaySoundFile",
+        "SetUnitCollisionVolumeData",
+        "SetUnitPieceCollisionVolumeData",
     ] {
         let state = Rc::clone(sim);
         let label = name.to_string();
@@ -1226,6 +1431,65 @@ fn install_spring(
             })?,
         )?;
     }
+
+    // One unit on its own, which is the team the preview has.
+    spring.set(
+        "GetUnitTeam",
+        lua.create_function(|_, _: MultiValue| Ok(0))?,
+    )?;
+
+    // Rules parameters, kept rather than dropped for the reason `SetUnitValue`
+    // is kept: a script stores one and reads it back a moment later, and a
+    // preview that always answered nothing would tell it nothing it did had
+    // happened. An unset one still reads as nothing, as the engine leaves it.
+    let state = Rc::clone(sim);
+    spring.set(
+        "SetUnitRulesParam",
+        lua.create_function(move |_, (_unit, name, value): (Value, String, Value)| {
+            state
+                .borrow_mut()
+                .unit_rules
+                .insert(name, RuleValue::of(&value));
+            Ok(())
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitRulesParam",
+        lua.create_function(move |lua, (_unit, name): (Value, String)| {
+            let sim = state.borrow();
+            match sim.unit_rules.get(&name) {
+                Some(value) => value.to_value(lua),
+                None => Ok(Value::Nil),
+            }
+        })?,
+    )?;
+
+    // The game's own, which take no unit and live in their own store.
+    let state = Rc::clone(sim);
+    spring.set(
+        "SetGameRulesParam",
+        lua.create_function(move |_, (name, value): (String, Value)| {
+            state
+                .borrow_mut()
+                .game_rules
+                .insert(name, RuleValue::of(&value));
+            Ok(())
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetGameRulesParam",
+        lua.create_function(move |lua, name: String| {
+            let sim = state.borrow();
+            match sim.game_rules.get(&name) {
+                Some(value) => value.to_value(lua),
+                None => Ok(Value::Nil),
+            }
+        })?,
+    )?;
 
     install_echo(lua, sim, &spring)
 }
@@ -1318,7 +1582,26 @@ fn install_pieces(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                 ));
             };
             let name = name.to_string_lossy();
-            let index = sim.model.pieces.iter().position(|piece| piece.name == name);
+            // Exactly first, then ignoring case. The engine matches exactly and
+            // only ever sees one spelling, the one its model file carries. A
+            // unit opened out of a game here has two: the file's own name, and
+            // the lower case one coilbox gives its pieces so that a generated
+            // script's locals are valid Lua identifiers. A game's own script
+            // names the first and a generated script names the second, and both
+            // mean this piece. flove is where this showed: its models name a
+            // piece `Trunk` and its unit definitions ask for `Trunk`, so every
+            // animation raised against a piece list holding `trunk`.
+            let index = sim
+                .model
+                .pieces
+                .iter()
+                .position(|piece| piece.name == name)
+                .or_else(|| {
+                    sim.model
+                        .pieces
+                        .iter()
+                        .position(|piece| piece.name.eq_ignore_ascii_case(&name))
+                });
             let Some(index) = index else {
                 return Err(mlua::Error::RuntimeError(format!(
                     "this unit has no piece called \"{name}\""
@@ -1483,8 +1766,8 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let state = Rc::clone(sim);
     globals.set(
         "Signal",
-        lua.create_function(move |_, mask: i64| {
-            state.borrow_mut().signalled.push(mask as u32);
+        lua.create_function(move |_, mask: Value| {
+            state.borrow_mut().signalled.push(Mask::of(&mask));
             Ok(())
         })?,
     )?;
@@ -1492,10 +1775,11 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let state = Rc::clone(sim);
     globals.set(
         "SetSignalMask",
-        lua.create_function(move |_, mask: i64| {
+        lua.create_function(move |_, mask: Value| {
             let mut sim = state.borrow_mut();
-            sim.mask = Some(mask as u32);
-            sim.current_mask = mask as u32;
+            let mask = Mask::of(&mask);
+            sim.mask = Some(mask);
+            sim.current_mask = mask;
             Ok(())
         })?,
     )?;
