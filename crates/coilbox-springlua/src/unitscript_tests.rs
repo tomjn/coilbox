@@ -393,6 +393,105 @@ fn a_table_is_a_mask_of_its_own() {
     assert_close(rot_y(&spared, 9, "turret"), 1.5);
 }
 
+/// The fields the engine builds for each of a unit's weapons, which are not the
+/// ones the definition file writes. A weapon mount reads `slavedTo` to find out
+/// which weapon it follows and `mainDirZ` to find out which way it faces, and
+/// both were missing, which stopped the thread that sets up the animations.
+#[test]
+fn a_weapon_carries_the_fields_the_engine_builds() {
+    let def = serde_json::json!({
+        "unitname": "mushroom",
+        "weapondefs": { "spray": { "weapontype": "Cannon" } },
+        "weapons": {
+            "1": { "name": "spray", "maindir": "0 0 -1", "maxangledif": 180, "slaveto": 2 },
+        },
+    });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local weapon = UnitDefs[unitDefID].weapons[1]
+            if weapon.slavedTo ~= 2 then error("slavedTo is " .. tostring(weapon.slavedTo)) end
+            -- The file gives the full arc and the engine keeps the cosine of
+            -- half of it, so 180 degrees arrives as the cosine of 90, or zero.
+            if math.abs(weapon.maxAngleDif) > 0.0001 then
+                error("maxAngleDif is " .. tostring(weapon.maxAngleDif))
+            end
+            -- Moved rather than turned: a rotation is reported inside one turn,
+            -- so a direction of -1 would come back as one turn less one.
+            Move(piece("turret"), z_axis, weapon.mainDirZ)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], -1.0);
+}
+
+/// A weapon that says none of it. Forward and slaved to nothing, which is what
+/// the engine fills in, and what the `slavedTo ~= 0` a mount opens with needs.
+#[test]
+fn a_weapon_that_says_nothing_points_forward_and_is_slaved_to_nothing() {
+    let def = serde_json::json!({
+        "unitname": "mushroom",
+        "weapons": { "1": { "name": "spray" } },
+    });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local weapon = UnitDefs[unitDefID].weapons[1]
+            if weapon.slavedTo ~= 0 then error("slavedTo is " .. tostring(weapon.slavedTo)) end
+            Move(piece("turret"), z_axis, weapon.mainDirZ)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 1.0);
+}
+
+/// A definition that gives only the older `maxvelocity`, which counts per frame
+/// where `speed` counts per second. Every flove unit is written that way, and
+/// reading past it played the walk cycle twenty times too slowly.
+#[test]
+fn the_move_type_falls_back_to_the_definitions_max_velocity() {
+    let def = serde_json::json!({ "maxvelocity": 20.0 });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            local data = Spring.GetUnitMoveTypeData(unitID)
+            Move(piece("turret"), z_axis, data.maxSpeed / 30)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 20.0);
+}
+
 /// Scripts work out how fast to play a walk cycle from the unit's top speed, so
 /// the preview has to answer with the definition's own rather than a zero they
 /// would divide by.

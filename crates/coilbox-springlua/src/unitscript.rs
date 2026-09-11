@@ -1011,6 +1011,24 @@ fn install_unit_def(
             weaponsKey, weapons = key, value
           end
         end
+        -- A weapon's aim direction, which a definition writes as three numbers
+        -- in a string or a table. Forward when it says nothing, and normalised,
+        -- both as the engine does. A direction with no length is left as it is,
+        -- since there is nothing to point it at.
+        local function direction(value)
+          local x, y, z
+          if type(value) == 'string' then
+            x, y, z = value:match('([^%s,]+)[%s,]+([^%s,]+)[%s,]+([^%s,]+)')
+          elseif type(value) == 'table' then
+            x, y, z = value[1], value[2], value[3]
+          end
+          x, y, z = tonumber(x), tonumber(y), tonumber(z)
+          if not (x and y and z) then return 0, 0, 1 end
+          local length = math.sqrt(x * x + y * y + z * z)
+          if length > 1e-4 then return x / length, y / length, z / length end
+          return x, y, z
+        end
+
         if type(weapons) == 'table' then
           local packed = {}
           for slot = 1, MAX_WEAPONS_PER_UNIT do
@@ -1030,8 +1048,28 @@ fn install_unit_def(
                 id = #WeaponDefs + 1
                 WeaponDefs[id] = insensitive({ id = id, name = string.lower(named), customParams = {} })
               end
-              weapon.weaponDef = id
-              packed[#packed + 1] = weapon
+              -- What the engine builds, rather than what the file wrote. It
+              -- reads `slaveTo`, `maxAngleDif` and `mainDir` and gives a script
+              -- `slavedTo`, the cosine of half that arc, and the direction as
+              -- three numbers, keeping none of the file's own keys. flove's
+              -- weapon mounts read `slavedTo` and `mainDirZ`, and both were
+              -- missing here, which stopped the thread that sets up the rest of
+              -- the unit's animations.
+              -- Read into locals first. `field` returns nothing at all when it
+              -- finds nothing, and `tonumber()` with no argument is an error
+              -- rather than a nil.
+              local slaveTo = field(weapon, 'slaveto')
+              local arc = field(weapon, 'maxangledif')
+              local mainDir = field(weapon, 'maindir')
+              local dirX, dirY, dirZ = direction(mainDir)
+              packed[#packed + 1] = {
+                weaponDef = id,
+                slavedTo = tonumber(slaveTo) or 0,
+                maxAngleDif = math.cos(math.rad((tonumber(arc) or 360) * 0.5)),
+                mainDirX = dirX,
+                mainDirY = dirY,
+                mainDirZ = dirZ,
+              }
             end
           end
           raw[weaponsKey] = packed
@@ -1132,11 +1170,17 @@ fn install_spring(
     // Full health, in whatever the definition counts health in, so a script
     // reading the pair back gets a unit that has taken no damage.
     let health = def_number(unit_def, "health").unwrap_or(100.0);
-    // Elmos per frame, which is what the engine's velocity is in, from a
-    // definition that counts its speed per second. A unit with no definition
-    // behind it gets one elmo a frame, the same as the compiled runtime
-    // answers when it is asked for `CURRENT_SPEED` without one.
-    let speed = def_number(unit_def, "speed").map_or(1.0, |per_second| per_second / f64::from(FPS));
+    // Elmos per frame, which is what the engine's velocity is in. A definition
+    // gives it either way round: `speed` counts per second, and the older
+    // `maxvelocity` counts per frame, which is the one the engine falls back to
+    // and the only one flove's units write. Reading past it left a mushroom
+    // walking at one elmo a frame rather than twenty. A unit with no definition
+    // behind it gets one elmo a frame, the same as the compiled runtime answers
+    // when it is asked for `CURRENT_SPEED` without one.
+    let speed = def_number(unit_def, "speed")
+        .map(|per_second| per_second / f64::from(FPS))
+        .or_else(|| def_number(unit_def, "maxvelocity").map(f64::abs))
+        .unwrap_or(1.0);
 
     spring.set(
         "GetUnitHealth",
