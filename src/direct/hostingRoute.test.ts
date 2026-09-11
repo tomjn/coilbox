@@ -423,21 +423,10 @@ describe("the word a battle room shows for its route", () => {
     expect(battleRouteLabel("portMapped", { lanRoom: false })?.word).toBe(
       "Port opened",
     );
-    expect(battleRouteLabel("relay", { lanRoom: false })?.word).toBe("Relayed");
+    // Said in the top bar instead, so the room has no word for it.
+    expect(battleRouteLabel("relay", { lanRoom: false })).toBe(null);
     expect(battleRouteLabel("unreachable", { lanRoom: false })?.word).toBe(
       "Not reachable",
-    );
-  });
-
-  // The reason somebody looks at this at all. The hosting form's sentence leaves
-  // the cost to the checkbox that asks about the relay, because that host is
-  // choosing. This reader is not, and "why is my ping worse" is the question
-  // that brought them here (issue #2071).
-  it("says what the relay costs, which the hosting form's sentence does not", () => {
-    const detail = battleRouteLabel("relay", { lanRoom: false })?.detail ?? "";
-    expect(detail).toContain("ping");
-    expect(hostingRouteSummary("relay", { lanRoom: false })).not.toContain(
-      "ping",
     );
   });
 

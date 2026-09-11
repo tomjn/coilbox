@@ -286,17 +286,10 @@ export function hostingRouteSummary(
  * word carries no weight on its own and the reason is a tooltip nobody has to
  * read (issue #2022).
  *
- * # Why the relay says what it costs and {@link hostingRouteSummary} does not
+ * # Why the relay has no word here
  *
- * The hosting form's sentence leaves the relay's cost to the checkbox that asks
- * whether to use one, because the host is deciding at that moment and the cost
- * is the thing to decide on (issue #2023). Here nobody is deciding. The
- * question that brings somebody to this word is "why is my ping worse than
- * usual", and answering it is the whole point of the issue, so the cost is
- * stated as a plain fact rather than held back as a warning (issue #2071).
- *
- * That checkbox defaults to on, so a relayed host has very likely never read
- * it. Repeating the cost once, in a tooltip, is not repetition for them.
+ * The top bar says a battle is relayed, on every page rather than only in its
+ * room, and offers the way back to it. A word here as well would say it twice.
  *
  * # What is deliberately silent
  *
@@ -331,14 +324,9 @@ export function battleRouteLabel(
           "Your router opened the port, so players connect straight to this machine.",
       };
     case "relay":
-      // Says nothing about why. The recorded route cannot tell a router that
-      // refused from a host who asked for the relay, and both are relayed the
-      // same way.
-      return {
-        word: "Relayed",
-        detail:
-          "This battle goes through the server's relay. That adds a hop, so pings here are a little worse than a direct game.",
-      };
+      // Said in the top bar instead, on every page and with the way back to
+      // the battle, so a word here would say it twice.
+      return null;
     case "unreachable":
       // Said without naming which of the two ways the ladder ended here, because
       // this does not know. A host who turned the relay off and a host on a

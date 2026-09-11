@@ -24,6 +24,7 @@ import {
 } from "./navPredicates";
 import HighlightsSettings from "./pages/HighlightsSettings";
 import IgnoreSettings from "./pages/IgnoreSettings";
+import RelayIndicator from "./RelayIndicator";
 import { MultiplayerProvider } from "./store";
 
 /**
@@ -202,7 +203,12 @@ const multiplayerPlugin: FramePlugin = {
       Component: IgnoreSettings,
     },
   ],
-  slots: [{ slot: "topbar.right", order: 100, Component: LobbyStatusButton }],
+  slots: [
+    { slot: "topbar.right", order: 100, Component: LobbyStatusButton },
+    // One pill for the relay on this machine, whichever battle it carries.
+    // Where the old pill for a relay left running sat, beside the in-game badge.
+    { slot: "topbar.right", order: -9, Component: RelayIndicator },
+  ],
   // App-level: the live connection + its state mirror must outlive the Lobby route
   // so navigating away doesn't drop the UI's view of a still-open connection. The
   // room this client hosts is here for the same reason (issue #1600): somebody

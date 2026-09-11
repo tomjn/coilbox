@@ -128,38 +128,39 @@ beforeEach(() => {
 });
 
 describe("the battle room's route word", () => {
-  it("tells the host of a relayed battle that it is relayed", () => {
+  // The top bar says a battle is relayed, on every page and with the way back
+  // to it, so the room says nothing and does not say it twice.
+  it("leaves a relayed battle to the top bar", () => {
     drawHeader({ route: "relay" });
-    expect(screen.getByText("Relayed")).toBeTruthy();
+    expect(routeShown()).toBe(false);
   });
 
   /**
-   * The route can be recorded after the room is drawn, and on the one route the
-   * word exists for it usually is. A relayed `mp_open_battle` waits for the
-   * lobby's answer, and that answer is also the delta that puts this client in
-   * the battle and sends the page here, so the room arrives before the form gets
-   * its promise back and records anything. A header that read the record once on
-   * mount would leave a relayed host with no word at all.
+   * The route can be recorded after the room is drawn. `mp_open_battle` waits
+   * for the lobby's answer, and that answer is also the delta that puts this
+   * client in the battle and sends the page here, so the room arrives before the
+   * form gets its promise back and records anything. A header that read the
+   * record once on mount would leave the host with no word at all.
    */
   it("takes a route recorded after the room is already on screen", () => {
     drawHeader();
     expect(routeShown()).toBe(false);
 
     act(() => {
-      recordHostingRoute("relay");
+      recordHostingRoute("direct");
     });
 
-    expect(screen.getByText("Relayed")).toBeTruthy();
+    expect(screen.getByText("Direct")).toBeTruthy();
   });
 
   // The word on its own explains nothing, so the reason has to be reachable
   // from it. Keyboard focus rather than a hover, because that is the path that
   // breaks silently when a trigger stops being a real focusable control.
   it("gives the reason behind the word to somebody who asks for it", async () => {
-    drawHeader({ route: "relay" });
-    fireEvent.focus(screen.getByText("Relayed"));
+    drawHeader({ route: "direct" });
+    fireEvent.focus(screen.getByText("Direct"));
     expect(
-      await screen.findByText(/pings here are a little worse/),
+      await screen.findByText(/players connect straight to it/),
     ).toBeTruthy();
   });
 
@@ -172,13 +173,13 @@ describe("the battle room's route word", () => {
   });
 
   // The one that matters. The recorded route outlives the battle it was
-  // recorded for, so somebody who hosts a relayed battle, closes it and walks
-  // into a battle hosted by somebody else still has "relay" sitting in the
-  // module. Nothing about that battle is known to be relayed, and telling them
-  // it is would be an invented answer to a real question.
+  // recorded for, so somebody who hosts a battle, closes it and walks into a
+  // battle hosted by somebody else still has that route sitting in the module.
+  // Nothing about their battle is known, and naming its route would be an
+  // invented answer to a real question.
   it("shows a joiner nothing, whatever route this client last hosted", () => {
-    drawHeader({ selfHost: false, route: "relay" });
-    expect(screen.queryByText("Relayed")).toBe(null);
+    drawHeader({ selfHost: false, route: "direct" });
+    expect(screen.queryByText("Direct")).toBe(null);
     expect(routeShown()).toBe(false);
   });
 
