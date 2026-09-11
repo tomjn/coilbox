@@ -1,0 +1,17 @@
+# Set for every cargo invocation, here rather than in the CI workflows, because
+# three separate things compile Assimp: `scripts/build-unitsync-worker.sh`,
+# `cargo clippy --all-targets`, and `cargo test --workspace`. Putting it in one
+# workflow step would leave the other two broken, and would leave a developer
+# running the same commands locally broken as well.
+#
+# Assimp 5.3.0 vendors zlib 1.2.13, whose `contrib/zlib/zutil.h` still carries a
+# branch written for pre-OS X Macs, guarded on `TARGET_OS_MAC`. Every modern Mac
+# defines that, so the branch fires and does `#define fdopen(fd,mode) NULL`,
+# which then mangles the macOS SDK's own declaration of `fdopen` and fails the
+# build. The guard around it is `#ifndef fdopen`, so defining `fdopen` as itself
+# makes zlib skip the bad define and changes nothing else.
+#
+# `[env]` does not override a value already set in the environment, so anyone
+# who needs different C flags can still pass their own.
+[env]
+CFLAGS = "-Dfdopen=fdopen"

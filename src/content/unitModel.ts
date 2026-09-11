@@ -5,9 +5,11 @@
  * the texture loader choice and the DDS orientation, sit in one place rather
  * than inside a render effect.
  *
- * Both model formats arrive already flattened by the worker into a tree of
- * pieces holding indexed triangle batches, so there is nothing format-specific
- * here beyond which loader reads a texture file.
+ * Every model format arrives already flattened by the worker into a tree of
+ * pieces holding indexed triangle batches, so there is little format-specific
+ * work here: which loader reads a texture file, the `.3do` palette, and the
+ * team-colour mask that only an `.s3o` carries. A format with none of those,
+ * such as a `.dae`, falls through all three and is drawn plainly textured.
  */
 
 import * as THREE from "three";
@@ -450,6 +452,28 @@ export function buildModel(
 }
 
 /** Triangles across the whole piece tree, for the viewer's summary line. */
+/**
+ * How a model's format is named on screen.
+ *
+ * The worker reports the real extension. Some of them say what they are to
+ * anyone who would be reading this panel, and some are the name of a tool or a
+ * standard nobody would guess, so those get expanded.
+ *
+ * Shared by the three panels that show a model's details, which each used to
+ * ask whether the format was `3do` and call everything else `s3o`. That was
+ * true while coilbox read two formats and labelled every Collada model wrongly
+ * as soon as it read more.
+ */
+export function modelFormatLabel(format: string): string {
+  const expanded: Record<string, string> = {
+    "3do": "3do (Total Annihilation)",
+    dae: "dae (Collada)",
+    lwo: "lwo (LightWave)",
+    blend: "blend (Blender)",
+  };
+  return expanded[format] ?? format;
+}
+
 export function countTriangles(piece: UnitModelPiece): number {
   let total = 0;
   for (const group of piece.groups) total += group.indices.length / 3;

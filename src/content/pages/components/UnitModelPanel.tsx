@@ -23,7 +23,7 @@ import type {
 } from "../../bindings";
 import { unitsyncUnitRender } from "../../bindings";
 import { useUnitsyncUnitModel } from "../../config";
-import { countPieces, countTriangles } from "../../unitModel";
+import { countPieces, countTriangles, modelFormatLabel } from "../../unitModel";
 import { ModelNotes, ModelViewport, Note } from "./ModelViewport";
 
 interface Props {
@@ -173,7 +173,7 @@ function Body({
         <dd className="break-all font-mono">{model.path}</dd>
 
         <dt className="text-muted-foreground">Format</dt>
-        <dd>{model.format === "3do" ? "3do (Total Annihilation)" : "s3o"}</dd>
+        <dd>{modelFormatLabel(model.format)}</dd>
 
         <dt className="text-muted-foreground">Size</dt>
         <dd>
