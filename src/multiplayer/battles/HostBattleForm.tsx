@@ -315,6 +315,7 @@ export function HostBattleForm({
             }
             onReport={setReachability}
             always
+            relayWillCarry={route === "relay"}
           />
 
           {/* How the relay is used, next to the answer that decides it in the

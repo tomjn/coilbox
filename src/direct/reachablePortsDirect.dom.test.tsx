@@ -212,4 +212,22 @@ describe("the reachability panel that always checks", () => {
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText("Nothing would open the ports.")).toBeTruthy();
   });
+
+  // The relay is about to route around the refusal, so it is not a fault the
+  // host has to fix. The ways to fix it stay, because a direct game has the
+  // better ping.
+  it("does not draw a refusal as a problem when the relay will carry the battle", () => {
+    report.current = REFUSED;
+    render(
+      <ReachablePorts
+        ports={[]}
+        help="Opens the ports"
+        always
+        relayWillCarry
+      />,
+    );
+    expect(screen.getByText("Nothing would open the ports.")).toBeTruthy();
+    expect(document.querySelector(".text-destructive")).toBeNull();
+    expect(document.body.textContent).toContain("UPnP or NAT-PMP");
+  });
 });

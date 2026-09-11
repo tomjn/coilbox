@@ -39,6 +39,7 @@ export function ReachablePorts({
   help,
   onReport,
   always = false,
+  relayWillCarry = false,
 }: {
   /** The ports to open, or null to close whatever is open. The caller builds
    *  this from its own port fields, so a host who moves their room takes the
@@ -60,6 +61,10 @@ export function ReachablePorts({
    *  evidence the route ladder has. Left out, the toggle is there and starts
    *  off. */
   always?: boolean;
+  /** The battle goes through the server's relay when nothing opens, so a
+   *  refusal is not a fault to draw in red. The ways to fix it are still shown,
+   *  because a direct game has the better ping. */
+  relayWillCarry?: boolean;
 }) {
   const [ticked, setTicked] = useState(false);
   const enabled = always || ticked;
@@ -72,7 +77,12 @@ export function ReachablePorts({
   // Nothing to answer with no ports asked for, which is a form that has decided
   // it does not need the router at all.
   const answer = enabled && ports !== null && (
-    <Answer busy={net.busy} error={net.error} report={net.report} />
+    <Answer
+      busy={net.busy}
+      error={net.error}
+      report={net.report}
+      relayWillCarry={relayWillCarry}
+    />
   );
 
   if (always) {
@@ -116,10 +126,12 @@ function Answer({
   busy,
   error,
   report,
+  relayWillCarry,
 }: {
   busy: boolean;
   error: string | null;
   report: DirectReachability | null;
+  relayWillCarry: boolean;
 }) {
   if (busy || (!report && !error)) {
     return (
@@ -142,12 +154,15 @@ function Answer({
   if (!report) return null;
 
   const problem = isReachabilityProblem(report);
+  // Still a problem, and still explained, but not a fault to draw in red when
+  // the relay is about to carry the battle anyway.
+  const alarming = problem && !relayWillCarry;
   const advice = reachabilityAdvice(report);
   const address = joinAddress(report);
   return (
     <div
       className={`flex flex-col gap-1.5 rounded-md border p-2 text-xs ${
-        problem
+        alarming
           ? "border-destructive/50 bg-destructive/10 text-destructive"
           : "border-border bg-muted/40 text-muted-foreground"
       }`}
