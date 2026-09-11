@@ -109,7 +109,7 @@ async function startedWith(
   );
 
   if (report) {
-    fireEvent.click(screen.getByRole("checkbox", { name: /reachable/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /open ports/i }));
   }
   fireEvent.click(screen.getByRole("button", { name: /start/i }));
 

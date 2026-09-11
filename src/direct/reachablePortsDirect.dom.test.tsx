@@ -3,8 +3,8 @@
 /**
  * What a host on a public address reads in the reachability panel (issue #2054).
  *
- * `reachabilityHeadline` and its neighbours are tested on their own and prove
- * the words are right. What they cannot prove is what the panel does with them:
+ * The panel builds its own words, so they are tested here along with what the
+ * panel does with them:
  * the colour of the box and the router's own words underneath are decided here
  * and nowhere else, and both of them used to tell a host who is already on the
  * internet that something had gone wrong.
@@ -94,11 +94,8 @@ function show(given: DirectReachability) {
 describe("the reachability panel for a host on a public address", () => {
   it("says they are reachable as they are", () => {
     show(ON_PUBLIC_ADDRESS);
-    expect(
-      screen.getByText(
-        "Open. This machine is on the internet at 209.35.91.246, so there was nothing to forward.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("Players can reach you")).toBeTruthy();
+    expect(document.body.textContent).toContain("209.35.91.246");
   });
 
   it("does not send them to a router setting", () => {
@@ -135,11 +132,8 @@ describe("the reachability panel for a host on a public address", () => {
 describe("the reachability panel for a host on a public address with a docker bridge", () => {
   it("says they are reachable as they are", () => {
     show(ON_PUBLIC_ADDRESS_WITH_A_BRIDGE);
-    expect(
-      screen.getByText(
-        "Open. This machine is on the internet at 209.35.91.246, so there was nothing to forward.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("Players can reach you")).toBeTruthy();
+    expect(document.body.textContent).toContain("209.35.91.246");
   });
 
   it("does not send them to a router setting", () => {
@@ -157,13 +151,21 @@ describe("the reachability panel for a host on a public address with a docker br
 describe("the reachability panel for a host behind a router", () => {
   it("still says nothing opened, with the way out", () => {
     show(REFUSED);
-    expect(screen.getByText("Nothing would open the ports.")).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "TCP 8200 and UDP 8452 aren't open",
+    );
     expect(document.body.textContent).toContain("UPnP or NAT-PMP");
     expect(document.body.textContent).toContain("192.168.1.45");
+    expect(document.body.textContent).toContain(
+      "Fix this so players outside your network can join.",
+    );
   });
 
-  it("keeps the router's own words for the host to read", () => {
+  // Folded away, because only a bug report needs it, and one press from view.
+  it("keeps the router's own words behind Details", () => {
     show(REFUSED);
+    expect(document.body.textContent).not.toContain("no UPnP gateway answered");
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
     expect(document.body.textContent).toContain("no UPnP gateway answered");
   });
 
@@ -177,15 +179,16 @@ describe("the reachability panel for a host behind a router", () => {
  * A cloud instance behind its provider's one to one NAT (issue #2114).
  *
  * Nothing in the report separates this host from the one above, so the panel
- * cannot draw them differently and does not try. What it must do is give this
- * reader something they can act on, which is a firewall rule in a browser and
- * not a setting on a router they have not got.
+ * cannot draw them differently and does not try. Coilbox is a desktop app, so it
+ * offers this host no advice of its own. What it must not do is name a router
+ * as the cause, because this host has none.
  */
 describe("the reachability panel for a host on a cloud instance", () => {
-  it("offers the firewall rule that is the only thing this host can change", () => {
+  it("says which ports are shut, as it would for anybody", () => {
     show(ON_A_CLOUD_INSTANCE);
-    expect(screen.getByText("Nothing would open the ports.")).toBeTruthy();
-    expect(document.body.textContent).toContain("firewall or security group");
+    expect(document.body.textContent).toContain(
+      "TCP 8200 and UDP 8452 aren't open",
+    );
     expect(document.body.textContent).toContain("TCP 8200 and UDP 8452");
   });
 
@@ -194,9 +197,81 @@ describe("the reachability panel for a host on a cloud instance", () => {
   // router is `portmap.rs`'s own test, since the string here is a fixture.
   it("shows the two unanswered requests without calling either one a router", () => {
     show(ON_A_CLOUD_INSTANCE);
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
     expect(document.body.textContent).toContain(
       "Nothing opened the ports. NAT-PMP:",
     );
     expect(document.body.textContent).not.toContain("Your router");
+  });
+});
+
+/**
+ * The panel in the lobby hosting form, which checks without asking. There is no
+ * toggle to turn the check off, so the answer is there from the start.
+ */
+describe("the reachability panel that always checks", () => {
+  it("shows the answer with no checkbox to tick", () => {
+    report.current = REFUSED;
+    render(<ReachablePorts ports={[]} help="Opens the ports" always />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(document.body.textContent).toContain(
+      "TCP 8200 and UDP 8452 aren't open",
+    );
+  });
+
+  // The relay is about to route around the refusal, so it is not a fault the
+  // host has to fix. The ways to fix it stay, because a direct game has the
+  // better ping.
+  it("does not draw a refusal as a problem when the relay will carry the battle", () => {
+    report.current = REFUSED;
+    render(
+      <ReachablePorts
+        ports={[]}
+        help="Opens the ports"
+        always
+        relayWillCarry
+      />,
+    );
+    expect(document.body.textContent).toContain(
+      "TCP 8200 and UDP 8452 aren't open",
+    );
+    expect(document.querySelector(".text-destructive")).toBeNull();
+    expect(document.body.textContent).toContain("UPnP or NAT-PMP");
+    expect(document.body.textContent).toContain(
+      "Fix this so players outside your network can connect without the relay.",
+    );
+  });
+
+  // A check takes seconds, so it has to look like something is happening, and
+  // the form above has to know it is not finished.
+  it("shows it is still looking, and tells the form", () => {
+    report.current = null;
+    const checking = vi.fn();
+    render(
+      <ReachablePorts
+        ports={[]}
+        help="Opens the ports"
+        always
+        onCheckingChange={checking}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Asking your router",
+    );
+    expect(checking).toHaveBeenLastCalledWith(true);
+  });
+
+  it("tells the form the check has finished once there is an answer", () => {
+    report.current = REFUSED;
+    const checking = vi.fn();
+    render(
+      <ReachablePorts
+        ports={[]}
+        help="Opens the ports"
+        always
+        onCheckingChange={checking}
+      />,
+    );
+    expect(checking).toHaveBeenLastCalledWith(false);
   });
 });

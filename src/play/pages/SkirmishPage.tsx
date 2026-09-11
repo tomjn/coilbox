@@ -525,7 +525,7 @@ export default function SkirmishPage() {
   // "Host as battle" (issue #373): take a skirmish draft (the current setup, or
   // a saved preset from the drawer) online. A draft's game or map might not be
   // installed locally at all (a preset saved on another machine, or an old one
-  // whose content moved). `HostBattlePopover` only ever offers installed
+  // whose content moved). `HostBattleForm` only ever offers installed
   // games/maps, so hosting one that isn't would silently open a battle for a
   // different game. Gate on the resolve-content flow (#387) first. Only once
   // both are confirmed installed does this navigate to the Battles hub with

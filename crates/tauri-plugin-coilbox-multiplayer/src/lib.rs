@@ -1979,9 +1979,10 @@ fn remember_relay(registry: &Registry, server_key: &str, host: relay_host::Relay
 /// Forget whatever relay this connection was last hosting through, telling the
 /// sidecar the battle is over on the way.
 ///
-/// The one place coilbox lets go of a relay, so the one place that has to say
-/// so. Both callers are a battle ending as far as the lobby is concerned: the
-/// host leaving it, and the host opening another one over the top of it.
+/// Both callers are a battle ending as far as the lobby is concerned: the host
+/// leaving it, and the host opening another one over the top of it. The
+/// connection ending is the third, in `conn.rs`, and all three go through
+/// [`relay_host::release`].
 ///
 /// What it deliberately does not do is stop the sidecar. Leaving a battle room
 /// is not the end of a game, and a host who does it mid-match still has an
@@ -1993,11 +1994,11 @@ fn remember_relay(registry: &Registry, server_key: &str, host: relay_host::Relay
 /// Sent before the handle is dropped and not waited on. A write that fails is a
 /// sidecar that has already gone, which is the outcome we wanted anyway.
 fn forget_relay(registry: &Registry, server_key: &str) {
-    let held = lock_or_recover(registry)
+    let relay = lock_or_recover(registry)
         .get(server_key)
-        .and_then(|conn| lock_or_recover(&conn.relay).take());
-    if let Some(host) = held {
-        let _ = host.agent.battle_over();
+        .map(|conn| Arc::clone(&conn.relay));
+    if let Some(relay) = relay {
+        relay_host::release(&relay);
     }
 }
 
@@ -4599,6 +4600,52 @@ mod tests {
         let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp");
         forget_relay(&registry, "alice@bar:8200");
         forget_relay(&registry, "nobody@nowhere:8200");
+    }
+
+    /// The lobby closes a battle with its connection, so a connection that ends
+    /// has a relay carrying a battle nobody can join.
+    #[test]
+    fn a_connection_that_ends_lets_go_of_its_relay() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp r");
+        let channel = Channelled::default();
+        remember_relay(
+            &registry,
+            "alice@bar:8200",
+            a_relay_writing_to(channel.clone()),
+        );
+        let relay = lock_or_recover(&registry)
+            .get("alice@bar:8200")
+            .map(|conn| Arc::clone(&conn.relay))
+            .expect("the connection is registered");
+
+        conn::unregister(&registry, "alice@bar:8200", &relay);
+
+        assert!(
+            channel.was_told_the_battle_is_over(),
+            "got: {:?}",
+            channel.sent()
+        );
+        assert!(!lock_or_recover(&registry).contains_key("alice@bar:8200"));
+    }
+
+    /// A connection finishes closing after another has been registered under
+    /// its key. Taking the key out then would log that one out as well.
+    #[test]
+    fn a_connection_that_ends_leaves_a_newer_login_in_place() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp r");
+        let old = lock_or_recover(&registry)
+            .get("alice@bar:8200")
+            .map(|conn| Arc::clone(&conn.relay))
+            .expect("the connection is registered");
+        lock_or_recover(&registry)
+            .insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
+
+        conn::unregister(&registry, "alice@bar:8200", &old);
+
+        assert!(
+            lock_or_recover(&registry).contains_key("alice@bar:8200"),
+            "the newer login has to stay registered"
+        );
     }
 
     /// Hosting twice on one connection, where the first attempt was refused.

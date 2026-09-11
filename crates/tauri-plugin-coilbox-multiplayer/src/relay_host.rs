@@ -437,6 +437,22 @@ fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr, patience:
     });
 }
 
+/// Let go of the relay a connection was hosting through, telling the sidecar
+/// the battle is over on the way. Nothing when it holds none.
+///
+/// Taken out of the slot before it is told, so a relay hears it once however
+/// many of the ways to let go of one happen together: the host leaving the
+/// battle, hosting another over it, or the connection ending.
+///
+/// Not a `stop`, for the reason `forget_relay` gives in `lib.rs`: a game already
+/// running through the relay carries on, and the sidecar decides.
+pub(crate) fn release(relay: &HostedRelay) {
+    let held = lock_or_recover(relay).take();
+    if let Some(host) = held {
+        let _ = host.agent.battle_over();
+    }
+}
+
 /// Tell the host their battle cannot be reached if the lobby has not answered
 /// move `number` within `patience`.
 ///
