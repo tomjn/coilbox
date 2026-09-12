@@ -37,20 +37,24 @@ static JOB: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new
 
 #[cfg(target_os = "windows")]
 pub fn confine_children_to_job() {
-    use windows::core::PCWSTR;
-    use windows::Win32::System::JobObjects::{
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::System::JobObjects::{
         AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
         SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
         JOB_OBJECT_LIMIT_BREAKAWAY_OK, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     };
-    use windows::Win32::System::Threading::GetCurrentProcess;
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
     unsafe {
-        // Unnamed job, default security.
-        let job = match CreateJobObjectW(None, PCWSTR::null()) {
-            Ok(h) if !h.is_invalid() => h,
-            _ => return,
-        };
+        // Unnamed job, default security. `windows-sys` returns the raw HANDLE
+        // instead of a `Result`, so we test it ourselves. CreateJobObjectW
+        // documents NULL as its only failure return, and INVALID_HANDLE_VALUE
+        // is rejected too because that is the other value the `windows`
+        // wrapper this replaced counted as a failure.
+        let job = CreateJobObjectW(core::ptr::null(), core::ptr::null());
+        if job.is_null() || job == INVALID_HANDLE_VALUE {
+            return;
+        }
 
         // BREAKAWAY_OK has to be here rather than added later, because
         // CreateProcess reads it at the moment the child is created: a child
@@ -60,29 +64,29 @@ pub fn confine_children_to_job() {
         let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         info.BasicLimitInformation.LimitFlags =
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
+        // Both of the next two return a BOOL that is zero on failure.
         if SetInformationJobObject(
             job,
             JobObjectExtendedLimitInformation,
             &info as *const _ as *const core::ffi::c_void,
             core::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-        )
-        .is_err()
+        ) == 0
         {
             return;
         }
 
         // Children spawned after this inherit the job (none set
         // CREATE_BREAKAWAY_FROM_JOB), so every sidecar is covered.
-        if AssignProcessToJobObject(job, GetCurrentProcess()).is_err() {
+        if AssignProcessToJobObject(job, GetCurrentProcess()) == 0 {
             return;
         }
-        JOB.store(job.0 as isize, std::sync::atomic::Ordering::Relaxed);
+        JOB.store(job as isize, std::sync::atomic::Ordering::Relaxed);
 
         // `job` is intentionally not closed: the handle must stay open for our whole
         // lifetime, since closing the last handle trips KILL_ON_JOB_CLOSE and would
-        // kill us too. `windows`' HANDLE has no Drop, so simply not calling
-        // CloseHandle keeps it open until the OS reclaims it at process exit — which
-        // is the trigger we want.
+        // kill us too. A raw HANDLE has no Drop, so simply not calling CloseHandle
+        // keeps it open until the OS reclaims it at process exit, which is the
+        // trigger we want.
     }
 }
 
@@ -99,8 +103,8 @@ pub fn confine_children_to_job() {
 /// update is going to fail the same silent way, and the caller should say so.
 #[cfg(target_os = "windows")]
 pub fn stop_confining_new_children() -> Result<(), String> {
-    use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::System::JobObjects::{
+    use windows_sys::Win32::Foundation::HANDLE;
+    use windows_sys::Win32::System::JobObjects::{
         JobObjectExtendedLimitInformation, SetInformationJobObject,
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_BREAKAWAY_OK,
         JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
@@ -122,15 +126,25 @@ pub fn stop_confining_new_children() -> Result<(), String> {
     info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
         | JOB_OBJECT_LIMIT_BREAKAWAY_OK
         | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
-    unsafe {
+    let ok = unsafe {
         SetInformationJobObject(
-            HANDLE(handle as *mut core::ffi::c_void),
+            handle as HANDLE,
             JobObjectExtendedLimitInformation,
             &info as *const _ as *const core::ffi::c_void,
             core::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
         )
+    };
+    if ok == 0 {
+        // Zero is the documented failure return, and the detail is in
+        // GetLastError. `last_os_error` reads exactly that on Windows and
+        // formats the system message for it, which the `windows` crate's own
+        // error type used to do for us.
+        return Err(format!(
+            "could not let the installer leave the job object: {}",
+            std::io::Error::last_os_error()
+        ));
     }
-    .map_err(|e| format!("could not let the installer leave the job object: {e}"))
+    Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]

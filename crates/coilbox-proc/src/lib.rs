@@ -109,8 +109,8 @@ pub fn is_running(pid: u32) -> bool {
     }
     #[cfg(windows)]
     {
-        use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
-        use windows::Win32::System::Threading::{
+        use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE, WAIT_OBJECT_0};
+        use windows_sys::Win32::System::Threading::{
             OpenProcess, WaitForSingleObject, PROCESS_QUERY_LIMITED_INFORMATION,
             PROCESS_SYNCHRONIZE,
         };
@@ -122,17 +122,26 @@ pub fn is_running(pid: u32) -> bool {
         // route, and it is worse, because a process that genuinely exited with
         // 259 is indistinguishable from `STILL_ACTIVE`.
         unsafe {
-            let Ok(handle) = OpenProcess(
+            // `windows-sys` hands back the raw HANDLE rather than a `Result`,
+            // so the failure test is ours to make. OpenProcess documents NULL
+            // as its only failure return, and INVALID_HANDLE_VALUE is rejected
+            // too because that is the other value the `windows` wrapper this
+            // replaced counted as a failure.
+            let handle = OpenProcess(
                 PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
-                false,
+                0,
                 pid,
-            ) else {
+            );
+            if handle.is_null() || handle == INVALID_HANDLE_VALUE {
                 // No such process, or one we are not allowed to look at. The
                 // second is not a case coilbox reaches: both processes it asks
                 // about are its own children.
                 return false;
-            };
+            }
             let finished = WaitForSingleObject(handle, 0) == WAIT_OBJECT_0;
+            // Still closed by hand. A raw HANDLE has no `Drop`, just as the
+            // `windows` HANDLE it replaces had none, so nothing closes it for
+            // us.
             let _ = CloseHandle(handle);
             !finished
         }
