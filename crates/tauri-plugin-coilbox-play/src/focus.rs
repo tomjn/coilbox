@@ -19,9 +19,9 @@ pub fn focus_pid(pid: u32) -> bool {
 
 #[cfg(target_os = "windows")]
 pub fn focus_pid(pid: u32) -> bool {
-    use windows::core::BOOL;
-    use windows::Win32::Foundation::{HWND, LPARAM};
-    use windows::Win32::UI::WindowsAndMessaging::{
+    use windows_sys::core::BOOL;
+    use windows_sys::Win32::Foundation::{HWND, LPARAM};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
         EnumWindows, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
     };
 
@@ -30,26 +30,31 @@ pub fn focus_pid(pid: u32) -> bool {
         hwnd: HWND,
     }
 
+    // `windows-sys` BOOL is a plain i32, so the callback returns 0 and 1 rather
+    // than a wrapper, and `IsWindowVisible` is compared against 0 rather than
+    // asked for a bool.
     unsafe extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
-        let search = &mut *(lparam.0 as *mut Search);
+        let search = &mut *(lparam as *mut Search);
         let mut wpid: u32 = 0;
-        GetWindowThreadProcessId(hwnd, Some(&mut wpid));
-        if wpid == search.pid && IsWindowVisible(hwnd).as_bool() {
+        GetWindowThreadProcessId(hwnd, &mut wpid);
+        if wpid == search.pid && IsWindowVisible(hwnd) != 0 {
             search.hwnd = hwnd;
-            return BOOL(0); // found a visible top-level window; stop enumerating
+            return 0; // a visible top-level window, so stop enumerating
         }
-        BOOL(1) // keep going
+        1 // keep going
     }
 
     let mut search = Search {
         pid,
-        hwnd: HWND(std::ptr::null_mut()),
+        hwnd: std::ptr::null_mut(),
     };
     unsafe {
-        // `EnumWindows` returns Err when the callback stops early — expected here.
-        let _ = EnumWindows(Some(cb), LPARAM(&mut search as *mut _ as isize));
-        if !search.hwnd.0.is_null() {
-            return SetForegroundWindow(search.hwnd).as_bool();
+        // `EnumWindows` returns zero when the callback stops early, which is
+        // what we make it do, so its return says nothing useful here.
+        let _ = EnumWindows(Some(cb), &mut search as *mut _ as LPARAM);
+        if !search.hwnd.is_null() {
+            // Non-zero means the foreground request was dispatched.
+            return SetForegroundWindow(search.hwnd) != 0;
         }
     }
     false
