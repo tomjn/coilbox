@@ -1,6 +1,13 @@
 import { Button } from "@picoframe/frame";
-import { ChevronRight, Loader2 } from "lucide-react";
+import {
+  ChevronRight,
+  CircleCheck,
+  CircleHelp,
+  CircleX,
+  Loader2,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { Details, ResultCard, Verdict } from "@/components/ResultCard";
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,6 +30,12 @@ import { type Firewall, mpFirewall, mpFirewallAllow } from "../bindings";
  * Drawn only on Windows, and only because Rust said so. The backend answers
  * `supported: false` everywhere else, which is a better gate than reading the
  * user agent for something that ends in an operating system call.
+ *
+ * The answer sits in the same {@link ResultCard} the reachability check above it
+ * uses, because they are the same kind of thing: something coilbox asked the
+ * machine, and what came back. Windows' own words go behind Details rather than
+ * into the drawer, after a host saw six lines of PowerShell error record where
+ * the verdict should have been.
  */
 export function WindowsFirewall({ engine }: { engine: string | null }) {
   const [state, setState] = useState<Firewall | null>(null);
@@ -54,7 +67,11 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
       setState((was) => ({
         supported: true,
         programs: was?.programs ?? [],
-        problem: e instanceof Error ? e.message : String(e),
+        problem: {
+          title: "Coilbox could not reach Windows Firewall",
+          details: [e instanceof Error ? e.message : String(e)],
+          fault: true,
+        },
       }));
     } finally {
       setAsking(false);
@@ -63,12 +80,17 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
 
   if (!state?.supported || state.programs.length === 0) return null;
 
+  const { problem } = state;
   const settled = state.programs.every((p) => p.allowed === true);
-  if (settled && !state.problem) {
+  if (settled && !problem) {
     return (
-      <p className="text-xs text-muted-foreground">
-        Windows Firewall already allows every program hosting needs.
-      </p>
+      <ResultCard tone="quiet">
+        <Verdict
+          icon={<CircleCheck className="size-3.5 shrink-0 text-emerald-500" />}
+        >
+          Windows Firewall already allows every program hosting needs
+        </Verdict>
+      </ResultCard>
     );
   }
 
@@ -80,32 +102,67 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
         The engine asks while your game is starting, which is the worst moment
         to be answering questions. Answer for all of them now instead.
       </p>
-      <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-        {state.programs.map((program) => (
-          <li key={program.path}>
-            <span className="font-medium text-foreground">{program.name}</span>{" "}
-            {program.allowed === true
-              ? "is allowed in"
-              : program.allowed === false
-                ? "is not allowed in"
-                : "could not be checked"}
-          </li>
-        ))}
-      </ul>
-      {state.problem && (
-        <p className="text-xs text-destructive">{state.problem}</p>
-      )}
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        onClick={allow}
-        disabled={asking}
-        className="self-start"
+
+      <ResultCard
+        tone={problem?.fault ? "alarm" : "quiet"}
+        role={problem?.fault ? "alert" : undefined}
       >
-        {asking && <Loader2 aria-hidden className="size-3 animate-spin" />}
-        {asking ? "Waiting for Windows" : "Allow them through the firewall"}
-      </Button>
+        <Verdict
+          icon={
+            asking ? (
+              <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" />
+            ) : problem?.fault ? (
+              <CircleX className="size-3.5 shrink-0" />
+            ) : (
+              <CircleHelp className="size-3.5 shrink-0" />
+            )
+          }
+          strong={!problem?.fault}
+        >
+          {asking
+            ? "Waiting for Windows"
+            : (problem?.title ?? verdict(state.programs))}
+        </Verdict>
+
+        <ul className="flex flex-col gap-0.5 pl-5">
+          {state.programs.map((program) => (
+            <li key={program.path}>
+              <span className="font-medium text-foreground">
+                {program.name}
+              </span>{" "}
+              {program.allowed === true
+                ? "is allowed in"
+                : program.allowed === false
+                  ? "is not allowed in"
+                  : "could not be checked"}
+            </li>
+          ))}
+        </ul>
+
+        {/* Said whenever coilbox could not read the rules, because that is
+            exactly when the button looks pointless and is not: the read is what
+            Windows refused, and adding them asks for administrator rights. */}
+        {state.programs.some((p) => p.allowed === null) && !asking && (
+          <span className="pl-5">
+            You can still add the rules. Windows keeps one per program, so doing
+            it twice changes nothing.
+          </span>
+        )}
+
+        <Details lines={problem?.details ?? []} />
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={allow}
+          disabled={asking}
+          className="ml-5 self-start"
+        >
+          Allow them through the firewall
+        </Button>
+      </ResultCard>
+
       <Collapsible>
         <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ChevronRight
@@ -129,4 +186,11 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
       </Collapsible>
     </div>
   );
+}
+
+/** The line above the list, when there is nothing wrong to say instead. */
+function verdict(programs: Firewall["programs"]): string {
+  const blocked = programs.filter((p) => p.allowed === false).length;
+  if (blocked === 1) return "One program is not allowed in yet";
+  return `${blocked} programs are not allowed in yet`;
 }

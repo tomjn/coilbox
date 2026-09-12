@@ -21,6 +21,11 @@
  * per program file and each engine version is its own file, so a host who
  * switches engine has a program nothing has allowed and a panel that would
  * still be showing the last engine's answer.
+ *
+ * A fourth since: that a machine which refuses the read keeps the button. Some
+ * machines deny an unelevated `Get-NetFirewallRule` outright, and that host is
+ * exactly the one for whom adding the rules still works, because adding them
+ * elevates.
  */
 
 import {
@@ -65,6 +70,20 @@ function allowed(): Firewall {
   return {
     ...answer,
     programs: answer.programs.map((p) => ({ ...p, allowed: true })),
+  };
+}
+
+/** A machine that would not let coilbox read the rules at all. */
+function unreadable(): Firewall {
+  const answer = blocked();
+  return {
+    programs: answer.programs.map((p) => ({ ...p, allowed: null })),
+    supported: true,
+    problem: {
+      title: "Windows would not let coilbox check the firewall rules",
+      details: ["Get-NetFirewallRule : Access is denied."],
+      fault: false,
+    },
   };
 }
 
@@ -184,8 +203,11 @@ it("redraws from what the rules say once they have been added", async () => {
 it("says what happened when the administrator prompt is refused", async () => {
   firewallAllow.mockResolvedValue({
     ...blocked(),
-    problem:
-      "The Windows administrator prompt was refused, so nothing was changed.",
+    problem: {
+      title: "The Windows administrator prompt was refused, so nothing changed",
+      details: [],
+      fault: false,
+    },
   });
   await draw();
 
@@ -206,6 +228,54 @@ it("keeps the button when the call to add the rules fails outright", async () =>
     fireEvent.click(screen.getByRole("button", { name: /Allow them through/ }));
   });
 
-  expect(screen.getByText(/PowerShell is not on PATH/)).toBeTruthy();
+  expect(screen.getByText(/could not reach Windows Firewall/)).toBeTruthy();
   expect(allowButton()).not.toBeNull();
+});
+
+/**
+ * The one this was written for. A machine that denies an unelevated
+ * `Get-NetFirewallRule` is not a machine coilbox can do nothing for: adding the
+ * rules raises an administrator prompt, which is the very thing the read was
+ * missing. A panel that only said "could not be checked" three times read as
+ * broken and hid a button that would have worked.
+ */
+it("keeps offering to add the rules when Windows refuses to say what they are", async () => {
+  firewall.mockResolvedValue(unreadable());
+  await draw();
+
+  expect(
+    screen.getByText(/would not let coilbox check the firewall rules/),
+  ).toBeTruthy();
+  expect(screen.getByText(/You can still add the rules/)).toBeTruthy();
+  expect(allowButton()).not.toBeNull();
+});
+
+/**
+ * PowerShell's own words are worth keeping for a bug report and worth keeping
+ * out of the way. Folded, they are not in the accessible tree until somebody
+ * asks.
+ */
+it("folds away what Windows said rather than printing it in the drawer", async () => {
+  firewall.mockResolvedValue(unreadable());
+  await draw();
+
+  expect(screen.queryByText(/Access is denied/)).toBeNull();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Details/ }));
+  });
+
+  expect(screen.getByText(/Access is denied/)).toBeTruthy();
+});
+
+/**
+ * Red is for something that went wrong. A machine that will not answer has not
+ * gone wrong, and neither has a host who said no to the prompt, so neither gets
+ * the alert role that would interrupt a screen reader.
+ */
+it("does not raise an alert for a machine that simply will not answer", async () => {
+  firewall.mockResolvedValue(unreadable());
+  await draw();
+
+  expect(screen.queryByRole("alert")).toBeNull();
 });
