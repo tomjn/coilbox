@@ -49,15 +49,20 @@ jobs:
         include:
           # `smcng_platform` selects the SpringMapConvNG release asset; `exe` is the
           # binary suffix on Windows.
+          # `cache_rust` restores the release-profile dependency cache primed on
+          # main by release-cache.yml. Windows only - see the step below.
           - platform: macos-14 # arm64
             smcng_platform: macos-arm64
             exe: ""
+            cache_rust: false
           - platform: ubuntu-22.04
             smcng_platform: linux-x86_64
             exe: ""
+            cache_rust: false
           - platform: windows-latest
             smcng_platform: windows-x86_64
             exe: ".exe"
+            cache_rust: true
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
@@ -80,6 +85,34 @@ jobs:
           # resolve and bundle the mapconv sidecars' DevIL deps into the AppImage
           # (the linux SpringMapConvNG build links system DevIL, not bundled libs).
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdevil-dev
+
+      # Restore the release-profile dependency artefacts that release-cache.yml
+      # primes on main. Three things about this step are load bearing:
+      #
+      # Windows only. The repository's cache store is already past its 10 GB
+      # limit and evicting, so three platforms' worth of release cache would
+      # push each other and the lint cache out (#2806). Windows is also the
+      # only platform whose time matters: publish-release waits for all three,
+      # and Windows spends 16m40s on app compile against under 10 minutes
+      # elsewhere (#2805), so it alone decides when a release goes live.
+      #
+      # save-if: false. A run can only restore a cache saved on its own ref or
+      # on the default branch, so anything saved under refs/tags/1.13.3 is
+      # unreadable by 1.13.4 - the duplicated bun keys in `gh cache list` are
+      # this happening already. Saving here would burn cache space for nothing.
+      #
+      # shared-key. The automatic key includes the job id, so a cache saved by
+      # the priming job would be filed under a key this job never looks for.
+      # shared-key replaces that job-id portion with a fixed string, which is
+      # the only way the two jobs can meet. It names the profile as well, so
+      # the key moves by itself if the profile changes and the cache cannot
+      # freeze on contents the build can no longer use (#2822). Keep it
+      # identical to the priming job's.
+      - uses: Swatinem/rust-cache@v2
+        if: matrix.cache_rust
+        with:
+          shared-key: profile-release
+          save-if: false
 
       # The release version comes from the git tag, not hand-maintained in source.
       # In source the bundle version is a 0.0.0 placeholder; on a tag build we
