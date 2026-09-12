@@ -84,6 +84,8 @@ const COMMANDS: &[&str] = &[
     "mp_relay_traffic",
     "mp_leftover_relay_agent",
     "mp_relay_left_running",
+    "mp_firewall",
+    "mp_firewall_allow",
     "mp_ask_leftover_relay_to_stop",
     "mp_watch_engine",
     "mp_chat_logs",

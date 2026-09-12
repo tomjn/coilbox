@@ -16,6 +16,10 @@ mod conn;
 #[cfg(test)]
 mod direct_loopback;
 mod dmlog;
+/// Answering Windows Firewall from the hosting drawer rather than while a game
+/// is starting. Windows only, and it says so itself so that nothing else has to
+/// check.
+mod firewall;
 mod probe;
 /// Telling the relay agent sidecar which addresses may reach a relayed battle.
 /// Public because the seam it exposes is the one thing relay hosting cannot
@@ -2361,6 +2365,51 @@ async fn mp_ask_leftover_relay_to_stop<R: Runtime>(
     )
 }
 
+/// `mp_firewall`: which programs Windows Defender Firewall has to let in
+/// before this host can host, and whether it already does (issue #2799).
+///
+/// `engine` is the path of the engine the hosting form is about to launch, so
+/// that the answer covers the version this battle will use. Windows remembers
+/// an answer per program file and every engine version is its own file, so a
+/// host who switches engine has a program nothing has allowed yet. Null when
+/// the form has no engine resolved, which leaves the two coilbox programs.
+///
+/// Answers for every platform. Off Windows `supported` is false and the panel
+/// is not drawn, which is why the frontend does not sniff the platform itself.
+#[tauri::command]
+fn mp_firewall<R: Runtime>(app: tauri::AppHandle<R>, engine: Option<String>) -> CliResult {
+    CliResult::ok(json!(firewall::state(
+        &app,
+        engine.as_deref().map(Path::new)
+    )))
+}
+
+/// `mp_firewall_allow`: add the inbound rules, behind one Windows
+/// administrator prompt, and answer with what the rules say afterwards.
+///
+/// The answer is read back rather than assumed from a command that exited zero,
+/// so a panel that says the programs are allowed is reporting the rules rather
+/// than reporting its own success.
+///
+/// A host who refuses the administrator prompt gets `problem` saying so and
+/// nothing changed, which is where they already were.
+#[tauri::command]
+async fn mp_firewall_allow<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    engine: Option<String>,
+) -> Result<CliResult, ()> {
+    // On a thread of its own because it waits for a person to answer a prompt,
+    // and the main thread is drawing the drawer they are answering it in.
+    let answered = tauri::async_runtime::spawn_blocking(move || {
+        firewall::allow(&app, engine.as_deref().map(Path::new))
+    })
+    .await;
+    Ok(match answered {
+        Ok(state) => CliResult::ok(json!(state)),
+        Err(e) => CliResult::err(format!("coilbox could not reach Windows Firewall: {e}")),
+    })
+}
+
 /// Tell the relay this connection's battle is hosted through which process the
 /// engine is. Answers whether there was one to tell.
 ///
@@ -3584,6 +3633,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_relay_traffic,
             mp_leftover_relay_agent,
             mp_relay_left_running,
+            mp_firewall,
+            mp_firewall_allow,
             mp_ask_leftover_relay_to_stop,
             mp_watch_engine,
             dmlog::mp_chat_logs,

@@ -32,6 +32,7 @@ import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
+import { WindowsFirewall } from "./WindowsFirewall";
 
 /** The `mpOpenBattle` argument shape, minus the connection key the parent supplies. */
 export type OpenBattleArgs = Omit<
@@ -383,6 +384,13 @@ export function HostBattleForm({
               </Collapsible>
             </div>
           )}
+
+          {/* Windows Firewall, in the same cluster as the reachability check
+              and the relay, because it is the third thing that decides whether
+              anybody gets in. Draws nothing off Windows, and the engine goes
+              with it because Windows remembers an answer per program file
+              (issue #2799). */}
+          <WindowsFirewall engine={target?.executable ?? null} />
 
           {/* What hosting is about to do, in the place where the answer it is
               reading appears. Not the same thing as issue #2022, which tells

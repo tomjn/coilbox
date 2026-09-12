@@ -35,6 +35,12 @@ vi.mock("../bindings", () => ({
     leftoverRelayAgent(args),
   mpAskLeftoverRelayToStop: (args: Record<string, never>) =>
     askLeftoverRelayToStop(args),
+  // The form's Windows Firewall panel asks on mount. Answered as a machine
+  // that has no Windows Firewall, so it draws nothing and this test is left
+  // looking at the relay panel it is about.
+  mpFirewall: () =>
+    Promise.resolve({ supported: false, programs: [], problem: null }),
+  mpFirewallAllow: () => Promise.reject(new Error("not this test")),
 }));
 
 vi.mock("@/components/OptionSelect", () => ({

@@ -1419,6 +1419,65 @@ export const mpLeftoverRelayAgent = defineCommand<
   { pid: number | null; ours: boolean }
 >("coilbox-multiplayer", "mp_leftover_relay_agent");
 
+/** One program Windows Defender Firewall has to let in, and what it says now. */
+export interface FirewallProgram {
+  /** What the rule is called, in Windows Defender Firewall and on screen. */
+  name: string;
+  /** The program file. Windows remembers an answer per file. */
+  path: string;
+  /**
+   * Whether an inbound allow rule for it is there, and null when coilbox could
+   * not look. Null is not "no": saying somebody is blocked when nothing was
+   * read would send them to an administrator prompt for no reason.
+   */
+  allowed: boolean | null;
+}
+
+/** What Windows Defender Firewall says about the programs hosting needs. */
+export interface Firewall {
+  /** False on every platform but Windows, where there is nothing to draw. */
+  supported: boolean;
+  programs: FirewallProgram[];
+  /** Why coilbox could not read or change the rules, if it could not. */
+  problem: string | null;
+}
+
+/**
+ * Which programs Windows Defender Firewall has to let in before this host can
+ * host, and whether it already does (issue #2799).
+ *
+ * Hosting can set off a firewall prompt for three separate programs, and the
+ * last is the engine, which asks while the game is starting. A host who
+ * dismisses that one gets a battle nobody can join and nothing on the machine
+ * can say why.
+ *
+ * `engine` is the engine the form is about to launch, because Windows remembers
+ * an answer per program file and each engine version is its own file. Leave it
+ * out and the answer covers the two coilbox programs.
+ *
+ * Answers everywhere. Off Windows `supported` is false, which is how the panel
+ * knows to draw nothing, rather than the frontend reading the user agent.
+ */
+export const mpFirewall = defineCommand<{ engine?: string | null }, Firewall>(
+  "coilbox-multiplayer",
+  "mp_firewall",
+);
+
+/**
+ * Add the inbound rules, behind one Windows administrator prompt, and answer
+ * with what the rules say afterwards (issue #2799).
+ *
+ * The answer is read back from Windows rather than assumed from a command that
+ * worked, so a panel saying the programs are allowed is reporting the rules.
+ *
+ * A host who refuses the administrator prompt gets `problem` saying so, and
+ * nothing was changed. Waits for them to answer it.
+ */
+export const mpFirewallAllow = defineCommand<
+  { engine?: string | null },
+  Firewall
+>("coilbox-multiplayer", "mp_firewall_allow");
+
 /**
  * Ask a leftover relay agent to stop, and say what it did (issue #2062).
  *
