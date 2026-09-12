@@ -240,9 +240,14 @@ jobs:
           # binary is matched by extension rather than by name: the bundler takes
           # that name from the Tauri config, and a rename there should not quietly
           # start shipping an empty zip.
+          #
+          # Sidecars are excluded by their `coilbox-` prefix rather than counted,
+          # because the relay agent stays in the install root on purpose. It is
+          # the one sidecar that outlives coilbox (win_job.rs), so the installer
+          # would have to kill a live relayed battle to move it safely.
           test -d "$STAGING/.coilbox" || { echo "installer did not tuck the sidecars away"; exit 1; }
-          test "$(find "$STAGING" -maxdepth 1 -name '*.exe' | wc -l)" -eq 1 \
-            || { echo "expected exactly one .exe in $STAGING"; find "$STAGING" -maxdepth 1; exit 1; }
+          test "$(find "$STAGING" -maxdepth 1 -name '*.exe' ! -name 'coilbox-*.exe' | wc -l)" -eq 1 \
+            || { echo "expected exactly one app .exe in $STAGING"; find "$STAGING" -maxdepth 1; exit 1; }
 
           ZIP="Coilbox_${VER}_x64-portable.zip"
           rm -f "$ZIP" "$ZIP.sig"
