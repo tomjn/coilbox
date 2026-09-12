@@ -159,15 +159,17 @@ pub fn log_path(run_file: &Path) -> PathBuf {
 /// belongs to somebody's browser refused every relayed battle for the rest of
 /// that machine's uptime (issue #2078).
 ///
-/// The lock settles it. The sidecar holds a shared lock on the run file for
-/// as long as it runs and the kernel releases it the moment that process ends,
-/// so a free lock means the writer is dead. That is the one thing a live
-/// sidecar always does and a recycled process never would, and it is why
-/// clearing on it cannot clear a record belonging to a sidecar carrying a game.
+/// The lock settles it. The sidecar holds a shared lock on
+/// [`coilbox_relay_protocol::lock_path`] for as long as it runs and the kernel
+/// releases it the moment that process ends, so a free lock means the writer is
+/// dead. That is the one thing a live sidecar always does and a recycled
+/// process never would, and it is why clearing on it cannot clear a record
+/// belonging to a sidecar carrying a game.
 ///
 /// Only for a record that says its writer took a lock. One from a build before
 /// the lock has a free lock either way, so it is left to its pid and needs the
-/// note in [`leave_a_stop_note`], or a restart.
+/// note in [`leave_a_stop_note`], or a restart. So is one from the build that
+/// locked the run file itself, which has no lock file to read (issue #2829).
 pub fn already_relaying(run_file: &Path) -> Option<u32> {
     let text = std::fs::read_to_string(run_file).ok()?;
     let record = RunFile::from_json(&text).ok()?;
@@ -340,7 +342,7 @@ mod tests {
     /// found, and one that has gone is not.
     ///
     /// The lock stands in for the sidecar, because that is what a running
-    /// sidecar is from out here: something holding the file open.
+    /// sidecar is from out here: something holding the lock open.
     #[test]
     fn a_run_file_naming_a_live_process_is_a_relay_that_is_already_running() {
         let dir = tempfile::tempdir().expect("a temp dir");
@@ -354,20 +356,31 @@ mod tests {
             .to_json(),
         )
         .expect("a writable temp dir");
-        let held = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&run_file)
-            .expect("the file is there");
-        held.try_lock_shared().expect("nothing else has it");
+        let _held = a_sidecar_holding_the_lock(&run_file);
 
         assert_eq!(already_relaying(&run_file), Some(std::process::id()));
     }
 
+    /// Hold the lock beside `run_file` the way a running sidecar does.
+    ///
+    /// The handle comes back because the lock lives on it: a caller that throws
+    /// it away is testing a leftover rather than a sidecar.
+    fn a_sidecar_holding_the_lock(run_file: &Path) -> std::fs::File {
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(coilbox_relay_protocol::lock_path(run_file))
+            .expect("a writable temp dir");
+        held.try_lock_shared().expect("nothing else has it");
+        held
+    }
+
     /// The bug in issue #2078. The sidecar has gone and the OS has given its
     /// number to something else, so the pid reads as running and nothing holds
-    /// the file. Reporting a relay here is what left a host unable to open a
-    /// relayed battle until they restarted the machine.
+    /// the lock it left behind. Reporting a relay here is what left a host
+    /// unable to open a relayed battle until they restarted the machine.
     #[test]
     fn a_run_file_naming_a_process_that_is_not_the_sidecar_is_not_a_relay() {
         let dir = tempfile::tempdir().expect("a temp dir");
@@ -382,6 +395,8 @@ mod tests {
             .to_json(),
         )
         .expect("a writable temp dir");
+        std::fs::write(coilbox_relay_protocol::lock_path(&run_file), "")
+            .expect("a writable temp dir");
 
         let found = already_relaying(&run_file);
         let _ = stranger.kill();

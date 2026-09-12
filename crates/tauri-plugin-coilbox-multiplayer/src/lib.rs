@@ -5513,8 +5513,8 @@ mod tests {
     }
 
     /// A run file naming a process that is definitely running and holding the
-    /// file, which is what a live sidecar leaves. This test process stands in
-    /// for it.
+    /// lock beside it, which is what a live sidecar leaves. This test process
+    /// stands in for it.
     ///
     /// The lock comes back with the path because it lives on the open handle:
     /// dropping it is the sidecar dying, so a caller that throws it away is
@@ -5536,8 +5536,10 @@ mod tests {
         let held = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
-            .open(&run_file)
-            .expect("the file is there");
+            .create(true)
+            .truncate(false)
+            .open(coilbox_relay_protocol::lock_path(&run_file))
+            .expect("a writable temp dir");
         held.try_lock_shared().expect("nothing else has it");
         (run_file, held)
     }
