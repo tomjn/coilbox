@@ -12,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../crates/coilbox-portable" }
+coilbox-proc = { path = "../crates/coilbox-proc" }
 tauri-plugin-coilbox-downloads = { path = "../crates/tauri-plugin-coilbox-downloads" }
 tauri-plugin-coilbox-uberstress = { path = "../crates/tauri-plugin-coilbox-uberstress" }
 tauri-plugin-coilbox-mapconv = { path = "../crates/tauri-plugin-coilbox-mapconv" }
@@ -38,6 +39,15 @@ tauri-plugin-process = "2"
 tauri-plugin-notification = "2"
 # generate_context! emits serde_json references when the updater config is present.
 serde_json = { workspace = true }
+serde = { workspace = true }
+# A portable Windows install cannot use the NSIS installer the updater plugin
+# runs, so it fetches and checks a signed zip itself (see src/portable_update.rs).
+# minisign-verify and base64 are the same pair the updater plugin verifies its own
+# artifacts with, and both are already in the tree through it.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+minisign-verify = "0.2"
+base64 = { workspace = true }
+zip = { workspace = true }
 # Dev-only AI-agent bridge: runs an MCP socket server so agents can screenshot/
 # drive the app. tomjn fork carries a macOS window-finding fix not yet upstream.
 # Optional, behind the `mcp` feature, and only initialised under
@@ -48,6 +58,9 @@ serde_json = { workspace = true }
 # yet merged to the fork's default branch. Capture targets Coilbox's own window
 # (by PID/window id) rather than whatever is frontmost.
 tauri-plugin-mcp = { git = "https://github.com/tomjn/tauri-plugin-mcp", branch = "fix/screenshot-by-window-id", optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [features]
 mcp = ["dep:tauri-plugin-mcp"]
