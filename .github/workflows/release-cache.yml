@@ -1,0 +1,93 @@
+name: release cache
+
+# Prime the release-profile Rust dependency cache that release.yml restores on
+# Windows.
+#
+# Releases run on tag pushes, and a run can only restore a cache saved on its
+# own ref or on the default branch. A cache saved by one tag is therefore
+# unreadable by the next, so the only ref a release build can read is main and
+# the cache has to be saved from here.
+#
+# Windows only, matching release.yml's restore step. The reasoning for that,
+# and for the key, is written out there.
+#
+# This job compiles dependencies and nothing else of value. It does not bundle,
+# sign, or publish, and its own artefacts are thrown away with the runner.
+
+on:
+  push:
+    branches: [main]
+    # Cargo.lock moving is what puts new dependency versions in the cache.
+    # Nothing else needs a re-prime: rust-cache's restore key leaves out the
+    # manifest hash, so an ordinary merge still restores the last entry and
+    # rebuilds only what actually changed. Cargo.lock changed 11 times in the
+    # eight days to 11 September 2026, and a release-profile Windows build is
+    # over twenty minutes, so priming on every merge would be a poor trade.
+    #
+    # This file's own path is here so that merging it primes the cache once,
+    # rather than leaving the release job cold until the next dependency bump.
+    paths:
+      - Cargo.lock
+      - .github/workflows/release-cache.yml
+  # A new stable rustc changes the cache key and no push announces it, so the
+  # cache would sit unreadable until something else happened to move it.
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+# Two primes running at once would compile the same thing twice and race each
+# other to the same key.
+concurrency:
+  group: release-cache
+  cancel-in-progress: true
+
+jobs:
+  prime:
+    runs-on: windows-latest
+    # The whole point of this job is to pay a cold release build, and the one
+    # measured on Windows was 3m42s of sidecars plus 16m40s of app compile
+    # (#2802). This is generous room over that rather than an expected time.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      # Must stay identical to release.yml's restore step. A difference in
+      # either input gives the two jobs different keys, and the failure is
+      # silent: the release simply restores nothing and compiles from cold.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: profile-release
+      # tauri-build checks that the declared bundle resources exist but never
+      # reads them, so empty folders satisfy it. release.yml fills these from a
+      # SpringMapConvNG release and the committed pr-downloader prebuilts.
+      # Neither affects a dependency artefact, so this job skips both.
+      - name: Placeholder mapconv and pr-downloader resource dirs
+        shell: bash
+        run: mkdir -p src-tauri/mapconv src-tauri/prdownloader
+      # tauri-codegen embeds the frontend at compile time and panics with
+      # "the `frontendDist` configuration is set to `../dist` but this path
+      # doesn't exist" unless it is building dev with a devUrl set. That is why
+      # the lint job gets away with no dist at all and a release-profile build
+      # does not. An empty index.html is enough, and running the real
+      # `bun run build` here would be worse than useless: it starts with
+      # `tsc --noEmit`, so a type error would turn this job red for something
+      # the frontend job already covers. What the file contains cannot change
+      # a dependency's artefacts, which are all this job exists to produce.
+      - name: Placeholder frontend dist
+        shell: bash
+        run: |
+          mkdir -p dist
+          printf '<!doctype html><title>cache prime</title>' > dist/index.html
+      # Release profile, as release.yml uses. These also land in
+      # src-tauri/binaries/ under the host triple, where tauri-build looks for
+      # the externalBin sidecars before it will compile the app crate at all.
+      - name: Build unitsync worker and relay agent sidecars
+        shell: bash
+        run: bash scripts/build-sidecars.sh coilbox-unitsync-worker coilbox-relay-agent
+      # rust-cache keeps dependencies and drops workspace crates, so none of
+      # the 39 crates in this workspace are cached and the app crate's own
+      # compile is thrown away. Building it is still the only way to pull its
+      # whole dependency graph into target/release, which is the part worth
+      # keeping.
+      - name: Build the app crate
+        run: cargo build --release -p coilbox
