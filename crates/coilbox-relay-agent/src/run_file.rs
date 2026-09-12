@@ -25,12 +25,19 @@
 //! The pid alone is not enough either, because a pid is unique only while its
 //! process lives. A number the OS has since given to somebody's browser reads
 //! as running, and that left a host unable to open a relayed battle until they
-//! restarted the machine (issue #2078). So the agent takes a shared lock on the
-//! file as well and keeps it for as long as it runs. The kernel gives that lock
-//! up the moment the process ends, however it ends, so a free lock is proof
-//! that the pid is somebody else's rather than an inference from one.
+//! restarted the machine (issue #2078). So the agent takes a shared lock as
+//! well and keeps it for as long as it runs. The kernel gives that lock up the
+//! moment the process ends, however it ends, so a free lock is proof that the
+//! pid is somebody else's rather than an inference from one.
 //! [`coilbox_relay_protocol::run_file_is_still_held`] is the reading of it, and
 //! carries why the lock is shared rather than exclusive.
+//!
+//! The lock goes on [`coilbox_relay_protocol::lock_path`], an empty file beside
+//! the run file, rather than on the run file itself. It was on the run file and
+//! that stopped every Windows host relaying anything (issue #2829): a Windows
+//! range lock denies writes to the process holding it too, so the agent's own
+//! write of the record below failed with "another process has locked a portion
+//! of the file". Locks and contents do not share a file here.
 //!
 //! A filesystem that will not lock leaves [`Contents::locked`] false, and the
 //! file is then back to the pid on its own. That is the old behaviour rather
@@ -60,8 +67,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use coilbox_relay_protocol::{
-    carrying_path, run_file_is_still_held, stop_note_path, RunFile as Contents, StopNote,
-    NOTE_LOOKED_FOR_EVERY,
+    carrying_path, lock_path, run_file_is_still_held, stop_note_path, RunFile as Contents,
+    StopNote, NOTE_LOOKED_FOR_EVERY,
 };
 
 use crate::stopping::Stopping;
@@ -88,11 +95,14 @@ impl std::fmt::Display for Taken {
 #[derive(Debug)]
 pub struct Claim {
     path: PathBuf,
-    /// The file itself, kept open because the lock lives on the open handle.
+    /// The lock file, kept open because the lock lives on the open handle.
     /// Dropping it is what gives the lock back, so it is held here rather than
-    /// closed after the write, and the kernel gives it back for us if this
-    /// process is killed.
-    _locked: File,
+    /// closed after [`Claim::take`] returns, and the kernel gives it back for
+    /// us if this process is killed.
+    ///
+    /// `None` on a filesystem that would not lock, which is the agent running
+    /// without the proof rather than refusing to run.
+    locked: Option<File>,
 }
 
 impl Claim {
@@ -106,12 +116,7 @@ impl Claim {
             std::fs::create_dir_all(parent).map_err(Taken::Unwritable)?;
         }
         match create_new(&path) {
-            Ok(locked) => {
-                return Ok(Claim {
-                    path,
-                    _locked: locked,
-                })
-            }
+            Ok(locked) => return Ok(Claim { path, locked }),
             Err(e) if e.kind() != io::ErrorKind::AlreadyExists => return Err(Taken::Unwritable(e)),
             Err(_) => {}
         }
@@ -122,10 +127,7 @@ impl Claim {
         // lying around, or one naming a pid the OS has since given away.
         std::fs::remove_file(&path).map_err(Taken::Unwritable)?;
         match create_new(&path) {
-            Ok(locked) => Ok(Claim {
-                path,
-                _locked: locked,
-            }),
+            Ok(locked) => Ok(Claim { path, locked }),
             // Somebody claimed it in the moment between the two, which is the
             // race the exclusive create exists to settle. They won.
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
@@ -145,12 +147,16 @@ impl Drop for Claim {
     /// for.
     fn drop(&mut self) {
         if holder(&self.path) == Some(std::process::id()) {
+            // Closed before the files go, because Windows keeps a name alive
+            // until the last handle on it closes and this is the last handle.
+            self.locked = None;
             // The figure goes with the claim, for the same reason and under the
             // same guard. It is already ignored once the run file it names has
             // gone, so this is tidiness rather than correctness, but a directory
             // left holding one file and not the other is a puzzle for whoever
             // reads it next.
             let _ = std::fs::remove_file(carrying_path(&self.path));
+            let _ = std::fs::remove_file(lock_path(&self.path));
             let _ = std::fs::remove_file(&self.path);
         }
     }
@@ -215,38 +221,61 @@ fn take_note_for(path: &Path, us: u32) -> bool {
     true
 }
 
-/// Create the file, lock it, and write this process into it, failing if it is
-/// already there. Answers with the open handle, which is where the lock lives.
+/// Create the file, take the lock beside it, and write this process into it,
+/// failing if the file is already there. Answers with the open lock handle,
+/// which is the thing that has to stay alive.
 ///
 /// `create_new` is the whole mechanism for the race: it is one atomic syscall,
 /// so two agents racing cannot both succeed.
 ///
 /// The lock is taken before the contents are written, so there is no moment
-/// where the file says a lock is held and none is. A filesystem that will not
-/// lock is written as a file that says so rather than being refused, because
+/// where the record says a lock is held and none is. A filesystem that will not
+/// lock is written as a record that says so rather than being refused, because
 /// the run file still does its old job without one.
 ///
-/// Shared rather than exclusive, so that the record stays readable on Windows.
-/// [`coilbox_relay_protocol::run_file_is_still_held`] has the reason, and it is
-/// not a small one: an exclusive lock there would make coilbox's own read of
-/// this file fail and have it start a second agent over a live game.
-fn create_new(path: &Path) -> io::Result<File> {
+/// Shared rather than exclusive, because mutual exclusion is the run file's job
+/// and this only has to prove the process is alive.
+/// [`coilbox_relay_protocol::run_file_is_still_held`] has the reasoning.
+fn create_new(path: &Path) -> io::Result<Option<File>> {
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()
-        .read(true)
         .write(true)
         .create_new(true)
         .open(path)?;
-    let locked = file.try_lock_shared().is_ok();
+    let locked = hold_the_lock(&lock_path(path));
     file.write_all(
         Contents {
             pid: std::process::id(),
-            locked,
+            locked: locked.is_some(),
         }
         .to_json()
         .as_bytes(),
     )?;
-    Ok(file)
+    Ok(locked)
+}
+
+/// Open the lock file and take a shared lock on it, or answer `None` because
+/// this filesystem does not do locking.
+///
+/// Opened rather than created afresh, because an agent that was killed leaves
+/// its lock file behind and the kernel has already given the lock back. Nothing
+/// is ever written to it: what it holds is a lock, not a record.
+///
+/// `None` is not a failure. It is the same degradation as a build from before
+/// the lock existed, and the caller writes it into the record so that nobody
+/// later reads a free lock as proof of anything.
+fn hold_the_lock(path: &Path) -> Option<File> {
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+        .ok()?;
+    // Write access as well as read, because Windows will not give a range lock
+    // to a handle that only has read.
+    file.try_lock_shared().ok()?;
+    Some(file)
 }
 
 /// The pid of the agent that holds `path`, if one still does.
@@ -290,6 +319,57 @@ mod tests {
 
         drop(claim);
         assert!(!path.exists(), "a stopped agent leaves nothing to find");
+        assert!(
+            !lock_path(&path).exists(),
+            "and nothing beside it either, or the directory keeps half a relay in it"
+        );
+    }
+
+    /// The bug in issue #2829, which stopped every Windows host relaying
+    /// anything. The lock and the record cannot share a file, because a Windows
+    /// range lock denies writes to the process holding it too, so an agent that
+    /// locked its own run file could not write itself into it.
+    ///
+    /// Asserted as "the run file is writable while the claim is held", which is
+    /// the property that has to hold rather than the arrangement that gives it.
+    /// It passes either way on Unix, where locks are advisory, and it is the
+    /// whole test on Windows.
+    #[test]
+    fn a_held_run_file_can_still_be_written() {
+        let (_dir, path) = a_path();
+        let _claim = Claim::take(path.clone()).expect("nothing else has it");
+
+        assert_eq!(
+            holder(&path),
+            Some(std::process::id()),
+            "the agent has to get its own record into the file it just claimed"
+        );
+        std::fs::write(
+            &path,
+            Contents {
+                pid: std::process::id(),
+                locked: true,
+            }
+            .to_json(),
+        )
+        .expect("the record is data, and data stays writable");
+    }
+
+    /// And the proof of life is still there to read, on the file the lock moved
+    /// to. Without this the claim would be writable and prove nothing, which is
+    /// issue #2078 back again.
+    #[test]
+    fn a_held_claim_reads_as_held_from_outside() {
+        let (_dir, path) = a_path();
+        let claim = Claim::take(path.clone()).expect("nothing else has it");
+        assert!(run_file_is_still_held(&path));
+
+        drop(claim);
+        std::fs::write(lock_path(&path), "").expect("a writable temp dir");
+        assert!(
+            !run_file_is_still_held(&path),
+            "a lock file an agent left behind holds nothing once the agent has gone"
+        );
     }
 
     /// The failure this exists to prevent, stated directly: while an agent
@@ -329,8 +409,8 @@ mod tests {
 
     /// The bug in issue #2078, from the agent's side. The OS has given the dead
     /// agent's number to something unrelated, so the file names a process that
-    /// is running and is not an agent. Nothing holds the file, and that is what
-    /// says so.
+    /// is running and is not an agent. Nothing holds the lock the dead agent
+    /// left behind, and that is what says so.
     #[test]
     fn a_file_naming_a_live_process_that_is_not_the_agent_is_taken_over() {
         let (_dir, path) = a_path();
@@ -345,6 +425,7 @@ mod tests {
             .to_json(),
         )
         .expect("a writable file");
+        std::fs::write(lock_path(&path), "").expect("a writable file");
 
         let claim = Claim::take(path.clone());
         let _ = stranger.kill();
@@ -373,6 +454,28 @@ mod tests {
         assert!(
             matches!(refused, Err(Taken::ByAgent(named)) if named == pid),
             "an older agent's record has to keep meaning what it meant, got: {refused:?}"
+        );
+    }
+
+    /// A file from the build that locked the run file itself, which is coilbox
+    /// upgraded while a relay was carrying a game. There is no lock file beside
+    /// it to read, so the record falls back to its pid and the agent it names
+    /// is left alone.
+    #[test]
+    fn a_file_from_the_build_that_locked_the_run_file_is_left_to_its_pid() {
+        let (_dir, path) = a_path();
+        std::fs::create_dir_all(path.parent().expect("a parent")).expect("a writable temp dir");
+        let mut older = a_process_that_is_not_an_agent();
+        let pid = older.id();
+        std::fs::write(&path, Contents { pid, locked: true }.to_json()).expect("a writable file");
+
+        let refused = Claim::take(path.clone());
+        let _ = older.kill();
+        let _ = older.wait();
+
+        assert!(
+            matches!(refused, Err(Taken::ByAgent(named)) if named == pid),
+            "a relay from the build before the lock moved is still a relay, got: {refused:?}"
         );
     }
 

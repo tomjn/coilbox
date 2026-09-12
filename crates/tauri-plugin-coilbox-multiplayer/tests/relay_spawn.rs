@@ -237,16 +237,21 @@ fn asking_a_sidecar_that_is_carrying_a_game_does_not_end_it() {
     );
 }
 
-/// The half of issue #2078 that only a real sidecar can prove: it holds its own
-/// run file open for as long as it runs, and its record says so.
+/// The half of issue #2078 that only a real sidecar can prove: it holds the
+/// lock beside its run file for as long as it runs, and its record says so.
 ///
 /// Everything coilbox does about a recycled process number rests on that. Both
 /// sides' unit tests stand in for the sidecar with a lock they take themselves,
 /// so a sidecar that wrote the promise and never took the lock, or took it and
 /// let it go, would leave every one of them green and have coilbox clearing a
 /// record belonging to a relay carrying a game.
+///
+/// It also proves the lock is not on the run file, which is issue #2829. A
+/// Windows range lock denies writes to the process holding it, so a sidecar
+/// that locked its run file could not write its own record and no Windows host
+/// could relay anything.
 #[test]
-fn a_running_sidecar_holds_its_own_run_file_and_says_it_does() {
+fn a_running_sidecar_holds_the_lock_beside_its_run_file_and_says_it_does() {
     let dir = tempfile::tempdir().expect("a temp dir");
     let run_file = dir.path().join("relay").join("agent.json");
 
@@ -266,6 +271,17 @@ fn a_running_sidecar_holds_its_own_run_file_and_says_it_does() {
         "the promise has to be kept, or coilbox reads a live relay as a leftover and starts a \
          second one over the game it is carrying"
     );
+    let data = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&run_file)
+        .expect("a running sidecar left a run file");
+    assert!(
+        data.try_lock().is_ok(),
+        "the run file itself must stay unlocked, or the sidecar cannot write its own record on \
+         Windows and no Windows host can relay a battle (issue #2829)"
+    );
+    drop(data);
 
     agent.stop().expect("a running sidecar is still reachable");
 }

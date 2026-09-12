@@ -19,13 +19,15 @@
 //! buys nothing here: the traffic is a handful of short messages per battle,
 //! not a hot path.
 //!
-//! ## Three files are part of the contract as well
+//! ## Four files are part of the contract as well
 //!
 //! [`RunFile`] is how a running agent is found once coilbox has been closed and
 //! reopened, and [`StopNote`] is the only thing that coilbox can say to one it
 //! finds, because a child's pipes cannot be taken over by a new parent.
-//! [`Carrying`] is what such an agent says back without being asked. All three
-//! are here rather than on one side for the same reason the messages are.
+//! [`Carrying`] is what such an agent says back without being asked, and
+//! [`lock_path`] is the empty file whose lock proves the agent is still there.
+//! All four are here rather than on one side for the same reason the messages
+//! are.
 //!
 //! ## Why the shapes live in a crate of their own
 //!
@@ -36,8 +38,8 @@
 //!
 //! [`run_file_is_still_held`] and [`carrying_now`] are here for the same
 //! reason. They are the only things in this crate that touch a file, and what
-//! they read is the contract: the sidecar promises to hold a shared lock on its
-//! run file for as long as it runs and to rewrite [`Carrying`] every
+//! they read is the contract: the sidecar promises to hold a shared lock on
+//! [`lock_path`] for as long as it runs and to rewrite [`Carrying`] every
 //! [`TRAFFIC_EVERY`], and these two are coilbox reading those promises. Split
 //! across the two crates, one end could stop making a promise while the other
 //! went on believing it.
@@ -290,9 +292,9 @@ pub enum Event {
 pub struct RunFile {
     /// The sidecar's process id.
     pub pid: u32,
-    /// Whether the sidecar that wrote this keeps a shared lock on the file for
-    /// as long as it runs, so that [`run_file_is_still_held`] answers for it
-    /// (issue #2078).
+    /// Whether the sidecar that wrote this keeps a shared lock on
+    /// [`lock_path`] for as long as it runs, so that
+    /// [`run_file_is_still_held`] answers for it (issue #2078).
     ///
     /// A promise about behaviour, not a reading of the current state. Never
     /// treat it as "the file is locked": the file cannot know that, and the
@@ -304,6 +306,22 @@ pub struct RunFile {
     /// proves nothing about that record and the pid is all there is to go on.
     #[serde(default)]
     pub locked: bool,
+}
+
+/// Where the sidecar takes the lock that proves it is running.
+///
+/// Beside the run file, like the stop note and the carrying record, because
+/// that is the one path both ends already have.
+///
+/// A file of its own rather than the run file itself, and that is the whole
+/// point of it (issue #2829). A Windows range lock denies writes to the locked
+/// range to every process including the one that took the lock, so a sidecar
+/// that locked its run file could never write its own record into it and no
+/// Windows host could relay a battle at all. Nothing is ever written here. It
+/// is a name for the kernel to hang a lock on, which leaves the run file as
+/// plain data anybody can read and rewrite.
+pub fn lock_path(run_file: &Path) -> PathBuf {
+    run_file.with_file_name("running.lock")
 }
 
 /// Whether the sidecar that claimed the run file at `path` is still the one
@@ -336,23 +354,26 @@ pub struct RunFile {
 /// from an older build never took a lock, so its lock is free whether the
 /// sidecar is alive or not.
 ///
+/// A record from a build that locked the run file itself rather than
+/// [`lock_path`] has no lock file beside it at all, so it lands on "cannot
+/// tell" and is left to its pid. That is a coilbox upgraded while a relay was
+/// running, and being left where issue #2078 found it beats ending a game.
+///
 /// ## Why the sidecar's lock is a shared one
 ///
-/// So that the file it is on stays readable. Windows range locks are mandatory
-/// rather than advisory, and an exclusive one denies other processes reads of
-/// the locked range as well as writes. A sidecar holding the file exclusively
-/// would therefore make every read of its own record fail, which reads as a
-/// record that cannot be parsed, which reads as no relay running. coilbox would
-/// start a second sidecar over a game people were playing, which is the failure
-/// the run file exists to prevent.
+/// Because mutual exclusion is not its job. One sidecar per run file is settled
+/// by the exclusive create of the run file, and this lock only has to say
+/// whether the process that took it is still alive. A shared lock says that,
+/// and the exclusive attempt here still fails while one is held.
 ///
-/// A shared lock denies writes and allows reads, and an exclusive attempt still
-/// fails while one is held, so the question here is answered either way.
+/// It also keeps a second sidecar's lock attempt from being the thing that
+/// refuses it, which would be a second rule about who may run, in a different
+/// place, disagreeing with the first at exactly the wrong moment.
 pub fn run_file_is_still_held(path: &Path) -> bool {
     let Ok(file) = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(path)
+        .open(lock_path(path))
     else {
         return true;
     };
@@ -830,10 +851,10 @@ mod tests {
     }
 
     /// The proof itself, in the two states that matter. Nothing holding the
-    /// file is what tells a record left over from a dead sidecar apart from one
+    /// lock is what tells a record left over from a dead sidecar apart from one
     /// naming a sidecar that is still relaying.
     #[test]
-    fn a_run_file_nothing_has_open_is_not_being_held() {
+    fn a_lock_nothing_has_open_is_not_being_held() {
         let dir = tempfile::tempdir().expect("a temp dir");
         let path = dir.path().join("agent.json");
         std::fs::write(
@@ -845,36 +866,56 @@ mod tests {
             .to_json(),
         )
         .expect("a writable temp dir");
+        std::fs::write(lock_path(&path), "").expect("a writable temp dir");
 
         assert!(!run_file_is_still_held(&path));
 
         let held = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
-            .open(&path)
+            .open(lock_path(&path))
             .expect("the file is there");
         held.try_lock_shared().expect("nothing else has it");
         assert!(
             run_file_is_still_held(&path),
-            "a sidecar that is still running holds its own run file, and clearing that record \
-             would start a second sidecar over a game people are playing"
+            "a sidecar that is still running holds its lock, and clearing that record would \
+             start a second sidecar over a game people are playing"
         );
         assert!(
-            RunFile::from_json(&std::fs::read_to_string(&path).expect("a readable record")).is_ok(),
-            "the record has to stay readable under the sidecar's lock. Windows range locks are \
-             mandatory, so an exclusive one would make this read fail, and a record that will \
-             not read is a record coilbox treats as no relay running"
+            std::fs::write(
+                &path,
+                RunFile {
+                    pid: 4022,
+                    locked: true
+                }
+                .to_json()
+            )
+            .is_ok(),
+            "the run file has to stay writable under the sidecar's lock. Windows range locks are \
+             mandatory and deny writes to the process holding them too, which is why the lock is \
+             on a file of its own (issue #2829)"
         );
     }
 
-    /// No file at all. Nothing here can open it, and the safe answer to a
-    /// question that cannot be asked is the one that changes nothing.
+    /// No lock file at all. That is either a run file from before the lock
+    /// moved off it or one from before locking existed, and the safe answer to
+    /// a question that cannot be asked is the one that changes nothing.
     #[test]
-    fn a_run_file_that_will_not_open_is_treated_as_held() {
+    fn a_run_file_with_no_lock_beside_it_is_treated_as_held() {
         let dir = tempfile::tempdir().expect("a temp dir");
         assert!(run_file_is_still_held(
             &dir.path().join("nothing-here.json")
         ));
+    }
+
+    /// The lock sits beside the run file, so a coilbox that found one has the
+    /// path to the other already.
+    #[test]
+    fn the_lock_sits_beside_the_run_file() {
+        assert_eq!(
+            lock_path(Path::new("/data/relay/agent.json")),
+            Path::new("/data/relay/running.lock")
+        );
     }
 
     /// The note, spelled out for the same reason the run file is. coilbox
