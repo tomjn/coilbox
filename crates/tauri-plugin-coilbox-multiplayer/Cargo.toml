@@ -59,14 +59,21 @@ coilbox-proc = { path = "../coilbox-proc" }
 # decides whether a game gets cut off.
 tauri-plugin-coilbox-play = { path = "../tauri-plugin-coilbox-play" }
 tauri-plugin-opener = "2"
-# rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
-# picks it.
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# rustls keeps OpenSSL out of the build, the same reason the downloads plugin
+# picks it. `rustls-no-provider` keeps ring as the one crypto provider in the
+# binary, which `coilbox_oauth::use_ring_provider` installs.
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls-no-provider",
+] }
 url = "2"
 tokio ={ version = "1", features = ["net", "io-util", "sync", "rt", "macros", "time"] }
 tokio-util = { version = "0.7", features = ["codec", "rt"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = [
+  "ring",
+  "std",
+  "tls12",
+] }
 webpki-roots = "1"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }

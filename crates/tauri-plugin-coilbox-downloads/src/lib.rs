@@ -100,10 +100,28 @@ fn cancel_slots(op_id: &Option<String>) -> (Arc<AtomicBool>, Arc<Mutex<Option<Ch
     }
 }
 
+/// Make `ring` the process-default rustls crypto provider, unless something
+/// already picked one.
+///
+/// Call this before building a `reqwest::Client`. We take reqwest's
+/// `rustls-no-provider` feature so the binary keeps one crypto provider instead
+/// of gaining aws-lc-rs alongside the ring the lobby socket and the updater
+/// already use, and reqwest panics on `build()` when no provider is installed.
+/// The root `Cargo.toml` has the full reasoning.
+///
+/// Idempotent, and safe from several threads at once: a second call and the
+/// loser of a race both get an `Err` back and leave the installed one alone.
+fn use_ring_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+}
+
 /// A reqwest client with idle read + connect timeouts, so a stalled transfer
 /// errors out instead of hanging forever. Built per download (cheap) rather than
 /// shared, matching the existing per-call `reqwest::get` usage.
 fn timed_client() -> Result<reqwest::Client, String> {
+    use_ring_provider();
     reqwest::Client::builder()
         .connect_timeout(DL_CONNECT_LIMIT)
         .read_timeout(DL_IDLE_LIMIT)
@@ -113,6 +131,7 @@ fn timed_client() -> Result<reqwest::Client, String> {
 
 /// Fetch a gzipped rapid index over HTTPS and inflate it to text.
 async fn fetch_gz(url: String) -> Result<String, String> {
+    use_ring_provider();
     let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
@@ -515,6 +534,7 @@ async fn dl_download(
 
 /// Fetch a URL as text. springfiles/BAR serve plain (non-gzipped) JSON.
 async fn fetch_text(url: String) -> Result<String, String> {
+    use_ring_provider();
     let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     resp.text().await.map_err(|e| e.to_string())
@@ -778,6 +798,7 @@ async fn dl_fetch_text(url: String) -> CliResult {
 
 /// GitHub's API rejects requests without a `User-Agent`; set one explicitly.
 async fn fetch_github(url: &str) -> Result<String, String> {
+    use_ring_provider();
     let client = reqwest::Client::builder()
         .user_agent("coilbox")
         .build()

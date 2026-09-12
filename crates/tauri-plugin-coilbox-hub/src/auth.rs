@@ -212,6 +212,7 @@ pub async fn is_behind_hub_vocabulary(hub_url: &str) -> bool {
 /// mean a hub that has moved its project stays wrong until the app restarts.
 pub async fn discover(hub_url: &str) -> Result<HubAuth, AuthError> {
     let url = format!("{}{DISCOVERY_PATH}", account_key(hub_url));
+    coilbox_oauth::use_ring_provider();
     let client = reqwest::Client::builder()
         .timeout(HTTP_TIMEOUT)
         .build()
@@ -964,6 +965,7 @@ mod tests {
             let query: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
             let target = format!("{}&code=an-authorization-code", query["redirect_to"]);
             tokio::spawn(async move {
+                coilbox_oauth::use_ring_provider();
                 let _ = reqwest::get(&target).await;
             });
             Ok(())

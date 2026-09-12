@@ -27,13 +27,16 @@ coilbox-map-catalog = { path = "../coilbox-map-catalog" }
 # user's answer and the distribution profile off disk rather than being told.
 coilbox-portable = { path = "../coilbox-portable" }
 tauri-plugin-opener = "2"
-# rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
-# picks it. `multipart` is the upload route's body shape (issue #1633): a JSON
-# declaration beside the encoded bytes, neither of which belongs inside the other.
-reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
+# rustls keeps OpenSSL out of the build, the same reason the downloads plugin
+# picks it, and `rustls-no-provider` keeps ring as the one crypto provider in the
+# binary, which `coilbox_oauth::use_ring_provider` installs. `multipart` is the
+# upload route's body shape (issue #1633): a JSON declaration beside the encoded
+# bytes, neither of which belongs inside the other.
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls-no-provider",
   "multipart",
 ] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 url = "2"
 # The timer and the select that race a cancel flag against a request in flight.
 # Already compiled here through coilbox-oauth, so nothing new is built.

@@ -10,9 +10,16 @@ license = "MIT"
 # note on SERVICE in account.rs says why its lobby name is reused here.
 tauri-plugin-coilbox-lobby-servers = { path = "../tauri-plugin-coilbox-lobby-servers" }
 serde_json = { workspace = true }
-# rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
-# picks it.
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# rustls keeps OpenSSL out of the build, the same reason the downloads plugin
+# picks it. `rustls-no-provider` keeps ring as the one crypto provider in the
+# binary, which `use_ring_provider` installs. `form` is the url-encoded token
+# request in token.rs, a crate feature since 0.13 where before it was always
+# compiled.
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls-no-provider",
+  "form",
+] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 url = "2"
 sha2 = { workspace = true }
 base64 = { workspace = true }
