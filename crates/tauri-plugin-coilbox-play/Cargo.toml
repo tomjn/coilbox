@@ -22,8 +22,11 @@ coilbox-proc = { path = "../coilbox-proc" }
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3", features = ["NSRunningApplication", "libc"] }
 
+# `windows-sys` rather than `windows`, to keep a Windows build down to the one
+# version Tauri already pins (issue #2808). Raising a window is four plain
+# user32 calls, so the COM wrappers were never in use here.
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = [
+windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",
 ] }

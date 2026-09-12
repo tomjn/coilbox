@@ -54,8 +54,18 @@ mcp = ["dep:tauri-plugin-mcp"]
 
 # Job Object API: confine spawned sidecars so they die with us and can't hold
 # their .exe locked during a Windows NSIS update (see src/win_job.rs).
+#
+# `windows-sys` rather than `windows`, because Tauri pins `windows` 0.61 and a
+# Windows build compiled that alongside our 0.62 (issue #2808). Nothing here
+# needs the COM wrappers the higher-level crate exists for, and 0.61 of
+# `windows-sys` is already in the tree under tauri, mio and socket2.
+#
+# `Win32_Security` is needed even though we pass a null SECURITY_ATTRIBUTES,
+# because `CreateJobObjectW` names that type in its signature and so sits behind
+# the feature. `Win32_System_Threading` likewise, for the IO_COUNTERS field of
+# JOBOBJECT_EXTENDED_LIMIT_INFORMATION as well as for GetCurrentProcess.
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = [
+windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_System_JobObjects",
