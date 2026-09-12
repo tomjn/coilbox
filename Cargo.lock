@@ -713,8 +713,13 @@ dependencies = [
 name = "coilbox"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "coilbox-portable",
+ "coilbox-proc",
+ "minisign-verify",
  "picoframe-core",
+ "reqwest 0.12.28",
+ "serde",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -744,7 +749,9 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tempfile",
  "windows-sys 0.61.2",
+ "zip 8.6.0",
 ]
 
 [[package]]

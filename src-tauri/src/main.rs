@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod asset_protocol;
+mod portable_update;
 mod settings;
 mod win_job;
 
@@ -115,7 +116,37 @@ fn prepare_for_update() -> Result<(), String> {
     win_job::stop_confining_new_children()
 }
 
+/// Swap mode for a portable Windows update: `--apply-portable-update <dir> <pid>`.
+///
+/// The staged build is started this way by the copy it replaces. It waits for that
+/// process to exit, copies itself into `<dir>`, relaunches from there and stops.
+/// Nothing else in `main` runs, which matters twice over: no window is created,
+/// and the single-instance plugin is never registered, so it cannot mistake this
+/// for a duplicate launch and kill it mid-copy.
+fn swap_mode_args() -> Option<(std::path::PathBuf, u32)> {
+    let mut args = std::env::args_os().skip(1);
+    if args.next()? != portable_update::APPLY_ARG {
+        return None;
+    }
+    let target = std::path::PathBuf::from(args.next()?);
+    let pid = args.next()?.to_str()?.parse().ok()?;
+    Some((target, pid))
+}
+
 fn main() {
+    if let Some((target, pid)) = swap_mode_args() {
+        if let Err(e) = portable_update::run_swap(&target, pid) {
+            eprintln!("coilbox: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // Clear a staging folder the update we just applied left behind. Before the
+    // window opens so it is gone by the time anyone could look, and best effort
+    // because the process that did the copy may still be running out of it.
+    portable_update::clear_staging();
+
     #[cfg(target_os = "linux")]
     pin_gio_modules_to_bundle();
     #[cfg(target_os = "linux")]
@@ -232,6 +263,9 @@ fn main() {
     builder
         .invoke_handler(tauri::generate_handler![
             prepare_for_update,
+            portable_update::portable_update_supported,
+            portable_update::portable_update_stage,
+            portable_update::portable_update_finish,
             settings::app_settings_load,
             settings::app_settings_save
         ])

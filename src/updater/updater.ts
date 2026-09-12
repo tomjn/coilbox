@@ -2,6 +2,12 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import {
+  finishPortableUpdate,
+  isPortableUpdate,
+  portableAsset,
+  stagePortableUpdate,
+} from "./portableUpdate";
 
 /** How far an update has got, for whatever is drawing it. */
 export type DownloadPhase =
@@ -39,6 +45,11 @@ export async function installUpdate(
   update: Update,
   onProgress: (phase: DownloadPhase) => void,
 ): Promise<void> {
+  if (await isPortableUpdate()) {
+    await installPortable(update, onProgress);
+    return;
+  }
+
   let total: number | undefined;
   let downloaded = 0;
   await update.download((event) => {
@@ -58,6 +69,43 @@ export async function installUpdate(
   });
   await invoke("prepare_for_update");
   await update.install();
+}
+
+/**
+ * The same job for a portable Windows install, which cannot run the NSIS
+ * installer without writing over the machine's ordinary Coilbox (see
+ * `portableUpdate.ts`).
+ *
+ * Coilbox fetches a signed zip of the payload, unpacks it to a staging folder and
+ * hands over to the staged build, which copies itself into place once we have
+ * exited. `prepare_for_update` is not called: the swap process is deliberately
+ * started outside the job object, and the sidecars need to stay in it so the
+ * kernel closes them, and their file locks, when we go.
+ *
+ * A release with no portable zip in its manifest is refused rather than installed
+ * the wrong way. That covers any release built before the workflow started
+ * producing one.
+ */
+async function installPortable(
+  update: Update,
+  onProgress: (phase: DownloadPhase) => void,
+): Promise<void> {
+  const asset = portableAsset(update.rawJson);
+  if (!asset) {
+    throw new Error(
+      `Coilbox ${update.version} has no portable download, so it cannot be installed over this copy. Update the package instead.`,
+    );
+  }
+
+  await stagePortableUpdate(asset, ({ downloaded, total }) =>
+    onProgress({
+      status: "downloading",
+      downloaded,
+      total: total ?? undefined,
+    }),
+  );
+  onProgress({ status: "installing" });
+  await finishPortableUpdate();
 }
 
 export type { Update };

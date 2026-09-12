@@ -193,6 +193,63 @@ jobs:
           prerelease: false
           args: -- --timings
 
+      # A portable Coilbox on Windows cannot take an update through NSIS. The
+      # installer picks its target folder from the registry, so a portable copy
+      # inside a game's folder installs the update over the machine's ordinary
+      # Coilbox and stays on the old version itself. src-tauri/src/portable_update.rs
+      # has the full diagnosis, including why pointing NSIS at the portable folder
+      # is worse rather than better. So the release also carries a plain zip of the
+      # same payload, signed with the same key, for a portable install to unpack
+      # over itself.
+      #
+      # The zip is built by running the installer we just built into a staging
+      # folder, rather than by collecting files out of target/release. The layout a
+      # player ends up with is the installer's doing and not the bundler's:
+      # nsis-hooks.nsh moves every sidecar and resource folder into `.coilbox`
+      # after the files are copied. Assembling the zip by hand would mean keeping a
+      # second copy of that hook in step with the first.
+      - name: Build and sign the Windows portable zip
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VER="$GITHUB_REF_NAME"
+          SETUP="target/release/bundle/nsis/Coilbox_${VER}_x64-setup.exe"
+          test -f "$SETUP" || { echo "no installer at $SETUP"; exit 1; }
+
+          STAGING="$RUNNER_TEMP/portable"
+          rm -rf "$STAGING"
+          # /S silent, /NS no shortcuts. /D= sets the target and NSIS requires it
+          # last and unquoted, so the path must have no spaces - $RUNNER_TEMP has
+          # none. MSYS2_ARG_CONV_EXCL stops Git Bash rewriting the switches into
+          # paths on the way through.
+          MSYS2_ARG_CONV_EXCL='*' "./$SETUP" /S /NS /D=$(cygpath -w "$STAGING")
+
+          # Registry entries and an uninstaller are the two things a portable copy
+          # must never grow. It cannot write the registry from a zip, and this drops
+          # the uninstaller.
+          rm -f "$STAGING/uninstall.exe"
+
+          # The installer is the only thing that knows the final layout, so check
+          # it produced one rather than trusting a silent run's exit code. The app
+          # binary is matched by extension rather than by name: the bundler takes
+          # that name from the Tauri config, and a rename there should not quietly
+          # start shipping an empty zip.
+          test -d "$STAGING/.coilbox" || { echo "installer did not tuck the sidecars away"; exit 1; }
+          test "$(find "$STAGING" -maxdepth 1 -name '*.exe' | wc -l)" -eq 1 \
+            || { echo "expected exactly one .exe in $STAGING"; find "$STAGING" -maxdepth 1; exit 1; }
+
+          ZIP="Coilbox_${VER}_x64-portable.zip"
+          rm -f "$ZIP" "$ZIP.sig"
+          (cd "$STAGING" && 7z a -tzip -mx=9 "$(cygpath -w "$GITHUB_WORKSPACE/$ZIP")" . > /dev/null)
+          bunx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$ZIP"
+          gh release upload "$VER" "$ZIP" "$ZIP.sig" --clobber
+
       # The sidecar build above and tauri-action's app build both run cargo
       # against the same workspace target/, so this one glob picks up both
       # timestamped reports. Named per platform so the three uploads don't
@@ -213,6 +270,37 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Tell the app about the portable zip, before anyone can see the release.
+      #
+      # tauri-action writes latest.json with only the target keys its own updater
+      # resolves, and an extra key is safe to add: the plugin looks up
+      # windows-x86_64 exactly as before and ignores the rest, while the whole
+      # manifest reaches the frontend as `update.rawJson`. That is where
+      # src/updater/portableUpdate.ts reads the url and signature from, so no part
+      # of the app has to guess an asset name.
+      #
+      # It has to happen here rather than in the Windows job: all three platforms
+      # upload to the same latest.json, and a patch applied before the others
+      # finish would be overwritten by them.
+      - name: Add the portable zip to latest.json
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          VER="$GITHUB_REF_NAME"
+          ZIP="Coilbox_${VER}_x64-portable.zip"
+          rm -rf manifest && mkdir manifest
+          gh release download "$VER" --pattern latest.json --pattern "$ZIP.sig" --dir manifest
+          jq \
+            --arg url "https://github.com/$GITHUB_REPOSITORY/releases/download/$VER/$ZIP" \
+            --rawfile sig "manifest/$ZIP.sig" \
+            '.platforms["windows-x86_64-portable"] = { signature: ($sig | rtrimstr("\n")), url: $url }' \
+            manifest/latest.json > manifest/patched.json
+          mv manifest/patched.json manifest/latest.json
+          gh release upload "$VER" manifest/latest.json --clobber
+
       - name: Publish the release
         if: startsWith(github.ref, 'refs/tags/')
         env:
