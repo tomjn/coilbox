@@ -124,10 +124,11 @@ describe("our own relayed battle", () => {
     traffic.mockResolvedValue({ relaying: true, bytesPerSecond: 0 });
   });
 
-  // A battle waiting for players carries nothing, and that is not a fault.
-  it("is named for what it is until traffic flows", async () => {
+  // A battle waiting for players carries nothing, and that is not a fault, so
+  // the pill says the relay is up as well as saying what it is carrying.
+  it("says the relay is up while nothing is going through it", async () => {
     await draw();
-    expect(pill()?.textContent).toBe("Relayed battle");
+    expect(pill()?.textContent).toBe("Relay running, no traffic");
 
     traffic.mockResolvedValue({ relaying: true, bytesPerSecond: 41984 });
     await aSecondLater();
@@ -208,7 +209,7 @@ describe("a relay an earlier coilbox left running", () => {
     leftover.mockResolvedValue({ pid: 4242, ours: false });
     await draw();
 
-    expect(pill()?.textContent).toBe("Relaying nothing");
+    expect(pill()?.textContent).toBe("Relay running, no traffic");
     expect(screen.getByRole("button", { name: "Ask it to stop" })).toBeTruthy();
   });
 

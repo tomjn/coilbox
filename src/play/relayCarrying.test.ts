@@ -12,9 +12,13 @@ describe("what the pill says a relay is carrying", () => {
    * The answer somebody is looking at the pill to find. Said in words rather
    * than as "0 B/s", because a number that happens to be zero is easy to read
    * past when the whole question is whether anything is moving.
+   *
+   * The relay is named as up in the same breath (issue #2809). A host reading
+   * this before their game starts is reading the ordinary state, and a label
+   * that only says nothing is going through reads as a relay that has failed.
    */
-  it("says nothing is going through in words, not as a zero", () => {
-    expect(relayCarryingLabel(0)).toBe("Relaying nothing");
+  it("says the relay is up and that nothing is going through it", () => {
+    expect(relayCarryingLabel(0)).toBe("Relay running, no traffic");
   });
 
   /**
@@ -23,16 +27,16 @@ describe("what the pill says a relay is carrying", () => {
    * saying nothing is going through.
    */
   it("treats a figure that is not a rate as nothing going through", () => {
-    expect(relayCarryingLabel(-1)).toBe("Relaying nothing");
-    expect(relayCarryingLabel(Number.NaN)).toBe("Relaying nothing");
+    expect(relayCarryingLabel(-1)).toBe("Relay running, no traffic");
+    expect(relayCarryingLabel(Number.NaN)).toBe("Relay running, no traffic");
   });
 
   /**
-   * A relay coilbox can see but cannot get a figure out of. It must not read as
-   * "Relaying nothing", because that says the relay is up and idle, and this
-   * says coilbox has not been told either way.
+   * A relay coilbox can see but cannot get a figure out of. It must not claim
+   * nothing is going through, because that is a reading coilbox has not been
+   * given. Both labels say the relay is up, and only this one stops there.
    */
   it("says only that a relay is there when it has not said what it carries", () => {
-    expect(relayCarryingLabel(null)).toBe("Relaying");
+    expect(relayCarryingLabel(null)).toBe("Relay running");
   });
 });
