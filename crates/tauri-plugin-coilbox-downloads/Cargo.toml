@@ -18,13 +18,9 @@ serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-proc = { path = "../coilbox-proc" }
 # Rapid-repo browsing: fetch gzipped index files over HTTPS and inflate them.
-# rustls avoids an OpenSSL build dependency across platforms, and
-# `rustls-no-provider` keeps ring as the one crypto provider in the binary,
-# which `use_ring_provider` installs.
-reqwest = { version = "0.13", default-features = false, features = [
-  "rustls-no-provider",
-] }
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
+# rustls avoids an OpenSSL build dependency across platforms.
+reqwest = { workspace = true }
+rustls = { workspace = true }
 flate2 = "1"
 # Extract Recoil engine release archives (.7z). Same crate the mapconv plugin uses.
 sevenz-rust2 = { workspace = true }
