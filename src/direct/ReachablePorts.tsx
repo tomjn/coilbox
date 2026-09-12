@@ -1,18 +1,7 @@
-import {
-  ChevronRight,
-  CircleCheck,
-  CircleX,
-  Info,
-  Loader2,
-} from "lucide-react";
+import { CircleCheck, CircleX, Info, Loader2 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { Details, ResultCard, Verdict } from "@/components/ResultCard";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
 import { CopyButton } from "./CopyButton";
 import {
   type DirectReachability,
@@ -171,7 +160,7 @@ function Answer({
 }) {
   if (busy || (!report && !error)) {
     return (
-      <Card tone="quiet" role="status">
+      <ResultCard tone="quiet" role="status">
         <Verdict
           icon={
             <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" />
@@ -180,17 +169,17 @@ function Answer({
           Asking your router to open{" "}
           {asked && asked.length > 0 ? <Ports ports={asked} /> : "the ports"}…
         </Verdict>
-      </Card>
+      </ResultCard>
     );
   }
   if (error) {
     return (
-      <Card tone="alarm" role="alert">
+      <ResultCard tone="alarm" role="alert">
         <Verdict icon={<CircleX className="size-3.5 shrink-0" />}>
           Could not check your router
         </Verdict>
         <Details lines={[error]} />
-      </Card>
+      </ResultCard>
     );
   }
   if (!report) return null;
@@ -217,7 +206,7 @@ function Answer({
   );
 
   return (
-    <Card tone={alarming ? "alarm" : "quiet"}>
+    <ResultCard tone={alarming ? "alarm" : "quiet"}>
       <Verdict icon={icon} strong={!alarming}>
         {said.title}
       </Verdict>
@@ -229,7 +218,7 @@ function Answer({
       )}
       {said.fix && <span className="pl-5">{said.fix}</span>}
       <Details lines={lines} />
-    </Card>
+    </ResultCard>
   );
 }
 
@@ -333,59 +322,6 @@ function isOrAre(ports: { port: number }[]): string {
   return ports.length > 1 ? "are" : "is";
 }
 
-/** The card every state sits in, looking included, so the panel keeps its shape
- *  from the moment it starts to the moment it has an answer. */
-function Card({
-  tone,
-  role,
-  children,
-}: {
-  tone: "quiet" | "alarm";
-  role?: "status" | "alert";
-  children: ReactNode;
-}) {
-  return (
-    <div
-      role={role}
-      className={cn(
-        "flex flex-col gap-1.5 rounded-md border p-2.5 text-xs",
-        tone === "alarm"
-          ? "border-destructive/50 bg-destructive/10 text-destructive"
-          : "border-border bg-muted/40 text-muted-foreground",
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-/** The one line to read first. Everything under it lines up with its words,
- *  not its icon. */
-function Verdict({
-  icon,
-  strong = true,
-  children,
-}: {
-  icon: ReactNode;
-  /** Drawn in the foreground colour, which a red card overrides. */
-  strong?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <span
-      className={cn(
-        "flex items-center gap-1.5 text-sm font-medium",
-        strong && "text-foreground",
-      )}
-    >
-      <span aria-hidden className="contents">
-        {icon}
-      </span>
-      <span>{children}</span>
-    </span>
-  );
-}
-
 /** Ports as a router's settings page names them, each one set as code. */
 function Ports({
   ports,
@@ -405,28 +341,6 @@ function Code({ children }: { children: ReactNode }) {
     <code className="rounded bg-background px-1 py-px font-mono text-foreground">
       {children}
     </code>
-  );
-}
-
-/** What only a bug report needs, one press from view. Nothing at all when there
- *  is nothing to show. */
-function Details({ lines }: { lines: string[] }) {
-  if (lines.length === 0) return null;
-  return (
-    <Collapsible className="pl-5">
-      <CollapsibleTrigger className="group flex items-center gap-1 opacity-80 hover:opacity-100">
-        <ChevronRight
-          aria-hidden
-          className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
-        />
-        Details
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-1 flex flex-col gap-1 font-mono text-[11px] opacity-80">
-        {lines.map((line) => (
-          <span key={line}>{line}</span>
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
   );
 }
 
