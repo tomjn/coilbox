@@ -39,6 +39,13 @@ export const RELAY_CARRYING_DETAIL =
  * read past. It is also not a fault on its own: a game that has not started yet
  * carries nothing, and so does one that is over.
  *
+ * That is why the zero case names the relay and its traffic as two facts rather
+ * than one (issue #2809). "Relaying nothing" reads as a relay that has failed,
+ * and the state it describes is the ordinary one before a game starts. It stops
+ * short of saying the relay is working, because zero in the middle of a game is
+ * how a relay that has stopped carrying players looks, and telling those two
+ * apart is the whole reason the badge is there.
+ *
  * `null` is a relay that is up and has not said what it is carrying, which is a
  * different thing from one carrying nothing and gets a shorter sentence rather
  * than an invented figure. It is the honest answer for a sidecar coilbox is
@@ -46,7 +53,7 @@ export const RELAY_CARRYING_DETAIL =
  * stale.
  */
 export function relayCarryingLabel(bytesPerSecond: number | null): string {
-  if (bytesPerSecond === null) return "Relaying";
-  if (!(bytesPerSecond > 0)) return "Relaying nothing";
+  if (bytesPerSecond === null) return "Relay running";
+  if (!(bytesPerSecond > 0)) return "Relay running, no traffic";
   return `Relaying ${formatSpeed(bytesPerSecond)}`;
 }

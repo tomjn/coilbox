@@ -185,11 +185,7 @@ function OurRelay({ bytesPerSecond, letThrough, heardFrom }: OurCarrying) {
     }
   }
 
-  // A battle waiting for players carries nothing, and "Relaying nothing" reads
-  // like a fault. It is named for what it is until there is a figure to show.
-  const label = bytesPerSecond
-    ? relayCarryingLabel(bytesPerSecond)
-    : "Relayed battle";
+  const label = relayCarryingLabel(bytesPerSecond);
 
   return (
     <Popover open={open} onOpenChange={choose}>

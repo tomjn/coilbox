@@ -176,7 +176,7 @@ describe("a relayed battle", () => {
     carrying(0);
     await drawBadge(true);
 
-    expect(pillSays()).toContain("Relaying nothing");
+    expect(pillSays()).toContain("Relay running, no traffic");
   });
 
   /** A figure that moves, because a figure that does not is not evidence. */
@@ -190,7 +190,7 @@ describe("a relayed battle", () => {
       vi.advanceTimersByTime(ASK_EVERY_MS);
     });
 
-    expect(pillSays()).toContain("Relaying nothing");
+    expect(pillSays()).toContain("Relay running, no traffic");
   });
 
   /**
@@ -250,15 +250,15 @@ describe("a relay coilbox can see but cannot get a figure out of", () => {
 
   /**
    * And it says the relay is there, rather than looking like an ordinary game
-   * with an X that unexpectedly argues back. "Relaying nothing" would be a
-   * different claim: that is a relay that is up and idle, and this is one that
-   * has not said either way.
+   * with an X that unexpectedly argues back. "Relay running, no traffic" would
+   * be a different claim: that is a relay that is up and idle, and this is one
+   * that has not said either way.
    */
   it("says a relay is there without inventing a rate for it", async () => {
     carrying(null);
     await drawBadge(true);
 
-    expect(relaySays()).toBe("Relaying");
+    expect(relaySays()).toBe("Relay running");
   });
 
   /**
@@ -276,7 +276,7 @@ describe("a relay coilbox can see but cannot get a figure out of", () => {
       vi.advanceTimersByTime(ASK_EVERY_MS);
     });
 
-    expect(relaySays()).toBe("Relaying");
+    expect(relaySays()).toBe("Relay running");
     fireEvent.click(screen.getByRole("button", { name: "End game" }));
     expect(cancel).not.toHaveBeenCalled();
   });
