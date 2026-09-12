@@ -1433,13 +1433,34 @@ export interface FirewallProgram {
   allowed: boolean | null;
 }
 
+/**
+ * Why the panel cannot say what it usually says.
+ *
+ * Split in two because PowerShell's half of this is an error record: six lines
+ * of file, offending source and category, only the first of which says
+ * anything. The whole thing used to go straight into the hosting drawer.
+ */
+export interface FirewallProblem {
+  /** The one line, in coilbox's words rather than PowerShell's. */
+  title: string;
+  /** What Windows said, for whoever is writing a bug report. Folded away. */
+  details: string[];
+  /**
+   * Whether something went wrong, as against a machine that will not answer or
+   * a host who said no. Only a fault is drawn in red: a refused administrator
+   * prompt is a decision, and a firewall coilbox may not read is a fact about
+   * the machine that the button below still fixes.
+   */
+  fault: boolean;
+}
+
 /** What Windows Defender Firewall says about the programs hosting needs. */
 export interface Firewall {
   /** False on every platform but Windows, where there is nothing to draw. */
   supported: boolean;
   programs: FirewallProgram[];
   /** Why coilbox could not read or change the rules, if it could not. */
-  problem: string | null;
+  problem: FirewallProblem | null;
 }
 
 /**

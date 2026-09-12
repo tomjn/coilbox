@@ -38,6 +38,15 @@
 //! hosting form is about to launch, and the drawer asks again when the host
 //! switches engine.
 //!
+//! ## Reading can be refused too
+//!
+//! The read was meant to be the cheap unprivileged half, and on some machines it
+//! is not: `Get-NetFirewallRule` answers "Access is denied" to an unelevated
+//! coilbox, with Windows Defender Firewall running normally and the same command
+//! working fine from an administrator window. So a host who cannot be told what
+//! the rules say is exactly a host for whom adding them still works, and the
+//! panel has to keep offering that rather than read as broken.
+//!
 //! ## What it cannot promise
 //!
 //! Reading the rules back matches on the program path Windows stored, so a rule
@@ -81,6 +90,44 @@ pub struct Program {
     pub allowed: Option<bool>,
 }
 
+/// Why coilbox could not read or change the rules, for a host who would
+/// otherwise be looking at a panel that quietly did nothing.
+///
+/// Split into a line to read and a pile to unfold, because PowerShell's half of
+/// this is an error record: six lines of file, offending source and category,
+/// only the first of which says anything. Sending the whole thing to the panel
+/// put a wall of red in the hosting drawer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Problem {
+    /// The one line, in coilbox's words rather than PowerShell's.
+    pub title: String,
+    /// What Windows said, for whoever is writing a bug report. Folded away.
+    pub details: Vec<String>,
+    /// Whether something went wrong, as against a machine that will not answer
+    /// or a host who said no. Only a fault is worth drawing in red: a refused
+    /// administrator prompt is a decision, and a firewall coilbox may not read
+    /// is a fact about the machine that the button below still fixes.
+    pub fault: bool,
+}
+
+impl Problem {
+    /// A problem with nothing to unfold: the line is the whole of it.
+    fn plain(title: impl Into<String>) -> Problem {
+        Problem {
+            title: title.into(),
+            details: Vec::new(),
+            fault: true,
+        }
+    }
+
+    /// The same problem, not held against anybody. See [`Problem::fault`].
+    fn not_a_fault(mut self) -> Problem {
+        self.fault = false;
+        self
+    }
+}
+
 /// What the hosting drawer draws.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -89,9 +136,8 @@ pub struct Firewall {
     pub supported: bool,
     /// The programs, in the order they should be listed.
     pub programs: Vec<Program>,
-    /// Why coilbox could not read or write the rules, for a host who would
-    /// otherwise be looking at a panel that quietly did nothing.
-    pub problem: Option<String>,
+    /// Why the panel cannot say what it usually says, if it cannot.
+    pub problem: Option<Problem>,
 }
 
 impl Firewall {
@@ -203,22 +249,38 @@ fn engine_rule_name(engine: &Path) -> String {
 }
 
 /// Read whether each program has an inbound allow rule, in the same order.
-fn read_rules<R: Runtime>(app: &AppHandle<R>, programs: &[Program]) -> Result<Vec<bool>, String> {
+///
+/// A read that cannot happen is never a fault. On a machine that refuses an
+/// unelevated `Get-NetFirewallRule` this is the only thing the panel will ever
+/// say, and it has to read as "coilbox cannot tell you" rather than as an error.
+fn read_rules<R: Runtime>(app: &AppHandle<R>, programs: &[Program]) -> Result<Vec<bool>, Problem> {
     if programs.is_empty() {
         return Ok(Vec::new());
     }
-    let out = run_script(app, "check.ps1", &check_script(programs))?;
+    let out = run_script(
+        app,
+        "check.ps1",
+        &check_script(programs),
+        "check the firewall rules",
+    )
+    .map_err(Problem::not_a_fault)?;
     read_answers(&out, programs.len())
 }
 
 /// Add a rule for each program, behind one elevation prompt.
-fn add_rules<R: Runtime>(app: &AppHandle<R>, programs: &[Program]) -> Result<(), String> {
+fn add_rules<R: Runtime>(app: &AppHandle<R>, programs: &[Program]) -> Result<(), Problem> {
     if programs.is_empty() {
         return Ok(());
     }
     let script = script_path(app, "allow.ps1")?;
     write_script(&script, &allow_script(programs))?;
-    run_script(app, "elevate.ps1", &elevate_script(&script)).map(|_| ())
+    run_script(
+        app,
+        "elevate.ps1",
+        &elevate_script(&script),
+        "add the firewall rules",
+    )
+    .map(|_| ())
 }
 
 /// PowerShell that prints `yes` or `no` for each program, one line each, in the
@@ -231,6 +293,10 @@ fn add_rules<R: Runtime>(app: &AppHandle<R>, programs: &[Program]) -> Result<(),
 /// Matching is case-insensitive, which is what Windows paths are. It is still a
 /// string match, so a rule Windows wrote with the path spelled differently reads
 /// as no rule. The module doc says what that costs.
+///
+/// The read is caught, and the catch writes the exception's own message and
+/// nothing else. Left to `$ErrorActionPreference` a refused read prints a whole
+/// error record, and every line of it reached the hosting drawer.
 fn check_script(programs: &[Program]) -> String {
     let paths = programs
         .iter()
@@ -241,9 +307,14 @@ fn check_script(programs: &[Program]) -> String {
         "$ErrorActionPreference = 'Stop'\n\
          $allowed = New-Object 'System.Collections.Generic.HashSet[string]' \
          ([System.StringComparer]::OrdinalIgnoreCase)\n\
-         Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True |\n\
-         \x20   Get-NetFirewallApplicationFilter |\n\
-         \x20   ForEach-Object {{ if ($_.Program) {{ [void]$allowed.Add($_.Program) }} }}\n\
+         try {{\n\
+         \x20   Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True |\n\
+         \x20       Get-NetFirewallApplicationFilter |\n\
+         \x20       ForEach-Object {{ if ($_.Program) {{ [void]$allowed.Add($_.Program) }} }}\n\
+         }} catch {{\n\
+         \x20   [Console]::Error.WriteLine($_.Exception.Message)\n\
+         \x20   exit 1\n\
+         }}\n\
          foreach ($p in @({paths})) {{ if ($allowed.Contains($p)) {{ 'yes' }} else {{ 'no' }} }}\n"
     )
 }
@@ -310,7 +381,7 @@ fn quoted(text: &str) -> String {
 /// A run that printed a different number of lines is refused rather than
 /// matched up as far as it goes, because the answers are positional: one line
 /// missing would report every program after it as the one before.
-fn read_answers(out: &str, wanted: usize) -> Result<Vec<bool>, String> {
+fn read_answers(out: &str, wanted: usize) -> Result<Vec<bool>, Problem> {
     let answers: Vec<bool> = out
         .lines()
         .map(str::trim)
@@ -318,10 +389,10 @@ fn read_answers(out: &str, wanted: usize) -> Result<Vec<bool>, String> {
         .map(|line| line.eq_ignore_ascii_case("yes"))
         .collect();
     if answers.len() != wanted {
-        return Err(format!(
+        return Err(Problem::plain(format!(
             "Windows answered about {} programs and coilbox asked about {wanted}",
             answers.len()
-        ));
+        )));
     }
     Ok(answers)
 }
@@ -332,8 +403,10 @@ fn read_answers(out: &str, wanted: usize) -> Result<Vec<bool>, String> {
 /// same reason the rest of it goes that way: portable mode puts the data root
 /// next to the executable, and a path that skipped it would be written in one
 /// place and run from another.
-fn script_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Result<PathBuf, String> {
-    Ok(coilbox_portable::data_dir(app)?.join("firewall").join(name))
+fn script_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Result<PathBuf, Problem> {
+    let dir = coilbox_portable::data_dir(app)
+        .map_err(|e| Problem::plain(format!("Coilbox has nowhere to write the script: {e}")))?;
+    Ok(dir.join("firewall").join(name))
 }
 
 /// Write a script where PowerShell can run it.
@@ -342,49 +415,85 @@ fn script_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Result<PathBuf, St
 /// command line and a program path with a space in it has to survive both that
 /// and the quoting Windows does on the way in. `-File` takes one path and reads
 /// the rest from disk, which has neither problem.
-fn write_script(path: &Path, script: &str) -> Result<(), String> {
+fn write_script(path: &Path, script: &str) -> Result<(), Problem> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("{e}"))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| Problem::plain(format!("Coilbox could not write the script: {e}")))?;
     }
-    std::fs::write(path, script).map_err(|e| format!("{e}"))
+    std::fs::write(path, script)
+        .map_err(|e| Problem::plain(format!("Coilbox could not write the script: {e}")))
 }
 
 /// Write `script` and run it, answering with what it printed.
-fn run_script<R: Runtime>(app: &AppHandle<R>, name: &str, script: &str) -> Result<String, String> {
+///
+/// `what` is what the script was for, in the second half of "Windows would not
+/// let coilbox ...", so a failure names the thing that did not happen.
+fn run_script<R: Runtime>(
+    app: &AppHandle<R>,
+    name: &str,
+    script: &str,
+    what: &str,
+) -> Result<String, Problem> {
     let path = script_path(app, name)?;
     write_script(&path, script)?;
     let out = coilbox_proc::command("powershell")
         .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         .arg(&path)
         .output()
-        .map_err(|e| format!("coilbox could not run PowerShell: {e}"))?;
+        .map_err(|e| Problem::plain(format!("Coilbox could not run PowerShell: {e}")))?;
     if !out.status.success() {
-        return Err(why_it_failed(out.status.code(), &out.stderr));
+        return Err(why_it_failed(out.status.code(), &out.stderr, what));
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 /// What to tell the host about a script that did not exit zero.
 ///
-/// A refusal at the elevation prompt is the answer somebody chose and gets a
-/// sentence saying nothing changed. Everything else carries whatever PowerShell
-/// said, because a firewall rule that did not get added has no other symptom
-/// until a game nobody can join.
-fn why_it_failed(code: Option<i32>, stderr: &[u8]) -> String {
+/// A refusal at the elevation prompt is the answer somebody chose, so it gets a
+/// sentence saying nothing changed and nothing to unfold. Everything else says
+/// what did not happen and keeps PowerShell's own words behind it, because a
+/// firewall rule that did not get added has no other symptom until a game
+/// nobody can join.
+fn why_it_failed(code: Option<i32>, stderr: &[u8], what: &str) -> Problem {
     if code == Some(CANCELLED) {
-        return "The Windows administrator prompt was refused, so nothing was changed.".into();
-    }
-    let said = String::from_utf8_lossy(stderr);
-    let said = said.trim();
-    if said.is_empty() {
-        return match code {
-            Some(code) => {
-                format!("Windows refused the change, and said nothing beyond code {code}")
-            }
-            None => "Windows stopped part way through the change".into(),
+        return Problem {
+            title: "The Windows administrator prompt was refused, so nothing changed".into(),
+            details: Vec::new(),
+            fault: false,
         };
     }
-    said.to_owned()
+    let mut details = tidy(stderr);
+    if details.is_empty() {
+        details.push(match code {
+            Some(code) => format!("PowerShell exited with code {code} and said nothing."),
+            None => "PowerShell stopped part way through.".into(),
+        });
+    }
+    Problem {
+        title: format!("Windows would not let coilbox {what}"),
+        details,
+        fault: true,
+    }
+}
+
+/// What PowerShell said, with the error record's decoration taken off.
+///
+/// A terminating error prints the message and then five more lines: where in
+/// the script it happened, the offending line, a row of tildes under it, and two
+/// lines of category and error id. Only the first says anything to a person, and
+/// the rest arrived in the hosting drawer as a wall of red.
+///
+/// Dropped by shape rather than by matching the text, because the message itself
+/// is in the language Windows is installed in and the decoration is not.
+fn tidy(stderr: &[u8]) -> Vec<String> {
+    String::from_utf8_lossy(stderr)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .filter(|line| !line.starts_with('+'))
+        .filter(|line| !(line.starts_with("At ") && line.contains(" char:")))
+        .map(str::to_owned)
+        .collect()
 }
 
 #[cfg(test)]
@@ -524,6 +633,90 @@ mod tests {
     fn a_short_answer_is_refused_rather_than_lined_up() {
         assert!(read_answers("yes\n", 3).is_err());
         assert!(read_answers("yes\nno\nyes\nno\n", 3).is_err());
+    }
+
+    /// The read is the half that was supposed to need no rights, and on some
+    /// machines it is refused. Caught, or `$ErrorActionPreference = 'Stop'`
+    /// prints a six line error record that the hosting drawer then shows.
+    #[test]
+    fn the_check_script_catches_a_refused_read() {
+        let script = check_script(&[a_program("Coilbox", r"C:\c\coilbox.exe")]);
+
+        assert!(script.contains("try {"), "got: {script}");
+        assert!(
+            script.contains("[Console]::Error.WriteLine($_.Exception.Message)"),
+            "the message alone, not the record around it, got: {script}"
+        );
+        let caught = script.find("} catch {").expect("a catch");
+        let asked = script.find("foreach ($p in").expect("the answers");
+        assert!(
+            caught < asked,
+            "the catch covers the read and not the answers, got: {script}"
+        );
+    }
+
+    /// PowerShell's error record, as a machine that refuses the read produces
+    /// it. Every line but the first is decoration, and the whole lot used to go
+    /// on screen.
+    #[test]
+    fn an_error_record_keeps_its_message_and_loses_its_decoration() {
+        let record = "Get-NetFirewallRule : Access is denied.\n\
+                      At C:\\c\\.coilbox\\data\\firewall\\check.ps1:3 char:1\n\
+                      + Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True |\n\
+                      + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n    \
+                      + CategoryInfo          : PermissionDenied: (MSFT_NetFirewallRule:root/\
+                      standardcimv2/MSFT_NetFirewallRule) [Get-NetFirewallRule], CimException\n    \
+                      + FullyQualifiedErrorId : Windows System Error 5,Get-NetFirewallRule\n";
+
+        assert_eq!(
+            tidy(record.as_bytes()),
+            vec!["Get-NetFirewallRule : Access is denied.".to_owned()]
+        );
+    }
+
+    /// A machine that will not answer is not a fault, and the panel draws it
+    /// quietly with the button still there. The host can still add the rules:
+    /// that half elevates.
+    #[test]
+    fn a_refused_read_is_not_drawn_as_a_fault() {
+        let problem = why_it_failed(Some(1), b"Access is denied.\n", "check the firewall rules")
+            .not_a_fault();
+
+        assert_eq!(
+            problem.title,
+            "Windows would not let coilbox check the firewall rules"
+        );
+        assert_eq!(problem.details, vec!["Access is denied.".to_owned()]);
+        assert!(!problem.fault);
+    }
+
+    /// A refusal at the administrator prompt is a decision. Nothing to unfold,
+    /// and nothing to draw in red.
+    #[test]
+    fn a_refused_prompt_reads_as_a_choice() {
+        let problem = why_it_failed(Some(CANCELLED), b"", "add the firewall rules");
+
+        assert!(problem.title.contains("refused"));
+        assert!(problem.details.is_empty());
+        assert!(!problem.fault);
+    }
+
+    /// A script that failed and said nothing still has to leave something to
+    /// unfold, or the panel says a thing went wrong and offers no way to find
+    /// out what.
+    #[test]
+    fn a_silent_failure_still_says_what_the_exit_code_was() {
+        let problem = why_it_failed(Some(9), b"  \n", "add the firewall rules");
+
+        assert_eq!(
+            problem.title,
+            "Windows would not let coilbox add the firewall rules"
+        );
+        assert_eq!(
+            problem.details,
+            vec!["PowerShell exited with code 9 and said nothing.".to_owned()]
+        );
+        assert!(problem.fault);
     }
 
     /// An engine is named after the folder it is in, because that is its
