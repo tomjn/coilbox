@@ -55,6 +55,9 @@
   RMDir /r "$INSTDIR\.coilbox\resources\legoparts"
   Rename "$INSTDIR\legoparts" "$INSTDIR\.coilbox\resources\legoparts"
 
+  RMDir /r "$INSTDIR\.coilbox\resources\blueprint-widget"
+  Rename "$INSTDIR\blueprint-widget" "$INSTDIR\.coilbox\resources\blueprint-widget"
+
   ; Layouts earlier versions left in the install root. `_up_` is what the bundler
   ; used to make of a `../` resource path, and `branding` held the catalog before
   ; it moved to the repo root. Both are bundler output, never a user's files, and
