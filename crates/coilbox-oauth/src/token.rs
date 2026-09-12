@@ -71,6 +71,7 @@ pub struct TokenResponse {
 
 /// POST to the token endpoint and read the tokens out of the answer.
 pub async fn post_token(request: TokenRequest<'_>) -> Result<TokenResponse, AuthError> {
+    crate::use_ring_provider();
     let client = reqwest::Client::builder()
         .timeout(HTTP_TIMEOUT)
         .build()

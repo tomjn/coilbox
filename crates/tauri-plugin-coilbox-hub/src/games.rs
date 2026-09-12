@@ -1157,6 +1157,7 @@ mod tests {
     #[ignore = "reaches a running hub, so it cannot run in CI"]
     async fn live_game_facts_need_a_token() {
         let url = api_url("http://localhost:3000", SUBMIT_PATH, "Sending").unwrap();
+        coilbox_oauth::use_ring_provider();
         let response = reqwest::Client::new()
             .post(&url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
