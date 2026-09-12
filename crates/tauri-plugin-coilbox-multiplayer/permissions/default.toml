@@ -85,6 +85,8 @@ permissions = [
   "allow-mp-leftover-relay-agent",
   "allow-mp-relay-left-running",
   "allow-mp-ask-leftover-relay-to-stop",
+  "allow-mp-firewall",
+  "allow-mp-firewall-allow",
   "allow-mp-watch-engine",
   "allow-mp-chat-logs",
   "allow-mp-chat-log-open",
