@@ -1074,14 +1074,14 @@ impl<'p, 'a> Writer<'p, 'a> {
             Some(_) => {
                 self.warn(
                     "shared",
-                    "This script shares unit values between units, which the engine stopped keeping in Spring 102.0. The Lua keeps them as rules params instead. Every script that shares them has to be converted too, because a COB script still reads 0. Gadgets and widgets that set or read them, through Spring.SetUnitCOBValue, Spring.GetCOBTeamVar or their siblings, need lualibs/cob_vars.lua, which the BOS to Lua page offers and a model editor export writes.".to_string(),
+                    "This script shares unit values between units, which the engine stopped keeping in Spring 102.0. The Lua keeps them as rules params instead. Every script that shares them has to be converted too, because a COB script still reads 0. Gadgets that set them, and gadgets and widgets that read them, through Spring.SetUnitCOBValue, Spring.GetCOBTeamVar or their siblings, need lualibs/cob_vars.lua, which the BOS to Lua page offers and a model editor export writes.".to_string(),
                 );
                 self.helper(shared)
             }
             None => {
                 self.warn(
                     "shared-runtime",
-                    "A get or set here only learns which unit value it wants while running, so it goes through cobGet or cobSet, which keep the shared values the engine stopped keeping and hand any other value to the engine.".to_string(),
+                    "A get or set here only learns which unit value it wants while running, so it goes through cobGet or cobSet, which keep the shared values the engine stopped keeping and hand any other value to the engine. If it does share values, gadgets and widgets need lualibs/cob_vars.lua to reach them.".to_string(),
                 );
                 self.helper(shared)
             }

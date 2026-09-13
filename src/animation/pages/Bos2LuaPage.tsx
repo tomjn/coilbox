@@ -72,7 +72,10 @@ export default function Bos2LuaPage() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(which);
-      setTimeout(() => setCopied(null), 1500);
+      setTimeout(
+        () => setCopied((current) => (current === which ? null : current)),
+        1500,
+      );
     } catch {
       // The clipboard may be unavailable, and the textarea stays selectable.
     }
@@ -196,13 +199,15 @@ export default function Bos2LuaPage() {
                 </Button>
               </div>
               <p className="text-muted-foreground">
-                This script shares values with other units, and keeps them as
-                rules params. The file lets the game's gadgets and widgets set
-                and read them through <code>Spring.SetUnitCOBValue</code>,{" "}
+                This script can share values with other units, which it keeps as
+                rules params. The file lets the game's synced gadgets set them,
+                and its gadgets and widgets read them, through{" "}
+                <code>Spring.SetUnitCOBValue</code>,{" "}
                 <code>Spring.GetCOBTeamVar</code> and their siblings. Put{" "}
                 <code>VFS.Include("lualibs/cob_vars.lua")</code> on the first
                 line of <code>LuaRules/main.lua</code>,{" "}
-                <code>LuaRules/draw.lua</code> and <code>luaui.lua</code>.
+                <code>LuaRules/draw.lua</code> and <code>luaui.lua</code> (or{" "}
+                <code>LuaUI/main.lua</code>).
               </p>
             </section>
           )}

@@ -1013,11 +1013,13 @@ export function ExportDrawer({
                     {result.cobVarsKept
                       ? "lualibs/cob_vars.lua was already there and has been left alone. "
                       : null}
-                    This unit's script keeps shared COB unit values as rules
-                    params. For the game's gadgets and widgets to set and read
-                    them, put <code>VFS.Include("lualibs/cob_vars.lua")</code>{" "}
-                    on the first line of <code>LuaRules/main.lua</code>,{" "}
-                    <code>LuaRules/draw.lua</code> and <code>luaui.lua</code>.
+                    This unit's script can keep shared COB unit values as rules
+                    params. For the game's synced gadgets to set them, and its
+                    gadgets and widgets to read them, put{" "}
+                    <code>VFS.Include("lualibs/cob_vars.lua")</code> on the
+                    first line of <code>LuaRules/main.lua</code>,{" "}
+                    <code>LuaRules/draw.lua</code> and <code>luaui.lua</code>{" "}
+                    (or <code>LuaUI/main.lua</code>).
                   </p>
                 ) : null}
                 {result.pieceCollision ? (
