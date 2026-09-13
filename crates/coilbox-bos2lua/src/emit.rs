@@ -2086,13 +2086,13 @@ impl<'p, 'a> Writer<'p, 'a> {
                 els,
             } => {
                 let c = self.cond(cond).text;
-                self.line(&format!("if {c} then"));
+                self.code(&format!("if {c} then"), &None);
                 self.if_rest(then, then_tail, els);
                 self.code("end", t);
             }
             StmtKind::While { cond, body, tail } => {
                 let c = self.cond(cond).text;
-                self.line(&format!("while {c} do"));
+                self.code(&format!("while {c} do"), &None);
                 self.indent += 1;
                 self.block(body);
                 self.comments(tail);
@@ -2292,7 +2292,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             {
                 if only.leading.is_empty() && only.trailing.is_none() && tail.is_empty() {
                     let c = self.cond(cond).text;
-                    self.line(&format!("elseif {c} then"));
+                    self.code(&format!("elseif {c} then"), &None);
                     self.if_rest(then, then_tail, els);
                     return;
                 }

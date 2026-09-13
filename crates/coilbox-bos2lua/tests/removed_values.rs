@@ -258,3 +258,28 @@ fn fuel_and_the_alpha_threshold_are_said_to_be_gone() {
     }
     assert_eq!(turret_height(lua), 0.0);
 }
+
+/// A removed value read in a condition is said on the line that reads it, not
+/// on the first line of the body or on its end.
+#[test]
+fn a_removed_value_in_a_condition_is_said_on_that_line() {
+    let lua = convert_bos(
+        "piece base, turret;\n\nCreate()\n{\n\tif (get 93)\n\t{\n\t\tmove turret to y-axis [1] now;\n\t}\n\twhile (get 103)\n\t{\n\t\tsleep 100;\n\t}\n}\n",
+    )
+    .lua;
+    let line_of = |text: &str| {
+        lua.lines()
+            .find(|line| line.contains(text))
+            .unwrap_or_else(|| panic!("{text} in {lua}"))
+            .trim_start()
+            .to_string()
+    };
+    assert!(
+        line_of("CURRENT_FUEL has done nothing").starts_with("if "),
+        "{lua}"
+    );
+    assert!(
+        line_of("ALPHA_THRESHOLD was removed").starts_with("while "),
+        "{lua}"
+    );
+}
