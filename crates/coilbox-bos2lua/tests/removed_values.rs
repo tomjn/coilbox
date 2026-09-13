@@ -4,7 +4,9 @@
 //! sent to the engine with 0, as the game does, so only Lua that keeps them
 //! itself passes.
 
-use coilbox_bos2lua::{convert, Conversion, Options, COB_VARS_POLYFILL, MODERN_LINEAR};
+use coilbox_bos2lua::{
+    convert, shares_values, Conversion, Options, COB_VARS_POLYFILL, MODERN_LINEAR,
+};
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 use std::collections::HashMap;
 
@@ -257,6 +259,16 @@ fn fuel_and_the_alpha_threshold_are_said_to_be_gone() {
         );
     }
     assert_eq!(turret_height(lua), 0.0);
+}
+
+/// A model editor export only has the script's text, which the user may have
+/// edited since it was converted, so whether it shares values is read from it.
+#[test]
+fn the_text_says_whether_a_script_shares_values() {
+    let sharing = convert_bos("piece base, turret;\n\nCreate()\n{\n\tset 2048 to 1;\n}\n");
+    let not_sharing = convert_bos("piece base, turret;\n\nCreate()\n{\n\tset 1032 to 1;\n}\n");
+    assert!(shares_values(&sharing.lua));
+    assert!(!shares_values(&not_sharing.lua));
 }
 
 /// A removed value read in a condition is said on the line that reads it, not

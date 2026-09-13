@@ -58,6 +58,13 @@ pub const SCRIPTOR_LINEAR: i64 = 163840;
 /// `luaui.lua`.
 pub const COB_VARS_POLYFILL: &str = include_str!("cob_vars.lua");
 
+/// Whether a Lua unit script keeps shared unit values the way a conversion
+/// writes them, read from its text so a script edited after converting still
+/// answers.
+pub fn shares_values(lua: &str) -> bool {
+    lua.contains("local cobAllied = { allied = true }")
+}
+
 /// Which of the two linear scales a `.cob` was compiled with, judged by which
 /// one turns more of the BOS's `[x]` constants into numbers the `.cob` holds.
 /// `None` when the BOS has no such constant or neither scale finds one.

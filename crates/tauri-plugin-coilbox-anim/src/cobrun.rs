@@ -847,6 +847,11 @@ impl Run {
                 if (LUA0..=LUA9).contains(&id) {
                     self.threads[i].lua[(id - LUA0) as usize] = value;
                 } else {
+                    if unitvalue::removed_shared(id) {
+                        self.model.note(format!(
+                            "This script sets shared value {id}, which the preview keeps, but the engine no longer keeps shared values, so the game ignores it unless the script is converted to Lua."
+                        ));
+                    }
                     // Kept rather than dropped, so a script that stores its own
                     // state in a unit value reads back what it wrote.
                     self.set_values.insert(id, value);
@@ -1037,6 +1042,12 @@ impl Run {
         }
         if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
             return value;
+        }
+        if unitvalue::removed_shared(id) {
+            self.model.note(format!(
+                "This script asks for shared value {id}, and the engine no longer keeps shared values, so it reads 0 in the game unless the script is converted to Lua."
+            ));
+            return self.set_values.get(&id).copied().unwrap_or(0);
         }
         if id == GAME_FRAME {
             return self.frame as i32;
