@@ -150,6 +150,16 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: false,
   },
   {
+    id: "metal-factions",
+    name: "Metal Factions",
+    // The address metalfactions.pt gives players. It is uberserver, so TLS is the
+    // in-band STLS upgrade with a self-signed cert.
+    host: "mfserver3.metalfactions.pt",
+    port: 8200,
+    tls: true,
+    allowSelfSigned: true,
+  },
+  {
     id: "bar-ssl",
     name: "Beyond All Reason",
     host: "server4.beyondallreason.info",

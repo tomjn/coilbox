@@ -747,7 +747,7 @@ Or just promote and brand an existing built-in as official while keeping one oth
 }
 ```
 
-Built-in ids: `recoil-official`, `spring-official`, `techa`, `bar-ssl`, `bar-tachyon`. An unknown `official` id (or an inline object with no `host`) is ignored, and the rest of the block still applies.
+Built-in ids: `recoil-official`, `spring-official`, `techa`, `metal-factions`, `bar-ssl`, `bar-tachyon`. An unknown `official` id (or an inline object with no `host`) is ignored, and the rest of the block still applies.
 
 `bar` was BAR's plaintext port and is no longer offered, because the same server answers on 8201 with TLS. A profile still naming `bar` resolves to `bar-ssl`, so it keeps working.
 
