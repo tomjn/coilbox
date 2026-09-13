@@ -8,6 +8,16 @@
 -- through Spring.GetCOBTeamVar, Spring.SetUnitCOBValue and their siblings.
 local cobAllied = { allied = true }
 
+-- A rules param keeps a number as a float, which only holds a whole number
+-- exactly up to 2^24. A packed map position is usually bigger than that, so
+-- this keeps anything outside the exact range as its decimal string instead.
+local function cobStore(value)
+	if value >= -16777216 and value <= 16777216 then
+		return value
+	end
+	return string.format("%d", value)
+end
+
 -- get, keeping the shared values. A unit value with a positive first argument
 -- reads that unit's, and with a negative one sets that unit's to the second.
 -- Any other id goes to the engine.
@@ -17,20 +27,20 @@ local function cobGet(id, ...)
 		p1 = p1 or 0
 		local name = "cobUnitVar" .. (id - 1024)
 		if p1 == 0 then
-			return Spring.GetUnitRulesParam(unitID, name) or 0
+			return tonumber(Spring.GetUnitRulesParam(unitID, name)) or 0
 		elseif p1 > 0 then
-			return Spring.GetUnitRulesParam(p1, name) or 0
+			return tonumber(Spring.GetUnitRulesParam(p1, name)) or 0
 		elseif Spring.ValidUnitID(-p1) then
-			Spring.SetUnitRulesParam(-p1, name, p2 or 0, cobAllied)
+			Spring.SetUnitRulesParam(-p1, name, cobStore(p2 or 0), cobAllied)
 			return 1
 		end
 		return 0
 	elseif id >= 2048 and id <= 2111 then
-		return Spring.GetTeamRulesParam(Spring.GetUnitTeam(unitID), "cobTeamVar" .. (id - 2048)) or 0
+		return tonumber(Spring.GetTeamRulesParam(Spring.GetUnitTeam(unitID), "cobTeamVar" .. (id - 2048))) or 0
 	elseif id >= 3072 and id <= 3135 then
-		return Spring.GetTeamRulesParam(Spring.GetUnitTeam(unitID), "cobAllyVar" .. (id - 3072)) or 0
+		return tonumber(Spring.GetTeamRulesParam(Spring.GetUnitTeam(unitID), "cobAllyVar" .. (id - 3072))) or 0
 	elseif id >= 4096 and id <= 8191 then
-		return Spring.GetGameRulesParam("cobGlobalVar" .. (id - 4096)) or 0
+		return tonumber(Spring.GetGameRulesParam("cobGlobalVar" .. (id - 4096))) or 0
 	end
 	return GetUnitValue(id, ...)
 end
@@ -38,16 +48,17 @@ end
 -- set, keeping the shared values. Any other id goes to the engine.
 local function cobSet(id, value)
 	if id >= 1024 and id <= 1031 then
-		Spring.SetUnitRulesParam(unitID, "cobUnitVar" .. (id - 1024), value, cobAllied)
+		Spring.SetUnitRulesParam(unitID, "cobUnitVar" .. (id - 1024), cobStore(value), cobAllied)
 	elseif id >= 2048 and id <= 2111 then
-		Spring.SetTeamRulesParam(Spring.GetUnitTeam(unitID), "cobTeamVar" .. (id - 2048), value, cobAllied)
+		Spring.SetTeamRulesParam(Spring.GetUnitTeam(unitID), "cobTeamVar" .. (id - 2048), cobStore(value), cobAllied)
 	elseif id >= 3072 and id <= 3135 then
 		local name = "cobAllyVar" .. (id - 3072)
+		local stored = cobStore(value)
 		for _, team in ipairs(Spring.GetTeamList(Spring.GetUnitAllyTeam(unitID))) do
-			Spring.SetTeamRulesParam(team, name, value, cobAllied)
+			Spring.SetTeamRulesParam(team, name, stored, cobAllied)
 		end
 	elseif id >= 4096 and id <= 8191 then
-		Spring.SetGameRulesParam("cobGlobalVar" .. (id - 4096), value)
+		Spring.SetGameRulesParam("cobGlobalVar" .. (id - 4096), cobStore(value))
 	else
 		SetUnitValue(id, value)
 	end

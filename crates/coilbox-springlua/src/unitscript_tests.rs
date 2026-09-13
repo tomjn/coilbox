@@ -492,6 +492,29 @@ fn a_rules_parameter_reads_back_as_it_was_set() {
     assert_close(pose(&timeline, 0, "turret")[2], 7.0);
 }
 
+/// A rules param stores a number as a float, which only holds a whole number
+/// exactly up to 2^24. A packed map position is usually bigger than that, so a
+/// value beyond the exact range must come back rounded the way the engine's
+/// float would round it, and the boundary itself must not round at all.
+#[test]
+fn a_large_rules_parameter_rounds_through_a_float_the_way_the_engine_does() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            Spring.SetGameRulesParam("big", 196609234)
+            Spring.SetGameRulesParam("small", 16777216)
+            Move(piece("turret"), y_axis, Spring.GetGameRulesParam("big"))
+            Move(piece("turret"), z_axis, Spring.GetGameRulesParam("small"))
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[1], 196609232.0);
+    assert_close(pose(&timeline, 0, "turret")[2], 16777216.0);
+}
+
 /// What flove's flowers open with. None of it can move a piece, but a preview
 /// that stops on any of it shows nothing at all.
 #[test]

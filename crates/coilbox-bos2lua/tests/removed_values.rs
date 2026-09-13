@@ -143,6 +143,65 @@ fn with_polyfill(lua: &str) -> coilbox_springlua::unitscript::Timeline {
     run(lua, "polyfill.lua", &unit, &create(), 3)
 }
 
+/// Like `with_polyfill`, but for a script that needs its own events and frame
+/// count, such as firing Activate a few frames after Create so Create's
+/// thread has definitely run.
+fn with_polyfill_events(
+    lua: &str,
+    events: &[ScriptEvent],
+    frames: u32,
+) -> coilbox_springlua::unitscript::Timeline {
+    let pieces = pieces();
+    let includes = HashMap::from([(
+        "lualibs/cob_vars.lua".to_string(),
+        COB_VARS_POLYFILL.to_string(),
+    )]);
+    let unit = Unit {
+        includes: &includes,
+        ..Unit::new(&pieces)
+    };
+    run(lua, "polyfill.lua", &unit, events, frames)
+}
+
+/// The converter and the polyfill agree on a unit, an allyteam and a game
+/// value together, not just the team and game pairing the other tests cover.
+/// The unit and game values are packed positions bigger than 2^24, so reading
+/// them back split must give the exact halves BOS packed, not a float's
+/// rounded approximation of the packed whole.
+#[test]
+fn the_converter_and_the_polyfill_agree_on_a_unit_an_allyteam_and_a_game_value() {
+    let conversion = convert_bos(
+        "piece base, turret;\n\nCreate()\n{\n\tset 1024 to 196609234;\n\tset 3073 to 9;\n\tset 4097 to 196609234;\n}\n",
+    );
+    let lua = format!(
+        "include(\"lualibs/cob_vars.lua\")\n\n{}\n\nfunction script.Activate()\n\tlocal ux, uz = Spring.GetCOBUnitVar(unitID, 0, true)\n\tlocal ally = Spring.GetCOBAllyTeamVar(0, 1)\n\tlocal gx, gz = Spring.GetCOBGlobalVar(1, true)\n\tMove(base, x_axis, gz)\n\tMove(base, y_axis, ally)\n\tMove(turret, x_axis, ux)\n\tMove(turret, y_axis, uz)\n\tMove(turret, z_axis, gx)\nend\n",
+        conversion.lua
+    );
+    let events = [
+        ScriptEvent {
+            frame: 0,
+            callin: "Create".into(),
+            args: Vec::new(),
+            ambient: true,
+        },
+        ScriptEvent {
+            frame: 3,
+            callin: "Activate".into(),
+            args: Vec::new(),
+            ambient: false,
+        },
+    ];
+    let timeline = with_polyfill_events(&lua, &events, 5);
+    assert_eq!(timeline.error, None, "{:?}", timeline.warnings);
+    let frame = &timeline.frames[4];
+    // base: x is the game value's z half, y is the allyteam value.
+    // turret: x is the unit value's x half, y its z half, z the game value's x half.
+    assert_eq!(
+        [frame[0], frame[1], frame[6], frame[7], frame[8]],
+        [1234.0, 9.0, 3000.0, 1234.0, 3000.0]
+    );
+}
+
 #[test]
 fn a_conversion_says_whether_it_shares_values() {
     let sharing = convert_bos("piece base, turret;\n\nCreate()\n{\n\tset 2048 to 1;\n}\n");

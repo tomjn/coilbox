@@ -162,8 +162,10 @@ enum RuleValue {
 impl RuleValue {
     fn of(value: &Value) -> Self {
         match value {
-            Value::Integer(number) => RuleValue::Number(*number as f64),
-            Value::Number(number) => RuleValue::Number(*number),
+            // The engine keeps a rules param number as a float, so this rounds
+            // it through f32 the same way SetRulesParam does.
+            Value::Integer(number) => RuleValue::Number(f64::from(*number as f32)),
+            Value::Number(number) => RuleValue::Number(f64::from(*number as f32)),
             Value::Boolean(flag) => RuleValue::Number(f64::from(u8::from(*flag))),
             Value::String(text) => {
                 let text = text.to_string_lossy();
