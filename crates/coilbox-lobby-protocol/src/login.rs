@@ -26,8 +26,9 @@
 //! handshake (`AGREEMENT...` / `AGREEMENTEND`). Rather than auto-confirm, the
 //! machine parks in [`LoginPhase::AwaitAgreement`] so the UI can collect the
 //! emailed code; [`LoginMachine::submit_agreement_code`] then emits
-//! `CONFIRMAGREEMENT [code]` and re-sends `LOGIN` (the server does not log us in
-//! on `CONFIRMAGREEMENT` alone).
+//! `CONFIRMAGREEMENT [code]` and waits for `ACCEPTED`. Both uberserver and
+//! teiserver log the client in on a good confirmation, and uberserver refuses a
+//! second `LOGIN` from a logged-in client with "Insufficient rights".
 //!
 //! Recovery ([`LoginMode::Recover`]) shares the same prelude, then on `COMPFLAGS`
 //! emits `RESETPASSWORDREQUEST`. uberserver emails a code and the machine parks in
@@ -311,15 +312,15 @@ impl LoginMachine {
     }
 
     /// Supply the verification/agreement code from the UI and resume the login.
-    /// Emits `CONFIRMAGREEMENT [code]` then re-sends `LOGIN` (the server does not
-    /// log us in on the confirmation alone). A no-op unless parked in
-    /// [`LoginPhase::AwaitAgreement`].
+    /// Emits `CONFIRMAGREEMENT [code]` only, because the server logs us in on a
+    /// good confirmation using the `LOGIN` it already has. A no-op unless parked
+    /// in [`LoginPhase::AwaitAgreement`].
     pub fn submit_agreement_code(&mut self, code: Option<&str>) -> Vec<String> {
         if self.phase != LoginPhase::AwaitAgreement {
             return vec![];
         }
         self.phase = LoginPhase::AwaitAccepted;
-        vec![command::confirm_agreement(code), self.login_line()]
+        vec![command::confirm_agreement(code)]
     }
 
     /// The web address a `RecoveryRedirected` answer carried, if any.
@@ -492,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn agreement_parks_for_code_then_confirms_and_relogins() {
+    fn agreement_parks_for_code_then_confirms_without_a_second_login() {
         let mut m = LoginMachine::new(cfg(false));
         m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
         m.on_message(&parse_line("COMPFLAGS u sp"));
@@ -514,16 +515,29 @@ mod tests {
             "Please accept the terms.\nThen enter the code"
         );
 
-        // Supplying the code confirms and re-sends LOGIN.
+        // Supplying the code confirms, and the server logs us in from there.
         let out = m.submit_agreement_code(Some("1234"));
-        assert_eq!(
-            out,
-            vec![
-                "CONFIRMAGREEMENT 1234".to_string(),
-                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp".to_string(),
-            ]
-        );
+        assert_eq!(out, vec!["CONFIRMAGREEMENT 1234".to_string()]);
         assert_eq!(m.phase(), LoginPhase::AwaitAccepted);
+
+        // The server's own login stream after a good confirmation finishes it.
+        m.on_message(&parse_line("ACCEPTED alice"));
+        m.on_message(&parse_line("LOGININFOEND"));
+        assert_eq!(m.phase(), LoginPhase::Ready);
+    }
+
+    /// A server with email verification switched off wants no code, and a bare
+    /// `CONFIRMAGREEMENT` is what it expects.
+    #[test]
+    fn an_agreement_confirmed_without_a_code_sends_no_code() {
+        let mut m = LoginMachine::new(cfg(false));
+        m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        m.on_message(&parse_line("COMPFLAGS u sp"));
+        m.on_message(&parse_line("AGREEMENTEND"));
+        assert_eq!(
+            m.submit_agreement_code(None),
+            vec!["CONFIRMAGREEMENT".to_string()]
+        );
     }
 
     /// The whole of the relay flag guarantee, in one place: a server that names
@@ -587,39 +601,6 @@ mod tests {
             assert!(m.on_message(&parse_line(line)).is_empty(), "{line}");
         }
         assert_eq!(m.phase(), LoginPhase::AwaitCompFlags);
-    }
-
-    /// The agreement path re-sends `LOGIN` from a second place, so it carries the
-    /// same answer. A server that offered a relay before the agreement still gets
-    /// the flag, and one that did not still does not, even though the code that
-    /// asked for it arrived much later.
-    #[test]
-    fn the_relogin_after_an_agreement_carries_the_same_relay_answer() {
-        let mut has_relay = LoginMachine::new(cfg(false));
-        has_relay.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
-        has_relay.on_message(&parse_line("COMPFLAGS u sp r"));
-        has_relay.on_message(&parse_line("AGREEMENTEND"));
-        assert_eq!(
-            has_relay.submit_agreement_code(Some("1234")),
-            vec![
-                "CONFIRMAGREEMENT 1234".to_string(),
-                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp r".to_string(),
-            ]
-        );
-
-        // The awkward one: a server that sends the agreement before it answers
-        // `LISTCOMPFLAGS`, so the only `LOGIN` it ever sees is the one the code
-        // triggers, built without an answer to go on.
-        let mut never_answered = LoginMachine::new(cfg(false));
-        never_answered.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
-        never_answered.on_message(&parse_line("AGREEMENTEND"));
-        assert_eq!(
-            never_answered.submit_agreement_code(Some("1234")),
-            vec![
-                "CONFIRMAGREEMENT 1234".to_string(),
-                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp".to_string(),
-            ]
-        );
     }
 
     #[test]
