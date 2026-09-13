@@ -492,6 +492,76 @@ fn a_rules_parameter_reads_back_as_it_was_set() {
     assert_close(pose(&timeline, 0, "turret")[2], 7.0);
 }
 
+/// A rules param stores a number as a float, which only holds a whole number
+/// exactly up to 2^24. A packed map position is usually bigger than that, so a
+/// value beyond the exact range must come back rounded the way the engine's
+/// float would round it, and the boundary itself must not round at all.
+#[test]
+fn a_large_rules_parameter_rounds_through_a_float_the_way_the_engine_does() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            Spring.SetGameRulesParam("big", 196609234)
+            Spring.SetGameRulesParam("small", 16777216)
+            Move(piece("turret"), y_axis, Spring.GetGameRulesParam("big"))
+            Move(piece("turret"), z_axis, Spring.GetGameRulesParam("small"))
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[1], 196609232.0);
+    assert_close(pose(&timeline, 0, "turret")[2], 16777216.0);
+}
+
+/// The engine's GetRulesParam answers no values at all for a parameter
+/// nobody set, not an explicit nil. `~= nil` cannot tell the two apart, but
+/// `select("#", ...)` can, and a script passing the answer straight to
+/// tonumber() without checking first is a script whose thread stops here.
+#[test]
+fn a_missing_rules_parameter_answers_no_values_rather_than_nil() {
+    let timeline = play(
+        r##"
+        function script.Create()
+            if select("#", Spring.GetGameRulesParam("never")) ~= 0 then
+                error("a parameter nobody set should answer no values")
+            end
+            Move(piece("turret"), y_axis, 1)
+        end
+        "##,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[1], 1.0);
+}
+
+/// The mistake `a_missing_rules_parameter_answers_no_values_rather_than_nil`
+/// guards against: a BOS `get` of a shared value nobody has `set` yet reads it
+/// through tonumber() with no values to convert, which is a Lua error, not 0.
+#[test]
+fn tonumber_of_a_missing_rules_parameter_stops_the_thread() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            local value = tonumber(Spring.GetGameRulesParam("never"))
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert!(
+        timeline
+            .warnings
+            .iter()
+            .any(|note| note.contains("tonumber")),
+        "{:?}",
+        timeline.warnings
+    );
+}
+
 /// What flove's flowers open with. None of it can move a piece, but a preview
 /// that stops on any of it shows nothing at all.
 #[test]
@@ -1645,6 +1715,68 @@ mod world {
             "{:?}",
             timeline.warnings
         );
+    }
+
+    /// The engine stopped keeping shared values in Spring 102.0, so a script
+    /// that sets one and reads it back gets 0 in the game. A preview that
+    /// handed the number back would show a script working that does not.
+    #[test]
+    fn a_shared_value_reads_zero_as_the_engine_answers() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                SetUnitValue(2048, 5)
+                Turn(turret, y_axis, GetUnitValue(2048))
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 0.0);
+        assert!(
+            note_about(&timeline, "the engine no longer keeps shared values"),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The preview has one unit, 1, on team 0 in allyteam 0. A rules param or a
+    /// question about any other unit or team finds nothing, as it would for a
+    /// unit or team that does not exist. Each check adds its own bit, so a
+    /// wrong total says which one failed.
+    #[test]
+    fn rules_params_and_teams_belong_to_the_one_unit() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Spring.SetUnitRulesParam(unitID, "mine", 1, { allied = true })
+                Spring.SetUnitRulesParam(unitID + 1, "mine", 10)
+                Spring.SetTeamRulesParam(0, "ours", 2, { allied = true })
+                Spring.SetTeamRulesParam(1, "ours", 20)
+                local total = Spring.GetUnitRulesParam(unitID, "mine") + Spring.GetTeamRulesParam(0, "ours")
+                if Spring.GetUnitRulesParam(unitID + 1, "mine") == nil and Spring.GetTeamRulesParam(1, "ours") == nil then
+                    total = total + 4
+                end
+                if Spring.ValidUnitID(unitID) and not Spring.ValidUnitID(unitID + 1) then
+                    total = total + 8
+                end
+                if Spring.GetTeamList(Spring.GetUnitAllyTeam(unitID))[1] == 0 and Spring.GetTeamList(1) == nil then
+                    total = total + 16
+                end
+                if Spring.GetTeamInfo(0) == 0 and Spring.GetTeamInfo(1) == nil then
+                    total = total + 32
+                end
+                Move(turret, y_axis, total)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "turret")[1], 63.0);
     }
 
     /// The fourth value is the speed, and BAR's commander divides its walk

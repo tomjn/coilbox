@@ -15,7 +15,7 @@
 use crate::parse::{self, Axis, Comment, Expr, Func, Item, ItemKind, Stmt, StmtKind};
 use crate::pp::{self, Output as Pre};
 use crate::{Conversion, Options};
-use coilbox_unitpose::unitvalue::NAMES as COB_NAMES;
+use coilbox_unitpose::unitvalue::{self, NAMES as COB_NAMES};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 const KEYWORDS: &[&str] = &[
@@ -808,6 +808,9 @@ impl<'a> Program<'a> {
     }
 }
 
+/// The Lua that keeps the shared unit values the engine stopped keeping.
+const SHARED_VALUES: &str = include_str!("shared_values.lua");
+
 struct Writer<'p, 'a> {
     p: &'p Program<'a>,
     mode: Mode,
@@ -837,13 +840,16 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 6] = [
+    const HELPER_NAMES: [&'static str; 9] = [
         "COB_ANGLE",
         "COB_LINEAR",
         "trunc",
         "toCobAngle",
         "div",
         "BosSleep",
+        "cobAllied",
+        "cobGet",
+        "cobSet",
     ];
 
     fn new(p: &'p Program<'a>, mode: Mode) -> Self {
@@ -919,6 +925,9 @@ impl<'p, 'a> Writer<'p, 'a> {
         if helpers.contains("div") {
             lua.push_str("\n-- BOS division keeps only the whole part, and the engine answers 1000 for a\n-- division by zero.\nlocal function div(a, b)\n\tif b == 0 then return 1000 end\n\treturn trunc(a / b)\nend\n");
         }
+        if helpers.contains("cobAllied") {
+            lua.push_str(SHARED_VALUES);
+        }
         if !helpers.is_empty() && !self.out.starts_with('\n') {
             lua.push('\n');
         }
@@ -936,6 +945,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         Conversion {
             lua,
             warnings: self.warnings,
+            shared_values: self.helpers.contains("cobAllied"),
         }
     }
 
@@ -1043,8 +1053,58 @@ impl<'p, 'a> Writer<'p, 'a> {
         if name == "div" {
             self.helpers.insert("trunc");
         }
+        if name == "cobGet" || name == "cobSet" {
+            self.helpers.extend(["cobAllied", "cobGet", "cobSet"]);
+        }
         self.refs.insert(name.to_string());
         name.to_string()
+    }
+
+    /// The function a `get` or `set` goes through: the engine's, or the Lua's
+    /// own for the shared values the engine stopped keeping. An id the script
+    /// only works out while running goes through the Lua's, which checks it
+    /// then and hands anything else to the engine.
+    fn unit_value_call(&mut self, id: Option<i64>, engine: &str, shared: &'static str) -> String {
+        match id {
+            Some(v) if !i32::try_from(v).is_ok_and(unitvalue::removed_shared) => {
+                self.header(engine)
+            }
+            Some(_) => {
+                self.warn(
+                    "shared",
+                    "This script shares unit values between units, which the engine stopped keeping in Spring 102.0. The Lua keeps them as rules params instead. Every script that shares them has to be converted too, because a COB script still reads 0. Gadgets that set them, and gadgets and widgets that read them, through Spring.SetUnitCOBValue, Spring.GetCOBTeamVar or their siblings, need lualibs/cob_vars.lua, which the BOS to Lua page offers and a model editor export writes.".to_string(),
+                );
+                self.helper(shared)
+            }
+            None => {
+                self.warn(
+                    "shared-runtime",
+                    "A get or set here only learns which unit value it wants while running, so it goes through cobGet or cobSet, which keep the shared values the engine stopped keeping and hand any other value to the engine. If it does share values, gadgets and widgets need lualibs/cob_vars.lua to reach them.".to_string(),
+                );
+                self.helper(shared)
+            }
+        }
+    }
+
+    /// Unit values the engine dropped with nothing to stand in for them. The
+    /// call stays as the BOS wrote it, and the line and the warnings say why
+    /// it does nothing.
+    fn removed_value(&mut self, id: Option<i64>) {
+        let (name, note, message) = match id {
+            Some(93) => (
+                "CURRENT_FUEL",
+                "CURRENT_FUEL has done nothing since Spring 101.0 removed fuel",
+                "CURRENT_FUEL has done nothing since Spring 101.0 removed fuel. It reads 0 and a set is ignored, with no error in the log.",
+            ),
+            Some(103) => (
+                "ALPHA_THRESHOLD",
+                "ALPHA_THRESHOLD was removed in Spring 99.0",
+                "ALPHA_THRESHOLD was removed in Spring 99.0. It reads 0, a set is ignored, and the engine logs an unknown constant error for each.",
+            ),
+            _ => return,
+        };
+        self.warn(&format!("removed:{name}"), message.to_string());
+        self.note = Some(note.to_string());
     }
 
     fn piece(&mut self, name: &str) -> String {
@@ -1152,11 +1212,12 @@ impl<'p, 'a> Writer<'p, 'a> {
             Expr::Const(n) => self.constant(n),
             Expr::Get(id, args) => {
                 let id = self.num(id);
+                self.removed_value(id.value);
+                let f = self.unit_value_call(id.value, "GetUnitValue", "cobGet");
                 let mut parts = vec![id.text.clone()];
                 for a in args {
                     parts.push(self.num(a).text);
                 }
-                let f = self.header("GetUnitValue");
                 L::atom(format!("{f}({})", parts.join(", ")))
             }
             Expr::Rand(a, b) => {
@@ -2025,13 +2086,13 @@ impl<'p, 'a> Writer<'p, 'a> {
                 els,
             } => {
                 let c = self.cond(cond).text;
-                self.line(&format!("if {c} then"));
+                self.code(&format!("if {c} then"), &None);
                 self.if_rest(then, then_tail, els);
                 self.code("end", t);
             }
             StmtKind::While { cond, body, tail } => {
                 let c = self.cond(cond).text;
-                self.line(&format!("while {c} do"));
+                self.code(&format!("while {c} do"), &None);
                 self.indent += 1;
                 self.block(body);
                 self.comments(tail);
@@ -2158,10 +2219,11 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.code(&format!("{f}({v})"), t);
             }
             StmtKind::Set(id, value) => {
-                let f = self.header("SetUnitValue");
-                let id = self.num(id).text;
+                let id = self.num(id);
+                self.removed_value(id.value);
+                let f = self.unit_value_call(id.value, "SetUnitValue", "cobSet");
                 let v = self.num(value).text;
-                self.code(&format!("{f}({id}, {v})"), t);
+                self.code(&format!("{f}({}, {v})", id.text), t);
             }
             StmtKind::Get(e) => {
                 let v = self.expr(e).text;
@@ -2230,7 +2292,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             {
                 if only.leading.is_empty() && only.trailing.is_none() && tail.is_empty() {
                     let c = self.cond(cond).text;
-                    self.line(&format!("elseif {c} then"));
+                    self.code(&format!("elseif {c} then"), &None);
                     self.if_rest(then, then_tail, els);
                     return;
                 }

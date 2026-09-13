@@ -162,8 +162,10 @@ enum RuleValue {
 impl RuleValue {
     fn of(value: &Value) -> Self {
         match value {
-            Value::Integer(number) => RuleValue::Number(*number as f64),
-            Value::Number(number) => RuleValue::Number(*number),
+            // The engine keeps a rules param number as a float, so this rounds
+            // it through f32 the same way SetRulesParam does.
+            Value::Integer(number) => RuleValue::Number(f64::from(*number as f32)),
+            Value::Number(number) => RuleValue::Number(f64::from(*number as f32)),
             Value::Boolean(flag) => RuleValue::Number(f64::from(u8::from(*flag))),
             Value::String(text) => {
                 let text = text.to_string_lossy();
@@ -220,6 +222,7 @@ struct Sim {
     /// it reads back a unit value. The engine keeps a unit's on the unit and the
     /// game's on the game, so one name used for both is two values here too.
     unit_rules: HashMap<String, RuleValue>,
+    team_rules: HashMap<String, RuleValue>,
     game_rules: HashMap<String, RuleValue>,
     /// How many lines the script has printed, so a script printing every frame
     /// does not bury everything else the run has to say.
@@ -1173,6 +1176,16 @@ fn sfx_table(lua: &Lua) -> mlua::Result<Table> {
     Ok(sfx)
 }
 
+/// Whether a unit id a script passed is the preview's one unit.
+fn is_the_unit(unit: &Value) -> bool {
+    let id = f64::from(unitvalue::UNIT_ID);
+    match unit {
+        Value::Integer(number) => *number as f64 == id,
+        Value::Number(number) => *number == id,
+        _ => false,
+    }
+}
+
 /// What a script gets when it asks the engine about its unit.
 ///
 /// A unit script is allowed to ask, and Beyond All Reason's do: its shared
@@ -1438,6 +1451,34 @@ fn install_spring(
         lua.create_function(|_, _: MultiValue| Ok(0))?,
     )?;
 
+    spring.set(
+        "GetUnitAllyTeam",
+        lua.create_function(|_, _: MultiValue| Ok(0))?,
+    )?;
+
+    // Only the preview's own unit exists.
+    spring.set(
+        "ValidUnitID",
+        lua.create_function(|_, unit: Value| Ok(is_the_unit(&unit)))?,
+    )?;
+
+    // One allyteam holding one team. The engine answers nothing for an
+    // allyteam that does not exist.
+    spring.set(
+        "GetTeamList",
+        lua.create_function(|lua, ally: Option<i64>| match ally.unwrap_or(0) {
+            0 => Ok(Value::Table(lua.create_sequence_from([0])?)),
+            _ => Ok(Value::Nil),
+        })?,
+    )?;
+
+    // The team's id, which is the first thing the engine answers, or nothing
+    // for a team that does not exist.
+    spring.set(
+        "GetTeamInfo",
+        lua.create_function(|_, team: Option<i64>| Ok((team == Some(0)).then_some(0)))?,
+    )?;
+
     // Rules parameters, kept rather than dropped for the reason `SetUnitValue`
     // is kept: a script stores one and reads it back a moment later, and a
     // preview that always answered nothing would tell it nothing it did had
@@ -1445,23 +1486,61 @@ fn install_spring(
     let state = Rc::clone(sim);
     spring.set(
         "SetUnitRulesParam",
-        lua.create_function(move |_, (_unit, name, value): (Value, String, Value)| {
-            state
-                .borrow_mut()
-                .unit_rules
-                .insert(name, RuleValue::of(&value));
+        lua.create_function(move |_, (unit, name, value): (Value, String, Value)| {
+            // Any other unit does not exist here, and the engine ignores a set
+            // on a unit that does not exist.
+            if is_the_unit(&unit) {
+                state
+                    .borrow_mut()
+                    .unit_rules
+                    .insert(name, RuleValue::of(&value));
+            }
             Ok(())
         })?,
     )?;
 
+    // The engine's GetRulesParam answers no values at all for a parameter
+    // nobody set, not an explicit nil, so passing the answer straight to
+    // tonumber() without a `select("#", ...)` check first raises an error.
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitRulesParam",
-        lua.create_function(move |lua, (_unit, name): (Value, String)| {
+        lua.create_function(move |lua, (unit, name): (Value, String)| {
             let sim = state.borrow();
             match sim.unit_rules.get(&name) {
-                Some(value) => value.to_value(lua),
-                None => Ok(Value::Nil),
+                Some(value) if is_the_unit(&unit) => {
+                    Ok(MultiValue::from_iter([value.to_value(lua)?]))
+                }
+                _ => Ok(MultiValue::new()),
+            }
+        })?,
+    )?;
+
+    // The one team's, which is team 0.
+    let state = Rc::clone(sim);
+    spring.set(
+        "SetTeamRulesParam",
+        lua.create_function(
+            move |_, (team, name, value): (Option<i64>, String, Value)| {
+                if team == Some(0) {
+                    state
+                        .borrow_mut()
+                        .team_rules
+                        .insert(name, RuleValue::of(&value));
+                }
+                Ok(())
+            },
+        )?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetTeamRulesParam",
+        lua.create_function(move |lua, (team, name): (Option<i64>, String)| {
+            let sim = state.borrow();
+            match sim.team_rules.get(&name) {
+                Some(value) if team == Some(0) => Ok(MultiValue::from_iter([value.to_value(lua)?])),
+                _ => Ok(MultiValue::new()),
             }
         })?,
     )?;
@@ -1485,8 +1564,8 @@ fn install_spring(
         lua.create_function(move |lua, name: String| {
             let sim = state.borrow();
             match sim.game_rules.get(&name) {
-                Some(value) => value.to_value(lua),
-                None => Ok(Value::Nil),
+                Some(value) => Ok(MultiValue::from_iter([value.to_value(lua)?])),
+                None => Ok(MultiValue::new()),
             }
         })?,
     )?;
@@ -1921,6 +2000,12 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         // for the handful of ids that are about where the unit is, which the
         // preview has nothing to say about anyway.
         lua.create_function(move |_, (id, value, _rest): (i64, Value, MultiValue)| {
+            if unitvalue::removed_shared(id as i32) {
+                state.borrow_mut().model.note(format!(
+                    "This script sets shared value {id}, and the engine no longer keeps shared values, so the game ignores it."
+                ));
+                return Ok(());
+            }
             let value = match value {
                 Value::Boolean(set) => i32::from(set),
                 Value::Integer(number) => number as i32,
@@ -1944,6 +2029,12 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             // runtimes cannot answer the same id differently.
             if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
                 return Ok(value);
+            }
+            if unitvalue::removed_shared(id) {
+                state.borrow_mut().model.note(format!(
+                    "This script asks for shared value {id}, and the engine no longer keeps shared values, so it reads 0 in the game."
+                ));
+                return Ok(0);
             }
             let mut sim = state.borrow_mut();
             if id == GAME_FRAME {

@@ -650,4 +650,36 @@ mod what_it_says_about_itself {
             .iter()
             .any(|note| note.contains("the world")));
     }
+
+    /// The engine stopped keeping shared values in Spring 102.0. The preview
+    /// still keeps what a script stores, so a `.cob` and its converted Lua play
+    /// the same, but says the game will not, rather than calling a shared value
+    /// a question about the world.
+    #[test]
+    fn says_the_engine_no_longer_keeps_shared_values() {
+        let mut code = push(2049);
+        code.extend(push(1));
+        code.push(op("SET"));
+        code.extend(push(2050));
+        code.push(op("GET_UNIT_VALUE"));
+        code.push(op("POP_STACK"));
+        code.push(op("RETURN"));
+
+        let timeline = play(&create_only(code), 2);
+
+        let shared: Vec<_> = timeline
+            .warnings
+            .iter()
+            .filter(|note| note.contains("no longer keeps shared values"))
+            .collect();
+        assert_eq!(shared.len(), 2, "{:?}", timeline.warnings);
+        assert!(
+            !timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("the world")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
 }

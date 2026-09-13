@@ -195,6 +195,9 @@ async fn anim_bos2lua(
             "lua": conversion.lua,
             "warnings": conversion.warnings,
             "linearScale": linear_scale,
+            "cobVars": conversion
+                .shared_values
+                .then_some(coilbox_bos2lua::COB_VARS_POLYFILL),
         })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("conversion task failed: {e}")),

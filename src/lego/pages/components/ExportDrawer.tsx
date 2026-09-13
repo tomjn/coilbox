@@ -119,6 +119,8 @@ type Result =
       texturesKept: string[];
       script: string | null;
       scriptKept: boolean;
+      cobVars: string | null;
+      cobVarsKept: boolean;
       pieceCollision: string | null;
       unitDef: string | null;
       unitDefKept: boolean;
@@ -1001,6 +1003,23 @@ export function ExportDrawer({
                 {result.scriptKept ? (
                   <p className="text-muted-foreground">
                     The unit script was already there and has been left alone.
+                  </p>
+                ) : null}
+                {result.cobVars ? (
+                  <code className="break-all">{result.cobVars}</code>
+                ) : null}
+                {result.cobVars || result.cobVarsKept ? (
+                  <p className="text-muted-foreground">
+                    {result.cobVarsKept
+                      ? "lualibs/cob_vars.lua was already there and has been left alone. "
+                      : null}
+                    This unit's script can keep shared COB unit values as rules
+                    params. For the game's synced gadgets to set them, and its
+                    gadgets and widgets to read them, put{" "}
+                    <code>VFS.Include("lualibs/cob_vars.lua")</code> on the
+                    first line of <code>LuaRules/main.lua</code>,{" "}
+                    <code>LuaRules/draw.lua</code> and <code>luaui.lua</code>{" "}
+                    (or <code>LuaUI/main.lua</code>).
                   </p>
                 ) : null}
                 {result.pieceCollision ? (

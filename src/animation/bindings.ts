@@ -77,5 +77,10 @@ export const animBos2lua = defineCommand<
     pieces?: string[];
     cob?: number[];
   },
-  { lua: string; warnings: string[]; linearScale: number }
+  {
+    lua: string;
+    warnings: string[];
+    linearScale: number;
+    cobVars: string | null;
+  }
 >("coilbox-anim", "anim_bos2lua");

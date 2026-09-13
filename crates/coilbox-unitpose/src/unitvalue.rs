@@ -184,6 +184,14 @@ const MAX_SPEED: i32 = 75;
 #[cfg(test)]
 const XZ_ATAN: i32 = 12;
 
+/// Unit values 1024 to 8191 once held numbers BOS scripts shared: 8 per unit,
+/// 64 per team, 64 per allyteam and 4096 for the whole game. Spring 102.0
+/// stopped keeping them and Recoil deleted them, so the engine answers 0 and
+/// ignores a set.
+pub fn removed_shared(id: i32) -> bool {
+    matches!(id, 1024..=1031 | 2048..=2111 | 3072..=3135 | 4096..=8191)
+}
+
 /// What a preview answers, for the questions that have an answer.
 ///
 /// Every one of these describes a whole unit doing what the scenario says, and
@@ -259,6 +267,19 @@ mod tests {
         let half = arithmetic(ATAN, 0, -1).unwrap();
         assert!((32767..=32768).contains(&half), "{half}");
         assert_eq!(arithmetic(HYPOT, 3, 4), Some(5));
+    }
+
+    /// The values BOS scripts once shared, which Spring 102.0 stopped keeping.
+    /// The edges matter, because the ids between the ranges were never shared
+    /// and still reach the engine.
+    #[test]
+    fn knows_which_values_were_shared() {
+        for id in [1024, 1031, 2048, 2111, 3072, 3135, 4096, 8191] {
+            assert!(removed_shared(id), "{id}");
+        }
+        for id in [1023, 1032, 2047, 2112, 3071, 3136, 4095, 8192, 93, 103] {
+            assert!(!removed_shared(id), "{id}");
+        }
     }
 
     /// The engine logs and answers zero rather than handing back a number that
