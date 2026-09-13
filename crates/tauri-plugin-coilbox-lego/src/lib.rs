@@ -1925,8 +1925,8 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
 const COB_VARS: &[&str] = &["lualibs", "cob_vars.lua"];
 
 /// `lualibs/cob_vars.lua`, beside a script that keeps the shared COB unit
-/// values the engine stopped keeping, so the game's gadgets and widgets can
-/// set and read them too.
+/// values the engine stopped keeping, so the game's synced gadgets can set
+/// them, and its gadgets and widgets can read them, too.
 ///
 /// Every sharing unit in the game uses the one file, so it is not any unit's:
 /// it is never in the receipt a rename reads, and it follows the script's rule,

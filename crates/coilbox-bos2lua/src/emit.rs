@@ -840,7 +840,7 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 10] = [
+    const HELPER_NAMES: [&'static str; 9] = [
         "COB_ANGLE",
         "COB_LINEAR",
         "trunc",
@@ -850,7 +850,6 @@ impl<'p, 'a> Writer<'p, 'a> {
         "cobAllied",
         "cobGet",
         "cobSet",
-        "cobStore",
     ];
 
     fn new(p: &'p Program<'a>, mode: Mode) -> Self {
@@ -1055,8 +1054,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             self.helpers.insert("trunc");
         }
         if name == "cobGet" || name == "cobSet" {
-            self.helpers
-                .extend(["cobAllied", "cobGet", "cobSet", "cobStore"]);
+            self.helpers.extend(["cobAllied", "cobGet", "cobSet"]);
         }
         self.refs.insert(name.to_string());
         name.to_string()

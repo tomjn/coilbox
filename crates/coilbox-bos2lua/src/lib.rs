@@ -52,10 +52,10 @@ pub const MODERN_LINEAR: i64 = 65536;
 /// Older Spring games, Expand and Exterminate among them, were built with it.
 pub const SCRIPTOR_LINEAR: i64 = 163840;
 
-/// `lualibs/cob_vars.lua`, which lets a game's gadgets and widgets set and
-/// read the shared unit values a converted script keeps as rules params. A
-/// game includes it from its own `LuaRules/main.lua`, `LuaRules/draw.lua` and
-/// `luaui.lua`.
+/// `lualibs/cob_vars.lua`, which lets a game's synced gadgets set, and its
+/// gadgets and widgets read, the shared unit values a converted script keeps
+/// as rules params. A game includes it from its own `LuaRules/main.lua`,
+/// `LuaRules/draw.lua` and `luaui.lua`.
 pub const COB_VARS_POLYFILL: &str = include_str!("cob_vars.lua");
 
 /// Whether a Lua unit script keeps shared unit values the way a conversion
