@@ -1647,6 +1647,68 @@ mod world {
         );
     }
 
+    /// The engine stopped keeping shared values in Spring 102.0, so a script
+    /// that sets one and reads it back gets 0 in the game. A preview that
+    /// handed the number back would show a script working that does not.
+    #[test]
+    fn a_shared_value_reads_zero_as_the_engine_answers() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                SetUnitValue(2048, 5)
+                Turn(turret, y_axis, GetUnitValue(2048))
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 0.0);
+        assert!(
+            note_about(&timeline, "the engine no longer keeps shared values"),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The preview has one unit, 1, on team 0 in allyteam 0. A rules param or a
+    /// question about any other unit or team finds nothing, as it would for a
+    /// unit or team that does not exist. Each check adds its own bit, so a
+    /// wrong total says which one failed.
+    #[test]
+    fn rules_params_and_teams_belong_to_the_one_unit() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Spring.SetUnitRulesParam(unitID, "mine", 1, { allied = true })
+                Spring.SetUnitRulesParam(unitID + 1, "mine", 10)
+                Spring.SetTeamRulesParam(0, "ours", 2, { allied = true })
+                Spring.SetTeamRulesParam(1, "ours", 20)
+                local total = Spring.GetUnitRulesParam(unitID, "mine") + Spring.GetTeamRulesParam(0, "ours")
+                if Spring.GetUnitRulesParam(unitID + 1, "mine") == nil and Spring.GetTeamRulesParam(1, "ours") == nil then
+                    total = total + 4
+                end
+                if Spring.ValidUnitID(unitID) and not Spring.ValidUnitID(unitID + 1) then
+                    total = total + 8
+                end
+                if Spring.GetTeamList(Spring.GetUnitAllyTeam(unitID))[1] == 0 and Spring.GetTeamList(1) == nil then
+                    total = total + 16
+                end
+                if Spring.GetTeamInfo(0) == 0 and Spring.GetTeamInfo(1) == nil then
+                    total = total + 32
+                end
+                Move(turret, y_axis, total)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "turret")[1], 63.0);
+    }
+
     /// The fourth value is the speed, and BAR's commander divides its walk
     /// cycle by it, so a unit answering nothing there never takes a step.
     #[test]
