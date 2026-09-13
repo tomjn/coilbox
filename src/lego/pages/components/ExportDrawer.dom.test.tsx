@@ -11,16 +11,23 @@
  * things it can say.
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { ExportDrawer } from "./ExportDrawer";
 
 const legoGameLanguage = vi.fn();
+const legoExport = vi.fn();
 
 vi.mock("../../bindings", () => ({
-  legoExport: vi.fn(),
+  legoExport: (args: unknown) => legoExport(args),
   legoExportGlb: vi.fn(),
   legoExportObj: vi.fn(),
   legoExportStale: vi.fn().mockResolvedValue({
@@ -33,6 +40,29 @@ vi.mock("../../bindings", () => ({
   legoOpenPath: vi.fn(),
   legoTexturePng: vi.fn(),
 }));
+
+/** What `legoExport` answers for a successful export, with `cobVars: null`
+ *  and `cobVarsKept: false` matching a script that shares no values, unless
+ *  overridden. */
+function exportResult(over: Record<string, unknown> = {}) {
+  return {
+    model: "/game/objects3d/skyfort.s3o",
+    texture: null,
+    language: null,
+    script: "/game/scripts/skyfort.lua",
+    scriptKept: false,
+    cobVars: null,
+    cobVarsKept: false,
+    pieceCollision: "/game/scripts/coilbox/skyfort_collision.lua",
+    unitDef: "/game/units/skyfort.lua",
+    unitDefKept: false,
+    textureKept: false,
+    textures: [],
+    texturesKept: [],
+    owned: [],
+    ...over,
+  };
+}
 
 const project = {
   ...newProject({
@@ -69,6 +99,7 @@ function show() {
 
 beforeEach(() => {
   legoGameLanguage.mockReset();
+  legoExport.mockReset();
 });
 
 afterEach(() => {
@@ -144,5 +175,45 @@ describe("where the unit's name is going", () => {
     await waitFor(() =>
       expect(screen.getByText(/will not parse as JSON/)).toBeTruthy(),
     );
+  });
+});
+
+/**
+ * The polyfill note, for a script that keeps shared COB unit values as rules
+ * params. A game's gadgets and widgets can only reach them by including
+ * `lualibs/cob_vars.lua`, so the drawer says the path it went to and the line
+ * that wires it in.
+ */
+describe("the shared values polyfill", () => {
+  it("shows where it was written and the line that includes it", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(
+      exportResult({ cobVars: "/game/lualibs/cob_vars.lua" }),
+    );
+    show();
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() =>
+      expect(screen.getByText("/game/lualibs/cob_vars.lua")).toBeTruthy(),
+    );
+    expect(
+      screen.getByText('VFS.Include("lualibs/cob_vars.lua")'),
+    ).toBeTruthy();
+  });
+
+  it("says nothing about it for a script that shares no values", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    show();
+    await waitFor(() =>
+      expect(screen.getByText(/goes into the definition/)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() =>
+      expect(screen.getByText("/game/scripts/skyfort.lua")).toBeTruthy(),
+    );
+    expect(screen.queryByText(/VFS\.Include/)).toBeNull();
   });
 });

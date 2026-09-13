@@ -142,6 +142,13 @@ export const legoExport = defineCommand<
     script: string | null;
     /** True when a script was already there and was left as it was. */
     scriptKept: boolean;
+    /**
+     * `lualibs/cob_vars.lua`, written because the script keeps shared COB unit
+     * values. Null when the script shares none or a file was already there.
+     */
+    cobVars: string | null;
+    /** True when `lualibs/cob_vars.lua` was already there and was left alone. */
+    cobVarsKept: boolean;
     pieceCollision: string | null;
     unitDef: string | null;
     /** True when a unit definition was already there and was left as it was. */

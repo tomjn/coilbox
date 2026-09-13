@@ -1921,6 +1921,40 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
     Ok(dir.join(write_as))
 }
 
+/// Where an export writes the polyfill for shared COB unit values.
+const COB_VARS: &[&str] = &["lualibs", "cob_vars.lua"];
+
+/// `lualibs/cob_vars.lua`, beside a script that keeps the shared COB unit
+/// values the engine stopped keeping, so the game's gadgets and widgets can
+/// set and read them too.
+///
+/// Every sharing unit in the game uses the one file, so it is not any unit's:
+/// it is never in the receipt a rename reads, and it follows the script's rule,
+/// written once and left alone in a real game folder and refreshed in the
+/// scratch game. Answers the path written, and whether a file already there
+/// was left alone.
+fn write_cob_vars(
+    root: &Path,
+    scratch: bool,
+    script: Option<&str>,
+) -> Result<(Option<String>, bool), String> {
+    if !script.is_some_and(coilbox_bos2lua::shares_values) {
+        return Ok((None, false));
+    }
+    let target = COB_VARS
+        .iter()
+        .fold(root.to_path_buf(), |path, part| path.join(part));
+    if keep_existing(&target, scratch, false) {
+        return Ok((None, true));
+    }
+    let dir = root.join(COB_VARS[0]);
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    std::fs::write(&target, coilbox_bos2lua::COB_VARS_POLYFILL)
+        .map_err(|e| format!("could not write {}: {e}", target.display()))?;
+    Ok((Some(target.to_string_lossy().to_string()), false))
+}
+
 /// `lego_export` writes a built unit into a game folder.
 ///
 /// The model goes to `objects3d/<unit>.s3o`. The atlas is shared by every unit
@@ -2067,6 +2101,11 @@ async fn lego_export<R: Runtime>(
         }
     }
 
+    let (cob_vars_path, cob_vars_kept) = match write_cob_vars(&root, scratch, script.as_deref()) {
+        Ok(written) => written,
+        Err(e) => return CliResult::err(e),
+    };
+
     // The unit script is written once and then left alone. It is meant to be
     // edited by hand, and re-exporting a model after a change to the geometry
     // must not throw that away. The scratch game is the one exception: it has
@@ -2160,6 +2199,8 @@ async fn lego_export<R: Runtime>(
         "texturesKept": stored_kept,
         "script": script_path,
         "scriptKept": script_kept,
+        "cobVars": cob_vars_path,
+        "cobVarsKept": cob_vars_kept,
         "pieceCollision": piece_collision_path,
         "unitDef": unit_def_path,
         "unitDefKept": unit_def_kept,
@@ -2867,6 +2908,51 @@ mod glb_picture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The polyfill is one file every sharing unit in the game uses, so it is
+    /// written once and left alone like the script, refreshed in the scratch
+    /// game, and never written for a script that shares nothing.
+    #[test]
+    fn writes_the_cob_vars_polyfill_only_beside_a_script_that_shares_values() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sharing = "local cobAllied = { allied = true }\n";
+        let target = dir.path().join("lualibs/cob_vars.lua");
+
+        assert_eq!(
+            write_cob_vars(dir.path(), false, Some("-- shares nothing")).expect("write"),
+            (None, false)
+        );
+        assert_eq!(
+            write_cob_vars(dir.path(), false, None).expect("write"),
+            (None, false)
+        );
+        assert!(!target.exists());
+
+        let (written, kept) = write_cob_vars(dir.path(), false, Some(sharing)).expect("write");
+        assert_eq!(written, Some(target.to_string_lossy().to_string()));
+        assert!(!kept);
+        assert_eq!(
+            std::fs::read_to_string(&target).expect("read"),
+            coilbox_bos2lua::COB_VARS_POLYFILL
+        );
+
+        std::fs::write(&target, "-- the game's own").expect("write");
+        assert_eq!(
+            write_cob_vars(dir.path(), false, Some(sharing)).expect("write"),
+            (None, true)
+        );
+        assert_eq!(
+            std::fs::read_to_string(&target).expect("read"),
+            "-- the game's own"
+        );
+
+        let (written, kept) = write_cob_vars(dir.path(), true, Some(sharing)).expect("write");
+        assert!(written.is_some() && !kept);
+        assert_eq!(
+            std::fs::read_to_string(&target).expect("read"),
+            coilbox_bos2lua::COB_VARS_POLYFILL
+        );
+    }
 
     fn reveal_args(target: &Path) -> Vec<std::ffi::OsString> {
         reveal_command(target)
