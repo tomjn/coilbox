@@ -231,3 +231,30 @@ end
         [5.0, 5.0, -7.0, 9.0]
     );
 }
+
+/// Neither can be brought back. The engine call stays, so the Lua does what the
+/// COB does today, and the porter is told why the unit behaves differently.
+#[test]
+fn fuel_and_the_alpha_threshold_are_said_to_be_gone() {
+    let conversion = convert_bos(
+        "piece base, turret;\n\nCreate()\n{\n\tset 103 to 5;\n\tmove turret to y-axis get 93 now;\n}\n",
+    );
+    let lua = &conversion.lua;
+    assert!(lua.contains("SetUnitValue(103, 5)"), "{lua}");
+    assert!(
+        lua.contains("ALPHA_THRESHOLD was removed in Spring 99.0"),
+        "{lua}"
+    );
+    assert!(
+        lua.contains("CURRENT_FUEL has done nothing since Spring 101.0"),
+        "{lua}"
+    );
+    for name in ["CURRENT_FUEL", "ALPHA_THRESHOLD"] {
+        assert!(
+            conversion.warnings.iter().any(|w| w.contains(name)),
+            "{name} in {:?}",
+            conversion.warnings
+        );
+    }
+    assert_eq!(turret_height(lua), 0.0);
+}

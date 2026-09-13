@@ -1086,6 +1086,27 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
     }
 
+    /// Unit values the engine dropped with nothing to stand in for them. The
+    /// call stays as the BOS wrote it, and the line and the warnings say why
+    /// it does nothing.
+    fn removed_value(&mut self, id: Option<i64>) {
+        let (name, note, message) = match id {
+            Some(93) => (
+                "CURRENT_FUEL",
+                "CURRENT_FUEL has done nothing since Spring 101.0 removed fuel",
+                "CURRENT_FUEL has done nothing since Spring 101.0 removed fuel. It reads 0 and a set is ignored, with no error in the log.",
+            ),
+            Some(103) => (
+                "ALPHA_THRESHOLD",
+                "ALPHA_THRESHOLD was removed in Spring 99.0",
+                "ALPHA_THRESHOLD was removed in Spring 99.0. It reads 0, a set is ignored, and the engine logs an unknown constant error for each.",
+            ),
+            _ => return,
+        };
+        self.warn(&format!("removed:{name}"), message.to_string());
+        self.note = Some(note.to_string());
+    }
+
     fn piece(&mut self, name: &str) -> String {
         let lower = name.to_lowercase();
         match self.p.pieces.iter().find(|(bos, _, _)| *bos == lower) {
@@ -1191,6 +1212,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             Expr::Const(n) => self.constant(n),
             Expr::Get(id, args) => {
                 let id = self.num(id);
+                self.removed_value(id.value);
                 let f = self.unit_value_call(id.value, "GetUnitValue", "cobGet");
                 let mut parts = vec![id.text.clone()];
                 for a in args {
@@ -2198,6 +2220,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
             StmtKind::Set(id, value) => {
                 let id = self.num(id);
+                self.removed_value(id.value);
                 let f = self.unit_value_call(id.value, "SetUnitValue", "cobSet");
                 let v = self.num(value).text;
                 self.code(&format!("{f}({}, {v})", id.text), t);
