@@ -945,6 +945,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         Conversion {
             lua,
             warnings: self.warnings,
+            shared_values: self.helpers.contains("cobAllied"),
         }
     }
 

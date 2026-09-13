@@ -4,7 +4,7 @@
 //! sent to the engine with 0, as the game does, so only Lua that keeps them
 //! itself passes.
 
-use coilbox_bos2lua::{convert, Conversion, Options, MODERN_LINEAR};
+use coilbox_bos2lua::{convert, Conversion, Options, COB_VARS_POLYFILL, MODERN_LINEAR};
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 use std::collections::HashMap;
 
@@ -125,4 +125,109 @@ fn a_value_that_was_never_shared_still_goes_to_the_engine() {
     assert!(lua.contains("GetUnitValue(1032)"), "{lua}");
     assert!(!lua.contains("cobAllied"), "{lua}");
     assert!(conversion.warnings.is_empty(), "{:?}", conversion.warnings);
+}
+
+/// A timeline for a Lua script that can include the polyfill as a game does.
+fn with_polyfill(lua: &str) -> coilbox_springlua::unitscript::Timeline {
+    let pieces = pieces();
+    let includes = HashMap::from([(
+        "lualibs/cob_vars.lua".to_string(),
+        COB_VARS_POLYFILL.to_string(),
+    )]);
+    let unit = Unit {
+        includes: &includes,
+        ..Unit::new(&pieces)
+    };
+    run(lua, "polyfill.lua", &unit, &create(), 3)
+}
+
+#[test]
+fn a_conversion_says_whether_it_shares_values() {
+    let sharing = convert_bos("piece base, turret;\n\nCreate()\n{\n\tset 2048 to 1;\n}\n");
+    let not_sharing = convert_bos("piece base, turret;\n\nCreate()\n{\n\tset 1032 to 1;\n}\n");
+    assert!(sharing.shared_values);
+    assert!(!not_sharing.shared_values);
+}
+
+/// The converted Lua and the polyfill are two files that must agree on where
+/// each kind of value lives.
+#[test]
+fn the_converter_and_the_polyfill_use_the_same_names() {
+    let lua = convert_bos("piece base, turret;\n\nCreate()\n{\n\tset 2048 to 1;\n}\n").lua;
+    for name in ["cobUnitVar", "cobTeamVar", "cobAllyVar", "cobGlobalVar"] {
+        assert!(lua.contains(&format!("\"{name}\"")), "{name} in {lua}");
+        assert!(COB_VARS_POLYFILL.contains(&format!("\"{name}\"")), "{name}");
+    }
+}
+
+/// The removed functions read back what a converted script stores. A packed
+/// position splits into two signed halves, and a team that does not exist, a
+/// unit that does not exist or a slot out of range answers nothing, as the
+/// engine's did.
+#[test]
+fn the_polyfill_reads_what_a_converted_script_stores() {
+    let timeline = with_polyfill(
+        r#"
+local base, turret = piece("base", "turret")
+include("lualibs/cob_vars.lua")
+function script.Create()
+	Spring.SetTeamRulesParam(0, "cobTeamVar3", 2, { allied = true })
+	Spring.SetGameRulesParam("cobGlobalVar0", 5 * 65536 + 65529)
+	local x, z = Spring.GetCOBGlobalVar(0, true)
+	Move(turret, y_axis, Spring.GetCOBTeamVar(0, 3) + Spring.GetCOBAllyTeamVar(0, 9) + Spring.GetCOBUnitVar(unitID, 0))
+	Move(turret, x_axis, x)
+	Move(turret, z_axis, z)
+	if Spring.GetCOBTeamVar(1, 3) == nil and Spring.GetCOBTeamVar(0, 64) == nil and Spring.GetCOBUnitVar(unitID + 1, 0) == nil then
+		Move(base, y_axis, 1)
+	end
+end
+"#,
+    );
+    assert_eq!(timeline.error, None, "{:?}", timeline.warnings);
+    let frame = &timeline.frames[1];
+    // base's y, then turret's x, y and z.
+    assert_eq!(
+        [frame[1], frame[6], frame[7], frame[8]],
+        [1.0, 5.0, 2.0, -7.0]
+    );
+}
+
+/// THIS sets a perk with `Spring.SetUnitCOBValue(u, 2048 + perk, 1)`. The
+/// wrapped functions keep a shared id in the rules params, so a converted
+/// script and `GetCOBTeamVar` both see it, and hand anything else, such as
+/// the heading `unit_turn.lua` sets, to the engine's function. The script
+/// stands in for the engine's two functions, counting the calls that reach
+/// them, because the preview has neither.
+#[test]
+fn the_polyfill_keeps_shared_ids_set_through_unit_cob_values() {
+    let timeline = with_polyfill(
+        r#"
+local base, turret = piece("base", "turret")
+local reached = 0
+Spring.GetUnitCOBValue = function(unitID, id) reached = reached + 1 return 7 end
+Spring.SetUnitCOBValue = function(unitID, id, value) reached = reached + 1 end
+include("lualibs/cob_vars.lua")
+function script.Create()
+	Spring.SetUnitCOBValue(unitID, 2049, 1)
+	Spring.SetUnitCOBValue(unitID, 82, 5)
+	local heading = Spring.GetUnitCOBValue(unitID, 82)
+	Spring.SetUnitCOBValue(unitID, 4096, 5 * 65536 + 65529)
+	local x, z = Spring.GetUnitCOBValue(unitID, true, 4096)
+	Spring.GetUnitCOBValue(unitID, 1025, -unitID, 3)
+	Move(turret, y_axis, Spring.GetUnitCOBValue(unitID, 2049) + Spring.GetCOBTeamVar(0, 1) + Spring.GetUnitCOBValue(unitID, 1025))
+	Move(turret, x_axis, x)
+	Move(turret, z_axis, z)
+	Move(base, y_axis, reached + heading)
+end
+"#,
+    );
+    assert_eq!(timeline.error, None, "{:?}", timeline.warnings);
+    let frame = &timeline.frames[1];
+    // turret: the perk read two ways plus the unit value set through a unit
+    // id, then the split position. base: the two calls with id 82 reached the
+    // engine's functions, and the heading they answered is 7.
+    assert_eq!(
+        [frame[7], frame[6], frame[8], frame[1]],
+        [5.0, 5.0, -7.0, 9.0]
+    );
 }

@@ -22,6 +22,10 @@ pub struct Conversion {
     /// Anything the Lua may do differently from the BOS, and any include that
     /// could not be found. Empty for a script that converted exactly.
     pub warnings: Vec<String>,
+    /// Whether the Lua keeps shared unit values as rules params. A game running
+    /// it also wants [`COB_VARS_POLYFILL`] if its gadgets or widgets set or
+    /// read them.
+    pub shared_values: bool,
 }
 
 pub struct Options<'a> {
@@ -47,6 +51,12 @@ pub const MODERN_LINEAR: i64 = 65536;
 /// `[1]` as Scriptor wrote it for Total Annihilation, two and a half elmos.
 /// Older Spring games, Expand and Exterminate among them, were built with it.
 pub const SCRIPTOR_LINEAR: i64 = 163840;
+
+/// `lualibs/cob_vars.lua`, which lets a game's gadgets and widgets set and
+/// read the shared unit values a converted script keeps as rules params. A
+/// game includes it from its own `LuaRules/main.lua`, `LuaRules/draw.lua` and
+/// `luaui.lua`.
+pub const COB_VARS_POLYFILL: &str = include_str!("cob_vars.lua");
 
 /// Which of the two linear scales a `.cob` was compiled with, judged by which
 /// one turns more of the BOS's `[x]` constants into numbers the `.cob` holds.
