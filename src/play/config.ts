@@ -55,6 +55,9 @@ export interface PlayTarget {
   /** Content root (`SPRING_DATADIR`). */
   dataDir: string;
   engineVersion: string;
+  /** The version the engine binary reported when it was verified. Absent until
+   *  then, when `engineVersion` is only the engine's folder name. */
+  syncVersion?: string;
 }
 
 /**
@@ -83,6 +86,7 @@ export function usePreferredTarget(): {
     executable: e.executable,
     dataDir: rootPath,
     engineVersion: e.syncVersion ?? e.version,
+    syncVersion: e.syncVersion,
   });
 
   // Preferred engine, else the first engine in any root.
@@ -229,6 +233,7 @@ export function useReplayTarget(demoVersion: string): {
     executable: e.executable,
     dataDir: rootPath,
     engineVersion: e.syncVersion ?? e.version,
+    syncVersion: e.syncVersion,
   });
 
   // Exact version match wins.

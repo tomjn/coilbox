@@ -30,6 +30,7 @@ import {
 } from "../../direct/reachability";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
+import { hostEngineVersion } from "./hostEngineVersion";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
 import { WindowsFirewall } from "./WindowsFirewall";
@@ -184,6 +185,7 @@ export function HostBattleForm({
     // leaves no route behind for the next reader to believe.
     recordHostingRoute(null);
     try {
+      const version = await hostEngineVersion(target);
       await onHost({
         battleType: 0,
         natType: NAT_TYPE_DIRECT,
@@ -199,7 +201,7 @@ export function HostBattleForm({
         rank: 0,
         maphash,
         engine: "spring",
-        version: target.engineVersion,
+        version,
         map: mapName,
         title: title.trim() || `${gameName} — hosted`,
         modname: gameName,

@@ -72,7 +72,7 @@ vi.mock("./useReachablePorts", () => ({
 
 vi.mock("../multiplayer/battles/useHostContent", () => ({
   useHostContent: () => ({
-    target: { engineVersion: "105.1.1" },
+    target: { engineVersion: "105.1.1", syncVersion: "105.1.1" },
     games: [{ name: "Beyond All Reason test-1234" }],
     maps: [{ name: "Red Comet" }],
     scanning: false,
