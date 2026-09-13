@@ -515,6 +515,53 @@ fn a_large_rules_parameter_rounds_through_a_float_the_way_the_engine_does() {
     assert_close(pose(&timeline, 0, "turret")[2], 16777216.0);
 }
 
+/// The engine's GetRulesParam answers no values at all for a parameter
+/// nobody set, not an explicit nil. `~= nil` cannot tell the two apart, but
+/// `select("#", ...)` can, and a script passing the answer straight to
+/// tonumber() without checking first is a script whose thread stops here.
+#[test]
+fn a_missing_rules_parameter_answers_no_values_rather_than_nil() {
+    let timeline = play(
+        r##"
+        function script.Create()
+            if select("#", Spring.GetGameRulesParam("never")) ~= 0 then
+                error("a parameter nobody set should answer no values")
+            end
+            Move(piece("turret"), y_axis, 1)
+        end
+        "##,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[1], 1.0);
+}
+
+/// The mistake `a_missing_rules_parameter_answers_no_values_rather_than_nil`
+/// guards against: a BOS `get` of a shared value nobody has `set` yet reads it
+/// through tonumber() with no values to convert, which is a Lua error, not 0.
+#[test]
+fn tonumber_of_a_missing_rules_parameter_stops_the_thread() {
+    let timeline = play(
+        r#"
+        function script.Create()
+            local value = tonumber(Spring.GetGameRulesParam("never"))
+        end
+        "#,
+        3,
+    );
+
+    assert_eq!(timeline.error, None);
+    assert!(
+        timeline
+            .warnings
+            .iter()
+            .any(|note| note.contains("tonumber")),
+        "{:?}",
+        timeline.warnings
+    );
+}
+
 /// What flove's flowers open with. None of it can move a piece, but a preview
 /// that stops on any of it shows nothing at all.
 #[test]

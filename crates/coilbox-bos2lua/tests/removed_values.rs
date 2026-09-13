@@ -165,13 +165,15 @@ fn with_polyfill_events(
 
 /// The converter and the polyfill agree on a unit, an allyteam and a game
 /// value together, not just the team and game pairing the other tests cover.
-/// The unit and game values are packed positions bigger than 2^24, so reading
-/// them back split must give the exact halves BOS packed, not a float's
-/// rounded approximation of the packed whole.
+/// 6619129 is 100 and -7 packed the way `Spring.SetUnitCOBValue` packs them,
+/// within the 2^24 a Recoil Lua float holds exactly. The get of 1025, never
+/// set, checks that a value nobody set still reads 0 rather than stopping the
+/// thread, which is what happened when GetRulesParam's answer was passed
+/// straight to tonumber().
 #[test]
 fn the_converter_and_the_polyfill_agree_on_a_unit_an_allyteam_and_a_game_value() {
     let conversion = convert_bos(
-        "piece base, turret;\n\nCreate()\n{\n\tset 1024 to 196609234;\n\tset 3073 to 9;\n\tset 4097 to 196609234;\n}\n",
+        "piece base, turret;\n\nCreate()\n{\n\tvar probe;\n\tprobe = get 1025;\n\tset 1024 to 6619129;\n\tset 3073 to 9;\n\tset 4097 to 6619129;\n\tmove base to z-axis probe now;\n}\n",
     );
     let lua = format!(
         "include(\"lualibs/cob_vars.lua\")\n\n{}\n\nfunction script.Activate()\n\tlocal ux, uz = Spring.GetCOBUnitVar(unitID, 0, true)\n\tlocal ally = Spring.GetCOBAllyTeamVar(0, 1)\n\tlocal gx, gz = Spring.GetCOBGlobalVar(1, true)\n\tMove(base, x_axis, gz)\n\tMove(base, y_axis, ally)\n\tMove(turret, x_axis, ux)\n\tMove(turret, y_axis, uz)\n\tMove(turret, z_axis, gx)\nend\n",
@@ -194,11 +196,12 @@ fn the_converter_and_the_polyfill_agree_on_a_unit_an_allyteam_and_a_game_value()
     let timeline = with_polyfill_events(&lua, &events, 5);
     assert_eq!(timeline.error, None, "{:?}", timeline.warnings);
     let frame = &timeline.frames[4];
-    // base: x is the game value's z half, y is the allyteam value.
+    // base: x is the game value's z half, y is the allyteam value, z is the
+    // never-set unit value 1025, which must still read 0.
     // turret: x is the unit value's x half, y its z half, z the game value's x half.
     assert_eq!(
-        [frame[0], frame[1], frame[6], frame[7], frame[8]],
-        [1234.0, 9.0, 3000.0, 1234.0, 3000.0]
+        [frame[0], frame[1], frame[2], frame[6], frame[7], frame[8]],
+        [-7.0, 9.0, 0.0, 100.0, -7.0, 100.0]
     );
 }
 
@@ -307,7 +310,7 @@ include("lualibs/cob_vars.lua")
 function script.Create()
 	Spring.SetUnitCOBValue(unitID, 2050, true)
 	local flag = Spring.GetUnitCOBValue(unitID, 2050)
-	Spring.SetUnitCOBValue(unitID, 4098, 3000, 1234)
+	Spring.SetUnitCOBValue(unitID, 4098, 100, -7)
 	local x, z = Spring.GetUnitCOBValue(unitID, true, 4098)
 	Move(turret, x_axis, x)
 	Move(turret, y_axis, z)
@@ -317,7 +320,7 @@ end
     );
     assert_eq!(timeline.error, None, "{:?}", timeline.warnings);
     let frame = &timeline.frames[1];
-    assert_eq!([frame[6], frame[7], frame[1]], [3000.0, 1234.0, 1.0]);
+    assert_eq!([frame[6], frame[7], frame[1]], [100.0, -7.0, 1.0]);
 }
 
 /// Neither can be brought back. The engine call stays, so the Lua does what the

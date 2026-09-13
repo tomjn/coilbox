@@ -1499,14 +1499,19 @@ fn install_spring(
         })?,
     )?;
 
+    // The engine's GetRulesParam answers no values at all for a parameter
+    // nobody set, not an explicit nil, so passing the answer straight to
+    // tonumber() without a `select("#", ...)` check first raises an error.
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitRulesParam",
         lua.create_function(move |lua, (unit, name): (Value, String)| {
             let sim = state.borrow();
             match sim.unit_rules.get(&name) {
-                Some(value) if is_the_unit(&unit) => value.to_value(lua),
-                _ => Ok(Value::Nil),
+                Some(value) if is_the_unit(&unit) => {
+                    Ok(MultiValue::from_iter([value.to_value(lua)?]))
+                }
+                _ => Ok(MultiValue::new()),
             }
         })?,
     )?;
@@ -1534,8 +1539,8 @@ fn install_spring(
         lua.create_function(move |lua, (team, name): (Option<i64>, String)| {
             let sim = state.borrow();
             match sim.team_rules.get(&name) {
-                Some(value) if team == Some(0) => value.to_value(lua),
-                _ => Ok(Value::Nil),
+                Some(value) if team == Some(0) => Ok(MultiValue::from_iter([value.to_value(lua)?])),
+                _ => Ok(MultiValue::new()),
             }
         })?,
     )?;
@@ -1559,8 +1564,8 @@ fn install_spring(
         lua.create_function(move |lua, name: String| {
             let sim = state.borrow();
             match sim.game_rules.get(&name) {
-                Some(value) => value.to_value(lua),
-                None => Ok(Value::Nil),
+                Some(value) => Ok(MultiValue::from_iter([value.to_value(lua)?])),
+                None => Ok(MultiValue::new()),
             }
         })?,
     )?;
