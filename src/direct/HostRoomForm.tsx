@@ -22,6 +22,7 @@ import {
   DEFAULT_HOST_PORT,
   type OpenBattleArgs,
 } from "../multiplayer/battles/HostBattleForm";
+import { hostEngineVersion } from "../multiplayer/battles/hostEngineVersion";
 import {
   hashFailureMessage,
   useHostContent,
@@ -142,6 +143,7 @@ export function HostRoomForm({
     // start leaves no route behind for the next reader to believe.
     recordHostingRoute(null);
     try {
+      const version = await hostEngineVersion(content.target);
       await onStart({
         host: trimmedName,
         port: Number(port),
@@ -188,7 +190,7 @@ export function HostRoomForm({
           rank: 0,
           maphash: content.maphash,
           engine: "spring",
-          version: content.target.engineVersion,
+          version,
           map: content.mapName,
           title: title.trim() || `${trimmedName}'s room`,
           modname: content.gameName,

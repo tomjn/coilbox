@@ -113,7 +113,12 @@ vi.mock("../../direct/reachability", async (importOriginal) => ({
 
 vi.mock("./useHostContent", () => ({
   useHostContent: () => ({
-    target: { engineVersion: "105.1.1", enginePath: "/e", dataDir: "/d" },
+    target: {
+      engineVersion: "105.1.1",
+      syncVersion: "105.1.1",
+      enginePath: "/e",
+      dataDir: "/d",
+    },
     games: [{ name: "Balanced Annihilation" }],
     maps: [{ name: "Comet Catcher Redux" }],
     scanning: false,
