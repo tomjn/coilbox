@@ -293,6 +293,33 @@ end
     );
 }
 
+/// The wrappers must accept what the engine's own `SetUnitCOBValue` and
+/// `GetUnitCOBValue` accept for a shared id: a boolean value with no extra
+/// argument, and two arguments packed into one value the way `PACKXZ` does.
+#[test]
+fn the_wrappers_accept_a_boolean_and_a_packed_position() {
+    let timeline = with_polyfill(
+        r#"
+local base, turret = piece("base", "turret")
+Spring.GetUnitCOBValue = function(unitID, id) return 7 end
+Spring.SetUnitCOBValue = function(unitID, id, value) end
+include("lualibs/cob_vars.lua")
+function script.Create()
+	Spring.SetUnitCOBValue(unitID, 2050, true)
+	local flag = Spring.GetUnitCOBValue(unitID, 2050)
+	Spring.SetUnitCOBValue(unitID, 4098, 3000, 1234)
+	local x, z = Spring.GetUnitCOBValue(unitID, true, 4098)
+	Move(turret, x_axis, x)
+	Move(turret, y_axis, z)
+	Move(base, y_axis, flag)
+end
+"#,
+    );
+    assert_eq!(timeline.error, None, "{:?}", timeline.warnings);
+    let frame = &timeline.frames[1];
+    assert_eq!([frame[6], frame[7], frame[1]], [3000.0, 1234.0, 1.0]);
+}
+
 /// Neither can be brought back. The engine call stays, so the Lua does what the
 /// COB does today, and the porter is told why the unit behaves differently.
 #[test]

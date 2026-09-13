@@ -36,9 +36,11 @@ local function signed16(value)
 end
 
 -- The value, or its two halves when asked to split it. The engine packed a map
--- position into one value as x * 65536 + z.
+-- position into one value as x * 65536 + z. A rules param answers a string for
+-- a value that would lose precision as a float, so this turns it back into a
+-- number.
 local function answer(value, split)
-	value = value or 0
+	value = tonumber(value) or 0
 	if split then
 		return signed16(floor(value / 65536)), signed16(value % 65536)
 	end
@@ -92,6 +94,16 @@ end
 
 local allied = { allied = true }
 
+-- A rules param keeps a number as a float, which only holds a whole number
+-- exactly up to 2^24. A packed map position is usually bigger than that, so
+-- this keeps anything outside the exact range as its decimal string instead.
+local function store(value)
+	if type(value) == "number" and value >= -16777216 and value <= 16777216 then
+		return value
+	end
+	return string.format("%d", value)
+end
+
 -- Which kind of shared value an id is, and the rules param it lives in, or
 -- nil for any other id.
 local function shared(id)
@@ -114,6 +126,13 @@ function Spring.SetUnitCOBValue(unitID, id, value, ...)
 	if kind == nil or not ValidUnitID(unitID) then
 		return SetUnitCOBValue(unitID, id, value, ...)
 	end
+	if select("#", ...) > 0 then
+		local z = ...
+		value = value * 65536 + (z % 65536)
+	elseif type(value) == "boolean" then
+		value = value and 1 or 0
+	end
+	value = store(value)
 	if kind == "unit" then
 		SetUnitRulesParam(unitID, name, value, allied)
 	elseif kind == "team" then
@@ -139,13 +158,19 @@ function Spring.GetUnitCOBValue(unitID, ...)
 	if kind == nil or not ValidUnitID(unitID) then
 		return GetUnitCOBValue(unitID, ...)
 	end
+	if type(p1) == "table" then
+		p1 = p1[1] * 65536 + (p1[2] % 65536)
+	end
+	if type(p2) == "table" then
+		p2 = p2[1] * 65536 + (p2[2] % 65536)
+	end
 	local value
 	if kind == "unit" then
 		p1 = p1 or 0
 		if p1 >= 0 then
 			value = GetUnitRulesParam(p1 == 0 and unitID or p1, name)
 		elseif ValidUnitID(-p1) then
-			SetUnitRulesParam(-p1, name, p2 or 0, allied)
+			SetUnitRulesParam(-p1, name, store(p2 or 0), allied)
 			value = 1
 		end
 	elseif kind == "game" then
