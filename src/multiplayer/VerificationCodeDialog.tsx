@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { agreementWantsCode } from "./agreement";
 import { useMultiplayer } from "./store";
 
 /**
@@ -15,7 +16,8 @@ import { useMultiplayer } from "./store";
  * verification-code handshake (`pendingAgreement`). Rendered inside
  * `MultiplayerProvider` so it appears on any route. It is deliberately sticky —
  * there's no close affordance and escape/outside clicks are ignored; the user
- * either confirms with the emailed code or explicitly disconnects.
+ * either confirms, with a code when the server emailed one, or explicitly
+ * disconnects.
  */
 export function VerificationCodeDialog() {
   const { pendingAgreement, submitAgreementCode, cancelAgreement } =
@@ -24,6 +26,9 @@ export function VerificationCodeDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = pendingAgreement != null;
+  // The field stays either way, so a server whose agreement is worded
+  // differently can still be given a code. It is only required when asked for.
+  const wantsCode = agreementWantsCode(pendingAgreement?.text ?? "");
 
   // Fresh field/error each time a new prompt appears.
   useEffect(() => {
@@ -63,10 +68,15 @@ export function VerificationCodeDialog() {
         className="sm:max-w-lg"
       >
         <DialogHeader>
-          <DialogTitle>Enter verification code</DialogTitle>
+          <DialogTitle>
+            {wantsCode
+              ? "Enter verification code"
+              : "Accept the server's terms"}
+          </DialogTitle>
           <DialogDescription>
-            The server sent a verification code to finish signing in. Enter it
-            below to continue.
+            {wantsCode
+              ? "The server sent a verification code to finish signing in. Enter it below to continue."
+              : "The server asks you to accept its terms before you sign in for the first time."}
           </DialogDescription>
         </DialogHeader>
         {pendingAgreement?.text ? (
@@ -86,7 +96,11 @@ export function VerificationCodeDialog() {
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="Verification code"
+            placeholder={
+              wantsCode
+                ? "Verification code"
+                : "Verification code, if you were sent one"
+            }
             autoFocus
             disabled={busy}
           />
@@ -100,8 +114,11 @@ export function VerificationCodeDialog() {
             >
               Disconnect
             </Button>
-            <Button type="submit" disabled={busy || code.trim() === ""}>
-              Confirm
+            <Button
+              type="submit"
+              disabled={busy || (wantsCode && code.trim() === "")}
+            >
+              {wantsCode ? "Confirm" : "Accept"}
             </Button>
           </DialogFooter>
         </form>

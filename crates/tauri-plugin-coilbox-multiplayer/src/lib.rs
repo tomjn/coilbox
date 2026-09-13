@@ -826,8 +826,8 @@ async fn open_zerok<R: Runtime>(
 }
 
 /// `mp_confirm_agreement` — resume a login parked awaiting the emailed verification
-/// code. Drives the connection's login machine to send `CONFIRMAGREEMENT [code]`
-/// and re-`LOGIN`. `code` is omitted for agreements that need no code.
+/// code. Drives the connection's login machine to send `CONFIRMAGREEMENT [code]`,
+/// and the server logs us in. `code` is omitted for agreements that need no code.
 #[tauri::command]
 fn mp_confirm_agreement(
     registry: State<'_, Registry>,

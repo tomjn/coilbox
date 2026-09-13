@@ -774,7 +774,7 @@ export const mpGetUserInfo = defineCommand<
 
 /**
  * Resume a login parked awaiting the emailed verification code: sends
- * `CONFIRMAGREEMENT [code]` and re-logs-in on the live connection. Omit `code` for
+ * `CONFIRMAGREEMENT [code]`, and the server logs the connection in. Omit `code` for
  * agreements that need none.
  */
 export const mpConfirmAgreement = defineCommand<

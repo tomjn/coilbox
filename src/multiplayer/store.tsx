@@ -2195,7 +2195,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const submitAgreementCode = useCallback(
     async (code: string) => {
       if (!pendingAgreement) return;
-      await mpConfirmAgreement({ serverKey: pendingAgreement.serverKey, code });
+      // No code at all rather than an empty one, which would go out as
+      // `CONFIRMAGREEMENT ` with a trailing space.
+      await mpConfirmAgreement({
+        serverKey: pendingAgreement.serverKey,
+        code: code || null,
+      });
       setPendingAgreement(null);
     },
     [pendingAgreement],

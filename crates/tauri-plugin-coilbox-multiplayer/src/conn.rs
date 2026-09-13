@@ -46,7 +46,7 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 /// task before the wire line is sent, keeping the task the single state writer;
 /// `Shutdown` requests a graceful logout (write `EXIT`, flush, then exit);
 /// `ConfirmAgreement` resumes a login parked awaiting the emailed verification
-/// code by driving the login machine (`CONFIRMAGREEMENT` + re-`LOGIN`).
+/// code by driving the login machine (`CONFIRMAGREEMENT`).
 /// `Tachyon` is an action with no wire line at all, carried out by the Tachyon
 /// task in [`crate::tachyon_conn`]. `Zerok` is an action turned into one of
 /// Zero-K's own commands by [`crate::zerok_conn`], which owns the types it is
