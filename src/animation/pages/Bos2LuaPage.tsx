@@ -18,10 +18,11 @@ Create()
 interface Converted {
   lua: string;
   warnings: string[];
+  cobVars: string | null;
   error: string | null;
 }
 
-const EMPTY: Converted = { lua: "", warnings: [], error: null };
+const EMPTY: Converted = { lua: "", warnings: [], cobVars: null, error: null };
 
 /**
  * BOS → Lua unit-script converter. Converts as you type through the Rust
@@ -33,7 +34,7 @@ export default function Bos2LuaPage() {
   const [bos, setBos] = useState("");
   const [fileName, setFileName] = useState("script.bos");
   const [converted, setConverted] = useState<Converted>(EMPTY);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"lua" | "cobVars" | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   // Only the newest conversion is shown, so a slow one for an older version
   // of the text cannot land on top of the current one.
@@ -46,9 +47,9 @@ export default function Bos2LuaPage() {
       return;
     }
     animBos2lua({ source: bos, name: fileName })
-      .then(({ lua, warnings }) => {
+      .then(({ lua, warnings, cobVars }) => {
         if (ticket === latest.current)
-          setConverted({ lua, warnings, error: null });
+          setConverted({ lua, warnings, cobVars, error: null });
       })
       .catch((error: unknown) => {
         if (ticket === latest.current) {
@@ -66,12 +67,12 @@ export default function Bos2LuaPage() {
     setBos(await file.text());
   }
 
-  async function copyLua() {
-    if (!converted.lua) return;
+  async function copy(text: string, which: "lua" | "cobVars") {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(converted.lua);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(text);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 1500);
     } catch {
       // The clipboard may be unavailable, and the textarea stays selectable.
     }
@@ -113,8 +114,13 @@ export default function Bos2LuaPage() {
             >
               <Upload /> Load .bos…
             </Button>
-            <Button size="sm" onClick={copyLua} disabled={!converted.lua}>
-              {copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy Lua"}
+            <Button
+              size="sm"
+              onClick={() => void copy(converted.lua, "lua")}
+              disabled={!converted.lua}
+            >
+              {copied === "lua" ? <Check /> : <Copy />}{" "}
+              {copied === "lua" ? "Copied" : "Copy Lua"}
             </Button>
           </>
         }
@@ -170,6 +176,35 @@ export default function Bos2LuaPage() {
                 <li key={warning}>{warning}</li>
               ))}
             </ul>
+          )}
+          {converted.cobVars && (
+            <section
+              aria-labelledby="cob-vars-heading"
+              className="flex flex-col gap-2 rounded-md border border-border p-3 text-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h2 id="cob-vars-heading" className="text-sm font-medium">
+                  Add <code>lualibs/cob_vars.lua</code> to the game
+                </h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void copy(converted.cobVars ?? "", "cobVars")}
+                >
+                  {copied === "cobVars" ? <Check /> : <Copy />}{" "}
+                  {copied === "cobVars" ? "Copied" : "Copy file"}
+                </Button>
+              </div>
+              <p className="text-muted-foreground">
+                This script shares values with other units, and keeps them as
+                rules params. The file lets the game's gadgets and widgets set
+                and read them through <code>Spring.SetUnitCOBValue</code>,{" "}
+                <code>Spring.GetCOBTeamVar</code> and their siblings. Put{" "}
+                <code>VFS.Include("lualibs/cob_vars.lua")</code> on the first
+                line of <code>LuaRules/main.lua</code>,{" "}
+                <code>LuaRules/draw.lua</code> and <code>luaui.lua</code>.
+              </p>
+            </section>
           )}
         </div>
       </div>
