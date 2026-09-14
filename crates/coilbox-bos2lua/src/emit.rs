@@ -955,6 +955,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             lua,
             warnings: self.warnings,
             shared_values: self.helpers.contains("cobAllied"),
+            missing_includes: self.p.pre.missing.clone(),
         }
     }
 

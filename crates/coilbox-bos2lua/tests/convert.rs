@@ -360,6 +360,13 @@ fn a_failed_conversion_names_the_includes_it_was_not_given() {
 #[test]
 fn a_missing_include_is_said_and_the_engine_s_names_stand_in() {
     let conversion = convert_with(WALKER, &HashMap::new(), MODERN_LINEAR);
+    assert_eq!(
+        conversion.missing_includes,
+        ["flags.h", "animations/stride.bos"]
+    );
+    assert!(convert_with(WALKER, &includes(), MODERN_LINEAR)
+        .missing_includes
+        .is_empty());
     assert!(
         conversion.warnings.iter().any(|w| w.contains("flags.h")),
         "{:?}",

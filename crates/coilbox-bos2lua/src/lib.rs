@@ -26,6 +26,10 @@ pub struct Conversion {
     /// it also wants [`COB_VARS_POLYFILL`] if its gadgets or widgets set or
     /// read them.
     pub shared_values: bool,
+    /// The includes that could not be found, as the script names them. Each
+    /// is also a warning. A caller with no way to supply them, such as a
+    /// pasted script, can treat any as a failure.
+    pub missing_includes: Vec<String>,
 }
 
 pub struct Options<'a> {

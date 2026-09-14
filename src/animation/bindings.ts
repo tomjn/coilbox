@@ -68,6 +68,7 @@ export const animBos2cob = defineCommand<
  * `cob` is the compiled script beside the source, when there is one, which
  * settles how long `[1]` is: Scriptor, which built the older games, made it two
  * and a half elmos. `warnings` is anything the Lua may do differently.
+ * `missingIncludes` names each `#include` that was not among `includes`.
  */
 export const animBos2lua = defineCommand<
   {
@@ -82,5 +83,6 @@ export const animBos2lua = defineCommand<
     warnings: string[];
     linearScale: number;
     cobVars: string | null;
+    missingIncludes: string[];
   }
 >("coilbox-anim", "anim_bos2lua");

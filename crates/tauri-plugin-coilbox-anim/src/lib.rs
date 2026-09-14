@@ -198,6 +198,7 @@ async fn anim_bos2lua(
             "cobVars": conversion
                 .shared_values
                 .then_some(coilbox_bos2lua::COB_VARS_POLYFILL),
+            "missingIncludes": conversion.missing_includes,
         })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("conversion task failed: {e}")),
