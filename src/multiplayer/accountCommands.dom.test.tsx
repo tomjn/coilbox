@@ -339,7 +339,7 @@ describe("account commands", () => {
   it("leaves the connection open on a refused code so a retry still reaches the binding", async () => {
     const { result, emit } = await renderRecovery();
 
-    let firstAttempt!: Promise<{ username: string }>;
+    let firstAttempt!: Promise<{ username: string | null }>;
     act(() => {
       firstAttempt = result.current.submitRecoveryCode(RECOVERY_KEY, "000000");
     });
@@ -358,7 +358,7 @@ describe("account commands", () => {
     await firstRejects;
     expect(wire.disconnected).not.toContain(RECOVERY_KEY);
 
-    let secondAttempt!: Promise<{ username: string }>;
+    let secondAttempt!: Promise<{ username: string | null }>;
     act(() => {
       secondAttempt = result.current.submitRecoveryCode(RECOVERY_KEY, "111111");
     });
@@ -380,10 +380,28 @@ describe("account commands", () => {
     expect(wire.disconnected).toContain(RECOVERY_KEY);
   });
 
+  // uberserver aborts the connection straight after a good code, throwing away
+  // the `RESETPASSWORDACCEPTED` it had queued, so the reset reaches us as a
+  // drop. The password has been reset and emailed by then, so this must not
+  // reject as a failure.
+  it("resolves with no username when the server drops the connection after the code", async () => {
+    const { result, emit } = await renderRecovery();
+
+    let attempt!: Promise<{ username: string | null }>;
+    act(() => {
+      attempt = result.current.submitRecoveryCode(RECOVERY_KEY, "12345678");
+    });
+    await act(async () => {});
+    await emit({ kind: "disconnected", reason: "connection reset by peer" });
+
+    await expect(attempt).resolves.toEqual({ username: null });
+    expect(wire.disconnected).toContain(RECOVERY_KEY);
+  });
+
   it("cancelRecovery closes a connection a refused code left open", async () => {
     const { result, emit } = await renderRecovery();
 
-    let attempt!: Promise<{ username: string }>;
+    let attempt!: Promise<{ username: string | null }>;
     act(() => {
       attempt = result.current.submitRecoveryCode(RECOVERY_KEY, "000000");
     });

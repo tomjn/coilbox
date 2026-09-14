@@ -62,7 +62,7 @@ function renderForm({
 }: {
   servers?: LobbyServer[];
   start?: RecoveryStart;
-  submit?: { username: string };
+  submit?: { username: string | null };
 } = {}) {
   if (start) mp.recoverPassword.mockResolvedValue(start);
   if (submit) mp.submitRecoveryCode.mockResolvedValue(submit);
@@ -114,6 +114,25 @@ it("shows the username the server returned", async () => {
   typeInto(await screen.findByLabelText("Code"), "12345678");
   fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
   expect(await screen.findByText("alice")).toBeTruthy();
+});
+
+/**
+ * uberserver aborts the connection right after a good code, before its answer
+ * goes out, so the reset arrives with no username. The new password is in the
+ * email by then, and saying the reset failed sent the user who found this
+ * looking for a problem that was not there.
+ */
+it("sends the user to their email when the server closed without answering", async () => {
+  renderForm({
+    start: { kind: "codeSent", serverKey: "k" },
+    submit: { username: null },
+  });
+  typeInto(screen.getByLabelText("Email"), "a@b.c");
+  fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+  typeInto(await screen.findByLabelText("Code"), "12345678");
+  fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+  expect(await screen.findByText(/Check your email/)).toBeTruthy();
+  expect(screen.queryByText(/Error/)).toBeNull();
 });
 
 it("does not offer servers whose protocol has no recovery", () => {

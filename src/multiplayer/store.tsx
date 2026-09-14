@@ -591,11 +591,15 @@ interface MultiplayerContextValue {
    * reason on a wrong code, but leaves the connection live for a retry
    * (uberserver allows three attempts) rather than disconnecting. Call
    * `cancelRecovery` to close it if the user gives up instead.
+   *
+   * Resolves with a null username when the server closed the connection
+   * without answering, which uberserver does after a good code. See the
+   * implementation for why.
    */
   submitRecoveryCode: (
     serverKey: string,
     code: string,
-  ) => Promise<{ username: string }>;
+  ) => Promise<{ username: string | null }>;
   /**
    * Close a recovery connection left open by a refused code, for when the
    * user abandons the flow rather than retrying. Safe to call on a
@@ -2012,8 +2016,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // recovery code." `cancelRecovery` is what closes it if the user gives up
   // instead of retrying.
   //
-  // Any other terminal failure (the connection dropping outright) still
-  // disconnects, since there is nothing left to talk to.
+  // The connection closing after the code went out resolves with no username
+  // rather than rejecting. uberserver resets the password, emails it, queues
+  // `RESETPASSWORDACCEPTED` and then aborts the connection, which throws the
+  // queued line away, so a good code arrives as a dropped connection. A wrong
+  // code is answered and leaves the connection open, so a drop here is almost
+  // always the reset having worked.
   const submitRecoveryCode = useCallback(
     async (serverKey: string, code: string) => {
       const onEvent = recoveryChannelsRef.current.get(serverKey);
@@ -2021,27 +2029,29 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       setBusy(true);
       let disconnect = true;
       try {
-        return await new Promise<{ username: string }>((resolve, reject) => {
-          let settled = false;
-          onEvent.onmessage = (ev) => {
-            if (settled) return;
-            if (ev.kind === "delta" && ev.delta.kind === "passwordReset") {
-              settled = true;
-              resolve({ username: ev.delta.username });
-            } else if (
-              ev.kind === "delta" &&
-              ev.delta.kind === "recoveryDenied"
-            ) {
-              settled = true;
-              disconnect = false;
-              reject(new Error(ev.delta.reason));
-            } else if (ev.kind === "disconnected") {
-              settled = true;
-              reject(new Error(ev.reason ?? "Account recovery failed"));
-            }
-          };
-          mpSubmitRecoveryCode({ serverKey, code }).catch(reject);
-        });
+        return await new Promise<{ username: string | null }>(
+          (resolve, reject) => {
+            let settled = false;
+            onEvent.onmessage = (ev) => {
+              if (settled) return;
+              if (ev.kind === "delta" && ev.delta.kind === "passwordReset") {
+                settled = true;
+                resolve({ username: ev.delta.username });
+              } else if (
+                ev.kind === "delta" &&
+                ev.delta.kind === "recoveryDenied"
+              ) {
+                settled = true;
+                disconnect = false;
+                reject(new Error(ev.delta.reason));
+              } else if (ev.kind === "disconnected") {
+                settled = true;
+                resolve({ username: null });
+              }
+            };
+            mpSubmitRecoveryCode({ serverKey, code }).catch(reject);
+          },
+        );
       } finally {
         if (disconnect) {
           recoveryChannelsRef.current.delete(serverKey);
