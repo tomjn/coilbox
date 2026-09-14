@@ -321,6 +321,26 @@ fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
     assert_eq!(timeline.error, None);
 }
 
+/// The loops run as the `.cob` THIS compiled them to runs them: the first
+/// clause once, the test before every pass, and the last clause after the body.
+#[test]
+fn for_loops_run_as_the_compiled_script_runs_them() {
+    let source = "piece base, arm, tip;\n\nCreate()\n{\n\tvar i, total;\n\ttotal = 0;\n\tfor (i = 0; i < 4; ++i) {\n\t\ttotal = total + [1];\n\t}\n\tmove base to y-axis total now;\n\tfor (i = 0; i < 2; sleep 100) ++i;\n\tmove arm to y-axis i * [1] now;\n\tfor (i = 5; i < 5; ++i) move arm to y-axis [9] now;\n\ti = 0;\n\tfor (;;) {\n\t\t++i;\n\t\tif (i == 3) {\n\t\t\tmove tip to y-axis i * [1] now;\n\t\t\treturn;\n\t\t}\n\t}\n}\n\nStop()\n{\n\tvar i;\n\tfor (i = 0; i < 4; ++i) {\n\t\treturn;\n\t}\n}\n";
+    let lua = convert_with(source, &HashMap::new(), MODERN_LINEAR).lua;
+    let pieces = pieces_of(&lua);
+    let timeline = run(
+        &lua,
+        "loops.lua",
+        &Unit::new(&pieces),
+        &[event(0, "Create", &[])],
+        30,
+    );
+    assert_eq!(timeline.error, None, "{lua}");
+    let last = timeline.frames.last().unwrap();
+    let y = |name: &str| last[pieces.iter().position(|p| p == name).unwrap() * 6 + 1];
+    assert_eq!((y("base"), y("arm"), y("tip")), (4.0, 2.0, 3.0), "{lua}");
+}
+
 #[test]
 fn a_failed_conversion_names_the_includes_it_was_not_given() {
     let err = convert(

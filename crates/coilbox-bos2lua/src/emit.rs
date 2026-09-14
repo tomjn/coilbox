@@ -534,7 +534,8 @@ fn exprs_in(k: &StmtKind) -> Vec<&Expr> {
         | StmtKind::EmitSfx(e, _)
         | StmtKind::PlaySound(_, e)
         | StmtKind::If { cond: e, .. }
-        | StmtKind::While { cond: e, .. } => vec![e],
+        | StmtKind::While { cond: e, .. }
+        | StmtKind::For { cond: Some(e), .. } => vec![e],
         StmtKind::Set(a, b) | StmtKind::AttachUnit(a, b) => vec![a, b],
         StmtKind::Call(_, args) | StmtKind::Start(_, args) => args.iter().collect(),
         StmtKind::Return(Some(e)) => vec![e],
@@ -589,6 +590,14 @@ fn walk<'s>(stmts: &'s [Stmt], f: &mut impl FnMut(&'s StmtKind)) {
                 }
             }
             StmtKind::While { body, .. } | StmtKind::Block(body, _) => walk(body, f),
+            StmtKind::For {
+                init, step, body, ..
+            } => {
+                for clause in [init, step].into_iter().flatten() {
+                    walk(std::slice::from_ref(clause.as_ref()), f);
+                }
+                walk(body, f);
+            }
             _ => {}
         }
     }
@@ -2103,6 +2112,43 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.indent += 1;
                 self.block(body);
                 self.comments(tail);
+                self.indent -= 1;
+                self.code("end", t);
+            }
+            // A `while` with the step last in its body is the loop exactly, since
+            // BOS has no `break` or `continue` to skip the step. A Lua numeric
+            // `for` is not: it reads its limit once and ignores a body that
+            // changes the counter.
+            StmtKind::For {
+                init,
+                cond,
+                step,
+                body,
+                tail,
+            } => {
+                if let Some(init) = init {
+                    self.stmt(init, false);
+                }
+                let c = match cond {
+                    Some(cond) => self.cond(cond).text,
+                    None => "true".into(),
+                };
+                self.code(&format!("while {c} do"), &None);
+                self.indent += 1;
+                match step {
+                    // Nothing in the body is last, because the step follows it.
+                    Some(step) => {
+                        for s in body {
+                            self.stmt(s, false);
+                        }
+                        self.comments(tail);
+                        self.stmt(step, false);
+                    }
+                    None => {
+                        self.block(body);
+                        self.comments(tail);
+                    }
+                }
                 self.indent -= 1;
                 self.code("end", t);
             }
