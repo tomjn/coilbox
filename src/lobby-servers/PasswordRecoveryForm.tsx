@@ -110,6 +110,29 @@ export function PasswordRecoveryForm({
     onCancel();
   };
 
+  // The server closed the connection instead of answering, which is how a good
+  // code ends on uberserver (see `submitRecoveryCode`). The email it sends names
+  // the account, so that is where to look.
+  if (stage === "done" && !username) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm">
+          Check your email. The server usually closes the connection like this
+          once it has reset your password, and it emails you the new password
+          with your username.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          If nothing arrives, start again and ask for a new code.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" size="sm" onClick={onCancel}>
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (stage === "done" && username) {
     return (
       <div className="flex flex-col gap-3">
