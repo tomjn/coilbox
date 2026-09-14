@@ -37,6 +37,13 @@ pub enum ItemKind {
     Define(String),
     IncludeStart(String),
     IncludeEnd,
+    /// An assignment outside any function, as written. A `.cob` holds nothing
+    /// but functions, so the compiler drops it and it never runs. THIS's header
+    /// has two.
+    Stray {
+        text: String,
+        line: u32,
+    },
     /// Comments with nothing after them before the next item or the end.
     Comments,
 }
@@ -386,6 +393,21 @@ impl<'t> Parser<'t> {
                     self.sym("-")?;
                     self.word("var")?;
                     ItemKind::Statics(self.names(";")?)
+                }
+                Kind::Ident if self.peek_at(1).is_some_and(|n| n.is_sym("=")) => {
+                    let line = t.line;
+                    let mut words = Vec::new();
+                    loop {
+                        let t = self.next()?;
+                        words.push(t.text.as_str());
+                        if t.is_sym(";") {
+                            break;
+                        }
+                    }
+                    ItemKind::Stray {
+                        text: words.join(" ").replace(" ;", ";"),
+                        line,
+                    }
                 }
                 Kind::Ident => ItemKind::Func(self.func()?),
                 _ => return Err(self.error(t, "a piece, static-var or function")),
@@ -951,6 +973,18 @@ mod tests {
     fn says_where_it_stopped_understanding() {
         let err = parse(&lex("F() {\n turn a;\n}", 0), 65536).unwrap_err();
         assert!(err.contains("line 2"), "{err}");
+    }
+
+    #[test]
+    fn an_assignment_outside_any_function_is_kept_aside() {
+        let items = items("static-var v;\nv = 1000;\nF() { }");
+        assert!(matches!(items[0].kind, ItemKind::Statics(_)));
+        assert!(
+            matches!(&items[1].kind, ItemKind::Stray { text, line: 2 } if text == "v = 1000;"),
+            "{:?}",
+            items[1].kind
+        );
+        assert!(matches!(items[2].kind, ItemKind::Func(_)));
     }
 
     #[test]

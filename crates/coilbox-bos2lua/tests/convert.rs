@@ -286,6 +286,57 @@ fn a_script_too_big_for_lua_s_locals_still_loads() {
     assert_eq!(timeline.error, None);
 }
 
+/// The shape of THIS's `THIS.h`: a multi-line macro with arguments that writes
+/// whole functions, and assignments sitting outside any function.
+const TRAIL_HEADER: &str = "static-var isMoving, fireStealthTime;\r\n\r\nfireStealthTime = 1000;\r\n\r\nlua_AddTrail() {\r\n\treturn 0;\r\n}\r\n\r\n#define TRAIL(p,width,ttl,rate) static-var EngineEnabled;\\\r\n\\\r\nMoveRate1() {\\\r\n\tisMoving = 1;\\\r\n\tif (!EngineEnabled) {\\\r\n\t\tcall-script lua_AddTrail(p,width,ttl,rate);\\\r\n\t\tEngineEnabled=1;\\\r\n\t}\\\r\n}\r\n";
+
+const TRAIL_SCRIPT: &str = "piece base;\r\n\r\n#include \"THIS.h\"\r\n\r\nTRAIL(base,1,1,1)\t//fake trail\r\n\r\nCreate() {\r\n\tsleep fireStealthTime;\r\n}\r\n";
+
+#[test]
+fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
+    let includes = HashMap::from([("scripts/THIS.h".to_string(), TRAIL_HEADER.to_string())]);
+    let conversion = convert(
+        TRAIL_SCRIPT,
+        &Options {
+            name: "scripts/comet.bos",
+            includes: &includes,
+            pieces: None,
+            linear_scale: MODERN_LINEAR,
+        },
+    )
+    .unwrap();
+    let lua = &conversion.lua;
+    // A piece handed over as a number is numbered as BOS numbers it.
+    assert!(lua.contains("lua_AddTrail(base - 1, 1, 1, 1)"), "{lua}");
+    assert!(
+        conversion
+            .warnings
+            .iter()
+            .any(|w| w.contains("THIS.h line 3") && w.contains("fireStealthTime = 1000;")),
+        "{:?}",
+        conversion.warnings
+    );
+    let events = [event(0, "Create", &[]), event(5, "StartMoving", &[])];
+    let timeline = run(lua, "comet.lua", &Unit::new(&pieces_of(lua)), &events, 20);
+    assert_eq!(timeline.error, None);
+}
+
+#[test]
+fn a_failed_conversion_names_the_includes_it_was_not_given() {
+    let err = convert(
+        TRAIL_SCRIPT,
+        &Options {
+            name: "scripts/comet.bos",
+            includes: &HashMap::new(),
+            pieces: None,
+            linear_scale: MODERN_LINEAR,
+        },
+    )
+    .err()
+    .unwrap();
+    assert!(err.contains("THIS.h"), "{err}");
+}
+
 #[test]
 fn a_missing_include_is_said_and_the_engine_s_names_stand_in() {
     let conversion = convert_with(WALKER, &HashMap::new(), MODERN_LINEAR);

@@ -6,7 +6,9 @@
 //! number, such as `#define SIG_AIM 2`, is kept as a name so the Lua can declare
 //! it once and read the same way the BOS did. Anything else, such as
 //! `#define ANIM_VARIABLE Moving`, is pasted in where it is used, because that
-//! is the only thing it can mean.
+//! is the only thing it can mean. So is a macro with arguments, such as THIS's
+//! `#define TRAIL(p,width,ttl,rate)`, with each use's arguments put in place
+//! of its parameters.
 //!
 //! A name defined twice with different values cannot be one Lua local, so every
 //! use of it is pasted in instead. Knowing that takes a first pass over the
@@ -34,6 +36,10 @@ pub struct Output {
     /// The ones something actually used.
     pub used: HashSet<String>,
     pub warnings: Vec<String>,
+    /// The name of each file a token's `file` index stands for.
+    pub files: Vec<String>,
+    /// The includes that could not be found, as the script names them.
+    pub missing: Vec<String>,
 }
 
 const MAX_INCLUDE_DEPTH: usize = 16;
@@ -59,11 +65,15 @@ pub fn preprocess(source: &str, name: &str, resolve: &Resolver, linear: i64) -> 
         constants: second.constants,
         used: second.used,
         warnings: second.warnings,
+        files: second.files,
+        missing: second.missing,
     }
 }
 
 struct Macro {
     body: Vec<Token>,
+    /// The parameter names of a macro with arguments, `None` for one without.
+    params: Option<Vec<String>>,
     builtin: bool,
 }
 
@@ -87,6 +97,7 @@ struct Pre<'r, 'a> {
     constants: HashMap<String, Constant>,
     used: HashSet<String>,
     warnings: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl<'r, 'a> Pre<'r, 'a> {
@@ -98,6 +109,7 @@ impl<'r, 'a> Pre<'r, 'a> {
                     name.to_string(),
                     Macro {
                         body: lex(body, 0),
+                        params: None,
                         builtin: true,
                     },
                 )
@@ -115,6 +127,7 @@ impl<'r, 'a> Pre<'r, 'a> {
             constants: HashMap::new(),
             used: HashSet::new(),
             warnings: Vec::new(),
+            missing: Vec::new(),
         }
     }
 
@@ -126,11 +139,15 @@ impl<'r, 'a> Pre<'r, 'a> {
         let file = self.files.len();
         self.files.push(name.to_string());
         let open = self.conds.len();
-        for token in lex(source, file) {
+        let tokens = lex(source, file);
+        let mut i = 0;
+        while i < tokens.len() {
+            let token = tokens[i].clone();
+            i += 1;
             match token.kind {
                 Kind::Directive => self.directive(&token, name, depth),
                 _ if !self.active() => {}
-                Kind::Ident => self.expand(token, &mut Vec::new()),
+                Kind::Ident => i += self.expand(token, &tokens[i..], &mut Vec::new()),
                 _ => self.out.push(token),
             }
         }
@@ -210,27 +227,42 @@ impl<'r, 'a> Pre<'r, 'a> {
         if name.kind != Kind::Ident {
             return;
         }
-        let after_name = token.text[token.text.find(&name.text).unwrap_or(0) + name.text.len()..]
-            .chars()
-            .next();
-        if after_name == Some('(') {
-            self.warnings.push(format!(
-                "{file_name} line {}: {} takes arguments, which BOS macros cannot, so its uses are pasted in as written.",
-                token.line, name.text
-            ));
-        }
-        let body: Vec<Token> = rest[1..]
+        // Looked for after the word `define`, which a name such as `fine` is in.
+        let from = token.text.find(char::is_whitespace).unwrap_or(0);
+        let after_name = token.text[from..]
+            .find(&name.text)
+            .and_then(|at| token.text[from + at + name.text.len()..].chars().next());
+        // As in C, a parenthesis straight after the name, with no space, starts
+        // the parameters. With a space it is the start of the body.
+        let (params, body_at) = if after_name == Some('(') {
+            match parameters(&rest[1..]) {
+                Some((params, read)) => (Some(params), 1 + read),
+                None => {
+                    self.warnings.push(format!(
+                        "{file_name} line {}: could not read the arguments {} takes, so it was skipped.",
+                        token.line, name.text
+                    ));
+                    return;
+                }
+            }
+        } else {
+            (None, 1)
+        };
+        let body: Vec<Token> = rest[body_at..]
             .iter()
             .map(|t| Token {
                 line: token.line,
                 ..t.clone()
             })
             .collect();
-        let text = body
+        let mut text = body
             .iter()
             .map(|t| t.text.as_str())
             .collect::<Vec<_>>()
             .join(" ");
+        if let Some(params) = &params {
+            text = format!("({}) {text}", params.join(","));
+        }
         self.bodies
             .entry(name.text.clone())
             .or_default()
@@ -239,6 +271,7 @@ impl<'r, 'a> Pre<'r, 'a> {
             name.text.clone(),
             Macro {
                 body,
+                params,
                 builtin: false,
             },
         );
@@ -284,6 +317,7 @@ impl<'r, 'a> Pre<'r, 'a> {
                 "{file_name} line {}: could not find {wanted}, so anything it defines is missing.",
                 token.line
             ));
+            self.missing.push(wanted);
             return;
         };
         // The marks carry the included file's index rather than the
@@ -301,14 +335,17 @@ impl<'r, 'a> Pre<'r, 'a> {
     }
 
     /// Paste in a macro, or keep it as a name if it is a constant.
-    fn expand(&mut self, token: Token, stack: &mut Vec<String>) {
+    ///
+    /// `after` is what follows the name, which is where a macro with arguments
+    /// finds them. Returns how many of those tokens it read.
+    fn expand(&mut self, token: Token, after: &[Token], stack: &mut Vec<String>) -> usize {
         let Some(m) = self.defs.get(&token.text) else {
             self.out.push(token);
-            return;
+            return 0;
         };
         if stack.contains(&token.text) || stack.len() > MAX_EXPANSION_DEPTH {
             self.out.push(token);
-            return;
+            return 0;
         }
         if !m.builtin && self.constant(&token.text, &mut Vec::new()).is_some() {
             self.mark_used(&token.text);
@@ -316,23 +353,56 @@ impl<'r, 'a> Pre<'r, 'a> {
                 kind: Kind::Const,
                 ..token
             });
-            return;
+            return 0;
         }
-        let body = m.body.clone();
-        stack.push(token.text.clone());
-        for t in body {
-            let t = Token {
+        let (body, read) = match m.params.clone() {
+            None => (m.body.clone(), 0),
+            // As in C, the name alone, with no arguments after it, is just a name.
+            Some(params) => {
+                let Some((mut args, read)) = arguments(after) else {
+                    self.out.push(token);
+                    return 0;
+                };
+                // `F()` is one empty argument, or none for a macro taking none.
+                if params.is_empty() && args.len() == 1 && args[0].is_empty() {
+                    args.clear();
+                }
+                if args.len() != params.len() {
+                    self.warnings.push(format!(
+                        "{} line {}: {} takes {} arguments and was given {}, so it was left as written.",
+                        self.files[token.file],
+                        token.line,
+                        token.text,
+                        params.len(),
+                        args.len()
+                    ));
+                    self.out.push(token);
+                    return 0;
+                }
+                (substitute(&m.body, &params, &args), read)
+            }
+        };
+        let body: Vec<Token> = body
+            .into_iter()
+            .map(|t| Token {
                 line: token.line,
                 file: token.file,
                 ..t
-            };
+            })
+            .collect();
+        stack.push(token.text.clone());
+        let mut i = 0;
+        while i < body.len() {
+            let t = body[i].clone();
+            i += 1;
             if t.kind == Kind::Ident {
-                self.expand(t, stack);
+                i += self.expand(t, &body[i..], stack);
             } else {
                 self.out.push(t);
             }
         }
         stack.pop();
+        read
     }
 
     fn mark_used(&mut self, name: &str) {
@@ -358,7 +428,7 @@ impl<'r, 'a> Pre<'r, 'a> {
             return None;
         }
         let m = self.defs.get(name)?;
-        if m.builtin || m.body.is_empty() {
+        if m.builtin || m.params.is_some() || m.body.is_empty() {
             return None;
         }
         seen.push(name.to_string());
@@ -422,7 +492,7 @@ impl<'r, 'a> Pre<'r, 'a> {
 
     fn paste(&self, token: &Token, out: &mut Vec<Token>, stack: &mut Vec<String>) {
         match self.defs.get(&token.text) {
-            Some(m) if !stack.contains(&token.text) => {
+            Some(m) if m.params.is_none() && !stack.contains(&token.text) => {
                 stack.push(token.text.clone());
                 for t in &m.body {
                     if t.kind == Kind::Ident {
@@ -436,6 +506,85 @@ impl<'r, 'a> Pre<'r, 'a> {
             _ => out.push(token.clone()),
         }
     }
+}
+
+/// The names between the parentheses of `#define NAME(a, b)`, starting at the
+/// opening one, and how many tokens that took.
+fn parameters(tokens: &[Token]) -> Option<(Vec<String>, usize)> {
+    if !tokens.first()?.is_sym("(") {
+        return None;
+    }
+    if tokens.get(1)?.is_sym(")") {
+        return Some((Vec::new(), 2));
+    }
+    let mut params = Vec::new();
+    let mut i = 1;
+    loop {
+        let name = tokens.get(i).filter(|t| t.kind == Kind::Ident)?;
+        params.push(name.text.clone());
+        let next = tokens.get(i + 1)?;
+        i += 2;
+        if next.is_sym(")") {
+            return Some((params, i));
+        }
+        if !next.is_sym(",") {
+            return None;
+        }
+    }
+}
+
+/// The arguments of a use of a macro with arguments: the tokens between the
+/// parentheses that follow its name, split at the commas outside any inner
+/// parentheses, and how many tokens that took. `None` when no parenthesis
+/// follows, or one is never closed. Comments among them are dropped.
+fn arguments(tokens: &[Token]) -> Option<(Vec<Vec<Token>>, usize)> {
+    let mut i = 0;
+    while tokens.get(i)?.is_comment() {
+        i += 1;
+    }
+    if !tokens[i].is_sym("(") {
+        return None;
+    }
+    i += 1;
+    let mut args = vec![Vec::new()];
+    let mut depth = 0;
+    loop {
+        let t = tokens.get(i)?;
+        i += 1;
+        match t.kind {
+            Kind::Directive => return None,
+            Kind::Comment { .. } => continue,
+            _ => {}
+        }
+        if t.is_sym(")") && depth == 0 {
+            return Some((args, i));
+        }
+        if t.is_sym(",") && depth == 0 {
+            args.push(Vec::new());
+            continue;
+        }
+        if t.is_sym("(") {
+            depth += 1;
+        } else if t.is_sym(")") {
+            depth -= 1;
+        }
+        args.last_mut()?.push(t.clone());
+    }
+}
+
+/// A macro's body with each parameter replaced by its argument.
+fn substitute(body: &[Token], params: &[String], args: &[Vec<Token>]) -> Vec<Token> {
+    body.iter()
+        .flat_map(|t| {
+            let at = (t.kind == Kind::Ident)
+                .then(|| params.iter().position(|p| *p == t.text))
+                .flatten();
+            match at {
+                Some(at) => args[at].clone(),
+                None => vec![t.clone()],
+            }
+        })
+        .collect()
 }
 
 fn number(text: &str) -> Token {
@@ -684,5 +833,44 @@ mod tests {
         let out = run("#include \"nowhere.h\"\npiece p;", &[]);
         assert!(out.warnings[0].contains("nowhere.h"), "{:?}", out.warnings);
         assert_eq!(code(&out), ["piece", "p", ";"]);
+    }
+
+    #[test]
+    fn a_macro_with_arguments_pastes_them_in() {
+        let out = run(
+            "#define TRAIL(p,rate) call-script add(p,rate);\nTRAIL(base, get PIECE_XZ(1, 2) + 3)",
+            &[],
+        );
+        assert_eq!(
+            code(&out),
+            [
+                "call", "-", "script", "add", "(", "base", ",", "get", "PIECE_XZ", "(", "1", ",",
+                "2", ")", "+", "3", ")", ";"
+            ]
+        );
+        assert!(out.warnings.is_empty(), "{:?}", out.warnings);
+    }
+
+    #[test]
+    fn a_macro_with_arguments_named_without_them_is_left_alone() {
+        let out = run("#define F(a) a\nx = F;", &[]);
+        assert_eq!(code(&out), ["x", "=", "F", ";"]);
+    }
+
+    #[test]
+    fn arguments_and_bodies_can_use_other_macros() {
+        let out = run(
+            "#define SIG 2\n#define A(x) x + 1\n#define B(y) signal A(y) * SIG;\nB(SIG)",
+            &[],
+        );
+        assert_eq!(code(&out), ["signal", "SIG", "+", "1", "*", "SIG", ";"]);
+        assert!(out.used.contains("SIG"));
+    }
+
+    #[test]
+    fn a_macro_with_arguments_is_never_a_named_constant() {
+        let out = run("#define TWICE(a) 2\nx = TWICE(1);", &[]);
+        assert!(!out.constants.contains_key("TWICE"));
+        assert_eq!(code(&out), ["x", "=", "2", ";"]);
     }
 }

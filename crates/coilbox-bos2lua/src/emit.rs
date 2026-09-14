@@ -1513,6 +1513,13 @@ impl<'p, 'a> Writer<'p, 'a> {
                 ItemKind::Comments => {
                     self.comments(&item.leading);
                 }
+                ItemKind::Stray { text, line } => {
+                    self.comments(&item.leading);
+                    self.warnings.push(format!(
+                        "{} line {line}: `{text}` is outside any function, where the compiler drops it, so the Lua leaves it out too.",
+                        self.p.pre.files[item.file]
+                    ));
+                }
                 ItemKind::Define(name) => {
                     self.comments(&item.leading);
                     self.define(name, item.file, &item.trailing);

@@ -130,8 +130,17 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
         .find_map(|candidate| includes.get(candidate).cloned())
     };
     let pre = pp::preprocess(source, options.name, &resolve, options.linear_scale);
-    let items = parse::parse(&pre.tokens, options.linear_scale)
-        .map_err(|e| format!("{}: {e}", options.name))?;
+    let items = parse::parse(&pre.tokens, options.linear_scale).map_err(|e| {
+        // Often the reason: a macro defined in a header nobody supplied.
+        match pre.missing.as_slice() {
+            [] => format!("{}: {e}", options.name),
+            missing => format!(
+                "{}: {e}. It includes {}, which could not be found, so anything defined there is missing.",
+                options.name,
+                missing.join(", ")
+            ),
+        }
+    })?;
     emit::emit(&items, &pre, options)
 }
 
