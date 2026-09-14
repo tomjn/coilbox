@@ -26,6 +26,10 @@ pub struct Conversion {
     /// it also wants [`COB_VARS_POLYFILL`] if its gadgets or widgets set or
     /// read them.
     pub shared_values: bool,
+    /// The includes that could not be found, as the script names them. Each
+    /// is also a warning. A caller with no way to supply them, such as a
+    /// pasted script, can treat any as a failure.
+    pub missing_includes: Vec<String>,
 }
 
 pub struct Options<'a> {
@@ -130,8 +134,17 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
         .find_map(|candidate| includes.get(candidate).cloned())
     };
     let pre = pp::preprocess(source, options.name, &resolve, options.linear_scale);
-    let items = parse::parse(&pre.tokens, options.linear_scale)
-        .map_err(|e| format!("{}: {e}", options.name))?;
+    let items = parse::parse(&pre.tokens, options.linear_scale).map_err(|e| {
+        // Often the reason: a macro defined in a header nobody supplied.
+        match pre.missing.as_slice() {
+            [] => format!("{}: {e}", options.name),
+            missing => format!(
+                "{}: {e}. It includes {}, which could not be found, so anything defined there is missing.",
+                options.name,
+                missing.join(", ")
+            ),
+        }
+    })?;
     emit::emit(&items, &pre, options)
 }
 

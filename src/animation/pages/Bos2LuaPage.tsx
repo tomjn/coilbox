@@ -27,8 +27,8 @@ const EMPTY: Converted = { lua: "", warnings: [], cobVars: null, error: null };
 /**
  * BOS → Lua unit-script converter. Converts as you type through the Rust
  * converter, whose Lua runs as it is. A pasted script has no `#include` files
- * beside it, so the warnings say which it asked for, and the engine's own
- * names stand in for the unit values those headers usually define.
+ * beside it, so one that includes anything is refused rather than converted
+ * without the macros and functions those files hold.
  */
 export default function Bos2LuaPage() {
   const [bos, setBos] = useState("");
@@ -47,9 +47,16 @@ export default function Bos2LuaPage() {
       return;
     }
     animBos2lua({ source: bos, name: fileName })
-      .then(({ lua, warnings, cobVars }) => {
-        if (ticket === latest.current)
-          setConverted({ lua, warnings, cobVars, error: null });
+      .then(({ lua, warnings, cobVars, missingIncludes }) => {
+        if (ticket !== latest.current) return;
+        if (missingIncludes.length > 0) {
+          setConverted({
+            ...EMPTY,
+            error: `This script includes ${missingIncludes.join(", ")}. A script pasted here cannot load its includes, so it cannot be converted. Open the unit out of its game instead, which brings them with it.`,
+          });
+          return;
+        }
+        setConverted({ lua, warnings, cobVars, error: null });
       })
       .catch((error: unknown) => {
         if (ticket === latest.current) {
@@ -95,7 +102,7 @@ export default function Bos2LuaPage() {
             Convert an old <code>.bos</code> unit script to a Lua unit script
             that runs as it is, comments and all. A script opened out of a game
             brings its <code>#include</code> files with it. One pasted here does
-            not, so any it asks for are listed under the Lua.
+            not, so a script that includes anything cannot be converted here.
           </>
         }
         actions={

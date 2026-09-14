@@ -37,6 +37,13 @@ pub enum ItemKind {
     Define(String),
     IncludeStart(String),
     IncludeEnd,
+    /// An assignment outside any function, as written. A `.cob` holds nothing
+    /// but functions, so the compiler drops it and it never runs. THIS's header
+    /// has two.
+    Stray {
+        text: String,
+        line: u32,
+    },
     /// Comments with nothing after them before the next item or the end.
     Comments,
 }
@@ -77,6 +84,15 @@ pub enum StmtKind {
     },
     While {
         cond: Expr,
+        body: Vec<Stmt>,
+        tail: Vec<Comment>,
+    },
+    /// A `for` loop, any of whose three clauses may be left out. `step` is any
+    /// statement, which Scriptor's own examples use to `sleep`.
+    For {
+        init: Option<Box<Stmt>>,
+        cond: Option<Expr>,
+        step: Option<Box<Stmt>>,
         body: Vec<Stmt>,
         tail: Vec<Comment>,
     },
@@ -156,6 +172,7 @@ pub fn parse(tokens: &[Token], linear: i64) -> Result<Vec<Item>, String> {
         last_line: 0,
         last_file: 0,
         depth: 0,
+        in_step: false,
     };
     p.file()
 }
@@ -167,6 +184,9 @@ struct Parser<'t> {
     last_line: u32,
     last_file: usize,
     depth: usize,
+    /// Whether the statement being read is a `for` loop's last clause, which
+    /// a `)` ends.
+    in_step: bool,
     /// What `[1]` is in 65536ths of an elmo.
     linear: i64,
 }
@@ -189,6 +209,7 @@ pub fn expression(tokens: &[Token], linear: i64) -> Result<Expr, String> {
         last_line: 0,
         last_file: 0,
         depth: 0,
+        in_step: false,
     };
     let e = p.expr(0)?;
     match p.peek() {
@@ -387,6 +408,21 @@ impl<'t> Parser<'t> {
                     self.word("var")?;
                     ItemKind::Statics(self.names(";")?)
                 }
+                Kind::Ident if self.peek_at(1).is_some_and(|n| n.is_sym("=")) => {
+                    let line = t.line;
+                    let mut words = Vec::new();
+                    loop {
+                        let t = self.next()?;
+                        words.push(t.text.as_str());
+                        if t.is_sym(";") {
+                            break;
+                        }
+                    }
+                    ItemKind::Stray {
+                        text: words.join(" ").replace(" ;", ";"),
+                        line,
+                    }
+                }
                 Kind::Ident => ItemKind::Func(self.func()?),
                 _ => return Err(self.error(t, "a piece, static-var or function")),
             };
@@ -465,10 +501,20 @@ impl<'t> Parser<'t> {
         }
     }
 
+    /// One clause of a `for`, or `None` for one left out.
+    fn clause(&mut self) -> Result<Option<Box<Stmt>>, String> {
+        let stmt = self.statement(Vec::new())?;
+        Ok(match stmt.kind {
+            StmtKind::Empty => None,
+            _ => Some(Box::new(stmt)),
+        })
+    }
+
     /// The end of a statement, which may be left out right before a closing
-    /// brace.
+    /// brace, and after a `for`'s last clause, whose `;` is optional.
     fn end(&mut self) -> Result<(), String> {
-        if self.eat_sym(";") || self.peek().is_some_and(|t| t.is_sym("}")) {
+        let closing = if self.in_step { ")" } else { "}" };
+        if self.eat_sym(";") || self.peek().is_some_and(|t| t.is_sym(closing)) {
             Ok(())
         } else {
             let t = self.next()?;
@@ -575,6 +621,35 @@ impl<'t> Parser<'t> {
                 self.sym(")")?;
                 let (body, tail) = self.block()?;
                 return Ok(StmtKind::While { cond, body, tail });
+            }
+            "for" => {
+                self.at += 1;
+                self.sym("(")?;
+                // A statement's own end reads the `;` after the first clause.
+                let init = self.clause()?;
+                let cond = if self.peek().is_some_and(|t| t.is_sym(";")) {
+                    None
+                } else {
+                    Some(self.expr(0)?)
+                };
+                self.sym(";")?;
+                let step = if self.peek().is_some_and(|t| t.is_sym(")")) {
+                    None
+                } else {
+                    self.in_step = true;
+                    let step = self.clause();
+                    self.in_step = false;
+                    step?
+                };
+                self.sym(")")?;
+                let (body, tail) = self.block()?;
+                return Ok(StmtKind::For {
+                    init,
+                    cond,
+                    step,
+                    body,
+                    tail,
+                });
             }
             "return" => {
                 self.at += 1;
@@ -951,6 +1026,54 @@ mod tests {
     fn says_where_it_stopped_understanding() {
         let err = parse(&lex("F() {\n turn a;\n}", 0), 65536).unwrap_err();
         assert!(err.contains("line 2"), "{err}");
+    }
+
+    #[test]
+    fn reads_for_loops_with_any_clause_left_out() {
+        let b = body(
+            "F() { for (i=0;i<4;++i) { sleep 1; } for (;;) sleep 1; for (x = 0; x < 2; sleep 1000;) { } }",
+        );
+        let StmtKind::For {
+            init: Some(init),
+            cond: Some(_),
+            step: Some(step),
+            body,
+            ..
+        } = &b[0].kind
+        else {
+            panic!("{:?}", b[0].kind)
+        };
+        assert!(matches!(init.kind, StmtKind::Assign(ref n, _) if n == "i"));
+        assert!(matches!(step.kind, StmtKind::Inc(ref n) if n == "i"));
+        assert_eq!(body.len(), 1);
+        assert!(matches!(
+            b[1].kind,
+            StmtKind::For {
+                init: None,
+                cond: None,
+                step: None,
+                ..
+            }
+        ));
+        let StmtKind::For {
+            step: Some(step), ..
+        } = &b[2].kind
+        else {
+            panic!("{:?}", b[2].kind)
+        };
+        assert!(matches!(step.kind, StmtKind::Sleep(_)));
+    }
+
+    #[test]
+    fn an_assignment_outside_any_function_is_kept_aside() {
+        let items = items("static-var v;\nv = 1000;\nF() { }");
+        assert!(matches!(items[0].kind, ItemKind::Statics(_)));
+        assert!(
+            matches!(&items[1].kind, ItemKind::Stray { text, line: 2 } if text == "v = 1000;"),
+            "{:?}",
+            items[1].kind
+        );
+        assert!(matches!(items[2].kind, ItemKind::Func(_)));
     }
 
     #[test]
