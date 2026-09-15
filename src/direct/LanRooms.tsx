@@ -62,7 +62,7 @@ export function LanRooms({
   dataDir?: string;
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(() => rooms.length === 0);
   return (
     <section className="flex w-full flex-col gap-2" aria-labelledby="lan-rooms">
       <div className="flex items-center justify-between gap-2">
