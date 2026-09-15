@@ -1,5 +1,7 @@
 import { Button, useSetting } from "@picoframe/frame";
 import {
+  ArrowLeft,
+  ArrowLeftRight,
   ExternalLink,
   KeyRound,
   Loader2,
@@ -8,7 +10,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   Popover,
@@ -20,7 +22,9 @@ import { cn } from "@/lib/utils";
 import {
   allServers,
   isLastLogin,
+  type LastLogin,
   type LobbyAccount,
+  type LobbyServer,
   resolveLastLogin,
   resolveServer,
   serverProtocol,
@@ -32,7 +36,7 @@ import {
 import { PasswordRecoveryForm } from "../lobby-servers/PasswordRecoveryForm";
 import { RegisterForm } from "../lobby-servers/RegisterForm";
 import type { LoginPhase } from "./bindings";
-import { useMultiplayer } from "./store";
+import { serverKeyFor, useMultiplayer } from "./store";
 
 type DotStatus = "off" | "connecting" | "on" | "away" | "error";
 
@@ -161,6 +165,11 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   // panel offers the browser as the way out rather than leaving them with a
   // message and nothing to press.
   const [needsSignIn, setNeedsSignIn] = useState<LobbyAccount | null>(null);
+  // True while a logged-in user is picking another login to switch to.
+  const [switching, setSwitching] = useState(false);
+  useEffect(() => {
+    if (activeKey == null) setSwitching(false);
+  }, [activeKey]);
 
   // A one-click "reconnect" shortcut to the last-used account, earned only after a
   // genuine connection this session (`revealed`) — on a fresh open it would just
@@ -219,6 +228,50 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     }
   }
 
+  /**
+   * Log out, then connect as `account`. Coilbox holds one lobby connection, so
+   * the old one has to close first. A failed log out stops here rather than
+   * opening a second socket beside one that may still be live.
+   */
+  async function switchTo(account: LobbyAccount) {
+    setSwitching(false);
+    setError(null);
+    try {
+      await disconnect();
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
+    await connectTo(account);
+  }
+
+  if (activeKey != null && switching) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1 pb-1">
+          <Button
+            variant="ghost"
+            onClick={() => setSwitching(false)}
+            className="h-8 gap-1.5 px-2"
+          >
+            <ArrowLeft className="size-4" />
+            Back
+          </Button>
+          <p className="text-sm font-medium">Switch account</p>
+        </div>
+        <AccountList
+          accounts={sortedAccounts}
+          customServers={customCfg.servers}
+          lastLogin={lastLogin}
+          activeKey={activeKey}
+          disabled={busy}
+          onPick={(a) => void switchTo(a)}
+          onNavigate={onNavigate}
+        />
+      </div>
+    );
+  }
+
   if (activeKey != null) {
     const username = mirror.state?.myUsername ?? "Connected";
     const ready = mirror.phase === "ready";
@@ -260,6 +313,15 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         >
           Chat
         </Link>
+        <Button
+          variant="outline"
+          onClick={() => setSwitching(true)}
+          disabled={busy}
+          className="h-8 gap-2"
+        >
+          <ArrowLeftRight className="size-4" />
+          Switch account
+        </Button>
         <Button onClick={onDisconnect} disabled={busy} className="h-8">
           Log out
         </Button>
@@ -344,57 +406,15 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           Reconnect as {reconnect.account.username || "last account"}
         </Button>
       )}
-      {sortedAccounts.map((a) => {
-        const server = resolveServer(a.serverId, customCfg.servers);
-        // A Tachyon login with no sign-in stored takes the user to their browser
-        // when they press it, so say so before they press it.
-        const opensBrowser =
-          server != null &&
-          serverProtocol(server) === "tachyon" &&
-          a.hasSecret !== true;
-        return (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => connectTo(a)}
-            disabled={busy}
-            className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-          >
-            <span className="flex w-full items-center gap-2 text-base font-semibold leading-tight">
-              {a.username || "(no username)"}
-              {isLastLogin(a, lastLogin) && (
-                <span className="ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                  Last used
-                </span>
-              )}
-            </span>
-            {/* The name and its badge are one inline run so a long name wraps
-                through the badge rather than pushing it into a column. The
-                sign-in note takes its own line under both. */}
-            <span className="text-xs text-muted-foreground">
-              {server?.name ?? "Unknown server"}
-              {server?.alpha && (
-                <span className="ml-1.5 rounded border border-destructive/40 bg-destructive/15 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
-                  Alpha
-                </span>
-              )}
-            </span>
-            {opensBrowser && (
-              <span className="text-xs text-muted-foreground">
-                Signs in with your browser
-              </span>
-            )}
-          </button>
-        );
-      })}
-      <Link
-        to="/settings/lobby-servers"
-        onClick={onNavigate}
-        className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-      >
-        <Plus className="size-4" />
-        Add a login
-      </Link>
+      <AccountList
+        accounts={sortedAccounts}
+        customServers={customCfg.servers}
+        lastLogin={lastLogin}
+        activeKey={null}
+        disabled={busy}
+        onPick={(a) => void connectTo(a)}
+        onNavigate={onNavigate}
+      />
       <button
         type="button"
         onClick={() => setRegistering(true)}
@@ -453,5 +473,92 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         )
       )}
     </div>
+  );
+}
+
+/**
+ * The saved logins as rows to press, followed by the link to add another. Shared
+ * by the logged-out view and the switch view. `activeKey` marks the login already
+ * connected, which is shown but cannot be picked.
+ */
+function AccountList({
+  accounts,
+  customServers,
+  lastLogin,
+  activeKey,
+  disabled,
+  onPick,
+  onNavigate,
+}: {
+  accounts: LobbyAccount[];
+  customServers: LobbyServer[];
+  lastLogin: LastLogin | null;
+  activeKey: string | null;
+  disabled: boolean;
+  onPick: (account: LobbyAccount) => void;
+  onNavigate: () => void;
+}) {
+  return (
+    <>
+      {accounts.map((a) => {
+        const server = resolveServer(a.serverId, customServers);
+        const current =
+          server != null && serverKeyFor(server, a.username) === activeKey;
+        // A Tachyon login with no sign-in stored takes the user to their browser
+        // when they press it, so say so before they press it.
+        const opensBrowser =
+          server != null &&
+          serverProtocol(server) === "tachyon" &&
+          a.hasSecret !== true;
+        return (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => onPick(a)}
+            disabled={disabled || current}
+            className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+          >
+            <span className="flex w-full items-center gap-2 text-base font-semibold leading-tight">
+              {a.username || "(no username)"}
+              {current ? (
+                <span className="ml-auto rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-600 dark:text-green-400">
+                  Connected
+                </span>
+              ) : (
+                isLastLogin(a, lastLogin) && (
+                  <span className="ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                    Last used
+                  </span>
+                )
+              )}
+            </span>
+            {/* The name and its badge are one inline run so a long name wraps
+                through the badge rather than pushing it into a column. The
+                sign-in note takes its own line under both. */}
+            <span className="text-xs text-muted-foreground">
+              {server?.name ?? "Unknown server"}
+              {server?.alpha && (
+                <span className="ml-1.5 rounded border border-destructive/40 bg-destructive/15 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                  Alpha
+                </span>
+              )}
+            </span>
+            {opensBrowser && (
+              <span className="text-xs text-muted-foreground">
+                Signs in with your browser
+              </span>
+            )}
+          </button>
+        );
+      })}
+      <Link
+        to="/settings/lobby-servers"
+        onClick={onNavigate}
+        className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      >
+        <Plus className="size-4" />
+        Add a login
+      </Link>
+    </>
   );
 }
