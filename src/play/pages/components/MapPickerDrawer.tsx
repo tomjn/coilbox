@@ -122,24 +122,7 @@ export function MapPickerDrawer({
                         <img
                           src={thumb.url}
                           alt={`Minimap of ${m.name}`}
-                          style={{
-                            aspectRatio:
-                              m.width && m.height
-                                ? `${m.width} / ${m.height}`
-                                : "1 / 1",
-                            // unitsync thumbnails are square; stretch back to the
-                            // map's real proportions (object-fill), letterboxed in
-                            // the square cell by fixing the longer axis to 100%.
-                            width:
-                              !m.width || !m.height || m.width >= m.height
-                                ? "100%"
-                                : "auto",
-                            height:
-                              !m.width || !m.height || m.width >= m.height
-                                ? "auto"
-                                : "100%",
-                          }}
-                          className="object-fill"
+                          className="size-full object-contain"
                         />
                       ) : (
                         <ImageOff className="size-6 text-muted-foreground" />
