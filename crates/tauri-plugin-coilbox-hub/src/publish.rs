@@ -78,6 +78,7 @@ pub async fn publish(hub_url: &str, publication: &Publication) -> Result<Answer,
         .map_err(|e| auth::explain(&e, hub_url))?;
 
     let body = serde_json::to_string(publication).map_err(|e| e.to_string())?;
+    coilbox_oauth::use_ring_provider();
     let client = reqwest::Client::builder()
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(PUBLISH_TIMEOUT)
@@ -196,6 +197,7 @@ mod tests {
     #[ignore = "reaches the live hub, so it cannot run in CI"]
     async fn live_publish_needs_a_token() {
         let url = publish_url("https://coilbox-hub.vercel.app").unwrap();
+        coilbox_oauth::use_ring_provider();
         let response = reqwest::Client::new()
             .post(&url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")

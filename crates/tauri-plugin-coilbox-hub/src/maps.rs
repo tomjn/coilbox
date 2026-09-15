@@ -1113,6 +1113,7 @@ mod tests {
             ),
         ] {
             let url = api_url("http://localhost:3000", path, "Asking").unwrap();
+            coilbox_oauth::use_ring_provider();
             let response = reqwest::Client::new()
                 .post(&url)
                 .header(reqwest::header::CONTENT_TYPE, "application/json")

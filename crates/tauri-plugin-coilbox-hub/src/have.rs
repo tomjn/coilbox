@@ -281,6 +281,7 @@ pub(crate) async fn ask_in_batches(
     token: &str,
     keys: &[AssetKey],
 ) -> Result<Vec<HaveResult>, String> {
+    coilbox_oauth::use_ring_provider();
     let client = reqwest::Client::builder()
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(HAVE_TIMEOUT)
@@ -805,6 +806,7 @@ mod tests {
     #[ignore = "reaches a running hub, so it cannot run in CI"]
     async fn live_have_needs_a_token() {
         let url = api_url("http://localhost:3000", HAVE_PATH, "Asking").unwrap();
+        coilbox_oauth::use_ring_provider();
         let response = reqwest::Client::new()
             .post(&url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")

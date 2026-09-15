@@ -793,6 +793,7 @@ pub(crate) async fn run(
             .count(),
     );
 
+    coilbox_oauth::use_ring_provider();
     let client = reqwest::Client::builder()
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(UPLOAD_TIMEOUT)
@@ -2402,6 +2403,7 @@ mod tests {
                 .mime_str("image/webp")
                 .unwrap(),
         );
+        coilbox_oauth::use_ring_provider();
         let response = reqwest::Client::new()
             .post(&url)
             .multipart(form)
