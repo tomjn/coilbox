@@ -44,6 +44,16 @@ export type OpenBattleArgs = Omit<
 /** Spring's conventional lobby-host port; editable for power users / multi-host. */
 export const DEFAULT_HOST_PORT = 8452;
 
+// Remembered from the last battle hosted (issue #2794), the same way as
+// RELAY_MODE_KEY below. Not the password, which would sit in the settings file
+// as plain text, and a host who locked one battle may not expect the next to
+// be locked too.
+const LAST_GAME_KEY = "multiplayer.hostBattle.lastGame";
+const LAST_MAP_KEY = "multiplayer.hostBattle.lastMap";
+const LAST_TITLE_KEY = "multiplayer.hostBattle.lastTitle";
+const LAST_MAX_PLAYERS_KEY = "multiplayer.hostBattle.lastMaxPlayers";
+const LAST_PORT_KEY = "multiplayer.hostBattle.lastPort";
+
 /**
  * The "Host a battle" form, as shown in the frame's drawer by `HostBattleButton`.
  * It collects the game, map, title, size and optional password, then fires
@@ -57,6 +67,12 @@ export const DEFAULT_HOST_PORT = 8452;
  * coilbox has never implemented hole punching. It is gone, and what replaced it
  * is {@link hostingRoute} reading the answer {@link ReachablePorts} already had
  * (issue #2020).
+ *
+ * The game, map, title, player limit and port default to whatever the host
+ * hosted last time, the same way `relayMode` below remembers the relay choice
+ * (issue #2794). `initialMap`/`initialGame`/`initialTitle` win over that,
+ * since those come from a jump the host asked for. The password does not get
+ * remembered.
  */
 export function HostBattleForm({
   relayAvailable,
@@ -79,7 +95,21 @@ export function HostBattleForm({
   initialTitle?: string;
 }) {
   const drawer = useDrawer();
-  const content = useHostContent(initialGame, initialMap);
+  // What the host picked last time (issue #2794), read once at mount. A jump
+  // that opened this drawer with a map or game already chosen (`initialMap`/
+  // `initialGame`) wins over it, per the jumps at `BattlesPage.tsx`.
+  const [lastGame, setLastGame] = useSetting(LAST_GAME_KEY, "");
+  const [lastMap, setLastMap] = useSetting(LAST_MAP_KEY, "");
+  const [lastTitle, setLastTitle] = useSetting(LAST_TITLE_KEY, "");
+  const [lastMaxPlayers, setLastMaxPlayers] = useSetting(
+    LAST_MAX_PLAYERS_KEY,
+    8,
+  );
+  const [lastPort, setLastPort] = useSetting(LAST_PORT_KEY, DEFAULT_HOST_PORT);
+  const content = useHostContent(
+    initialGame ?? lastGame,
+    initialMap ?? lastMap,
+  );
   const {
     target,
     games,
@@ -97,13 +127,13 @@ export function HostBattleForm({
     mapFailed,
   } = content;
 
-  const [title, setTitle] = useState(initialTitle ?? "");
-  // 8 is a sensible starting size for a fresh host (issue #502), the user can
-  // still raise it. A "Host as battle" draft only ever carries the AIs (added
-  // as bots, not real player slots) plus the one human host seat, so no
-  // preset needs this raised to fit.
-  const [maxPlayers, setMaxPlayers] = useState(8);
-  const [port, setPort] = useState(DEFAULT_HOST_PORT);
+  const [title, setTitle] = useState(initialTitle ?? lastTitle);
+  // 8 is a sensible starting size for a fresh host (issue #502) and also the
+  // fallback here, the user can still raise it. A "Host as battle" draft only
+  // ever carries the AIs (added as bots, not real player slots) plus the one
+  // human host seat, so no preset needs this raised to fit.
+  const [maxPlayers, setMaxPlayers] = useState(lastMaxPlayers);
+  const [port, setPort] = useState(lastPort);
   const [password, setPassword] = useState("");
   // What the router and the internet said, handed up by ReachablePorts below.
   // Null until the check answers, and for as long as the host has it turned off,
@@ -210,6 +240,13 @@ export function HostBattleForm({
       // route for a battle that never happened. Read back by the battle room
       // (issue #2022).
       recordHostingRoute(route);
+      // Remembered for the next battle (issue #2794), except the password,
+      // per the keys above.
+      setLastGame(gameName);
+      setLastMap(mapName);
+      setLastTitle(title);
+      setLastMaxPlayers(maxPlayers);
+      setLastPort(port);
       hosted.current = true;
       drawer.close();
     } catch (err) {
