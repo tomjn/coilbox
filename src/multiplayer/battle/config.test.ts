@@ -46,6 +46,7 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     ip: "",
     port: "",
     natType: "0",
+    relayed: false,
     map: "Map",
     maphash: "",
     modname: "Game",

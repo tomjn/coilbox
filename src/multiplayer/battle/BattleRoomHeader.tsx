@@ -16,7 +16,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { copyDeepLink } from "@/deeplink/copyLink";
-import { battleRouteLabel, useChosenHostingRoute } from "@/direct/hostingRoute";
+import {
+  battleRouteLabel,
+  joinedBattleRouteLabel,
+  useChosenHostingRoute,
+} from "@/direct/hostingRoute";
 import { inviteLink } from "@/direct/invite";
 import type { Battle, MemberStatus } from "../bindings";
 import { serverAddressFromKey } from "../store";
@@ -129,31 +133,15 @@ export function BattleRoomHeader({
   // `hostingRoute.ts` says why the record is not keyed and what asking the
   // connection instead would and would not answer.
   //
-  // Which leaves the joiners with nothing, and there is nothing to give them.
-  // A relayed battle is advertised at the relay's own public address with
-  // `natType` 0, exactly like a direct one (issue #2017), so it is
-  // indistinguishable from the outside on purpose and no lobby protocol carries
-  // the route. Guessing from a ping would be inventing an answer. Telling the
-  // joiners needs the host to say so over the wire, which nothing does yet.
-  //
-  // Issue #2073 went back and checked that against the relay commands the
-  // server side has written since, rather than against the state of things when
-  // this was first put here, and the answer has not changed. `CLIENTIP` goes to
-  // the host alone. `RELAYEDHOSTFAILED` and `MOVERELAYEDHOSTFAILED` go to
-  // whoever sent the command. `BATTLEOPENED` for a relayed battle is unchanged
-  // to the byte, which is the property the whole scheme rests on.
-  //
-  // One line does reach a joiner and does prove a relay, which is
-  // `BATTLEHOSTMOVED`: a lobby server refuses to move a battle that was never
-  // relayed, so receiving one says this battle is. It is still not a badge. It
-  // fires only when a live allocation is rebuilt, so its absence says nothing at
-  // all, and a word that appeared halfway through some relayed battles and never
-  // in the rest would read as "direct" every other time. What the move is worth
-  // saying is that the address moved, which is true of every move on every kind
-  // of host, and that is a strip of its own rather than a word up here.
+  // A joiner is told only whether the battle is relayed, which is the one route
+  // the lobby names. A relayed battle is advertised at the relay's own address
+  // with `natType` 0, exactly like a direct one (issue #2017), so the lobby says
+  // it separately, with `BATTLEISRELAYED`, to clients that asked for relay
+  // support (issue #2133). `joinedBattleRouteLabel` says why nothing else gets a
+  // word.
   const routeLabel = selfHost
     ? battleRouteLabel(hostingRoute, { lanRoom: directRoom })
-    : null;
+    : joinedBattleRouteLabel(battle.relayed);
   const startDisabled = hostIngame || !allReady || !!blockReason;
   const startButton = (
     <Button

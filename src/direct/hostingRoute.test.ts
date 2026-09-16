@@ -5,6 +5,7 @@ import {
   chosenHostingRoute,
   hostingRoute,
   hostingRouteSummary,
+  joinedBattleRouteLabel,
   NAT_TYPE_DIRECT,
   RELAY_EXPLAINED,
   recordHostingRoute,
@@ -550,5 +551,19 @@ describe("hostingRouteSummary for a host who asked for the relay", () => {
     });
     expect(said).toContain("as you asked");
     expect(said).not.toContain("Nothing would open the ports");
+  });
+});
+
+describe("joinedBattleRouteLabel", () => {
+  it("names a relayed battle and what it costs", () => {
+    const label = joinedBattleRouteLabel(true);
+    expect(label?.word).toBe("Relayed");
+    expect(label?.detail).toMatch(/ping to the host is higher/);
+  });
+
+  // A battle the lobby did not name could be direct or on a lobby too old to
+  // say, so it gets no word rather than a guess.
+  it("says nothing about a battle the lobby did not name", () => {
+    expect(joinedBattleRouteLabel(false)).toBe(null);
   });
 });

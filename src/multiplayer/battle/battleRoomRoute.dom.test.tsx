@@ -41,7 +41,7 @@ vi.mock("@/components/ui/popover", () => ({
   ),
 }));
 
-function battle(): Battle {
+function battle(relayed = false): Battle {
   return {
     id: 7,
     tachyonId: null,
@@ -49,6 +49,7 @@ function battle(): Battle {
     ip: "",
     port: "",
     natType: "0",
+    relayed,
     map: "Comet Catcher Remake 1.8",
     maphash: "",
     modname: "Beyond All Reason test-1234",
@@ -80,12 +81,17 @@ function battle(): Battle {
  * wording and nothing else, and the wording already has its own tests.
  */
 function drawHeader(
-  over: { selfHost?: boolean; directRoom?: boolean; route?: HostingRoute } = {},
+  over: {
+    selfHost?: boolean;
+    directRoom?: boolean;
+    route?: HostingRoute;
+    relayed?: boolean;
+  } = {},
 ) {
   if (over.route) recordHostingRoute(over.route);
   render(
     <BattleRoomHeader
-      battle={battle()}
+      battle={battle(over.relayed)}
       myStatus={undefined}
       sync="synced"
       blockShort={null}
@@ -180,6 +186,22 @@ describe("the battle room's route word", () => {
   it("shows a joiner nothing, whatever route this client last hosted", () => {
     drawHeader({ selfHost: false, route: "direct" });
     expect(screen.queryByText("Direct")).toBe(null);
+    expect(routeShown()).toBe(false);
+  });
+
+  // Issue #2133. The lobby names a relayed battle, so a joiner is told, and told
+  // what it costs them.
+  it("tells a joiner their battle is relayed when the lobby says so", async () => {
+    drawHeader({ selfHost: false, relayed: true });
+    fireEvent.focus(screen.getByText("Relayed"));
+    expect(
+      await screen.findByText(/Your ping to the host is higher/),
+    ).toBeTruthy();
+  });
+
+  // The relay word is the joiner's, and the host keeps the top bar for it.
+  it("does not give the host a second relay word", () => {
+    drawHeader({ selfHost: true, relayed: true, route: "relay" });
     expect(routeShown()).toBe(false);
   });
 

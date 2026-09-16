@@ -136,6 +136,11 @@ pub enum Delta {
     BattleHostMoved {
         id: u32,
     },
+    /// A battle goes through the lobby's relay, and its copy in
+    /// [`crate::LobbyState`] now says so (issue #2133).
+    BattleIsRelayed {
+        id: u32,
+    },
     /// The lobby would not move our battle to the address its relay came back
     /// at, in its own words, so the battle is still advertised where the
     /// allocation used to be.
@@ -936,12 +941,24 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             if let Some(b) = state.battles.get_mut(&battle_id) {
                 b.ip = ip;
                 b.port = port;
+                // A lobby only moves a battle that was opened through its
+                // relay, so this proves it is one even where the lobby never
+                // said so on its own.
+                b.relayed = true;
             }
             // Raised even for a battle this client has never heard of, because
             // a battle we hold nothing for is one the list is about to be told
             // about, and a delta about a battle that is not there costs a
             // refresh of a list that is already refreshing.
             vec![Delta::BattleHostMoved { id: battle_id }]
+        }
+        ServerMessage::BattleIsRelayed { battle_id } => {
+            // Only a battle this client holds. The line follows the battle's
+            // BATTLEOPENED, so one it does not hold has already closed.
+            if let Some(b) = state.battles.get_mut(&battle_id) {
+                b.relayed = true;
+            }
+            vec![Delta::BattleIsRelayed { id: battle_id }]
         }
         ServerMessage::MoveRelayedHostFailed { reason } => {
             // Nothing here changes, and there is nothing here that could be put
@@ -1981,6 +1998,32 @@ mod tests {
         assert_eq!(moved.host, "bob");
         assert_eq!(moved.map, "Comet Catcher");
         assert!(moved.members.contains_key("bob"));
+        assert!(moved.relayed, "only a relayed battle can be moved");
+    }
+
+    /// Issue #2133. A battle the lobby says is relayed is held as one, and one
+    /// it says nothing about is not.
+    #[test]
+    fn a_battle_the_lobby_says_is_relayed_is_held_as_one() {
+        let mut s = LobbyState::new();
+        for line in [
+            "BATTLEOPENED 9 0 0 bob 198.51.100.9 30001 8 0 0 -1 spring\t105\tComet Catcher\tTheirs\tBAR",
+            "BATTLEOPENED 10 0 0 carol 203.0.113.7 8452 8 0 0 -1 spring\t105\tComet Catcher\tDirect\tBAR",
+        ] {
+            reduce(&mut s, parse_line(line));
+        }
+
+        assert_eq!(
+            reduce(&mut s, parse_line("BATTLEISRELAYED 9")),
+            vec![Delta::BattleIsRelayed { id: 9 }]
+        );
+        assert!(s.battles[&9].relayed);
+        assert!(!s.battles[&10].relayed);
+
+        // One the client does not hold changes nothing.
+        let before = s.clone();
+        reduce(&mut s, parse_line("BATTLEISRELAYED 11"));
+        assert_eq!(s, before);
     }
 
     /// A move for a battle this client holds nothing for. The list is about to

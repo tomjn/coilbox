@@ -342,6 +342,30 @@ export function battleRouteLabel(
 }
 
 /**
+ * The route word for somebody who joined a battle rather than hosting it.
+ * Pure.
+ *
+ * Only the relay has a word. The lobby says a battle is relayed with
+ * `BATTLEISRELAYED` (issue #2133) and says nothing about any other route, so a
+ * battle it did not name could be direct or could be on a lobby too old to
+ * say, and a word for that would be a guess.
+ *
+ * No ping figure. Timing the relay needs a TURN credential, which the lobby
+ * rations per account, and spending a joiner's on a number would leave them
+ * fewer to host with.
+ */
+export function joinedBattleRouteLabel(
+  relayed: boolean,
+): { word: string; detail: string } | null {
+  if (!relayed) return null;
+  return {
+    word: "Relayed",
+    detail:
+      "The host could not be reached directly, so this battle goes through the lobby server's relay. Your ping to the host is higher than it would be in a direct game.",
+  };
+}
+
+/**
  * The route the battle this client last opened actually took.
  *
  * A module singleton, like `hostedRoom.ts`, because the route is decided in a

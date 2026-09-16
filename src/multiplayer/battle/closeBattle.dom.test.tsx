@@ -38,6 +38,7 @@ function battle(): Battle {
     ip: "",
     port: "",
     natType: "0",
+    relayed: false,
     map: "Comet Catcher Remake 1.8",
     maphash: "",
     modname: "Beyond All Reason test-1234",
