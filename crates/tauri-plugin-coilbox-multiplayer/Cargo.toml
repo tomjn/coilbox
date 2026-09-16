@@ -15,9 +15,6 @@ tauri-plugin = { version = "2", features = ["build"] }
 # Paused time, so the test for the request timeout does not wait out the real
 # fifteen seconds.
 tokio = { version = "1", features = ["test-util"] }
-# The room this client can be pointed at when nobody is running a lobby server.
-# A dev dependency only: nothing in this crate's build depends on it.
-tauri-plugin-coilbox-direct = { path = "../tauri-plugin-coilbox-direct" }
 # A directory to write a relay agent's run file into that is not somebody's
 # real one.
 tempfile = { workspace = true }
@@ -58,6 +55,10 @@ coilbox-proc = { path = "../coilbox-proc" }
 # the frontend and handed back: see `mp_watch_engine` for why that difference
 # decides whether a game gets cut off.
 tauri-plugin-coilbox-play = { path = "../tauri-plugin-coilbox-play" }
+# The room this client can be pointed at when nobody is running a lobby
+# server, and, since issue #2798, the STUN timing `turn.rs` uses to ping a
+# relay named by a `TURNCREDENTIALS` answer.
+tauri-plugin-coilbox-direct = { path = "../tauri-plugin-coilbox-direct" }
 tauri-plugin-opener = "2"
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
 # picks it.

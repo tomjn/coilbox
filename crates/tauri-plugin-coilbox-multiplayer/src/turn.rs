@@ -16,9 +16,11 @@
 //! time anybody wants to host, and asking anyway would cost a round trip that
 //! ends in silence.
 //!
-//! No server implements either half yet. ScarylePoo/uberserver#26 is the flag
-//! and #27 is the command, both open, so today every ask ends in
-//! [`NoCredential::NoRelay`] without a line being sent.
+//! ScarylePoo/uberserver#26 added the flag and #27 the command, and both are
+//! closed, so a server can implement either half today. Nothing here changes
+//! for a server that has not: the flag is still what decides whether a line
+//! is sent at all, and an ask still ends in [`NoCredential::NoRelay`] without
+//! one going out.
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -27,6 +29,7 @@ use coilbox_lobby_protocol::{command, Delta, LobbyState, TurnCredentials};
 use picoframe_core::CliResult;
 use serde_json::json;
 use tauri::State;
+use tauri_plugin_coilbox_direct::stun;
 use tokio::sync::watch;
 
 use crate::conn::{now_ms, ConnProtocol, Outbound, Registry, READY_TIMEOUT};
@@ -126,9 +129,11 @@ pub enum NoCredential {
     /// is a server that advertised a relay it has not finished building, which
     /// is not their problem but is worth knowing it is not their fault.
     NotRun(String),
-    /// The server has no relay, so there is nothing to ask it for. Far and away
-    /// the likeliest answer today, because the flag that says otherwise is
-    /// ScarylePoo/uberserver#26 and no server names it yet.
+    /// The server has no relay, so there is nothing to ask it for. Still the
+    /// likeliest answer today: the flag that says otherwise is
+    /// ScarylePoo/uberserver#26, and a `LISTCOMPFLAGS` against every TASServer
+    /// lobby coilbox ships with on 16 September 2026 found it on exactly one,
+    /// `lobby.recoilengine.org`.
     NoRelay,
     /// Nothing came back at all: a server that advertised a relay and then said
     /// nothing when asked for a credential.
@@ -279,6 +284,49 @@ pub(crate) async fn mp_turn_credentials(
         }
         Err(e) => CliResult::err(e.to_string()),
     })
+}
+
+/// `mp_relay_ping`: how long a STUN round trip to this connection's relay
+/// takes right now, timed rather than assumed (issue #2798).
+///
+/// Reuses [`credentials`], so this reads whichever relay a live credential
+/// already names, or mints one the ordinary way when nothing is held yet.
+/// Before a battle is open that is the only way to learn the relay's
+/// address at all: the lobby names it in the same `TURNCREDENTIALS` answer
+/// that grants the credential, and there is no way to ask for one without
+/// the other. While a battle is open through the relay a credential is
+/// already held, so this measures without asking the lobby anything.
+///
+/// The credential's username and password never reach the frontend, the same
+/// as [`mp_turn_credentials`]: only the timing crosses the IPC boundary.
+///
+/// `milliseconds` is null whenever there is nothing to report, which is two
+/// different things read as one. Either the lobby would not name a relay at
+/// all, or it did and the relay's own STUN said nothing back. Both have to
+/// read as "could not be measured" rather than "the relay is down", because a
+/// coturn operator can turn STUN replies off with `no-stun` and still be
+/// relaying perfectly well.
+#[tauri::command]
+pub(crate) async fn mp_relay_ping(
+    registry: State<'_, Registry>,
+    server_key: String,
+) -> Result<CliResult, ()> {
+    let milliseconds = relay_ping(registry.inner(), &server_key).await;
+    Ok(CliResult::ok(json!({ "milliseconds": milliseconds })))
+}
+
+/// The body of [`mp_relay_ping`], with the `State` taken out so it can be
+/// driven directly in tests the way [`credentials`] and [`renewed`] are.
+///
+/// `None` covers both a credential [`credentials`] could not get and a
+/// credential whose relay's STUN never answered: see [`mp_relay_ping`] for
+/// why the two have to read as one thing.
+async fn relay_ping(registry: &Registry, server_key: &str) -> Option<u64> {
+    let credential = credentials(registry, server_key, now_ms(), READY_TIMEOUT)
+        .await
+        .ok()?;
+    let measured = stun::ping(&credential.turn.server, stun::RELAY_PING_SAMPLES).await?;
+    Some(measured.as_millis() as u64)
 }
 
 /// A credential to replace the one a relay is already running on, whatever the
@@ -553,10 +601,21 @@ pub(crate) mod tests {
         ttl_seconds: u64,
         at: u64,
     ) -> TurnCredentials {
+        minted_at(state, "turn:relay.example.org:3478", ttl_seconds, at)
+    }
+
+    /// The same, at a relay of the caller's choosing rather than the fixed
+    /// example address, for a test that has to name a real socket.
+    pub(crate) fn minted_at(
+        state: &Arc<Mutex<LobbyState>>,
+        uri: &str,
+        ttl_seconds: u64,
+        at: u64,
+    ) -> TurnCredentials {
         reduce_at(
             &mut lock_or_recover(state),
             parse_line(&format!(
-                "TURNCREDENTIALS turn:relay.example.org:3478 1786086400:alice bWFj= {ttl_seconds}"
+                "TURNCREDENTIALS {uri} 1786086400:alice bWFj= {ttl_seconds}"
             )),
             at,
         );
@@ -864,6 +923,46 @@ pub(crate) mod tests {
         assert!(
             w.sent.try_recv().is_err(),
             "nothing may go on the wire to a server with no relay"
+        );
+    }
+
+    /// Issue #2798. A server with no relay has nothing to ping either, and
+    /// [`relay_ping`] has to say so the same way [`credentials`] does: nothing
+    /// to report, not an error and not a number.
+    #[tokio::test]
+    async fn a_server_with_no_relay_has_no_ping_to_report() {
+        let w = wired_with_flags(
+            ConnProtocol::TasServer,
+            "COMPFLAGS u sp b",
+            Arc::new(Mutex::new(Channel::new(|_| Ok(())))),
+        );
+
+        let got = relay_ping(&w.registry, KEY).await;
+        assert_eq!(got, None, "no relay is nothing to report, not an error");
+    }
+
+    /// Issue #2798's unhappy path: a relay named by a live credential that
+    /// never answers a STUN request, over a real socket bound to a real,
+    /// unused address, the same as a coturn with `no-stun` set would leave
+    /// it. The result has to be unmeasured, never a number and never read as
+    /// the relay being down.
+    #[tokio::test]
+    async fn a_relay_that_never_answers_is_unmeasured_not_reported_as_a_number() {
+        let w = wired(ConnProtocol::TasServer);
+        // A real, currently unused address: bound for just long enough to
+        // learn a free port, then dropped, so nothing answers on it.
+        let silent = {
+            let socket = tokio::net::UdpSocket::bind("127.0.0.1:0")
+                .await
+                .expect("a free port");
+            socket.local_addr().expect("a bound address")
+        };
+        minted_at(&w.state, &format!("turn:{silent}"), 86_400, NOW);
+
+        let got = relay_ping(&w.registry, KEY).await;
+        assert_eq!(
+            got, None,
+            "a relay that never answers must not be reported as a number"
         );
     }
 
