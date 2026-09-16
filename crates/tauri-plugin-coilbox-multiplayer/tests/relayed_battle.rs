@@ -1136,7 +1136,7 @@ impl Sidecar {
     /// The address the agent's allocation is at, once it has one.
     fn relay_open(&self) -> SocketAddr {
         match self.said.recv_timeout(PATIENCE) {
-            Ok(Event::RelayOpen { addr }) => addr,
+            Ok(Event::RelayOpen { addr, .. }) => addr,
             // Everything else the agent can say before it has a relay is a
             // reason it has not got one, and none of them are recoverable
             // inside a test that is about to want one.
@@ -1177,7 +1177,7 @@ impl Sidecar {
         loop {
             let left = deadline.saturating_duration_since(std::time::Instant::now());
             match self.said.recv_timeout(left) {
-                Ok(Event::RelayOpen { addr }) => return Some(addr.port()),
+                Ok(Event::RelayOpen { addr, .. }) => return Some(addr.port()),
                 Ok(Event::RelayDown { reason }) => {
                     println!("  no relay yet, because {reason}");
                 }

@@ -1366,6 +1366,9 @@ export const mpProbeHost = defineCommand<
  * last 15 seconds. Both are null whenever coilbox cannot read a current count,
  * which includes a relay it is reading off disk.
  *
+ * `overTls` is whether the relay is reached over TLS because UDP got no answer,
+ * which can add delay (issue #1698). False for a relay read off disk.
+ *
  * No server key, because there is at most one relay sidecar on the machine
  * whatever is connected. The Rust command's doc says why.
  */
@@ -1396,6 +1399,7 @@ export const mpRelayTraffic = defineCommand<
     bytesPerSecond: number | null;
     letThrough: number | null;
     heardFrom: number | null;
+    overTls: boolean;
   }
 >("coilbox-multiplayer", "mp_relay_traffic");
 

@@ -76,7 +76,9 @@ pub const PASSWORD_VAR: &str = "COILBOX_TURN_PASSWORD";
 /// The TURN server a relayed battle goes through.
 #[derive(Clone, Debug)]
 pub struct Turn {
-    /// `host:port`.
+    /// The servers as the sidecar's `--turn-server` takes them:
+    /// `host:port`, `turns:host:port`, or several joined with commas. See
+    /// `coilbox_relay_protocol::relay_servers`.
     pub server: String,
     pub user: String,
     pub password: String,

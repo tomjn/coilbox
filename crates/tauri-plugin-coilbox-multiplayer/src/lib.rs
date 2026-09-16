@@ -2037,6 +2037,15 @@ fn relay_peers(registry: &Registry) -> Option<relay_agent::Peers> {
     })
 }
 
+/// Whether the relay this coilbox is hosting through is reached over TLS.
+fn relay_over_tls(registry: &Registry) -> bool {
+    lock_or_recover(registry).values().any(|conn| {
+        lock_or_recover(&conn.relay)
+            .as_ref()
+            .is_some_and(|host| host.over_tls)
+    })
+}
+
 /// What coilbox can say about the relay carrying the game that is running.
 ///
 /// Two answers, because they go missing separately and the in-game pill uses
@@ -2054,6 +2063,9 @@ struct RelayBehindTheGame {
     /// relay this coilbox is hosting through says, because the record a
     /// leftover sidecar writes down carries the rate and nothing else.
     peers: Option<relay_agent::Peers>,
+    /// Whether the sidecar reaches its relay server over TLS. False for a
+    /// relay coilbox is reading off disk, whose record does not say.
+    over_tls: bool,
 }
 
 /// The relay behind the running game: from the handle while coilbox holds one,
@@ -2081,6 +2093,7 @@ fn relay_behind_the_game(registry: &Registry, run_file: Option<&Path>) -> RelayB
             relaying: true,
             bytes_per_second: relay_traffic(registry),
             peers: relay_peers(registry),
+            over_tls: relay_over_tls(registry),
         };
     }
     // The outer `Option` is whether a sidecar is there, the inner one is
@@ -2094,6 +2107,7 @@ fn relay_behind_the_game(registry: &Registry, run_file: Option<&Path>) -> RelayB
         relaying: left_running.is_some(),
         bytes_per_second: left_running.flatten(),
         peers: None,
+        over_tls: false,
     }
 }
 
@@ -2114,6 +2128,9 @@ fn relay_behind_the_game(registry: &Registry, run_file: Option<&Path>) -> RelayB
 /// `letThrough` and `heardFrom` are who the relay is carrying, for the panel
 /// behind the host's relay pill. Null on the same terms as the rate, and null
 /// for a relay coilbox is reading off disk.
+///
+/// `overTls` is whether the relay is reached over TLS, so the panel can say it
+/// may add delay (issue #1698).
 #[tauri::command]
 fn mp_relay_traffic<R: Runtime>(
     app: tauri::AppHandle<R>,
@@ -2126,6 +2143,7 @@ fn mp_relay_traffic<R: Runtime>(
         "bytesPerSecond": relay.bytes_per_second,
         "letThrough": relay.peers.map(|p| p.let_through),
         "heardFrom": relay.peers.map(|p| p.heard_from),
+        "overTls": relay.over_tls,
     }))
 }
 
@@ -4006,6 +4024,7 @@ mod tests {
         relay_host::RelayHost {
             engine_port: RELAYED_ENGINE_PORT,
             relayed: "198.51.100.9:30001".parse().expect("an address"),
+            over_tls: false,
             agent: Arc::new(relay_agent::RelayAgent::driving(Nothing, to_agent, |_| {})),
             moves: relay_host::MoveWatch::default(),
             credential: relay_host::CredentialWatch::default(),
@@ -4343,6 +4362,7 @@ mod tests {
         );
         listener(coilbox_relay_protocol::Event::RelayOpen {
             addr: "198.51.100.9:30002".parse().expect("an address"),
+            over_tls: false,
         });
 
         assert_eq!(
@@ -4374,6 +4394,7 @@ mod tests {
         );
         listener(coilbox_relay_protocol::Event::RelayOpen {
             addr: "198.51.100.9:30001".parse().expect("an address"),
+            over_tls: false,
         });
 
         assert_eq!(queued(&mut sent), Vec::<String>::new());
@@ -4422,6 +4443,7 @@ mod tests {
             relay_host::listening(&registry, "alice@bar:8200", saw, Duration::from_millis(50));
         listener(coilbox_relay_protocol::Event::RelayOpen {
             addr: "198.51.100.9:30002".parse().expect("an address"),
+            over_tls: false,
         });
 
         assert_eq!(
@@ -5505,6 +5527,7 @@ mod tests {
         let (saw, heard) = std::sync::mpsc::channel();
         saw.send(coilbox_relay_protocol::Event::RelayOpen {
             addr: "198.51.100.9:30001".parse().expect("an address"),
+            over_tls: false,
         })
         .expect("the channel is open");
         let host = relay_host::waiting_on(agent, heard, 8452, Duration::from_secs(5))
@@ -5797,6 +5820,7 @@ mod tests {
                 relaying: true,
                 bytes_per_second: Some(41_984),
                 peers: None,
+                over_tls: false,
             }
         );
     }
@@ -5818,6 +5842,7 @@ mod tests {
                 relaying: true,
                 bytes_per_second: None,
                 peers: None,
+                over_tls: false,
             }
         );
     }
@@ -5839,6 +5864,7 @@ mod tests {
                 relaying: false,
                 bytes_per_second: None,
                 peers: None,
+                over_tls: false,
             }
         );
     }
@@ -5863,8 +5889,31 @@ mod tests {
                 relaying: true,
                 bytes_per_second: None,
                 peers: None,
+                over_tls: false,
             }
         );
+    }
+
+    /// Issue #1698. The relay pill is told when the relay is reached over TLS,
+    /// from the handle that holds the battle.
+    #[test]
+    fn a_relay_reached_over_tls_says_so() {
+        let registry = Registry::default();
+        lock_or_recover(&registry)
+            .insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
+        let _agent_said = hosting_through_a_relay(&registry, "alice@bar:8200", None);
+        if let Some(host) = lock_or_recover(
+            &lock_or_recover(&registry)
+                .get("alice@bar:8200")
+                .expect("the connection is registered")
+                .relay,
+        )
+        .as_mut()
+        {
+            host.over_tls = true;
+        }
+
+        assert!(relay_behind_the_game(&registry, None).over_tls);
     }
 
     /// The registry scan behind the guard above, which is the only thing

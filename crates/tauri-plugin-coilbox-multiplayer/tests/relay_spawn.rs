@@ -198,7 +198,7 @@ fn asking_a_sidecar_that_is_carrying_a_game_does_not_end_it() {
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);
-    let Event::RelayOpen { addr } = hears(&seen) else {
+    let Event::RelayOpen { addr, .. } = hears(&seen) else {
         panic!("the first thing a sidecar says is where players send");
     };
     let pid = relay_sidecar::already_relaying(&run_file).expect("a running sidecar");
@@ -324,7 +324,7 @@ fn a_coilbox_with_no_pipe_can_read_what_a_running_sidecar_is_carrying() {
     let run_file = dir.path().join("relay").join("agent.json");
 
     let (agent, seen) = start(&run_file);
-    let Event::RelayOpen { addr } = hears(&seen) else {
+    let Event::RelayOpen { addr, .. } = hears(&seen) else {
         panic!("the first thing a sidecar says is where players send");
     };
     let pid = relay_sidecar::already_relaying(&run_file).expect("a running sidecar");

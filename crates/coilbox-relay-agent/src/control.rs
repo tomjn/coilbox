@@ -52,7 +52,7 @@
 use std::io;
 use std::sync::Arc;
 
-use coilbox_relay_protocol::{read_request, to_line, Event, Request, Unreadable};
+use coilbox_relay_protocol::{read_request, relay_servers, to_line, Event, Request, Unreadable};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, Mutex};
 
@@ -198,10 +198,24 @@ impl Requests {
                         user,
                         password,
                     }) => {
+                        // Checked before anything is swapped, so a list the
+                        // agent cannot read leaves the credential it has.
+                        let servers = match relay_servers(&server) {
+                            Ok(servers) => servers,
+                            Err(why) => {
+                                reporter
+                                    .say(Event::Failed {
+                                        id,
+                                        reason: format!("the relay named is not usable: {why}"),
+                                    })
+                                    .await;
+                                continue;
+                            }
+                        };
                         let swapped = {
                             let mut held = turn.lock().unwrap_or_else(|e| e.into_inner());
                             held.as_mut().map(|held| {
-                                held.server = server;
+                                held.servers = servers;
                                 held.username = user;
                                 held.password = password;
                             })
@@ -298,7 +312,7 @@ mod tests {
     /// The credential a sidecar was started with.
     fn started_with() -> TurnCredentials {
         TurnCredentials {
-            server: "relay.example.org:3478".to_string(),
+            servers: relay_servers("relay.example.org:3478").expect("a relay"),
             username: "1786086400:alice".to_string(),
             password: "the-old-one".to_string(),
         }
@@ -370,7 +384,7 @@ mod tests {
 
         w.asked(&Request::RenewCredential {
             id: 3,
-            server: "relay2.example.org:3478".to_string(),
+            server: "relay2.example.org:3478,turns:relay2.example.org:5349".to_string(),
             user: "1786090000:alice".to_string(),
             password: "the-new-one".to_string(),
         })
@@ -378,9 +392,36 @@ mod tests {
 
         assert_eq!(w.answer().await, Event::Done { id: 3 });
         let held = w.holding().expect("a credential is still held");
-        assert_eq!(held.server, "relay2.example.org:3478");
+        assert_eq!(
+            held.servers,
+            relay_servers("relay2.example.org:3478,turns:relay2.example.org:5349")
+                .expect("a relay")
+        );
         assert_eq!(held.username, "1786090000:alice");
         assert_eq!(held.password, "the-new-one");
+    }
+
+    /// A renewal naming a relay the agent cannot read is refused, and the
+    /// credential it had stays, so the next rebuild still has something to
+    /// sign with.
+    #[tokio::test]
+    async fn a_renewal_naming_an_unusable_relay_is_refused_and_changes_nothing() {
+        let mut w = wired(Some(started_with()));
+
+        w.asked(&Request::RenewCredential {
+            id: 5,
+            server: "turns:relay.example.org".to_string(),
+            user: "1786090000:alice".to_string(),
+            password: "the-new-one".to_string(),
+        })
+        .await;
+
+        let Event::Failed { id, reason } = w.answer().await else {
+            panic!("a relay with no port cannot be used");
+        };
+        assert_eq!(id, 5);
+        assert!(reason.contains("names no port"), "{reason}");
+        assert_eq!(w.holding(), Some(started_with()));
     }
 
     /// A relay that is not going through a TURN server has no credential to

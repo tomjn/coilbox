@@ -1919,6 +1919,7 @@ fn a_relay_at(relayed: SocketAddr) -> crate::relay_host::RelayHost {
     crate::relay_host::RelayHost {
         engine_port: 8452,
         relayed,
+        over_tls: false,
         agent: Arc::new(crate::relay_agent::RelayAgent::driving(
             Nothing,
             Vec::new(),
@@ -1970,6 +1971,7 @@ async fn a_lobby_that_names_the_command_warns_the_host_without_waiting_it_out() 
     let listener = crate::relay_host::listening(&registry, &client.key, saw, MOVE_ANSWER_PATIENCE);
     listener(coilbox_relay_protocol::Event::RelayOpen {
         addr: "198.51.100.9:30002".parse().expect("an address"),
+        over_tls: false,
     });
 
     wait_until(

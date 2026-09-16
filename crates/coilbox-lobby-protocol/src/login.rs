@@ -19,8 +19,8 @@
 //! -> [`LoginPhase::Denied`].
 //!
 //! Compatibility flags: the `COMPFLAGS` answer arrives before the `LOGIN` that
-//! carries our own flags, and that ordering is what makes the relay flag safe to
-//! send. See [`crate::command::RELAY_COMPAT_FLAG`].
+//! carries our own flags, and that ordering is what makes the relay flags safe to
+//! send. See [`crate::command::NEGOTIATED_COMPAT_FLAGS`].
 //!
 //! Verification codes: a new account's first `LOGIN` can trigger the agreement
 //! handshake (`AGREEMENT...` / `AGREEMENTEND`). Rather than auto-confirm, the
@@ -134,12 +134,13 @@ pub struct LoginMachine {
     phase: LoginPhase,
     /// `AGREEMENT` lines collected between the first one and `AGREEMENTEND`.
     agreement: Vec<String>,
-    /// Whether the server's answer to `LISTCOMPFLAGS` named the relay flag.
+    /// Which of [`command::NEGOTIATED_COMPAT_FLAGS`] the server's answer to
+    /// `LISTCOMPFLAGS` named.
     ///
-    /// False until an answer arrives, and false forever on a server that never
-    /// sends one. That default is the safe one: it means no relay flag on the
-    /// `LOGIN`, which is how every server behaves today.
-    server_relays: bool,
+    /// Empty until an answer arrives, and empty forever on a server that never
+    /// sends one. That default is the safe one: it means none of those flags on
+    /// the `LOGIN`.
+    server_offers: Vec<&'static str>,
     /// The address from a `RecoveryRedirected` answer, held so the UI can offer
     /// to open it. `LoginPhase` is `Copy`, so it cannot carry the string itself.
     recovery_url: Option<String>,
@@ -152,7 +153,7 @@ impl LoginMachine {
             config,
             phase: LoginPhase::AwaitGreeting,
             agreement: Vec::new(),
-            server_relays: false,
+            server_offers: Vec::new(),
             recovery_url: None,
         }
     }
@@ -189,7 +190,10 @@ impl LoginMachine {
                 // what the server offers, and what we are about to claim. The
                 // handshake makes that ordering rather than assuming it, because
                 // `LOGIN` is unreachable except through this arm.
-                self.server_relays = flags.iter().any(|f| f == command::RELAY_COMPAT_FLAG);
+                self.server_offers = command::NEGOTIATED_COMPAT_FLAGS
+                    .into_iter()
+                    .filter(|negotiated| flags.iter().any(|f| f == negotiated))
+                    .collect();
                 match &self.config.mode {
                     LoginMode::Login => {
                         self.phase = LoginPhase::AwaitAccepted;
@@ -281,9 +285,9 @@ impl LoginMachine {
 
     /// The `LOGIN` wire line for this config.
     ///
-    /// The relay flag is decided here and nowhere else. It is added when the
-    /// server advertised one and dropped from the configured flags when it did
-    /// not, so there is a single rule for it rather than a caller and a server
+    /// The relay flags are decided here and nowhere else. Each is added when the
+    /// server advertised it and dropped from the configured flags when it did
+    /// not, so there is a single rule for them rather than a caller and a server
     /// each having a say.
     fn login_line(&self) -> String {
         let mut flag_refs: Vec<&str> = self
@@ -291,11 +295,9 @@ impl LoginMachine {
             .compat_flags
             .iter()
             .map(String::as_str)
-            .filter(|f| *f != command::RELAY_COMPAT_FLAG)
+            .filter(|f| !command::NEGOTIATED_COMPAT_FLAGS.contains(f))
             .collect();
-        if self.server_relays {
-            flag_refs.push(command::RELAY_COMPAT_FLAG);
-        }
+        flag_refs.extend(&self.server_offers);
         command::login(
             &self.config.username,
             &self.config.password_hash,
@@ -559,6 +561,30 @@ mod tests {
         assert_eq!(
             out,
             vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp"]
+        );
+    }
+
+    /// Issue #1698. The TLS flag is negotiated the same way: sent to a server
+    /// that offers it, and to nobody else.
+    #[test]
+    fn the_tls_relay_flag_goes_out_only_to_a_server_that_advertised_it() {
+        let mut has_tls = LoginMachine::new(cfg(false));
+        has_tls.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        let out = has_tls.on_message(&parse_line("COMPFLAGS u sp b r turns"));
+        assert_eq!(
+            out,
+            vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp r turns"]
+        );
+
+        let mut configured = LoginMachine::new(LoginConfig {
+            compat_flags: vec!["u".into(), "sp".into(), "turns".into()],
+            ..cfg(false)
+        });
+        configured.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        let out = configured.on_message(&parse_line("COMPFLAGS u sp b r"));
+        assert_eq!(
+            out,
+            vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp r"]
         );
     }
 

@@ -45,6 +45,14 @@ async-trait = "0.1"
 stun = "0.17"
 webrtc-util = { version = "0.17", default-features = false, features = ["conn"] }
 
+# TURN over TLS, for a host whose network drops UDP (issue #1698). The `turn`
+# crate has no TLS of its own, so `crate::tls` carries its messages over a TLS
+# stream instead. The same versions and features the multiplayer plugin uses
+# for the lobby connection, so no package is added to `Cargo.lock`.
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+
 # The whole crate is one socket fanned out into many, so it is tokio and
 # nothing else. `net` for the sockets, `sync` for the one channel that carries
 # engine replies back up to the relay, `time` for the clock the allocation is
