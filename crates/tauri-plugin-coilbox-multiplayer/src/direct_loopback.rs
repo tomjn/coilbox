@@ -423,6 +423,104 @@ async fn a_seat_the_joiner_picks_reaches_the_host() {
     room.stop("done").await;
 }
 
+/// A fresh joiner lands on the next free team and ally without touching the
+/// seat controls (issue #2735): before this, everyone landed on team 1, ally
+/// A, the same as the host, and start boxes could not be placed per ally.
+#[tokio::test]
+async fn a_fresh_joiner_gets_the_next_free_team_and_ally() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(open_battle_line());
+    wait_until(
+        || host.state().current_battle == Some(1),
+        "the host to be in its own battle",
+    )
+    .await;
+
+    let joiner = Client::connect(&registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_until(
+        || {
+            joiner
+                .state()
+                .battles
+                .get(&1)
+                .is_some_and(|b| b.members.get("bob").is_some_and(|m| m.battle_status.mode))
+        },
+        "bob to be seated as a player",
+    )
+    .await;
+
+    let seen = joiner.state();
+    let bob = &seen.battles[&1].members["bob"];
+    assert_eq!(bob.battle_status.team_id, 1, "alice already holds team 0");
+    assert_eq!(bob.battle_status.ally, 1, "alice already holds ally 0");
+    assert!(
+        bob.battle_status.mode,
+        "a fresh joiner is a player, not a spectator"
+    );
+
+    room.stop("done").await;
+}
+
+/// Joining a battle that is already running is "watch live" (`BattleRow.tsx`),
+/// not a fresh player claiming a seat: the match already started without them,
+/// so they keep the ordinary spectator default rather than being auto-seated
+/// on top of whichever team happens to be free.
+#[tokio::test]
+async fn a_joiner_of_a_running_battle_is_not_auto_seated() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(open_battle_line());
+    wait_until(
+        || host.state().current_battle == Some(1),
+        "the host to be in its own battle",
+    )
+    .await;
+    host.send(command::my_status(ClientStatus {
+        ingame: true,
+        ..Default::default()
+    }));
+
+    let joiner = Client::connect(&registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    wait_until(
+        || joiner.state().users["alice"].status.ingame,
+        "the joiner to see the host is already in-game",
+    )
+    .await;
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_until(
+        || {
+            joiner
+                .state()
+                .battles
+                .get(&1)
+                .is_some_and(|b| b.members.contains_key("bob"))
+        },
+        "bob to appear as a member",
+    )
+    .await;
+    // No CLIENTBATTLESTATUS is coming, only the ordinary REQUESTBATTLESTATUS
+    // round trip, so give it as long as an unanswered prompt is ever given.
+    tokio::time::sleep(LONG_ENOUGH_TO_HANG).await;
+
+    let bob = &joiner.state().battles[&1].members["bob"];
+    assert!(
+        !bob.battle_status.mode,
+        "a late arrival watches live rather than claiming a seat in a running match"
+    );
+
+    room.stop("done").await;
+}
+
 /// A room with the battle open and one joiner already in it, which is where the
 /// tests about what the host does next all start.
 async fn hosted_battle_with_a_joiner(registry: &Registry) -> (Room, Client, Client) {

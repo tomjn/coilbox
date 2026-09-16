@@ -260,7 +260,9 @@ async fn the_sweep_frees_a_name_and_leaves_the_seat_alone() {
     let mut bob = RawPeer::connect(&room).await;
     bob.log_in("bob").await;
     bob.send("JOINBATTLE 1 * s3cret").await;
-    bob.read_to("REQUESTBATTLESTATUS").await;
+    // Bob is the only other player, so he is auto-seated on the next free team
+    // and ally rather than asked for one (issue #2735), then picks his own.
+    bob.read_to("CLIENTBATTLESTATUS bob").await;
     bob.send(&command::my_battle_status(seat, 16_711_680)).await;
     assert_eq!(bob.read_to("CLIENTBATTLESTATUS").await.last(), Some(&taken));
 
@@ -414,7 +416,8 @@ async fn a_room_that_works_out_its_own_address_follows_it() {
         "bob was told the old address on the way in: {burst:?}"
     );
     bob.send("JOINBATTLE 1 * s3cret").await;
-    bob.read_to("REQUESTBATTLESTATUS").await;
+    // Auto-seated on the next free team and ally rather than asked (#2735).
+    bob.read_to("CLIENTBATTLESTATUS bob").await;
 
     // The VPN comes up and takes the default route with it.
     *machine.lock().expect("the address list") = vec![vpn, Ipv4Addr::LOCALHOST];
@@ -523,7 +526,8 @@ async fn a_room_on_a_public_address_announces_it_rather_than_the_docker_bridge()
         "bob is given an address he can dial from outside: {burst:?}"
     );
     bob.send("JOINBATTLE 1 * s3cret").await;
-    bob.read_to("REQUESTBATTLESTATUS").await;
+    // Auto-seated on the next free team and ally rather than asked (#2735).
+    bob.read_to("CLIENTBATTLESTATUS bob").await;
 
     // The public interface goes away and the bridge is all that is left, so the
     // measurement names an address the machine no longer has.
