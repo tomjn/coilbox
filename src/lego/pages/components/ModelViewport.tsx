@@ -90,24 +90,15 @@ import {
   showSeat,
   showTargetAnchors,
 } from "./anchorsAndSnapping";
-import { disposeBaked, showBaked } from "./bakedPlayback";
-import {
-  applySceneScale,
-  boundsBox,
-  frameBounds,
-  homeView,
-} from "./cameraFraming";
+import { disposeBaked } from "./bakedPlayback";
+import { boundsBox, frameBounds, homeView } from "./cameraFraming";
 import {
   buildCollisionHandles,
   commitCollision,
   commitPieceCollision,
   handleBox,
 } from "./collisionHandles";
-import {
-  disposePieceCollision,
-  showCollisionVolume,
-  showPieceCollisionVolumes,
-} from "./collisionVolumes";
+import { disposePieceCollision } from "./collisionVolumes";
 import { dotMaterial, points } from "./dotsAndPoints";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import {
