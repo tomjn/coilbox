@@ -18,6 +18,7 @@ import { HostBattleForm, type OpenBattleArgs } from "./HostBattleForm";
 export function HostBattleButton({
   disabled,
   relayAvailable,
+  serverKey,
   onHost,
   initialMap,
   initialGame,
@@ -28,6 +29,10 @@ export function HostBattleButton({
   /** Whether this lobby server has a relay to host through, from
    *  `relayHostingAvailable`. */
   relayAvailable: boolean;
+  /** This connection's key, for the relay ping preview beside the relay
+   *  choice (issue #2798). Null hides the preview rather than asking with a
+   *  key that names no connection. */
+  serverKey: string | null;
   /** Rejects when the battle did not open, which is what the form shows. */
   onHost: (args: OpenBattleArgs) => Promise<void>;
   /** Preselect this map (e.g. from a content map detail's "Host a battle here"). */
@@ -55,6 +60,7 @@ export function HostBattleButton({
         <HostBattleForm
           key={nextDrawerKey()}
           relayAvailable={relayAvailable}
+          serverKey={serverKey}
           onHost={(args) => latest.current(args)}
           initialMap={initialMap}
           initialGame={initialGame}

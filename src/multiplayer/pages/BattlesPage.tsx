@@ -483,6 +483,7 @@ function BattlesPage() {
       <HostBattleButton
         disabled={!canJoin}
         relayAvailable={relayHostingAvailable(mirror.state)}
+        serverKey={activeKey}
         onHost={onHost}
         initialMap={hostDraft?.mapName ?? hostMap}
         initialGame={hostDraft?.gameName}

@@ -3630,6 +3630,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_build_host_config,
             probe::mp_probe_host,
             turn::mp_turn_credentials,
+            turn::mp_relay_ping,
             mp_relay_traffic,
             mp_leftover_relay_agent,
             mp_relay_left_running,

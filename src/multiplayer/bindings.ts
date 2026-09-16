@@ -1369,6 +1369,26 @@ export const mpProbeHost = defineCommand<
  * No server key, because there is at most one relay sidecar on the machine
  * whatever is connected. The Rust command's doc says why.
  */
+/**
+ * How long a STUN round trip to this connection's relay takes right now,
+ * timed rather than assumed (issue #2798).
+ *
+ * Works before a battle is open, where it mints a credential the ordinary
+ * way to learn the relay's address, and while one is open through the relay,
+ * where a credential is already held and this only measures. Either way the
+ * credential itself never reaches the frontend, only the timing.
+ *
+ * `milliseconds` is null whenever there is nothing to report: the lobby has
+ * no relay to ask about, could not mint a credential, or the relay's own
+ * STUN said nothing back. All three read as "could not be measured", never
+ * as "the relay is down", because a coturn operator can turn STUN replies
+ * off with `no-stun` and still be relaying perfectly well.
+ */
+export const mpRelayPing = defineCommand<
+  { serverKey: string },
+  { milliseconds: number | null }
+>("coilbox-multiplayer", "mp_relay_ping");
+
 export const mpRelayTraffic = defineCommand<
   Record<string, never>,
   {

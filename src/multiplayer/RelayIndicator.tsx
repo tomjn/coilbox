@@ -17,6 +17,7 @@ import {
   mpRelayLeftRunning,
   mpRelayTraffic,
 } from "./bindings";
+import { relayPingLabel, useRelayPing } from "./relayPing";
 import { useMultiplayer } from "./store";
 
 /**
@@ -164,6 +165,9 @@ function OurRelay({ bytesPerSecond, letThrough, heardFrom }: OurCarrying) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // This component only renders while hosting through the relay, so the
+  // measurement runs for as long as it is on screen (issue #2798).
+  const ping = useRelayPing(activeKey, true);
 
   function choose(next: boolean) {
     setOpen(next);
@@ -220,6 +224,9 @@ function OurRelay({ bytesPerSecond, letThrough, heardFrom }: OurCarrying) {
             <p className="text-sm">
               Your battle goes through the server's relay, so players reach it
               through the lobby server rather than connecting to you directly.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {relayPingLabel(ping)}
             </p>
             {letThrough !== null && heardFrom !== null && (
               <RelayPeers letThrough={letThrough} heardFrom={heardFrom} />

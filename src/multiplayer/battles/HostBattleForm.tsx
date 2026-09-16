@@ -31,6 +31,7 @@ import {
   directClosePorts,
 } from "../../direct/reachability";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
+import { relayPingLabel, useRelayPing } from "../relayPing";
 import { hostBattleFailure } from "./hostBattle";
 import { hostEngineVersion } from "./hostEngineVersion";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
@@ -78,6 +79,7 @@ const LAST_PORT_KEY = "multiplayer.hostBattle.lastPort";
  */
 export function HostBattleForm({
   relayAvailable,
+  serverKey,
   onHost,
   initialMap,
   initialGame,
@@ -87,6 +89,10 @@ export function HostBattleForm({
    *  `relayHostingAvailable`. The bottom rung of the ladder does not exist
    *  without it. */
   relayAvailable: boolean;
+  /** This connection's key, for the relay ping preview beside the relay
+   *  choice below (issue #2798). Null or missing hides the preview rather
+   *  than asking with a key that names no connection. */
+  serverKey?: string | null;
   /** Rejects when the battle did not open, which is what this form shows. */
   onHost: (args: OpenBattleArgs) => Promise<void>;
   /** Preselect this map (e.g. from a content map detail's "Host a battle here"). */
@@ -179,6 +185,11 @@ export function HostBattleForm({
     null,
   );
   const relayMode = relayModeFrom(relayPicked, relayBefore);
+  // A preview of what relaying would cost, next to the choice that decides
+  // whether to pay it. Asked for as long as there is a relay to ask about,
+  // whatever the host has picked so far, because it is meant to inform that
+  // pick rather than react to it (issue #2798).
+  const relayPing = useRelayPing(serverKey ?? null, relayAvailable);
   // Whether the battle this form was opened for has been opened. The port the
   // check asked for belongs to that battle. Closing the drawer unmounts the
   // form, and a form that goes without a battle hands the port back, rather
@@ -445,6 +456,9 @@ export function HostBattleForm({
                 <ToggleGroupItem value="always">Always</ToggleGroupItem>
                 <ToggleGroupItem value="never">Never</ToggleGroupItem>
               </ToggleGroup>
+              <p className="text-xs text-muted-foreground">
+                {relayPingLabel(relayPing)}
+              </p>
               <Collapsible>
                 <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                   <ChevronRight

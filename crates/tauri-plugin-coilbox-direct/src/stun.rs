@@ -30,7 +30,7 @@
 //! regardless, so it is reported as a signal and not as a verdict.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use stun::agent::TransactionId;
@@ -193,6 +193,52 @@ async fn ask(socket: &UdpSocket, server: &str) -> Option<Reflexive> {
     .await
     .ok()
     .flatten()
+}
+
+/// How many STUN round trips [`ping`] times against one relay, so a single
+/// slow packet does not decide the number shown for it.
+///
+/// This asks one server a few times rather than asking the four in
+/// [`SERVERS`] once each, so it is a separate figure from anything
+/// [`public_address`] uses.
+pub const RELAY_PING_SAMPLES: usize = 3;
+
+/// Time up to `samples` STUN round trips to `server`, an arbitrary
+/// `host:port` rather than one of [`SERVERS`], and report the middle one.
+///
+/// coturn answers a plain STUN binding request on the same port its TURN
+/// allocations use, unless its operator has turned that off with `no-stun`. A
+/// binding request needs no credential and opens no allocation, so timing
+/// one is a cheap and harmless way to learn a relay's round trip without
+/// spending any TURN traffic on it.
+///
+/// `None` only when every attempt timed out. That reads the same whether the
+/// relay is unreachable or has simply turned plain STUN off, and it has to:
+/// a relay with `no-stun` set can still be relaying perfectly well, so this
+/// is "could not measure", never "the relay is down".
+pub async fn ping(server: &str, samples: usize) -> Option<Duration> {
+    let socket = bind(None).await?;
+    let mut times = Vec::with_capacity(samples);
+    for _ in 0..samples {
+        let started = Instant::now();
+        if ask(&socket, server).await.is_some() {
+            times.push(started.elapsed());
+        }
+    }
+    if times.is_empty() {
+        return None;
+    }
+    Some(median(times))
+}
+
+/// The middle of `times`, so one slow packet among several does not decide
+/// the number [`ping`] reports.
+///
+/// Takes the times already measured rather than measuring them itself, so
+/// the choice of "middle" is testable without a socket.
+fn median(mut times: Vec<Duration>) -> Duration {
+    times.sort_unstable();
+    times[times.len() / 2]
 }
 
 #[cfg(test)]
@@ -390,6 +436,78 @@ mod tests {
     #[test]
     fn two_transaction_ids_in_a_row_are_different() {
         assert_ne!(TransactionId::new(), TransactionId::new());
+    }
+
+    /// The whole point of timing more than once: a single slow packet among
+    /// several must not become the number reported.
+    #[test]
+    fn the_middle_time_is_reported_not_the_slowest_or_the_fastest() {
+        assert_eq!(
+            median(vec![
+                Duration::from_millis(500),
+                Duration::from_millis(10),
+                Duration::from_millis(20),
+            ]),
+            Duration::from_millis(20)
+        );
+    }
+
+    /// A minimal coturn stand-in for [`ping`]'s tests: binds a UDP socket and
+    /// answers every well formed binding request it reads with a success
+    /// reply, so the timing path can be tested without a real relay to send
+    /// to.
+    async fn answering_stun_server() -> SocketAddr {
+        let socket = UdpSocket::bind("127.0.0.1:0").await.expect("a free port");
+        let addr = socket.local_addr().expect("a bound address");
+        tokio::spawn(async move {
+            let mut buf = vec![0u8; MAX_REPLY];
+            loop {
+                let Ok((len, from)) = socket.recv_from(&mut buf).await else {
+                    return;
+                };
+                let mut request = Message::new();
+                if request.unmarshal_binary(&buf[..len]).is_err() {
+                    continue;
+                }
+                let answer = reply(
+                    BINDING_SUCCESS,
+                    request.transaction_id,
+                    v4(203, 0, 113, 9),
+                    40000,
+                );
+                if socket.send_to(&answer, from).await.is_err() {
+                    return;
+                }
+            }
+        });
+        addr
+    }
+
+    /// A relay whose STUN answers gets back a measured duration, over a real
+    /// socket rather than through [`decode_response`] directly.
+    #[tokio::test]
+    async fn a_relay_that_answers_gets_a_measured_ping() {
+        let addr = answering_stun_server().await;
+        let got = ping(&addr.to_string(), RELAY_PING_SAMPLES).await;
+        assert!(
+            got.is_some(),
+            "a server that answered should produce a duration"
+        );
+    }
+
+    /// A relay that never answers, the way one with `no-stun` set would leave
+    /// it, has to come back as nothing to report rather than a number that
+    /// would read as a measurement.
+    #[tokio::test]
+    async fn a_relay_that_never_answers_is_read_as_unmeasured() {
+        let addr = {
+            let socket = UdpSocket::bind("127.0.0.1:0").await.expect("a free port");
+            socket.local_addr().expect("a bound address")
+            // Dropped here, so the port is free again and nothing is
+            // listening on it to answer.
+        };
+        let got = ping(&addr.to_string(), 1).await;
+        assert_eq!(got, None, "silence must not be read as a number");
     }
 
     /// Every server in [`SERVERS`], one at a time, against the real internet.
