@@ -281,6 +281,29 @@ describe("one lobby connection", () => {
     expect(wire.notified).not.toContain("Connection lost — reconnecting…");
   });
 
+  // Issue #2737: a kicked joiner is dropped the same way a closed room is,
+  // a `SERVERMSG` naming why then a clean close, so the fix above already
+  // covers it once conn.rs carries the reason forward. This is that claim,
+  // with the exact words the room's kick sends (`crates/coilbox-lobby-
+  // protocol/src/server/room.rs`) rather than a stand-in string.
+  it("says who kicked us and does not reconnect into whoever now holds the room", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await fire(ROOM_KEY, { kind: "phase", phase: "ready", agreement: null });
+    wire.notified.length = 0;
+
+    await fire(ROOM_KEY, {
+      kind: "disconnected",
+      reason: "alice removed you from this room",
+    });
+
+    expect(activeKey()).toBe("none");
+    expect(wire.notified).toContain("Disconnected from the room");
+    expect(wire.notified).not.toContain("Connection lost — reconnecting…");
+  });
+
   // The same drop with no reason is what a network blip looks like rather
   // than the room ending, and the same room is still there to reclaim a seat
   // in, so this is the one case that still gets the usual reconnect loop.

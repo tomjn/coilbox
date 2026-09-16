@@ -380,7 +380,7 @@ fn a_kicked_player_is_out_on_their_own_screen() {
     // Back on a fresh connection, under the same name, and turned away at login.
     s.log_in(3, "bob");
     assert!(s.deltas_for(3).contains(&Delta::LoginDenied {
-        reason: "you were kicked from this room".into()
+        reason: "alice removed you from this room".into()
     }));
     assert_eq!(s.clients[&3].current_battle, None);
 }

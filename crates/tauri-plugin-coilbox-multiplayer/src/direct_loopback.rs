@@ -1098,9 +1098,9 @@ async fn a_kicked_joiner_is_told_why_and_cannot_come_back() {
         || {
             joiner
                 .received()
-                .contains(&"SERVERMSG you were kicked from this room".to_string())
+                .contains(&"SERVERMSG alice removed you from this room".to_string())
         },
-        "the kicked joiner to be told why",
+        "the kicked joiner to be told why, and by whom",
     )
     .await;
     // Out of the battle for everybody, and off the socket.
@@ -1118,7 +1118,7 @@ async fn a_kicked_joiner_is_told_why_and_cannot_come_back() {
         || {
             again
                 .received()
-                .contains(&"DENIED you were kicked from this room".to_string())
+                .contains(&"DENIED alice removed you from this room".to_string())
         },
         "the returning bob to be refused by name",
     )
