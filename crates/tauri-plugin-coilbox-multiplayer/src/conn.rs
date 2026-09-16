@@ -1247,6 +1247,7 @@ mod tests {
         ) = Some(crate::relay_host::RelayHost {
             engine_port: 8452,
             relayed: "198.51.100.9:30001".parse().expect("an address"),
+            over_tls: false,
             agent: Arc::new(agent),
             moves: crate::relay_host::MoveWatch::default(),
             credential: crate::relay_host::CredentialWatch::default(),

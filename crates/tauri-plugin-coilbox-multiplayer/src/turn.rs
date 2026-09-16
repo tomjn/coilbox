@@ -300,9 +300,10 @@ pub(crate) async fn mp_turn_credentials(
 /// The credential's username and password never reach the frontend, the same
 /// as [`mp_turn_credentials`]: only the timing crosses the IPC boundary.
 ///
-/// `milliseconds` is null whenever there is nothing to report, which is two
+/// `milliseconds` is null whenever there is nothing to report, which is three
 /// different things read as one. Either the lobby would not name a relay at
-/// all, or it did and the relay's own STUN said nothing back. Both have to
+/// all, or it named one only over TLS and STUN is timed over UDP, or it did and
+/// the relay's own STUN said nothing back. Both have to
 /// read as "could not be measured" rather than "the relay is down", because a
 /// coturn operator can turn STUN replies off with `no-stun` and still be
 /// relaying perfectly well.
@@ -325,7 +326,11 @@ async fn relay_ping(registry: &Registry, server_key: &str) -> Option<u64> {
     let credential = credentials(registry, server_key, now_ms(), READY_TIMEOUT)
         .await
         .ok()?;
-    let measured = stun::ping(&credential.turn.server, stun::RELAY_PING_SAMPLES).await?;
+    // STUN is timed over UDP, so a relay offered only over TLS has nothing to
+    // time here.
+    let servers = coilbox_relay_protocol::relay_servers(&credential.turn.server).ok()?;
+    let udp = servers.iter().find(|server| !server.tls)?;
+    let measured = stun::ping(&udp.addr, stun::RELAY_PING_SAMPLES).await?;
     Some(measured.as_millis() as u64)
 }
 
@@ -481,38 +486,19 @@ fn usable(minted: &TurnCredentials) -> Result<Credential, NoCredential> {
     })
 }
 
-/// The `host:port` the relay agent's `--turn-server` takes, out of the URI the
-/// lobby named the relay with.
+/// What the relay agent's `--turn-server` takes, out of the URI the lobby named
+/// the relay with.
 ///
 /// The lobby names it the way TURN servers are named everywhere else, as
-/// `turn:host:port` (RFC 7065), and the agent takes a bare `host:port`. A
-/// `?transport=` on the end is dropped: the agent speaks UDP and there is
-/// nothing to select.
-///
-/// `turns:` is refused rather than quietly treated as `turn:`. It is TURN over
-/// TLS on a different port, the agent has no TLS, and sending UDP at a TLS port
-/// would fail as a relay that never answers rather than as anything a person
-/// could read.
+/// `turn:host:port` or `turns:host:port` (RFC 7065), and several of them joined
+/// with commas when it offers both. The agent takes the same list with plain UDP
+/// first, and reaches a `turns:` one over TLS only when UDP gets no answer
+/// (issue #1698). `coilbox_relay_protocol::relay_servers` is the parser, shared
+/// with the agent so a list accepted here is one the agent can open.
 fn relay_address(uri: &str) -> Result<String, NoCredential> {
-    let unusable = |why: String| Err(NoCredential::Unusable(why));
-    if let Some(rest) = uri.strip_prefix("turns:") {
-        return unusable(format!(
-            "{rest} is TURN over TLS, and the relay agent speaks plain UDP"
-        ));
-    }
-    // A scheme is optional, so that a lobby naming a bare host and port is read
-    // as the same thing rather than as a host called "turn".
-    let authority = uri.strip_prefix("turn:").unwrap_or(uri);
-    let authority = authority.split('?').next().unwrap_or(authority);
-    // From the right, so an IPv6 address written `[2001:db8::1]:3478` keeps its
-    // colons and gives up only the port.
-    let Some((host, port)) = authority.rsplit_once(':') else {
-        return unusable(format!("{uri} names no port"));
-    };
-    if host.is_empty() || port.parse::<u16>().is_err() {
-        return unusable(format!("{uri} is not a host and a port"));
-    }
-    Ok(authority.to_string())
+    coilbox_relay_protocol::relay_servers(uri)
+        .map(|servers| coilbox_relay_protocol::to_arg(&servers))
+        .map_err(NoCredential::Unusable)
 }
 
 #[cfg(test)]
@@ -1373,6 +1359,16 @@ pub(crate) mod tests {
             ("relay.example.org:3478", "relay.example.org:3478"),
             // IPv6 keeps its colons and gives up only the port.
             ("turn:[2001:db8::1]:3478", "[2001:db8::1]:3478"),
+            // TURN over TLS, which the agent reaches over TLS.
+            (
+                "turns:relay.example.org:5349?transport=tcp",
+                "turns:relay.example.org:5349",
+            ),
+            // Both, with plain UDP first whatever order the lobby used.
+            (
+                "turns:relay.example.org:5349,turn:relay.example.org:3478",
+                "relay.example.org:3478,turns:relay.example.org:5349",
+            ),
         ] {
             assert_eq!(
                 relay_address(uri).expect("a usable relay"),
@@ -1385,8 +1381,6 @@ pub(crate) mod tests {
     #[test]
     fn a_relay_coilbox_cannot_reach_is_refused_in_words() {
         for uri in [
-            // TLS on a different port, and the agent has no TLS.
-            "turns:relay.example.org:5349",
             // No port to send to.
             "turn:relay.example.org",
             "turn:[2001:db8::1]",
@@ -1395,6 +1389,8 @@ pub(crate) mod tests {
             // Nothing at all.
             "turn:",
             "",
+            // One good entry does not make up for a broken one.
+            "turn:relay.example.org:3478,turns:relay.example.org",
         ] {
             let refused = relay_address(uri).expect_err("not a relay coilbox can use");
             assert!(

@@ -75,6 +75,9 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+mod relay_servers;
+pub use relay_servers::{relay_servers, to_arg, RelayServer};
+
 /// How often the agent says how much it is carrying.
 ///
 /// Here rather than in the agent because both ends need it. The agent sleeps
@@ -187,7 +190,8 @@ pub enum Request {
     #[serde(rename_all = "camelCase")]
     RenewCredential {
         id: RequestId,
-        /// `host:port` of the TURN server, as `--turn-server` takes it.
+        /// The TURN servers, as `--turn-server` takes them. See
+        /// [`relay_servers`].
         server: String,
         user: String,
         password: String,
@@ -217,8 +221,16 @@ pub enum Event {
     /// lost allocation and the new one is at a different address, so a second
     /// `relayOpen` means the battle is being advertised at an address that has
     /// gone (issue #2031).
+    ///
+    /// `over_tls` is whether the agent reaches the TURN server over TLS, which
+    /// adds delay the host should be told about (issue #1698). False from an
+    /// agent built before TLS, which is correct, because that agent had none.
     #[serde(rename_all = "camelCase")]
-    RelayOpen { addr: SocketAddr },
+    RelayOpen {
+        addr: SocketAddr,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        over_tls: bool,
+    },
     /// There is no relay at the moment, for this reason. The agent is either
     /// about to try again or about to stop, and says which.
     #[serde(rename_all = "camelCase")]
@@ -710,8 +722,16 @@ mod tests {
         assert_eq!(
             to_line(&Event::RelayOpen {
                 addr: SocketAddr::from(([198, 51, 100, 7], 41641)),
+                over_tls: false,
             }),
             "{\"type\":\"relayOpen\",\"addr\":\"198.51.100.7:41641\"}\n"
+        );
+        assert_eq!(
+            to_line(&Event::RelayOpen {
+                addr: SocketAddr::from(([198, 51, 100, 7], 41641)),
+                over_tls: true,
+            }),
+            "{\"type\":\"relayOpen\",\"addr\":\"198.51.100.7:41641\",\"overTls\":true}\n"
         );
         assert_eq!(
             to_line(&Event::Traffic {

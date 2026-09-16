@@ -813,6 +813,7 @@ mod tests {
         for port in [41641u16, 41642] {
             scripted.line(to_line(&Event::RelayOpen {
                 addr: (Ipv4Addr::new(198, 51, 100, 7), port).into(),
+                over_tls: false,
             }));
         }
 
@@ -821,6 +822,7 @@ mod tests {
                 seen.recv_timeout(PATIENCE).expect("an event arrived"),
                 Event::RelayOpen {
                     addr: (Ipv4Addr::new(198, 51, 100, 7), port).into(),
+                    over_tls: false,
                 }
             );
         }
@@ -971,11 +973,13 @@ mod tests {
 
         scripted.line(to_line(&Event::RelayOpen {
             addr: (Ipv4Addr::new(198, 51, 100, 7), 41641).into(),
+            over_tls: false,
         }));
         assert_eq!(
             seen.recv_timeout(PATIENCE).expect("an event arrived"),
             Event::RelayOpen {
                 addr: (Ipv4Addr::new(198, 51, 100, 7), 41641).into(),
+                over_tls: false,
             },
             "the first thing the listener hears has to be the relay, not the meter"
         );

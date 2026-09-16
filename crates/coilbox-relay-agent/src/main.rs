@@ -28,6 +28,11 @@
 //! an address on the server's machine, which anybody can reach.
 //! [`allocation`] carries that side.
 //!
+//! `--turn-server` can name several servers, comma separated, and a
+//! `turns:` one is reached over TLS for a network that drops UDP (issue
+//! #1698). [`tls`] carries that, and `coilbox_relay_protocol::relay_servers`
+//! reads the list.
+//!
 //! Without it, the relay is a plain UDP socket bound at `--relay-bind`. That is
 //! a working transport for a relay that can already reach the host, and it is
 //! what the demux tests drive.
@@ -85,7 +90,7 @@
 //!
 //! ```text
 //! coilbox-relay-agent --engine-port <port> --max-peers <n> [--relay-bind <addr>]
-//!                     [--turn-server <host:port> --turn-user <name>]
+//!                     [--turn-server <host:port>[,turns:<host:port>] --turn-user <name>]
 //!                     [--run-file <path>]
 //! ```
 //!
@@ -100,6 +105,7 @@ mod demux;
 mod relay;
 mod run_file;
 mod stopping;
+mod tls;
 mod traffic;
 
 use std::convert::Infallible;
@@ -111,7 +117,7 @@ use std::time::Duration;
 
 use allocation::{AllocationFailure, TurnAllocation, TurnCredentials};
 use allowlist::Allowlist;
-use coilbox_relay_protocol::{Event, Request};
+use coilbox_relay_protocol::{relay_servers, Event, Request};
 use control::{Reporter, Requests};
 use demux::Agent;
 use relay::RelayLink;
@@ -137,6 +143,8 @@ struct Args {
     relay_bind: SocketAddr,
     /// The TURN server to allocate on, if the battle is going through one.
     turn: Option<TurnCredentials>,
+    /// What a TLS relay's certificate is checked against.
+    tls: Arc<rustls::ClientConfig>,
     /// Where to record that this agent is running, so a coilbox that reopens
     /// mid-game finds it instead of starting a second one. See [`run_file`].
     ///
@@ -240,7 +248,7 @@ fn parse_args() -> Result<Args, String> {
     // the battle has been advertised.
     let turn = match (turn_server, turn_user, std::env::var(PASSWORD_VAR).ok()) {
         (Some(server), Some(username), Some(password)) => Some(TurnCredentials {
-            server,
+            servers: relay_servers(&server).map_err(|e| format!("--turn-server: {e}"))?,
             username,
             password,
         }),
@@ -257,6 +265,7 @@ fn parse_args() -> Result<Args, String> {
         max_peers,
         relay_bind,
         turn,
+        tls: tls::client_config(),
         run_file,
     })
 }
@@ -326,7 +335,7 @@ impl Transport {
         credentials: Option<TurnCredentials>,
     ) -> Result<Transport, AllocationFailure> {
         match &credentials {
-            Some(credentials) => TurnAllocation::open(args.relay_bind, credentials)
+            Some(credentials) => TurnAllocation::open(args.relay_bind, credentials, &args.tls)
                 .await
                 .map(Transport::Relayed),
             None => UdpSocket::bind(args.relay_bind)
@@ -348,6 +357,14 @@ impl Transport {
                 .local_addr()
                 .map_err(|e| format!("bound socket has no address: {e}")),
             Transport::Relayed(allocation) => Ok(allocation.relayed_addr()),
+        }
+    }
+
+    /// Whether the relay's server is reached over TLS.
+    fn over_tls(&self) -> bool {
+        match self {
+            Transport::Direct(_) => false,
+            Transport::Relayed(allocation) => allocation.over_tls(),
         }
     }
 
@@ -605,7 +622,14 @@ async fn relay_until_it_gives_up(
             // Where players send. With `--relay-bind` left at port 0 this is
             // the only way to learn it, and a rebuilt relay says it again
             // because the address will have moved (issue #2031).
-            Ok(addr) => reporter.say(Event::RelayOpen { addr }).await,
+            Ok(addr) => {
+                reporter
+                    .say(Event::RelayOpen {
+                        addr,
+                        over_tls: relay.over_tls(),
+                    })
+                    .await
+            }
             Err(e) => {
                 eprintln!("coilbox-relay-agent: {e}");
                 reporter.say(Event::Stopping { reason: e }).await;
@@ -789,7 +813,7 @@ mod tests {
 
     fn a_credential(password: &str) -> TurnCredentials {
         TurnCredentials {
-            server: "relay.example.org:3478".to_string(),
+            servers: relay_servers("relay.example.org:3478").expect("a relay"),
             username: "1786086400:alice".to_string(),
             password: password.to_string(),
         }

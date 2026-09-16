@@ -159,6 +159,10 @@ pub struct RelayHost {
     /// somewhere else. [`readvertise`] is the only thing that changes it, and it
     /// tells the lobby in the same breath.
     pub relayed: SocketAddr,
+    /// Whether the sidecar reaches the relay server over TLS, which the host is
+    /// told because it adds delay (issue #1698). Follows [`Self::relayed`] when
+    /// a rebuild moves it.
+    pub over_tls: bool,
     /// The control channel, held so joiners can be let through the relay and so
     /// the battle can be stopped or ended.
     ///
@@ -393,8 +397,8 @@ pub(crate) fn listening(
     let registry = Arc::clone(registry);
     let server_key = server_key.to_string();
     move |event| {
-        if let Event::RelayOpen { addr } = &event {
-            rebuilt_at(&registry, &server_key, *addr, patience);
+        if let Event::RelayOpen { addr, over_tls } = &event {
+            rebuilt_at(&registry, &server_key, *addr, *over_tls, patience);
         }
         let _ = saw.send(event);
     }
@@ -413,11 +417,22 @@ pub(crate) fn listening(
 /// afterwards to queue the line. Everything else in coilbox that touches both
 /// locks holds the registry's while it takes the relay's, so this must not hold
 /// the relay's while it takes the registry's.
-fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr, patience: Duration) {
+fn rebuilt_at(
+    registry: &Registry,
+    server_key: &str,
+    addr: SocketAddr,
+    over_tls: bool,
+    patience: Duration,
+) {
     let held = lock_or_recover(registry)
         .get(server_key)
         .map(|conn| (Arc::clone(&conn.relay), conn.sink.clone()));
     let Some((relay, sink)) = held else { return };
+    // A rebuild can fall back to TLS, or get UDP back, whether or not the
+    // address it opened at needs advertising.
+    if let Some(host) = lock_or_recover(&relay).as_mut() {
+        host.over_tls = over_tls;
+    }
     let Some(moved) = readvertise(&relay, addr) else {
         return;
     };
@@ -1009,10 +1024,11 @@ pub fn waiting_on(
     let why = loop {
         let left = deadline.saturating_duration_since(std::time::Instant::now());
         match heard.recv_timeout(left) {
-            Ok(Event::RelayOpen { addr }) => {
+            Ok(Event::RelayOpen { addr, over_tls }) => {
                 return Ok(RelayHost {
                     engine_port,
                     relayed: addr,
+                    over_tls,
                     agent: Arc::new(agent),
                     moves: MoveWatch::default(),
                     // Nothing here knows when the credential runs out, and
@@ -1468,8 +1484,11 @@ pub(crate) mod tests {
     #[test]
     fn an_open_relay_is_the_address_the_battle_is_advertised_at() {
         let (saw, heard) = mpsc::channel();
-        saw.send(Event::RelayOpen { addr: relayed() })
-            .expect("the channel is open");
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        })
+        .expect("the channel is open");
 
         let host = waiting_on(silent_agent(), heard, ENGINE_PORT, PATIENCE)
             .expect("the agent opened a relay");
@@ -1489,8 +1508,11 @@ pub(crate) mod tests {
     #[test]
     fn the_engines_own_port_is_not_the_one_the_battle_is_advertised_at() {
         let (saw, heard) = mpsc::channel();
-        saw.send(Event::RelayOpen { addr: relayed() })
-            .expect("the channel is open");
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        })
+        .expect("the channel is open");
 
         let host = waiting_on(silent_agent(), heard, ENGINE_PORT, PATIENCE)
             .expect("the agent opened a relay");
@@ -1578,8 +1600,11 @@ pub(crate) mod tests {
         let (saw, heard) = mpsc::channel();
         saw.send(Event::Done { id: 1 })
             .expect("the channel is open");
-        saw.send(Event::RelayOpen { addr: relayed() })
-            .expect("the channel is open");
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        })
+        .expect("the channel is open");
 
         let host = waiting_on(silent_agent(), heard, ENGINE_PORT, PATIENCE)
             .expect("the agent opened a relay after answering something else");
@@ -1592,10 +1617,14 @@ pub(crate) mod tests {
     #[test]
     fn a_second_address_does_not_quietly_replace_the_one_hosted_at() {
         let (saw, heard) = mpsc::channel();
-        saw.send(Event::RelayOpen { addr: relayed() })
-            .expect("the channel is open");
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        })
+        .expect("the channel is open");
         saw.send(Event::RelayOpen {
             addr: SocketAddr::from((Ipv4Addr::new(198, 51, 100, 9), 30002)),
+            over_tls: false,
         })
         .expect("the channel is open");
 
@@ -1625,8 +1654,11 @@ pub(crate) mod tests {
         let written = Written::default();
         let agent = agent_writing_to(written.clone());
         let (saw, heard) = mpsc::channel();
-        saw.send(Event::RelayOpen { addr: relayed() })
-            .expect("the channel is open");
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        })
+        .expect("the channel is open");
         let host =
             waiting_on(agent, heard, ENGINE_PORT, PATIENCE).expect("the agent opened a relay");
 
@@ -1691,8 +1723,11 @@ pub(crate) mod tests {
     fn an_agent_that_opened_a_relay_is_not_stopped() {
         let written = Written::default();
         let (saw, heard) = mpsc::channel();
-        saw.send(Event::RelayOpen { addr: relayed() })
-            .expect("the channel is open");
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        })
+        .expect("the channel is open");
 
         let host = waiting_on(
             agent_writing_to(written.clone()),
@@ -1708,6 +1743,53 @@ pub(crate) mod tests {
             written.sent()
         );
         assert_eq!(host.relayed, relayed());
+    }
+
+    /// Issue #1698. A relay the sidecar reached over TLS is held as one, so the
+    /// host can be told it may add delay.
+    #[test]
+    fn a_relay_opened_over_tls_is_held_as_one() {
+        let (saw, heard) = mpsc::channel();
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: true,
+        })
+        .expect("the channel is open");
+
+        let host = waiting_on(silent_agent(), heard, ENGINE_PORT, PATIENCE)
+            .expect("the agent opened a relay");
+        assert!(host.over_tls);
+    }
+
+    /// A rebuild can fall back to TLS, or get UDP back, and what the host is
+    /// told follows it.
+    #[tokio::test]
+    async fn a_rebuild_changes_whether_the_relay_is_over_tls() {
+        let renewing = hosting_and_renewing();
+        let (saw, _heard) = mpsc::channel();
+        let listener = listening(&renewing.registry, KEY, saw, PATIENCE);
+        let over_tls = || {
+            let registry = lock_or_recover(&renewing.registry);
+            let relay = &registry
+                .get(KEY)
+                .expect("the connection is registered")
+                .relay;
+            let over_tls = lock_or_recover(relay).as_ref().map(|host| host.over_tls);
+            over_tls
+        };
+        assert_eq!(over_tls(), Some(false));
+
+        listener(Event::RelayOpen {
+            addr: rebuilt(),
+            over_tls: true,
+        });
+        assert_eq!(over_tls(), Some(true), "the rebuild fell back to TLS");
+
+        listener(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        });
+        assert_eq!(over_tls(), Some(false), "the next rebuild got UDP back");
     }
 
     /// Where the sidecar's second allocation lands. Same relay server, different
@@ -2046,8 +2128,11 @@ pub(crate) mod tests {
     /// holds it in, which is the shape [`let_joiner_through`] reads.
     fn relay_slot(agent: RelayAgent) -> HostedRelay {
         let (saw, heard) = mpsc::channel();
-        saw.send(Event::RelayOpen { addr: relayed() })
-            .expect("the channel is open");
+        saw.send(Event::RelayOpen {
+            addr: relayed(),
+            over_tls: false,
+        })
+        .expect("the channel is open");
         let host =
             waiting_on(agent, heard, ENGINE_PORT, PATIENCE).expect("the agent opened a relay");
         Arc::new(Mutex::new(Some(host)))

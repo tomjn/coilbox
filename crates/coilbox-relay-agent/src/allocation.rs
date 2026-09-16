@@ -61,6 +61,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use coilbox_relay_protocol::RelayServer;
 use stun::attributes::ATTR_MESSAGE_INTEGRITY;
 use stun::error_code::{ErrorCodeAttribute, CODE_STALE_NONCE, ERROR_REASONS};
 use stun::message::{
@@ -75,6 +76,7 @@ use turn::proto::lifetime::Lifetime;
 use webrtc_util::Conn;
 
 use crate::relay::RelayLink;
+use crate::tls::TlsConn;
 
 /// What the sidecar needs to open an allocation.
 ///
@@ -82,8 +84,9 @@ use crate::relay::RelayLink;
 /// coilbox's job, and issue #2016's. The sidecar is handed the answer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TurnCredentials {
-    /// `host:port` of the TURN server.
-    pub server: String,
+    /// The TURN servers to try, in order. Plain UDP comes before TLS
+    /// (`coilbox_relay_protocol::relay_servers`).
+    pub servers: Vec<RelayServer>,
     pub username: String,
     pub password: String,
 }
@@ -340,54 +343,79 @@ async fn watch_lifetime(health: Arc<Health>) {
     }
 }
 
-/// The UDP socket the TURN client speaks to the server over, with the agent
+/// The socket the TURN client speaks to the server over, with the agent
 /// reading along.
 ///
-/// Everything here is the socket's own behaviour apart from the two lines that
-/// hand each datagram to [`Health`] on the way past.
+/// Everything here is the socket's own behaviour apart from the lines that
+/// hand each message to [`Health`] on the way past.
 struct WatchedSocket {
-    socket: UdpSocket,
+    socket: Box<dyn Conn + Send + Sync>,
     health: Arc<Health>,
+    /// Whether `socket` is a TLS connection.
+    ///
+    /// A TURN server ends every allocation made over a connection when that
+    /// connection closes (RFC 8656 section 3.1). The client stops reading when
+    /// a read fails and says nothing, so without this a closed connection would
+    /// look like a quiet game until the lifetime ran out.
+    over_tls: bool,
+}
+
+impl WatchedSocket {
+    fn read_failed(&self, e: &webrtc_util::Error) {
+        if self.over_tls {
+            self.health.report(AllocationFailure::Unreachable(format!(
+                "the TLS connection to the relay ended: {e}"
+            )));
+        }
+    }
 }
 
 #[async_trait]
 impl Conn for WatchedSocket {
     async fn connect(&self, addr: SocketAddr) -> Result<(), webrtc_util::Error> {
-        Conn::connect(&self.socket, addr).await
+        self.socket.connect(addr).await
     }
 
     async fn recv(&self, buf: &mut [u8]) -> Result<usize, webrtc_util::Error> {
-        let read = Conn::recv(&self.socket, buf).await?;
+        let read = self
+            .socket
+            .recv(buf)
+            .await
+            .inspect_err(|e| self.read_failed(e))?;
         self.health.saw_inbound(&buf[..read]);
         Ok(read)
     }
 
     async fn recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr), webrtc_util::Error> {
-        let (read, from) = Conn::recv_from(&self.socket, buf).await?;
+        let (read, from) = self
+            .socket
+            .recv_from(buf)
+            .await
+            .inspect_err(|e| self.read_failed(e))?;
         self.health.saw_inbound(&buf[..read]);
         Ok((read, from))
     }
 
     async fn send(&self, buf: &[u8]) -> Result<usize, webrtc_util::Error> {
         self.health.saw_outbound(buf);
-        Conn::send(&self.socket, buf).await
+        self.socket.send(buf).await
     }
 
     async fn send_to(&self, buf: &[u8], target: SocketAddr) -> Result<usize, webrtc_util::Error> {
         self.health.saw_outbound(buf);
-        Conn::send_to(&self.socket, buf, target).await
+        self.socket.send_to(buf, target).await
     }
 
     fn local_addr(&self) -> Result<SocketAddr, webrtc_util::Error> {
-        Conn::local_addr(&self.socket)
+        self.socket.local_addr()
     }
 
     fn remote_addr(&self) -> Option<SocketAddr> {
-        Conn::remote_addr(&self.socket)
+        self.socket.remote_addr()
     }
 
     async fn close(&self) -> Result<(), webrtc_util::Error> {
-        Conn::close(&self.socket).await
+        self.socket.close().await
     }
 
     fn as_any(&self) -> &(dyn std::any::Any + Send + Sync) {
@@ -400,30 +428,73 @@ pub struct TurnAllocation {
     client: Client,
     relayed: Box<dyn Conn + Send + Sync>,
     relayed_addr: SocketAddr,
+    over_tls: bool,
     health: Arc<Health>,
 }
 
 impl TurnAllocation {
-    /// Ask `credentials.server` for an allocation, talking to it from a socket
-    /// bound at `bind`.
+    /// Ask each of `credentials.servers` for an allocation in turn, until one
+    /// grants it.
     ///
-    /// `bind` is the agent's own address, not the relayed one. `0.0.0.0:0` is
-    /// the usual answer, because nothing has to reach this socket except the
-    /// TURN server replying to us.
+    /// The next server is tried only when this one was never reached. That is
+    /// what makes TLS a fallback: UDP that gets no answer on a network that
+    /// drops it fails on the TURN client's own retransmit schedule, and then
+    /// TLS is tried. A server that answered and refused is the answer, because
+    /// every server in the list takes the same credential.
+    ///
+    /// `bind` is the agent's own address for UDP, not the relayed one.
+    /// `0.0.0.0:0` is the usual answer, because nothing has to reach this
+    /// socket except the TURN server replying to us. `tls` is what a TLS
+    /// server's certificate is checked against.
     pub async fn open(
         bind: SocketAddr,
         credentials: &TurnCredentials,
+        tls: &Arc<rustls::ClientConfig>,
     ) -> Result<TurnAllocation, AllocationFailure> {
-        let socket = UdpSocket::bind(bind)
-            .await
-            .map_err(|e| AllocationFailure::Unreachable(format!("could not bind {bind}: {e}")))?;
+        let mut unreached = Vec::new();
+        for (tried, server) in credentials.servers.iter().enumerate() {
+            match TurnAllocation::open_on(bind, server, credentials, tls).await {
+                Err(AllocationFailure::Unreachable(why)) => {
+                    if tried + 1 < credentials.servers.len() {
+                        eprintln!("coilbox-relay-agent: {why}, so trying the next relay");
+                    }
+                    unreached.push(why);
+                }
+                opened => return opened,
+            }
+        }
+        Err(AllocationFailure::Unreachable(unreached.join(", and ")))
+    }
+
+    async fn open_on(
+        bind: SocketAddr,
+        server: &RelayServer,
+        credentials: &TurnCredentials,
+        tls: &Arc<rustls::ClientConfig>,
+    ) -> Result<TurnAllocation, AllocationFailure> {
+        let named = coilbox_relay_protocol::to_arg(std::slice::from_ref(server));
+        let socket: Box<dyn Conn + Send + Sync> = if server.tls {
+            Box::new(
+                TlsConn::connect(&server.addr, Arc::clone(tls))
+                    .await
+                    .map_err(|e| {
+                        AllocationFailure::Unreachable(format!(
+                            "could not connect to {named} over TLS: {e}"
+                        ))
+                    })?,
+            )
+        } else {
+            Box::new(UdpSocket::bind(bind).await.map_err(|e| {
+                AllocationFailure::Unreachable(format!("could not bind {bind}: {e}"))
+            })?)
+        };
         let health = Arc::new(Health::new());
         let client = Client::new(ClientConfig {
             // Empty because the agent has no use for a reflexive address: the
             // relayed one is the whole point, and asking a STUN server for the
             // other one is what the direct paths are for.
             stun_serv_addr: String::new(),
-            turn_serv_addr: credentials.server.clone(),
+            turn_serv_addr: server.addr.clone(),
             username: credentials.username.clone(),
             password: credentials.password.clone(),
             // The server names its own in the challenge, and the client
@@ -436,16 +507,17 @@ impl TurnAllocation {
             conn: Arc::new(WatchedSocket {
                 socket,
                 health: Arc::clone(&health),
+                over_tls: server.tls,
             }),
             vnet: None,
         })
         .await
-        .map_err(|e| unreachable_server(&credentials.server, &e))?;
+        .map_err(|e| unreachable_server(&named, &e))?;
 
         client
             .listen()
             .await
-            .map_err(|e| unreachable_server(&credentials.server, &e))?;
+            .map_err(|e| unreachable_server(&named, &e))?;
 
         let relayed = match client.allocate().await {
             Ok(relayed) => relayed,
@@ -456,7 +528,7 @@ impl TurnAllocation {
                 // worth deciding on.
                 return Err(health
                     .failure()
-                    .unwrap_or_else(|| unreachable_server(&credentials.server, &e)));
+                    .unwrap_or_else(|| unreachable_server(&named, &e)));
             }
         };
         let relayed_addr = relayed.local_addr().map_err(|e| {
@@ -469,6 +541,7 @@ impl TurnAllocation {
             client,
             relayed: Box::new(relayed),
             relayed_addr,
+            over_tls: server.tls,
             health,
         })
     }
@@ -477,6 +550,11 @@ impl TurnAllocation {
     /// battle advertises.
     pub fn relayed_addr(&self) -> SocketAddr {
         self.relayed_addr
+    }
+
+    /// Whether the agent reaches this allocation's server over TLS.
+    pub fn over_tls(&self) -> bool {
+        self.over_tls
     }
 
     /// Why the allocation stopped working, once it has.
@@ -544,12 +622,15 @@ mod tests {
     //! this file already believes. The real coturn round trip is issue #2025.
 
     use super::*;
+    use crate::tls;
+    use crate::tls::tests::{tls_server, trusting_the_test_ca};
     use std::net::Ipv4Addr;
     use stun::attributes::{ATTR_NONCE, ATTR_REALM};
     use stun::error_code::{ErrorCode, CODE_ALLOC_MISMATCH, CODE_UNAUTHORIZED};
     use stun::integrity::MessageIntegrity;
     use stun::message::{Method, Setter};
     use stun::textattrs::{Nonce, Realm};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::sync::mpsc;
     use turn::proto::relayaddr::RelayedAddress;
 
@@ -600,6 +681,16 @@ mod tests {
         /// The address it hands out, which the test asserts the agent reports.
         relayed: SocketAddr,
         asked: mpsc::UnboundedReceiver<Asked>,
+        /// Whether it is answering over TLS rather than UDP.
+        tls: bool,
+    }
+
+    /// What a server that speaks TLS does once it has granted an allocation.
+    #[derive(Clone, Copy)]
+    enum AfterGrant {
+        KeepAnswering,
+        /// Close the connection, which ends the allocation on a real server.
+        HangUp,
     }
 
     impl FakeTurn {
@@ -634,6 +725,59 @@ mod tests {
                 addr,
                 relayed,
                 asked,
+                tls: false,
+            }
+        }
+
+        /// The same server, answering over TLS with the test certificate.
+        async fn start_over_tls(
+            on_refresh: OnRefresh,
+            lifetime: Duration,
+            after_grant: AfterGrant,
+        ) -> FakeTurn {
+            let relayed = SocketAddr::from(([198, 51, 100, 7], 41641));
+            let (say, asked) = mpsc::unbounded_channel();
+            let addr = tls_server(move |mut stream| {
+                let say = say.clone();
+                async move {
+                    let mut buf = vec![0u8; 4096];
+                    loop {
+                        // Everything the client sends before it has a channel
+                        // is STUN, so the length in the header is all there is
+                        // to framing here.
+                        if stream.read_exact(&mut buf[..20]).await.is_err() {
+                            return;
+                        }
+                        let length = usize::from(u16::from_be_bytes([buf[2], buf[3]]));
+                        if stream.read_exact(&mut buf[20..20 + length]).await.is_err() {
+                            return;
+                        }
+                        let Some(request) = decode(&buf[..20 + length]) else {
+                            return;
+                        };
+                        let Some(reply) = answer(&request, relayed, lifetime, on_refresh, &say)
+                        else {
+                            continue;
+                        };
+                        if stream.write_all(&reply.raw).await.is_err() {
+                            return;
+                        }
+                        let _ = stream.flush().await;
+                        let granted =
+                            reply.typ == MessageType::new(METHOD_ALLOCATE, CLASS_SUCCESS_RESPONSE);
+                        if granted && matches!(after_grant, AfterGrant::HangUp) {
+                            let _ = stream.shutdown().await;
+                            return;
+                        }
+                    }
+                }
+            })
+            .await;
+            FakeTurn {
+                addr,
+                relayed,
+                asked,
+                tls: true,
             }
         }
 
@@ -647,13 +791,35 @@ mod tests {
             assert_eq!(heard, what);
         }
 
+        fn server(&self) -> RelayServer {
+            RelayServer {
+                addr: self.addr.to_string(),
+                tls: self.tls,
+            }
+        }
+
         fn credentials(&self) -> TurnCredentials {
             TurnCredentials {
-                server: self.addr.to_string(),
+                servers: vec![self.server()],
                 username: USER.to_string(),
                 password: PASSWORD.to_string(),
             }
         }
+
+        /// Whether the server has been asked anything at all yet.
+        fn was_asked_nothing(&mut self) -> bool {
+            self.asked.try_recv().is_err()
+        }
+    }
+
+    /// A UDP port with a socket on it that never answers, which is what a TURN
+    /// server looks like from a network that drops UDP.
+    async fn silent_udp() -> (UdpSocket, RelayServer) {
+        let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .expect("a free loopback port");
+        let addr = socket.local_addr().expect("a bound address").to_string();
+        (socket, RelayServer { addr, tls: false })
     }
 
     /// The server's whole protocol, such as it is.
@@ -770,9 +936,10 @@ mod tests {
         let mut server = FakeTurn::start(OnRefresh::Grant, Duration::from_secs(600)).await;
         let credentials = server.credentials();
 
-        let allocation = TurnAllocation::open(any_local_port(), &credentials)
-            .await
-            .expect("the server granted an allocation");
+        let allocation =
+            TurnAllocation::open(any_local_port(), &credentials, &tls::client_config())
+                .await
+                .expect("the server granted an allocation");
 
         assert_eq!(
             allocation.relayed_addr(),
@@ -787,6 +954,312 @@ mod tests {
         allocation.close().await;
     }
 
+    /// Issue #1698. The same exchange over TLS, and the allocation says so.
+    #[tokio::test]
+    async fn an_allocation_can_be_made_over_tls() {
+        let mut server = FakeTurn::start_over_tls(
+            OnRefresh::Grant,
+            Duration::from_secs(600),
+            AfterGrant::KeepAnswering,
+        )
+        .await;
+
+        let allocation = TurnAllocation::open(
+            any_local_port(),
+            &server.credentials(),
+            &trusting_the_test_ca(),
+        )
+        .await
+        .expect("the server granted an allocation over TLS");
+
+        assert_eq!(allocation.relayed_addr(), server.relayed);
+        assert!(allocation.over_tls());
+        server.waits_to_be_asked(Asked::AllocateUnsigned).await;
+        server.waits_to_be_asked(Asked::AllocateSigned).await;
+        allocation.close().await;
+        server.waits_to_be_asked(Asked::Release).await;
+    }
+
+    /// The fallback: UDP that never answers gives way to TLS once the TURN
+    /// client has given up on it.
+    ///
+    /// Real time rather than a paused clock, because the TLS handshake is real
+    /// IO. How long the UDP attempt took is printed, since that is the delay a
+    /// host on such a network waits before their relay opens.
+    #[tokio::test]
+    async fn udp_that_gets_no_answer_falls_back_to_tls() {
+        let (_silent, udp) = silent_udp().await;
+        let mut server = FakeTurn::start_over_tls(
+            OnRefresh::Grant,
+            Duration::from_secs(600),
+            AfterGrant::KeepAnswering,
+        )
+        .await;
+        let credentials = TurnCredentials {
+            servers: vec![udp, server.server()],
+            ..server.credentials()
+        };
+
+        let started = Instant::now();
+        let allocation =
+            TurnAllocation::open(any_local_port(), &credentials, &trusting_the_test_ca())
+                .await
+                .expect("TLS granted what UDP could not");
+        println!("UDP was given up on after {:?}", started.elapsed());
+
+        assert!(allocation.over_tls(), "the relay is carried over TLS");
+        server.waits_to_be_asked(Asked::AllocateUnsigned).await;
+        server.waits_to_be_asked(Asked::AllocateSigned).await;
+        allocation.close().await;
+    }
+
+    /// Working UDP is used, and TLS is never touched.
+    #[tokio::test]
+    async fn udp_that_answers_is_used_and_tls_is_not_tried() {
+        let udp = FakeTurn::start(OnRefresh::Grant, Duration::from_secs(600)).await;
+        let mut over_tls = FakeTurn::start_over_tls(
+            OnRefresh::Grant,
+            Duration::from_secs(600),
+            AfterGrant::KeepAnswering,
+        )
+        .await;
+        let credentials = TurnCredentials {
+            servers: vec![udp.server(), over_tls.server()],
+            ..udp.credentials()
+        };
+
+        let allocation =
+            TurnAllocation::open(any_local_port(), &credentials, &trusting_the_test_ca())
+                .await
+                .expect("the UDP server granted an allocation");
+
+        assert!(!allocation.over_tls());
+        assert_eq!(allocation.relayed_addr(), udp.relayed);
+        assert!(over_tls.was_asked_nothing());
+        allocation.close().await;
+    }
+
+    /// A refusal is an answer, so it is not a reason to try TLS. The TLS server
+    /// takes the same credential and would refuse it too.
+    #[tokio::test]
+    async fn a_credential_refused_over_udp_is_not_tried_over_tls() {
+        let udp = FakeTurn::start(OnRefresh::Grant, Duration::from_secs(600)).await;
+        let mut over_tls = FakeTurn::start_over_tls(
+            OnRefresh::Grant,
+            Duration::from_secs(600),
+            AfterGrant::KeepAnswering,
+        )
+        .await;
+        let credentials = TurnCredentials {
+            servers: vec![udp.server(), over_tls.server()],
+            password: "not-the-password".to_string(),
+            ..udp.credentials()
+        };
+
+        let failure = TurnAllocation::open(any_local_port(), &credentials, &trusting_the_test_ca())
+            .await
+            .err()
+            .expect("the credential is no good");
+
+        assert!(failure.is_credential_failure(), "{failure}");
+        assert!(over_tls.was_asked_nothing());
+    }
+
+    /// Every server unreachable is one failure that names each of them, so
+    /// the host can see that TLS was tried too.
+    #[tokio::test]
+    async fn a_relay_nobody_could_reach_says_what_was_tried() {
+        let credentials = TurnCredentials {
+            servers: vec![RelayServer {
+                addr: "127.0.0.1:1".to_string(),
+                tls: true,
+            }],
+            username: USER.to_string(),
+            password: PASSWORD.to_string(),
+        };
+
+        let failure = TurnAllocation::open(any_local_port(), &credentials, &trusting_the_test_ca())
+            .await
+            .err()
+            .expect("nothing listens on port 1");
+
+        let AllocationFailure::Unreachable(why) = failure else {
+            panic!("a server nobody reached is unreachable, got {failure}");
+        };
+        assert!(
+            why.contains("could not connect to turns:127.0.0.1:1 over TLS"),
+            "{why}"
+        );
+    }
+
+    /// A TURN server ends an allocation when the connection it was made over
+    /// closes. The relay has to break when that happens, rather than wait out
+    /// the lifetime while nobody can reach the host.
+    #[tokio::test]
+    async fn a_tls_connection_that_closes_loses_the_allocation() {
+        let server = FakeTurn::start_over_tls(
+            OnRefresh::Grant,
+            Duration::from_secs(600),
+            AfterGrant::HangUp,
+        )
+        .await;
+        let allocation = TurnAllocation::open(
+            any_local_port(),
+            &server.credentials(),
+            &trusting_the_test_ca(),
+        )
+        .await
+        .expect("the server granted an allocation before hanging up");
+
+        let mut buf = vec![0u8; 4096];
+        let stopped = tokio::time::timeout(PATIENCE, RelayLink::recv_from(&allocation, &mut buf))
+            .await
+            .expect("the relay broke rather than waiting out a 600 second lifetime")
+            .expect_err("an allocation whose connection closed cannot deliver datagrams");
+        assert!(
+            stopped
+                .to_string()
+                .contains("TLS connection to the relay ended"),
+            "{stopped}"
+        );
+        assert!(
+            !allocation
+                .failure()
+                .expect("a recorded failure")
+                .is_credential_failure(),
+            "a closed connection is worth rebuilding"
+        );
+    }
+
+    /// Issue #1698 against a real coturn: a host whose UDP never reaches the
+    /// relay still gets a relay over TLS, and a player's datagrams go both ways
+    /// through it.
+    ///
+    /// coturn runs with `no-udp`, so nothing answers UDP on its plain port,
+    /// which is what a network that drops UDP looks like from the host. The
+    /// relayed address is still UDP, which is what players send to. The
+    /// certificate is the test one in `tests/tls/`.
+    ///
+    /// Ignored for the same reason as `relayed_battle.rs` in the multiplayer
+    /// plugin: a CI runner has no coturn. With `brew install coturn` or
+    /// `apt-get install coturn`:
+    ///
+    /// ```text
+    /// cargo test -p coilbox-relay-agent real_coturn -- --ignored --nocapture
+    /// ```
+    #[tokio::test]
+    #[ignore = "needs coturn on PATH"]
+    async fn a_real_coturn_relays_over_tls_when_udp_gets_no_answer() {
+        let free_port = || {
+            std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+                .and_then(|listener| listener.local_addr())
+                .expect("a free loopback port")
+                .port()
+        };
+        let (plain_port, tls_port) = (free_port(), free_port());
+        let dir = tempfile::tempdir().expect("somewhere for coturn's configuration");
+        let fixture = |name: &str| format!("{}/tests/tls/{name}", env!("CARGO_MANIFEST_DIR"));
+        let conf = dir.path().join("turnserver.conf");
+        let settings = [
+            format!("listening-port={plain_port}"),
+            format!("tls-listening-port={tls_port}"),
+            "listening-ip=127.0.0.1".to_string(),
+            "relay-ip=127.0.0.1".to_string(),
+            // Clear of the ranges `relayed_battle.rs` uses.
+            "min-port=30200".to_string(),
+            "max-port=30209".to_string(),
+            format!("realm={SERVER_NAME}"),
+            "allow-loopback-peers".to_string(),
+            "fingerprint".to_string(),
+            "no-udp".to_string(),
+            "no-dtls".to_string(),
+            format!("cert={}", fixture("relay.pem")),
+            format!("pkey={}", fixture("relay.key")),
+            "lt-cred-mech".to_string(),
+            format!("user={USER}:{PASSWORD}"),
+            "no-cli".to_string(),
+            "simple-log".to_string(),
+            format!("log-file={}", dir.path().join("coturn.log").display()),
+            "no-stdout-log".to_string(),
+            format!("pidfile={}", dir.path().join("turnserver.pid").display()),
+        ];
+        std::fs::write(&conf, settings.join("\n") + "\n").expect("a writable temp dir");
+        let mut coturn = std::process::Command::new("turnserver")
+            .arg("-c")
+            .arg(&conf)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("turnserver on PATH");
+
+        let listening = async {
+            while tokio::net::TcpStream::connect((Ipv4Addr::LOCALHOST, tls_port))
+                .await
+                .is_err()
+            {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        };
+        tokio::time::timeout(PATIENCE, listening)
+            .await
+            .expect("coturn opened its TLS port");
+
+        let credentials = TurnCredentials {
+            servers: coilbox_relay_protocol::relay_servers(&format!(
+                "turns:127.0.0.1:{tls_port},turn:127.0.0.1:{plain_port}"
+            ))
+            .expect("a relay"),
+            username: USER.to_string(),
+            password: PASSWORD.to_string(),
+        };
+        let started = Instant::now();
+        let allocation =
+            TurnAllocation::open(any_local_port(), &credentials, &trusting_the_test_ca())
+                .await
+                .expect("coturn granted an allocation over TLS");
+        println!(
+            "relay open at {} after {:?}",
+            allocation.relayed_addr(),
+            started.elapsed()
+        );
+        assert!(allocation.over_tls());
+
+        // A player, sending to the relayed address as any joiner would.
+        let player = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .expect("a free loopback port");
+        let player_addr = player.local_addr().expect("a bound address");
+        // The first send also lets the player through, the same as
+        // `allowlist.rs` does.
+        RelayLink::send_to(&allocation, b"from the host", player_addr)
+            .await
+            .expect("sent through the relay");
+        let mut buf = vec![0u8; 1500];
+        let (read, from) = tokio::time::timeout(PATIENCE, player.recv_from(&mut buf))
+            .await
+            .expect("the player heard the host through the relay")
+            .expect("a readable socket");
+        assert_eq!(&buf[..read], b"from the host");
+        assert_eq!(from, allocation.relayed_addr());
+
+        player
+            .send_to(b"from the player", allocation.relayed_addr())
+            .await
+            .expect("sent to the relay");
+        let (read, from) =
+            tokio::time::timeout(PATIENCE, RelayLink::recv_from(&allocation, &mut buf))
+                .await
+                .expect("the host heard the player through the relay")
+                .expect("the allocation is alive");
+        assert_eq!(&buf[..read], b"from the player");
+        assert_eq!(from, player_addr);
+
+        allocation.close().await;
+        let _ = coturn.kill();
+        let _ = coturn.wait();
+    }
+
     /// A credential the server will not take is refused at the door, and says
     /// so precisely enough for the caller to know not to try again.
     #[tokio::test]
@@ -797,7 +1270,7 @@ mod tests {
             ..server.credentials()
         };
 
-        let failure = TurnAllocation::open(any_local_port(), &credentials)
+        let failure = TurnAllocation::open(any_local_port(), &credentials, &tls::client_config())
             .await
             .err()
             .expect("a server that will not take the credential grants nothing");
@@ -822,9 +1295,13 @@ mod tests {
     #[tokio::test]
     async fn a_granted_allocation_is_held_open_with_refresh() {
         let mut server = FakeTurn::start(OnRefresh::Grant, SHORTEST_LIFETIME).await;
-        let allocation = TurnAllocation::open(any_local_port(), &server.credentials())
-            .await
-            .expect("the server granted an allocation");
+        let allocation = TurnAllocation::open(
+            any_local_port(),
+            &server.credentials(),
+            &tls::client_config(),
+        )
+        .await
+        .expect("the server granted an allocation");
 
         server.waits_to_be_asked(Asked::AllocateUnsigned).await;
         server.waits_to_be_asked(Asked::AllocateSigned).await;
@@ -853,9 +1330,13 @@ mod tests {
     #[tokio::test]
     async fn giving_an_allocation_back_asks_the_server_for_a_lifetime_of_zero() {
         let mut server = FakeTurn::start(OnRefresh::Grant, Duration::from_secs(600)).await;
-        let allocation = TurnAllocation::open(any_local_port(), &server.credentials())
-            .await
-            .expect("the server granted an allocation");
+        let allocation = TurnAllocation::open(
+            any_local_port(),
+            &server.credentials(),
+            &tls::client_config(),
+        )
+        .await
+        .expect("the server granted an allocation");
         server.waits_to_be_asked(Asked::AllocateUnsigned).await;
         server.waits_to_be_asked(Asked::AllocateSigned).await;
 
@@ -876,9 +1357,13 @@ mod tests {
     async fn a_refused_refresh_loses_the_allocation_and_breaks_the_relay() {
         let mut server =
             FakeTurn::start(OnRefresh::Refuse(CODE_UNAUTHORIZED), SHORTEST_LIFETIME).await;
-        let allocation = TurnAllocation::open(any_local_port(), &server.credentials())
-            .await
-            .expect("the server granted an allocation");
+        let allocation = TurnAllocation::open(
+            any_local_port(),
+            &server.credentials(),
+            &tls::client_config(),
+        )
+        .await
+        .expect("the server granted an allocation");
         server.waits_to_be_asked(Asked::AllocateUnsigned).await;
         server.waits_to_be_asked(Asked::AllocateSigned).await;
         server.waits_to_be_asked(Asked::Refresh).await;
