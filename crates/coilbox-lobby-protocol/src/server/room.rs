@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use super::client::ClientCommand;
 use super::line::{self, BattleOpened};
 use crate::state::{Battle, Bot, MemberStatus, StartRect};
-use crate::status::{BattleStatus, ClientStatus};
+use crate::status::{default_battle_status, BattleStatus, ClientStatus};
 
 /// A connected socket, named by whatever the driving plugin counts with.
 pub type PeerId = u64;
@@ -814,13 +814,26 @@ impl RoomState {
     /// seat back, announced to the room, and is *not* asked for one. The two are
     /// alternatives, not a sequence.
     ///
+    /// # Seating a fresh joiner
+    ///
+    /// Nobody reclaiming a seat is put on the next free team and the next free
+    /// ally, the way a SPADS host seats a newcomer, so a two-player game is
+    /// playable without either person touching the seat controls (issue #2735).
+    /// Picked here, inside the one command that admits them, so two joins
+    /// arriving together cannot both land on the same free seat.
+    ///
+    /// Skipped while the host is already in-game: that join is "watch live"
+    /// (`BattleRow.tsx`), not a fresh player, and a battle already running takes
+    /// no more of them.
+    ///
     /// `REQUESTBATTLESTATUS` is answered by the client's connection task out of
-    /// whatever it has folded so far, and a client that has just reconnected has
-    /// folded nothing. Ask it before telling it and the answer is the spectator
-    /// default, which comes back as a `MYBATTLESTATUS` that overwrites the seat we
-    /// had just handed back. Ask it after and the answer happens to be right.
-    /// Measured on the wire, both ways round. Not asking is the version that does
-    /// not depend on which line the client reads first.
+    /// whatever it has folded so far, and a client that has just reconnected, or
+    /// just joined, has folded nothing of its own. Ask it before telling it and
+    /// the answer is the spectator default, which comes back as a
+    /// `MYBATTLESTATUS` that overwrites the seat we had just handed back or
+    /// assigned. Ask it after and the answer happens to be right. Measured on
+    /// the wire, both ways round. Not asking is the version that does not depend
+    /// on which line the client reads first.
     fn admit(&mut self, peer: PeerId, script_password: Option<String>) -> Vec<Outbound> {
         let (Some(name), Some(battle)) = (self.name_of(peer), self.battle.as_ref()) else {
             return vec![];
@@ -882,9 +895,16 @@ impl RoomState {
         // left with: the client generates a fresh one when it cannot remember the
         // old, and the host's start script has to authenticate the new socket.
         let reclaimed = self.seats.remove(&name);
-        let (battle_status, team_color) = match &reclaimed {
-            Some(seat) => (seat.battle_status, seat.team_color),
-            None => (BattleStatus::default(), 0),
+        let host_ingame = self
+            .peer_named(&self.config.host)
+            .and_then(|p| self.peers.get(&p))
+            .is_some_and(|p| p.status.ingame);
+        let assigned =
+            (reclaimed.is_none() && !host_ingame).then(|| self.next_free_seat(&existing));
+        let (battle_status, team_color) = match (&reclaimed, &assigned) {
+            (Some(seat), _) => (seat.battle_status, seat.team_color),
+            (None, Some(seat)) => (*seat, 0),
+            (None, None) => (BattleStatus::default(), 0),
         };
         self.peers.get_mut(&peer).expect("peer exists").member = Some(MemberStatus {
             battle_status,
@@ -910,20 +930,57 @@ impl RoomState {
                 line: line::joined_battle(id, &name, None),
             }),
         }
-        match reclaimed {
-            // The seat they dropped with, given back and said out loud, so their
-            // own room and everybody else's agree without anybody being asked.
-            Some(_) => out.push(Outbound::All {
+        if reclaimed.is_some() || assigned.is_some() {
+            // The seat they dropped with, or the seat just assigned, given back
+            // and said out loud, so their own room and everybody else's agree
+            // without anybody being asked.
+            out.push(Outbound::All {
                 line: line::client_battle_status(&name, battle_status, team_color),
-            }),
+            });
+        } else {
             // Their team, ally and colour come back as MYBATTLESTATUS, which the
-            // room then broadcasts. Without the prompt they sit at the default.
-            None => out.push(Outbound::To {
+            // room then broadcasts. Without the prompt they sit at the default:
+            // the "watch live" path this is, and a spectator is the right
+            // starting point for it.
+            out.push(Outbound::To {
                 peer,
                 line: line::request_battle_status(),
-            }),
+            });
         }
         out
+    }
+
+    /// The next free team and the next free ally for a fresh joiner, picked
+    /// independently so team 2 does not imply ally B. `existing` is the roster
+    /// before this join, so the newcomer is never counted as their own
+    /// competition for a seat.
+    ///
+    /// A bot occupies a seat as surely as a player does, so both feed the same
+    /// used sets: a two-player game with a bot already on team 2 must not seat
+    /// the second joiner on top of it.
+    ///
+    /// Team and ally are 4-bit wire fields (0-15, see [`BattleStatus`]), so the
+    /// search is bounded rather than run over all of `u8`. A room this full
+    /// falls back to seat 15, which collides rather than panics: a real host
+    /// caps `max_players` long before every slot is spoken for.
+    fn next_free_seat(&self, existing: &HashMap<String, MemberStatus>) -> BattleStatus {
+        let mut used_teams = BTreeSet::new();
+        let mut used_allies = BTreeSet::new();
+        for member in existing.values() {
+            used_teams.insert(member.battle_status.team_id);
+            used_allies.insert(member.battle_status.ally);
+        }
+        for bot in self.battle.iter().flat_map(|b| b.bots.values()) {
+            used_teams.insert(bot.battle_status.team_id);
+            used_allies.insert(bot.battle_status.ally);
+        }
+        let first_free = |used: &BTreeSet<u8>| (0..=15u8).find(|i| !used.contains(i)).unwrap_or(15);
+        BattleStatus {
+            mode: true,
+            team_id: first_free(&used_teams),
+            ally: first_free(&used_allies),
+            ..default_battle_status()
+        }
     }
 
     /// Take a peer out of the battle, closing it if they founded it.
@@ -1581,13 +1638,109 @@ mod tests {
                 "{scoped} arrived before the join ack: {lines:?}"
             );
         }
-        // The joiner is caught up on what the room already holds, and asked for
-        // the seat they arrived with.
+        // The joiner is caught up on what the room already holds, and seated on
+        // the next free team and ally rather than asked to pick one: alice and
+        // Barb both hold team 0/ally 0, so bob lands on team 1/ally 1.
         assert!(lines.contains(&"SETSCRIPTTAGS game/startpostype=2"));
         assert!(lines.contains(&"ADDSTARTRECT 0 0 0 50 200"));
         assert!(lines.contains(&"ADDBOT 1 Barb alice 0 255 BARb"));
         assert!(lines.contains(&"JOINEDBATTLE 1 alice"));
-        assert_eq!(lines.last(), Some(&"REQUESTBATTLESTATUS"));
+        let seat = BattleStatus {
+            mode: true,
+            team_id: 1,
+            ally: 1,
+            ..default_battle_status()
+        };
+        assert_eq!(
+            lines.last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 0", seat.to_int()).as_str())
+        );
+    }
+
+    /// Every fresh joiner lands past the one before, so a third person does not
+    /// double up with the second (issue #2735).
+    #[test]
+    fn successive_joiners_each_land_on_the_next_team_and_ally() {
+        let mut room = started(false);
+
+        let bob_seat = BattleStatus {
+            mode: true,
+            team_id: 1,
+            ally: 1,
+            ..default_battle_status()
+        };
+        let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        assert_eq!(
+            due(&out, BOB).last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 0", bob_seat.to_int()).as_str())
+        );
+
+        let carol_seat = BattleStatus {
+            mode: true,
+            team_id: 2,
+            ally: 2,
+            ..default_battle_status()
+        };
+        log_in(&mut room, 3, "carol");
+        let out = send(&mut room, 3, "JOINBATTLE 1 * s3cret");
+        assert_eq!(
+            due(&out, 3).last(),
+            Some(&format!("CLIENTBATTLESTATUS carol {} 0", carol_seat.to_int()).as_str())
+        );
+    }
+
+    /// A bot occupies a seat as surely as a player, so a joiner is not seated on
+    /// top of one (issue #2735: "Bots added through the room's Add AI control
+    /// should follow the same rule").
+    #[test]
+    fn a_joiner_does_not_land_on_a_bots_seat() {
+        let mut room = started(false);
+        let bot_seat = BattleStatus {
+            mode: true,
+            team_id: 1,
+            ally: 1,
+            ..default_battle_status()
+        };
+        send(
+            &mut room,
+            ALICE,
+            &command::add_bot("Barb", bot_seat, 255, "BARb"),
+        );
+
+        let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        let bob_seat = BattleStatus {
+            mode: true,
+            team_id: 2,
+            ally: 2,
+            ..default_battle_status()
+        };
+        assert_eq!(
+            due(&out, BOB).last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 0", bob_seat.to_int()).as_str())
+        );
+    }
+
+    /// Joining a battle that is already running is "watch live"
+    /// (`BattleRow.tsx`), not a fresh player claiming a seat, so it keeps the
+    /// ordinary spectator default and the `REQUESTBATTLESTATUS` round trip.
+    #[test]
+    fn a_join_while_the_host_is_ingame_is_not_auto_seated() {
+        let mut room = started(false);
+        send(
+            &mut room,
+            ALICE,
+            &command::my_status(ClientStatus {
+                ingame: true,
+                ..Default::default()
+            }),
+        );
+
+        let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        assert_eq!(due(&out, BOB).last(), Some(&"REQUESTBATTLESTATUS"));
+        assert_eq!(
+            room.battle_view().unwrap().members["bob"].battle_status,
+            BattleStatus::default()
+        );
     }
 
     /// The script password is what the host's start script authenticates a joiner
@@ -1840,7 +1993,8 @@ mod tests {
     }
 
     /// Leaving the battle is a decision. Coming back after one starts fresh, the
-    /// same as it would on a real server.
+    /// same as it would on a real server: seated on the next free team and
+    /// ally again, not on the seat given up.
     #[test]
     fn leaving_the_battle_gives_the_seat_up() {
         let mut room = started(false);
@@ -1854,9 +2008,18 @@ mod tests {
         send(&mut room, BOB, "LEAVEBATTLE");
 
         let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
-        assert_eq!(due(&out, BOB).last(), Some(&"REQUESTBATTLESTATUS"));
+        let fresh_seat = BattleStatus {
+            mode: true,
+            team_id: 1,
+            ally: 1,
+            ..default_battle_status()
+        };
+        assert_eq!(
+            due(&out, BOB).last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 0", fresh_seat.to_int()).as_str())
+        );
         let members = room.battle_view().unwrap().members;
-        assert_eq!(members["bob"].battle_status, BattleStatus::default());
+        assert_eq!(members["bob"].battle_status, fresh_seat);
         assert_eq!(members["bob"].team_color, 0);
     }
 
@@ -1878,10 +2041,19 @@ mod tests {
         send(&mut room, ALICE, &open_battle_line());
 
         let out = send(&mut room, BOB, "JOINBATTLE 2 * s3cret");
-        assert_eq!(due(&out, BOB).last(), Some(&"REQUESTBATTLESTATUS"));
+        let fresh_seat = BattleStatus {
+            mode: true,
+            team_id: 1,
+            ally: 1,
+            ..default_battle_status()
+        };
+        assert_eq!(
+            due(&out, BOB).last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 0", fresh_seat.to_int()).as_str())
+        );
         assert_eq!(
             room.battle_view().unwrap().members["bob"].battle_status,
-            BattleStatus::default()
+            fresh_seat
         );
     }
 
@@ -1961,11 +2133,15 @@ mod tests {
         assert!(view.start_rects.is_empty());
         assert_eq!(view.map, "Red Comet");
 
-        // The host's own force lands, and reaches the whole room.
+        // The host's own force lands, and reaches the whole room. Bob was seated
+        // on the next free team and ally when he joined (alice already holds
+        // team 0/ally 0), so the force only moves the ally on top of that.
         let out = send(&mut room, ALICE, "FORCEALLYNO bob 3");
         let expected = BattleStatus {
+            mode: true,
+            team_id: 1,
             ally: 3,
-            ..BattleStatus::default()
+            ..default_battle_status()
         };
         assert_eq!(
             due(&out, BOB),
