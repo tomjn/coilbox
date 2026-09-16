@@ -83,6 +83,18 @@ pub fn list_comp_flags() -> String {
 /// first.
 pub const RELAY_COMPAT_FLAG: &str = "r";
 
+/// The compatibility flag that says a client can use TURN over TLS and a
+/// `TURNCREDENTIALS` URI that lists several relays (issue #1698).
+///
+/// A server that offers it sends such a list only to a client that echoes it
+/// back, and a plain `turn:` URI to everybody else, because a coilbox from
+/// before TLS reads a list as one address it cannot reach. Negotiated the same
+/// way as [`RELAY_COMPAT_FLAG`], for the same reason.
+pub const TURNS_COMPAT_FLAG: &str = "turns";
+
+/// The flags a client sends only when the server's `COMPFLAGS` named them.
+pub const NEGOTIATED_COMPAT_FLAGS: [&str; 2] = [RELAY_COMPAT_FLAG, TURNS_COMPAT_FLAG];
+
 /// `CHANNELS` - request the public channel directory.
 pub fn list_channels() -> String {
     "CHANNELS".to_string()
