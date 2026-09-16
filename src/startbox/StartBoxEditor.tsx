@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { allyLetter, readableText } from "@/lib/allyDisplay";
+import { allyPaletteColor } from "@/lib/allyPalette";
 import {
   boxFromPoints,
   type Edge,
@@ -73,13 +74,11 @@ function boxOf(d: Drag): StartRect {
  */
 export function StartBoxEditor({
   rects,
-  allyColors,
   activeAlly,
   onCommit,
   onClear,
 }: {
   rects: Record<string, StartRect>;
-  allyColors: Record<number, string>;
   /** Ally a new box (drag on empty map) is assigned to. */
   activeAlly: number;
   /** Commit one ally's box on release. `ally` is 0-based (protocol). */
@@ -203,7 +202,7 @@ export function StartBoxEditor({
       onPointerDown={startCreate}
     >
       {boxes.map(({ ally, rect }) => {
-        const color = allyColors[ally] ?? "#e5e7eb";
+        const color = allyPaletteColor(ally);
         return (
           <div
             key={ally}

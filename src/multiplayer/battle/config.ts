@@ -131,18 +131,14 @@ export interface MemberRow {
 }
 
 /**
- * Each ally team's colour for the start-box editor: its lowest-numbered player's.
- * Spectators are skipped because they hold no ally. Feeds `useStartBoxAllies`,
- * which takes colours rather than a roster so a skirmish can supply its own.
+ * The ally teams a battle's roster actually has a player on. Spectators are
+ * skipped because they hold no ally. Feeds `useStartBoxAllies`, which takes
+ * this rather than a roster so a skirmish can supply its own. Start-box
+ * colour itself no longer comes from the roster (issue #2797) - see
+ * `@/lib/allyPalette`.
  */
-export function allyColorsFromRows(rows: MemberRow[]): Record<number, string> {
-  const out: Record<number, string> = {};
-  for (const r of [...rows]
-    .filter((r) => !r.spectator)
-    .sort((a, b) => a.teamId - b.teamId)) {
-    if (out[r.ally] == null) out[r.ally] = r.colorHex;
-  }
-  return out;
+export function alliesFromRows(rows: MemberRow[]): number[] {
+  return [...new Set(rows.filter((r) => !r.spectator).map((r) => r.ally))];
 }
 
 function rowFromStatus(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Battle, BattleStatus, MemberStatus, Vote } from "../bindings";
 import {
   aiShortNameFromDll,
+  alliesFromRows,
   allyLetter,
   battleStartable,
   clampBonus,
@@ -438,6 +439,31 @@ describe("battleStartable", () => {
         row({ kind: "human", spectator: false, ready: true }),
       ]),
     ).toBe(true);
+  });
+});
+
+describe("alliesFromRows", () => {
+  it("lists each ally team that has a player on it, once each", () => {
+    expect(
+      alliesFromRows([
+        row({ name: "a", ally: 0 }),
+        row({ name: "b", ally: 1 }),
+        row({ name: "c", ally: 1 }),
+      ]),
+    ).toEqual([0, 1]);
+  });
+
+  it("skips spectators, who hold no ally", () => {
+    expect(
+      alliesFromRows([
+        row({ name: "a", ally: 0, spectator: true }),
+        row({ name: "b", ally: 2, spectator: false }),
+      ]),
+    ).toEqual([2]);
+  });
+
+  it("returns nothing for an empty roster", () => {
+    expect(alliesFromRows([])).toEqual([]);
   });
 });
 

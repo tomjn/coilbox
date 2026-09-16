@@ -1,4 +1,5 @@
 import { allyLetter, readableText } from "@/lib/allyDisplay";
+import { allyPaletteColor } from "@/lib/allyPalette";
 import { GRID, type StartRect } from "./geometry";
 
 const pct = (v: number) => (v / GRID) * 100;
@@ -13,17 +14,14 @@ const pct = (v: number) => (v / GRID) * 100;
  */
 export function StartBoxOverlay({
   rects,
-  allyColors,
 }: {
   rects: Record<string, StartRect>;
-  /** Ally index -> CSS colour; falls back to a neutral outline. */
-  allyColors?: Record<number, string>;
 }) {
   return (
     <>
       {Object.entries(rects).map(([ally, r]) => {
         const i = Number(ally);
-        const color = allyColors?.[i] ?? "#e5e7eb";
+        const color = allyPaletteColor(i);
         return (
           <div
             key={ally}

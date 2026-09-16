@@ -408,20 +408,20 @@ export default function SkirmishPage() {
     });
   }, [participants]);
 
-  // Each ally's colour for the start-box editor, taken from the first row on it
-  // so a box is drawn in the colour of the side that will spawn in it. A
-  // spectating "you" holds no ally, so it contributes none.
-  const allyColors = useMemo(() => {
-    const out: Record<number, string> = {};
+  // The ally teams the roster actually has a participant on. A spectating
+  // "you" holds no ally, so it contributes none. Start-box colour itself no
+  // longer comes from the roster (issue #2797) - see `@/lib/allyPalette`.
+  const alliesInPlay = useMemo(() => {
+    const out = new Set<number>();
     for (const p of participants) {
       if (p.kind === "you" && p.spectator) continue;
-      if (out[p.allyTeam] == null) out[p.allyTeam] = rgbToHex(p.color);
+      out.add(p.allyTeam);
     }
     return out;
   }, [participants]);
   // Ally state shared between the minimap's drag editor and the controls under
   // the start-position dropdown, exactly as the battle room shares it.
-  const boxAllies = useStartBoxAllies(allyColors, startRects);
+  const boxAllies = useStartBoxAllies(alliesInPlay, startRects);
   const boxMode = isBoxMode(startPosType);
 
   const setStartBox = useCallback((ally: number, rect: StartRect) => {
@@ -1039,14 +1039,10 @@ export default function SkirmishPage() {
                 )}
                 {boxMode &&
                   (running ? (
-                    <StartBoxOverlay
-                      rects={startRects}
-                      allyColors={allyColors}
-                    />
+                    <StartBoxOverlay rects={startRects} />
                   ) : (
                     <StartBoxEditor
                       rects={startRects}
-                      allyColors={allyColors}
                       activeAlly={boxAllies.activeAlly}
                       onCommit={setStartBox}
                       onClear={clearStartBox}
@@ -1073,7 +1069,6 @@ export default function SkirmishPage() {
                 mapName={mapName}
                 rects={startRects}
                 allyList={boxAllies.allyList}
-                allyColors={allyColors}
                 activeAlly={boxAllies.activeAlly}
                 onPickAlly={boxAllies.pickAlly}
                 onSetBox={setStartBox}
