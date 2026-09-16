@@ -2,11 +2,14 @@
 //!
 //! A hand-written descent parser rather than the compiler's grammar tables,
 //! because the tables keep no comments and no line numbers. It accepts what the
-//! compiler accepts, keywords in any case, plus the few things older scripts
-//! compiled with Scriptor rely on: a statement left unterminated right before a
-//! closing brace, a bare braced block, and `x++` alongside `++x`.
+//! compiler accepts, keywords in any case, plus what older scripts compiled
+//! with Scriptor rely on: a statement left unterminated right before a closing
+//! brace or at the end of a line, a bare braced block, `x++` alongside `++x`,
+//! `break` and `continue`, `sound` declarations, `stop-sound`,
+//! `Mission-Command`, and a stray `)` after a condition.
 
 use crate::lex::{Kind, Token};
+use crate::Precedence;
 
 /// How deep blocks and expressions may nest. Real scripts nest a handful of
 /// levels, and this stops a runaway from overflowing the stack.
@@ -32,6 +35,9 @@ pub struct Item {
 pub enum ItemKind {
     Pieces(Vec<String>),
     Statics(Vec<String>),
+    /// `sound a, b;`, the names `play-sound` may play. The Lua plays a sound
+    /// by its name, so the names are not kept.
+    Sounds,
     Func(Func),
     /// A `#define` of this name.
     Define(String),
@@ -122,8 +128,18 @@ pub enum StmtKind {
         dest: Expr,
         speed: Option<Expr>,
     },
+    /// `scale`, which the engine applies to the whole piece whatever axis is
+    /// written.
+    Scale {
+        piece: String,
+        dest: Expr,
+        speed: Option<Expr>,
+    },
     WaitTurn(String, Axis),
     WaitMove(String, Axis),
+    WaitScale(String),
+    Break,
+    Continue,
     EmitSfx(Expr, String),
     Sleep(Expr),
     Hide(String),
@@ -137,9 +153,12 @@ pub enum StmtKind {
     DropUnit(Expr),
     Return(Option<Expr>),
     PlaySound(String, Expr),
+    /// Total Annihilation: Kingdoms' `Mission-Command`, an opcode the engine
+    /// does not run.
+    MissionCommand(Vec<Expr>),
     Var(Vec<String>),
     /// `cache`, `dont-cache`, `dont-shade` and `dont-shadow`, which the engine
-    /// ignores.
+    /// ignores, and `stop-sound`, which Scriptor compiles to nothing.
     Ignored,
     Define(String),
     Empty,
@@ -163,10 +182,12 @@ pub enum Expr {
     Bin(String, Box<Expr>, Box<Expr>),
 }
 
-pub fn parse(tokens: &[Token], linear: i64) -> Result<Vec<Item>, String> {
+pub fn parse(tokens: &[Token], linear: i64, precedence: Precedence) -> Result<Vec<Item>, String> {
     let mut p = Parser {
         tokens,
         linear,
+        precedence,
+        loops: 0,
         at: 0,
         pending: Vec::new(),
         last_line: 0,
@@ -189,6 +210,9 @@ struct Parser<'t> {
     in_step: bool,
     /// What `[1]` is in 65536ths of an elmo.
     linear: i64,
+    precedence: Precedence,
+    /// How many loops the statement being read is inside.
+    loops: usize,
 }
 
 fn comment_of(t: &Token) -> Comment {
@@ -200,10 +224,12 @@ fn comment_of(t: &Token) -> Comment {
 }
 
 /// One expression on its own, such as the body of a `#define`.
-pub fn expression(tokens: &[Token], linear: i64) -> Result<Expr, String> {
+pub fn expression(tokens: &[Token], linear: i64, precedence: Precedence) -> Result<Expr, String> {
     let mut p = Parser {
         tokens,
         linear,
+        precedence,
+        loops: 0,
         at: 0,
         pending: Vec::new(),
         last_line: 0,
@@ -402,6 +428,11 @@ impl<'t> Parser<'t> {
                     self.at += 1;
                     ItemKind::Pieces(self.names(";")?)
                 }
+                _ if t.is_word("sound") => {
+                    self.at += 1;
+                    self.names(";")?;
+                    ItemKind::Sounds
+                }
                 _ if t.is_word("static") => {
                     self.at += 1;
                     self.sym("-")?;
@@ -489,6 +520,22 @@ impl<'t> Parser<'t> {
     }
 
     /// The body of an `if`, `else` or `while`: a braced block or one statement.
+    /// The `)` closing a condition, and any more after it, which Metal
+    /// Factions' `.cob` files show its compiler skipped.
+    fn close_condition(&mut self) -> Result<(), String> {
+        self.sym(")")?;
+        while self.eat_sym(")") {}
+        Ok(())
+    }
+
+    /// A loop's body, inside which `break` and `continue` mean something.
+    fn loop_body(&mut self) -> Result<(Vec<Stmt>, Vec<Comment>), String> {
+        self.loops += 1;
+        let body = self.block();
+        self.loops -= 1;
+        body
+    }
+
     fn block(&mut self) -> Result<(Vec<Stmt>, Vec<Comment>), String> {
         if self.peek().is_some_and(|t| t.is_sym("{")) {
             self.braced()
@@ -511,10 +558,16 @@ impl<'t> Parser<'t> {
     }
 
     /// The end of a statement, which may be left out right before a closing
-    /// brace, and after a `for`'s last clause, whose `;` is optional.
+    /// brace, after a `for`'s last clause, whose `;` is optional, and at the
+    /// end of a line, as Spring 1944's `Mine.cob` shows its compiler allowed.
     fn end(&mut self) -> Result<(), String> {
         let closing = if self.in_step { ")" } else { "}" };
-        if self.eat_sym(";") || self.peek().is_some_and(|t| t.is_sym(closing)) {
+        let line = self.last_line;
+        if self.eat_sym(";")
+            || self
+                .peek()
+                .is_some_and(|t| t.is_sym(closing) || (!self.in_step && t.line > line))
+        {
             Ok(())
         } else {
             let t = self.next()?;
@@ -600,7 +653,7 @@ impl<'t> Parser<'t> {
                 self.at += 1;
                 self.sym("(")?;
                 let cond = self.expr(0)?;
-                self.sym(")")?;
+                self.close_condition()?;
                 let (then, then_tail) = self.block()?;
                 let els = if self.eat_word("else") {
                     Some(self.block()?)
@@ -618,8 +671,8 @@ impl<'t> Parser<'t> {
                 self.at += 1;
                 self.sym("(")?;
                 let cond = self.expr(0)?;
-                self.sym(")")?;
-                let (body, tail) = self.block()?;
+                self.close_condition()?;
+                let (body, tail) = self.loop_body()?;
                 return Ok(StmtKind::While { cond, body, tail });
             }
             "for" => {
@@ -642,7 +695,7 @@ impl<'t> Parser<'t> {
                     step?
                 };
                 self.sym(")")?;
-                let (body, tail) = self.block()?;
+                let (body, tail) = self.loop_body()?;
                 return Ok(StmtKind::For {
                     init,
                     cond,
@@ -650,6 +703,17 @@ impl<'t> Parser<'t> {
                     body,
                     tail,
                 });
+            }
+            "break" | "continue" if !self.peek_at(1).is_some_and(|n| n.is_sym("=")) => {
+                self.at += 1;
+                if self.loops == 0 {
+                    return Err(format!("line {}: {word} outside a loop", t.line));
+                }
+                if word == "break" {
+                    StmtKind::Break
+                } else {
+                    StmtKind::Continue
+                }
             }
             "return" => {
                 self.at += 1;
@@ -729,6 +793,35 @@ impl<'t> Parser<'t> {
                     }
                 }
             }
+            "scale" => {
+                self.at += 1;
+                let piece = self.ident()?;
+                self.word("to")?;
+                self.axis()?;
+                let dest = self.expr(0)?;
+                let speed = if self.eat_word("now") {
+                    None
+                } else {
+                    self.word("speed")?;
+                    Some(self.expr(0)?)
+                };
+                StmtKind::Scale { piece, dest, speed }
+            }
+            "wait" if self.looks_like(&["wait", "for", "scale"]) => {
+                self.hyphenated(&["wait", "for", "scale"])?;
+                let piece = self.ident()?;
+                self.word("along")?;
+                self.axis()?;
+                StmtKind::WaitScale(piece)
+            }
+            "stop" if self.looks_like(&["stop", "sound"]) => {
+                self.hyphenated(&["stop", "sound"])?;
+                StmtKind::Ignored
+            }
+            "mission" if self.looks_like(&["mission", "command"]) => {
+                self.hyphenated(&["mission", "command"])?;
+                StmtKind::MissionCommand(self.args()?)
+            }
             "wait" if self.looks_like(&["wait", "for", "turn"]) => {
                 self.hyphenated(&["wait", "for", "turn"])?;
                 let piece = self.ident()?;
@@ -794,9 +887,10 @@ impl<'t> Parser<'t> {
             "play" if self.looks_like(&["play", "sound"]) => {
                 self.hyphenated(&["play", "sound"])?;
                 self.sym("(")?;
+                // Quoted, or a name a `sound` declaration gave.
                 let t = self.next()?;
-                if t.kind != Kind::Str {
-                    return Err(self.error(t, "a sound name in quotes"));
+                if !matches!(t.kind, Kind::Str | Kind::Ident) {
+                    return Err(self.error(t, "a sound name"));
                 }
                 let name = t.text.clone();
                 self.sym(",")?;
@@ -849,7 +943,7 @@ impl<'t> Parser<'t> {
         if !matches!(t.kind, Kind::Sym | Kind::Ident) {
             return None;
         }
-        let power = crate::pp::binding(&t.text)?;
+        let power = crate::pp::binding(&t.text, self.precedence)?;
         let op = match t.text.to_ascii_lowercase().as_str() {
             "and" => "&&".to_string(),
             "or" => "||".to_string(),
@@ -950,7 +1044,7 @@ mod tests {
     use crate::lex::lex;
 
     fn items(src: &str) -> Vec<Item> {
-        parse(&lex(src, 0), 65536).unwrap()
+        parse(&lex(src, 0), 65536, Precedence::Modern).unwrap()
     }
 
     fn body(src: &str) -> Vec<Stmt> {
@@ -1024,7 +1118,7 @@ mod tests {
 
     #[test]
     fn says_where_it_stopped_understanding() {
-        let err = parse(&lex("F() {\n turn a;\n}", 0), 65536).unwrap_err();
+        let err = parse(&lex("F() {\n turn a;\n}", 0), 65536, Precedence::Modern).unwrap_err();
         assert!(err.contains("line 2"), "{err}");
     }
 
@@ -1079,6 +1173,8 @@ mod tests {
     #[test]
     fn runaway_nesting_is_an_error_not_a_crash() {
         let src = format!("F() {{ x = {}1{}; }}", "(".repeat(5000), ")".repeat(5000));
-        assert!(parse(&lex(&src, 0), 65536).unwrap_err().contains("nested"));
+        assert!(parse(&lex(&src, 0), 65536, Precedence::Modern)
+            .unwrap_err()
+            .contains("nested"));
     }
 }

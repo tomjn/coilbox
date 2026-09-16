@@ -59,6 +59,27 @@ const HEADER: &[&str] = &[
     "z_axis",
 ];
 
+/// The `explode` flags of the standard `exptype.h`, for a script whose copy of
+/// it is missing or older than the one its `.cob` was compiled with. Balanced
+/// Annihilation's has no `NOHEATCLOUD`, and its `armamph.cob` holds 128 for it.
+/// Numbers rather than the engine's `SFX` names, whose `FALL` is 0 in Lua.
+const EXPLODE_FLAGS: &[(&str, i64)] = &[
+    ("SHATTER", 1),
+    ("EXPLODE_ON_HIT", 2),
+    ("FALL", 4),
+    ("SMOKE", 8),
+    ("FIRE", 16),
+    ("BITMAPONLY", 32),
+    ("NOCEGTRAIL", 64),
+    ("NOHEATCLOUD", 128),
+    ("BITMAP1", 256),
+    ("BITMAP2", 512),
+    ("BITMAP3", 1024),
+    ("BITMAP4", 2048),
+    ("BITMAP5", 4096),
+    ("BITMAPNUKE", 8192),
+];
+
 /// Names a script's environment already means something by.
 const RESERVED: &[&str] = &[
     "math",
@@ -157,6 +178,17 @@ impl L {
             format!("({})", self.text)
         } else {
             self.text.clone()
+        }
+    }
+
+    /// Minus this, bracketed when it already starts with a minus, since `--`
+    /// begins a Lua comment.
+    fn negated(&self) -> String {
+        let text = self.wrap(P_UNARY);
+        if text.starts_with('-') {
+            format!("-({text})")
+        } else {
+            format!("-{text}")
         }
     }
 }
@@ -541,9 +573,10 @@ fn exprs_in(k: &StmtKind) -> Vec<&Expr> {
         StmtKind::Return(Some(e)) => vec![e],
         StmtKind::Spin { speed, accel, .. } => std::iter::once(speed).chain(accel).collect(),
         StmtKind::StopSpin { decel, .. } => decel.iter().collect(),
-        StmtKind::Turn { dest, speed, .. } | StmtKind::Move { dest, speed, .. } => {
-            std::iter::once(dest).chain(speed).collect()
-        }
+        StmtKind::Turn { dest, speed, .. }
+        | StmtKind::Move { dest, speed, .. }
+        | StmtKind::Scale { dest, speed, .. } => std::iter::once(dest).chain(speed).collect(),
+        StmtKind::MissionCommand(args) => args.iter().collect(),
         _ => Vec::new(),
     }
 }
@@ -556,6 +589,18 @@ fn mentions(e: &Expr, name: &str) -> bool {
         Expr::Not(a) | Expr::Neg(a) => mentions(a, name),
         _ => false,
     }
+}
+
+/// Whether a loop's own body uses `continue`, not counting loops inside it.
+fn continues(body: &[Stmt]) -> bool {
+    body.iter().any(|s| match &s.kind {
+        StmtKind::Continue => true,
+        StmtKind::If { then, els, .. } => {
+            continues(then) || els.as_ref().is_some_and(|(els, _)| continues(els))
+        }
+        StmtKind::Block(body, _) => continues(body),
+        _ => false,
+    })
 }
 
 /// Whether a function only ever sets `param` to a piece by name and never
@@ -744,9 +789,10 @@ impl<'a> Program<'a> {
             let mut blocks = false;
             let mut callees = Vec::new();
             walk(&f.body, &mut |k| match k {
-                StmtKind::Sleep(_) | StmtKind::WaitTurn(..) | StmtKind::WaitMove(..) => {
-                    blocks = true
-                }
+                StmtKind::Sleep(_)
+                | StmtKind::WaitTurn(..)
+                | StmtKind::WaitMove(..)
+                | StmtKind::WaitScale(_) => blocks = true,
                 StmtKind::Call(name, args) | StmtKind::Start(name, args) => {
                     let callee = name.to_lowercase();
                     if let Some(info) = p.funcs.get_mut(&callee) {
@@ -846,6 +892,9 @@ struct Writer<'p, 'a> {
     include_stack: Vec<String>,
     last_header: Option<String>,
     adapters: Vec<String>,
+    /// The loops the statement being written is inside, innermost last, each
+    /// with the flag its `break` sets when the body is wrapped for `continue`.
+    loops: Vec<Option<String>>,
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
@@ -881,6 +930,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             include_stack: Vec::new(),
             last_header: None,
             adapters: Vec::new(),
+            loops: Vec::new(),
         }
     }
 
@@ -1180,6 +1230,13 @@ impl<'p, 'a> Writer<'p, 'a> {
                 ..L::atom(format!("COB.{name}"))
             };
         }
+        if let Some((_, value)) = EXPLODE_FLAGS.iter().find(|(flag, _)| *flag == name) {
+            self.warn(
+                &format!("flag:{name}"),
+                format!("{name} is never defined here, probably in an include that was not found or is older than the one the script was compiled with, so the Lua uses {value}, its value in the standard exptype.h."),
+            );
+            return L::number(*value);
+        }
         self.warn(
             &format!("name:{name}"),
             format!("{name} is never declared, probably in an include that was not found, so it reads as nothing and the script will stop where it is used."),
@@ -1263,7 +1320,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                     return L::number(-l.value.unwrap_or(0));
                 }
                 L {
-                    text: format!("-{}", l.wrap(P_UNARY)),
+                    text: l.negated(),
                     prec: P_UNARY,
                     boolean: false,
                     value: l.value.map(|v| -v),
@@ -1434,7 +1491,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
         let unit = self.helper("COB_ANGLE");
         if negate {
-            format!("-{} * {unit}", l.wrap(P_UNARY))
+            format!("{} * {unit}", l.negated())
         } else {
             format!("{} * {unit}", l.wrap(P_MUL))
         }
@@ -1503,7 +1560,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
         let unit = self.helper("COB_LINEAR");
         if negate {
-            format!("-{} * {unit}", l.wrap(P_UNARY))
+            format!("{} * {unit}", l.negated())
         } else {
             format!("{} * {unit}", l.wrap(P_MUL))
         }
@@ -1548,6 +1605,12 @@ impl<'p, 'a> Writer<'p, 'a> {
                     if self.p.code_files.contains(&item.file) {
                         self.line(&format!("-- End of {name}"));
                         self.gap();
+                    }
+                }
+                ItemKind::Sounds => {
+                    self.comments(&item.leading);
+                    if let Some(c) = &item.trailing {
+                        self.comments(std::slice::from_ref(c));
                     }
                 }
                 ItemKind::Pieces(names) => {
@@ -1643,7 +1706,11 @@ impl<'p, 'a> Writer<'p, 'a> {
                 t
             })
             .collect();
-        let value = match parse::expression(&body, self.p.options.linear_scale) {
+        let value = match parse::expression(
+            &body,
+            self.p.options.linear_scale,
+            self.p.options.precedence,
+        ) {
             Ok(e) => {
                 let saved = std::mem::take(&mut self.refs);
                 let l = self.num(&e);
@@ -2110,16 +2177,13 @@ impl<'p, 'a> Writer<'p, 'a> {
             StmtKind::While { cond, body, tail } => {
                 let c = self.cond(cond).text;
                 self.code(&format!("while {c} do"), &None);
-                self.indent += 1;
-                self.block(body);
-                self.comments(tail);
-                self.indent -= 1;
+                self.loop_body(body, tail, None);
                 self.code("end", t);
             }
-            // A `while` with the step last in its body is the loop exactly, since
-            // BOS has no `break` or `continue` to skip the step. A Lua numeric
-            // `for` is not: it reads its limit once and ignores a body that
-            // changes the counter.
+            // A `while` with the step after the body is the loop exactly, with
+            // `continue` leaving the body and so still running the step. A Lua
+            // numeric `for` is not: it reads its limit once and ignores a body
+            // that changes the counter.
             StmtKind::For {
                 init,
                 cond,
@@ -2135,22 +2199,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                     None => "true".into(),
                 };
                 self.code(&format!("while {c} do"), &None);
-                self.indent += 1;
-                match step {
-                    // Nothing in the body is last, because the step follows it.
-                    Some(step) => {
-                        for s in body {
-                            self.stmt(s, false);
-                        }
-                        self.comments(tail);
-                        self.stmt(step, false);
-                    }
-                    None => {
-                        self.block(body);
-                        self.comments(tail);
-                    }
-                }
-                self.indent -= 1;
+                self.loop_body(body, tail, step.as_deref());
                 self.code("end", t);
             }
             StmtKind::Block(body, tail) => {
@@ -2160,6 +2209,24 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.comments(tail);
                 self.indent -= 1;
                 self.code("end", t);
+            }
+            // The engine hands `call-script lua_X` to LuaRules' global `X`,
+            // whatever the script defines under that name. A unit script cannot
+            // reach LuaRules' globals, only `GG`.
+            StmtKind::Call(name, args) if name.starts_with("lua_") => {
+                let values: Vec<String> = args.iter().map(|a| self.num(a).text).collect();
+                let lua = &name["lua_".len()..];
+                self.warn(
+                    &format!("luacall:{name}"),
+                    format!("call-script {name} runs LuaRules' own {lua} in the engine, which a Lua unit script cannot reach, so the Lua calls GG.{lua} if a gadget puts it there. Anything it hands back through LUA0 to LUA9 is lost."),
+                );
+                let id = self.header("unitID");
+                let def = self.header("unitDefID");
+                let call = std::iter::once(format!("{id}, {def}, Spring.GetUnitTeam({id})"))
+                    .chain(values)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                self.code(&format!("if GG.{lua} then GG.{lua}({call}) end"), t);
             }
             StmtKind::Call(name, args) | StmtKind::Start(name, args) => {
                 let start = matches!(s.kind, StmtKind::Start(..));
@@ -2225,6 +2292,51 @@ impl<'p, 'a> Writer<'p, 'a> {
                     None => format!("{f}({p}, {a}, {d})"),
                 };
                 self.code(&text, t);
+            }
+            StmtKind::Scale { piece, dest, speed } => {
+                let f = self.header("Scale");
+                let p = self.piece(piece);
+                let d = self.distance(dest, false);
+                let text = match speed {
+                    Some(sp) => format!("{f}({p}, {d}, {})", self.distance(sp, false)),
+                    None => format!("{f}({p}, {d})"),
+                };
+                self.code(&text, t);
+            }
+            StmtKind::WaitScale(piece) => {
+                let f = self.header("UnitScript");
+                let p = self.piece(piece);
+                self.code(&format!("{f}.WaitForScale({p})"), t);
+            }
+            StmtKind::Break => {
+                let text = if last { "break" } else { "do break end" };
+                match self.loops.last().cloned().flatten() {
+                    Some(flag) => {
+                        self.line(&format!("{flag} = true"));
+                        self.code(text, t);
+                    }
+                    None => self.code(text, t),
+                }
+            }
+            // Only in a body `loop_body` wrapped, where leaving the `repeat`
+            // goes on to the next time round.
+            StmtKind::Continue => {
+                self.code(if last { "break" } else { "do break end" }, t);
+            }
+            StmtKind::MissionCommand(args) => {
+                for a in args {
+                    self.num(a);
+                }
+                self.warn(
+                    "mission-command",
+                    "Mission-Command is an opcode from Total Annihilation: Kingdoms that the engine does not run. A COB thread reaching it logs an error and stops, so the Lua raises one there.".into(),
+                );
+                let text = "error(\"Mission-Command is not something the engine runs\")";
+                if last {
+                    self.code(text, t);
+                } else {
+                    self.code(&format!("do {text} end"), t);
+                }
             }
             StmtKind::WaitTurn(piece, axis) | StmtKind::WaitMove(piece, axis) => {
                 let f = self.header(if matches!(s.kind, StmtKind::WaitTurn(..)) {
@@ -2322,6 +2434,51 @@ impl<'p, 'a> Writer<'p, 'a> {
                 }
             }
         }
+    }
+
+    /// A loop's body, then its step if it is a `for`.
+    ///
+    /// Lua 5.1 has no `continue`, so a body that uses one goes inside
+    /// `repeat ... until true`, where `break` leaves the body and the loop goes
+    /// round again. A real `break` in there sets a flag first, which ends the
+    /// loop once the `repeat` is left.
+    fn loop_body(&mut self, body: &[Stmt], tail: &[Comment], step: Option<&Stmt>) {
+        self.indent += 1;
+        let flag = continues(body).then(|| {
+            let taken: HashSet<String> = self
+                .p
+                .taken
+                .iter()
+                .chain(self.locals.values())
+                .cloned()
+                .collect();
+            sanitise("broke", &taken)
+        });
+        if let Some(flag) = &flag {
+            self.line(&format!("local {flag} = false"));
+            self.line("repeat");
+            self.indent += 1;
+        }
+        self.loops.push(flag.clone());
+        if step.is_some() && flag.is_none() {
+            // Nothing in the body is last, because the step follows it.
+            for s in body {
+                self.stmt(s, false);
+            }
+        } else {
+            self.block(body);
+        }
+        self.comments(tail);
+        self.loops.pop();
+        if let Some(flag) = &flag {
+            self.indent -= 1;
+            self.line("until true");
+            self.line(&format!("if {flag} then break end"));
+        }
+        if let Some(step) = step {
+            self.stmt(step, false);
+        }
+        self.indent -= 1;
     }
 
     fn if_rest(

@@ -36,10 +36,15 @@ fn main() {
         .replace('\\', "/");
     let source =
         String::from_utf8_lossy(&std::fs::read(path).expect("readable script")).into_owned();
-    let linear_scale = std::fs::read(path.with_extension("cob"))
-        .ok()
-        .and_then(|cob| coilbox_bos2lua::linear_scale(&source, &cob))
+    let cob = std::fs::read(path.with_extension("cob")).ok();
+    let linear_scale = cob
+        .as_deref()
+        .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))
         .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
+    let precedence = cob
+        .as_deref()
+        .and_then(|cob| coilbox_bos2lua::precedence(&source, cob))
+        .unwrap_or_default();
     match convert(
         &source,
         &Options {
@@ -47,6 +52,7 @@ fn main() {
             includes: &includes,
             pieces: None,
             linear_scale,
+            precedence,
         },
     ) {
         Ok(c) => {

@@ -82,8 +82,10 @@ pub fn lex(src: &str, file: usize) -> Vec<Token> {
             continue;
         }
         // A stray quote mark is skipped, as Scriptor skipped it: Expand and
-        // Exterminate ships `#define reactionalien5 1024+0'` compiled.
-        if c.is_whitespace() || c == '\\' || c == '\'' || c == '`' {
+        // Exterminate ships `#define reactionalien5 1024+0'` compiled. So is a
+        // stray `~`, which Metal Factions' `sphere_chub.cob` shows its compiler
+        // skipped.
+        if c.is_whitespace() || c == '\\' || c == '\'' || c == '`' || c == '~' {
             i += 1;
             continue;
         }
@@ -237,13 +239,25 @@ pub fn lex(src: &str, file: usize) -> Vec<Token> {
         }
 
         let pair: String = chars[i..(i + 2).min(n)].iter().collect();
+        // Scriptor's operator table also spells `>` as `>?`, `>=` as `>=?`, and
+        // `&` as `?`.
+        let scriptor = |at: usize| chars.get(at) == Some(&'?');
         if PAIRS.contains(&pair.as_str()) {
+            i += if pair == ">=" && scriptor(i + 2) {
+                3
+            } else {
+                2
+            };
             push(&mut out, Kind::Sym, pair, line);
-            i += 2;
             continue;
         }
-        push(&mut out, Kind::Sym, c.to_string(), line);
-        i += 1;
+        let (text, len) = match c {
+            '>' if scriptor(i + 1) => (">".to_string(), 2),
+            '?' => ("&".to_string(), 1),
+            _ => (c.to_string(), 1),
+        };
+        push(&mut out, Kind::Sym, text, line);
+        i += len;
     }
     out
 }

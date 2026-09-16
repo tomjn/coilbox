@@ -5,7 +5,7 @@
 //! itself passes.
 
 use coilbox_bos2lua::{
-    convert, shares_values, Conversion, Options, COB_VARS_POLYFILL, MODERN_LINEAR,
+    convert, shares_values, Conversion, Options, Precedence, COB_VARS_POLYFILL, MODERN_LINEAR,
 };
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 use std::collections::HashMap;
@@ -19,6 +19,7 @@ fn convert_bos(source: &str) -> Conversion {
             includes: &includes,
             pieces: None,
             linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
         },
     )
     .unwrap()

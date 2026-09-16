@@ -26,3 +26,5 @@ coilbox-bos2lua = { path = "../coilbox-bos2lua" }
 # The converter's Lua, run beside a game's own COB to check they move a unit
 # the same way. See src/bos2lua_parity.rs.
 coilbox-springlua = { path = "../coilbox-springlua" }
+# A real folder for the tests of reading a `.bos` and its headers off disk.
+tempfile = { workspace = true }

@@ -4,7 +4,9 @@
 //! conversion here is also loaded and run, because Lua that only looks right
 //! is the failure this crate exists to end.
 
-use coilbox_bos2lua::{convert, linear_scale, Conversion, Options, MODERN_LINEAR, SCRIPTOR_LINEAR};
+use coilbox_bos2lua::{
+    convert, linear_scale, Conversion, Options, Precedence, MODERN_LINEAR, SCRIPTOR_LINEAR,
+};
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 use std::collections::HashMap;
 
@@ -31,6 +33,7 @@ fn convert_with(source: &str, includes: &HashMap<String, String>, linear_scale: 
             includes,
             pieces: None,
             linear_scale,
+            precedence: Precedence::Modern,
         },
     )
     .unwrap()
@@ -248,6 +251,7 @@ fn asks_for_pieces_by_the_model_s_spelling() {
             includes: &includes,
             pieces: Some(&model),
             linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
         },
     )
     .unwrap();
@@ -302,12 +306,19 @@ fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
             includes: &includes,
             pieces: None,
             linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
         },
     )
     .unwrap();
     let lua = &conversion.lua;
-    // A piece handed over as a number is numbered as BOS numbers it.
-    assert!(lua.contains("lua_AddTrail(base - 1, 1, 1, 1)"), "{lua}");
+    // A piece handed over as a number is numbered as BOS numbers it, and the
+    // call goes to the trail gadget, which THIS puts in GG, not to the stub.
+    assert!(
+        lua.contains(
+            "GG.AddTrail(unitID, unitDefID, Spring.GetUnitTeam(unitID), base - 1, 1, 1, 1)"
+        ),
+        "{lua}"
+    );
     assert!(
         conversion
             .warnings
@@ -350,6 +361,7 @@ fn a_failed_conversion_names_the_includes_it_was_not_given() {
             includes: &HashMap::new(),
             pieces: None,
             linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
         },
     )
     .err()
@@ -381,5 +393,63 @@ fn a_missing_include_is_said_and_the_engine_s_names_stand_in() {
         conversion.warnings.iter().any(|w| w.contains("SHATTER")),
         "{:?}",
         conversion.warnings
+    );
+}
+
+/// The search every host runs finds exactly the files the walker includes, and
+/// the conversion it feeds reports nothing missing.
+#[test]
+fn find_includes_finds_what_convert_looks_for() {
+    let files = includes();
+    let mut asked = Vec::new();
+    let found = coilbox_bos2lua::find_includes(WALKER, "scripts/walker.bos", |candidate| {
+        asked.push(candidate.to_string());
+        files
+            .get_key_value(candidate)
+            .map(|(path, text)| (path.clone(), text.clone()))
+    });
+    let mut paths: Vec<_> = found.iter().map(|f| f.path.as_str()).collect();
+    paths.sort();
+    assert_eq!(paths, ["scripts/animations/stride.bos", "scripts/flags.h"]);
+    let map = found.into_iter().map(|f| (f.path, f.text)).collect();
+    assert!(convert_with(WALKER, &map, MODERN_LINEAR)
+        .missing_includes
+        .is_empty());
+    assert!(asked
+        .iter()
+        .all(|c| c == &c.to_lowercase() && !c.contains('\\')));
+}
+
+#[test]
+fn find_includes_skips_comments_follows_parents_and_stops_on_a_cycle() {
+    let files = HashMap::from([
+        ("scripts/a.h", "#include \"lib\\B.h\"\n"),
+        (
+            "scripts/lib/b.h",
+            "  # include <../a.h>\n#include \"../c.h\"\n",
+        ),
+        ("scripts/c.h", "// #include \"never.h\"\n"),
+        ("scripts/never.h", ""),
+    ]);
+    let found = coilbox_bos2lua::find_includes(
+        "#include \"A.H\"\n/* x */ #include \"never.h\"\n",
+        "scripts/unit.bos",
+        |candidate| {
+            files
+                .get(candidate)
+                .map(|t| (candidate.to_string(), t.to_string()))
+        },
+    );
+    let names: Vec<_> = found
+        .iter()
+        .map(|f| (f.name.as_str(), f.path.as_str()))
+        .collect();
+    assert_eq!(
+        names,
+        [
+            ("A.H", "scripts/a.h"),
+            ("lib\\B.h", "scripts/lib/b.h"),
+            ("../c.h", "scripts/c.h"),
+        ]
     );
 }

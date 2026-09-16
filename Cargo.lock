@@ -927,6 +927,7 @@ dependencies = [
  "coilbox-3do-convert",
  "coilbox-assets",
  "coilbox-assimp",
+ "coilbox-bos2lua",
  "coilbox-map-catalog",
  "coilbox-s3o",
  "coilbox-texture",
@@ -6250,6 +6251,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+ "tempfile",
 ]
 
 [[package]]
