@@ -26,3 +26,6 @@ sevenz-rust2 = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# The mock runtime, for the test that pins how a progress channel behaves when
+# one JavaScript channel is handed to two commands (issue #2861).
+tauri = { version = "2", features = ["test"] }

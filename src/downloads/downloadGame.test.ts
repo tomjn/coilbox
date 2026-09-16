@@ -24,7 +24,18 @@ vi.mock("./bindings", () => ({
 }));
 vi.mock("../content/branding", () => ({ loadGithubGameRepos }));
 vi.mock("../notify/notify", () => ({ notify }));
+// The real `Channel` registers its callback against the internals Tauri injects
+// into a webview, and there is no webview here. What these tests read off a
+// channel is which object it is and what it delivers. How the real one behaves
+// when two commands share it is pinned in Rust, by `channel_reuse_tests` in the
+// downloads plugin.
+vi.mock("@tauri-apps/api/core", () => ({
+  Channel: class {
+    onmessage: (sample: unknown) => void = () => {};
+  },
+}));
 
+import type { DownloadProgress } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 
@@ -35,8 +46,7 @@ const run = () =>
   downloadGameAnySource({
     gameName: BAR_GAME,
     writePath: "/data",
-    // biome-ignore lint/suspicious/noExplicitAny: the channel is never read here
-    onProgress: {} as any,
+    onProgress: () => {},
   });
 
 beforeEach(() => {
@@ -77,8 +87,7 @@ describe("downloadGameAnySource, github step", () => {
       downloadGameAnySource({
         gameName: "Metal Factions v2.40",
         writePath: "/data",
-        // biome-ignore lint/suspicious/noExplicitAny: the channel is never read here
-        onProgress: {} as any,
+        onProgress: () => {},
       }),
     ).resolves.toBe("github release");
 
@@ -114,6 +123,84 @@ describe("downloadGameAnySource, github step", () => {
     expect(String(err)).toContain("springraaar/metal_factions");
     expect(String(err)).toContain("Metal Factions v2.40");
     expect(dlDownloadFileRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe("downloadGameAnySource, progress across sources", () => {
+  /** A channel a command has returned from is closed, and a send on it is lost
+   * without a word. Both fakes below behave that way, which is what makes these
+   * tests say anything about issue #2861. */
+  const closed = new WeakSet<object>();
+  type Fake = { onProgress: { onmessage: (p: DownloadProgress) => void } };
+
+  const sample = (percent: number): DownloadProgress => ({
+    phase: percent === 100 ? "done" : "downloading",
+    downloadedBytes: percent * 10,
+    totalBytes: 1000,
+    percent,
+    bytesPerSec: null,
+  });
+
+  const send = (args: Fake, percent: number) => {
+    if (!closed.has(args.onProgress))
+      args.onProgress.onmessage(sample(percent));
+  };
+
+  it("reports a later source's progress rather than losing it down the failed one's channel (issue #2861)", async () => {
+    // What a joiner saw: the bar stopped at 4 percent and stayed there while the
+    // download carried on to the end, then said it was complete.
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [
+        {
+          filename: "metalfactions-v2.40.sdz",
+          url: "https://example.com/v2.40",
+          size: 1,
+          tag: "v2.40",
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockImplementationOnce(async (args: Fake) => {
+      send(args, 4);
+      closed.add(args.onProgress);
+      throw new Error("connection reset");
+    });
+    dlSpringfilesList.mockResolvedValueOnce({
+      results: [
+        {
+          springname: "Metal Factions v2.40",
+          name: "Metal Factions v2.40",
+          filename: "metalfactions-v2.40.sdz",
+          category: "game",
+          size: 1,
+          mirrors: ["https://mirror.example.com/v2.40"],
+          mapimages: [],
+          metadata: { author: "", width: 0, height: 0 },
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockImplementationOnce(async (args: Fake) => {
+      send(args, 50);
+      send(args, 100);
+      closed.add(args.onProgress);
+      return { message: "ok", path: "/data/games/metalfactions-v2.40.sdz" };
+    });
+
+    const seen: (number | null)[] = [];
+    await expect(
+      downloadGameAnySource({
+        gameName: "Metal Factions v2.40",
+        writePath: "/data",
+        onProgress: (p) => seen.push(p?.percent ?? null),
+      }),
+    ).resolves.toBe("springfiles mirror");
+
+    // The nulls are each source starting: the one before it got no further than
+    // 4 percent, and carrying that over is what made a finished download look
+    // like a stalled one.
+    expect(seen).toEqual([null, 4, null, 50, 100]);
+
+    const channels = dlDownloadFileRaw.mock.calls.map((c) => c[0].onProgress);
+    expect(channels[0]).not.toBe(channels[1]);
   });
 });
 

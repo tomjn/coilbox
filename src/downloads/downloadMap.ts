@@ -1,6 +1,4 @@
-import type { Channel } from "@tauri-apps/api/core";
 import {
-  type DownloadProgress,
   dlDownloadFileRaw,
   dlDownloadMapRaw,
   dlHakoraMaps,
@@ -9,6 +7,7 @@ import {
 import { withDownloadNotify } from "./downloadNotify";
 import { norm } from "./gameRepos";
 import { type MapSource, mapSourceOrder } from "./mapSources";
+import { type ProgressSink, progressChannel } from "./progressChannel";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -32,13 +31,16 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * cost. This step asked it for every map the mirrors above had missed, whatever
  * game it belonged to. The price of removing it is that BAR-exclusive maps
  * carried by no other mirror can no longer be downloaded here at all.
+ *
+ * Progress arrives as a sink rather than a channel, because each attempt needs a
+ * channel of its own: see `progressChannel` for what sharing one costs.
  */
 async function downloadMapAnySourceImpl(opts: {
   mapName: string;
   writePath?: string;
   /** Pass a stable id to make the active download cancellable via dlCancel. */
   opId?: string;
-  onProgress: Channel<DownloadProgress>;
+  onProgress: ProgressSink;
 }): Promise<string> {
   const { mapName, writePath, opId, onProgress } = opts;
   const target = norm(mapName);
@@ -59,7 +61,7 @@ async function downloadMapAnySourceImpl(opts: {
           destDir: `${writePath}/maps`,
           filename: hit.filename,
           opId,
-          onProgress,
+          onProgress: progressChannel(onProgress),
         });
         return "springfiles mirror";
       }
@@ -73,7 +75,7 @@ async function downloadMapAnySourceImpl(opts: {
           destDir: `${writePath}/maps`,
           filename: hit.filename,
           opId,
-          onProgress,
+          onProgress: progressChannel(onProgress),
         });
         return "hakora";
       }
@@ -84,7 +86,7 @@ async function downloadMapAnySourceImpl(opts: {
             springName: mapName,
             writePath,
             opId,
-            onProgress,
+            onProgress: progressChannel(onProgress),
           });
           return label;
         } catch (e) {

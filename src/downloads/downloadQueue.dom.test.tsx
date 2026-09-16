@@ -28,6 +28,9 @@ import {
   DownloadQueueProvider,
   useDownloadQueue,
 } from "./DownloadQueueProvider";
+import { downloadMapAnySource } from "./downloadMap";
+import { IDLE_RATE } from "./downloadRate";
+import type { ProgressSink } from "./progressChannel";
 import { useQueuedDownload } from "./useQueuedDownload";
 
 /** One in-flight fake download, held open so a test can drive it. */
@@ -632,6 +635,48 @@ describe("a download reported from outside the queue", () => {
       result.current.report("app-update", null);
     });
     expect(result.current.reported).toHaveLength(0);
+  });
+
+  it("empties the bar when a download moves on to another source (issue #2861)", async () => {
+    // A source that failed partway leaves a percentage that measures nothing
+    // the source now running is doing, and a speed and time left worked out
+    // from a transfer that is over. The chain says "nothing measured yet" by
+    // reporting null, and the queue has to take the old numbers down.
+    let sink: ProgressSink | null = null;
+    vi.mocked(downloadMapAnySource).mockImplementationOnce(async (args) => {
+      sink = args.onProgress;
+      return "springfiles mirror";
+    });
+
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+    act(() => {
+      result.current.enqueue({
+        kind: "mapAnySource",
+        label: "Map: Isis",
+        args: { mapName: "Isis" },
+      });
+    });
+    await waitFor(() => expect(sink).not.toBeNull());
+    const report = sink as unknown as ProgressSink;
+
+    act(() => {
+      report({
+        phase: "downloading",
+        downloadedBytes: 40,
+        totalBytes: 1000,
+        percent: 4,
+        bytesPerSec: null,
+      });
+    });
+    await waitFor(() =>
+      expect(result.current.items[0]?.progress?.percent).toBe(4),
+    );
+
+    act(() => {
+      report(null);
+    });
+    await waitFor(() => expect(result.current.items[0]?.progress).toBeNull());
+    expect(result.current.items[0]?.rate).toEqual(IDLE_RATE);
   });
 
   it("runs an engine download through the archive-cache warm", async () => {
