@@ -14,8 +14,10 @@
  * stays pure and testable independent of where the list came from.
  */
 
-/** Loose key for matching a game name to a curated entry: lowercased, extension
- * and separators stripped. Shared with `downloadGame.ts`'s source matching.
+/** Loose key for matching a game or map name to a curated entry: lowercased,
+ * extension and separators stripped. Shared with `downloadGame.ts`'s and
+ * `downloadMap.ts`'s source matching (issue #2860 removed `downloadMap.ts`'s
+ * own copy, which had the same hyphen bug this comment describes).
  *
  * The hyphen matters: GitHub release archives are commonly named
  * `metalfactions-v2.40.sdz` or `Evolution-RTS-v17.07.sdz`, hyphen before the

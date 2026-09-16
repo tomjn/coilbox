@@ -7,16 +7,10 @@ import {
   dlSpringfilesList,
 } from "./bindings";
 import { withDownloadNotify } from "./downloadNotify";
+import { norm } from "./gameRepos";
 import { type MapSource, mapSourceOrder } from "./mapSources";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Loose key for matching a catalog entry to a battle's map name. */
-const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/\.(sd7|sdz)$/, "")
-    .replace(/[\s_]+/g, "");
 
 /**
  * Download a map, trying each source in the order set by mapSourceOrder and

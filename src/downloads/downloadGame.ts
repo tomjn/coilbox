@@ -57,14 +57,28 @@ async function downloadGameAnySourceImpl(opts: {
   const attempt = async (source: GameSource): Promise<string | null> => {
     switch (source) {
       // Curated GitHub releases: resolve a known repo from the game name and
-      // fetch its matching (or newest) release archive.
+      // fetch its exact-matching release archive.
       case "github": {
         const repo = githubRepoForGame(repos, gameName);
         if (!repo || !writePath) return null;
         const { archives } = await dlGithubReleaseArchives({ repo });
-        const hit =
-          archives.find((a) => norm(a.filename) === target) ?? archives[0];
-        if (!hit) return null;
+        // No releases at all: this source genuinely has nothing, same as any
+        // other step finding no candidate. Move on to the next source.
+        if (archives.length === 0) return null;
+        const hit = archives.find((a) => norm(a.filename) === target);
+        // Releases exist but none matches the requested version. Only the
+        // most recent 30 are fetched (`dl_github_release_archives`), so the
+        // one asked for may have aged off, been renamed, or been deleted.
+        // Throwing here (rather than falling back to the newest release) is
+        // what issue #2859 is about: silently installing a different version
+        // than the one asked for still reported success, and the wrong
+        // version could never satisfy the battle room's exact-name check
+        // afterwards. Other sources still get a chance further down the loop.
+        if (!hit) {
+          throw new Error(
+            `${repo} has no release matching "${gameName}" in its latest ${archives.length} release(s) (newest: ${archives[0].filename})`,
+          );
+        }
         await dlDownloadFileRaw({
           url: hit.url,
           destDir: `${writePath}/games`,
