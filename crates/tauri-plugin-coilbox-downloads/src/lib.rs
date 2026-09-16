@@ -525,6 +525,17 @@ async fn fetch_text(url: String) -> Result<String, String> {
 /// springfiles game mirrors) the sidecar can't fetch. Removes the partial file
 /// if the transfer fails partway. `cancel` (polled each chunk) and the client's
 /// idle read-timeout turn a stalled or cancelled transfer into an error.
+///
+/// There is no explicit check that `downloaded` reached `total` once the loop
+/// below sees `Ok(None)`. That was investigated for issue #2878 and found to be
+/// unnecessary rather than missing: `reqwest`'s `http2` feature is off (see
+/// Cargo.toml, `features = ["rustls-tls"]` only), so every download here speaks
+/// HTTP/1.1, and hyper's own h1 decoder already refuses to report a clean end
+/// while a declared `Content-Length` (or a chunked body's terminating chunk)
+/// is still outstanding. Instead it surfaces as `UnexpectedEof` on
+/// `resp.chunk()`, caught below by the general `Err(e)` arm, which deletes the
+/// partial file before returning. `download_to_tests` proves this against a
+/// server that closes mid body rather than asserting it from the arithmetic.
 async fn download_to(
     url: &str,
     dest_dir: &str,
@@ -2042,5 +2053,80 @@ mod local_rapid_tests {
     fn a_data_dir_with_no_rapid_folder_answers_with_nothing() {
         let tmp = tempfile::tempdir().unwrap();
         assert!(local_release_md5s(tmp.path()).is_empty());
+    }
+}
+
+/// Whether `download_to` can ever see a body that ends short of its declared
+/// `Content-Length` without an error (issue #2878). Answered against a real
+/// local server that closes the connection early, not by feeding a short body
+/// to the arithmetic and checking the arithmetic.
+#[cfg(test)]
+mod download_to_tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    /// A one-shot HTTP/1.1 server that answers with a `Content-Length` of
+    /// `total` bytes but writes only `sent` of them before closing the
+    /// connection. Returns the URL to hit it at.
+    fn truncating_server(total: usize, sent: usize) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind a local port");
+        let port = listener.local_addr().expect("local addr").port();
+        std::thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else {
+                return;
+            };
+            // Drain the request headers first, so writing the response can't
+            // race the client still sending its GET.
+            let mut buf = Vec::new();
+            let mut chunk = [0u8; 512];
+            loop {
+                match sock.read(&mut chunk) {
+                    Ok(0) | Err(_) => return,
+                    Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                }
+                if buf.windows(4).position(|w| w == b"\r\n\r\n").is_some() {
+                    break;
+                }
+            }
+            let header =
+                format!("HTTP/1.1 200 OK\r\nContent-Length: {total}\r\nConnection: close\r\n\r\n");
+            let _ = sock.write_all(header.as_bytes());
+            let _ = sock.write_all(&vec![b'a'; sent]);
+            let _ = sock.flush();
+            // Dropping `sock` here closes the connection with `total - sent`
+            // bytes still outstanding against the declared length.
+        });
+        format!("http://127.0.0.1:{port}/short.bin")
+    }
+
+    /// With this client (HTTP/1.1 only, see the doc comment on `download_to`)
+    /// a body that ends before its declared `Content-Length` never reaches the
+    /// success path: hyper's decoder turns the early close into an error, and
+    /// `download_to` removes the partial file before returning it.
+    #[test]
+    fn a_body_that_ends_short_of_its_content_length_errors_and_cleans_up() {
+        let url = truncating_server(1000, 500);
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dest_dir = tmp.path().join("dest");
+        let on_progress: Channel<DownloadProgress> = Channel::new(|_| Ok(()));
+        let cancel = Arc::new(AtomicBool::new(false));
+
+        let result = tauri::async_runtime::block_on(download_to(
+            &url,
+            dest_dir.to_str().expect("utf8 path"),
+            "short.bin",
+            &on_progress,
+            &cancel,
+        ));
+
+        assert!(
+            result.is_err(),
+            "a short length-delimited body should surface as an error, not a success"
+        );
+        assert!(
+            !dest_dir.join("short.bin").exists(),
+            "download_to should not leave a truncated file behind"
+        );
     }
 }

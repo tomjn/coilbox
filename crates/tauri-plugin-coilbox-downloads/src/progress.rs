@@ -58,7 +58,14 @@ impl DownloadProgress {
         }
     }
 
-    /// A terminal "done" sample; `percent` is forced to 100 when a total was known.
+    /// A terminal "done" sample. `percent` is forced to 100 when a total was
+    /// known, and that is safe rather than assumed: both callers only reach
+    /// this point once the HTTP body decoder itself has confirmed the
+    /// transfer complete, and for this client that already means
+    /// `downloaded_bytes` equals `total_bytes` whenever a total was known
+    /// (see the doc comment on `download_to` in lib.rs, issue #2878). Forcing
+    /// 100 here does not paper over a short transfer. It just skips
+    /// recomputing a percentage that can only ever come out as 100.
     pub fn done(downloaded_bytes: u64, total_bytes: Option<u64>) -> Self {
         DownloadProgress {
             phase: "done".into(),
