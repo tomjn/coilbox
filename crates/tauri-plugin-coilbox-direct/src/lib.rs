@@ -41,6 +41,7 @@ pub mod portmap;
 pub mod reachability;
 pub mod room;
 pub mod stun;
+pub mod vpn;
 
 pub use beacon::{Beacon, LanRoom, Source};
 pub use discovery::Discovery;
@@ -266,6 +267,18 @@ async fn direct_local_addresses() -> CliResult {
     CliResult::ok(json!({ "addresses": discovery::local_addresses() }))
 }
 
+/// `direct_vpn_route`: the VPN this machine's internet traffic goes through, or
+/// null when none of it does (issue #2800).
+///
+/// Only a VPN that carries everything is answered. Tailscale and the other
+/// private network VPNs leave the default route alone, so they are not one, and
+/// telling somebody their working setup is a problem is worse than saying
+/// nothing. See [`vpn`] for what is known about that rule and what is not.
+#[tauri::command]
+async fn direct_vpn_route() -> CliResult {
+    CliResult::ok(json!({ "vpn": vpn::default_route_vpn() }))
+}
+
 /// `direct_open_ports`: ask the router to open every port given, then look from
 /// outside to see whether it made any difference.
 ///
@@ -374,6 +387,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             direct_lan_rooms,
             direct_stop_discovery,
             direct_local_addresses,
+            direct_vpn_route,
             direct_open_ports,
             direct_close_ports,
             direct_port_status
