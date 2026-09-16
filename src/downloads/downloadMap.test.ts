@@ -21,6 +21,13 @@ vi.mock("./bindings", () => ({
   dlSpringfilesList,
 }));
 vi.mock("../notify/notify", () => ({ notify }));
+// progressChannel builds a real Channel, which needs the Tauri webview. The
+// same stand-in downloadGame.test.ts uses.
+vi.mock("@tauri-apps/api/core", () => ({
+  Channel: class {
+    onmessage: (sample: unknown) => void = () => {};
+  },
+}));
 
 import { downloadMapAnySource } from "./downloadMap";
 
@@ -28,8 +35,7 @@ const run = (mapName: string) =>
   downloadMapAnySource({
     mapName,
     writePath: "/data",
-    // biome-ignore lint/suspicious/noExplicitAny: the channel is never read here
-    onProgress: {} as any,
+    onProgress: () => {},
   });
 
 beforeEach(() => {
