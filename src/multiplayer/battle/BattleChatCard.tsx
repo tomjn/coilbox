@@ -1,11 +1,19 @@
 import { useCallback, useEffect } from "react";
 import type { MapItem } from "@/content/bindings";
+import { autohostHearsChat } from "../../direct/room";
 import type { Battle, ChatMsg } from "../bindings";
 import { ChatPane } from "../chat/ChatPane";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
 import { useConversation } from "../chat/useConversation";
 import { useMultiplayer } from "../store";
-import { colorIntToHex } from "./config";
+import { colorIntToHex, type MemberRow } from "./config";
+import { applyLayoutDirectly, balanceLayoutForRows } from "./gameTypePresets";
+import { HostSuggestionAction } from "./HostSuggestionAction";
+import {
+  type HostSuggestionKind,
+  hostSuggestionActionLabel,
+  matchHostSuggestion,
+} from "./hostSuggestion";
 import { MapSuggestionAction } from "./MapSuggestionAction";
 import { matchMapSuggestion } from "./mapSuggestion";
 import { useMapChangeQueue } from "./useMapChangeQueue";
@@ -21,6 +29,18 @@ import { useMapChangeQueue } from "./useMapChangeQueue";
  * own. When we can change the map ourselves, every `!map` line gets matched
  * against installed maps and, on a single match, an Accept button that
  * applies it (issue #2795).
+ *
+ * A direct room runs no autohost, so `!balance`/`!lock`/`!unlock` are read
+ * the same way (issue #2871): the founder alone (`selfHost`) gets a
+ * `messageAction` of Accept/Reject, drawn under the plain command line
+ * rather than instead of it, so the line itself stays exactly what was
+ * sent. Selecting or copying it, alone or as part of a drag across several
+ * lines of chat, still yields the literal command a real autohost would
+ * read, and a real autohost battle is unaffected either way. Accept reuses
+ * the founder-direct paths `GameTypePresetsControls` and the battle room
+ * header already have. Reject is an ordinary chat message, which is how the
+ * joiner sees they were answered without teaching the room server anything
+ * new.
  */
 export function BattleChatCard({
   battle,
@@ -29,6 +49,12 @@ export function BattleChatCard({
   maps,
   canChangeMap,
   onChangeMap,
+  selfHost,
+  directRoom,
+  rows,
+  hostControls,
+  onSetBattleStatusBatch,
+  onSetLocked,
 }: {
   battle: Battle;
   enginePath: string | undefined;
@@ -39,6 +65,20 @@ export function BattleChatCard({
    *  `!map` line get an Accept button. Everyone else sees the line as before. */
   canChangeMap: boolean;
   onChangeMap: (name: string, maphash: number) => void;
+  /** This client is the battle's founder, running the game themselves. Only
+   *  the founder of a direct room gets Accept/Reject on a host suggestion,
+   *  mirroring the header's Lock toggle and the Balance button's own gate. */
+  selfHost: boolean;
+  /** The live connection is a room somebody hosts rather than a lobby
+   *  server, so there is no autohost behind it able to read a `!` command. */
+  directRoom: boolean;
+  rows: MemberRow[];
+  hostControls: {
+    forceTeam: (user: string, team: number) => void;
+    forceAlly: (user: string, ally: number) => void;
+  };
+  onSetBattleStatusBatch: (patch: { ally?: number; teamId?: number }) => void;
+  onSetLocked: (locked: boolean) => void;
 }) {
   const { mirror, markSeen } = useMultiplayer();
   const me = mirror.state?.myUsername ?? null;
@@ -78,20 +118,71 @@ export function BattleChatCard({
     dataDir,
     onChangeMap,
   );
+
+  // Only the founder of a direct room can honour a `!balance`/`!lock`
+  // request by hand (issue #2871). This is the same fact the header's Lock
+  // toggle and the Balance button's self-host branch already gate on.
+  const canHonourHostSuggestion = selfHost && !autohostHearsChat(directRoom);
+  const acceptHostSuggestion = useCallback(
+    (kind: HostSuggestionKind) => {
+      if (kind === "balance") {
+        applyLayoutDirectly(
+          balanceLayoutForRows(rows),
+          me,
+          hostControls.forceAlly,
+          hostControls.forceTeam,
+          onSetBattleStatusBatch,
+        );
+        return;
+      }
+      onSetLocked(kind === "lock");
+    },
+    [rows, me, hostControls, onSetBattleStatusBatch, onSetLocked],
+  );
+  const rejectHostSuggestion = useCallback(
+    (kind: HostSuggestionKind) => {
+      conv.send(`Declined: ${hostSuggestionActionLabel(kind)}`);
+    },
+    [conv],
+  );
+
   const messageAction = useCallback(
     (m: ChatMsg) => {
-      if (!canChangeMap) return null;
-      const suggestion = matchMapSuggestion(m.text, maps);
-      if (!suggestion) return null;
-      return (
-        <MapSuggestionAction
-          suggestion={suggestion}
-          pending={pendingMap != null}
-          onAccept={requestMapChange}
-        />
-      );
+      if (canChangeMap) {
+        const mapMatch = matchMapSuggestion(m.text, maps);
+        if (mapMatch) {
+          return (
+            <MapSuggestionAction
+              suggestion={mapMatch}
+              pending={pendingMap != null}
+              onAccept={requestMapChange}
+            />
+          );
+        }
+      }
+      if (canHonourHostSuggestion) {
+        const suggestion = matchHostSuggestion(m.text);
+        if (suggestion) {
+          return (
+            <HostSuggestionAction
+              suggestion={suggestion}
+              onAccept={() => acceptHostSuggestion(suggestion.kind)}
+              onReject={() => rejectHostSuggestion(suggestion.kind)}
+            />
+          );
+        }
+      }
+      return null;
     },
-    [canChangeMap, maps, pendingMap, requestMapChange],
+    [
+      canChangeMap,
+      maps,
+      pendingMap,
+      requestMapChange,
+      canHonourHostSuggestion,
+      acceptHostSuggestion,
+      rejectHostSuggestion,
+    ],
   );
 
   if (!channel) {

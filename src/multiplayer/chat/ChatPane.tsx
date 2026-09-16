@@ -161,10 +161,13 @@ export interface ChatPaneProps {
   maxChars?: number | null;
   /** Extra content under one message's bubble, for a chat line a client-side
    * command recognises, e.g. a `!map <name>` suggestion the host can Accept
-   * (issue #2795). Only the battle room passes this. The hub and DM panes
-   * leave it unset. Returns nothing for a message with no action to offer,
-   * so the caller can extend it to other commands (issue #2738) without any
-   * change here. */
+   * (issue #2795), or Accept/Reject on a `!balance`/`!lock` request in a
+   * direct room (issue #2871). Only the battle room passes this. The hub and
+   * DM panes leave it unset. Returns nothing for a message with no action to
+   * offer. The message's own bubble text is never touched by this: the
+   * command stays exactly as sent, so selecting or copying the line (or
+   * dragging across several) still yields the literal command, which is how
+   * players learn autohost commands in the first place. */
   messageAction?: (m: ChatMsg) => ReactNode;
 }
 
