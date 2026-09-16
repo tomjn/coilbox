@@ -46,8 +46,14 @@ export const MissionLuaCode = forwardRef<
     tokens: LuaTokenLine[] | null;
     matches: LuaMatch[];
     activeMatch: LuaMatch | null;
+    /** What a screen reader calls the view. The BOS converter shows its own
+     *  Lua through this too. */
+    label?: string;
   }
->(function MissionLuaCode({ lines, tokens, matches, activeMatch }, ref) {
+>(function MissionLuaCode(
+  { lines, tokens, matches, activeMatch, label = "Compiled mission.lua" },
+  ref,
+) {
   const containerRef = useRef<HTMLElement | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
@@ -101,13 +107,14 @@ export const MissionLuaCode = forwardRef<
     LINE_HEIGHT,
     OVERSCAN,
   );
-  const gutterWidth = `${Math.max(2, String(lines.length).length)}ch`;
+  // The digits plus the gutter's own right padding, which is inside its width.
+  const gutterWidth = `calc(${Math.max(2, String(lines.length).length)}ch + 0.75rem)`;
 
   return (
     <section
       ref={containerRef}
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-      aria-label="Compiled mission.lua"
+      aria-label={label}
       className="h-full overflow-auto rounded-md border border-border/50 bg-muted/20 font-mono text-xs"
     >
       <div style={{ height: lines.length * LINE_HEIGHT, position: "relative" }}>
