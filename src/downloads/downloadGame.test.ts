@@ -45,6 +45,49 @@ beforeEach(() => {
   dlSpringfilesList.mockResolvedValue({ results: [] });
 });
 
+describe("downloadGameAnySource, github step", () => {
+  it("downloads the exact requested version's archive, not the newest release (issue #2731)", async () => {
+    // Metal Factions' real release archives are named with a hyphen before the
+    // version ("metalfactions-v2.40.sdz"), while the battle advertises the game
+    // as space-separated ("Metal Factions v2.40"). Before the fix, the exact
+    // match never fired for any version and this fell back to `archives[0]`,
+    // the newest release, silently installing the wrong version every time.
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [
+        {
+          filename: "metalfactions-v2.58.sdz",
+          url: "https://example.com/v2.58",
+          size: 1,
+          tag: "v2.58",
+        },
+        {
+          filename: "metalfactions-v2.40.sdz",
+          url: "https://example.com/v2.40",
+          size: 1,
+          tag: "v2.40",
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({
+      message: "ok",
+      path: "/data/games/metalfactions-v2.40.sdz",
+    });
+
+    await expect(
+      downloadGameAnySource({
+        gameName: "Metal Factions v2.40",
+        writePath: "/data",
+        // biome-ignore lint/suspicious/noExplicitAny: the channel is never read here
+        onProgress: {} as any,
+      }),
+    ).resolves.toBe("github release");
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: "metalfactions-v2.40.sdz" }),
+    );
+  });
+});
+
 describe("downloadGameAnySource, rapid step", () => {
   it("asks every configured master rather than stopping at the first", async () => {
     // pr-downloader only ever searches the master it is given, and games are
