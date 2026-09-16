@@ -201,6 +201,60 @@ async fn a_refused_login_is_told_why_before_it_is_dropped() {
     room.stop("done").await;
 }
 
+/// A kicked peer is named the way a closed room already names itself (issue
+/// #2737): `alice removed you from this room` rather than an anonymous "you
+/// were kicked", so the two read the same way over the wire. Checked here
+/// rather than through the lobby client in `direct_loopback`, because that
+/// test folds the line through `parse_line` and never shows the raw order: the
+/// battle-scoped `LEFTBATTLE` broadcast lands on the kicked peer's own socket
+/// first, and the `SERVERMSG` naming the host comes after it but still before
+/// the close, with nothing queued behind either.
+#[tokio::test]
+async fn a_kicked_peer_is_told_by_name_before_the_socket_closes() {
+    let room = room().await;
+    let mut host = RawPeer::connect(&room).await;
+    host.log_in("alice").await;
+    host.send(&command::open_battle(
+        0,
+        0,
+        "*",
+        8452,
+        16,
+        -1,
+        0,
+        -1,
+        "spring",
+        "105.1.1",
+        "Red Comet",
+        "Tom's LAN game",
+        "Beyond All Reason test-1234",
+    ))
+    .await;
+    host.read_to("REQUESTBATTLESTATUS").await;
+
+    let mut bob = RawPeer::connect(&room).await;
+    bob.log_in("bob").await;
+    bob.send("JOINBATTLE 1 * s3cret").await;
+    // Auto-seated on the next free team and ally rather than asked (#2735).
+    bob.read_to("CLIENTBATTLESTATUS bob").await;
+
+    host.send(&command::kick_from_battle("bob")).await;
+
+    let seen = bob.read_to("SERVERMSG").await;
+    assert_eq!(
+        seen.last().map(String::as_str),
+        Some("SERVERMSG alice removed you from this room"),
+        "told who kicked them, before anything else: {seen:?}"
+    );
+    assert_eq!(
+        bob.next().await,
+        None,
+        "and then dropped, with nothing else queued behind it"
+    );
+
+    room.stop("done").await;
+}
+
 /// The sweep and the reclaim, against each other, on one clock.
 ///
 /// The sweep exists to free a name whose socket died quietly, so its owner can

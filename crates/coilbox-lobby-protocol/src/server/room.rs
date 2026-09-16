@@ -49,8 +49,12 @@ const COMP_FLAGS: [&str; 2] = ["u", "sp"];
 
 /// What a kicked player is told, both as they go and every time they try to come
 /// back. One sentence rather than two, so somebody who reads it twice is not left
-/// wondering whether the second is about something else.
-const KICK_REASON: &str = "you were kicked from this room";
+/// wondering whether the second is about something else. Named the way
+/// `roomStopReason` in `src/direct/room.ts` names a closed room, so a kick and a
+/// closed room read the same way rather than a kick alone being anonymous.
+fn kick_reason(host: &str) -> String {
+    format!("{host} removed you from this room")
+}
 
 /// What somebody turned away is told when they ask a second time.
 ///
@@ -564,7 +568,7 @@ impl RoomState {
             );
         }
         if self.kicked.contains(&username) {
-            return self.deny(peer, KICK_REASON);
+            return self.deny(peer, &kick_reason(&self.config.host));
         }
 
         let entry = self.peers.get_mut(&peer).expect("peer checked by caller");
@@ -732,7 +736,7 @@ impl RoomState {
             return refuse("you are already in this battle");
         }
         if self.kicked.contains(&name) {
-            return refuse(KICK_REASON);
+            return refuse(&kick_reason(&self.config.host));
         }
         // Answered once, answered for good. Queueing this again would put the
         // same name back in front of a host who has already said no, with
@@ -1234,7 +1238,7 @@ impl RoomState {
         let mut out = self.leave_battle(target, username);
         out.push(Outbound::To {
             peer: target,
-            line: line::server_msg(KICK_REASON),
+            line: line::server_msg(&kick_reason(&self.config.host)),
         });
         out.push(Outbound::Close { peer: target });
         out
@@ -2069,15 +2073,15 @@ mod tests {
         // Told before the socket goes, or the kick is indistinguishable from the
         // host's machine falling over.
         assert!(
-            due(&out, BOB).contains(&"SERVERMSG you were kicked from this room"),
-            "the kicked player has to be told: {:?}",
+            due(&out, BOB).contains(&"SERVERMSG alice removed you from this room"),
+            "the kicked player has to be told, and told who by: {:?}",
             due(&out, BOB)
         );
         assert!(out.contains(&Outbound::Close { peer: BOB }));
         room.disconnect(BOB);
 
         let out = log_in(&mut room, 3, "bob");
-        assert_eq!(due(&out, 3), ["DENIED you were kicked from this room"]);
+        assert_eq!(due(&out, 3), ["DENIED alice removed you from this room"]);
     }
 
     /// The host is the battle. When they go, it goes, and the joiners' clients
