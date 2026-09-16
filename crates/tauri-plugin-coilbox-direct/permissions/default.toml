@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows starting, stopping, inspecting and answering joins to the lobby room this client hosts itself, finding rooms announced on the local network, reading this machine's own addresses so a host can read one out, and asking the router to open the ports a host needs."
+description = "Allows starting, stopping, inspecting and answering joins to the lobby room this client hosts itself, finding rooms announced on the local network, reading this machine's own addresses so a host can read one out, seeing whether this machine's internet traffic goes through a VPN, and asking the router to open the ports a host needs."
 permissions = [
   "allow-direct-start-room",
   "allow-direct-stop-room",
@@ -10,6 +10,7 @@ permissions = [
   "allow-direct-lan-rooms",
   "allow-direct-stop-discovery",
   "allow-direct-local-addresses",
+  "allow-direct-vpn-route",
   "allow-direct-open-ports",
   "allow-direct-close-ports",
   "allow-direct-port-status",
