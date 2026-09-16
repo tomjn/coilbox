@@ -1907,6 +1907,88 @@ mod engine_sweep_tests {
 }
 
 #[cfg(test)]
+mod channel_reuse_tests {
+    use super::progress::DownloadProgress;
+    use std::str::FromStr;
+    use std::sync::{Arc, Mutex};
+    use tauri::ipc::{Channel, JavaScriptChannelId};
+    use tauri::test::{mock_builder, mock_context, noop_assets};
+    use tauri::WebviewWindowBuilder;
+
+    /// Every message a progress channel sent, as `(channel id, message index)`.
+    ///
+    /// The index is Tauri's ordering number, and the receiving `Channel` in
+    /// `@tauri-apps/api` only hands a message to `onmessage` when its index is
+    /// the next one it is waiting for. Anything lower is filed away and never
+    /// read again, so an index that goes backwards is progress the bar never
+    /// sees.
+    type Sends = Arc<Mutex<Vec<(u32, usize)>>>;
+
+    fn sample(bytes: u64) -> DownloadProgress {
+        DownloadProgress {
+            phase: "downloading".into(),
+            downloaded_bytes: bytes,
+            total_bytes: Some(1000),
+            percent: super::progress::percent(bytes, Some(1000)),
+            bytes_per_sec: None,
+        }
+    }
+
+    /// What Tauri does with one JavaScript channel handed to two commands.
+    ///
+    /// A command taking a `Channel<T>` argument does not get the frontend's
+    /// channel object. It gets a fresh Rust `Channel` built from the id the
+    /// frontend serialised, and that Rust channel carries its own message
+    /// counter starting at zero. The frontend's counter, meanwhile, only ever
+    /// goes up for the life of the `Channel` object.
+    ///
+    /// So a second command handed the same channel numbers its first message 0
+    /// while the frontend is waiting for message 40, and every sample it sends
+    /// is filed under an index already used and never delivered. That is what
+    /// froze a joiner's game download bar at 4 percent while the download itself
+    /// carried on to the end and its completion notification fired (issue
+    /// #2861): the first source failed partway, and the source that succeeded
+    /// streamed into a channel nothing was listening to any more.
+    #[test]
+    fn a_second_command_on_one_channel_restarts_the_message_index() {
+        let sends: Sends = Default::default();
+        let captured = sends.clone();
+        let app = mock_builder()
+            .channel_interceptor(move |_webview, callback, index, _body| {
+                captured.lock().unwrap().push((callback.0, index));
+                true
+            })
+            .build(mock_context(noop_assets()))
+            .expect("an app on the mock runtime");
+        let webview = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("a window to own the channel");
+
+        // One frontend channel, as `@tauri-apps/api` serialises it.
+        let id = JavaScriptChannelId::from_str("__CHANNEL__:7").expect("a channel id");
+
+        // The first source: two samples, then the command returns and its
+        // channel is dropped.
+        {
+            let ch: Channel<DownloadProgress> = id.channel_on(webview.as_ref().clone());
+            ch.send(sample(100)).expect("sent");
+            ch.send(sample(200)).expect("sent");
+        }
+        // The next source, handed the very same frontend channel.
+        {
+            let ch: Channel<DownloadProgress> = id.channel_on(webview.as_ref().clone());
+            ch.send(sample(300)).expect("sent");
+        }
+
+        assert_eq!(
+            *sends.lock().unwrap(),
+            vec![(7, 0), (7, 1), (7, 0)],
+            "the second command numbers its first sample 0 again, so the frontend drops it"
+        );
+    }
+}
+
+#[cfg(test)]
 mod local_rapid_tests {
     use super::local_release_md5s;
     use flate2::write::GzEncoder;
