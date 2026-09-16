@@ -34,7 +34,9 @@ export function MinimapPreview({
   width?: number;
   height?: number;
   startPositions: StartPos[];
-  /** CSS colours for each start marker, by index; falls back to white. */
+  /** CSS colours for each start marker, by index. A position past the last
+   * entry has no player and draws as an unclaimed dashed marker instead
+   * of taking a colour (issue #2867). */
   markerColors?: string[];
   loading?: boolean;
   alt: string;
@@ -62,7 +64,9 @@ export function MinimapPreview({
           key: `${p.x},${p.z},${i}`,
           left: (p.x / worldW) * 100,
           top: (p.z / worldH) * 100,
-          color: markerColors?.[i] ?? "#ffffff",
+          // undefined, not a colour fallback, for a position past the last
+          // coloured entry: it has no player, so it gets no colour (issue #2867).
+          color: markerColors?.[i],
         }))
       : [];
 
@@ -93,20 +97,31 @@ export function MinimapPreview({
           dim ? " brightness-[0.55]" : ""
         }`}
       />
-      {markers.map((m, i) => (
-        <span
-          key={m.key}
-          className="absolute flex size-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black/60 text-[9px] font-bold text-black shadow"
-          style={{
-            left: `${m.left}%`,
-            top: `${m.top}%`,
-            background: m.color,
-          }}
-          title={`Start position ${i + 1}`}
-        >
-          {i + 1}
-        </span>
-      ))}
+      {markers.map((m, i) => {
+        const claimed = m.color != null;
+        return (
+          <span
+            key={m.key}
+            className={`absolute flex size-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[9px] font-bold shadow ${
+              claimed
+                ? "border-2 border-black/60 text-black"
+                : "border-2 border-dashed border-white/80 bg-black/45 text-white"
+            }`}
+            style={{
+              left: `${m.left}%`,
+              top: `${m.top}%`,
+              ...(claimed ? { background: m.color } : {}),
+            }}
+            title={
+              claimed
+                ? `Start position ${i + 1}`
+                : `Start position ${i + 1} (unclaimed)`
+            }
+          >
+            {i + 1}
+          </span>
+        );
+      })}
       {children}
     </div>
   ) : placeholder ? (
