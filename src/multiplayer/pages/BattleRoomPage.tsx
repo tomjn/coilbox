@@ -6,7 +6,7 @@ import { useBrandingEntry } from "@/content/branding";
 import { useHostedRoom } from "@/direct/hostedRoom";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
 import { RoomMovedPanel } from "@/direct/RoomMoved";
-import { closeEndsTheRoom } from "@/direct/room";
+import { autohostHearsChat, closeEndsTheRoom } from "@/direct/room";
 import { stopHostedRoom } from "@/direct/stopRoom";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
@@ -699,14 +699,17 @@ function BattleRoomPage() {
             me={room.me}
             selfHost={room.selfHost}
             serverAssignsSeat={room.serverAssignsSeat}
+            directRoom={room.directRoom}
             hostControls={room.hostControls}
             onSetBattleStatusBatch={room.setBattleStatusBatch}
             onAutohostSend={room.autohostSend}
           />
-          {/* The `!`-command panel only makes sense with a SPADS autohost; when
+          {/* The `!`-command panel only makes sense with a SPADS autohost. When
               we host the battle ourselves those commands are inert (lock moves to
-              the header, map changes go through the map card). */}
-          {!room.selfHost && (
+              the header, map changes go through the map card). A direct room
+              runs no SPADS either, so a joiner there sees no button that posts
+              into a chat nobody reads (issue #2738). */}
+          {!room.selfHost && autohostHearsChat(room.directRoom) && (
             <AutohostControls
               locked={battle.locked}
               onCommand={room.autohostSend}

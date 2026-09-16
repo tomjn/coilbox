@@ -3,6 +3,7 @@ import type { Battle } from "../multiplayer/bindings";
 import type { DirectRoomStatus } from "./bindings";
 import {
   announcementNote,
+  autohostHearsChat,
   battleOpened,
   closeEndsTheRoom,
   DEFAULT_ROOM_PORT,
@@ -129,6 +130,21 @@ describe("closeEndsTheRoom", () => {
     expect(
       closeEndsTheRoom({ selfHost: false, directRoom: true, hosting: true }),
     ).toBe(false);
+  });
+});
+
+describe("autohostHearsChat", () => {
+  // The failure this exists for (issue #2738). Coilbox's own room server does
+  // not read SPADS commands, so a joiner pressing one posts into a chat
+  // nobody answers.
+  it("hears nothing in a direct room", () => {
+    expect(autohostHearsChat(true)).toBe(false);
+  });
+
+  // An ordinary lobby battle is assumed to have SPADS behind it, which is
+  // the case this panel and this button were built for.
+  it("hears a command on a battle hosted through a real lobby server", () => {
+    expect(autohostHearsChat(false)).toBe(true);
   });
 });
 
