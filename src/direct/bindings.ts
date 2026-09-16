@@ -175,3 +175,22 @@ export const directLocalAddresses = defineCommand<
   Record<string, never>,
   { addresses: DirectLocalAddress[] }
 >("coilbox-direct", "direct_local_addresses");
+
+/** The VPN carrying this machine's internet traffic (mirrors the Rust `VpnRoute`). */
+export interface DirectVpnRoute {
+  /** What the OS calls the interface it goes out of, for example `utun4`. */
+  interface: string;
+}
+
+/**
+ * The VPN this machine's internet traffic goes through, or `null` when none of
+ * it does (issue #2800).
+ *
+ * Only a VPN that carries everything is answered. Tailscale, ZeroTier and
+ * Radmin carry their own network and leave the rest alone, so they are not one
+ * and nothing is said about them.
+ */
+export const directVpnRoute = defineCommand<
+  Record<string, never>,
+  { vpn: DirectVpnRoute | null }
+>("coilbox-direct", "direct_vpn_route");

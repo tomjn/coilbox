@@ -31,6 +31,7 @@ import {
 } from "../../direct/room";
 import { stopHostedRoom } from "../../direct/stopRoom";
 import { useLanRooms } from "../../direct/useLanRooms";
+import { VpnWarning } from "../../direct/VpnWarning";
 import { useLastLogin } from "../../lobby-servers/config";
 import { notify } from "../../notify/notify";
 import { getGameMatcher } from "../../profile/profile";
@@ -566,6 +567,12 @@ function BattlesPage() {
           Join failed: {lastJoinError}
         </div>
       )}
+
+      {/* Said once above the list rather than on every row, because it is about
+          this machine and not about any one battle (issue #2800). The shorter
+          of the two wordings: all a VPN costs somebody joining is their own
+          ping. The host gets the longer one in the hosting drawer. */}
+      <VpnWarning place="join" className="px-4 pt-3" />
 
       <div className="border-b border-border px-4 py-3">{lanSection}</div>
 

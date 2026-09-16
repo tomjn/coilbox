@@ -30,6 +30,7 @@ import {
   type DirectReachability,
   directClosePorts,
 } from "../../direct/reachability";
+import { VpnWarning } from "../../direct/VpnWarning";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { relayPingLabel, useRelayPing } from "../relayPing";
 import { hostBattleFailure } from "./hostBattle";
@@ -496,6 +497,13 @@ export function HostBattleForm({
               with it because Windows remembers an answer per program file
               (issue #2799). */}
           <WindowsFirewall engine={target?.executable ?? null} />
+
+          {/* A VPN carrying this machine's internet traffic, next to the
+              sentence about what hosting will do, because it changes the
+              answer that sentence gives: on a VPN the address the lobby
+              advertises is usually one nobody can dial (issue #2800). Drawn
+              only when there is one, and never for Tailscale and its like. */}
+          <VpnWarning place="host" />
 
           {/* What hosting is about to do, in the place where the answer it is
               reading appears. Not the same thing as issue #2022, which tells
