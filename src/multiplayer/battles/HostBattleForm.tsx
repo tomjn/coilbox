@@ -1,5 +1,5 @@
 import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -9,6 +9,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useUnitsyncThumbnails } from "@/content/config";
+import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
 import {
   advertisedGamePort,
   HOST_THROUGH_RELAY_KEY,
@@ -126,6 +128,11 @@ export function HostBattleForm({
     gameFailed,
     mapFailed,
   } = content;
+  const { thumbs } = useUnitsyncThumbnails(target?.enginePath, target?.dataDir);
+  // Swaps the drawer's whole content for the map picker grid, with a back
+  // button, rather than stacking a second drawer on top of the one this form
+  // is already showing in (issue #2796).
+  const [pickingMap, setPickingMap] = useState(false);
 
   const [title, setTitle] = useState(initialTitle ?? lastTitle);
   // 8 is a sensible starting size for a fresh host (issue #502) and also the
@@ -269,6 +276,39 @@ export function HostBattleForm({
     }
   }
 
+  // The map picker takes over the whole drawer rather than opening a second
+  // one on top of it (issue #2796). Picking a map, or the back button, drops
+  // back to the form with every other field exactly as it was, since nothing
+  // here unmounts the form's own state.
+  if (pickingMap) {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Back to the battle form"
+            onClick={() => setPickingMap(false)}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <h2 className="text-sm font-semibold">Choose a map</h2>
+        </div>
+        <MapPickerGrid
+          maps={maps}
+          thumbs={thumbs}
+          selectedName={mapName}
+          onSelect={(name) => {
+            setMapName(name);
+            setPickingMap(false);
+          }}
+          mapsLoading={content.scanning}
+        />
+      </div>
+    );
+  }
+
   return (
     <form className="flex flex-col gap-3" onSubmit={submit}>
       {noEngine ? (
@@ -306,17 +346,29 @@ export function HostBattleForm({
             />
           </label>
 
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
-          <label className="flex flex-col gap-1 text-sm">
+          <div className="flex flex-col gap-1 text-sm">
             <span className="font-medium">Map</span>
-            <OptionSelect
-              value={mapName}
-              onValueChange={setMapName}
-              options={maps.map((m) => ({ value: m.name, label: m.name }))}
-              placeholder={content.scanning ? "Scanning…" : "Select a map"}
-              size="sm"
-            />
-          </label>
+            <button
+              type="button"
+              onClick={() => setPickingMap(true)}
+              className="flex h-11 items-center gap-2 rounded-md border border-input bg-transparent px-2 text-left text-sm shadow-xs transition-colors hover:bg-accent/50 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted/40">
+                {thumbs.get(mapName) ? (
+                  <img
+                    src={thumbs.get(mapName)?.url}
+                    alt=""
+                    className="size-full object-contain"
+                  />
+                ) : (
+                  <ImageOff className="size-4 text-muted-foreground" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {mapName || (content.scanning ? "Scanning…" : "Select a map")}
+              </span>
+            </button>
+          </div>
 
           <div className="flex gap-2">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}

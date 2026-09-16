@@ -1,18 +1,19 @@
-import { Button, Input } from "@picoframe/frame";
-import { Check, ImageOff, Loader2, Search, X } from "lucide-react";
+import { Button } from "@picoframe/frame";
+import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useMemo, useState } from "react";
 import type { MapItem } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
-import { mapSizeLabel } from "@/content/pages/components/MapThumb";
-
-/** Unique id for a map: its name plus its own archive (distinguishes variants). */
-const mapId = (m: MapItem) => `${m.name}::${m.archives[0]?.name ?? ""}`;
+import { MapPickerGrid } from "./MapPickerGrid";
 
 /**
  * A right-hand slide-in sheet for picking a map from a searchable thumbnail grid.
  * Built on the radix `Dialog` primitive (the `@picoframe` registry ships no
  * sheet), styled as a side panel. Selecting a thumbnail sets the map and closes.
+ *
+ * A thin wrapper around `MapPickerGrid`, which owns the search box and the grid
+ * itself (issue #2796). Kept as its own component, with its own `Dialog`, for
+ * callers that open the picker over a page rather than inside a drawer that is
+ * already open.
  */
 export function MapPickerDrawer({
   open,
@@ -33,35 +34,6 @@ export function MapPickerDrawer({
    * yet" rather than "no maps installed". */
   mapsLoading?: boolean;
 }) {
-  const [query, setQuery] = useState("");
-  const filtered = useMemo(() => {
-    // De-dupe by name + own-archive: collapses true duplicates (same map listed
-    // twice) while keeping genuine same-named variants (e.g. a packaged `.sd7` and
-    // a decompiled `.sdd`). The composite is unique, so it's also a safe React key
-    // — a colliding key here corrupts the grid across searches.
-    const seen = new Set<string>();
-    const unique = maps.filter((m) => {
-      const id = mapId(m);
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-    // Matches the map's own description too (issue #350): mapinfo.lua carries
-    // no structured play-type field on any installed map we could find, so
-    // "1v1"/"ffa"/"survival" tabs would filter almost nothing. What mappers
-    // do write, on some maps, is the type into the description text itself
-    // ("1v1 Map by...", "Survival Hill on..."), so a name-only search can't
-    // reach it. Widening to description costs nothing for maps without one.
-    const q = query.trim().toLowerCase();
-    return q
-      ? unique.filter(
-          (m) =>
-            m.name.toLowerCase().includes(q) ||
-            m.info.description?.toLowerCase().includes(q),
-        )
-      : unique;
-  }, [maps, query]);
-
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -78,90 +50,16 @@ export function MapPickerDrawer({
             </DialogPrimitive.Close>
           </div>
 
-          <div className="px-5 pb-1 pt-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={`Search ${maps.length} maps…`}
-                className="pl-9"
-              />
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            <div className="grid grid-cols-3 content-start gap-3">
-              {filtered.map((m) => {
-                const thumb = thumbs.get(m.name);
-                const size = mapSizeLabel(m.width, m.height);
-                // The map's own archive disambiguates same-named variants (e.g. a
-                // packaged `.sd7` vs a decompiled `.sdd`).
-                const archiveName = m.archives[0]?.name;
-                return (
-                  <button
-                    key={mapId(m)}
-                    type="button"
-                    onClick={() => {
-                      onSelect(m.name);
-                      onOpenChange(false);
-                    }}
-                    aria-pressed={m.name === selectedName}
-                    className="flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card text-left transition-colors hover:border-border hover:bg-accent/50 hover:shadow-md focus-visible:border-primary focus-visible:outline-none"
-                  >
-                    <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted/40">
-                      {m.name === selectedName && (
-                        <div
-                          className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background"
-                          aria-hidden
-                        >
-                          <Check className="size-4" />
-                        </div>
-                      )}
-                      {thumb ? (
-                        <img
-                          src={thumb.url}
-                          alt={`Minimap of ${m.name}`}
-                          className="size-full object-contain"
-                        />
-                      ) : (
-                        <ImageOff className="size-6 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="px-2.5 py-2">
-                      <span className="line-clamp-2 block text-xs font-medium">
-                        {m.name}
-                      </span>
-                      <div className="mt-0.5 flex flex-col text-[11px] text-muted-foreground">
-                        {size && <span>{size}</span>}
-                        {archiveName && (
-                          <span className="truncate" title={archiveName}>
-                            {archiveName}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-              {filtered.length === 0 &&
-                (mapsLoading ? (
-                  <div className="col-span-3 flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                    Scanning maps…
-                  </div>
-                ) : maps.length === 0 ? (
-                  <div className="col-span-3 flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
-                    <ImageOff className="size-6" aria-hidden />
-                    No maps installed.
-                  </div>
-                ) : (
-                  <p className="col-span-3 py-8 text-center text-sm text-muted-foreground">
-                    No maps match “{query}”.
-                  </p>
-                ))}
-            </div>
-          </div>
+          <MapPickerGrid
+            maps={maps}
+            thumbs={thumbs}
+            selectedName={selectedName}
+            onSelect={(name) => {
+              onSelect(name);
+              onOpenChange(false);
+            }}
+            mapsLoading={mapsLoading}
+          />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
