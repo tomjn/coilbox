@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useSetting } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -23,6 +23,10 @@ export type CreateLobbyArgs = Omit<
   Parameters<typeof mpCreateLobby>[0],
   "serverKey"
 >;
+
+// Remembered from the last lobby created. Issue #2794 did the same for the
+// TASServer "Host a battle" form, and issue #2853 carries it to this one too.
+const LAST_MAP_KEY = "multiplayer.createLobby.lastMap";
 
 /**
  * "Create a lobby" for the Battles hub on a Tachyon server, sitting where the
@@ -70,8 +74,12 @@ export function CreateLobbyPopover({
     [scan.data],
   );
 
+  // What was picked last time (issue #2853), read once at mount. A jump that
+  // opened this popover with a map already chosen (`initialMap`) wins over it.
+  const [lastMap, setLastMap] = useSetting(LAST_MAP_KEY, "");
+
   const [name, setName] = useState("");
-  const [mapName, setMapName] = useState(initialMap ?? "");
+  const [mapName, setMapName] = useState(initialMap ?? lastMap);
   const [allyTeams, setAllyTeams] = useState(2);
   const [playersPerTeam, setPlayersPerTeam] = useState(8);
   // On by default, matching the schema. A Tachyon lobby has no founder, so a
@@ -98,6 +106,7 @@ export function CreateLobbyPopover({
       playersPerTeam,
       bossesEnabled,
     });
+    setLastMap(mapName);
     setOpen(false);
   }
 
