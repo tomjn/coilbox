@@ -250,6 +250,11 @@ pub struct Battle {
     /// implement the direct case, so anything else is worth telling a joining
     /// player about rather than letting the engine hang on it.
     pub nat_type: String,
+    /// Whether the battle's traffic goes through the lobby's relay, which
+    /// costs everybody in it some ping (issue #2133). Only a lobby that sends
+    /// `BATTLEISRELAYED` can say so, and false means it did not, not that the
+    /// battle is direct.
+    pub relayed: bool,
     pub map: String,
     pub maphash: String,
     pub modname: String,

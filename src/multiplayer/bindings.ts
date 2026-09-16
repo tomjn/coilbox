@@ -141,6 +141,12 @@ export interface Battle {
    * `"2"` fixed source ports. Coilbox only does the direct case.
    */
   natType: string;
+  /**
+   * Whether the battle's traffic goes through the lobby's relay (issue #2133).
+   * Only a lobby that sends `BATTLEISRELAYED` can say so, so false means it did
+   * not, not that the battle is direct.
+   */
+  relayed: boolean;
   map: string;
   maphash: string;
   modname: string;
@@ -437,6 +443,8 @@ export type Delta =
    * has gone, and for the host it is the lobby confirming the move.
    */
   | { kind: "battleHostMoved"; id: number }
+  /** A battle goes through the lobby's relay, and the snapshot says so. */
+  | { kind: "battleIsRelayed"; id: number }
   /**
    * The lobby would not move our battle to the address its relay came back at,
    * so the battle is still advertised where the allocation used to be. Worse

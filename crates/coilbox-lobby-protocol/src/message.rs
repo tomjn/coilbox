@@ -273,6 +273,13 @@ pub enum ServerMessage {
         ip: String,
         port: String,
     },
+    /// `BATTLEISRELAYED <battle_id>`, a battle whose traffic goes through the
+    /// lobby's relay (issue #2133).
+    ///
+    /// Follows the battle's `BATTLEOPENED`, only to a client that asked for
+    /// relay support at login, because that line is identical for a relayed
+    /// battle and a direct one on purpose (issue #2017).
+    BattleIsRelayed { battle_id: u32 },
     /// `MOVERELAYEDHOSTFAILED <reason>`, the lobby refusing to move a battle to
     /// the address [`crate::command::move_relayed_host`] named.
     ///
@@ -768,6 +775,12 @@ pub fn parse_line(line: &str) -> ServerMessage {
                 port: port.to_string(),
             },
             None => ServerMessage::Unknown { raw: raw() },
+        },
+        // A line with no number in it names no battle, and battle 0 is a real
+        // one, so it is not read as that.
+        "BATTLEISRELAYED" => match rest.trim().parse() {
+            Ok(battle_id) => ServerMessage::BattleIsRelayed { battle_id },
+            Err(_) => ServerMessage::Unknown { raw: raw() },
         },
         "MOVERELAYEDHOSTFAILED" => ServerMessage::MoveRelayedHostFailed {
             reason: rest.to_string(),
@@ -1554,6 +1567,21 @@ mod tests {
                 parse_line(line),
                 ServerMessage::Unknown { raw: line.into() },
                 "a line this shape says nothing about where a battle is: {line}"
+            );
+        }
+    }
+
+    #[test]
+    fn parses_a_battle_that_is_relayed() {
+        assert_eq!(
+            parse_line("BATTLEISRELAYED 9"),
+            ServerMessage::BattleIsRelayed { battle_id: 9 }
+        );
+        for line in ["BATTLEISRELAYED", "BATTLEISRELAYED nine"] {
+            assert_eq!(
+                parse_line(line),
+                ServerMessage::Unknown { raw: line.into() },
+                "a line that names no battle says nothing about one: {line}"
             );
         }
     }
