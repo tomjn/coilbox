@@ -14,15 +14,18 @@ import {
 const heard = (
   id: string,
   isSelf: boolean,
-  address = "192.168.1.1",
-  port = 8200,
+  extra: Partial<DirectLanRoom> = {},
 ) =>
   ({
     id,
     title: `room ${id}`,
+    host: `host-${id}`,
+    game: "Beyond All Reason",
+    map: "Comet Catcher Redux",
+    address: "192.168.1.1",
+    port: 8200,
     isSelf,
-    address,
-    port,
+    ...extra,
   }) as unknown as DirectLanRoom;
 
 describe("otherRooms", () => {
@@ -48,22 +51,47 @@ describe("otherRooms", () => {
   it("leaves out a room this client has joined as somebody else's guest", () => {
     const rooms = otherRooms(
       [
-        heard("theirs", false, "192.168.1.45", 8200),
-        heard("someone-elses", false, "192.168.1.99", 8200),
+        heard("theirs", false, { title: "Friday pubs", host: "alice" }),
+        heard("someone-elses", false, { title: "Saturday pubs", host: "bob" }),
       ],
-      "192.168.1.45:8200",
+      {
+        title: "Friday pubs",
+        host: "alice",
+        game: "Beyond All Reason",
+        map: "Comet Catcher Redux",
+      },
     );
     expect(rooms.map((room) => room.id)).toEqual(["someone-elses"]);
   });
 
-  // A host reaches their own room over loopback, so the address it is
-  // connected on never matches the beacon's, which is why `isSelf` (not the
-  // address) is what has to catch the hosting case.
-  it("still leaves out the host's own room even though its connected address differs", () => {
+  // The bug this replaced (issue #2857): a joiner who dialled a hostname the
+  // beacon has no way to know resolves to the same machine it is announcing an
+  // IP for saw the room twice, because the address strings did not match. Title,
+  // host, game and map come off the room's one battle on both sides and do not
+  // depend on what name got the joiner there.
+  it("still catches the joined room when its dialled address differs from the beacon's", () => {
     const rooms = otherRooms(
-      [heard("mine", true, "192.168.1.1", 8200)],
-      "127.0.0.1:8200",
+      [
+        heard("theirs", false, {
+          title: "Friday pubs",
+          host: "alice",
+          address: "192.168.1.45",
+        }),
+      ],
+      {
+        title: "Friday pubs",
+        host: "alice",
+        game: "Beyond All Reason",
+        map: "Comet Catcher Redux",
+      },
     );
+    expect(rooms).toEqual([]);
+  });
+
+  // A host reaches their own room over loopback, so nothing about the connected
+  // battle needs to match for `isSelf` to catch the hosting case.
+  it("still leaves out the host's own room when nothing is connected", () => {
+    const rooms = otherRooms([heard("mine", true)], null);
     expect(rooms).toEqual([]);
   });
 });

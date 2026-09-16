@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useSetting } from "@picoframe/frame";
 import { memo, useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
@@ -28,6 +28,15 @@ export type ZerokOpenBattleArgs = Omit<
  * refuses an empty value, and a NUL cannot appear in a name unitsync returned,
  * so this cannot be mistaken for a map. */
 const SERVER_PICKS = "\u0000";
+
+// Remembered from the last battle hosted. Issue #2794 did the same for the
+// TASServer "Host a battle" form, and issue #2853 carries it to this one too.
+// Not the password, for the reason #2794 does not: it would sit in the
+// settings file as plain text, and a host who locked one battle may not
+// expect the next to be locked too.
+const LAST_TITLE_KEY = "multiplayer.hostZerokBattle.lastTitle";
+const LAST_MAP_KEY = "multiplayer.hostZerokBattle.lastMap";
+const LAST_MAX_PLAYERS_KEY = "multiplayer.hostZerokBattle.lastMaxPlayers";
 
 /**
  * "Host a battle" for the Battles hub on a Zero-K server, sitting where the
@@ -75,10 +84,20 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
     [scan.data],
   );
 
-  const [title, setTitle] = useState(initialTitle ?? "");
+  // What was hosted last time (issue #2853), read once at mount. A jump that
+  // opened this popover with a title or map already chosen (`initialTitle`/
+  // `initialMap`) wins over it.
+  const [lastTitle, setLastTitle] = useSetting(LAST_TITLE_KEY, "");
+  const [lastMap, setLastMap] = useSetting(LAST_MAP_KEY, SERVER_PICKS);
+  const [lastMaxPlayers, setLastMaxPlayers] = useSetting(
+    LAST_MAX_PLAYERS_KEY,
+    8,
+  );
+
+  const [title, setTitle] = useState(initialTitle ?? lastTitle);
   const [mode, setMode] = useState<ZerokBattleMode>("custom");
-  const [mapName, setMapName] = useState(initialMap ?? SERVER_PICKS);
-  const [maxPlayers, setMaxPlayers] = useState(8);
+  const [mapName, setMapName] = useState(initialMap ?? lastMap);
+  const [maxPlayers, setMaxPlayers] = useState(lastMaxPlayers);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [hosting, setHosting] = useState(false);
@@ -119,6 +138,11 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
         maxPlayers,
         password: password.trim() || null,
       });
+      // Remembered for the next battle (issue #2853), except the password,
+      // per the keys above.
+      setLastTitle(title);
+      setLastMap(mapName);
+      setLastMaxPlayers(maxPlayers);
       setOpen(false);
     } catch (err) {
       // Left open on purpose: the answer is in here, and the fields that need

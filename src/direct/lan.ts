@@ -29,19 +29,37 @@ export const LAN_POLL_MS = 2000;
  * Joining somebody else's room is the same duplicate a different way: the
  * beacon still carries their room, `isSelf` is still false, and because a room
  * holds exactly one battle the Open list below is now that same room too
- * (issue #2734). `isSelf` cannot catch this: a host reaches their own room over
- * loopback, so its address never matches the beacon's, but a joiner dials the
- * exact address and port the beacon gave, so those do match, and that is what
- * this checks instead.
+ * (issue #2734). `isSelf` cannot catch this, so a joiner's connected battle was
+ * matched against the beacon's address and port instead: a joiner dials the
+ * exact address and port the beacon gave, so those matched too.
+ *
+ * That match broke the moment the two spellings of the address differed, for
+ * example a hostname (`tomlaptop.local:8200`) dialled against a beacon
+ * announcing the IP it resolved to (`192.168.1.45:8200`) - same room, same
+ * port, different string (issue #2857). Resolving both sides to compare them
+ * is real machinery for what turns out to have a cheaper answer already
+ * sitting in the beacon: `title`, `host`, `game` and `map` are read straight
+ * off the room's one battle (see `Beacon::from_status` in `beacon.rs`), so the
+ * connected battle carries the same four values, unresolved and exact. Four
+ * independent matches is not a coincidence two different rooms are going to
+ * share, and unlike the address it does not care what name got us there.
  */
 export function otherRooms(
   rooms: DirectLanRoom[],
-  /** `host:port` of the direct room this client is currently connected to, or
-   *  null when it is not connected to one. */
-  connectedRoom: string | null,
+  /** The battle held by the direct room this client is connected to, or null
+   *  when it is not connected to one. */
+  connectedRoom: Pick<DirectLanRoom, "title" | "host" | "game" | "map"> | null,
 ): DirectLanRoom[] {
   return rooms.filter(
-    (room) => !room.isSelf && `${room.address}:${room.port}` !== connectedRoom,
+    (room) =>
+      !room.isSelf &&
+      !(
+        connectedRoom &&
+        room.title === connectedRoom.title &&
+        room.host === connectedRoom.host &&
+        room.game === connectedRoom.game &&
+        room.map === connectedRoom.map
+      ),
   );
 }
 
