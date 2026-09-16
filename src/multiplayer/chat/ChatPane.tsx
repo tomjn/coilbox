@@ -159,6 +159,13 @@ export interface ChatPaneProps {
   /** The longest one message may be on this connection, where the protocol
    * caps it (Tachyon does, at 512). Omit where it does not. */
   maxChars?: number | null;
+  /** Extra content under one message's bubble, for a chat line a client-side
+   * command recognises, e.g. a `!map <name>` suggestion the host can Accept
+   * (issue #2795). Only the battle room passes this. The hub and DM panes
+   * leave it unset. Returns nothing for a message with no action to offer,
+   * so the caller can extend it to other commands (issue #2738) without any
+   * change here. */
+  messageAction?: (m: ChatMsg) => ReactNode;
 }
 
 /**
@@ -183,6 +190,7 @@ export function ChatPane({
   disabled = false,
   completions,
   maxChars = null,
+  messageAction,
 }: ChatPaneProps) {
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
@@ -571,6 +579,7 @@ export function ChatPane({
                               <FormattedText text={m.text} />
                             </span>
                           </div>
+                          {messageAction?.(m)}
                           {!nextSame && (
                             <span className="px-1 pt-0.5 text-[10px] text-muted-foreground">
                               {formatTime(m.at)}

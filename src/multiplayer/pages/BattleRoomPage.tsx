@@ -546,7 +546,14 @@ function BattleRoomPage() {
             onAlly={room.setAlly}
             onColor={room.setColor}
           />
-          <BattleChatCard battle={battle} />
+          <BattleChatCard
+            battle={battle}
+            enginePath={room.enginePath}
+            dataDir={room.dataDir}
+            maps={room.maps}
+            canChangeMap={room.canChangeMap}
+            onChangeMap={room.setMap}
+          />
         </div>
 
         <aside className="w-[22rem] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">

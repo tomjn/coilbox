@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
 import type { MapItem } from "@/content/bindings";
 import {
-  useUnitsyncMapInfo,
   useUnitsyncMapMeta,
   useUnitsyncMinimap,
   useUnitsyncThumbnails,
@@ -20,8 +18,9 @@ import type { StartRect } from "@/startbox/geometry";
 import { StartBoxEditor } from "@/startbox/StartBoxEditor";
 import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
 import type { Battle } from "../bindings";
-import { hexToI32, type MemberRow } from "./config";
+import type { MemberRow } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
+import { useMapChangeQueue } from "./useMapChangeQueue";
 
 /**
  * The battle's map, rendered through the shared singleplayer `MapCard` so it
@@ -100,27 +99,13 @@ export function BattleMapCard({
   const canOverlay = !!localMap && !mapMissing && !!minimap.url;
 
   // As host, changing the map needs the new map's CRC for UPDATEBATTLEINFO so
-  // joiners can sync. The checksum comes from the unitsync worker (a hook keyed
-  // on map name), so a pick stashes the name and we fire onChangeMap once its
-  // info resolves; a hash failure just drops the pick.
-  const [pendingMap, setPendingMap] = useState<string | null>(null);
-  const pendingInfo = useUnitsyncMapInfo(
+  // joiners can sync - shared with the chat "Accept" button on a `!map`
+  // suggestion (issue #2795), which waits on the same checksum this way.
+  const { pendingMap, requestMapChange } = useMapChangeQueue(
     enginePath,
     dataDir,
-    pendingMap ?? undefined,
+    onChangeMap,
   );
-  useEffect(() => {
-    if (!pendingMap) return;
-    if (pendingInfo.status === "ready") {
-      onChangeMap(pendingMap, hexToI32(pendingInfo.info?.checksum));
-      setPendingMap(null);
-    } else if (
-      pendingInfo.status === "error" ||
-      pendingInfo.status === "unsyncable"
-    ) {
-      setPendingMap(null);
-    }
-  }, [pendingMap, pendingInfo.status, pendingInfo.info, onChangeMap]);
 
   const players = rows
     .filter((r) => !r.spectator)
@@ -186,7 +171,7 @@ export function BattleMapCard({
         // Dim the base minimap while a terrain overlay is shown so the metal /
         // height layer reads clearly over it.
         dimBase={!!overlayUrl}
-        onSelectMap={canChangeMap ? setPendingMap : onSuggestMap}
+        onSelectMap={canChangeMap ? requestMapChange : onSuggestMap}
         selectLabel={
           canChangeMap
             ? pendingMap

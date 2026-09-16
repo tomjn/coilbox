@@ -1,18 +1,45 @@
 import { useCallback, useEffect } from "react";
-import type { Battle } from "../bindings";
+import type { MapItem } from "@/content/bindings";
+import type { Battle, ChatMsg } from "../bindings";
 import { ChatPane } from "../chat/ChatPane";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
 import { useConversation } from "../chat/useConversation";
 import { useMultiplayer } from "../store";
 import { colorIntToHex } from "./config";
+import { MapSuggestionAction } from "./MapSuggestionAction";
+import { matchMapSuggestion } from "./mapSuggestion";
+import { useMapChangeQueue } from "./useMapChangeQueue";
 
 /**
  * The battle's chat, embedded in the room. Reuses the same `ChatPane` +
  * `useConversation` as the chat hub — bound to the `{kind:"battle"}` descriptor —
  * so autohost replies and player chat land here, tinted by each player's team
  * colour. The grid wrapper gives the embedded pane a bounded height to scroll in.
+ *
+ * A member who isn't the host can only suggest a map with `!map <name>`
+ * (`BattleMapCard`'s "Suggest map" path). Nothing here reads that line on its
+ * own. When we can change the map ourselves, every `!map` line gets matched
+ * against installed maps and, on a single match, an Accept button that
+ * applies it (issue #2795).
  */
-export function BattleChatCard({ battle }: { battle: Battle }) {
+export function BattleChatCard({
+  battle,
+  enginePath,
+  dataDir,
+  maps,
+  canChangeMap,
+  onChangeMap,
+}: {
+  battle: Battle;
+  enginePath: string | undefined;
+  dataDir: string | undefined;
+  maps: MapItem[];
+  /** Whether we may change the map directly, the founder or a boss of a
+   *  Tachyon lobby (mirrors `BattleMapCard`'s own gate). Only then does a
+   *  `!map` line get an Accept button. Everyone else sees the line as before. */
+  canChangeMap: boolean;
+  onChangeMap: (name: string, maphash: number) => void;
+}) {
   const { mirror, markSeen } = useMultiplayer();
   const me = mirror.state?.myUsername ?? null;
   const channel = battle.channel;
@@ -44,6 +71,29 @@ export function BattleChatCard({ battle }: { battle: Battle }) {
     [users],
   );
 
+  // Shared with BattleMapCard's own map picker (issue #2795), so an Accept
+  // click here waits on the same checksum lookup before applying the change.
+  const { pendingMap, requestMapChange } = useMapChangeQueue(
+    enginePath,
+    dataDir,
+    onChangeMap,
+  );
+  const messageAction = useCallback(
+    (m: ChatMsg) => {
+      if (!canChangeMap) return null;
+      const suggestion = matchMapSuggestion(m.text, maps);
+      if (!suggestion) return null;
+      return (
+        <MapSuggestionAction
+          suggestion={suggestion}
+          pending={pendingMap != null}
+          onAccept={requestMapChange}
+        />
+      );
+    },
+    [canChangeMap, maps, pendingMap, requestMapChange],
+  );
+
   if (!channel) {
     return (
       <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
@@ -66,6 +116,7 @@ export function BattleChatCard({ battle }: { battle: Battle }) {
         isBot={isBot}
         maxChars={conv.maxChars}
         onSend={conv.send}
+        messageAction={messageAction}
       />
     </div>
   );
