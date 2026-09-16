@@ -1202,7 +1202,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // Late-bound so the frozen `openChannel` handler can invoke the latest logic.
   // It is handed the key that dropped, because which connection it was decides
   // everything the handler does (issue #2149).
-  const handleDropRef = useRef<(serverKey: string) => void>(() => {});
+  const handleDropRef = useRef<
+    (serverKey: string, reason: string | null) => void
+  >(() => {});
 
   // Cancel any running reconnect loop (a manual connect/disconnect supersedes it).
   const stopReconnect = useCallback(() => {
@@ -1517,7 +1519,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // decides it, so the key goes with it. Acting on every drop meant a
         // connection somebody had stopped using could log them out of the one
         // they were on, and start a reconnect loop for it too (issue #2149).
-        handleDropRef.current(serverKey);
+        handleDropRef.current(serverKey, ev.reason);
       }
     };
     return onEvent;
@@ -1770,10 +1772,20 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // it used to clear the key and start a reconnect for whoever held it next
   // (issue #2149).
   const handleDrop = useCallback(
-    (serverKey: string) => {
+    (serverKey: string, reason: string | null) => {
       if (activeKeyRef.current !== serverKey) return;
       applyActiveKey(null);
       if (intentionalRef.current) return;
+      // A room is one running process, not an address worth retrying: once it
+      // has told us why it ended (a stop, and later a kick), reconnecting would
+      // dial whatever else has since taken that address and port, and land us
+      // in a battle nobody chose (issue #2733). An unnamed drop is still worth
+      // the reconnect below, since that is the shape a network blip takes and
+      // the same room is what is still there to reclaim a seat in.
+      if (reconnectCtxRef.current?.direct && reason) {
+        void notify({ title: "Disconnected from the room", body: reason });
+        return;
+      }
       if (!autoRejoinRef.current) return;
       if (!loggedInRef.current) return;
       if (!reconnectCtxRef.current) return;

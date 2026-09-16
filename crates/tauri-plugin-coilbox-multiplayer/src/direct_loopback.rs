@@ -158,6 +158,19 @@ impl Client {
         )
         .await;
     }
+
+    /// The reason the connection ended, once a `disconnected` event has
+    /// arrived: `None` while there is none yet, `Some(None)` for a reason-less
+    /// drop, `Some(Some(text))` for one that named itself.
+    fn disconnect_reason(&self) -> Option<Option<String>> {
+        self.events.lock().unwrap().iter().find_map(|e| {
+            let event: serde_json::Value = serde_json::from_str(e).ok()?;
+            if event["kind"] != "disconnected" {
+                return None;
+            }
+            Some(event["reason"].as_str().map(|s| s.to_string()))
+        })
+    }
 }
 
 /// Poll `done` until it is true, or fail the test saying what never happened.
@@ -1331,6 +1344,14 @@ async fn stopping_a_room_names_the_reason() {
     // And then dropped: the connection task evicts itself from the registry when
     // the socket ends.
     wait_until(|| client.phase().is_none(), "the connection to end").await;
+    // The room's `SERVERMSG` arrived, then the socket's own EOF followed with no
+    // reason of its own. The `disconnected` event has to carry the room's line
+    // forward as the reason, or the frontend returns to disconnected with
+    // nothing to say why (issue #2733).
+    assert_eq!(
+        client.disconnect_reason(),
+        Some(Some("the host stopped hosting this room".to_string())),
+    );
 }
 
 /// The port a host cannot have is the one they are already using, and a room

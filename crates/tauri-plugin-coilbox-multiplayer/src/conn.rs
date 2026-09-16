@@ -469,6 +469,15 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
     // greeting/login has even started.
     ping.tick().await;
 
+    // The last plain announcement the server sent, so a clean close with no
+    // protocol-level reason (an EOF, not a read error) can still say why. A
+    // room names its own closing (or a kick) with a `SERVERMSG` right before
+    // it drops the socket, and today that line lands as a toast disconnected
+    // from the drop that follows it (issue #2733). Cleared on every other
+    // kind of line, so a stale announcement from earlier in the session is
+    // never mistaken for why a later, unrelated drop happened.
+    let mut last_server_msg: Option<String> = None;
+
     let reason: Option<String> = 'conn: loop {
         // Each iteration collects the lines to write, then flushes them at the end,
         // so the single owned sink is only ever borrowed in one place.
@@ -480,6 +489,10 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                 Some(Ok(line)) => {
                     console(&sink, "in", &line);
                     let msg = parse_line(&line);
+                    last_server_msg = match &msg {
+                        ServerMessage::ServerMsg { text } => Some(text.clone()),
+                        _ => None,
+                    };
 
                     let before = login.phase();
                     outbound.extend(login.on_message(&msg));
@@ -690,7 +703,10 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                     }
                 }
                 Some(Err(e)) => break 'conn Some(e.to_string()),
-                None => break 'conn None,
+                // A clean EOF carries no reason of its own, but the last thing
+                // the server said may be one: a room's `stop` (and a future
+                // kick) says why in a `SERVERMSG` right before it closes.
+                None => break 'conn last_server_msg.clone(),
             },
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),

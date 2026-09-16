@@ -257,4 +257,44 @@ describe("one lobby connection", () => {
     await fire(ROOM_KEY, { kind: "disconnected", reason: "room closed" });
     expect(activeKey()).toBe("none");
   });
+
+  // Issue #2733: a joiner whose host closed the room kept reading as
+  // connected, because the drop was treated as a flaky link worth retrying at
+  // the same address. A fresh room the host started next would answer that
+  // retry, silently joining nobody's battle rather than saying the old room
+  // ended.
+  it("says why and does not reconnect once a room has named its own closing", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await fire(ROOM_KEY, { kind: "phase", phase: "ready", agreement: null });
+    wire.notified.length = 0;
+
+    await fire(ROOM_KEY, {
+      kind: "disconnected",
+      reason: "AF closed this room",
+    });
+
+    expect(activeKey()).toBe("none");
+    expect(wire.notified).toContain("Disconnected from the room");
+    expect(wire.notified).not.toContain("Connection lost — reconnecting…");
+  });
+
+  // The same drop with no reason is what a network blip looks like rather
+  // than the room ending, and the same room is still there to reclaim a seat
+  // in, so this is the one case that still gets the usual reconnect loop.
+  it("still reconnects a room drop that named no reason", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await fire(ROOM_KEY, { kind: "phase", phase: "ready", agreement: null });
+    wire.notified.length = 0;
+
+    await fire(ROOM_KEY, { kind: "disconnected", reason: null });
+
+    expect(activeKey()).toBe("none");
+    expect(wire.notified).toContain("Connection lost — reconnecting…");
+  });
 });
