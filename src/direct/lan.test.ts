@@ -11,21 +11,60 @@ import {
   splitHostPort,
 } from "./lan";
 
-const heard = (id: string, isSelf: boolean) =>
-  ({ id, title: `room ${id}`, isSelf }) as unknown as DirectLanRoom;
+const heard = (
+  id: string,
+  isSelf: boolean,
+  address = "192.168.1.1",
+  port = 8200,
+) =>
+  ({
+    id,
+    title: `room ${id}`,
+    isSelf,
+    address,
+    port,
+  }) as unknown as DirectLanRoom;
 
 describe("otherRooms", () => {
   // The host is already in their own room, and the battle list below holds it
   // with the way back into it, so listing it here as well was the same room
   // twice (issue #1608).
   it("leaves out the room this client is hosting", () => {
-    const rooms = otherRooms([heard("mine", true), heard("theirs", false)]);
+    const rooms = otherRooms(
+      [heard("mine", true), heard("theirs", false)],
+      null,
+    );
     expect(rooms.map((room) => room.id)).toEqual(["theirs"]);
   });
 
   it("keeps every room somebody else is announcing", () => {
     const rooms = [heard("a", false), heard("b", false)];
-    expect(otherRooms(rooms)).toEqual(rooms);
+    expect(otherRooms(rooms, null)).toEqual(rooms);
+  });
+
+  // Joining somebody else's room is the same duplicate a different way: the
+  // room is still heard on the beacon and `isSelf` is still false, but once
+  // connected it is also the whole Open list below (issue #2734).
+  it("leaves out a room this client has joined as somebody else's guest", () => {
+    const rooms = otherRooms(
+      [
+        heard("theirs", false, "192.168.1.45", 8200),
+        heard("someone-elses", false, "192.168.1.99", 8200),
+      ],
+      "192.168.1.45:8200",
+    );
+    expect(rooms.map((room) => room.id)).toEqual(["someone-elses"]);
+  });
+
+  // A host reaches their own room over loopback, so the address it is
+  // connected on never matches the beacon's, which is why `isSelf` (not the
+  // address) is what has to catch the hosting case.
+  it("still leaves out the host's own room even though its connected address differs", () => {
+    const rooms = otherRooms(
+      [heard("mine", true, "192.168.1.1", 8200)],
+      "127.0.0.1:8200",
+    );
+    expect(rooms).toEqual([]);
   });
 });
 

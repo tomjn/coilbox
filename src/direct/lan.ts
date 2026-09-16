@@ -25,9 +25,24 @@ export const LAN_POLL_MS = 2000;
  * back into it (issue #1608). The list is what a joiner reads, so it keeps the
  * rooms a joiner can join, and what the host's own beacon proves is said on the
  * host's own line instead (see `announcementNote`).
+ *
+ * Joining somebody else's room is the same duplicate a different way: the
+ * beacon still carries their room, `isSelf` is still false, and because a room
+ * holds exactly one battle the Open list below is now that same room too
+ * (issue #2734). `isSelf` cannot catch this: a host reaches their own room over
+ * loopback, so its address never matches the beacon's, but a joiner dials the
+ * exact address and port the beacon gave, so those do match, and that is what
+ * this checks instead.
  */
-export function otherRooms(rooms: DirectLanRoom[]): DirectLanRoom[] {
-  return rooms.filter((room) => !room.isSelf);
+export function otherRooms(
+  rooms: DirectLanRoom[],
+  /** `host:port` of the direct room this client is currently connected to, or
+   *  null when it is not connected to one. */
+  connectedRoom: string | null,
+): DirectLanRoom[] {
+  return rooms.filter(
+    (room) => !room.isSelf && `${room.address}:${room.port}` !== connectedRoom,
+  );
 }
 
 /** Whether this client's own room has come back off the network. Pure. */

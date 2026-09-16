@@ -431,11 +431,15 @@ function BattlesPage() {
   // The list is everybody else's rooms. A host is already in their own, so it
   // sits in the battle list below with the way back into it, and listing it here
   // as well was the same room twice (issue #1608). What the host's own beacon
-  // proves is said on the host's own line instead.
+  // proves is said on the host's own line instead. Joining somebody else's room
+  // is the same duplicate: once connected, that room is the whole Open list
+  // below, so it drops out of Local network too (issue #2734).
+  const connectedRoom =
+    activeDirect && activeKey ? serverAddressFromKey(activeKey) : null;
   const lanSection = (
     <>
       <LanRooms
-        rooms={otherRooms(lan.rooms)}
+        rooms={otherRooms(lan.rooms, connectedRoom)}
         error={lan.error}
         blocked={joinBlockedReason(activeKey, activeDirect, room !== null)}
         defaultName={lastLogin?.username}
