@@ -99,6 +99,19 @@ export function closeEndsTheRoom({
   return selfHost && directRoom && hosting;
 }
 
+/**
+ * Whether a `!`-command posted into battle chat reaches an autohost that
+ * acts on it. Pure.
+ *
+ * A direct room runs coilbox's own room server, not SPADS, so a command
+ * posted into its chat sits read by nobody (issue #2738). A battle on a real
+ * lobby server is assumed to have SPADS behind it, as the autohost panel and
+ * the Balance button always have.
+ */
+export function autohostHearsChat(directRoom: boolean): boolean {
+  return !directRoom;
+}
+
 /** The words a stopped room gives its joiners, so the drop is named rather than
  *  silent. Pure. */
 export function roomStopReason(host: string): string {

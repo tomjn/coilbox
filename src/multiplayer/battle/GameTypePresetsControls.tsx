@@ -1,4 +1,5 @@
 import { Button } from "@picoframe/frame";
+import { autohostHearsChat } from "../../direct/room";
 import type { MemberRow } from "./config";
 import {
   balanceLayout,
@@ -35,12 +36,20 @@ const PRESETS: { label: string; preset: GameTypePreset }[] = [
  * Hidden where the server assigns seats itself (Zero-K, Tachyon), since
  * there is nothing here to send on those protocols. This mirrors the
  * roster's own team/ally controls, which go read-only for the same reason.
+ *
+ * The Balance button is further hidden for a joiner in a direct room:
+ * self-hosted, it always acts directly and never touches chat, but a joiner
+ * who is not self-hosting relies on `!balance` reaching an autohost, and a
+ * direct room runs coilbox's own room server rather than SPADS (issue
+ * #2738). The other presets still send the same `!force` line in that case,
+ * which is an existing, separate gap this issue does not cover.
  */
 export function GameTypePresetsControls({
   rows,
   me,
   selfHost,
   serverAssignsSeat,
+  directRoom,
   hostControls,
   onSetBattleStatusBatch,
   onAutohostSend,
@@ -49,6 +58,7 @@ export function GameTypePresetsControls({
   me: string | null;
   selfHost: boolean;
   serverAssignsSeat: boolean;
+  directRoom: boolean;
   hostControls: {
     forceTeam: (user: string, team: number) => void;
     forceAlly: (user: string, ally: number) => void;
@@ -91,9 +101,11 @@ export function GameTypePresetsControls({
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-4">
       <span className="text-sm font-semibold">Team setup</span>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={onBalance}>
-          Balance
-        </Button>
+        {(selfHost || autohostHearsChat(directRoom)) && (
+          <Button variant="outline" size="sm" onClick={onBalance}>
+            Balance
+          </Button>
+        )}
         {PRESETS.map((p) => (
           <Button
             key={p.preset}
