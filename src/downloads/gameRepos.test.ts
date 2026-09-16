@@ -21,6 +21,13 @@ describe("norm", () => {
     expect(norm("Splinter Faction 0.1.72.sd7")).toBe("splinterfaction0.1.72");
     expect(norm("Metal_Factions.sdz")).toBe("metalfactions");
   });
+
+  it("strips the hyphen GitHub release archives put before the version (issue #2731)", () => {
+    // e.g. "metalfactions-v2.40.sdz" and "Evolution-RTS-v17.07.sdz". Without
+    // this, a space-separated battle name never matches any release's archive.
+    expect(norm("metalfactions-v2.40.sdz")).toBe(norm("Metal Factions v2.40"));
+    expect(norm("Evolution-RTS-v17.07.sdz")).toBe(norm("Evolution RTS v17.07"));
+  });
 });
 
 describe("repoForKey", () => {

@@ -15,12 +15,20 @@
  */
 
 /** Loose key for matching a game name to a curated entry: lowercased, extension
- * and separators stripped. Shared with `downloadGame.ts`'s source matching. */
+ * and separators stripped. Shared with `downloadGame.ts`'s source matching.
+ *
+ * The hyphen matters: GitHub release archives are commonly named
+ * `metalfactions-v2.40.sdz` or `Evolution-RTS-v17.07.sdz`, hyphen before the
+ * version, while the name a battle advertises is space-separated (`Metal
+ * Factions v2.40`). Before this stripped hyphens too, no archive for any
+ * version ever matched, so `downloadGameAnySource` silently fell back to
+ * `archives[0]` (the newest release) and installed the wrong version every
+ * time (issue #2731). */
 export const norm = (s: string) =>
   s
     .toLowerCase()
     .replace(/\.(sd7|sdz)$/, "")
-    .replace(/[\s_]+/g, "");
+    .replace(/[\s_-]+/g, "");
 
 export interface GameRepo {
   /** Stable source id — the Downloads browse dropdown value. */
