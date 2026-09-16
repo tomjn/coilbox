@@ -86,6 +86,35 @@ describe("downloadGameAnySource, github step", () => {
       expect.objectContaining({ filename: "metalfactions-v2.40.sdz" }),
     );
   });
+
+  it("fails rather than silently installing a different version when nothing matches (issue #2859)", async () => {
+    // The requested version genuinely isn't on the fetched page. It may have
+    // aged off, been renamed, or been deleted, since dl_github_release_archives
+    // only fetches the most recent 30. Before the fix this fell back to
+    // archives[0], the newest release, and reported success anyway.
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [
+        {
+          filename: "metalfactions-v2.58.sdz",
+          url: "https://example.com/v2.58",
+          size: 1,
+          tag: "v2.58",
+        },
+      ],
+    });
+    dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
+
+    const err = await downloadGameAnySource({
+      gameName: "Metal Factions v2.40",
+      writePath: "/data",
+      // biome-ignore lint/suspicious/noExplicitAny: the channel is never read here
+      onProgress: {} as any,
+    }).catch((e: Error) => e);
+
+    expect(String(err)).toContain("springraaar/metal_factions");
+    expect(String(err)).toContain("Metal Factions v2.40");
+    expect(dlDownloadFileRaw).not.toHaveBeenCalled();
+  });
 });
 
 describe("downloadGameAnySource, rapid step", () => {
