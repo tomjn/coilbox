@@ -11,6 +11,7 @@
 
 #[cfg(test)]
 mod bos2lua_parity;
+mod bos_disk;
 mod cob;
 mod cobrun;
 mod compiler;
@@ -162,8 +163,11 @@ async fn anim_cob_run(
 /// settles how long `[1]` is: Scriptor, which built the older games, made it two
 /// and a half elmos, and today's compilers make it one.
 ///
-/// Nothing is read or written. Source in, Lua and what it could not carry over
-/// out.
+/// `path` is where the source was loaded from, when it was a file. Then the
+/// headers it includes are read from its game folder, exactly as the game
+/// import reads them from the archive, the script is named by its path in that
+/// folder rather than `name`, and the `.cob` beside it is read when `cob` is not
+/// given. Otherwise nothing is read, and nothing is ever written.
 #[tauri::command]
 async fn anim_bos2lua(
     source: String,
@@ -171,9 +175,22 @@ async fn anim_bos2lua(
     includes: Option<HashMap<String, String>>,
     pieces: Option<Vec<String>>,
     cob: Option<Vec<u8>>,
+    path: Option<String>,
 ) -> CliResult {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let includes = includes.unwrap_or_default();
+        let mut includes = includes.unwrap_or_default();
+        let mut name = name;
+        let mut cob = cob;
+        if let Some(path) = path.as_deref().map(Path::new) {
+            let (root, in_game) = bos_disk::locate(path);
+            for (key, text) in bos_disk::includes(&source, &root, &in_game) {
+                includes.entry(key).or_insert(text);
+            }
+            name = in_game;
+            if cob.is_none() {
+                cob = bos_disk::cob_beside(path);
+            }
+        }
         let linear_scale = cob
             .as_deref()
             .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))
@@ -202,6 +219,19 @@ async fn anim_bos2lua(
         })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("conversion task failed: {e}")),
+    }
+}
+
+/// `anim_bos_read`: the text of a `.bos` on disk, for the converter page to
+/// show and edit.
+#[tauri::command]
+async fn anim_bos_read(path: String) -> CliResult {
+    let result =
+        tauri::async_runtime::spawn_blocking(move || bos_disk::read_text(Path::new(&path))).await;
+    match result {
+        Ok(Ok(source)) => CliResult::ok(json!({ "source": source })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("read task failed: {e}")),
     }
 }
 
@@ -248,7 +278,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             anim_cob_disasm_bytes,
             anim_cob_run,
             anim_bos2cob,
-            anim_bos2lua
+            anim_bos2lua,
+            anim_bos_read
         ])
         .build()
 }

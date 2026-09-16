@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "anim_cob_run",
     "anim_bos2cob",
     "anim_bos2lua",
+    "anim_bos_read",
 ];
 
 fn main() {

@@ -1,10 +1,13 @@
 import { Button } from "@picoframe/frame";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Check, Copy, FileCode2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { animBos2lua } from "../bindings";
+import { errorText } from "@/lib/helpers";
+import { animBos2lua, animBosRead } from "../bindings";
 
 const PLACEHOLDER = `piece base, turret, barrel;
 
@@ -22,20 +25,24 @@ interface Converted {
   error: string | null;
 }
 
+const BOS = /\.bos$/i;
+
 const EMPTY: Converted = { lua: "", warnings: [], cobVars: null, error: null };
 
 /**
  * BOS → Lua unit-script converter. Converts as you type through the Rust
- * converter, whose Lua runs as it is. A pasted script has no `#include` files
- * beside it, so one that includes anything is refused rather than converted
- * without the macros and functions those files hold.
+ * converter, whose Lua runs as it is. A script loaded from disk has its
+ * `#include` files read from its folder, even as it is edited here. A pasted
+ * script has none, so one that includes anything is refused rather than
+ * converted without the macros and functions those files hold.
  */
 export default function Bos2LuaPage() {
   const [bos, setBos] = useState("");
   const [fileName, setFileName] = useState("script.bos");
+  // Where the script was loaded from, so its includes are read from beside it.
+  const [path, setPath] = useState<string | null>(null);
   const [converted, setConverted] = useState<Converted>(EMPTY);
   const [copied, setCopied] = useState<"lua" | "cobVars" | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
   // Only the newest conversion is shown, so a slow one for an older version
   // of the text cannot land on top of the current one.
   const latest = useRef(0);
@@ -46,13 +53,15 @@ export default function Bos2LuaPage() {
       setConverted(EMPTY);
       return;
     }
-    animBos2lua({ source: bos, name: fileName })
+    animBos2lua({ source: bos, name: fileName, ...(path ? { path } : {}) })
       .then(({ lua, warnings, cobVars, missingIncludes }) => {
         if (ticket !== latest.current) return;
         if (missingIncludes.length > 0) {
           setConverted({
             ...EMPTY,
-            error: `This script includes ${missingIncludes.join(", ")}. A script pasted here cannot load its includes, so it cannot be converted. Open the unit out of its game instead, which brings them with it.`,
+            error: path
+              ? `${fileName} includes ${missingIncludes.join(", ")}, which could not be found beside it or in a scripts folder above it, so it cannot be converted.`
+              : `This script includes ${missingIncludes.join(", ")}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game.`,
           });
           return;
         }
@@ -66,13 +75,50 @@ export default function Bos2LuaPage() {
           });
         }
       });
-  }, [bos, fileName]);
+  }, [bos, fileName, path]);
 
-  async function loadFile(file: File | undefined) {
-    if (!file) return;
-    setFileName(file.name);
-    setBos(await file.text());
+  async function loadPath(picked: string) {
+    try {
+      const { source } = await animBosRead({ path: picked });
+      setPath(picked);
+      setFileName(picked.split(/[\\/]/).pop() ?? picked);
+      setBos(source);
+    } catch (error) {
+      setConverted({ ...EMPTY, error: errorText(error) });
+    }
   }
+
+  async function browse() {
+    const picked = await open({
+      title: "Select a .bos unit script to convert",
+      multiple: false,
+      filters: [{ name: "Unit script source", extensions: ["bos", "txt"] }],
+    });
+    if (typeof picked === "string") await loadPath(picked);
+  }
+
+  // A file dropped on the window. Tauri hands over real paths, which a
+  // browser drop does not, and the includes are found from the path.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe once on mount, not per render
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type !== "drop") return;
+        const dropped = event.payload.paths.find((f) => BOS.test(f));
+        if (dropped) void loadPath(dropped);
+      })
+      .then((fn) => {
+        if (active) unlisten = fn;
+        else fn();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
 
   async function copy(text: string, which: "lua" | "cobVars") {
     if (!text) return;
@@ -100,28 +146,15 @@ export default function Bos2LuaPage() {
         description={
           <>
             Convert an old <code>.bos</code> unit script to a Lua unit script
-            that runs as it is, comments and all. A script opened out of a game
-            brings its <code>#include</code> files with it. One pasted here does
-            not, so a script that includes anything cannot be converted here.
+            that runs as it is, comments and all. A script loaded or dropped
+            here has its <code>#include</code> files read from its folder, and
+            one opened out of a game brings them with it. A pasted script has
+            none, so one that includes anything cannot be converted.
           </>
         }
         actions={
           <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".bos,.txt"
-              className="hidden"
-              onChange={(e) => {
-                void loadFile(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileRef.current?.click()}
-            >
+            <Button variant="outline" size="sm" onClick={() => void browse()}>
               <Upload /> Load .bos…
             </Button>
             <Button
@@ -141,17 +174,15 @@ export default function Bos2LuaPage() {
           htmlFor="bos-input"
           className="flex min-h-0 flex-col items-stretch gap-2 font-normal"
         >
-          <span className="text-sm font-medium text-muted-foreground">BOS</span>
+          <span className="text-sm font-medium text-muted-foreground">
+            {path ? `BOS, from ${path}` : "BOS"}
+          </span>
           <Textarea
             id="bos-input"
             value={bos}
-            onChange={(e) => setBos(e.target.value)}
-            onDrop={(e) => {
-              const file = e.dataTransfer.files?.[0];
-              if (file) {
-                e.preventDefault();
-                void loadFile(file);
-              }
+            onChange={(e) => {
+              setBos(e.target.value);
+              if (e.target.value.trim() === "") setPath(null);
             }}
             placeholder={PLACEHOLDER}
             spellCheck={false}

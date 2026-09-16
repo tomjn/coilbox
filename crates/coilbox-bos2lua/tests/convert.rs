@@ -383,3 +383,61 @@ fn a_missing_include_is_said_and_the_engine_s_names_stand_in() {
         conversion.warnings
     );
 }
+
+/// The search every host runs finds exactly the files the walker includes, and
+/// the conversion it feeds reports nothing missing.
+#[test]
+fn find_includes_finds_what_convert_looks_for() {
+    let files = includes();
+    let mut asked = Vec::new();
+    let found = coilbox_bos2lua::find_includes(WALKER, "scripts/walker.bos", |candidate| {
+        asked.push(candidate.to_string());
+        files
+            .get_key_value(candidate)
+            .map(|(path, text)| (path.clone(), text.clone()))
+    });
+    let mut paths: Vec<_> = found.iter().map(|f| f.path.as_str()).collect();
+    paths.sort();
+    assert_eq!(paths, ["scripts/animations/stride.bos", "scripts/flags.h"]);
+    let map = found.into_iter().map(|f| (f.path, f.text)).collect();
+    assert!(convert_with(WALKER, &map, MODERN_LINEAR)
+        .missing_includes
+        .is_empty());
+    assert!(asked
+        .iter()
+        .all(|c| c == &c.to_lowercase() && !c.contains('\\')));
+}
+
+#[test]
+fn find_includes_skips_comments_follows_parents_and_stops_on_a_cycle() {
+    let files = HashMap::from([
+        ("scripts/a.h", "#include \"lib\\B.h\"\n"),
+        (
+            "scripts/lib/b.h",
+            "  # include <../a.h>\n#include \"../c.h\"\n",
+        ),
+        ("scripts/c.h", "// #include \"never.h\"\n"),
+        ("scripts/never.h", ""),
+    ]);
+    let found = coilbox_bos2lua::find_includes(
+        "#include \"A.H\"\n/* x */ #include \"never.h\"\n",
+        "scripts/unit.bos",
+        |candidate| {
+            files
+                .get(candidate)
+                .map(|t| (candidate.to_string(), t.to_string()))
+        },
+    );
+    let names: Vec<_> = found
+        .iter()
+        .map(|f| (f.name.as_str(), f.path.as_str()))
+        .collect();
+    assert_eq!(
+        names,
+        [
+            ("A.H", "scripts/a.h"),
+            ("lib\\B.h", "scripts/lib/b.h"),
+            ("../c.h", "scripts/c.h"),
+        ]
+    );
+}

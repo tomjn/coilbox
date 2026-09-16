@@ -33,6 +33,9 @@ image = { workspace = true, features = [
 # DXT/BCn-compressed, and the PNG encode every cache here writes. Shared with the
 # unit builder's Blender exports, which decode the same files (issue #715).
 coilbox-texture = { path = "../coilbox-texture" }
+# The converter's include search, so a `.bos` read out of a game finds the same
+# headers the converter page finds for one on disk.
+coilbox-bos2lua = { path = "../coilbox-bos2lua" }
 base64 = { workspace = true }
 # The one WebP encoder, lossy and lossless (issue #1623). It wraps libwebp-sys,
 # which vendors libwebp's C and builds it with `cc`, so there is no system

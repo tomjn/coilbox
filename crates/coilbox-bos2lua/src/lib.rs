@@ -15,7 +15,7 @@ mod lex;
 mod parse;
 mod pp;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub struct Conversion {
     pub lua: String,
@@ -120,18 +120,9 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
         .map(|(path, text)| (normalise(path), (path.clone(), text.clone())))
         .collect();
     let resolve = |wanted: &str, from: &str| {
-        let dir = normalise(from)
-            .rsplit_once('/')
-            .map(|(dir, _)| format!("{dir}/"))
-            .unwrap_or_default();
-        let wanted = normalise(wanted);
-        [
-            format!("{dir}{wanted}"),
-            wanted.clone(),
-            format!("scripts/{wanted}"),
-        ]
-        .iter()
-        .find_map(|candidate| includes.get(candidate).cloned())
+        candidates(wanted, from)
+            .iter()
+            .find_map(|candidate| includes.get(candidate).cloned())
     };
     let pre = pp::preprocess(source, options.name, &resolve, options.linear_scale);
     let items = parse::parse(&pre.tokens, options.linear_scale).map_err(|e| {
@@ -148,12 +139,119 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
     emit::emit(&items, &pre, options)
 }
 
-/// A path as the lookup compares it: lower case, forward slashes, no `./`.
+/// Where `wanted` is looked for when the file at `from` includes it, in order:
+/// beside that file, at the root, then under `scripts/`.
+fn candidates(wanted: &str, from: &str) -> [String; 3] {
+    let dir = normalise(from)
+        .rsplit_once('/')
+        .map(|(dir, _)| format!("{dir}/"))
+        .unwrap_or_default();
+    let wanted = normalise(wanted);
+    [
+        format!("{dir}{wanted}"),
+        wanted.clone(),
+        format!("scripts/{wanted}"),
+    ]
+}
+
+/// How many levels of `#include` [`find_includes`] follows. A header including
+/// a header is ordinary and a third level is rare. It also stops two files that
+/// include each other, along with the seen set.
+const INCLUDE_DEPTH: u32 = 4;
+
+/// Most files [`find_includes`] reads for one script, so a script naming files
+/// in a loop cannot pull in a whole game.
+const MAX_INCLUDES: usize = 32;
+
+/// A file a script includes, as [`find_includes`] found it.
+pub struct Include {
+    /// The name the script wrote.
+    pub name: String,
+    /// Where it was found, as `read` spelled it. This is its key in
+    /// [`Options::includes`].
+    pub path: String,
+    pub text: String,
+}
+
+/// Every file `source` includes, and every file those include.
+///
+/// `name` is the script's own path, as [`convert`] is given it. `read` is handed
+/// each path [`convert`] would look in, lower case with forward slashes, and
+/// returns the file's own path and text when there is a file there. A game
+/// archive and a folder on disk both find includes through here, so a script
+/// that converts from one converts from the other.
+///
+/// Breadth first, so the files a script names itself are read before the ones
+/// a header names. A name found nowhere is left out, and [`convert`] reports it.
+pub fn find_includes(
+    source: &str,
+    name: &str,
+    mut read: impl FnMut(&str) -> Option<(String, String)>,
+) -> Vec<Include> {
+    let mut found = Vec::new();
+    let mut seen = HashSet::new();
+    let mut queue: VecDeque<(String, String, u32)> = include_names(source)
+        .into_iter()
+        .map(|wanted| (wanted, name.to_string(), 1))
+        .collect();
+    while let Some((wanted, from, depth)) = queue.pop_front() {
+        if found.len() >= MAX_INCLUDES {
+            break;
+        }
+        let Some((path, text)) = candidates(&wanted, &from).iter().find_map(|c| read(c)) else {
+            continue;
+        };
+        if !seen.insert(normalise(&path)) {
+            continue;
+        }
+        if depth < INCLUDE_DEPTH {
+            queue.extend(
+                include_names(&text)
+                    .into_iter()
+                    .map(|next| (next, path.clone(), depth + 1)),
+            );
+        }
+        found.push(Include {
+            name: wanted,
+            path,
+            text,
+        });
+    }
+    found
+}
+
+/// The names a file asks for with `#include`, in order. Only a directive at
+/// the start of a line counts, so one commented out with `//` is not read.
+fn include_names(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|line| {
+            let rest = line.trim_start().strip_prefix('#')?.trim_start();
+            let rest = rest.strip_prefix("include")?.trim_start();
+            let close = match rest.chars().next()? {
+                '"' => '"',
+                '<' => '>',
+                _ => return None,
+            };
+            let (name, _) = rest[1..].split_once(close)?;
+            (!name.is_empty()).then(|| name.to_string())
+        })
+        .collect()
+}
+
+/// A path as the lookup compares it: lower case, forward slashes, no `./`,
+/// and a `..` taken back out with the folder before it, since a game archive
+/// has no `..` to follow.
 fn normalise(path: &str) -> String {
     let lower = path.replace('\\', "/").to_lowercase();
-    lower
-        .split('/')
-        .filter(|part| !part.is_empty() && *part != ".")
-        .collect::<Vec<_>>()
-        .join("/")
+    let mut parts: Vec<&str> = Vec::new();
+    for part in lower.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            _ => parts.push(part),
+        }
+    }
+    parts.join("/")
 }
