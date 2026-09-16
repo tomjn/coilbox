@@ -1,7 +1,5 @@
-import type { Channel } from "@tauri-apps/api/core";
 import { loadGithubGameRepos } from "../content/branding";
 import {
-  type DownloadProgress,
   dlDownloadFileRaw,
   dlDownloadRaw,
   dlGithubReleaseArchives,
@@ -15,6 +13,7 @@ import {
   norm,
 } from "./gameRepos";
 import { type GameSource, gameSourceOrder } from "./gameSources";
+import { type ProgressSink, progressChannel } from "./progressChannel";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -38,13 +37,16 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * The GitHub repo per game comes from the unified registry (issue #512): the
  * branding catalog is authoritative, `GAME_REPOS` in `gameRepos.ts` is the
  * in-code fallback seed. See `mergeGameRepos`.
+ *
+ * Progress arrives as a sink rather than a channel, because each attempt needs a
+ * channel of its own: see `progressChannel` for what sharing one costs.
  */
 async function downloadGameAnySourceImpl(opts: {
   gameName: string;
   writePath?: string;
   /** Pass a stable id to make the active download cancellable via dlCancel. */
   opId?: string;
-  onProgress: Channel<DownloadProgress>;
+  onProgress: ProgressSink;
 }): Promise<string> {
   const { gameName, writePath, opId, onProgress } = opts;
   const target = norm(gameName);
@@ -70,7 +72,7 @@ async function downloadGameAnySourceImpl(opts: {
           destDir: `${writePath}/games`,
           filename: hit.filename,
           opId,
-          onProgress,
+          onProgress: progressChannel(onProgress),
         });
         return "github release";
       }
@@ -88,7 +90,7 @@ async function downloadGameAnySourceImpl(opts: {
           destDir: `${writePath}/games`,
           filename: found.filename,
           opId,
-          onProgress,
+          onProgress: progressChannel(onProgress),
         });
         return "springfiles mirror";
       }
@@ -109,7 +111,7 @@ async function downloadGameAnySourceImpl(opts: {
               masterUrl: master.url,
               writePath,
               opId,
-              onProgress,
+              onProgress: progressChannel(onProgress),
             });
             return "rapid";
           } catch (e) {

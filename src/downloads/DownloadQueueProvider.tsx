@@ -1,4 +1,3 @@
-import { Channel } from "@tauri-apps/api/core";
 import {
   createContext,
   type ReactNode,
@@ -30,6 +29,7 @@ import {
   rateFrom,
 } from "./downloadRate";
 import { errMessage } from "./pages/components/states";
+import { type ProgressSink, progressChannel } from "./progressChannel";
 import { installEngine } from "./warmEngineCache";
 
 /**
@@ -295,12 +295,18 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     }, PRUNE_MS);
   }, []);
 
-  // Fire the backend start command for an item and apply its kind's side effects.
+  // Fire the backend start command for an item and apply its kind's side
+  // effects. Every backend call gets a channel of its own from the sink, since a
+  // channel serves one command and no more (see `progressChannel`).
   const start = useCallback(
-    async (item: QueueItem, onProgress: Channel<DownloadProgress>) => {
+    async (item: QueueItem, onProgress: ProgressSink) => {
       switch (item.kind) {
         case "rapid":
-          await dlDownload({ ...item.args, opId: item.id, onProgress });
+          await dlDownload({
+            ...item.args,
+            opId: item.id,
+            onProgress: progressChannel(onProgress),
+          });
           // The freshly-written `.sdp` is now on disk; warm it into the page
           // cache so the first launch/join after this download is quicker.
           warmAllRoots().catch(() => {});
@@ -317,7 +323,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           warmAllRoots().catch(() => {});
           return;
         case "map":
-          await dlDownloadMap({ ...item.args, opId: item.id, onProgress });
+          await dlDownloadMap({
+            ...item.args,
+            opId: item.id,
+            onProgress: progressChannel(onProgress),
+          });
           invalidateScans();
           return;
         case "mapAnySource":
@@ -329,7 +339,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           invalidateScans();
           return;
         case "file":
-          await dlDownloadFile({ ...item.args, opId: item.id, onProgress });
+          await dlDownloadFile({
+            ...item.args,
+            opId: item.id,
+            onProgress: progressChannel(onProgress),
+          });
           invalidateScans();
           return;
         case "engineRecoil":
@@ -337,7 +351,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             dlDownloadEngineRecoil({
               ...item.args,
               opId: item.id,
-              onProgress,
+              onProgress: progressChannel(onProgress),
             }),
           );
           return;
@@ -346,7 +360,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             dlDownloadEngineSpring({
               ...item.args,
               opId: item.id,
-              onProgress,
+              onProgress: progressChannel(onProgress),
             }),
           );
           return;
@@ -357,9 +371,18 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async (item: QueueItem) => {
-      const onProgress = new Channel<DownloadProgress>();
       let samples: RateSample[] = [];
-      onProgress.onmessage = (p) => {
+      const onProgress: ProgressSink = (p) => {
+        if (p == null) {
+          // A source is starting. Whatever the last one reached is not this
+          // one's progress, and its samples would put a speed and a time left
+          // on a transfer they were never measured from, so the bar goes back
+          // to empty rather than carrying a number over (issue #2861).
+          samples = [];
+          samplesRef.current.delete(item.id);
+          patch(item.id, { progress: null, rate: IDLE_RATE });
+          return;
+        }
         const now = Date.now();
         // The sidecar's final event reports zero bytes and no percentage, so it
         // is a terminator rather than a measurement. `addSample` drops it, but
