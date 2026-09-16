@@ -435,8 +435,22 @@ function BattlesPage() {
   // proves is said on the host's own line instead. Joining somebody else's room
   // is the same duplicate: once connected, that room is the whole Open list
   // below, so it drops out of Local network too (issue #2734).
+  //
+  // A direct room holds exactly one battle, so `all[0]` while `activeDirect` is
+  // it, and its title, host, game and map are the same four fields the room's
+  // own beacon is announcing (issue #2857). Reading those off the connected
+  // battle instead of matching addresses means it still catches the room when a
+  // joiner dialled a hostname the beacon has no way to know resolves to the IP
+  // it is announcing.
   const connectedRoom =
-    activeDirect && activeKey ? serverAddressFromKey(activeKey) : null;
+    activeDirect && activeKey && all[0]
+      ? {
+          title: all[0].title,
+          host: all[0].host,
+          game: all[0].modname,
+          map: all[0].map,
+        }
+      : null;
   const lanSection = (
     <>
       <LanRooms
