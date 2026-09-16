@@ -11,6 +11,8 @@
  * autohost paths produce the same seating.
  */
 
+import type { MemberRow } from "./config";
+
 export type GameTypePreset = "team" | "ffa" | "coop" | "duel" | "tourney";
 
 export interface LayoutEntry {
@@ -96,6 +98,44 @@ export function balanceLayout(
 /** How many distinct ally teams the given ally numbers currently use. */
 export function currentAllyCount(allies: number[]): number {
   return new Set(allies).size;
+}
+
+/**
+ * `balanceLayout` over the roster's active (non-spectator human) rows, the
+ * subset every seating control here already agrees on. Shared by the
+ * founder-direct Balance button and the chat "Accept" on a balance
+ * suggestion (issue #2871), so both seat players the same way.
+ */
+export function balanceLayoutForRows(rows: MemberRow[]): LayoutEntry[] {
+  const active = rows.filter((r) => r.kind === "human" && !r.spectator);
+  return balanceLayout(
+    active.map((r) => r.name),
+    currentAllyCount(active.map((r) => r.ally)),
+  );
+}
+
+/**
+ * Push a layout directly over the wire rather than through an autohost's
+ * `!force` line: the caller's own status for `me`, `hostControls.forceAlly`/
+ * `forceTeam` for everyone else. This is `GameTypePresetsControls`' own
+ * self-hosted branch, pulled out so the chat "Accept" on a balance
+ * suggestion (issue #2871) can apply the same layout the same way.
+ */
+export function applyLayoutDirectly(
+  layout: LayoutEntry[],
+  me: string | null,
+  forceAlly: (user: string, ally: number) => void,
+  forceTeam: (user: string, team: number) => void,
+  onSetBattleStatusBatch: (patch: { ally?: number; teamId?: number }) => void,
+): void {
+  for (const entry of layout) {
+    if (entry.name === me) {
+      onSetBattleStatusBatch({ ally: entry.ally, teamId: entry.teamId });
+    } else {
+      forceAlly(entry.name, entry.ally);
+      forceTeam(entry.name, entry.teamId);
+    }
+  }
 }
 
 /**

@@ -6,7 +6,7 @@ import { useBrandingEntry } from "@/content/branding";
 import { useHostedRoom } from "@/direct/hostedRoom";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
 import { RoomMovedPanel } from "@/direct/RoomMoved";
-import { autohostHearsChat, closeEndsTheRoom } from "@/direct/room";
+import { closeEndsTheRoom } from "@/direct/room";
 import { stopHostedRoom } from "@/direct/stopRoom";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
@@ -553,6 +553,12 @@ function BattleRoomPage() {
             maps={room.maps}
             canChangeMap={room.canChangeMap}
             onChangeMap={room.setMap}
+            selfHost={room.selfHost}
+            directRoom={room.directRoom}
+            rows={room.rows}
+            hostControls={room.hostControls}
+            onSetBattleStatusBatch={room.setBattleStatusBatch}
+            onSetLocked={room.setLocked}
           />
         </div>
 
@@ -704,14 +710,17 @@ function BattleRoomPage() {
             onSetBattleStatusBatch={room.setBattleStatusBatch}
             onAutohostSend={room.autohostSend}
           />
-          {/* The `!`-command panel only makes sense with a SPADS autohost. When
-              we host the battle ourselves those commands are inert (lock moves to
-              the header, map changes go through the map card). A direct room
-              runs no SPADS either, so a joiner there sees no button that posts
-              into a chat nobody reads (issue #2738). */}
-          {!room.selfHost && autohostHearsChat(room.directRoom) && (
+          {/* The `!`-command panel only makes sense for somebody who isn't
+              hosting the battle themselves: self-hosted, those commands are
+              inert (lock moves to the header, map changes go through the map
+              card). A direct room runs no SPADS, so here it reads as
+              requests the founder answers in the battle chat rather than
+              commands a bot answers (issue #2871, replacing #2738's outright
+              hiding of this panel there). */}
+          {!room.selfHost && (
             <AutohostControls
               locked={battle.locked}
+              directRoom={room.directRoom}
               onCommand={room.autohostSend}
             />
           )}

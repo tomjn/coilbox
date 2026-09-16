@@ -2,8 +2,8 @@ import { Button } from "@picoframe/frame";
 import { autohostHearsChat } from "../../direct/room";
 import type { MemberRow } from "./config";
 import {
-  balanceLayout,
-  currentAllyCount,
+  applyLayoutDirectly,
+  balanceLayoutForRows,
   type GameTypePreset,
   gameTypeLayout,
   type LayoutEntry,
@@ -37,12 +37,15 @@ const PRESETS: { label: string; preset: GameTypePreset }[] = [
  * there is nothing here to send on those protocols. This mirrors the
  * roster's own team/ally controls, which go read-only for the same reason.
  *
- * The Balance button is further hidden for a joiner in a direct room:
+ * The Balance button reads "Suggest balance" for a joiner in a direct room:
  * self-hosted, it always acts directly and never touches chat, but a joiner
- * who is not self-hosting relies on `!balance` reaching an autohost, and a
- * direct room runs coilbox's own room server rather than SPADS (issue
- * #2738). The other presets still send the same `!force` line in that case,
- * which is an existing, separate gap this issue does not cover.
+ * who is not self-hosting has no autohost to send `!balance` to, only the
+ * room's founder reading the same chat everybody else does. It still sends
+ * the same `!balance` line either way, and only the label differs.
+ * `BattleChatCard` matches that line and offers the founder Accept/Reject on
+ * it (issue #2871, replacing #2738's outright hiding of this button). The
+ * other presets still send the same `!force` line unconditionally in a
+ * direct room, which is an existing, separate gap this issue does not cover.
  */
 export function GameTypePresetsControls({
   rows,
@@ -73,14 +76,13 @@ export function GameTypePresetsControls({
 
   function applyLayout(layout: LayoutEntry[]) {
     if (selfHost) {
-      for (const entry of layout) {
-        if (entry.name === me) {
-          onSetBattleStatusBatch({ ally: entry.ally, teamId: entry.teamId });
-        } else {
-          hostControls.forceAlly(entry.name, entry.ally);
-          hostControls.forceTeam(entry.name, entry.teamId);
-        }
-      }
+      applyLayoutDirectly(
+        layout,
+        me,
+        hostControls.forceAlly,
+        hostControls.forceTeam,
+        onSetBattleStatusBatch,
+      );
       return;
     }
     const command = layoutToForceCommand(layout);
@@ -89,23 +91,24 @@ export function GameTypePresetsControls({
 
   function onBalance() {
     if (selfHost) {
-      applyLayout(
-        balanceLayout(activeNames, currentAllyCount(active.map((r) => r.ally))),
-      );
+      applyLayout(balanceLayoutForRows(rows));
       return;
     }
     onAutohostSend("!balance");
   }
 
+  // Only the label says whether pressing this sends a real SPADS command or
+  // a request the founder reads in the same chat (issue #2871): a direct
+  // room has no autohost for a joiner's `!balance` to reach.
+  const suggestOnly = !selfHost && !autohostHearsChat(directRoom);
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-4">
       <span className="text-sm font-semibold">Team setup</span>
       <div className="flex flex-wrap gap-2">
-        {(selfHost || autohostHearsChat(directRoom)) && (
-          <Button variant="outline" size="sm" onClick={onBalance}>
-            Balance
-          </Button>
-        )}
+        <Button variant="outline" size="sm" onClick={onBalance}>
+          {suggestOnly ? "Suggest balance" : "Balance"}
+        </Button>
         {PRESETS.map((p) => (
           <Button
             key={p.preset}
