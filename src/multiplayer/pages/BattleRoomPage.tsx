@@ -34,7 +34,7 @@ import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
-import { allyColorsFromRows } from "../battle/config";
+import { alliesFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { GameTypePresetsControls } from "../battle/GameTypePresetsControls";
@@ -121,9 +121,8 @@ function BattleRoomPage() {
   );
   // Ally state for start-box editing, shared between the minimap's drag editor
   // and the controls under the start-position dropdown.
-  const allyColors = allyColorsFromRows(room.rows);
   const boxAllies = useStartBoxAllies(
-    allyColors,
+    alliesFromRows(room.rows),
     room.battle?.startRects ?? {},
   );
 
@@ -620,7 +619,6 @@ function BattleRoomPage() {
                 mapName={battle.map}
                 rects={battle.startRects}
                 allyList={boxAllies.allyList}
-                allyColors={allyColors}
                 activeAlly={boxAllies.activeAlly}
                 onPickAlly={boxAllies.pickAlly}
                 onSetBox={room.setStartBox}

@@ -126,10 +126,6 @@ export function BattleMapCard({
     .filter((r) => !r.spectator)
     .sort((a, b) => a.teamId - b.teamId);
   const markerColors = players.map((r) => r.colorHex);
-  const allyColors: Record<number, string> = {};
-  for (const r of players) {
-    if (allyColors[r.ally] == null) allyColors[r.ally] = r.colorHex;
-  }
 
   const boxMode = startPosType === 2;
   const showBoxes = boxMode && Object.keys(battle.startRects).length > 0;
@@ -209,16 +205,12 @@ export function BattleMapCard({
             {canEditBoxes ? (
               <StartBoxEditor
                 rects={battle.startRects}
-                allyColors={allyColors}
                 activeAlly={activeAlly}
                 onCommit={onSetBox}
                 onClear={onClearBox}
               />
             ) : showBoxes ? (
-              <StartBoxOverlay
-                rects={battle.startRects}
-                allyColors={allyColors}
-              />
+              <StartBoxOverlay rects={battle.startRects} />
             ) : null}
           </>
         }

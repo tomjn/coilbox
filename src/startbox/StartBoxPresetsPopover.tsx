@@ -9,6 +9,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { allyLetter } from "@/lib/allyDisplay";
+import { allyPaletteColor } from "@/lib/allyPalette";
 import { GRID, type StartRect } from "./geometry";
 import {
   nextSlotStart,
@@ -86,7 +87,6 @@ export function StartBoxPresetsPopover({
   mapName,
   rects,
   allyOrder,
-  allyColors,
   onSetBox,
   onClearBox,
 }: {
@@ -99,8 +99,6 @@ export function StartBoxPresetsPopover({
    * next preset applied rather than being undone by it.
    */
   allyOrder: number[];
-  /** Ally index -> CSS colour, so a preview shows who gets which box. */
-  allyColors: Record<number, string>;
   onSetBox: (ally: number, rect: StartRect) => void;
   onClearBox: (ally: number) => void;
 }) {
@@ -192,7 +190,7 @@ export function StartBoxPresetsPopover({
                           color:
                             at === -1
                               ? undefined
-                              : (allyColors[allyOrder[at]] ?? "#e5e7eb"),
+                              : allyPaletteColor(allyOrder[at]),
                         };
                       })}
                     />
@@ -249,7 +247,7 @@ export function StartBoxPresetsPopover({
                         boxes={Object.entries(layout.boxes).map(
                           ([ally, rect]) => ({
                             rect,
-                            color: allyColors[Number(ally)] ?? "#e5e7eb",
+                            color: allyPaletteColor(Number(ally)),
                           }),
                         )}
                       />

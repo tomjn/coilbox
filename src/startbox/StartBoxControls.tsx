@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { ArrowLeftRight } from "lucide-react";
 import { useState } from "react";
 import { allyLetter, readableText } from "@/lib/allyDisplay";
+import { allyPaletteColor } from "@/lib/allyPalette";
 import type { StartRect } from "./geometry";
 import { rotateBoxes, rotateOrder } from "./presets";
 import { StartBoxPresetsPopover } from "./StartBoxPresetsPopover";
@@ -16,23 +17,23 @@ import { StartBoxPresetsPopover } from "./StartBoxPresetsPopover";
  */
 
 /**
- * Derive the box-editing ally state from the colour each ally already has: the
- * allies to offer (those with a player, plus any that already have a box,
- * falling back to [0, 1]) and the ally the next drawn box belongs to (picked,
- * else the lowest without a box).
+ * Derive the box-editing ally state: the allies to offer (those with a
+ * player, plus any that already have a box, falling back to [0, 1]) and the
+ * ally the next drawn box belongs to (picked, else the lowest without a box).
  *
- * `allyColors` is the caller's job because the two surfaces read a roster
- * differently: a battle takes each ally's first player's colour off the lobby
- * roster, a skirmish off its participant list.
+ * `alliesInPlay` is the caller's job because the two surfaces read a roster
+ * differently: a battle reads it off the lobby roster, a skirmish off its
+ * participant list. Colour itself no longer comes from either roster (issue
+ * #2797) - it is a fixed per-ally-index palette, so this hook only needs to
+ * know which ally indices are actually in play.
  */
 export function useStartBoxAllies(
-  allyColors: Record<number, string>,
+  alliesInPlay: Iterable<number>,
   startRects: Record<string, StartRect>,
 ) {
   const [pickedAlly, setPickedAlly] = useState<number | null>(null);
 
-  const allySet = new Set<number>();
-  for (const k of Object.keys(allyColors)) allySet.add(Number(k));
+  const allySet = new Set<number>(alliesInPlay);
   for (const k of Object.keys(startRects)) allySet.add(Number(k));
   const sortedAllies = [...allySet].sort((a, b) => a - b);
   const allyList = sortedAllies.length > 0 ? sortedAllies : [0, 1];
@@ -46,7 +47,6 @@ export function StartBoxControls({
   mapName,
   rects,
   allyList,
-  allyColors,
   activeAlly,
   onPickAlly,
   onSetBox,
@@ -56,7 +56,6 @@ export function StartBoxControls({
   /** The live rects, keyed by 0-based ally as string. */
   rects: Record<string, StartRect>;
   allyList: number[];
-  allyColors: Record<number, string>;
   activeAlly: number;
   onPickAlly: (ally: number) => void;
   onSetBox: (ally: number, rect: StartRect) => void;
@@ -97,7 +96,7 @@ export function StartBoxControls({
         <span className="font-semibold">Start boxes</span>
         <div className="flex flex-wrap items-center gap-1.5">
           {allyList.map((a) => {
-            const color = allyColors[a] ?? "#e5e7eb";
+            const color = allyPaletteColor(a);
             const active = a === activeAlly;
             return (
               <button
@@ -121,7 +120,6 @@ export function StartBoxControls({
           mapName={mapName}
           rects={rects}
           allyOrder={allyOrder}
-          allyColors={allyColors}
           onSetBox={onSetBox}
           onClearBox={onClearBox}
         />
