@@ -4,7 +4,9 @@
 //! conversion here is also loaded and run, because Lua that only looks right
 //! is the failure this crate exists to end.
 
-use coilbox_bos2lua::{convert, linear_scale, Conversion, Options, MODERN_LINEAR, SCRIPTOR_LINEAR};
+use coilbox_bos2lua::{
+    convert, linear_scale, Conversion, Options, Precedence, MODERN_LINEAR, SCRIPTOR_LINEAR,
+};
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 use std::collections::HashMap;
 
@@ -31,6 +33,7 @@ fn convert_with(source: &str, includes: &HashMap<String, String>, linear_scale: 
             includes,
             pieces: None,
             linear_scale,
+            precedence: Precedence::Modern,
         },
     )
     .unwrap()
@@ -248,6 +251,7 @@ fn asks_for_pieces_by_the_model_s_spelling() {
             includes: &includes,
             pieces: Some(&model),
             linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
         },
     )
     .unwrap();
@@ -302,12 +306,19 @@ fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
             includes: &includes,
             pieces: None,
             linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
         },
     )
     .unwrap();
     let lua = &conversion.lua;
-    // A piece handed over as a number is numbered as BOS numbers it.
-    assert!(lua.contains("lua_AddTrail(base - 1, 1, 1, 1)"), "{lua}");
+    // A piece handed over as a number is numbered as BOS numbers it, and the
+    // call goes to the trail gadget, which THIS puts in GG, not to the stub.
+    assert!(
+        lua.contains(
+            "GG.AddTrail(unitID, unitDefID, Spring.GetUnitTeam(unitID), base - 1, 1, 1, 1)"
+        ),
+        "{lua}"
+    );
     assert!(
         conversion
             .warnings
@@ -350,6 +361,7 @@ fn a_failed_conversion_names_the_includes_it_was_not_given() {
             includes: &HashMap::new(),
             pieces: None,
             linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
         },
     )
     .err()

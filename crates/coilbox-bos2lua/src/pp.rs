@@ -15,6 +15,7 @@
 //! whole script before the real one.
 
 use crate::lex::{lex, Kind, Token};
+use crate::Precedence;
 use std::collections::{HashMap, HashSet};
 
 /// Finds an included file: `(name as written, the including file's name)` to
@@ -48,8 +49,14 @@ const MAX_EXPANSION_DEPTH: usize = 32;
 /// What the compiler's preprocessor defines before the script starts.
 const BUILTINS: [(&str, &str); 3] = [("TRUE", "1"), ("FALSE", "0"), ("UNKNOWN_UNIT_VALUE", "")];
 
-pub fn preprocess(source: &str, name: &str, resolve: &Resolver, linear: i64) -> Output {
-    let mut first = Pre::new(resolve, None, linear);
+pub fn preprocess(
+    source: &str,
+    name: &str,
+    resolve: &Resolver,
+    linear: i64,
+    precedence: Precedence,
+) -> Output {
+    let mut first = Pre::new(resolve, None, linear, precedence);
     first.run(source, name, 0);
     let stable = first
         .bodies
@@ -58,7 +65,7 @@ pub fn preprocess(source: &str, name: &str, resolve: &Resolver, linear: i64) -> 
         .map(|(name, _)| name)
         .collect();
 
-    let mut second = Pre::new(resolve, Some(stable), linear);
+    let mut second = Pre::new(resolve, Some(stable), linear, precedence);
     second.run(source, name, 0);
     Output {
         tokens: second.out,
@@ -89,6 +96,7 @@ struct Pre<'r, 'a> {
     stable: Option<HashSet<String>>,
     /// What `[1]` is in 65536ths of an elmo.
     linear: i64,
+    precedence: Precedence,
     defs: HashMap<String, Macro>,
     bodies: HashMap<String, HashSet<String>>,
     conds: Vec<Cond>,
@@ -101,7 +109,12 @@ struct Pre<'r, 'a> {
 }
 
 impl<'r, 'a> Pre<'r, 'a> {
-    fn new(resolve: &'r Resolver<'a>, stable: Option<HashSet<String>>, linear: i64) -> Self {
+    fn new(
+        resolve: &'r Resolver<'a>,
+        stable: Option<HashSet<String>>,
+        linear: i64,
+        precedence: Precedence,
+    ) -> Self {
         let defs = BUILTINS
             .iter()
             .map(|(name, body)| {
@@ -119,6 +132,7 @@ impl<'r, 'a> Pre<'r, 'a> {
             resolve,
             stable,
             linear,
+            precedence,
             defs,
             bodies: HashMap::new(),
             conds: Vec::new(),
@@ -347,7 +361,12 @@ impl<'r, 'a> Pre<'r, 'a> {
             self.out.push(token);
             return 0;
         }
-        if !m.builtin && self.constant(&token.text, &mut Vec::new()).is_some() {
+        // A constant inside `[ ]` or `< >` is pasted, since only a number may
+        // stand there, as it does once the compiler's preprocessor has run.
+        if !m.builtin
+            && !self.in_brackets()
+            && self.constant(&token.text, &mut Vec::new()).is_some()
+        {
             self.mark_used(&token.text);
             self.out.push(Token {
                 kind: Kind::Const,
@@ -405,6 +424,17 @@ impl<'r, 'a> Pre<'r, 'a> {
         read
     }
 
+    /// Whether the next token lands inside a `[x]` or `<x>` constant, after
+    /// its opening bracket and any minus sign.
+    fn in_brackets(&self) -> bool {
+        let mut code = self.out.iter().rev().filter(|t| !t.is_comment());
+        match code.next() {
+            Some(t) if t.is_sym("[") || t.is_sym("<") => true,
+            Some(t) if t.is_sym("-") => code.next().is_some_and(|t| t.is_sym("[") || t.is_sym("<")),
+            _ => false,
+        }
+    }
+
     fn mark_used(&mut self, name: &str) {
         if !self.used.insert(name.to_string()) {
             return;
@@ -421,14 +451,16 @@ impl<'r, 'a> Pre<'r, 'a> {
     }
 
     /// The value of a macro the Lua can keep as a named constant, if it is one:
-    /// defined once, and made only of numbers and other such constants.
+    /// defined once, one term, and made only of numbers and other such
+    /// constants. A body of more than one term, such as `1+2`, is pasted,
+    /// because pasted beside a `*` it is not the value it adds up to.
     fn constant(&self, name: &str, seen: &mut Vec<String>) -> Option<i64> {
         let stable = self.stable.as_ref()?;
         if !stable.contains(name) || seen.iter().any(|s| s == name) {
             return None;
         }
         let m = self.defs.get(name)?;
-        if m.builtin || m.params.is_some() || m.body.is_empty() {
+        if m.builtin || m.params.is_some() || !one_term(&m.body) {
             return None;
         }
         seen.push(name.to_string());
@@ -443,6 +475,7 @@ impl<'r, 'a> Pre<'r, 'a> {
                 }
             },
             brackets: Some(self.linear),
+            precedence: self.precedence,
         }
         .all();
         value
@@ -477,6 +510,8 @@ impl<'r, 'a> Pre<'r, 'a> {
             at: 0,
             ident: &mut |_| Some(0),
             brackets: None,
+            // The preprocessor's own arithmetic, which is C's.
+            precedence: Precedence::Modern,
         }
         .all();
         match value {
@@ -587,6 +622,33 @@ fn substitute(body: &[Token], params: &[String], args: &[Vec<Token>]) -> Vec<Tok
         .collect()
 }
 
+/// Whether a macro body is one term: a number, a name, a `[x]` or `<x>`
+/// constant, or something in parentheses, any of them after a minus sign.
+fn one_term(body: &[Token]) -> bool {
+    let code: Vec<&Token> = body.iter().filter(|t| !t.is_comment()).collect();
+    let code = match code.split_first() {
+        Some((first, rest)) if first.is_sym("-") => rest,
+        _ => &code[..],
+    };
+    match code {
+        [t] => matches!(t.kind, Kind::Number | Kind::Ident),
+        [open, .., close] if open.is_sym("[") => close.is_sym("]") && code.len() <= 4,
+        [open, .., close] if open.is_sym("<") => close.is_sym(">") && code.len() <= 4,
+        [open, inner @ .., close] if open.is_sym("(") && close.is_sym(")") => {
+            let mut depth = 0i32;
+            inner.iter().all(|t| {
+                if t.is_sym("(") {
+                    depth += 1;
+                } else if t.is_sym(")") {
+                    depth -= 1;
+                }
+                depth >= 0
+            })
+        }
+        _ => false,
+    }
+}
+
 fn number(text: &str) -> Token {
     Token {
         kind: Kind::Number,
@@ -606,12 +668,30 @@ pub struct Eval<'t, 'f> {
     /// Whether `<x>` and `[x]` are the BOS angle and distance constants, and
     /// if so what `[1]` is.
     pub brackets: Option<i64>,
+    pub precedence: Precedence,
 }
 
-/// Binding power by operator. Higher binds tighter. The compiler's table
-/// (compiler.rs `precedence`), turned upside down.
-pub fn binding(op: &str) -> Option<u8> {
-    Some(match op.to_ascii_lowercase().as_str() {
+/// Binding power by operator. Higher binds tighter, and operators that bind
+/// the same are read left to right.
+///
+/// [`Precedence::Modern`] is the compiler's table (compiler.rs `precedence`),
+/// turned upside down. [`Precedence::Scriptor`] is the five levels of
+/// Scriptor's `Compiler.cfg`: `*` and `/`, then `+` and `-`, then every
+/// comparison, then `&` and `|`, then `&&` and `||`. It has no `%`, `^` or
+/// `^^`, which sit with their nearest neighbours.
+pub fn binding(op: &str, precedence: Precedence) -> Option<u8> {
+    let op = op.to_ascii_lowercase();
+    if precedence == Precedence::Scriptor {
+        return Some(match op.as_str() {
+            "*" | "/" | "%" => 10,
+            "+" | "-" => 9,
+            "<" | ">" | "<=" | ">=" | "==" | "!=" => 8,
+            "&" | "^" | "|" => 6,
+            "&&" | "and" | "||" | "or" | "^^" | "xor" => 3,
+            _ => return None,
+        });
+    }
+    Some(match op.as_str() {
         "*" | "/" | "%" => 10,
         "+" | "-" => 9,
         "<" | ">" | "<=" | ">=" => 8,
@@ -640,7 +720,7 @@ impl Eval<'_, '_> {
         let mut left = self.term()?;
         while let Some(t) = self.peek() {
             let Some(power) = (matches!(t.kind, Kind::Sym | Kind::Ident))
-                .then(|| binding(&t.text))
+                .then(|| binding(&t.text, self.precedence))
                 .flatten()
             else {
                 break;
@@ -757,6 +837,7 @@ mod tests {
             "main.bos",
             &|name, _| files.get(name).map(|text| (name.to_string(), text.clone())),
             65536,
+            Precedence::Modern,
         )
     }
 

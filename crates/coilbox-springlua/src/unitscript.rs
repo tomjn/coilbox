@@ -837,6 +837,8 @@ fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
         "Sleep",
         "WaitForTurn",
         "WaitForMove",
+        "Scale",
+        "WaitForScale",
         "StartThread",
         "Signal",
         "SetSignalMask",
@@ -1750,6 +1752,20 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         )?,
     )?;
 
+    // Scale(piece, scale, speed), which Recoil added. The preview draws no
+    // scaling, as the compiled runtime does not, so it says so and goes on.
+    let state = Rc::clone(sim);
+    globals.set(
+        "Scale",
+        lua.create_function(move |_, _: MultiValue| {
+            state
+                .borrow_mut()
+                .model
+                .note("Scaling a piece does nothing in the preview.".to_string());
+            Ok(())
+        })?,
+    )?;
+
     // Spin(piece, axis, speed, accel). A spin replaces a turn on the same axis,
     // as it does in the engine: one animation per axis.
     let state = Rc::clone(sim);
@@ -2144,6 +2160,8 @@ fn bootstrap(lua: &Lua) -> mlua::Result<()> {
         function WaitForMove(piece, axis)
             if __needswait(piece, axis, "move") then coroutine.yield("move", piece, axis) end
         end
+        -- Nothing scales in the preview, so there is never a scale to wait for.
+        function WaitForScale(piece) return false end
         function StartThread(fn, ...) __spawn(coroutine.create(fn), ...) end
         "#,
     )

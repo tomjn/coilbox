@@ -47,6 +47,20 @@ pub struct Options<'a> {
     /// [`SCRIPTOR_LINEAR`]. The BOS alone cannot say, the `.cob` it was
     /// compiled to can: see [`linear_scale`].
     pub linear_scale: i64,
+    /// How tightly each operator binds, which also depends on the compiler.
+    /// The `.cob` can say: see [`precedence`].
+    pub precedence: Precedence,
+}
+
+/// Which compiler's operator precedence a script was written for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Precedence {
+    /// Today's compilers, with C's levels: `a || b && c` is `a || (b && c)`.
+    #[default]
+    Modern,
+    /// Scriptor's five levels, read left to right, so `a || b && c` is
+    /// `(a || b) && c`. Balanced Annihilation's `armss.cob` was compiled so.
+    Scriptor,
 }
 
 /// `[1]` as today's compilers write it, one elmo.
@@ -113,6 +127,94 @@ pub fn linear_scale(source: &str, cob: &[u8]) -> Option<i64> {
     }
 }
 
+/// Which operator precedence a `.cob` was compiled with, judged by the
+/// expressions in the BOS that the two read differently, such as
+/// `a || b && c`, and which order the `.cob` does their operators in. `None`
+/// when the BOS has no such expression or the `.cob` shows neither order.
+///
+/// Only an expression of three plain names or numbers counts, with no operator
+/// either side of it, so its opcodes sit together in the `.cob`: pushes, then
+/// `&&` then `||` for [`Precedence::Modern`], or `||`, one more push and `&&`
+/// for [`Precedence::Scriptor`].
+pub fn precedence(source: &str, cob: &[u8]) -> Option<Precedence> {
+    const PUSHES: [u32; 3] = [0x1002_1001, 0x1002_1002, 0x1002_1004];
+    let tokens: Vec<lex::Token> = lex::lex(source, 0)
+        .into_iter()
+        .filter(|t| !t.is_comment())
+        .collect();
+    let words: Vec<u32> = cob
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|w| u32::from_le_bytes(*w))
+        .collect();
+    let op = |t: &lex::Token| {
+        matches!(t.kind, lex::Kind::Sym | lex::Kind::Ident)
+            .then(|| pp::binding(&t.text, Precedence::Modern))
+            .flatten()
+    };
+    let operand =
+        |t: &lex::Token| matches!(t.kind, lex::Kind::Ident | lex::Kind::Number) && op(t).is_none();
+    let (mut modern, mut scriptor) = (0, 0);
+    for (i, w) in tokens.windows(5).enumerate() {
+        let [a, op1, b, op2, c] = w else { continue };
+        let before = i.checked_sub(1).and_then(|at| tokens.get(at));
+        // A `(` after the last one would make it `get`'s arguments.
+        let after = tokens.get(i + 5);
+        if ![a, b, c].into_iter().all(operand)
+            || before.is_some_and(|t| op(t).is_some())
+            || after.is_some_and(|t| op(t).is_some() || t.is_sym("("))
+        {
+            continue;
+        }
+        let (Some(code1), Some(code2)) = (opcode(&op1.text), opcode(&op2.text)) else {
+            continue;
+        };
+        let tighter = |p| pp::binding(&op2.text, p) > pp::binding(&op1.text, p);
+        if !tighter(Precedence::Modern) || tighter(Precedence::Scriptor) {
+            continue;
+        }
+        if words.windows(2).any(|w| w == [code2, code1]) {
+            modern += 1;
+        }
+        if words
+            .windows(4)
+            .any(|w| w[0] == code1 && PUSHES.contains(&w[1]) && w[3] == code2)
+        {
+            scriptor += 1;
+        }
+    }
+    match modern.cmp(&scriptor) {
+        std::cmp::Ordering::Greater => Some(Precedence::Modern),
+        std::cmp::Ordering::Less => Some(Precedence::Scriptor),
+        std::cmp::Ordering::Equal => None,
+    }
+}
+
+/// The opcode a binary operator compiles to.
+fn opcode(op: &str) -> Option<u32> {
+    Some(match op.to_ascii_lowercase().as_str() {
+        "+" => 0x1003_1000,
+        "-" => 0x1003_2000,
+        "*" => 0x1003_3000,
+        "/" => 0x1003_4000,
+        "%" => 0x1003_4001,
+        "&" => 0x1003_5000,
+        "|" => 0x1003_6000,
+        "^" => 0x1003_7000,
+        "<" => 0x1005_1000,
+        "<=" => 0x1005_2000,
+        ">" => 0x1005_3000,
+        ">=" => 0x1005_4000,
+        "==" => 0x1005_5000,
+        "!=" => 0x1005_6000,
+        "&&" | "and" => 0x1005_7000,
+        "||" | "or" => 0x1005_8000,
+        "^^" | "xor" => 0x1005_9000,
+        _ => return None,
+    })
+}
+
 pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
     let includes: HashMap<String, (String, String)> = options
         .includes
@@ -124,8 +226,14 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
             .iter()
             .find_map(|candidate| includes.get(candidate).cloned())
     };
-    let pre = pp::preprocess(source, options.name, &resolve, options.linear_scale);
-    let items = parse::parse(&pre.tokens, options.linear_scale).map_err(|e| {
+    let pre = pp::preprocess(
+        source,
+        options.name,
+        &resolve,
+        options.linear_scale,
+        options.precedence,
+    );
+    let items = parse::parse(&pre.tokens, options.linear_scale, options.precedence).map_err(|e| {
         // Often the reason: a macro defined in a header nobody supplied.
         match pre.missing.as_slice() {
             [] => format!("{}: {e}", options.name),

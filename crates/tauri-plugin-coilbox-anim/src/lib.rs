@@ -195,6 +195,10 @@ async fn anim_bos2lua(
             .as_deref()
             .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))
             .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
+        let precedence = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::precedence(&source, cob))
+            .unwrap_or_default();
         coilbox_bos2lua::convert(
             &source,
             &coilbox_bos2lua::Options {
@@ -202,6 +206,7 @@ async fn anim_bos2lua(
                 includes: &includes,
                 pieces: pieces.as_deref(),
                 linear_scale,
+                precedence,
             },
         )
         .map(|conversion| (conversion, linear_scale))

@@ -83,10 +83,15 @@ fn every_script_in_the_folder_converts_and_runs() {
         }
         count += 1;
         let source = text(path);
-        let linear_scale = std::fs::read(path.with_extension("cob"))
-            .ok()
-            .and_then(|cob| coilbox_bos2lua::linear_scale(&source, &cob))
+        let cob = std::fs::read(path.with_extension("cob")).ok();
+        let linear_scale = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))
             .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
+        let precedence = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::precedence(&source, cob))
+            .unwrap_or_default();
         let conversion = match convert(
             &source,
             &Options {
@@ -94,6 +99,7 @@ fn every_script_in_the_folder_converts_and_runs() {
                 includes: &includes,
                 pieces: None,
                 linear_scale,
+                precedence,
             },
         ) {
             Ok(c) => c,
