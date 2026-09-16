@@ -161,6 +161,21 @@ describe("our own relayed battle", () => {
     expect(screen.queryByText("Addresses let through")).toBeNull();
   });
 
+  // Issue #1698. A relay reached over TLS can add delay, and the host is told
+  // why rather than left to wonder. A relay on UDP says nothing about it.
+  it("says when the relay is reached over TLS", async () => {
+    await draw();
+    expect(screen.queryByText(/over TLS/)).toBeNull();
+
+    traffic.mockResolvedValue({
+      relaying: true,
+      bytesPerSecond: 0,
+      overTls: true,
+    });
+    await aSecondLater();
+    expect(screen.getByText(/reaches the relay over TLS/)).toBeTruthy();
+  });
+
   it("takes the host back to the battle", async () => {
     await draw();
     fireEvent.click(screen.getByRole("button", { name: "Go to battle" }));

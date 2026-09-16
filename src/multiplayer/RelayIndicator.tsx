@@ -50,10 +50,14 @@ export default function RelayIndicator() {
 /** What a relay says it is carrying, or null when it has not said. */
 type Carrying = { bytesPerSecond: number | null };
 
-/** Our own relay's figure and who it is carrying, null when it has not said. */
+/**
+ * Our own relay's figure and who it is carrying, null when it has not said,
+ * and whether it is reached over TLS.
+ */
 type OurCarrying = Carrying & {
   letThrough: number | null;
   heardFrom: number | null;
+  overTls: boolean;
 };
 
 const QUIET_PILL =
@@ -97,6 +101,7 @@ function useOurRelay(hosting: boolean): OurCarrying | null {
         bytesPerSecond: answer.bytesPerSecond,
         letThrough: answer.letThrough ?? null,
         heardFrom: answer.heardFrom ?? null,
+        overTls: answer.overTls === true,
       });
       asking = setTimeout(ask, ASK_EVERY_MS);
     };
@@ -160,7 +165,12 @@ function useRelayLeftRunning(ours: boolean): Carrying | null {
  * Closing asks first, in the words the battle room's own Close uses, because it
  * removes everybody in the battle.
  */
-function OurRelay({ bytesPerSecond, letThrough, heardFrom }: OurCarrying) {
+function OurRelay({
+  bytesPerSecond,
+  letThrough,
+  heardFrom,
+  overTls,
+}: OurCarrying) {
   const { activeKey } = useMultiplayer();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -225,6 +235,13 @@ function OurRelay({ bytesPerSecond, letThrough, heardFrom }: OurCarrying) {
               Your battle goes through the server's relay, so players reach it
               through the lobby server rather than connecting to you directly.
             </p>
+            {overTls && (
+              <p className="text-sm">
+                Your network gave no answer over the relay's usual route, so
+                coilbox reaches the relay over TLS instead. This can add delay
+                to the game.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               {relayPingLabel(ping)}
             </p>
