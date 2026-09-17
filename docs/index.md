@@ -116,4 +116,5 @@ Download and run the installer / AppImage from the [latest release](https://gith
 - [Distribution profile](/distribution-profile) — reskin and narrow Coilbox for a specific game.
 - [Campaigns](/campaigns), [Galactic conquest](/conquest) and [Roguelite run](/roguelite-run) — the singleplayer game modes.
 - [Scenarios](/scenarios) and [the mission runtime](/mission-runtime): authoring in-engine missions, and what a game does to play them.
+- [Server admin](/server-admin): the moderation and admin tools for an uberserver lobby.
 - [Routes](/routes) — the app's screen map.
