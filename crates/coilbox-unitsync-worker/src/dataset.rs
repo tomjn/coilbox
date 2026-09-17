@@ -417,9 +417,14 @@ for _, k in ipairs(names) do
   full = tostring(full):gsub('[\t\r\n]', ' ')
   local opts = {}
   if type(d) == 'table' and type(d.buildoptions) == 'table' then
-    for _, o in ipairs(d.buildoptions) do
-      if type(o) == 'string' and o ~= '' then opts[#opts + 1] = string.lower(o) end
+    -- Every numbered entry, in key order. Games comment entries out and leave
+    -- gaps in the numbering, and the engine keeps what follows a gap.
+    local keys = {}
+    for i, o in pairs(d.buildoptions) do
+      if type(i) == 'number' and type(o) == 'string' and o ~= '' then keys[#keys + 1] = i end
     end
+    table.sort(keys)
+    for _, i in ipairs(keys) do opts[#opts + 1] = string.lower(d.buildoptions[i]) end
   end
   local mobile = (speed_of(d) > 0) and '1' or '0'
   -- The model file the engine draws the unit with. Often has no extension and
@@ -1589,6 +1594,34 @@ mod tests {
     fn a_unit_that_morphs_nowhere_claims_nothing() {
         let units = extract(TWO_COMMANDERS);
         assert!(units.iter().all(|u| u.morph_targets.is_empty()));
+    }
+
+    /// Tech Annihilation comments entries out of its build lists and leaves the
+    /// numbered keys after them as they were. The engine keeps every numbered
+    /// entry, so stopping at the first gap would hide most of a builder's menu.
+    #[test]
+    fn a_build_list_with_gaps_keeps_every_entry_after_them() {
+        let defs = r#"{
+          unitdefs = {
+            armcom = {
+              name = 'Commander',
+              buildoptions = {
+                [1] = 'armwin',
+                [2] = 'armsolar',
+                [4] = 'armgeo_mini',
+                [6] = 'ARMMEX',
+                [9] = 'armmstor',
+                [10] = 7,
+                label = 'armnotanoption',
+              },
+            },
+          },
+        }"#;
+        let units = extract(defs);
+        assert_eq!(
+            units[0].build_options,
+            vec!["armwin", "armsolar", "armgeo_mini", "armmex", "armmstor"]
+        );
     }
 
     #[test]
