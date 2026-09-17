@@ -39,6 +39,7 @@ export const HIDEABLE_NAV_IDS: string[] = [
   "hub.browse",
   "multiplayer.battles",
   "multiplayer.stats",
+  "multiplayer.admin",
   "conquest.list",
   "runlite.list",
   "campaign.builder",

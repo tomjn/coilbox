@@ -25,6 +25,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Multiplayer   | Matchmaking   | `#/matchmaking`      | `multiplayer.matchmaking` | no²|
 | Multiplayer   | Battle Room   | `#/battle`           | `multiplayer.battle`  | no²   |
 | Multiplayer   | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
+| Multiplayer   | Server admin  | `#/admin`            | `multiplayer.admin`   | **yes**² |
 | Library       | Maps          | `#/library/maps`     | `library.maps`     | no       |
 | Library       | Games         | `#/library/games`    | `library.games`    | **yes**  |
 | Library       | Blueprints    | `#/library/blueprints` | `library.blueprints` | no    |
@@ -43,9 +44,9 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ³ **Settings** items are not on the `hide` list. They link to settings sections rather than to routes of their own, so `hideSettings` already governs them: hide `engine-settings`, `frame.appearance` or `lobby-servers` and both the settings section and its card here disappear together.
 
-² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle Room** shows only while you're in a battle. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead.
+² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle Room** shows only while you're in a battle. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead. **Server admin** shows only while a connected account is a moderator or admin on an uberserver lobby (never on Teiserver or Zero-K), and is also on the profile's `hide` list, so a distribution can turn it off outright.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `conquest.list`, `library.games`, `downloads.browse`, `downloads.games`, `hub.browse`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `conquest.list`, `library.games`, `downloads.browse`, `downloads.games`, `hub.browse`, `multiplayer.admin`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
 
 > **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467). `#/content/setup-packs` redirects to `#/downloads/maps`, since the Setup packs page is gone and sharing a pack now happens from the Coilbox hub screen instead.
 >
