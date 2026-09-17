@@ -13,10 +13,12 @@
 //! - [`ClientStatus`] / [`BattleStatus`] pack and unpack the status bitfields.
 //! - [`password_hash`] computes the login password hash.
 //! - [`reduce`] applies a [`ServerMessage`] to [`LobbyState`], emitting [`Delta`]s.
+//! - [`AdminCollector`] reads uberserver's answer to a moderator command.
 //! - [`LoginMachine`] drives the reply-driven login handshake.
 //! - The [`server`] module is the mirror, for hosting a room with no lobby
 //!   server: it parses client lines and builds server ones.
 
+mod admin_reply;
 pub mod command;
 mod hash;
 mod login;
@@ -28,6 +30,10 @@ mod state;
 mod status;
 mod vote;
 
+pub use admin_reply::{
+    AccountDetails, AdminCollector, AdminReply, AdminShape, BanEntry, BlacklistEntry,
+    BridgedDetails, Heard, IpBinding, UserInfo,
+};
 pub use hash::password_hash;
 pub use login::{LoginConfig, LoginMachine, LoginMode, LoginPhase};
 pub use message::{parse_line, ServerMessage};

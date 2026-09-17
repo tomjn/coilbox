@@ -16,6 +16,7 @@ const COMMANDS: &[&str] = &[
     "mp_change_email",
     "mp_resend_verification",
     "mp_get_user_info",
+    "mp_admin_command",
     "mp_disconnect",
     "mp_cancel_connect",
     "mp_wait_until_ready",

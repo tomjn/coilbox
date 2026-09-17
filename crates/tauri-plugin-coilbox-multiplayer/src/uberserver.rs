@@ -94,6 +94,25 @@ pub(crate) fn rejection_of<'a>(delta: &'a Delta, command: &str) -> Option<&'a st
     Some(reason.trim())
 }
 
+/// Uberserver's sentence for a database error behind `command`, if that is
+/// what this delta is.
+///
+/// The handlers that answer from a database callback (`FINDIP`, `GETIP`,
+/// `LISTBANS`, `LISTBLACKLIST`, `LISTMODS`, `RESETUSERPASSWORD`,
+/// `DELETEACCOUNT`) write `Server error processing <COMMAND>.` when the query
+/// fails. The command did not run, so it is a refusal. The whole sentence is
+/// the reason, because it has no other words. Safe to act on for the same
+/// reason as [`rejection_of`]: only while that command is outstanding.
+pub(crate) fn server_error_of<'a>(delta: &'a Delta, command: &str) -> Option<&'a str> {
+    let Delta::ServerMessage { text, .. } = delta else {
+        return None;
+    };
+    let named = text
+        .strip_prefix("Server error processing ")?
+        .strip_suffix('.')?;
+    (named == command).then_some(text.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,6 +208,20 @@ mod tests {
                 "for {text}"
             );
         }
+    }
+
+    /// `_listbans_failed` in `Protocol.py`: `"Server error processing
+    /// LISTBANS."`. Only the named command's.
+    #[test]
+    fn a_database_error_is_the_named_command_not_running() {
+        let line = "Server error processing LISTBANS.";
+        assert_eq!(server_error_of(&said(line), "LISTBANS"), Some(line));
+        assert_eq!(server_error_of(&said(line), "LISTBLACKLIST"), None);
+        assert_eq!(
+            server_error_of(&said("Server error processing LISTBANSX."), "LISTBANS"),
+            None
+        );
+        assert_eq!(server_error_of(&said("Banlist is empty"), "LISTBANS"), None);
     }
 
     /// Everything else the lobby sends is somebody else's line entirely. A

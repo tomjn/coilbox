@@ -9,6 +9,7 @@
 //! the per-connection event loop and the [`Registry`] of live connections; this
 //! file exposes the Tauri commands over that registry.
 
+mod admin_command;
 mod conn;
 /// This client against a room the direct-hosting plugin is listening for. It
 /// lives here rather than beside that plugin because [`conn::run_loop`] is
@@ -924,6 +925,38 @@ fn mp_resend_verification(
 #[tauri::command]
 fn mp_get_user_info(registry: State<'_, Registry>, server_key: String) -> CliResult {
     enqueue(registry.inner(), &server_key, command::get_user_info())
+}
+
+/// `mp_admin_command` - send a moderator or admin command to uberserver and
+/// wait for its outcome: the parsed answer, the server's refusal, or nothing
+/// within [`admin_command::ADMIN_REPLY_TIMEOUT`].
+///
+/// Commands on one connection go one at a time, so this can take several
+/// timeouts to settle behind others. The lines that answer never reach the
+/// event channel as deltas, so none of them becomes a toast. They are still in
+/// the protocol console.
+#[tauri::command]
+async fn mp_admin_command(
+    registry: State<'_, Registry>,
+    server_key: String,
+    command: String,
+    args: Vec<String>,
+    shape: coilbox_lobby_protocol::AdminShape,
+) -> Result<CliResult, ()> {
+    let sent = admin_command::send(
+        registry.inner(),
+        &server_key,
+        &command,
+        &args,
+        shape,
+        admin_command::ADMIN_REPLY_TIMEOUT,
+    )
+    .await;
+    Ok(match sent.map(serde_json::to_value) {
+        Ok(Ok(outcome)) => CliResult::ok(outcome),
+        Ok(Err(e)) => CliResult::err(format!("could not encode the outcome: {e}")),
+        Err(e) => CliResult::err(e),
+    })
 }
 
 /// `mp_disconnect` — request a graceful logout: the connection task writes `EXIT`,
@@ -3583,6 +3616,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_change_email,
             mp_resend_verification,
             mp_get_user_info,
+            mp_admin_command,
             mp_disconnect,
             mp_cancel_connect,
             mp_wait_until_ready,
