@@ -140,6 +140,15 @@ it("switches to the picked connection's lines and sends on it", () => {
   });
 });
 
+it("stops the raw command input auto-capitalising on macOS (issue #2924)", () => {
+  connections = { [KEY_A]: connectionFor(KEY_A, ["line from A"]) };
+  activeKey = KEY_A;
+  render(<ConsoleDrawer open onClose={() => {}} />);
+
+  const field = screen.getByPlaceholderText("Send a raw command…");
+  expect(field.getAttribute("autocapitalize")).toBe("off");
+});
+
 it("re-opens on the given connection rather than remembering the last pick", () => {
   connections = {
     [KEY_A]: connectionFor(KEY_A, ["line from A"]),
