@@ -82,6 +82,7 @@ import {
 } from "./clientId";
 import {
   type AccountInfo,
+  anotherLiveKey,
   type ConnectionRuntime,
   type ConnectionState,
   type Connections,
@@ -573,17 +574,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const applyActiveKey = useCallback(
     (key: string | null) => {
       const prev = activeKeyRef.current;
-      activeKeyRef.current = key;
-      setActiveKey(key);
-      if (prev != null && prev !== key) {
+      // Clearing the key that was focused: refocus another live connection
+      // rather than leaving nothing focused, if one is still up (issue #2894).
+      const next =
+        key == null && prev != null ? anotherLiveKey(connections, prev) : key;
+      activeKeyRef.current = next;
+      setActiveKey(next);
+      if (prev != null && prev !== next) {
         updateConnection(prev, (c) => (c.live ? { ...c, live: false } : c));
       }
-      if (key != null) {
-        updateConnection(key, (c) => (c.live ? c : { ...c, live: true }));
-        setFocusKey(key);
+      if (next != null) {
+        updateConnection(next, (c) => (c.live ? c : { ...c, live: true }));
+        setFocusKey(next);
       }
     },
-    [updateConnection],
+    [connections, updateConnection],
   );
   const [busy, setBusy] = useState(false);
 
