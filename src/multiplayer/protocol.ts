@@ -49,6 +49,29 @@ export function liveTachyonKeys(
 }
 
 /**
+ * Every live connection that can host a battle, the focused one first when
+ * it is among them. Pure.
+ *
+ * Under Tachyon the server allocates a dedicated autohost from its own pool
+ * and a client cannot host at all (see `docs/tachyon-protocol.md`), so this
+ * is every live connection whose protocol is not Tachyon. With more than one
+ * such connection open, "Host as battle" has to ask which one rather than
+ * always taking the focused connection (issue #2847).
+ */
+export function liveHostableKeys(
+  connections: Connections,
+  servers: LobbyServer[],
+  focusKey: string | null,
+): string[] {
+  const keys = Object.keys(connections).filter(
+    (key) =>
+      connections[key].live && protocolForKey(key, servers) !== "tachyon",
+  );
+  if (focusKey == null || !keys.includes(focusKey)) return keys;
+  return [focusKey, ...keys.filter((key) => key !== focusKey)];
+}
+
+/**
  * Whether a connection pulls the server's ignore list, friend list and pending
  * friend requests once it is ready.
  *

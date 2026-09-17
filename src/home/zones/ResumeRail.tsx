@@ -11,7 +11,7 @@ import {
   useLastLogin,
   useLobbyAccounts,
 } from "../../lobby-servers/config";
-import { useMultiplayer } from "../../multiplayer/store";
+import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
 import { CARD_FOCUS_CLASS } from "../cardShell";
 import {
   RESUME_KIND_COPY,
@@ -64,19 +64,30 @@ export interface LoginOffer {
  * successful connect. A login added in Settings and never used is still a saved
  * login, and is exactly the person this card helps.
  *
+ * `taken` is every server key that already has its own state, live or a
+ * connect in flight, so the rail does not offer to log in to an account it
+ * is already handling. Each login's own state, not a store-wide "something
+ * is connected" flag (issue #2847). Defaults to empty so the
+ * profile-narrowed and never-connected cases stay callable without it.
+ *
  * Pure, so the profile-narrowed and never-connected cases are unit tests.
  */
 export function loginOffer(
   accounts: readonly LobbyAccount[],
   lastLogin: LastLogin | null,
   servers: readonly LobbyServer[],
+  taken: ReadonlySet<string> = EMPTY_TAKEN,
 ): LoginOffer | null {
   for (const account of sortAccountsByRecency([...accounts], lastLogin)) {
     const server = servers.find((s) => s.id === account.serverId);
-    if (server) return { account, server };
+    if (!server) continue;
+    if (taken.has(serverKeyFor(server, account.username))) continue;
+    return { account, server };
   }
   return null;
 }
+
+const EMPTY_TAKEN: ReadonlySet<string> = new Set();
 
 /** A resume candidate as a card, worded by the collector rather than here. */
 function candidateCard(c: ResumeCandidate): RailCard {
@@ -197,31 +208,37 @@ export const RAIL_CARD_CLASS =
  *
  * ## The log-in card
  *
- * Offered when the lobby is logged out and there is a login saved, and it is a
- * link to the login screen at `/lobby`, not a connect. Clicking it opens the
- * account list with that user at the top and one click left to make. It never
- * reads the keychain, so it cannot raise a macOS password prompt from the home
- * page. The saved logins come from the recency-sorted list of #458 rather than
- * through the collector, because a login is not something you were doing.
+ * Offered when there is a login saved and it is not already connected or
+ * connecting, and it is a link to the login screen at `/lobby`, not a
+ * connect. Clicking it opens the account list with that user at the top and
+ * one click left to make. It never reads the keychain, so it cannot raise a
+ * macOS password prompt from the home page. The saved logins come from the
+ * recency-sorted list of #458 rather than through the collector, because a
+ * login is not something you were doing.
  *
- * A connect already in flight suppresses it, so an install with auto-connect on
- * does not flash a login offer during boot and then withdraw it.
+ * Each login's own state decides this, not a store-wide "something is
+ * connected" flag (issue #2847): a second saved account is still offered
+ * while a different one is live, and a connect already in flight for that
+ * specific account suppresses it, so an install with auto-connect on does
+ * not flash a login offer during boot and then withdraw it.
  */
 export default function ResumeRail() {
   const { candidates, loading } = useResume();
-  const { connected, busy } = useMultiplayer();
+  const { connections, busyKeys } = useMultiplayer();
   const [accountsCfg] = useLobbyAccounts();
   const [lastLogin] = useLastLogin();
   const [customCfg] = useCustomServers();
 
-  const login =
-    connected || busy
-      ? null
-      : loginOffer(
-          accountsCfg.accounts,
-          lastLogin,
-          allServers(customCfg.servers),
-        );
+  const taken = new Set(busyKeys);
+  for (const key of Object.keys(connections)) {
+    if (connections[key].live) taken.add(key);
+  }
+  const login = loginOffer(
+    accountsCfg.accounts,
+    lastLogin,
+    allServers(customCfg.servers),
+    taken,
+  );
   const cards = railCards(candidates, login);
   if (loading || cards.length === 0) return null;
 

@@ -73,6 +73,11 @@ export default function LobbyServersSettings() {
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
   const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
+  // The connection whose row opened the console, so it defaults to that
+  // account rather than whichever happens to be focused (issue #2847). The
+  // drawer's own picker still lets the user switch once more than one
+  // connection is live.
+  const [consoleServerKey, setConsoleServerKey] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   // The account whose editor drawer is open (null = closed).
@@ -351,7 +356,10 @@ export default function LobbyServersSettings() {
         servers={servers}
         onChange={(id, patch) => updateAccount(id, patch)}
         onRemove={removeAccount}
-        onOpenConsole={() => setConsoleOpen(true)}
+        onOpenConsole={(serverKey) => {
+          setConsoleServerKey(serverKey);
+          setConsoleOpen(true);
+        }}
         onClose={() => setEditingId(null)}
       />
       <ServerDrawer
@@ -360,7 +368,11 @@ export default function LobbyServersSettings() {
         onRemove={removeCustomServer}
         onClose={() => setEditingServerId(null)}
       />
-      <ConsoleDrawer open={consoleOpen} onClose={() => setConsoleOpen(false)} />
+      <ConsoleDrawer
+        open={consoleOpen}
+        serverKey={consoleServerKey}
+        onClose={() => setConsoleOpen(false)}
+      />
     </div>
   );
 }
@@ -445,7 +457,7 @@ function AccountDrawer({
   servers: LobbyServer[];
   onChange: (id: string, patch: Partial<LobbyAccount>) => void;
   onRemove: (a: LobbyAccount) => void;
-  onOpenConsole: () => void;
+  onOpenConsole: (serverKey: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -536,7 +548,7 @@ function AccountForm({
   servers: LobbyServer[];
   onChange: (patch: Partial<LobbyAccount>) => void;
   onRemove: () => void;
-  onOpenConsole: () => void;
+  onOpenConsole: (serverKey: string) => void;
 }) {
   const [password, setPassword] = useState("");
   // Seed from the persisted flag for an instant render, then verify against the
@@ -544,6 +556,10 @@ function AccountForm({
   const [saved, setSaved] = useState<boolean | undefined>(a.hasSecret);
   const server = servers.find((s) => s.id === a.serverId);
   const { connected, onlineCount } = useAccountConnection(a, server);
+  // The button below only shows while `connected`, which needs `server`
+  // resolved (see `useAccountConnection`), so this is non-null whenever it
+  // is clickable.
+  const accountKey = server ? serverKeyFor(server, a.username) : null;
 
   // Latest patcher behind a ref so the probe effect keys only on the identity
   // fields (a fresh `onChange` closure each render must not re-fire the probe).
@@ -593,7 +609,7 @@ function AccountForm({
             variant="outline"
             size="sm"
             className="ml-auto"
-            onClick={onOpenConsole}
+            onClick={() => accountKey && onOpenConsole(accountKey)}
             aria-label="Open protocol console"
           >
             <Terminal />

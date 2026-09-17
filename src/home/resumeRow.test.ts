@@ -61,8 +61,21 @@ vi.mock("./continue", async (importOriginal) => ({
   useResume: () => resume(),
 }));
 
-const lobby = vi.fn<() => { connected: boolean; busy: boolean }>();
-vi.mock("../multiplayer/store", () => ({ useMultiplayer: () => lobby() }));
+type Lobby = {
+  connections: Record<string, { live: boolean }>;
+  busyKeys: Set<string>;
+};
+const lobby = vi.fn<() => Lobby>();
+// A lightweight stand-in for the real `serverKeyFor` (store.tsx), matching
+// `resumeRail.test.ts`'s reasoning for keeping this test free of store.tsx's
+// Tauri-bound module graph.
+function fakeServerKeyFor(server: LobbyServer, username: string): string {
+  return `${username}@${server.host}:${server.port}`;
+}
+vi.mock("../multiplayer/store", () => ({
+  useMultiplayer: () => lobby(),
+  serverKeyFor: fakeServerKeyFor,
+}));
 
 const accounts = vi.fn<() => LobbyAccount[]>();
 vi.mock("../lobby-servers/config", async (importOriginal) => ({
@@ -158,7 +171,7 @@ function text(): string {
 
 beforeEach(() => {
   resume.mockReturnValue({ candidates: [], loading: false });
-  lobby.mockReturnValue({ connected: true, busy: false });
+  lobby.mockReturnValue({ connections: {}, busyKeys: new Set() });
   accounts.mockReturnValue([]);
 });
 
@@ -238,7 +251,6 @@ describe("the resume row with one half missing", () => {
     // Reachable: the hero takes `candidates[0]` and there is none, but the rail
     // offers a login the collector knows nothing about. A logged-out install
     // with an account saved and nothing played is exactly this page.
-    lobby.mockReturnValue({ connected: false, busy: false });
     accounts.mockReturnValue([SAVED]);
     const html = page();
     expect(html).not.toContain('aria-labelledby="home-continue-heading"');
@@ -269,7 +281,6 @@ describe("the resume row with nothing to show", () => {
   });
 
   it("leaves the row empty when logged out with no login saved", () => {
-    lobby.mockReturnValue({ connected: false, busy: false });
     expect(page()).toBe(BARE);
   });
 });

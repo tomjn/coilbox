@@ -15,16 +15,22 @@ import {
  * blocking: it stays until the user acknowledges it. Rendered inside
  * `MultiplayerProvider` so it appears on any route.
  *
- * `text` is the front of the box queue (null when empty); `onDismiss` pops it. A
- * huge or malformed message can't break the lobby — the body scrolls and wraps,
- * and any `http(s)` URL in the text is turned into a clickable link opened in the
- * system browser.
+ * `text` is the front of the box queue (null when empty), across every
+ * connection (issue #2847), so a box on a connection nobody is looking at
+ * still queues rather than being lost. `onDismiss` pops it. `serverName`
+ * names which connection this one is from, once there is more than one to
+ * tell apart, so a queued second box does not read as the same one still
+ * open. A huge or malformed message cannot break the lobby: the body scrolls
+ * and wraps, and any `http(s)` URL in the text is turned into a clickable
+ * link opened in the system browser.
  */
 export function ServerMessageBoxDialog({
   text,
+  serverName,
   onDismiss,
 }: {
   text: string | null;
+  serverName: string | null;
   onDismiss: () => void;
 }) {
   return (
@@ -36,7 +42,11 @@ export function ServerMessageBoxDialog({
     >
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Server message</DialogTitle>
+          <DialogTitle>
+            {serverName
+              ? `Server message from ${serverName}`
+              : "Server message"}
+          </DialogTitle>
         </DialogHeader>
         <div className="max-h-72 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 p-3 text-sm">
           {text != null ? linkify(text) : null}

@@ -45,6 +45,7 @@ export function DebriefingDrawer({
   report,
   myUsername,
   serverKey,
+  serverName,
   onClose,
 }: {
   open: boolean;
@@ -54,6 +55,11 @@ export function DebriefingDrawer({
    * lands on that server even when another is focused. Omitted falls back to
    * the active connection, same as any other old-style chat link. */
   serverKey?: string | null;
+  /** The same connection's display name, shown under the heading once there
+   * is more than one to tell apart (issue #2847), so a debriefing queued
+   * behind another does not read as the same result still open. Null hides
+   * it, which is every single-connection install. */
+  serverName?: string | null;
   onClose: () => void;
 }) {
   const me = report?.players.find((player) => player.name === myUsername);
@@ -86,7 +92,12 @@ export function DebriefingDrawer({
         inert={!(open && report)}
       >
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">Match result</h2>
+          <div>
+            <h2 className="text-sm font-semibold">Match result</h2>
+            {serverName ? (
+              <p className="text-xs text-muted-foreground">{serverName}</p>
+            ) : null}
+          </div>
           <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
             <X className="size-4" />
           </Button>

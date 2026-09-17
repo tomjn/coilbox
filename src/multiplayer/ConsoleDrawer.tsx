@@ -1,6 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { ChevronRight, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,8 +11,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { LobbyProtocol } from "../lobby-servers/config";
+import { AccountPicker } from "./AccountPicker";
 import { mpSend, mpTachyonRequest } from "./bindings";
-import { useMultiplayer } from "./store";
+import { protocolForKey } from "./protocol";
+import {
+  liveConnectionKeys,
+  useConnection,
+  useMultiplayer,
+  useProtocolServers,
+} from "./store";
 import {
   buildTachyonRequest,
   consoleView,
@@ -43,20 +50,42 @@ import {
 export function ConsoleDrawer({
   open,
   onClose,
+  serverKey: openedFor,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Which connection to show first, e.g. the account whose row opened this
+   * drawer (issue #2847). Falls back to the focused connection, then to
+   * whichever live connection sorts first. The picker below lets the user
+   * switch once more than one connection is live. */
+  serverKey?: string | null;
 }) {
-  const { mirror, activeKey, protocol } = useMultiplayer();
-  const lines = mirror.consoleLines;
+  const { connections, activeKey } = useMultiplayer();
+  const servers = useProtocolServers();
+  const liveKeys = liveConnectionKeys(connections, activeKey);
+  const [manualPick, setManualPick] = useState<string | null>(null);
+  // A fresh pick each time the drawer opens, so a previous open's manual
+  // switch does not leak into the next: the drawer stays mounted between
+  // opens (it slides rather than unmounts), only `open` toggles.
+  useEffect(() => {
+    if (open) setManualPick(null);
+  }, [open]);
+  const pickedKey =
+    (manualPick && liveKeys.includes(manualPick) ? manualPick : null) ??
+    (openedFor && liveKeys.includes(openedFor) ? openedFor : null) ??
+    liveKeys[0] ??
+    null;
+  const picked = useConnection(pickedKey);
+  const lines = picked?.mirror.consoleLines ?? [];
+  const protocol = protocolForKey(pickedKey, servers);
   const [command, setCommand] = useState("");
 
   function send(e: React.FormEvent) {
     e.preventDefault();
     const line = command.trim();
-    if (!line || !activeKey) return;
+    if (!line || !pickedKey) return;
     // The sent line and any reply surface in `consoleLines` via the protocol layer.
-    mpSend({ serverKey: activeKey, line }).catch(() => {});
+    mpSend({ serverKey: pickedKey, line }).catch(() => {});
     setCommand("");
   }
 
@@ -76,8 +105,17 @@ export function ConsoleDrawer({
         }`}
         inert={!open}
       >
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">Protocol console</h2>
+        <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <h2 className="shrink-0 text-sm font-semibold">Protocol console</h2>
+          {liveKeys.length > 1 && (
+            <div className="min-w-0 flex-1">
+              <AccountPicker
+                keys={liveKeys}
+                value={pickedKey ?? liveKeys[0]}
+                onChange={setManualPick}
+              />
+            </div>
+          )}
           <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
             <X className="size-4" />
           </Button>
@@ -94,17 +132,17 @@ export function ConsoleDrawer({
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               placeholder={
-                activeKey ? "Send a raw command…" : "Connect to send commands"
+                pickedKey ? "Send a raw command…" : "Connect to send commands"
               }
-              disabled={!activeKey}
+              disabled={!pickedKey}
               className="font-mono text-xs"
             />
-            <Button type="submit" disabled={!activeKey || !command.trim()}>
+            <Button type="submit" disabled={!pickedKey || !command.trim()}>
               Send
             </Button>
           </form>
         ) : (
-          <TachyonSendBox serverKey={activeKey} />
+          <TachyonSendBox serverKey={pickedKey} />
         )}
       </aside>
     </>,

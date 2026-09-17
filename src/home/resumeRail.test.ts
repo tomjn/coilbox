@@ -23,8 +23,24 @@ vi.mock("./continue", async (importOriginal) => ({
   useResume: () => resume(),
 }));
 
-const lobby = vi.fn<() => { connected: boolean; busy: boolean }>();
-vi.mock("../multiplayer/store", () => ({ useMultiplayer: () => lobby() }));
+type Lobby = {
+  connections: Record<string, { live: boolean }>;
+  busyKeys: Set<string>;
+};
+const lobby = vi.fn<() => Lobby>();
+// A lightweight stand-in for the real `serverKeyFor` (store.tsx), which the
+// component and `loginOffer` both use to match an offered account against a
+// live/busy connection. Kept in step with the real formula rather than
+// imported from it, so this test stays free of store.tsx's Tauri-bound
+// module graph (the same reasoning `continueZone.test.ts` gives for stubbing
+// @picoframe/frame).
+function fakeServerKeyFor(server: LobbyServer, username: string): string {
+  return `${username}@${server.host}:${server.port}`;
+}
+vi.mock("../multiplayer/store", () => ({
+  useMultiplayer: () => lobby(),
+  serverKeyFor: fakeServerKeyFor,
+}));
 
 // The saved-login list and the server catalog are settings, so the hooks are
 // replaced and the pure helpers around them (`sortAccountsByRecency`) are real.
@@ -102,7 +118,7 @@ function text(): string {
 
 beforeEach(() => {
   resume.mockReturnValue({ candidates: [], loading: false });
-  lobby.mockReturnValue({ connected: true, busy: false });
+  lobby.mockReturnValue({ connections: {}, busyKeys: new Set() });
   accounts.mockReturnValue([]);
   servers.mockReturnValue([BAR, TECHA]);
 });
@@ -228,6 +244,21 @@ describe("loginOffer", () => {
   it("offers nothing when no login is saved", () => {
     expect(loginOffer([], null, [BAR])).toBeNull();
   });
+
+  it("skips an account whose own connection is already taken", () => {
+    // "Taken" is each login's own key, live or busy, not a global flag
+    // (issue #2847).
+    const taken = new Set([fakeServerKeyFor(BAR, "AF_")]);
+    expect(loginOffer([SAVED], null, [BAR], taken)).toBeNull();
+  });
+
+  it("falls through to the next login when the first is taken", () => {
+    const other = account("a2", "Other");
+    const taken = new Set([fakeServerKeyFor(BAR, "AF_")]);
+    expect(
+      loginOffer([SAVED, other], null, [BAR], taken)?.account.username,
+    ).toBe("Other");
+  });
 });
 
 describe("the rail on the page", () => {
@@ -259,27 +290,45 @@ describe("the rail on the page", () => {
   });
 
   it("offers a saved login when logged out", () => {
-    lobby.mockReturnValue({ connected: false, busy: false });
     accounts.mockReturnValue([SAVED]);
     expect(text()).toBe("Multiplayer AF_ Beyond All Reason Log in");
     expect(render()).toContain('href="/lobby"');
   });
 
-  it("offers no login when already logged in", () => {
+  it("offers no login when that account is already connected", () => {
     accounts.mockReturnValue([SAVED]);
+    lobby.mockReturnValue({
+      connections: { [fakeServerKeyFor(BAR, "AF_")]: { live: true } },
+      busyKeys: new Set(),
+    });
     expect(render()).toBe("");
   });
 
-  it("offers no login while a connect is in flight", () => {
+  it("offers no login while a connect for that account is in flight", () => {
     // Auto-connect would otherwise flash the offer during boot and withdraw it.
-    lobby.mockReturnValue({ connected: false, busy: true });
     accounts.mockReturnValue([SAVED]);
+    lobby.mockReturnValue({
+      connections: {},
+      busyKeys: new Set([fakeServerKeyFor(BAR, "AF_")]),
+    });
     expect(render()).toBe("");
   });
 
   it("offers no login when logged out with nothing saved", () => {
-    lobby.mockReturnValue({ connected: false, busy: false });
     expect(render()).toBe("");
+  });
+
+  it("offers a login even while a different account is connected", () => {
+    // Each login's own state, not a global "something is connected" flag
+    // (issue #2847): a second saved account with nothing of its own
+    // connected still gets offered.
+    const other = account("a2", "Other");
+    accounts.mockReturnValue([SAVED, other]);
+    lobby.mockReturnValue({
+      connections: { [fakeServerKeyFor(BAR, "Other")]: { live: true } },
+      busyKeys: new Set(),
+    });
+    expect(text()).toBe("Multiplayer AF_ Beyond All Reason Log in");
   });
 
   it("groups the cards under a label rather than a heading", () => {

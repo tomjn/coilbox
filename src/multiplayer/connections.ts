@@ -1,6 +1,6 @@
 import type { LobbyServer } from "../lobby-servers/config";
 import type { ClientFlags } from "./awayStatus";
-import type { Delta, LobbyState } from "./bindings";
+import type { Debriefing, Delta, LobbyState } from "./bindings";
 import {
   initialMirror,
   type LobbyMirror,
@@ -90,6 +90,54 @@ export function liveConnectionKeys(
   const keys = Object.keys(connections).filter((key) => connections[key].live);
   if (focusKey == null || !keys.includes(focusKey)) return keys;
   return [focusKey, ...keys.filter((key) => key !== focusKey)];
+}
+
+/**
+ * The connection parked on the agreement / verification-code handshake to
+ * show, preferring the focused one, or null when none are parked (issue
+ * #2847). Two connections parking at once queue rather than race: whichever
+ * is not picked stays parked in `connections`, so this returns it next once
+ * the first clears its `agreement` (accepted, coded, or disconnected).
+ */
+export function pendingAgreement(
+  connections: Connections,
+  focusKey: string | null,
+): { serverKey: string; text: string } | null {
+  const parked = Object.values(connections).filter((c) => c.agreement != null);
+  const pick =
+    parked.find((c) => c.serverKey === focusKey) ?? parked[0] ?? null;
+  return pick
+    ? { serverKey: pick.serverKey, text: pick.agreement ?? "" }
+    : null;
+}
+
+/**
+ * The connection whose debriefing drawer should be open, preferring the
+ * focused one, or null when none has one waiting (issue #2847). A
+ * connection only counts once its mirror has caught up with the `battleId`
+ * `debriefingShown` recorded, since the drawer opens off the result rather
+ * than off the bare notice that one exists. Queues the same way
+ * {@link pendingAgreement} does: the connection not picked stays recorded
+ * and surfaces next once the shown one is closed.
+ */
+export function pendingDebriefing(
+  connections: Connections,
+  focusKey: string | null,
+): { serverKey: string; report: Debriefing; myUsername: string | null } | null {
+  const parked = Object.values(connections).filter(
+    (c) =>
+      c.debriefingShown != null &&
+      c.mirror.state?.debriefing?.battleId === c.debriefingShown,
+  );
+  const pick =
+    parked.find((c) => c.serverKey === focusKey) ?? parked[0] ?? null;
+  const report = pick?.mirror.state?.debriefing ?? null;
+  if (!pick || !report) return null;
+  return {
+    serverKey: pick.serverKey,
+    report,
+    myUsername: pick.mirror.state?.myUsername ?? null,
+  };
 }
 
 export type ConnectionAction =
