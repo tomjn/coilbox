@@ -7,11 +7,16 @@
  * account in view. The queue and the reply parsing are Rust's and tested
  * there (`admin_reply.rs`). This covers what the section does with each
  * outcome.
+ *
+ * Also covers the Ban action (issue #2778): it hands the account's name to
+ * the bans section through `?ban=` rather than banning directly, so this
+ * only checks that the param is set, not any `BAN` request (that belongs
+ * to `BansSection.dom.test.tsx`).
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useSearchParams } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AdminOutcome, AdminReply } from "../bindings";
 
@@ -42,10 +47,18 @@ afterEach(() => {
   mpAdminCommand.mockReset();
 });
 
+/** Renders the current URL search params as text, so a test can see what a
+ * component wrote to them without a real browser location. */
+function SearchParamsProbe() {
+  const [params] = useSearchParams();
+  return <span data-testid="search-params">{params.toString()}</span>;
+}
+
 function draw(initialPath = "/admin") {
   render(
     <MemoryRouter initialEntries={[initialPath]}>
       <PlayerLookupSection serverKey={SERVER_KEY} />
+      <SearchParamsProbe />
     </MemoryRouter>,
   );
 }
@@ -332,6 +345,41 @@ describe("kicking the account in view", () => {
     fireEvent.click(screen.getByRole("button", { name: "Kick" }));
     expect(await screen.findByText("Bob was not online.")).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("the Ban action", () => {
+  it("hands the account's name to the bans form through ?ban=", async () => {
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "userInfo",
+        info: {
+          kind: "account",
+          username: "Alice",
+          online: true,
+          userId: "42",
+          sessionId: "7",
+          agent: null,
+          registered: "Jan 02, 2020",
+          lastLogin: "Sep 16, 2026",
+          access: "mod",
+          bot: false,
+          ingameHours: "12",
+          email: null,
+          lastIp: null,
+          lastSysId: null,
+          lastMacId: null,
+        },
+      }),
+    );
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Ban…" }));
+    expect(screen.getByTestId("search-params").textContent).toContain(
+      "ban=Alice",
+    );
   });
 });
 

@@ -18,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { DaysField } from "../DaysField";
 import * as mod from "../moderation";
 
 /**
@@ -82,7 +83,9 @@ const FORM_META: Record<
   },
   modBan: {
     // Server-wide BAN takes a plain number of days (decimals allowed), not a
-    // ChanServ-style span. See src/multiplayer/moderation.ts:modBan.
+    // ChanServ-style span. See src/multiplayer/moderation.ts:modBan. The days
+    // input itself is `DaysField`, shared with the Server admin bans form
+    // (issue #2778) rather than the generic duration `Input` below.
     title: "Ban from server",
     duration: true,
     defaultDuration: "1",
@@ -195,18 +198,27 @@ export function MemberActionsMenu({
             <p className="px-1 text-sm font-medium">
               {FORM_META[form].title}: {nick}
             </p>
-            {FORM_META[form].duration && (
-              <span className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
-                {FORM_META[form].durationLabel}
-                <Input
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder={FORM_META[form].durationPlaceholder}
-                  aria-label={FORM_META[form].durationLabel}
-                  className="h-8"
-                  autoFocus
-                />
-              </span>
+            {form === "modBan" ? (
+              <DaysField
+                value={duration}
+                onChange={setDuration}
+                className="px-1"
+                autoFocus
+              />
+            ) : (
+              FORM_META[form].duration && (
+                <span className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
+                  {FORM_META[form].durationLabel}
+                  <Input
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder={FORM_META[form].durationPlaceholder}
+                    aria-label={FORM_META[form].durationLabel}
+                    className="h-8"
+                    autoFocus
+                  />
+                </span>
+              )
             )}
             <span className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
               Reason{" "}

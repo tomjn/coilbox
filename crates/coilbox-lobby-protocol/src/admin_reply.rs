@@ -41,6 +41,17 @@ pub enum AdminShape {
     /// `KICK <name> [reason]`: one line, `Kicked <name> from the server` or
     /// `User <name> was not online`.
     Kick,
+    /// `BAN <username> <days> <reason>`: one line, `Successfully banned
+    /// <name>, <ip>, <email> for <days> days.` or an error such as
+    /// `Unable to ban <name>, user doesn't exist`.
+    Ban,
+    /// `BANSPECIFIC <target> <days> <reason>`: one line, `Successfully
+    /// banned <target> for <days> days` (no full stop, unlike `BAN`) or an
+    /// error such as `Unable to match '<target>' to username/ip/email`.
+    BanSpecific,
+    /// `UNBAN <target>`: one line, `Successfully removed <n> bans relating
+    /// to <target>` or `No matching bans for <target>`.
+    Unban,
     /// `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`: never answered.
     NoReply,
 }
@@ -151,6 +162,9 @@ pub enum AdminReply {
     IpSearch { bindings: Vec<IpBinding> },
     BotMode { username: String, bot: bool },
     Kick { username: String, kicked: bool },
+    Ban { success: bool, message: String },
+    BanSpecific { success: bool, message: String },
+    Unban { success: bool, message: String },
 }
 
 /// What one `SERVERMSG` meant to the command waiting.
@@ -301,6 +315,20 @@ impl AdminCollector {
             },
             (AdminShape::Kick, _) => match kick_result_from(text) {
                 Some((username, kicked)) => Heard::Finished(AdminReply::Kick { username, kicked }),
+                None => Heard::NotOurs,
+            },
+            (AdminShape::Ban, _) => match ban_result_from(text) {
+                Some((success, message)) => Heard::Finished(AdminReply::Ban { success, message }),
+                None => Heard::NotOurs,
+            },
+            (AdminShape::BanSpecific, _) => match ban_specific_result_from(text) {
+                Some((success, message)) => {
+                    Heard::Finished(AdminReply::BanSpecific { success, message })
+                }
+                None => Heard::NotOurs,
+            },
+            (AdminShape::Unban, _) => match unban_result_from(text) {
+                Some((success, message)) => Heard::Finished(AdminReply::Unban { success, message }),
                 None => Heard::NotOurs,
             },
             _ => Heard::NotOurs,
@@ -544,6 +572,57 @@ fn kick_result_from(text: &str) -> Option<(String, bool)> {
         .strip_prefix("User <")
         .and_then(|t| t.strip_suffix("> was not online"))?;
     Some((name.to_string(), false))
+}
+
+/// `SQLUsers.ban`: `'Successfully banned %s, %s, %s for %s days.' %
+/// (username, ip, email, duration)` on success, ending in a full stop
+/// (unlike `BANSPECIFIC`'s reply). Failure is one of
+/// `"Unable to ban %s, user doesn't exist" % username` or
+/// `'Duration must be a float, cannot convert %s' % duration`.
+fn ban_result_from(text: &str) -> Option<(bool, String)> {
+    if text.starts_with("Successfully banned ") && text.ends_with(" days.") {
+        return Some((true, text.to_string()));
+    }
+    if text.starts_with("Unable to ban ") && text.ends_with(", user doesn't exist") {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("Duration must be a float, cannot convert ") {
+        return Some((false, text.to_string()));
+    }
+    None
+}
+
+/// `SQLUsers.ban_specific`: `'Successfully banned %s for %s days' % (arg,
+/// duration)` on success, with no full stop (unlike `BAN`'s reply). Failure
+/// is one of `"Unable to match '%s' to username/ip/email" % arg` or
+/// `'Duration must be a float, cannot convert %s' % duration`.
+fn ban_specific_result_from(text: &str) -> Option<(bool, String)> {
+    if text.starts_with("Successfully banned ") && text.ends_with(" days") {
+        return Some((true, text.to_string()));
+    }
+    if text.starts_with("Unable to match '") && text.ends_with("' to username/ip/email") {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("Duration must be a float, cannot convert ") {
+        return Some((false, text.to_string()));
+    }
+    None
+}
+
+/// `SQLUsers.unban`: `'Successfully removed %s bans relating to %s' %
+/// (n_unban, arg)` on success. Failure is one of `'No matching bans for %s'
+/// % arg` or `"Unable to match '%s' to username/ip/email" % arg`.
+fn unban_result_from(text: &str) -> Option<(bool, String)> {
+    if text.starts_with("Successfully removed ") && text.contains(" bans relating to ") {
+        return Some((true, text.to_string()));
+    }
+    if text.starts_with("No matching bans for ") {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("Unable to match '") && text.ends_with("' to username/ip/email") {
+        return Some((false, text.to_string()));
+    }
+    None
 }
 
 #[cfg(test)]
@@ -949,6 +1028,9 @@ mod tests {
             AdminShape::IpLookup,
             AdminShape::BotMode,
             AdminShape::Kick,
+            AdminShape::Ban,
+            AdminShape::BanSpecific,
+            AdminShape::Unban,
             AdminShape::NoReply,
             AdminShape::UserInfo,
         ] {
@@ -1000,6 +1082,81 @@ mod tests {
                 kicked: false,
             })]
         );
+    }
+
+    /// `SQLUsers.ban`: success ends in a full stop, and the two failures.
+    #[test]
+    fn a_ban_reply_is_one_line() {
+        for (line, success) in [
+            (
+                "Successfully banned Spammer, 203.0.113.7, spam@example.com for 7.0 days.",
+                true,
+            ),
+            ("Unable to ban Nobody, user doesn't exist", false),
+            ("Duration must be a float, cannot convert soon", false),
+        ] {
+            let (_, heard) = hear_all(AdminShape::Ban, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::Ban {
+                    success,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `SQLUsers.ban_specific`: success has no full stop, unlike `BAN`'s.
+    #[test]
+    fn a_banspecific_reply_is_one_line() {
+        for (line, success) in [
+            ("Successfully banned 203.0.113.7 for 7.0 days", true),
+            ("Unable to match 'not-a-target' to username/ip/email", false),
+            ("Duration must be a float, cannot convert soon", false),
+        ] {
+            let (_, heard) = hear_all(AdminShape::BanSpecific, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::BanSpecific {
+                    success,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
+    }
+
+    /// A `BAN`-shaped success line is not read as `BANSPECIFIC`'s, because it
+    /// still ends in a full stop.
+    #[test]
+    fn a_ban_success_does_not_answer_banspecific() {
+        let (_, heard) = hear_all(
+            AdminShape::BanSpecific,
+            &["Successfully banned Spammer, 203.0.113.7, spam@example.com for 7.0 days."],
+        );
+        assert_eq!(heard, vec![Heard::NotOurs]);
+    }
+
+    /// `SQLUsers.unban`: success, no matching bans, and an unrecognised
+    /// target.
+    #[test]
+    fn an_unban_reply_is_one_line() {
+        for (line, success) in [
+            ("Successfully removed 2 bans relating to 203.0.113.7", true),
+            ("No matching bans for 203.0.113.7", false),
+            ("Unable to match 'not-a-target' to username/ip/email", false),
+        ] {
+            let (_, heard) = hear_all(AdminShape::Unban, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::Unban {
+                    success,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
     }
 
     /// A command with no reply claims nothing, not even a line that answers

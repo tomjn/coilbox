@@ -126,6 +126,38 @@ function KickAction({
   );
 }
 
+/**
+ * Opens the bans section below on the Server admin page with this account's
+ * name filled into the `BAN` form (issue #2778). Handed off through `?ban=`
+ * rather than a prop, so `PlayerLookupSection` and `BansSection` stay
+ * independent siblings on `ServerAdminPage`, the same URL-as-shared-state
+ * pattern `useServerAdminKey` uses for `?server=`.
+ */
+function BanAction({ username }: { username: string }) {
+  const [, setParams] = useSearchParams();
+
+  return (
+    <Button
+      type="button"
+      variant="destructive"
+      size="sm"
+      className="h-8"
+      onClick={() =>
+        setParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("ban", username);
+            return next;
+          },
+          { replace: true },
+        )
+      }
+    >
+      Ban…
+    </Button>
+  );
+}
+
 /** A dash placeholder for a field uberserver can write as Python's `None`. */
 function dash(value: string | null): string {
   return value ?? "not known";
@@ -225,6 +257,9 @@ function AccountInfoView({
           )}
           <DetailField label="Last hardware ID" value={dash(info.lastMacId)} />
           <DetailField label="Last system ID" value={dash(info.lastSysId)} />
+          <div className="flex items-center justify-end">
+            <BanAction username={info.username} />
+          </div>
           <KickAction username={info.username} serverKey={serverKey} />
         </div>
       );

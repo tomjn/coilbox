@@ -24,6 +24,7 @@ vi.mock("@picoframe/frame", () => ({
   ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   NavGate: ({ children }: { children: ReactNode }) => <>{children}</>,
+  cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
 }));
 
 // AccountPicker composes a Radix Select, swapped for plain buttons so a test
