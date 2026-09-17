@@ -797,6 +797,8 @@ export const mpGetUserInfo = defineCommand<
  * - `ipSearch`: `FINDIP <address>`, silent when nothing matches, and only
  *   complete when the wait runs out
  * - `botMode`: `SETBOTMODE <name> <mode>`, silent for a missing user
+ * - `createBotAccount`: `CREATEBOTACCOUNT <newname> <fromuser> [founder]`, a
+ *   line on success. A refusal arrives as a tagged `FAILED` instead.
  * - `kick`: `KICK <name> [reason]`
  * - `ban`: `BAN <username> <days> <reason>`
  * - `banSpecific`: `BANSPECIFIC <target> <days> <reason>`
@@ -810,6 +812,7 @@ export type AdminShape =
   | "ipLookup"
   | "ipSearch"
   | "botMode"
+  | "createBotAccount"
   | "kick"
   | "ban"
   | "banSpecific"
@@ -886,6 +889,12 @@ export type AdminReply =
   | { shape: "ipLookup"; binding: IpBinding }
   | { shape: "ipSearch"; bindings: IpBinding[] }
   | { shape: "botMode"; username: string; bot: boolean }
+  | {
+      shape: "createBotAccount";
+      username: string;
+      fromUsername: string;
+      founder: string | null;
+    }
   | { shape: "kick"; username: string; kicked: boolean }
   | { shape: "ban"; success: boolean; message: string }
   | { shape: "banSpecific"; success: boolean; message: string }

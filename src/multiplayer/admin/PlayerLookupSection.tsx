@@ -2,6 +2,8 @@ import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { Field } from "@/components/Field";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import type { AdminUserInfo } from "../bindings";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { type AdminRequestState, useAdminRequest } from "./adminRequest";
@@ -66,9 +68,68 @@ function IpSearchResults({
   );
 }
 
+/**
+ * The bot flag toggle for the account in view (issue #2780): `SETBOTMODE
+ * <username> true|false`. uberserver answers nothing when the account no
+ * longer exists by the time the change reaches it, which is covered by the
+ * `unanswered` wording below rather than shown as an error, the same as
+ * `botMode`'s silence is read for `useAdminRequest` generally.
+ *
+ * `onChanged` re-runs the lookup after a successful change, so the switch
+ * always reflects the server's own record rather than an optimistic guess.
+ */
+function BotFlagAction({
+  username,
+  bot,
+  serverKey,
+  onChanged,
+}: {
+  username: string;
+  bot: boolean;
+  serverKey: string;
+  onChanged: () => void;
+}) {
+  const botMode = useAdminRequest(serverKey);
+  const id = `bot-flag-${username}`;
+
+  const setBotMode = (next: boolean) => {
+    void botMode
+      .send("SETBOTMODE", [username, next ? "true" : "false"], "botMode")
+      .then((state) => {
+        if (state.status === "answered") onChanged();
+      });
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded border border-border p-3">
+      <span className="flex items-center gap-2">
+        <Switch
+          id={id}
+          checked={bot}
+          disabled={botMode.state.status === "sending"}
+          onCheckedChange={setBotMode}
+        />
+        <Label htmlFor={id} className="text-xs font-medium">
+          Bot account
+        </Label>
+      </span>
+      <AdminRequestStatus
+        state={botMode.state}
+        unanswered={`${username} may no longer exist, so nothing changed.`}
+      >
+        {(reply) =>
+          reply.shape === "botMode"
+            ? `Bot flag for ${reply.username} is now ${reply.bot ? "on" : "off"}.`
+            : null
+        }
+      </AdminRequestStatus>
+    </div>
+  );
+}
+
 /** The kick form and its result, for the account currently in view. Later
- * issues add more actions beside this one (ban #2778, bot flag #2780,
- * password reset #2781, access level #2786, delete #2787). */
+ * issues add more actions beside this one (ban #2778, password reset #2781,
+ * access level #2786, delete #2787). */
 function KickAction({
   username,
   serverKey,
@@ -232,7 +293,12 @@ function AccountInfoView({
           <DetailField label="Registered" value={info.registered} />
           <DetailField label="Last login" value={info.lastLogin} />
           <DetailField label="Access level" value={info.access} />
-          <DetailField label="Bot flag" value={info.bot ? "Yes" : "No"} />
+          <BotFlagAction
+            username={info.username}
+            bot={info.bot}
+            serverKey={serverKey}
+            onChanged={() => onPickName(info.username)}
+          />
           <DetailField
             label="In-game time"
             value={`${info.ingameHours} hours`}
