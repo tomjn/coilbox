@@ -3,6 +3,7 @@ import type { Debriefing } from "./bindings";
 import {
   type ConnectionState,
   connectionsReducer,
+  hasLiveLogin,
   liveConnectionKeys,
   liveRoomKey,
   newConnection,
@@ -195,5 +196,30 @@ describe("a connection that is a room (issue #2850)", () => {
     expect(liveRoomKey({ a: live("a") })).toBeNull();
     const gone = { ...dropped("room"), direct: true };
     expect(liveRoomKey({ a: live("a"), room: gone })).toBeNull();
+  });
+});
+
+// A room is not a lobby login (issue #2850), so it must not count as
+// "connected" for the Login sidebar item and its `/lobby` route (issue #2905),
+// the same split `lobbyDotStatus` already makes for the top bar (issue #2904).
+describe("hasLiveLogin", () => {
+  it("is false with no connections", () => {
+    expect(hasLiveLogin({})).toBe(false);
+  });
+
+  it("is false while only a room is live", () => {
+    const room = { ...live("room"), direct: true };
+    expect(hasLiveLogin({ room })).toBe(false);
+  });
+
+  it("is true while a lobby login is live, even beside a live room", () => {
+    const room = { ...live("room"), direct: true };
+    expect(hasLiveLogin({ a: live("a") })).toBe(true);
+    expect(hasLiveLogin({ a: live("a"), room })).toBe(true);
+  });
+
+  it("is false for a login that exists but has not gone live, or has dropped", () => {
+    expect(hasLiveLogin({ a: dropped("a") })).toBe(false);
+    expect(hasLiveLogin({ a: newConnection("a") })).toBe(false);
   });
 });

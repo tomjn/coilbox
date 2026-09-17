@@ -97,6 +97,16 @@ export function liveRoomKey(connections: Connections): string | null {
 }
 
 /**
+ * Whether any live connection is a lobby login rather than a room (issue
+ * #2905). Pure. Mirrors {@link liveRoomKey}'s room/login split, the same one
+ * `lobbyDotStatus` (issue #2904) uses for the top bar, so a LAN or
+ * direct-address room open with no lobby login does not count as connected.
+ */
+export function hasLiveLogin(connections: Connections): boolean {
+  return Object.values(connections).some((c) => c.live && !c.direct);
+}
+
+/**
  * The connection parked on the agreement / verification-code handshake to
  * show, preferring the focused one, or null when none are parked (issue
  * #2847). Two connections parking at once queue rather than race: whichever

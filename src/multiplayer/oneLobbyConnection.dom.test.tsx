@@ -517,6 +517,25 @@ describe("a room beside lobby logins (issue #2850)", () => {
     expect(store.activeKey).toBe(BAR_KEY);
   });
 
+  // Issue #2905: a room can hold focus with no lobby login open (nothing else
+  // had it to take), so `connected` - which gates the Login sidebar item and
+  // its `/lobby` route - must not follow `activeKey` alone.
+  it("is not connected while only a room is open, even though the room holds focus", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+
+    expect(store.activeKey).toBe(ROOM_KEY);
+    expect(store.connected).toBe(false);
+
+    await act(async () => {
+      await store.connect(BAR, "AF_");
+    });
+
+    expect(store.connected).toBe(true);
+  });
+
   it("refuses a second room and names the first, leaving the lobby alone", async () => {
     await roomBesideLobby();
 
