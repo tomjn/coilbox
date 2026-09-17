@@ -1,4 +1,8 @@
 import { useFrame } from "@picoframe/frame";
+import {
+  type Connections,
+  liveConnectionKeys,
+} from "../../multiplayer/connections";
 import { useMultiplayer } from "../../multiplayer/store";
 import type { ZoneId } from "../config";
 import { useResume } from "../continue";
@@ -115,21 +119,55 @@ const TOOLS_LINE = "Choose a tool to get started.";
 const NO_TOOLS_LINE = "No tools available yet.";
 
 /**
- * The name to greet, or null.
+ * Every live, logged-in connection's lobby name, the focused one first
+ * (issue #2847).
  *
- * Only once the connection reaches `ready`, because that is when the server has
- * told us who we are. A connection in progress therefore keeps the app title:
- * the account being dialled is a guess until the server accepts it, and a
- * heading that changes twice in a second reads worse than one that changes once.
+ * A connection only counts once it reaches `ready`, because that is when the
+ * server has told us who we are: one still mid-handshake is a guess until
+ * the server accepts it, and a heading that changes twice in a second reads
+ * worse than one that changes once. This is the same single-connection rule
+ * {@link useLobbyName} always applied, just asked of every connection rather
+ * than one.
+ */
+export function connectedNames(
+  connections: Connections,
+  focusKey: string | null,
+): string[] {
+  return liveConnectionKeys(connections, focusKey)
+    .map((key) => connections[key])
+    .filter((c) => c.mirror.phase === "ready")
+    .map((c) => c.mirror.state?.myUsername ?? null)
+    .filter((name): name is string => name != null);
+}
+
+/**
+ * The greeting's subject line: everybody connected, or the most recently
+ * focused account with a count of the rest once there are more than two
+ * (issue #2847). Two names still fit the heading in full. Past that a third
+ * name onward would run the sentence on, so the line names the one the
+ * reader is most likely looking at and counts the others instead.
+ *
+ * Null with nobody connected, which is what tells {@link greetingCopy} to
+ * fall back to the app title.
+ */
+export function greetingSubject(names: readonly string[]): string | null {
+  if (names.length === 0) return null;
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  const [first, ...rest] = names;
+  return `${first} and ${rest.length} others`;
+}
+
+/**
+ * The name to greet, or null.
  *
  * The lobby provider is app-level and unconditional (see `app.plugins.ts`), so
  * this is safe to call from the home page even in a build with multiplayer
  * hidden from the sidebar.
  */
 function useLobbyName(): string | null {
-  const { activeKey, mirror } = useMultiplayer();
-  if (activeKey == null || mirror.phase !== "ready") return null;
-  return mirror.state?.myUsername ?? null;
+  const { connections, activeKey } = useMultiplayer();
+  return greetingSubject(connectedNames(connections, activeKey));
 }
 
 /**

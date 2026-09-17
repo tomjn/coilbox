@@ -35,9 +35,13 @@ vi.mock("@picoframe/frame", async () => {
 // The links card opens its chips through the OS opener, which is not there in node.
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
+type LobbyConnection = {
+  live: boolean;
+  mirror: { phase: string | null; state: { myUsername: string | null } | null };
+};
 type Lobby = {
   activeKey: string | null;
-  mirror: { phase: string | null; state: { myUsername: string | null } | null };
+  connections: Record<string, LobbyConnection>;
 };
 const lobby = vi.fn<() => Lobby>();
 vi.mock("../multiplayer/store", () => ({ useMultiplayer: () => lobby() }));
@@ -87,14 +91,19 @@ const LINKS_ONLY: NavGroup[] = [
 /** Logged out: no connection, nobody to greet. */
 const OFFLINE: Lobby = {
   activeKey: null,
-  mirror: { phase: null, state: null },
+  connections: {},
 };
 
 /** Connected and accepted, so the server has told us our name. */
 function online(name: string): Lobby {
   return {
     activeKey: "server:1",
-    mirror: { phase: "ready", state: { myUsername: name } },
+    connections: {
+      "server:1": {
+        live: true,
+        mirror: { phase: "ready", state: { myUsername: name } },
+      },
+    },
   };
 }
 
@@ -326,8 +335,13 @@ describe("Greeting zone", () => {
     // Mid-handshake the account being dialled is still a guess, so the heading
     // waits for the server to accept it rather than changing twice.
     lobby.mockReturnValue({
-      activeKey: "server:1",
-      mirror: { phase: "registered", state: null },
+      activeKey: null,
+      connections: {
+        "server:1": {
+          live: false,
+          mirror: { phase: "registered", state: null },
+        },
+      },
     });
     expect(render().heading).toBe("Coilbox");
   });
@@ -335,9 +349,66 @@ describe("Greeting zone", () => {
   it("keeps the title when a connection is up but unnamed", () => {
     lobby.mockReturnValue({
       activeKey: "server:1",
-      mirror: { phase: "ready", state: { myUsername: null } },
+      connections: {
+        "server:1": {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: null } },
+        },
+      },
     });
     expect(render().heading).toBe("Coilbox");
+  });
+
+  it("greets every connected account when there are two", () => {
+    lobby.mockReturnValue({
+      activeKey: "a",
+      connections: {
+        a: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Zephyr" } },
+        },
+        b: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Kip" } },
+        },
+      },
+    });
+    expect(render().heading).toBe("Welcome back Zephyr and Kip");
+  });
+
+  it("names the focused account first with a count of the rest once there are more than two", () => {
+    lobby.mockReturnValue({
+      activeKey: "b",
+      connections: {
+        a: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Zephyr" } },
+        },
+        b: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Kip" } },
+        },
+        c: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Rho" } },
+        },
+      },
+    });
+    expect(render().heading).toBe("Welcome back Kip and 2 others");
+  });
+
+  it("leaves out a connection that is live but has not reached ready yet", () => {
+    lobby.mockReturnValue({
+      activeKey: "a",
+      connections: {
+        a: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Zephyr" } },
+        },
+        b: { live: true, mirror: { phase: "registered", state: null } },
+      },
+    });
+    expect(render().heading).toBe("Welcome back Zephyr");
   });
 
   it("offers to resume when the collector found something", () => {
