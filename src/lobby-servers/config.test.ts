@@ -22,6 +22,7 @@ import {
   buildCatalog,
   type CustomServersConfig,
   canonicalServerId,
+  dedupeByHost,
   isLastLogin,
   type LobbyAccount,
   type LobbyServer,
@@ -424,6 +425,83 @@ describe("rememberedLogins", () => {
     };
     const narrowed = buildCatalog([], { presets: ["techa"] });
     expect(rememberedLogins([flagged], null, narrowed)).toEqual([]);
+  });
+});
+
+describe("dedupeByHost", () => {
+  const servers = allServers([]);
+  // bar-ssl and bar-tachyon are the same server behind two protocols, on the
+  // same host but different ports (issue #2848), the clashing pair below.
+  const barSsl = servers.find((s) => s.id === "bar-ssl") as LobbyServer;
+  const barTachyon = servers.find((s) => s.id === "bar-tachyon") as LobbyServer;
+  const techa = servers.find((s) => s.id === "techa") as LobbyServer;
+
+  it("keeps only one login per host", () => {
+    const alice: LobbyAccount = {
+      id: "a",
+      serverId: "bar-ssl",
+      username: "alice",
+    };
+    const bob: LobbyAccount = {
+      id: "b",
+      serverId: "bar-tachyon",
+      username: "bob",
+    };
+    const carol: LobbyAccount = {
+      id: "c",
+      serverId: "techa",
+      username: "carol",
+    };
+    const targets = [
+      { account: alice, server: barSsl },
+      { account: bob, server: barTachyon },
+      { account: carol, server: techa },
+    ];
+    expect(dedupeByHost(targets, null).map((t) => t.account.id)).toEqual([
+      "a",
+      "c",
+    ]);
+  });
+
+  it("keeps the more recently used of a clashing pair", () => {
+    const older: LobbyAccount = {
+      id: "a",
+      serverId: "bar-ssl",
+      username: "alice",
+      lastUsedAt: 100,
+    };
+    const newer: LobbyAccount = {
+      id: "b",
+      serverId: "bar-tachyon",
+      username: "bob",
+      lastUsedAt: 200,
+    };
+    const targets = [
+      { account: older, server: barSsl },
+      { account: newer, server: barTachyon },
+    ];
+    expect(dedupeByHost(targets, null).map((t) => t.account.id)).toEqual(["b"]);
+  });
+
+  it("keeps the lastLogin account over one with no timestamp", () => {
+    const lastLogin = { serverId: "bar-tachyon", username: "bob" };
+    const alice: LobbyAccount = {
+      id: "a",
+      serverId: "bar-ssl",
+      username: "alice",
+    };
+    const bob: LobbyAccount = {
+      id: "b",
+      serverId: "bar-tachyon",
+      username: "bob",
+    };
+    const targets = [
+      { account: alice, server: barSsl },
+      { account: bob, server: barTachyon },
+    ];
+    expect(dedupeByHost(targets, lastLogin).map((t) => t.account.id)).toEqual([
+      "b",
+    ]);
   });
 });
 

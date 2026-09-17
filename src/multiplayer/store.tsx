@@ -17,6 +17,7 @@ import {
   allServers,
   autoConnectTargets,
   BUILTIN_SERVERS,
+  type LobbyAccount,
   type LobbyProtocol,
   type LobbyServer,
   resolveLastLogin,
@@ -405,6 +406,16 @@ interface MultiplayerContextValue {
   busyKeys: ReadonlySet<string>;
   /** Open a connection as `username` to `server` (throws if no stored password). */
   connect: (server: LobbyServer, username: string) => Promise<void>;
+  /**
+   * Connect every one of `targets` not already connected, one after another,
+   * skipping a Tachyon login that needs a browser sign-in the same way the
+   * boot reconnect does (issue #2849). Backs the login panel's "Reconnect
+   * all" (issue #2927). One failing does not stop the rest, and each raises
+   * its own notification.
+   */
+  reconnectAll: (
+    targets: { account: LobbyAccount; server: LobbyServer }[],
+  ) => Promise<void>;
   /**
    * Connect to a room, and answer with its `serverKey` so the caller can act on
    * the connection before React has re-rendered. Loopback for a room this client
@@ -1560,6 +1571,45 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [doConnect, stopReconnect],
   );
 
+  // Connect every one of `targets` that isn't already connected, one after
+  // another, skipping a Tachyon login the server no longer accepts without
+  // opening a browser for it. Shared by the boot reconnect (issue #2849,
+  // below) and the login panel's "Reconnect all" (issue #2927), so there is
+  // one place this loop is written. `doConnect` is called directly rather
+  // than through the public `connect`: every login here is meant to run
+  // unfocused and independent of any other server's reconnect loop, which is
+  // exactly what boot always assumed. One failing does not stop the rest,
+  // and each raises its own notification.
+  const connectRemembered = useCallback(
+    async (targets: { account: LobbyAccount; server: LobbyServer }[]) => {
+      for (const { account, server } of targets) {
+        const serverKey = serverKeyFor(server, account.username);
+        if (serverKey in connections) continue;
+        if (
+          serverProtocol(server) === "tachyon" &&
+          (await needsSignIn(server, account.username))
+        ) {
+          void notify({
+            title: "Signed out of multiplayer",
+            body: `${account.username} on ${server.name} needs a new sign-in. Log in again from the topbar to sign in with your browser.`,
+            level: "error",
+          });
+          continue;
+        }
+        try {
+          await doConnect(server, account.username, false, false);
+        } catch {
+          void notify({
+            title: "Couldn't connect to multiplayer",
+            body: `Log in as ${account.username} on ${server.name} from the topbar when you're ready.`,
+            level: "error",
+          });
+        }
+      }
+    },
+    [connections, doConnect],
+  );
+
   // Connect to a room, ours or somebody else's. The key is returned rather
   // than read off `activeKey`, because a caller that starts a room then opens a
   // battle in it does both before React has re-rendered with the new key, and a
@@ -2294,14 +2344,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       // Fresh launch with nothing to reattach: if the user opted in, connect
       // every remembered login (every account flagged open at quit, or, for
       // someone upgrading from a version that tracked only one, that single
-      // login) one after another (issue #2849). One failing does not stop the
-      // rest, and each raises its own notification, so a player logged in to
-      // two servers can tell which login needs attention. `doConnect` is
-      // called directly rather than through the public `connect`: nothing has
-      // connected yet at this point, so there is no other server's reconnect
-      // loop for `connect` to stop first. Every attempt is unfocused, the
-      // same rule `runReconnect` follows, and `doConnect`'s own fallback
-      // still focuses the first one to land since nothing else is focused yet.
+      // login) one after another via `connectRemembered` (issue #2849), so a
+      // player logged in to two servers can tell which login needs attention
+      // from its own notification.
       const b = bootRef.current;
       const targets = autoConnectTargets(
         b.autoConnect,
@@ -2309,37 +2354,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         b.accounts,
         allServers(b.custom),
       );
-      for (const { account, server } of targets) {
-        if (
-          serverProtocol(server) === "tachyon" &&
-          (await needsSignIn(server, account.username))
-        ) {
-          // Never open a browser at boot: skip this login with its own
-          // notification, same as the reconnect loop does for a Tachyon
-          // sign-in the server no longer accepts.
-          void notify({
-            title: "Signed out of multiplayer",
-            body: `${account.username} on ${server.name} needs a new sign-in. Log in again from the topbar to sign in with your browser.`,
-            level: "error",
-          });
-          continue;
-        }
-        try {
-          await doConnect(server, account.username, false, false);
-        } catch {
-          void notify({
-            title: "Couldn't connect to multiplayer",
-            body: `Log in as ${account.username} on ${server.name} from the topbar when you're ready.`,
-            level: "error",
-          });
-        }
-      }
+      await connectRemembered(targets);
     })();
   }, [
     dispatchMirror,
     focusOn,
     openChannel,
-    doConnect,
+    connectRemembered,
     runtimeFor,
     updateConnection,
   ]);
@@ -2366,6 +2387,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         busy,
         busyKeys,
         connect,
+        reconnectAll: connectRemembered,
         connectDirect,
         signIn,
         register,

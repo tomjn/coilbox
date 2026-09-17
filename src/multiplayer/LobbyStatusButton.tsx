@@ -1,4 +1,4 @@
-import { Button, useSetting } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import {
   ArrowLeft,
   ExternalLink,
@@ -20,8 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   allServers,
-  isLastLogin,
-  type LastLogin,
+  dedupeByHost,
   type LobbyAccount,
   type LobbyServer,
   rememberedLogins,
@@ -141,6 +140,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     signIn,
     disconnect,
     cancelConnect,
+    reconnectAll,
     manualAway,
     setManualAway,
   } = useMultiplayer();
@@ -148,7 +148,6 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const rowId = useId();
 
   const [lastLogin] = useLastLogin();
-  const [autoConnect] = useSetting<boolean>("multiplayer.autoConnect", false);
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LobbyAccount | null>(null);
@@ -189,30 +188,37 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     ),
   ];
 
-  // A one-click "reconnect" shortcut for each remembered login (the ones
-  // open-at-quit resolves, per issue #2849), earned only after a genuine
-  // connection this session (`revealed`). On a fresh open it would just
-  // duplicate the top rows of the most-recent-first list below. Also hidden
-  // when startup auto-connect is on, since the boot connect already tried
-  // every one of them. A login already showing its own row (live, opening, or
-  // dropped and still listed) is filtered out, so this never duplicates
-  // `AccountList` below it. Resolved against the profile-filtered catalog, so
-  // a profile-disallowed server won't offer it.
-  const reconnects =
-    autoConnect || !revealed
-      ? []
-      : rememberedLogins(
-          accounts,
-          lastLogin,
-          allServers(customCfg.servers),
-        ).filter(
-          ({ account, server }) =>
-            !(serverKeyFor(server, account.username) in connections),
-        );
+  // Every remembered login (the ones open-at-quit resolves, per issue #2849),
+  // resolved against the profile-filtered catalog so a profile-disallowed
+  // server is left out. `AccountList` marks each of these with a small badge
+  // and sorts them to the top (issue #2927) instead of the separate
+  // "Reconnect as…" buttons this used to feed, which duplicated the account
+  // rows below them and ran long server names past the panel edge.
+  const remembered = rememberedLogins(
+    accounts,
+    lastLogin,
+    allServers(customCfg.servers),
+  );
+  const rememberedIds = new Set(remembered.map(({ account }) => account.id));
 
-  // Most recently used first. The last-used login is badged instead of getting
-  // a dedicated connect button.
-  const sortedAccounts = sortAccountsByRecency(accounts, lastLogin);
+  // What "Reconnect all" actually attempts: the remembered logins not already
+  // connected, collapsed to one per host so two that would log each other out
+  // are never both tried (the one-login-per-host rule enforced in `doConnect`
+  // via `connectBlockedReason`). The more recently used of a clashing pair is
+  // kept.
+  const pendingRemembered = dedupeByHost(
+    remembered.filter(
+      ({ account, server }) =>
+        !(serverKeyFor(server, account.username) in connections),
+    ),
+    lastLogin,
+  );
+
+  // Most recently used first, with every remembered login pulled to the top
+  // of that order so it reads as one list instead of two.
+  const sortedAccounts = [...sortAccountsByRecency(accounts, lastLogin)].sort(
+    (a, b) => Number(rememberedIds.has(b.id)) - Number(rememberedIds.has(a.id)),
+  );
 
   /** The connection a login would replace: another account on its server. */
   function replacedBy(account: LobbyAccount): string | null {
@@ -468,7 +474,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex max-h-[calc(var(--radix-popover-content-available-height)-2rem)] flex-col gap-1">
       {adding ? (
         <div className="flex items-center gap-1 pb-1">
           <Button
@@ -489,27 +495,29 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
         </p>
       )}
-      {reconnects.map(({ account: a, server }) => (
+      {pendingRemembered.length > 1 && (
         <Button
-          key={a.id}
-          onClick={() => void connectTo(a)}
+          variant="outline"
+          onClick={() => void reconnectAll(pendingRemembered)}
           disabled={busy}
           className="mb-1 h-9 justify-start gap-2"
         >
           <RefreshCw className="size-4" />
-          Reconnect as {a.username || "last account"} on {server.name}
+          Reconnect all
         </Button>
-      ))}
-      <AccountList
-        accounts={sortedAccounts}
-        customServers={customCfg.servers}
-        lastLogin={lastLogin}
-        liveKeys={liveKeys}
-        replacedBy={replacedBy}
-        disabled={busy}
-        onPick={(a) => void pick(a)}
-        onNavigate={onNavigate}
-      />
+      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <AccountList
+          accounts={sortedAccounts}
+          customServers={customCfg.servers}
+          remembered={rememberedIds}
+          liveKeys={liveKeys}
+          replacedBy={replacedBy}
+          disabled={busy}
+          onPick={(a) => void pick(a)}
+          onNavigate={onNavigate}
+        />
+      </div>
       <button
         type="button"
         onClick={() => setRegistering(true)}
@@ -581,7 +589,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
 function AccountList({
   accounts,
   customServers,
-  lastLogin,
+  remembered,
   liveKeys,
   replacedBy,
   disabled,
@@ -590,7 +598,8 @@ function AccountList({
 }: {
   accounts: LobbyAccount[];
   customServers: LobbyServer[];
-  lastLogin: LastLogin | null;
+  /** Account ids `rememberedLogins` names, badged "Open last time" below. */
+  remembered: ReadonlySet<string>;
   liveKeys: string[];
   replacedBy: (account: LobbyAccount) => string | null;
   disabled: boolean;
@@ -625,9 +634,9 @@ function AccountList({
                   Connected
                 </span>
               ) : (
-                isLastLogin(a, lastLogin) && (
+                remembered.has(a.id) && (
                   <span className="ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                    Last used
+                    Open last time
                   </span>
                 )
               )}

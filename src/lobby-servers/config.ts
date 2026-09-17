@@ -493,3 +493,34 @@ export function autoConnectTargets(
 ): { account: LobbyAccount; server: LobbyServer }[] {
   return enabled ? rememberedLogins(accounts, lastLogin, servers) : [];
 }
+
+/**
+ * `targets` collapsed to at most one entry per host, keeping the more
+ * recently used login where two would log each other out. Coilbox holds one
+ * connection per lobby server, the same host counting as the same server
+ * whichever port or account (issue #2848's `connectBlockedReason`), so two
+ * remembered logins on one host can never both stay connected. Used to decide
+ * what the login panel's "Reconnect all" (issue #2927) actually attempts.
+ * Pure, and order-preserving among the entries it keeps.
+ */
+export function dedupeByHost(
+  targets: { account: LobbyAccount; server: LobbyServer }[],
+  lastLogin: LastLogin | null,
+): { account: LobbyAccount; server: LobbyServer }[] {
+  const rank = (a: LobbyAccount) =>
+    Math.max(a.lastUsedAt ?? 0, isLastLogin(a, lastLogin) ? Infinity : 0);
+  const bestForHost = new Map<
+    string,
+    { account: LobbyAccount; server: LobbyServer }
+  >();
+  for (const target of targets) {
+    const host = target.server.host.toLowerCase();
+    const current = bestForHost.get(host);
+    if (!current || rank(target.account) > rank(current.account)) {
+      bestForHost.set(host, target);
+    }
+  }
+  return targets.filter(
+    (target) => bestForHost.get(target.server.host.toLowerCase()) === target,
+  );
+}
