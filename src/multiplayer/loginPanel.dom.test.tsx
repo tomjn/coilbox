@@ -22,7 +22,7 @@ import {
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionState } from "./connections";
-import { LoginPanel } from "./LobbyStatusButton";
+import LobbyStatusButton, { LoginPanel } from "./LobbyStatusButton";
 
 const ALICE_KEY = "alice@server4.beyondallreason.info:8201";
 const CAROL_KEY = "carol@lobby.techa-rts.com:8200";
@@ -35,6 +35,9 @@ const mp = {
   revealed: true,
   busy: false,
   busyKeys: new Set<string>(),
+  loginPopoverOpen: false,
+  openLoginPopover: vi.fn(),
+  closeLoginPopover: vi.fn(),
   manualAway: false,
   setManualAway: vi.fn(),
   signIn: vi.fn(),
@@ -265,6 +268,46 @@ describe("the login panel beside a room", () => {
     expect(screen.queryByRole("button", { name: "Log out" })).toBeNull();
     expect(account("alice")).toBeTruthy();
     expect(account("carol")).toBeTruthy();
+  });
+});
+
+// The topbar button follows lobby accounts and logins only, not rooms (issue
+// #2904). A room is controlled from the Battles page, which already has its
+// own Stop room control.
+describe("the topbar button's visibility beside a room (issue #2904)", () => {
+  const ROOM_KEY = "AF@127.0.0.1:8200";
+
+  const drawButton = () =>
+    render(
+      <MemoryRouter>
+        <LobbyStatusButton />
+      </MemoryRouter>,
+    );
+
+  it("hides when only a room is open and no accounts are configured", () => {
+    settings["lobbyServers.accounts"] = { accounts: [] };
+    connectAs(connection(ROOM_KEY, { direct: true }));
+    drawButton();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("shows once an account is configured, even with only a room open", () => {
+    settings["lobbyServers.accounts"] = { accounts: BASE_ACCOUNTS };
+    connectAs(connection(ROOM_KEY, { direct: true }));
+    drawButton();
+    expect(
+      screen.getByRole("button", { name: "Multiplayer: log in" }),
+    ).toBeTruthy();
+  });
+
+  it("shows for a dropped login beside a room, with no accounts configured", () => {
+    settings["lobbyServers.accounts"] = { accounts: [] };
+    connectAs(
+      connection(ALICE_KEY, { live: false, error: "connection reset" }),
+      connection(ROOM_KEY, { direct: true }),
+    );
+    drawButton();
+    expect(screen.getByRole("button")).toBeTruthy();
   });
 });
 

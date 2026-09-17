@@ -67,14 +67,16 @@ const LABEL: Record<DotStatus, string> = {
 /**
  * topbar.right slot: an icon button that shows lobby connection status via a dot
  * and opens a popover to connect / view status / log out. Hidden entirely when no
- * login is configured and nothing is connected. The open state is controlled by
- * MultiplayerContext so not-connected CTAs elsewhere can open this same popover.
+ * login is configured and no lobby login is connected. A room (`direct`) does not
+ * count either way, since it is not a login and is closed from the Battles page,
+ * which already has its own Stop room control (issue #2904). The open state is
+ * controlled by MultiplayerContext so not-connected CTAs elsewhere can open this
+ * same popover.
  */
 export default function LobbyStatusButton() {
   const [accountsCfg] = useLobbyAccounts();
   const {
     connections,
-    activeKey,
     busy,
     loginPopoverOpen,
     openLoginPopover,
@@ -82,7 +84,8 @@ export default function LobbyStatusButton() {
   } = useMultiplayer();
 
   const hasAccounts = accountsCfg.accounts.length > 0;
-  if (!hasAccounts && activeKey == null) return null;
+  const hasLogins = Object.values(connections).some((c) => !c.direct);
+  if (!hasAccounts && !hasLogins) return null;
 
   const status = lobbyDotStatus(connections, busy);
 
