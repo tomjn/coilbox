@@ -172,13 +172,18 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     if (activeKey == null) setAdding(false);
   }, [activeKey]);
 
-  // Every connection, live ones first and the focused one first among those.
-  // A connection that dropped stays listed beside the live ones, so its reason
-  // can still be read and its reconnect stopped.
-  const liveKeys = liveConnectionKeys(connections, activeKey);
+  // Every lobby login, live ones first and the focused one first among those.
+  // A login that dropped stays listed beside the live ones, so its reason can
+  // still be read and its reconnect stopped. A room is left out: it is not a
+  // login, and it is closed from the Battles page (issue #2850).
+  const liveKeys = liveConnectionKeys(connections, activeKey).filter(
+    (key) => !connections[key].direct,
+  );
   const listed = [
     ...liveKeys,
-    ...Object.keys(connections).filter((key) => !connections[key].live),
+    ...Object.keys(connections).filter(
+      (key) => !connections[key].live && !connections[key].direct,
+    ),
   ];
 
   // A one-click "reconnect" shortcut for each remembered login (the ones
