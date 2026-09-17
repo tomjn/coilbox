@@ -61,7 +61,23 @@ function settingText(reply: AdminReply) {
   }
 }
 
-function BansTable({ entries }: { entries: ChannelBanEntry[] }) {
+/** The channel's real history and antispam state, from ChanServ's `:info`. */
+function infoText(reply: AdminReply) {
+  if (reply.shape !== "channelInfo") return null;
+  return `Currently, history is ${reply.historyOn ? "on" : "off"} and antispam is ${
+    reply.antispamOn ? "on" : "off"
+  } for #${reply.channel}.`;
+}
+
+function BansTable({
+  entries,
+  onLift,
+  disabled,
+}: {
+  entries: ChannelBanEntry[];
+  onLift: (username: string) => void;
+  disabled: boolean;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -71,6 +87,9 @@ function BansTable({ entries }: { entries: ChannelBanEntry[] }) {
           <TableHead>Reason</TableHead>
           <TableHead>Ends</TableHead>
           <TableHead>Issuer</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -81,6 +100,19 @@ function BansTable({ entries }: { entries: ChannelBanEntry[] }) {
             <TableCell className="whitespace-normal">{entry.reason}</TableCell>
             <TableCell className="whitespace-normal">{entry.ends}</TableCell>
             <TableCell>{entry.issuer}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                disabled={disabled}
+                aria-label={`Unban ${entry.username}`}
+                onClick={() => onLift(entry.username)}
+              >
+                Unban
+              </Button>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -88,7 +120,15 @@ function BansTable({ entries }: { entries: ChannelBanEntry[] }) {
   );
 }
 
-function MutesTable({ entries }: { entries: ChannelMuteEntry[] }) {
+function MutesTable({
+  entries,
+  onLift,
+  disabled,
+}: {
+  entries: ChannelMuteEntry[];
+  onLift: (username: string) => void;
+  disabled: boolean;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -97,6 +137,9 @@ function MutesTable({ entries }: { entries: ChannelMuteEntry[] }) {
           <TableHead>Reason</TableHead>
           <TableHead>Ends</TableHead>
           <TableHead>Issuer</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -106,6 +149,19 @@ function MutesTable({ entries }: { entries: ChannelMuteEntry[] }) {
             <TableCell className="whitespace-normal">{entry.reason}</TableCell>
             <TableCell className="whitespace-normal">{entry.ends}</TableCell>
             <TableCell>{entry.issuer}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                disabled={disabled}
+                aria-label={`Unmute ${entry.username}`}
+                onClick={() => onLift(entry.username)}
+              >
+                Unmute
+              </Button>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -113,19 +169,33 @@ function MutesTable({ entries }: { entries: ChannelMuteEntry[] }) {
   );
 }
 
-function listView(reply: AdminReply, channel: string) {
+function listView(
+  reply: AdminReply,
+  channel: string,
+  onLiftBan: (username: string) => void,
+  onLiftMute: (username: string) => void,
+  disabled: boolean,
+) {
   if (reply.shape === "channelBanList") {
     return reply.entries.length === 0 ? (
       <span>No one is banned from #{channel}.</span>
     ) : (
-      <BansTable entries={reply.entries} />
+      <BansTable
+        entries={reply.entries}
+        onLift={onLiftBan}
+        disabled={disabled}
+      />
     );
   }
   if (reply.shape === "channelMuteList") {
     return reply.entries.length === 0 ? (
       <span>No one is muted in #{channel}.</span>
     ) : (
-      <MutesTable entries={reply.entries} />
+      <MutesTable
+        entries={reply.entries}
+        onLift={onLiftMute}
+        disabled={disabled}
+      />
     );
   }
   return null;
@@ -140,6 +210,13 @@ function listView(reply: AdminReply, channel: string) {
  * None of these takes a duration. Timed channel mutes and bans stay in the
  * chat member menu, with their ChanServ span field (`10m`, `2h`), which is a
  * separate input from the server-wide `DaysField` (issue #2774).
+ *
+ * Issue #2923 added a row action to lift a ban or mute straight from its
+ * list entry, and reads the channel's real history and antispam state from
+ * `:info <chan>` whenever the channel changes, rather than leaving the
+ * on/off buttons to be set blind. `:info` is asked again after a history or
+ * antispam change answers, so the reading always reflects what the server
+ * just did.
  */
 export function ChannelsSection({ serverKey }: { serverKey: string }) {
   const [typed, setTyped] = useState("");
@@ -149,6 +226,9 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
   const connection = useConnection(serverKey);
   const setting = useAdminRequest(serverKey);
   const list = useAdminRequest(serverKey);
+  const info = useAdminRequest(serverKey);
+  const unban = useAdminRequest(serverKey);
+  const unmute = useAdminRequest(serverKey);
 
   const channel = chanServChannel(typed);
   const suggestions = knownChannels(
@@ -157,13 +237,50 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
   );
   const none = channel === "";
 
+  // ChanServ's `:info` names the channel's real history and antispam state
+  // (issue #2923). Asked for once the channel field settles, either a pick
+  // from the suggestions or leaving the typed field, rather than once per
+  // keystroke while a name is still being typed.
+  const loadInfo = (name: string) => {
+    if (name === "") return;
+    void info.send("info", [name], "channelInfo");
+  };
+
   const change = (command: string, args: string[], shape: AdminShape) => {
-    void setting.send(command, [channel, ...args], shape);
+    void setting.send(command, [channel, ...args], shape).then((state) => {
+      if (
+        state.status === "answered" &&
+        (shape === "channelHistory" || shape === "channelAntispam")
+      ) {
+        loadInfo(channel);
+      }
+    });
   };
   const show = (command: string, shape: AdminShape) => {
     setListed(channel);
     void list.send(command, [channel], shape);
   };
+  const refreshList = (command: string, shape: AdminShape) => {
+    void list.send(command, [listed], shape);
+  };
+  const liftBan = (username: string) => {
+    void unban
+      .send("unban", [listed, username], "channelUnban")
+      .then((state) => {
+        if (state.status === "answered")
+          refreshList("listbans", "channelBanList");
+      });
+  };
+  const liftMute = (username: string) => {
+    void unmute
+      .send("unmute", [listed, username], "channelUnmute")
+      .then((state) => {
+        if (state.status === "answered")
+          refreshList("listmutes", "channelMuteList");
+      });
+  };
+  const lifting =
+    unban.state.status === "sending" || unmute.state.status === "sending";
 
   const onOff = (label: string, command: string, shape: AdminShape) => (
     <div className="flex flex-wrap items-center gap-2">
@@ -202,6 +319,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
           <Input
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
+            onBlur={() => loadInfo(channel)}
             placeholder="main"
             aria-label="Channel"
             {...identifierFieldProps}
@@ -215,7 +333,10 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
                 size="sm"
                 variant="ghost"
                 className="h-7"
-                onClick={() => setTyped(name)}
+                onClick={() => {
+                  setTyped(name);
+                  loadInfo(name);
+                }}
               >
                 #{name}
               </Button>
@@ -245,7 +366,27 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
           </Button>
         </div>
         <AdminRequestStatus state={list.state}>
-          {(reply) => listView(reply, listed)}
+          {(reply) => listView(reply, listed, liftBan, liftMute, lifting)}
+        </AdminRequestStatus>
+        <AdminRequestStatus
+          state={unban.state}
+          unanswered="The server did not answer."
+        >
+          {(reply) =>
+            reply.shape === "channelUnban"
+              ? `${reply.username} was unbanned from #${reply.channel}.`
+              : null
+          }
+        </AdminRequestStatus>
+        <AdminRequestStatus
+          state={unmute.state}
+          unanswered="The server did not answer."
+        >
+          {(reply) =>
+            reply.shape === "channelUnmute"
+              ? `${reply.username} was unmuted in #${reply.channel}.`
+              : null
+          }
         </AdminRequestStatus>
       </ToolGroup>
 
@@ -286,6 +427,9 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
             Unregister
           </Button>
         </div>
+        <AdminRequestStatus state={info.state}>
+          {(reply) => infoText(reply)}
+        </AdminRequestStatus>
         {onOff("History", "history", "channelHistory")}
         {onOff("Antispam", "antispam", "channelAntispam")}
         <AdminRequestStatus state={setting.state}>

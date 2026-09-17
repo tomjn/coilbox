@@ -80,6 +80,14 @@ pub enum AdminShape {
     /// ChanServ's `:listmutes <chan>`: a marked list, or `The mutelist is
     /// empty.`
     ChannelMuteList,
+    /// ChanServ's `:unban <chan> <nick>`: `#<chan>: <nick> unbanned`.
+    ChannelUnban,
+    /// ChanServ's `:unmute <chan> <nick>`: `#<chan>: unmuted <nick>`.
+    ChannelUnmute,
+    /// ChanServ's `:info <chan>`: one line naming the founder, the operator
+    /// list, the user counts, antispam, history and when the channel was
+    /// last used. Only antispam and history are read here.
+    ChannelInfo,
     /// ChanServ's `:showip`: two lines, the online address then the local.
     ShowIp,
     /// ChanServ's `:refreship`: a line straight away, and a second when the
@@ -100,6 +108,9 @@ impl AdminShape {
                 | Self::ChannelAntispam
                 | Self::ChannelBanList
                 | Self::ChannelMuteList
+                | Self::ChannelUnban
+                | Self::ChannelUnmute
+                | Self::ChannelInfo
                 | Self::ShowIp
                 | Self::RefreshIp
         )
@@ -298,6 +309,26 @@ pub enum AdminReply {
     ChannelMuteList {
         entries: Vec<ChannelMuteEntry>,
     },
+    ChannelUnban {
+        channel: String,
+        username: String,
+    },
+    ChannelUnmute {
+        channel: String,
+        username: String,
+    },
+    ChannelInfo {
+        channel: String,
+        // `rename_all` on an internally tagged enum (`tag = "shape"`) only
+        // renames the tag value, never a struct variant's own field names
+        // (a serde nuance: ShowIp's four fields and CreateBotAccount's
+        // `from_username` have the same latent bug, filed as a follow-up
+        // rather than fixed here). Named explicitly so this one is right.
+        #[serde(rename = "historyOn")]
+        history_on: bool,
+        #[serde(rename = "antispamOn")]
+        antispam_on: bool,
+    },
     ShowIp {
         online_ip: String,
         /// `None` when the server looks the address up itself.
@@ -487,6 +518,44 @@ impl AdminCollector {
                 }
                 collect(entries, channel_mute_entry_from(trimmed))
             }
+            (AdminShape::ChannelUnban, _, Some(rest)) => {
+                match rest
+                    .strip_prefix('<')
+                    .and_then(|t| t.strip_suffix("> unbanned"))
+                {
+                    Some(name) => Heard::Finished(AdminReply::ChannelUnban {
+                        channel: channel(),
+                        username: name.to_string(),
+                    }),
+                    None => Heard::NotOurs,
+                }
+            }
+            (AdminShape::ChannelUnmute, _, Some(rest)) => {
+                match rest
+                    .strip_prefix("unmuted <")
+                    .and_then(|t| t.strip_suffix('>'))
+                {
+                    Some(name) => Heard::Finished(AdminReply::ChannelUnmute {
+                        channel: channel(),
+                        username: name.to_string(),
+                    }),
+                    None => Heard::NotOurs,
+                }
+            }
+            (AdminShape::ChannelInfo, _, _) => {
+                let prefix = format!("#{chan} info: ");
+                match trimmed
+                    .strip_prefix(prefix.as_str())
+                    .and_then(channel_info_from)
+                {
+                    Some((history_on, antispam_on)) => Heard::Finished(AdminReply::ChannelInfo {
+                        channel: channel(),
+                        history_on,
+                        antispam_on,
+                    }),
+                    None => Heard::NotOurs,
+                }
+            }
             (AdminShape::ShowIp, Progress::Waiting, _) => {
                 match address_line(trimmed, "Server online IP: ") {
                     Some((ip, pinned)) => {
@@ -600,6 +669,21 @@ impl AdminCollector {
             }
             AdminShape::ChannelBanList | AdminShape::ChannelMuteList => {
                 rest == "You do not have permission to execute this command"
+            }
+            AdminShape::ChannelUnban => {
+                rest == "You do not have permission to unban users from this channel"
+                    || rest == "You must specify a user to unban from the channel"
+                    || (rest.starts_with("User <") && rest.ends_with("> not found on the bridge"))
+                    || (rest.starts_with("User <")
+                        && rest.ends_with("> not found in bridged banlist"))
+                    || (rest.starts_with("User '") && rest.ends_with("' does not exist"))
+                    || (rest.starts_with("User <") && rest.ends_with("> not found in banlist"))
+            }
+            AdminShape::ChannelUnmute => {
+                rest == "You do not have permission to unmute users in this channel"
+                    || rest == "You must specify a user to unmute"
+                    || rest == "For bridged users, use !ban/!unban"
+                    || (rest.starts_with("User <") && rest.ends_with("> not found in mutelist"))
             }
             _ => false,
         };
@@ -792,6 +876,22 @@ fn channel_mute_entry_from(text: &str) -> Option<ChannelMuteEntry> {
         ends,
         issuer,
     })
+}
+
+/// ChanServ's `:info <chan>` reply, once its `#<chan> info: ` prefix is
+/// stripped: `"%s. %s. %s. %s. %s. %s."` (founder, operator list, user
+/// counts, antispam, history, last used), from `ChanServ.py`'s `info`
+/// handler. Only the antispam and history sentences are read. The rest are
+/// for a person to read, not parsed here.
+fn channel_info_from(rest: &str) -> Option<(bool, bool)> {
+    let antispam_on = rest.contains("Anti-spam protection is on");
+    let antispam_off = rest.contains("Anti-spam protection is off");
+    let history_on = rest.contains("Channel history is on");
+    let history_off = rest.contains("Channel history is off");
+    if antispam_on == antispam_off || history_on == history_off {
+        return None;
+    }
+    Some((history_on, antispam_on))
 }
 
 /// A ChanServ list line's `<head> :: ends <when> (<issuer>)`, as its parts.
@@ -2068,6 +2168,130 @@ mod tests {
         );
     }
 
+    /// `:unban <chan> <nick>`, captured live against a local uberserver
+    /// (issue #2923). Success is `#<chan>: <nick> unbanned`, the same
+    /// whether the target was a native or bridged account.
+    #[test]
+    fn a_channel_unban_is_one_line() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelUnban,
+                Some("test2923"),
+                &["#test2923: <cbplayer2> unbanned"],
+            ),
+            vec![Heard::Finished(AdminReply::ChannelUnban {
+                channel: "test2923".into(),
+                username: "cbplayer2".into(),
+            })]
+        );
+    }
+
+    /// The refusals `:unban` can give, captured live except for the
+    /// permission one, which needs a non-mod account to trigger and is taken
+    /// verbatim from `ChanServ.py` instead.
+    #[test]
+    fn a_channel_unban_refusal_is_read() {
+        for line in [
+            "#test2923: You do not have permission to unban users from this channel",
+            "#test2923: You must specify a user to unban from the channel",
+            "#test2923: User <cbplayer2> not found in banlist",
+            "#test2923: User 'nosuchuser' does not exist",
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::ChannelUnban, Some("test2923"), &[line]),
+                vec![refused(line)],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `:unmute <chan> <nick>`, captured live. Success is `#<chan>: unmuted
+    /// <nick>`, the word order swapped from `:unban`'s.
+    #[test]
+    fn a_channel_unmute_is_one_line() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelUnmute,
+                Some("test2923"),
+                &["#test2923: unmuted <cbplayer2>"],
+            ),
+            vec![Heard::Finished(AdminReply::ChannelUnmute {
+                channel: "test2923".into(),
+                username: "cbplayer2".into(),
+            })]
+        );
+    }
+
+    /// The refusals `:unmute` can give, captured live except for the
+    /// permission one.
+    #[test]
+    fn a_channel_unmute_refusal_is_read() {
+        for line in [
+            "#test2923: You do not have permission to unmute users in this channel",
+            "#test2923: You must specify a user to unmute",
+            "#test2923: User <cbplayer2> not found in mutelist",
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::ChannelUnmute, Some("test2923"), &[line]),
+                vec![refused(line)],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `:info <chan>`, captured live. Only the antispam and history
+    /// sentences are read. The founder, operator list, user counts and
+    /// last-used date are shown for a person, but this collector has no use
+    /// for them.
+    #[test]
+    fn a_channel_info_reads_antispam_and_history() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelInfo,
+                Some("test2923"),
+                &[
+                    "#test2923 info: Founder is <cbmod>. Operator list is empty. \
+                     Currently contains 2 users and 0 bridged users. Anti-spam \
+                     protection is off. Channel history is off. Last used on \
+                     Sep 17, 2026."
+                ],
+            ),
+            vec![Heard::Finished(AdminReply::ChannelInfo {
+                channel: "test2923".into(),
+                history_on: false,
+                antispam_on: false,
+            })]
+        );
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelInfo,
+                Some("test2923"),
+                &[
+                    "#test2923 info: Founder is <cbmod>. Operator list is empty. \
+                     Currently contains 2 users and 0 bridged users. Anti-spam \
+                     protection is on. Channel history is on. Last used on \
+                     Sep 17, 2026."
+                ],
+            ),
+            vec![Heard::Finished(AdminReply::ChannelInfo {
+                channel: "test2923".into(),
+                history_on: true,
+                antispam_on: true,
+            })]
+        );
+    }
+
+    /// `:info` on an unknown channel gives the same generic refusal every
+    /// other channel command does, captured live.
+    #[test]
+    fn a_channel_info_refusal_is_the_generic_one() {
+        let line = "Channel 'nosuchchannel2923' does not exist";
+        assert_eq!(
+            hear_chanserv(AdminShape::ChannelInfo, Some("nosuchchannel2923"), &[line]),
+            vec![refused(line)]
+        );
+    }
+
     /// `:showip`, captured live with both overrides set. `none` is how
     /// `ChanServ.py` writes an unset override.
     #[test]
@@ -2239,6 +2463,9 @@ mod tests {
             AdminShape::ChannelAntispam,
             AdminShape::ChannelBanList,
             AdminShape::ChannelMuteList,
+            AdminShape::ChannelUnban,
+            AdminShape::ChannelUnmute,
+            AdminShape::ChannelInfo,
         ] {
             assert!(shape.is_chanserv(), "{shape:?}");
             assert!(shape.names_channel(), "{shape:?}");
@@ -2271,5 +2498,26 @@ mod tests {
             serde_json::from_str::<AdminShape>("\"ipSearch\"").unwrap(),
             AdminShape::IpSearch
         );
+    }
+
+    /// A field directly on an `AdminReply` variant needs its own
+    /// `#[serde(rename)]`: the enum's `rename_all` only renames the `shape`
+    /// tag value on an internally tagged enum, never a struct variant's own
+    /// field names. Caught live (issue #2923): the wire genuinely sent
+    /// `history_on`/`antispam_on`, not `historyOn`/`antispamOn`, so the
+    /// frontend read `undefined` and rendered both as off no matter the
+    /// channel's real setting.
+    #[test]
+    fn channel_info_fields_serialise_as_camel_case() {
+        let json = serde_json::to_value(AdminReply::ChannelInfo {
+            channel: "main".into(),
+            history_on: true,
+            antispam_on: false,
+        })
+        .unwrap();
+        assert_eq!(json["historyOn"], true);
+        assert_eq!(json["antispamOn"], false);
+        assert!(json.get("history_on").is_none());
+        assert!(json.get("antispam_on").is_none());
     }
 }

@@ -816,6 +816,9 @@ export const mpGetUserInfo = defineCommand<
  * - `channelAntispam`: `:antispam <chan> on|off`
  * - `channelBanList`: `:listbans <chan>`
  * - `channelMuteList`: `:listmutes <chan>`
+ * - `channelUnban`: `:unban <chan> <nick>`
+ * - `channelUnmute`: `:unmute <chan> <nick>`
+ * - `channelInfo`: `:info <chan>`
  * - `showIp`: `:showip`
  * - `refreshIp`: `:refreship`, answered twice, and waits up to 70 seconds
  *   for the second line
@@ -840,6 +843,9 @@ export type AdminShape =
   | "channelAntispam"
   | "channelBanList"
   | "channelMuteList"
+  | "channelUnban"
+  | "channelUnmute"
+  | "channelInfo"
   | "showIp"
   | "refreshIp";
 
@@ -948,6 +954,14 @@ export type AdminReply =
   | { shape: "channelAntispam"; channel: string; on: boolean }
   | { shape: "channelBanList"; entries: ChannelBanEntry[] }
   | { shape: "channelMuteList"; entries: ChannelMuteEntry[] }
+  | { shape: "channelUnban"; channel: string; username: string }
+  | { shape: "channelUnmute"; channel: string; username: string }
+  | {
+      shape: "channelInfo";
+      channel: string;
+      historyOn: boolean;
+      antispamOn: boolean;
+    }
   | {
       shape: "showIp";
       onlineIp: string;
