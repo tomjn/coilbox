@@ -16,7 +16,7 @@ import {
   within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AdminOutcome, AdminReply } from "../bindings";
 
@@ -72,18 +72,23 @@ const ONE_BAN = {
   issuer: "Moderator",
 };
 
+/** The forms open on demand in a drawer (issue #2918), so each helper
+ * presses the header button that opens its form first. */
+function opened(button: string, group: string) {
+  fireEvent.click(screen.getByRole("button", { name: button }));
+  return screen.getByRole("group", { name: group });
+}
+
 function banFieldset() {
-  return screen.getByRole("group", { name: "Ban an account" });
+  return opened("Ban an account…", "Ban an account");
 }
 
 function banSpecificFieldset() {
-  return screen.getByRole("group", {
-    name: "Ban a specific username, IP or email",
-  });
+  return opened("Ban IP or email…", "Ban a specific username, IP or email");
 }
 
 function unbanFieldset() {
-  return screen.getByRole("group", { name: "Lift a ban" });
+  return opened("Lift a ban…", "Lift a ban");
 }
 
 describe("loading the ban list", () => {
@@ -327,13 +332,59 @@ describe("lifting a ban", () => {
   });
 });
 
+describe("a row's Lift action", () => {
+  it("opens the unban form filled with that row's name", async () => {
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({ shape: "banList", entries: [ONE_BAN] }),
+    );
+    draw();
+    await screen.findByText("Spammer");
+    expect(screen.queryByRole("group", { name: "Lift a ban" })).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Lift ban on Spammer…" }),
+    );
+    const form = screen.getByRole("group", { name: "Lift a ban" });
+    expect(
+      within(form).getByLabelText("Username, IP or email to unban"),
+    ).toHaveProperty("value", "Spammer");
+  });
+
+  it("falls back to the IP for a ban with no account", async () => {
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({ shape: "banList", entries: [{ ...ONE_BAN, username: null }] }),
+    );
+    draw();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Lift ban on 203.0.113.7…" }),
+    );
+    expect(
+      screen.getByLabelText("Username, IP or email to unban"),
+    ).toHaveProperty("value", "203.0.113.7");
+  });
+});
+
+function SearchProbe() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
+
 describe("the name from the player lookup's Ban action", () => {
-  it("prefills the ban form's username from ?ban= and clears the param", () => {
+  it("opens the ban form filled from ?ban=, and swaps the param for ?tool=bans", () => {
     mpAdminCommand.mockResolvedValueOnce(
       answered({ shape: "banList", entries: [] }),
     );
-    draw("/admin?ban=Alice");
-    const form = banFieldset();
+    render(
+      <MemoryRouter initialEntries={["/admin?tool=players&ban=Alice"]}>
+        <BansSection serverKey={SERVER_KEY} />
+        <SearchProbe />
+      </MemoryRouter>,
+    );
+    const search = new URLSearchParams(
+      screen.getByTestId("search").textContent ?? "",
+    );
+    expect(search.has("ban")).toBe(false);
+    expect(search.get("tool")).toBe("bans");
+    const form = screen.getByRole("group", { name: "Ban an account" });
     expect(within(form).getByLabelText("Username")).toHaveProperty(
       "value",
       "Alice",

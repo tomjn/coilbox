@@ -2,6 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
+import { SlideDrawer } from "@/components/SlideDrawer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Table,
@@ -16,18 +17,32 @@ import type { BanEntry } from "../bindings";
 import { DaysField } from "../DaysField";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { useAdminRequest } from "./adminRequest";
+import { DrawerBody, ToolHeader } from "./ToolHeader";
+import { TOOL_PARAM } from "./toolNav";
 
 /** A field uberserver can write as Python's `None`. */
 function dash(value: string | null): string {
   return value ?? "-";
 }
 
-function BansTable({ entries }: { entries: BanEntry[] }) {
+/** What `UNBAN` should be given to lift a row: its username, or failing that
+ * its IP or email. */
+function unbanTarget(entry: BanEntry): string {
+  return entry.username ?? entry.ip ?? entry.email ?? "";
+}
+
+function BansTable({
+  entries,
+  onLift,
+}: {
+  entries: BanEntry[];
+  onLift: (target: string) => void;
+}) {
   if (entries.length === 0) {
     return <p className="text-sm text-muted-foreground">No one is banned.</p>;
   }
   return (
-    <Table>
+    <Table className="text-foreground">
       <TableHeader>
         <TableRow>
           <TableHead>Username</TableHead>
@@ -36,6 +51,9 @@ function BansTable({ entries }: { entries: BanEntry[] }) {
           <TableHead>Reason</TableHead>
           <TableHead>Ends</TableHead>
           <TableHead>Issuer</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -49,6 +67,18 @@ function BansTable({ entries }: { entries: BanEntry[] }) {
             <TableCell className="whitespace-normal">{entry.reason}</TableCell>
             <TableCell className="whitespace-normal">{entry.ends}</TableCell>
             <TableCell>{entry.issuer}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                aria-label={`Lift ban on ${unbanTarget(entry)}…`}
+                onClick={() => onLift(unbanTarget(entry))}
+              >
+                Lift…
+              </Button>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -86,10 +116,10 @@ function BanForm({
     name.trim() !== "" && days.trim() !== "" && reason.trim() !== "";
 
   return (
-    <fieldset className="flex flex-col gap-2 rounded border border-border p-3">
-      <legend className="px-1 text-sm font-medium">Ban an account</legend>
+    <fieldset className="flex flex-col gap-3">
+      <legend className="sr-only">Ban an account</legend>
       <form
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           if (!canSubmit) return;
@@ -160,12 +190,10 @@ function BanSpecificForm({
     target.trim() !== "" && days.trim() !== "" && reason.trim() !== "";
 
   return (
-    <fieldset className="flex flex-col gap-2 rounded border border-border p-3">
-      <legend className="px-1 text-sm font-medium">
-        Ban a specific username, IP or email
-      </legend>
+    <fieldset className="flex flex-col gap-3">
+      <legend className="sr-only">Ban a specific username, IP or email</legend>
       <form
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           if (!canSubmit) return;
@@ -226,20 +254,25 @@ function BanSpecificForm({
  */
 function UnbanForm({
   serverKey,
+  initialTarget,
   onChanged,
 }: {
   serverKey: string;
+  /** Filled from the row whose Lift action opened the form. */
+  initialTarget: string;
   onChanged: () => void;
 }) {
-  const [target, setTarget] = useState("");
+  const [target, setTarget] = useState(initialTarget);
   const unban = useAdminRequest(serverKey);
 
   return (
-    <fieldset className="flex flex-col gap-2 rounded border border-border p-3">
-      <legend className="px-1 text-sm font-medium">Lift a ban</legend>
+    <fieldset className="flex flex-col gap-3">
+      <legend className="sr-only">Lift a ban</legend>
       <Alert>
         <TriangleAlert />
-        <AlertTitle>Lifting by IP or email lifts every ban on it</AlertTitle>
+        <AlertTitle className="line-clamp-none">
+          Lifting by IP or email lifts every ban on it
+        </AlertTitle>
         <AlertDescription>
           Not only the row you had in mind. uberserver removes every ban
           matching the username, IP or email you give it.
@@ -284,30 +317,49 @@ function UnbanForm({
   );
 }
 
+/** Which form the drawer holds, if any. */
+type BansDrawer =
+  | { kind: "ban" }
+  | { kind: "banSpecific" }
+  | { kind: "unban"; target: string };
+
+const DRAWER_TITLES: Record<BansDrawer["kind"], string> = {
+  ban: "Ban an account",
+  banSpecific: "Ban a specific username, IP or email",
+  unban: "Lift a ban",
+};
+
 /**
- * The bans section of the Server admin page (issue #2778): `LISTBANS` as a
- * table, `BAN` and `BANSPECIFIC` forms to add one, and `UNBAN` to lift one,
- * refreshing the table after every change.
+ * The Bans tool of the Server admin page (issues #2778 and #2918): `LISTBANS`
+ * as the tool's main content, with `BAN` as its primary action, and
+ * `BANSPECIFIC` and `UNBAN` as secondary ones. Each form opens on demand in a
+ * drawer, and the table refreshes after every change. Each row has its own
+ * Lift action, which opens `UNBAN` filled with that row's name.
  *
- * The player lookup section's Ban action hands off the account's name
- * through `?ban=`, the same URL-as-shared-state pattern `useServerAdminKey`
- * uses for `?server=` and `PlayerLookupSection` for `?player=`. The param is
- * consumed once (copied into the form, then removed) rather than kept,
- * since unlike `?player=` there is nothing useful to reload it into.
+ * The player lookup's Ban action hands off the account's name through
+ * `?ban=`, the same URL-as-shared-state pattern `useServerAdminKey` uses for
+ * `?server=` and `PlayerLookupSection` for `?player=`. The param is consumed
+ * once: copied into the ban form, which opens, then removed, with `?tool=`
+ * pinned to this tool so the page stays here once `?ban=` is gone.
  */
 export function BansSection({ serverKey }: { serverKey: string }) {
   const [params, setParams] = useSearchParams();
   const banParam = params.get("ban");
   const [banTarget, setBanTarget] = useState(banParam ?? "");
+  const [drawer, setDrawer] = useState<BansDrawer | null>(
+    banParam ? { kind: "ban" } : null,
+  );
   const list = useAdminRequest(serverKey);
 
   useEffect(() => {
     if (!banParam) return;
     setBanTarget(banParam);
+    setDrawer({ kind: "ban" });
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         next.delete("ban");
+        next.set(TOOL_PARAM, "bans");
         return next;
       },
       { replace: true },
@@ -328,24 +380,81 @@ export function BansSection({ serverKey }: { serverKey: string }) {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-base font-semibold">Bans</h2>
-      <p className="text-sm text-muted-foreground">
-        There is no command to change a ban's reason or length. Lift it and ban
-        again instead.
-      </p>
+      <ToolHeader
+        title="Bans"
+        description="There is no command to change a ban's reason or length. Lift it and ban again instead."
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setDrawer({ kind: "banSpecific" })}
+            >
+              Ban IP or email…
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setDrawer({ kind: "unban", target: "" })}
+            >
+              Lift a ban…
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8"
+              onClick={() => {
+                setBanTarget("");
+                setDrawer({ kind: "ban" });
+              }}
+            >
+              Ban an account…
+            </Button>
+          </>
+        }
+      />
       <AdminRequestStatus
         state={list.state}
         unanswered="The server did not answer."
       >
         {(reply) =>
           reply.shape === "banList" ? (
-            <BansTable entries={reply.entries} />
+            <BansTable
+              entries={reply.entries}
+              onLift={(target) => setDrawer({ kind: "unban", target })}
+            />
           ) : null
         }
       </AdminRequestStatus>
-      <BanForm serverKey={serverKey} username={banTarget} onChanged={refresh} />
-      <BanSpecificForm serverKey={serverKey} onChanged={refresh} />
-      <UnbanForm serverKey={serverKey} onChanged={refresh} />
+      <SlideDrawer
+        open={drawer !== null}
+        title={drawer ? DRAWER_TITLES[drawer.kind] : ""}
+        onClose={() => setDrawer(null)}
+      >
+        <DrawerBody>
+          {drawer?.kind === "ban" && (
+            <BanForm
+              serverKey={serverKey}
+              username={banTarget}
+              onChanged={refresh}
+            />
+          )}
+          {drawer?.kind === "banSpecific" && (
+            <BanSpecificForm serverKey={serverKey} onChanged={refresh} />
+          )}
+          {drawer?.kind === "unban" && (
+            <UnbanForm
+              serverKey={serverKey}
+              initialTarget={drawer.target}
+              onChanged={refresh}
+            />
+          )}
+        </DrawerBody>
+      </SlideDrawer>
     </section>
   );
 }

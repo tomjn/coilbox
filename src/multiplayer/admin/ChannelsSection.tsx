@@ -24,6 +24,7 @@ import { chanServChannel } from "../moderation";
 import { useConnection } from "../store";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { useAdminRequest } from "./adminRequest";
+import { ToolGroup, ToolHeader } from "./ToolHeader";
 
 /** Battle rooms are channels too, but ChanServ is not for them. */
 const BATTLE_ROOM = "__battle__";
@@ -164,18 +165,45 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
     void list.send(command, [channel], shape);
   };
 
+  const onOff = (label: string, command: string, shape: AdminShape) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-20 text-sm">{label}</span>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8"
+        disabled={none}
+        onClick={() => change(command, ["on"], shape)}
+      >
+        {label} on
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8"
+        disabled={none}
+        onClick={() => change(command, ["off"], shape)}
+      >
+        {label} off
+      </Button>
+    </div>
+  );
+
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-base font-semibold">Channels</h2>
-      <div className="flex flex-col gap-2 rounded border border-border p-3">
-        <span className="flex flex-col gap-1 text-xs text-muted-foreground">
+    <section className="flex flex-col gap-6">
+      <ToolHeader
+        title="Channels"
+        description="ChanServ's tools for one channel. Timed channel bans and mutes are in the chat member menu."
+      />
+
+      <div className="flex max-w-md flex-col gap-2">
+        <span className="flex flex-col gap-1 text-sm font-medium">
           Channel
           <Input
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
             placeholder="main"
             aria-label="Channel"
-            className="h-8"
             {...identifierFieldProps}
           />
         </span>
@@ -196,100 +224,10 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
         )}
       </div>
 
-      <div className="flex flex-col gap-2 rounded border border-border p-3">
-        <h3 className="text-sm font-medium">Registration</h3>
-        <p className="text-xs text-muted-foreground">
-          A registered channel has a founder, and ChanServ keeps its operators,
-          bans, mutes and settings. Someone has to be in the channel to register
-          it.
-        </p>
-        <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Founder (optional, defaults to you)
-          <Input
-            value={founder}
-            onChange={(event) => setFounder(event.target.value)}
-            aria-label="Founder"
-            className="h-8"
-            {...identifierFieldProps}
-          />
-        </span>
+      <ToolGroup title="Bans and mutes">
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            className="h-8"
-            disabled={none}
-            onClick={() => {
-              const name = founder.trim();
-              change("register", name ? [name] : [], "registerChannel");
-            }}
-          >
-            Register
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8"
-            disabled={none}
-            onClick={() => change("unregister", [], "unregisterChannel")}
-          >
-            Unregister
-          </Button>
-        </div>
-
-        <h3 className="mt-2 text-sm font-medium">Settings</h3>
-        <p className="text-xs text-muted-foreground">
-          With history on, the server stores the channel's messages and deletes
-          them after 14 days.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8"
-            disabled={none}
-            onClick={() => change("history", ["on"], "channelHistory")}
-          >
-            History on
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8"
-            disabled={none}
-            onClick={() => change("history", ["off"], "channelHistory")}
-          >
-            History off
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8"
-            disabled={none}
-            onClick={() => change("antispam", ["on"], "channelAntispam")}
-          >
-            Antispam on
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8"
-            disabled={none}
-            onClick={() => change("antispam", ["off"], "channelAntispam")}
-          >
-            Antispam off
-          </Button>
-        </div>
-        <AdminRequestStatus state={setting.state}>
-          {(reply) => settingText(reply)}
-        </AdminRequestStatus>
-      </div>
-
-      <div className="flex flex-col gap-2 rounded border border-border p-3">
-        <h3 className="text-sm font-medium">Bans and mutes</h3>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
             className="h-8"
             disabled={none}
             onClick={() => show("listbans", "channelBanList")}
@@ -309,7 +247,51 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
         <AdminRequestStatus state={list.state}>
           {(reply) => listView(reply, listed)}
         </AdminRequestStatus>
-      </div>
+      </ToolGroup>
+
+      <ToolGroup
+        title="Registration and settings"
+        description="A registered channel has a founder, and ChanServ keeps its operators, bans, mutes and settings. Someone has to be in the channel to register it. With history on, the server stores the channel's messages and deletes them after 14 days."
+      >
+        <div className="flex max-w-md flex-wrap items-end gap-2">
+          <span className="flex min-w-40 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+            Founder (optional, defaults to you)
+            <Input
+              value={founder}
+              onChange={(event) => setFounder(event.target.value)}
+              aria-label="Founder"
+              className="h-8"
+              {...identifierFieldProps}
+            />
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            disabled={none}
+            onClick={() => {
+              const name = founder.trim();
+              change("register", name ? [name] : [], "registerChannel");
+            }}
+          >
+            Register
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            disabled={none}
+            onClick={() => change("unregister", [], "unregisterChannel")}
+          >
+            Unregister
+          </Button>
+        </div>
+        {onOff("History", "history", "channelHistory")}
+        {onOff("Antispam", "antispam", "channelAntispam")}
+        <AdminRequestStatus state={setting.state}>
+          {(reply) => settingText(reply)}
+        </AdminRequestStatus>
+      </ToolGroup>
     </section>
   );
 }
