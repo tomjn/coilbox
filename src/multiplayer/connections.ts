@@ -61,6 +61,22 @@ export interface ConnectionState {
 /** Every connection the provider holds, by server key. */
 export type Connections = Readonly<Record<string, ConnectionState>>;
 
+/**
+ * The key of another live connection, once `excludeKey` is done with, or null
+ * when none of the survivors are live. Used to refocus the provider's single-
+ * connection fields onto a connection that is still usable, rather than onto
+ * nothing, when the one in focus is disconnected or drops (issue #2894).
+ */
+export function anotherLiveKey(
+  connections: Connections,
+  excludeKey: string | null,
+): string | null {
+  for (const entry of Object.values(connections)) {
+    if (entry.serverKey !== excludeKey && entry.live) return entry.serverKey;
+  }
+  return null;
+}
+
 export type ConnectionAction =
   /** Make an entry for a connection, keeping one that already exists. */
   | { type: "open"; serverKey: string }
