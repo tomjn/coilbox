@@ -16,6 +16,10 @@
 
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+} from "../lib/storedSetting";
 import type { LobbyServer } from "../lobby-servers/config";
 import type { LobbyEvent, LobbyState } from "./bindings";
 
@@ -163,6 +167,10 @@ async function mountWithTwoEntries() {
 }
 
 beforeEach(() => {
+  // `useSetting` is mocked as plain `useState` here, so nothing ever writes
+  // through to this. It only has to exist: `seedJoinedChannels` reads through
+  // it before seeding a first connect's auto-join channels (issue #2920).
+  installSettingsStorage(memorySettingsStorage());
   wire.channels.clear();
   wire.closed.length = 0;
 });

@@ -22,6 +22,10 @@ import {
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+} from "../../lib/storedSetting";
 import type { Battle, LobbyEvent, LobbyState } from "../bindings";
 
 interface FakeChannel {
@@ -264,6 +268,9 @@ async function openPage(state?: unknown) {
 }
 
 beforeEach(() => {
+  // `seedJoinedChannels` reads through the storage singleton before seeding a
+  // first connect's auto-join channels (issue #2920).
+  installSettingsStorage(memorySettingsStorage());
   wire.channels.clear();
   wire.states.clear();
   wire.calls.length = 0;

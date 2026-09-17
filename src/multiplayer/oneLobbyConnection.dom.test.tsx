@@ -19,6 +19,10 @@
 
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+} from "../lib/storedSetting";
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import type { LobbyEvent, LobbyState } from "./bindings";
 
@@ -273,6 +277,10 @@ async function roomBesideLobby() {
 }
 
 beforeEach(() => {
+  // `seedJoinedChannels` reads through the storage singleton before seeding a
+  // first connect's auto-join channels (issue #2920), so it needs one
+  // installed even though `wire.settings` is this file's own settings mock.
+  installSettingsStorage(memorySettingsStorage());
   wire.channels.clear();
   wire.opened.length = 0;
   wire.notified.length = 0;
@@ -472,6 +480,9 @@ describe("a room beside lobby logins (issue #2850)", () => {
     expect(store.activeKey).toBe(TECHA_KEY);
     // The fields read off the focused connection describe the login too.
     expect(store.mirror).toBe(store.connections[TECHA_KEY].mirror);
+    // Every login above auto-joined `main` on first connect (issue #2920).
+    // Clear those before the join this test is actually about.
+    wire.joins.length = 0;
     await act(async () => {
       await store.requestJoinChannel("main");
     });
