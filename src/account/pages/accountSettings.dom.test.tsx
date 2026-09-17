@@ -114,6 +114,7 @@ vi.mock("../../multiplayer/store", () => ({
   useConnection: (key: string | null) =>
     key ? (connections[key] ?? null) : null,
   useProtocolServers: () => servers,
+  usernameFromKey: (key: string) => key.split("@")[0],
   liveConnectionKeys: (
     conns: Record<string, ConnEntry>,
     focusKey: string | null,
@@ -125,12 +126,14 @@ vi.mock("../../multiplayer/store", () => ({
 }));
 
 let lastLogin: LastLogin | null = null;
+let accounts: { id: string; serverId: string; username: string }[] = [];
 vi.mock("../../lobby-servers/config", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../lobby-servers/config")>();
   return {
     ...actual,
     useLastLogin: () => [lastLogin, vi.fn()],
+    useLobbyAccounts: () => [{ accounts }, vi.fn()],
   };
 });
 
@@ -145,6 +148,7 @@ beforeEach(() => {
   mp.openLoginPopover.mockClear();
   lsStoreCredential.mockClear();
   lastLogin = null;
+  accounts = [];
   connections = {};
   activeKey = null;
   servers = [];
@@ -176,6 +180,7 @@ function renderPage({
     connections = { [key]: connectionFor(myUsername, accountEmail) };
     activeKey = key;
     lastLogin = { serverId: SERVER.id, username: myUsername };
+    accounts = [{ id: "a", serverId: SERVER.id, username: myUsername }];
   } else {
     connections = {};
     activeKey = null;
@@ -192,6 +197,10 @@ function renderTwoAccounts() {
     [keyFor("bob")]: connectionFor("bob", "bob@example.com"),
   };
   activeKey = keyFor("alice");
+  accounts = [
+    { id: "a", serverId: SERVER.id, username: "alice" },
+    { id: "b", serverId: SERVER.id, username: "bob" },
+  ];
   render(<AccountSettings />);
 }
 
@@ -480,6 +489,32 @@ it("changes the password on the picked account, not the focused one", async () =
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() =>
     expect(mp.changePassword).toHaveBeenCalledWith("old", "new", keyFor("bob")),
+  );
+});
+
+/**
+ * `lastLogin` names whichever of two connections connected most recently,
+ * not necessarily the one being edited (issue #2846). The keychain write
+ * must follow the picked account, not that global marker, which is why this
+ * test leaves `lastLogin` unset entirely.
+ */
+it("saves the changed password under the picked account's own login even when it is not lastLogin", async () => {
+  renderTwoAccounts();
+  mp.changePassword.mockResolvedValue({
+    message: "Password changed successfully.",
+    succeeded: true,
+  });
+  fireEvent.click(screen.getByText(`pick ${keyFor("bob")}`));
+  fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+  typeInto(screen.getByLabelText("Current password"), "old");
+  typeInto(screen.getByLabelText("New password"), "new");
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(lsStoreCredential).toHaveBeenCalledWith({
+      serverId: SERVER.id,
+      username: "bob",
+      secret: "new",
+    }),
   );
 });
 

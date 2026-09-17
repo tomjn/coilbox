@@ -3,7 +3,12 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
 import { SlideDrawer } from "@/components/SlideDrawer";
 import { lsStoreCredential } from "../../lobby-servers/bindings";
-import { useLastLogin } from "../../lobby-servers/config";
+import {
+  type LobbyAccount,
+  type LobbyServer,
+  useLastLogin,
+  useLobbyAccounts,
+} from "../../lobby-servers/config";
 import { AccountPicker } from "../../multiplayer/AccountPicker";
 import { protocolForKey } from "../../multiplayer/protocol";
 import {
@@ -11,6 +16,7 @@ import {
   useConnection,
   useMultiplayer,
   useProtocolServers,
+  usernameFromKey,
 } from "../../multiplayer/store";
 
 const H2_CLASS =
@@ -197,16 +203,39 @@ function AccountActions({
 }
 
 /**
+ * The saved login the given connection's own key names, or undefined when it
+ * doesn't match one (e.g. a login typed and connected but never saved). Used
+ * to find which keychain entry a successful password change should update -
+ * derived from the connection being edited rather than from `lastLogin`
+ * (issue #2846: with two connections open, `lastLogin` names whichever
+ * connected most recently, not necessarily the one this form is for).
+ */
+function accountForKey(
+  serverKey: string,
+  servers: LobbyServer[],
+  accounts: LobbyAccount[],
+): LobbyAccount | undefined {
+  const server = servers.find((s) =>
+    serverKey.endsWith(`@${s.host}:${s.port}`),
+  );
+  if (!server) return undefined;
+  const username = usernameFromKey(serverKey);
+  return accounts.find(
+    (a) => a.serverId === server.id && a.username === username,
+  );
+}
+
+/**
  * Current + new password, submitted to `changePassword`. `CHANGEPASSWORD` has no
  * accept/deny reply of its own, only a bare `SERVERMSG`, so whatever the server
  * says is shown verbatim rather than interpreted. The saved keychain entry is
  * only touched when `succeeded` is true and the drawer can tell which saved
- * login this session came from (`lastLogin`, written on every successful
- * connect). A stale saved password is fixed by retyping it, but one
- * overwritten on a change that did not happen locks the user out of their own
- * saved login. A change that succeeded but whose keychain write then fails is
- * a third case: the server-side password is now correct and the saved one is
- * wrong, so that failure is surfaced rather than swallowed (see `submit`).
+ * login this connection is (`accountForKey`, matched against `serverKey`). A
+ * stale saved password is fixed by retyping it, but one overwritten on a
+ * change that did not happen locks the user out of their own saved login. A
+ * change that succeeded but whose keychain write then fails is a third case:
+ * the server-side password is now correct and the saved one is wrong, so
+ * that failure is surfaced rather than swallowed (see `submit`).
  */
 function ChangePasswordDrawer({
   open,
@@ -239,8 +268,8 @@ function ChangePasswordForm({
   onClose: () => void;
 }) {
   const { changePassword } = useMultiplayer();
-  const mirror = useConnection(serverKey)?.mirror;
-  const [lastLogin] = useLastLogin();
+  const servers = useProtocolServers();
+  const [accountsCfg] = useLobbyAccounts();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -258,15 +287,14 @@ function ChangePasswordForm({
       const result = await changePassword(current, next, serverKey);
       setMessage(result.message);
       setSucceeded(result.succeeded);
-      if (
-        result.succeeded &&
-        lastLogin &&
-        lastLogin.username === mirror?.state?.myUsername
-      ) {
+      const account = result.succeeded
+        ? accountForKey(serverKey, servers, accountsCfg.accounts)
+        : undefined;
+      if (account) {
         try {
           await lsStoreCredential({
-            serverId: lastLogin.serverId,
-            username: lastLogin.username,
+            serverId: account.serverId,
+            username: account.username,
             secret: next,
           });
         } catch {
