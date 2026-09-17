@@ -19,7 +19,6 @@ import {
   BUILTIN_SERVERS,
   type LobbyProtocol,
   type LobbyServer,
-  profileOfficialServer,
   serverProtocol,
   tachyonBaseUrl,
   tlsModeFor,
@@ -38,7 +37,6 @@ import {
   type Delta,
   type LobbyEvent,
   type LobbyState,
-  type LoginPhase,
   mpActiveKeys,
   mpCancelConnect,
   mpChangeEmail,
@@ -49,12 +47,7 @@ import {
   mpConnectTachyon,
   mpConnectZerok,
   mpDisconnect,
-  mpFriendList,
-  mpFriendRequestList,
   mpGetUserInfo,
-  mpIgnore,
-  mpIgnoreList,
-  mpJoinBattle,
   mpJoinChannel,
   mpReattach,
   mpRecoverPassword,
@@ -67,14 +60,12 @@ import {
   mpTachyonSignIn,
   mpWaitUntilReady,
 } from "./bindings";
+import { ConnectionSession } from "./ConnectionSession";
 import {
   forgetJoinedChannel,
-  normalizeChannelList,
-  profileDefaultChannels,
   rememberJoinedChannel,
   useJoinedChannels,
 } from "./channels";
-import { backfilledCounts, conversationCounts } from "./chat/conversation";
 import {
   HIGHLIGHT_OWN_KEY,
   HIGHLIGHT_SOUND_KEY,
@@ -88,17 +79,33 @@ import {
   newZerokInstallId,
   ZEROK_INSTALL_ID_KEY,
 } from "./clientId";
+import {
+  type AccountInfo,
+  type ConnectionRuntime,
+  type ConnectionState,
+  type Connections,
+  connectionsReducer,
+  newRuntime,
+} from "./connections";
 import { DebriefingDrawer } from "./DebriefingDrawer";
-import { favouritesFor, useFavourites } from "./friends";
-import { addIgnore, ignoredFor, useIgnored } from "./ignore";
+import { useFavourites } from "./friends";
+import { useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
 import { MatchFoundPanel } from "./MatchFoundPanel";
-import { autoJoinsChannels, protocolForKey, syncsOnReady } from "./protocol";
+import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
+import { protocolForKey } from "./protocol";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
-import { newScriptPassword } from "./scriptPassword";
-import { useAwayStatus } from "./useAwayStatus";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
+
+export type { AccountInfo, ConnectionState, Connections } from "./connections";
+export {
+  initialMirror,
+  type LobbyMirror,
+  type MirrorAction,
+  mirrorReducer,
+  serverMessagesSince,
+} from "./mirror";
 
 /**
  * The connection key for a server: `username@host:port`. Shared by the store and
@@ -210,7 +217,7 @@ export const CHANGE_PASSWORD_SUCCESS = "Password changed successfully.";
  * and after the promise has already settled.
  */
 function waitForAccountDelta(
-  waiters: { current: Set<(d: Delta) => void> },
+  waiters: Set<(d: Delta) => void>,
   acceptKind: Delta["kind"],
   denyKind: Delta["kind"],
 ): { promise: Promise<void>; cleanup: () => void } {
@@ -218,7 +225,7 @@ function waitForAccountDelta(
   let timer: ReturnType<typeof setTimeout>;
   const cleanup = () => {
     clearTimeout(timer);
-    waiters.current.delete(waiter);
+    waiters.delete(waiter);
   };
   const promise = new Promise<void>((resolve, reject) => {
     timer = setTimeout(() => {
@@ -234,7 +241,7 @@ function waitForAccountDelta(
         resolve();
       }
     };
-    waiters.current.add(waiter);
+    waiters.add(waiter);
   });
   return { promise, cleanup };
 }
@@ -277,234 +284,6 @@ async function needsSignIn(
 }
 
 /**
- * A per-connection mirror of the Rust-side lobby state. The Rust plugin owns the
- * authoritative parse; this mirror is refreshed wholesale from `mpSnapshot` on each
- * `delta` event (correctness over incremental cleverness) while `phase` and
- * `console` are driven directly off the event stream.
- */
-export interface LobbyMirror {
-  connected: boolean;
-  phase: LoginPhase | null;
-  state: LobbyState | null;
-  consoleLines: string[];
-  error: string | null;
-  /** Reason from the last failed JOINBATTLE/OPENBATTLE, cleared on next attempt. */
-  lastJoinError: string | null;
-  /**
-   * Reason from the last rejected LOGIN (`DENIED`), for a precise inline error on
-   * the login form ("Login failed: …"). Set from the `loginDenied` delta, which
-   * arrives just before the connection's `disconnected` teardown, and deliberately
-   * preserved across that `disconnected` so the inline message survives it. Cleared
-   * on the next connect attempt (`connecting` resets the whole mirror).
-   */
-  loginError: string | null;
-  /**
-   * Monotonic count of `ENDOFCHANNELS` completions (the `channelListReceived`
-   * delta). The channel-list stream emits no per-row delta, so this is the only
-   * observable "directory finished loading" signal — the browser drawer watches
-   * it advance to end its loading state, honestly, even for an empty directory.
-   */
-  channelListReceivedSeq: number;
-  /**
-   * The server's confirmed ignore list from the last `IGNORELIST` (the
-   * `serverIgnoreList` delta), plus a monotonic count of how many have arrived.
-   * The reconcile effect watches the seq advance and reads this payload directly
-   * (rather than the async snapshot) so it can't race an in-flight snapshot fetch.
-   */
-  serverIgnoreList: string[];
-  serverIgnoreListSeq: number;
-  /**
-   * The last few `SERVERMSG` announcements, plus a running total of how many
-   * have ever arrived. Both, because a caller wants "what did the server say
-   * while I was doing that", and a count taken before an action is the only way
-   * to ask it: the list is capped, so an index into it is not stable.
-   *
-   * Kept for the tweak-slot delivery run (issue #1279), which sends lines big
-   * enough for a server to refuse. Uberserver names its own limit when it drops
-   * an over-long command, and quoting that beats reporting a timeout. The toast
-   * these also raise is transient by design and gone by the time anyone reads a
-   * failure report.
-   */
-  serverMessages: string[];
-  serverMessageCount: number;
-  /**
-   * Monotonic count of `battleStarting` events: a Tachyon server telling us
-   * where the match is. There is no state behind it, because the connection has
-   * already promised the server we will be there, so the room watches this
-   * advance and launches.
-   */
-  battleStartSeq: number;
-}
-
-const CONSOLE_CAP = 500;
-
-/** How many server announcements to keep. Enough to cover one slot's flight in
- *  a delivery run, which is the only thing that reads them back. */
-const SERVER_MESSAGE_CAP = 20;
-
-/**
- * The announcements that arrived after a running total was taken.
- *
- * The kept list is capped and the total is not, so the answer is the last
- * `total - since` of it. Clamped to what is still there, because a burst longer
- * than the cap has already thrown some away and reporting the wrong ones would
- * be worse than reporting fewer.
- */
-export function serverMessagesSince(
-  m: Pick<LobbyMirror, "serverMessages" | "serverMessageCount">,
-  since: number,
-): string[] {
-  const wanted = Math.max(0, m.serverMessageCount - since);
-  return wanted === 0 ? [] : m.serverMessages.slice(-wanted);
-}
-
-export const initialMirror: LobbyMirror = {
-  connected: false,
-  phase: null,
-  state: null,
-  consoleLines: [],
-  error: null,
-  lastJoinError: null,
-  loginError: null,
-  channelListReceivedSeq: 0,
-  serverIgnoreList: [],
-  serverIgnoreListSeq: 0,
-  serverMessages: [],
-  serverMessageCount: 0,
-  battleStartSeq: 0,
-};
-
-export type MirrorAction =
-  | { type: "connecting" }
-  | { type: "event"; ev: LobbyEvent }
-  | { type: "snapshot"; state: LobbyState }
-  | { type: "reset" }
-  | { type: "clearJoinError" };
-
-/**
- * Fold one action into the mirror. `delta` events are intentionally not applied
- * here — the provider re-fetches a snapshot and dispatches `snapshot` instead, so
- * the mirror never drifts from the authoritative state.
- */
-export function mirrorReducer(
-  m: LobbyMirror,
-  action: MirrorAction,
-): LobbyMirror {
-  switch (action.type) {
-    case "connecting":
-      return { ...initialMirror, connected: false };
-    case "snapshot":
-      return { ...m, state: action.state };
-    case "reset":
-      return initialMirror;
-    case "clearJoinError":
-      return { ...m, lastJoinError: null };
-    case "event": {
-      const ev = action.ev;
-      switch (ev.kind) {
-        case "connected":
-          return { ...m, connected: true, error: null };
-        case "phase":
-          return { ...m, phase: ev.phase };
-        case "console": {
-          const line = `${ev.direction === "out" ? ">>" : "<<"} ${ev.line}`;
-          const next = [...m.consoleLines, line];
-          return {
-            ...m,
-            consoleLines:
-              next.length > CONSOLE_CAP ? next.slice(-CONSOLE_CAP) : next,
-          };
-        }
-        case "battleStarting":
-          return { ...m, battleStartSeq: m.battleStartSeq + 1 };
-        case "disconnected":
-          return { ...m, connected: false, error: ev.reason ?? null };
-        case "delta": {
-          const d = ev.delta;
-          if (d.kind === "joinBattleFailed" || d.kind === "openBattleFailed") {
-            return { ...m, lastJoinError: d.reason };
-          }
-          // Somebody who cannot forward a port hosts through the lobby's relay,
-          // and the lobby is what says whether they may. A refusal is the
-          // difference between hosting and not, so it goes where the other
-          // reasons a battle would not open go rather than into a log nobody
-          // reads.
-          if (d.kind === "turnCredentialsRefused") {
-            return {
-              ...m,
-              lastJoinError: `the lobby would not hand out a relay credential: ${d.reason}`,
-            };
-          }
-          if (d.kind === "loginDenied") {
-            return { ...m, loginError: d.reason };
-          }
-          if (d.kind === "channelListReceived") {
-            return {
-              ...m,
-              channelListReceivedSeq: m.channelListReceivedSeq + 1,
-            };
-          }
-          // An announcement is a toast for whoever is looking, but it is also
-          // the only place a server explains itself when it drops a command for
-          // being too long. Keep the last few so a delivery run can say what
-          // happened rather than only that nothing came back (issue #1279).
-          if (d.kind === "serverMessage") {
-            const next = [...m.serverMessages, d.text];
-            return {
-              ...m,
-              serverMessages:
-                next.length > SERVER_MESSAGE_CAP
-                  ? next.slice(-SERVER_MESSAGE_CAP)
-                  : next,
-              serverMessageCount: m.serverMessageCount + 1,
-            };
-          }
-          // The full server ignore list finished streaming: record it and tick the
-          // seq so the reconcile effect runs exactly once against this payload.
-          if (d.kind === "serverIgnoreList") {
-            return {
-              ...m,
-              serverIgnoreList: d.ignores,
-              serverIgnoreListSeq: m.serverIgnoreListSeq + 1,
-            };
-          }
-          // The server's message-of-the-day arrives as a run of MOTD lines at
-          // login. Log each as a clean `MOTD |` entry so the welcome/news reads
-          // as a contiguous block in the console, distinct from the raw `<<`
-          // wire echo of the same lines.
-          if (d.kind === "motd") {
-            const next = [...m.consoleLines, `MOTD | ${d.line}`];
-            return {
-              ...m,
-              consoleLines:
-                next.length > CONSOLE_CAP ? next.slice(-CONSOLE_CAP) : next,
-            };
-          }
-          return m;
-        }
-        // `delta` is otherwise handled by the provider via a snapshot refresh.
-        default:
-          return m;
-      }
-    }
-    default:
-      return m;
-  }
-}
-
-/**
- * The account's details as `mpGetUserInfo` answers them, merged from the three
- * `accountInfo` deltas the server sends separately. A field stays at its last
- * known value until its own line arrives, so a caller reading before the first
- * answer sees every field null.
- */
-export interface AccountInfo {
-  registrationDate: string | null;
-  email: string | null;
-  ingameHours: string | null;
-}
-
-/**
  * How `recoverPassword` ended. uberserver emails a code and waits for
  * `submitRecoveryCode`. teiserver has no in-lobby recovery and hands back a web
  * address instead, with nothing further to send.
@@ -514,7 +293,16 @@ export type RecoveryStart =
   | { kind: "redirected"; url: string };
 
 interface MultiplayerContextValue {
+  /**
+   * The mirror of the connection this context describes: the live one, or the
+   * one opening, or the last one to drop so its error stays readable.
+   */
   mirror: LobbyMirror;
+  /**
+   * Every connection this session has opened and not closed, by server key
+   * (issue #2841). Read one with {@link useConnection}.
+   */
+  connections: Connections;
   /** The connected `serverKey`, or null when not connected. */
   activeKey: string | null;
   /** Whether a connection is currently live (`activeKey != null`). */
@@ -614,23 +402,28 @@ interface MultiplayerContextValue {
   changePassword: (
     current: string,
     next: string,
+    serverKey?: string,
   ) => Promise<{ message: string; succeeded: boolean }>;
   /** Ask for a code to confirm a new email address on the signed-in account. */
-  changeEmailRequest: (email: string) => Promise<void>;
+  changeEmailRequest: (email: string, serverKey?: string) => Promise<void>;
   /** Confirm a new email address with the emailed code. */
-  changeEmail: (email: string, code: string) => Promise<void>;
+  changeEmail: (
+    email: string,
+    code: string,
+    serverKey?: string,
+  ) => Promise<void>;
   /** Ask for the signup verification code again. */
-  resendVerification: (email: string) => Promise<void>;
+  resendVerification: (email: string, serverKey?: string) => Promise<void>;
   /** Ask the server for the signed-in account's details, answered as
    * `accountInfo` deltas that land in {@link accountInfo}. */
-  getUserInfo: () => void;
+  getUserInfo: (serverKey?: string) => void;
   /** The signed-in account's details, merged from the deltas `getUserInfo`
    * triggers, or null before any have arrived. */
   accountInfo: AccountInfo | null;
-  disconnect: () => Promise<void>;
+  disconnect: (serverKey?: string) => Promise<void>;
   /** Abort a connect still in progress (the "Connecting…" state), returning to
    * disconnected without an error or an auto-reconnect. */
-  cancelConnect: () => Promise<void>;
+  cancelConnect: (serverKey?: string) => Promise<void>;
   /**
    * The connection currently parked awaiting agreement acceptance / an emailed
    * verification code (its `serverKey` and the server's agreement `text`, which
@@ -642,26 +435,30 @@ interface MultiplayerContextValue {
   /** Abandon the verification prompt by disconnecting the parked connection. */
   cancelAgreement: () => Promise<void>;
   /** Unread count for a conversation id given its current message count. */
-  unreadFor: (id: string, count: number) => number;
+  unreadFor: (id: string, count: number, serverKey?: string) => number;
   /** Mark a conversation read up to its current message count. */
-  markSeen: (id: string, count: number) => void;
+  markSeen: (id: string, count: number, serverKey?: string) => void;
   /**
    * Remember a joined channel (with an optional key) so it's auto-joined on the
    * next connect. Adding an already-remembered channel with a key updates its key.
    */
-  rememberChannel: (name: string, key?: string) => void;
+  rememberChannel: (name: string, key?: string, serverKey?: string) => void;
   /** Forget a channel so it's no longer auto-joined. */
-  forgetChannel: (name: string) => void;
+  forgetChannel: (name: string, serverKey?: string) => void;
   /**
    * Send a `JOIN` for a channel the user chose, marking it as user-requested so the
    * server's join confirm persists it to the autojoin list (server-forced joins are
    * not). Prefer this over calling `mpJoinChannel` directly from the UI.
    */
-  requestJoinChannel: (channel: string, key?: string) => Promise<unknown>;
+  requestJoinChannel: (
+    channel: string,
+    key?: string,
+    serverKey?: string,
+  ) => Promise<unknown>;
   /** Reason from the last failed battle join, or null. */
   lastJoinError: string | null;
   /** Clear the last join-failure reason (call at the start of a join attempt). */
-  clearJoinError: () => void;
+  clearJoinError: (serverKey?: string) => void;
   /** Whether the topbar login/status popover is open. */
   loginPopoverOpen: boolean;
   /** Open the topbar login/status popover (used by not-connected CTAs app-wide). */
@@ -687,12 +484,12 @@ interface MultiplayerContextValue {
    */
   status: ClientFlags;
   /** Flag the running game, from the battle room's launch/exit path. */
-  setIngame: (ingame: boolean) => void;
+  setIngame: (ingame: boolean, serverKey?: string) => void;
   /** Whether the user has set themselves away by hand. */
   manualAway: boolean;
   /** Set (or clear) away by hand. Sticky: activity won't clear it, only the
    *  user will, and it survives the idle watcher being off. */
-  setManualAway: (away: boolean) => void;
+  setManualAway: (away: boolean, serverKey?: string) => void;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -704,7 +501,44 @@ const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
  * locally (which would desync from the persistent Rust-side socket on remount).
  */
 export function MultiplayerProvider({ children }: { children: ReactNode }) {
-  const [mirror, dispatch] = useReducer(mirrorReducer, initialMirror);
+  // Each connection's state, keyed by server key (issue #2841). The context's
+  // single-connection fields read one entry, `focusKey`, so every caller that
+  // predates the map keeps working unchanged.
+  const [connections, dispatchConn] = useReducer(
+    connectionsReducer,
+    {} as Connections,
+  );
+  const dispatchMirror = useCallback(
+    (serverKey: string, action: MirrorAction) =>
+      dispatchConn({ type: "mirror", serverKey, action }),
+    [],
+  );
+  const updateConnection = useCallback(
+    (serverKey: string, update: (c: ConnectionState) => ConnectionState) =>
+      dispatchConn({ type: "update", serverKey, update }),
+    [],
+  );
+
+  // The connection the context's single-connection fields describe: the live
+  // one, the one opening, or the last to drop. A drop leaves it in place, which
+  // is what keeps a drop's reason on the login panel after the key clears.
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const focus: ConnectionState | undefined =
+    focusKey != null ? connections[focusKey] : undefined;
+  const mirror = focus?.mirror ?? initialMirror;
+
+  // The values each connection's handler, reconnect loop and account commands
+  // read and write outside a render. See `ConnectionRuntime`.
+  const runtimesRef = useRef(new Map<string, ConnectionRuntime>());
+  const runtimeFor = useCallback((serverKey: string) => {
+    let rt = runtimesRef.current.get(serverKey);
+    if (!rt) {
+      rt = newRuntime();
+      runtimesRef.current.set(serverKey, rt);
+    }
+    return rt;
+  }, []);
+
   const [activeKey, setActiveKey] = useState<string | null>(null);
   // The same key as a value rather than as state, because the two readers that
   // decide with it both run before React has re-rendered: `doConnect` checks it
@@ -712,57 +546,28 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // a Channel callback. Written here beside the state rather than synced from it
   // in an effect, so it is never a render behind.
   const activeKeyRef = useRef<string | null>(null);
-  const applyActiveKey = useCallback((key: string | null) => {
-    activeKeyRef.current = key;
-    setActiveKey(key);
-  }, []);
+  const applyActiveKey = useCallback(
+    (key: string | null) => {
+      const prev = activeKeyRef.current;
+      activeKeyRef.current = key;
+      setActiveKey(key);
+      if (prev != null && prev !== key) {
+        updateConnection(prev, (c) => (c.live ? { ...c, live: false } : c));
+      }
+      if (key != null) {
+        updateConnection(key, (c) => (c.live ? c : { ...c, live: true }));
+        setFocusKey(key);
+      }
+    },
+    [updateConnection],
+  );
   const [busy, setBusy] = useState(false);
-  const [pendingAgreement, setPendingAgreement] = useState<{
-    serverKey: string;
-    text: string;
-  } | null>(null);
 
   // FIFO queue of `SERVERMSGBOX` texts awaiting acknowledgement. Boxed server
   // messages are important enough that the server asked for a modal, so they're
-  // queued (never dropped) rather than overwriting each other; the dialog shows the
-  // front and dismissing pops it.
+  // queued (never dropped) rather than overwriting each other. The dialog shows
+  // the front and dismissing pops it.
   const [serverMsgBoxes, setServerMsgBoxes] = useState<string[]>([]);
-
-  // Callbacks waiting on the next `SERVERMSG`, for a command like `CHANGEPASSWORD`
-  // that has no reply of its own to correlate on. A set rather than a single slot,
-  // because nothing stops two such commands overlapping. Each is removed as soon
-  // as it fires or times out.
-  const serverMessageWaiters = useRef(new Set<(text: string) => void>());
-
-  // Callbacks waiting on one of the paired accept/deny deltas for a signed-in
-  // account command that does carry a token (CHANGEEMAILREQUEST, CHANGEEMAIL,
-  // RESENDVERIFICATION), unlike CHANGEPASSWORD above. Kept separate from
-  // `serverMessageWaiters` because these match on the delta's own kind rather
-  // than on SERVERMSG text.
-  const accountDeltaWaiters = useRef(new Set<(d: Delta) => void>());
-
-  // The signed-in account's details, merged from the `accountInfo` deltas
-  // `getUserInfo` triggers. Null until the first one arrives.
-  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
-
-  // The game whose result the debriefing drawer is open on, or null when it is
-  // shut. The result itself lives in the snapshot, so this only decides whether
-  // to show it: holding the id rather than a flag means the next game's
-  // debriefing opens the drawer again after this one was dismissed.
-  const [debriefingShown, setDebriefingShown] = useState<number | null>(null);
-
-  // Transient "just launched the game" set, populated off `playerWentIngame`
-  // deltas and drained per-name after a short delay, so battle rows can flash as a
-  // player goes in-game. `stateRef` mirrors the latest snapshot so the frozen
-  // event handler (openChannel is `useCallback(..., [])`) can read current battle /
-  // founder to decide whether the launcher is our battle's host.
-  const [ingameFlash, setIngameFlash] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  const stateRef = useRef<LobbyState | null>(null);
-  useEffect(() => {
-    stateRef.current = mirror.state;
-  }, [mirror.state]);
 
   // Highlight-word preferences (issue #193), mirrored into a ref so the frozen
   // event handler (openChannel is `useCallback(..., [])`) can read the current
@@ -789,284 +594,93 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // into a TASServer one. Everything TASServer has and Tachyon does not gates on
   // this: see `docs/tachyon-protocol.md`.
   const [customCfg] = useCustomServers();
+  const protocolServers = useMemo(
+    () => [...BUILTIN_SERVERS, ...customCfg.servers],
+    [customCfg.servers],
+  );
   const protocol = useMemo(
-    () => protocolForKey(activeKey, [...BUILTIN_SERVERS, ...customCfg.servers]),
-    [activeKey, customCfg.servers],
+    () => protocolForKey(activeKey, protocolServers),
+    [activeKey, protocolServers],
   );
 
   const [loginPopoverOpen, setLoginPopoverOpen] = useState(false);
   const openLoginPopover = useCallback(() => setLoginPopoverOpen(true), []);
   const closeLoginPopover = useCallback(() => setLoginPopoverOpen(false), []);
 
-  // Per-conversation "seen up to N messages" marks. Seeded to the connect-time
-  // snapshot so persisted DM history and already-present channel logs don't show
-  // as unread; conversations appearing AFTER connect start unseen (fully unread).
-  const seenRef = useRef<Record<string, number>>({});
+  // Per-conversation "seen up to N messages" marks live in each connection's
+  // runtime and are seeded by its session. This tick re-renders when one moves.
   const [, forceSeenTick] = useReducer((n: number) => n + 1, 0);
-  const baselineDoneRef = useRef(false);
 
-  useEffect(() => {
-    if (activeKey == null) {
-      seenRef.current = {};
-      baselineDoneRef.current = false;
-      return;
-    }
-    if (!mirror.state) return;
-    if (!baselineDoneRef.current) {
-      seenRef.current = conversationCounts(mirror.state);
-      baselineDoneRef.current = true;
+  const unreadFor = useCallback(
+    (id: string, count: number, serverKey?: string) => {
+      const key = serverKey ?? activeKeyRef.current;
+      const seen = (key && runtimesRef.current.get(key)?.seen[id]) || 0;
+      return Math.max(0, count - seen);
+    },
+    [],
+  );
+
+  const markSeen = useCallback(
+    (id: string, count: number, serverKey?: string) => {
+      const key = serverKey ?? activeKeyRef.current;
+      const rt = key ? runtimesRef.current.get(key) : undefined;
+      if (!rt || rt.seen[id] === count) return;
+      rt.seen[id] = count;
       forceSeenTick();
-      return;
-    }
-    // A channel's stored backlog arrives after that baseline — we only ask for it
-    // once joined — and streams in a message at a time, so it would otherwise read
-    // as a channel's worth of unread the moment you join. Keep each seen mark at
-    // or above the backlog behind it. This only ever raises, so live messages
-    // arriving afterwards still count as unread as normal.
-    let raised = false;
-    for (const [id, n] of Object.entries(backfilledCounts(mirror.state))) {
-      if ((seenRef.current[id] ?? 0) < n) {
-        seenRef.current[id] = n;
-        raised = true;
-      }
-    }
-    if (raised) forceSeenTick();
-  }, [activeKey, mirror.state]);
-
-  const unreadFor = useCallback((id: string, count: number) => {
-    const seen = seenRef.current[id] ?? 0;
-    return Math.max(0, count - seen);
-  }, []);
-
-  const markSeen = useCallback((id: string, count: number) => {
-    if (seenRef.current[id] === count) return;
-    seenRef.current[id] = count;
-    forceSeenTick();
-  }, []);
+    },
+    [],
+  );
 
   // Channels the user has chosen to be in, persisted per `serverKey` so they can be
   // auto-rejoined on the next connect. This is a preference list (re-derivable by
   // rejoining), so it lives in the frame settings store rather than backend state.
   const [joinedChannels, setJoinedChannels] = useJoinedChannels();
-  const rejoinedForRef = useRef<string | null>(null);
+  // The frozen event handler (openChannel) persists a confirmed join through
+  // this. The list itself does not come from a render (issue #1375), so a
+  // confirm that lands before the next one has rendered still sees the channel
+  // it added.
+  const setJoinedChannelsRef = useRef(setJoinedChannels);
+  useEffect(() => {
+    setJoinedChannelsRef.current = setJoinedChannels;
+  }, [setJoinedChannels]);
 
   const rememberChannel = useCallback(
-    (name: string, key?: string) => {
-      if (!activeKey) return;
-      rememberJoinedChannel(activeKey, name, key, setJoinedChannels);
+    (name: string, key?: string, serverKey?: string) => {
+      const target = serverKey ?? activeKeyRef.current;
+      if (!target) return;
+      rememberJoinedChannel(target, name, key, setJoinedChannelsRef.current);
     },
-    [activeKey, setJoinedChannels],
+    [],
   );
 
-  const forgetChannel = useCallback(
-    (name: string) => {
-      if (!activeKey) return;
-      forgetJoinedChannel(activeKey, name, setJoinedChannels);
-    },
-    [activeKey, setJoinedChannels],
-  );
+  const forgetChannel = useCallback((name: string, serverKey?: string) => {
+    const target = serverKey ?? activeKeyRef.current;
+    if (!target) return;
+    forgetJoinedChannel(target, name, setJoinedChannelsRef.current);
+  }, []);
 
-  // The frozen event handler (openChannel) can't close over `rememberChannel`
-  // directly, so route through a ref to reach the current `activeKey`. The list
-  // itself no longer comes from a render (issue #1375), so a confirm that lands
-  // before the next one has rendered still sees the channel it added.
-  const rememberChannelRef = useRef(rememberChannel);
-  useEffect(() => {
-    rememberChannelRef.current = rememberChannel;
-  }, [rememberChannel]);
-
-  // Channels WE asked to join, awaiting the server's confirm. The `channelJoined`
-  // delta fires for any self-join — including channels a server auto-joins us to on
-  // login — so we only persist a confirm whose channel is in this set, i.e. one the
-  // user actually chose. Keyed by name; consumed on confirm or failure.
-  const pendingJoinsRef = useRef<Set<string>>(new Set());
+  // Channels WE asked to join, awaiting the server's confirm, are held per
+  // connection. The `channelJoined` delta fires for any self-join, including
+  // channels a server auto-joins us to on login, so we only persist a confirm
+  // whose channel is in that set, i.e. one the user actually chose.
   const requestJoinChannel = useCallback(
-    (channel: string, key?: string): Promise<unknown> => {
-      if (!activeKey) return Promise.resolve();
-      pendingJoinsRef.current.add(channel);
-      return mpJoinChannel({ serverKey: activeKey, channel, key });
+    (channel: string, key?: string, serverKey?: string): Promise<unknown> => {
+      const target = serverKey ?? activeKeyRef.current;
+      if (!target) return Promise.resolve();
+      runtimesRef.current.get(target)?.pendingJoins.add(channel);
+      return mpJoinChannel({ serverKey: target, channel, key });
     },
-    [activeKey],
+    [],
   );
 
-  // Channels whose auto-rejoin the server refused this session (name -> reason).
-  // Transient by design: a refused channel stays on the remembered/autojoin list
-  // (its restriction may be temporary), but is recorded here so the auto-join
-  // settings can flag it and the user can remove it deliberately.
-  const [channelJoinFailures, setChannelJoinFailures] = useState<
-    Record<string, string>
-  >({});
-  // One-shot guard so a channel that keeps failing is toasted only once per session
-  // — the badge persists, the notification doesn't nag on every reconnect.
-  const notifiedJoinFailuresRef = useRef<Set<string>>(new Set());
-  // A new connection is a fresh session: clear both so a recovered channel is
-  // re-notified next time and no stale failure badge lingers.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: activeKey is the reset trigger (a session change), not read in the body
-  useEffect(() => {
-    setChannelJoinFailures({});
-    notifiedJoinFailuresRef.current = new Set();
-    pendingJoinsRef.current = new Set();
-  }, [activeKey]);
-
-  // Auto-join the configured channels once per connection, after login reaches the
-  // `ready` phase (JOIN before ACCEPTED would be rejected). The ref guards against
-  // re-firing when `joinedChannels` changes mid-session (e.g. the user joins one).
-  // Each entry may carry a key/password, passed straight through to JOIN.
-  //
-  // A Tachyon server has no named channels, so it gets none of this and the
-  // auto-join list is hidden in settings to match (see `autoJoinsChannels`).
-  useEffect(() => {
-    if (activeKey == null) {
-      rejoinedForRef.current = null;
-      return;
-    }
-    if (!autoJoinsChannels(protocol)) return;
-    if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
-      rejoinedForRef.current = activeKey;
-      // First-ever connect for this login (no stored list yet) to the profile's
-      // official server: seed the distribution's default channels. Seed-once — this
-      // persists them, after which the user can leave them and they stay gone.
-      let entries = normalizeChannelList(joinedChannels[activeKey]);
-      const official = profileOfficialServer();
-      if (
-        joinedChannels[activeKey] === undefined &&
-        official != null &&
-        activeKey.endsWith(`@${official.host}:${official.port}`)
-      ) {
-        const seed = profileDefaultChannels();
-        if (seed.length > 0) {
-          entries = seed;
-          setJoinedChannels({ ...joinedChannels, [activeKey]: seed });
-        }
-      }
-      for (const { name, key } of entries) {
-        // A settings row can be added before it's named; don't JOIN "".
-        if (!name.trim()) continue;
-        requestJoinChannel(name, key).catch((e) =>
-          console.warn("multiplayer: auto-join channel failed", name, e),
-        );
-      }
-      // Pull the server's ignore list so it can be reconciled with the local one
-      // (see the reconcile effect). Best-effort: unsupported servers just never
-      // send a list, and local hiding still applies.
-      mpIgnoreList({ serverKey: activeKey }).catch(() => {});
-    }
-  }, [
-    activeKey,
-    protocol,
-    mirror.phase,
-    joinedChannels,
-    requestJoinChannel,
-    setJoinedChannels,
-  ]);
-
-  // Reconcile the local ignore list with the server's once its IGNORELIST arrives:
-  // fold any server-confirmed ignores we lack into the local store, and push any
-  // local-only ignores up so the server suppresses them too. Driven off the
-  // received-list seq (not the map) so setting the map here can't re-trigger it,
-  // and reading the delta payload (`serverIgnoreList`) avoids racing the snapshot.
   const [ignored, setIgnored] = useIgnored();
-  const ignoredRef = useRef(ignored);
-  useEffect(() => {
-    ignoredRef.current = ignored;
-  }, [ignored]);
-  const ignoreReconciledRef = useRef(0);
-  useEffect(() => {
-    if (activeKey == null) {
-      ignoreReconciledRef.current = 0;
-      return;
-    }
-    const seq = mirror.serverIgnoreListSeq;
-    if (seq === 0 || seq === ignoreReconciledRef.current) return;
-    ignoreReconciledRef.current = seq;
-
-    const server = mirror.serverIgnoreList;
-    const local = ignoredFor(ignoredRef.current, activeKey);
-
-    // Add server-confirmed ignores we don't have locally (addIgnore dedupes).
-    let next = ignoredRef.current;
-    for (const name of server) next = addIgnore(next, activeKey, name);
-    if (next !== ignoredRef.current) setIgnored(next);
-
-    // Push local-only ignores up so both sides converge. Best-effort; a server
-    // that just replied with an empty list may still not support IGNORE.
-    const known = new Set(server.map((n) => n.toLowerCase()));
-    for (const name of local) {
-      if (name.trim() && !known.has(name.toLowerCase())) {
-        mpIgnore({ serverKey: activeKey, username: name }).catch(() => {});
-      }
-    }
-  }, [
-    activeKey,
-    mirror.serverIgnoreListSeq,
-    mirror.serverIgnoreList,
-    setIgnored,
-  ]);
-
-  // Sync the server-side friend list + pending requests once per connection, after
-  // login reaches `ready`. These commands are a no-op on servers without friend
-  // support (they just ignore the line), so failure is swallowed and never blocks
-  // the UI — local favourites keep working regardless.
-  // Tachyon has friends of its own, but not over these commands, so it sends
-  // neither of them (see `syncsOnReady`).
-  const friendsSyncedForRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (activeKey == null) {
-      friendsSyncedForRef.current = null;
-      return;
-    }
-    if (!syncsOnReady(protocol)) return;
-    if (mirror.phase === "ready" && friendsSyncedForRef.current !== activeKey) {
-      friendsSyncedForRef.current = activeKey;
-      mpFriendList({ serverKey: activeKey }).catch(() => {});
-      mpFriendRequestList({ serverKey: activeKey }).catch(() => {});
-    }
-  }, [activeKey, protocol, mirror.phase]);
-
-  // Notify when a friend (server-side or a client-local favourite) comes online or
-  // goes offline. The lobby has no friend presence event, so this is derived from
-  // the roster: diff the online set between snapshots. Gated on `ready` (the
-  // initial ADDUSER dump completes before then) and baselined on the first ready
-  // snapshot so the login roster flood never fires a burst of notifications.
   const [favourites] = useFavourites();
-  const prevRosterRef = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    const st = mirror.state;
-    if (activeKey == null || mirror.phase !== "ready" || !st) {
-      prevRosterRef.current = null;
-      return;
-    }
-    const roster = new Set(Object.keys(st.users));
-    const prev = prevRosterRef.current;
-    prevRosterRef.current = roster;
-    if (prev == null) return; // baseline the first ready snapshot, don't notify
-    const watched = new Set<string>([
-      ...(st.friends ?? []),
-      ...favouritesFor(favourites, activeKey),
-    ]);
-    for (const name of watched) {
-      if (name === st.myUsername) continue;
-      const online = roster.has(name);
-      if (online && !prev.has(name))
-        void notify({ title: `${name} is online` });
-      else if (!online && prev.has(name))
-        void notify({ title: `${name} went offline` });
-    }
-  }, [activeKey, mirror.phase, mirror.state, favourites]);
-
-  // Away status (issue #333): see useAwayStatus for the design. Owns the ingame
-  // and manual-away bits, and is the only sender of MYSTATUS.
-  const { status, setIngame, manualAway, setManualAway } = useAwayStatus(
-    activeKey,
-    protocol,
-    mirror.phase,
-  );
 
   // --- Auto-rejoin on unexpected server drop (issue #192) --------------------
-  // Distinct from the reload-reattach path above: this handles a genuine server-
+  // Distinct from the reload-reattach path below: this handles a genuine server-
   // side disconnect, where the Rust task dies and self-evicts. We re-run `connect`
   // (which re-fetches the password and, on reaching `ready`, replays channels via
-  // the effect above) and best-effort rejoin the battle we were in.
+  // the connection's session) and best-effort rejoin the battle we were in.
   const [autoRejoin] = useSetting<boolean>("multiplayer.autoRejoin", true);
   const autoRejoinRef = useRef(autoRejoin);
   useEffect(() => {
@@ -1164,41 +778,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     };
   }, [autoConnect, lastLogin, accountsCfg.accounts, customCfg.servers]);
 
-  // `true` while a user-initiated disconnect/cancel is in flight, so its clean
-  // `disconnected` event isn't mistaken for an unexpected drop. Reset on connect.
-  const intentionalRef = useRef(false);
   // The serverKey of a connect still in its handshake (before it registers as a
   // live connection), so `cancelConnect` knows which pending connect to abort.
   // Cleared once the connect resolves either way.
   const connectingKeyRef = useRef<string | null>(null);
-  // `true` once a session reached `ready`; only then is a drop worth reconnecting
-  // (excludes login-denied / initial-connect failures, which never logged in).
-  const loggedInRef = useRef(false);
-  // `true` once the server has refused this attempt's credentials. The drop path
-  // already declines to reconnect a session that never reached `ready`, but a
-  // denial can also surface as a `doConnect` throw, when the connection is torn
-  // down before the snapshot that follows it lands. This closes that race, which
-  // matters most on Zero-K: it counts failed attempts per IP address, so a retry
-  // loop bans the address rather than the account. Reset on every attempt.
-  const deniedRef = useRef(false);
-  // Enough to call `connect()` again; captured on each connect attempt.
-  const reconnectCtxRef = useRef<{
-    server: LobbyServer;
-    username: string;
-    /** A room this client hosts, which has no stored credential to re-read. */
-    direct?: boolean;
-  } | null>(null);
-  // The battle to rejoin after a reconnect reaches `ready` (captured before the
-  // drop tears down state). Cleared once attempted or on a manual connect.
-  const rejoinBattleRef = useRef<{
-    id: number;
-    scriptPassword: string | null;
-  } | null>(null);
-  // Single-loop guards: a monotonic generation invalidates any in-flight loop, and
-  // the pending timer is tracked so it can be cancelled.
-  const reconnectGenRef = useRef(0);
-  const reconnectAttemptRef = useRef(0);
-  const reconnectTimerRef = useRef<number | null>(null);
   // Late-bound so the frozen `openChannel` handler can invoke the latest logic.
   // It is handed the key that dropped, because which connection it was decides
   // everything the handler does (issue #2149).
@@ -1206,332 +789,408 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     (serverKey: string, reason: string | null) => void
   >(() => {});
 
-  // Cancel any running reconnect loop (a manual connect/disconnect supersedes it).
-  const stopReconnect = useCallback(() => {
-    reconnectGenRef.current += 1;
-    reconnectAttemptRef.current = 0;
-    rejoinBattleRef.current = null;
-    if (reconnectTimerRef.current != null) {
-      window.clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
+  // Cancel a connection's reconnect loop, or every loop when no key is given (a
+  // manual connect/disconnect supersedes it).
+  const stopReconnect = useCallback((serverKey?: string) => {
+    const stop = (rt: ConnectionRuntime) => {
+      rt.reconnectGen += 1;
+      rt.reconnectAttempt = 0;
+      rt.rejoinBattle = null;
+      if (rt.reconnectTimer != null) {
+        window.clearTimeout(rt.reconnectTimer);
+        rt.reconnectTimer = null;
+      }
+    };
+    if (serverKey === undefined) {
+      for (const rt of runtimesRef.current.values()) stop(rt);
+    } else {
+      const rt = runtimesRef.current.get(serverKey);
+      if (rt) stop(rt);
     }
   }, []);
 
-  // Build the event Channel for a connection and wire it to the mirror. Shared by
-  // `connect` and the reload-rehydrate path so both handle events identically. The
-  // Rust side evicts the connection on any teardown (socket close, or a rejected
-  // login), so a `disconnected` event clears the active key to return the UI to the
-  // connect screen while keeping the reason.
+  // Mark a user-initiated disconnect or cancel as intended, so its clean
+  // `disconnected` event isn't mistaken for an unexpected drop. With no key it
+  // marks every connection, which is what the one flag this replaced did.
+  const markIntentional = useCallback((serverKey?: string) => {
+    if (serverKey === undefined) {
+      for (const rt of runtimesRef.current.values()) rt.intentional = true;
+    } else {
+      const rt = runtimesRef.current.get(serverKey);
+      if (rt) rt.intentional = true;
+    }
+  }, []);
+
+  // A connect is past its checks and about to open: give it an entry, reset
+  // its mirror, and point the context at it.
+  const beginConnecting = useCallback(
+    (serverKey: string) => {
+      dispatchConn({ type: "open", serverKey });
+      dispatchMirror(serverKey, { type: "connecting" });
+      setFocusKey(serverKey);
+    },
+    [dispatchMirror],
+  );
+
+  // Forget a connection the user has closed. Its runtime goes too, so anything
+  // its channel still sends is ignored.
+  const closeConnection = useCallback(
+    (serverKey: string) => {
+      stopReconnect(serverKey);
+      runtimesRef.current.delete(serverKey);
+      dispatchConn({ type: "close", serverKey });
+    },
+    [stopReconnect],
+  );
+
+  // Build the event Channel for a connection and wire it to that connection's
+  // entry. Shared by `connect` and the reload-rehydrate path so both handle
+  // events identically. The Rust side evicts the connection on any teardown
+  // (socket close, or a rejected login), so a `disconnected` event clears the
+  // active key to return the UI to the connect screen while keeping the reason.
   //
-  // Only the agreement prompt and the drop below ask which connection an event
-  // belongs to. Everything else here is connection-blind on purpose: there is one
-  // mirror, one `deniedRef`, one `loggedInRef`, and every snapshot is dispatched
-  // into that mirror whoever fetched it. That is correct only because there is one
-  // connection, which `connectBlockedReason` is what makes true (issue #2149).
-  // Giving each connection a mirror of its own is what a second one would need,
-  // and nobody has asked for a second one. The interface promises the opposite.
-  const openChannel = useCallback((serverKey: string) => {
-    const onEvent = new Channel<LobbyEvent>();
-    // The Rust side emits one delta per server line, and the mirror is rebuilt
-    // wholesale from a snapshot, so on a busy server (hundreds of battles, a few
-    // thousand users) a delta per event means a full serialise of every battle,
-    // user and channel across IPC many times a second. Batch instead: a burst of
-    // deltas costs one snapshot, which caps the rate at one per SNAPSHOT_BATCH_MS
-    // however loud the server gets. The deltas themselves still act immediately
-    // in the handler below. Only the state refresh waits.
-    let pendingDeltas: Delta[] = [];
-    let flushTimer: number | null = null;
-    const flush = () => {
-      flushTimer = null;
-      const batch = pendingDeltas;
-      pendingDeltas = [];
-      mpSnapshot({ serverKey })
-        .then((r) => {
-          dispatch({ type: "snapshot", state: r.state });
-          // A chat/private message that mentions a highlight word or our own
-          // username fires the mention cue (a soft ping + taskbar flash), gated
-          // behind the sound setting. Skip our own messages and non-chat lines
-          // (join/leave/system). The text lives in the snapshot, not the delta.
-          // Skip replayed channel history too (`id != null`): joining a channel
-          // would otherwise ping once per past mention in its backlog.
-          const hl = highlightRef.current;
-          if (!hl.sound) return;
-          for (const d of batch) {
-            const msg = incomingChatMsg(d, r.state);
-            if (
-              msg &&
-              msg.id == null &&
-              msg.from !== r.state.myUsername &&
-              (msg.kind === "said" ||
-                msg.kind === "saidEx" ||
-                msg.kind === "saidBattle" ||
-                msg.kind === "private") &&
-              matchesHighlight(msg.text, hl.words, r.state.myUsername, hl.own)
-            ) {
-              triggerMentionCue(msg.from);
+  // Everything here is read and written against `serverKey`, so an event on
+  // one connection never reaches another's entry (issue #2841). A connection
+  // that has been closed has no runtime, and its events are dropped.
+  const openChannel = useCallback(
+    (serverKey: string) => {
+      const onEvent = new Channel<LobbyEvent>();
+      // The Rust side emits one delta per server line, and the mirror is rebuilt
+      // wholesale from a snapshot, so on a busy server (hundreds of battles, a few
+      // thousand users) a delta per event means a full serialise of every battle,
+      // user and channel across IPC many times a second. Batch instead: a burst of
+      // deltas costs one snapshot, which caps the rate at one per SNAPSHOT_BATCH_MS
+      // however loud the server gets. The deltas themselves still act immediately
+      // in the handler below. Only the state refresh waits.
+      let pendingDeltas: Delta[] = [];
+      let flushTimer: number | null = null;
+      const flush = () => {
+        flushTimer = null;
+        const batch = pendingDeltas;
+        pendingDeltas = [];
+        mpSnapshot({ serverKey })
+          .then((r) => {
+            const live = runtimesRef.current.get(serverKey);
+            if (live) live.state = r.state;
+            dispatchMirror(serverKey, { type: "snapshot", state: r.state });
+            // A chat/private message that mentions a highlight word or our own
+            // username fires the mention cue (a soft ping + taskbar flash), gated
+            // behind the sound setting. Skip our own messages and non-chat lines
+            // (join/leave/system). The text lives in the snapshot, not the delta.
+            // Skip replayed channel history too (`id != null`): joining a channel
+            // would otherwise ping once per past mention in its backlog.
+            const hl = highlightRef.current;
+            if (!hl.sound) return;
+            for (const d of batch) {
+              const msg = incomingChatMsg(d, r.state);
+              if (
+                msg &&
+                msg.id == null &&
+                msg.from !== r.state.myUsername &&
+                (msg.kind === "said" ||
+                  msg.kind === "saidEx" ||
+                  msg.kind === "saidBattle" ||
+                  msg.kind === "private") &&
+                matchesHighlight(msg.text, hl.words, r.state.myUsername, hl.own)
+              ) {
+                triggerMentionCue(msg.from);
+              }
+            }
+          })
+          .catch(() => {});
+      };
+      const queueSnapshot = (d: Delta) => {
+        pendingDeltas.push(d);
+        if (flushTimer == null) {
+          flushTimer = window.setTimeout(flush, SNAPSHOT_BATCH_MS);
+        }
+      };
+      onEvent.onmessage = (ev) => {
+        const rt = runtimesRef.current.get(serverKey);
+        if (!rt) return;
+        dispatchMirror(serverKey, { type: "event", ev });
+        if (ev.kind === "delta") {
+          const d = ev.delta;
+          // The server has refused these credentials. Recorded so the reconnect
+          // loop stops rather than spending attempts on a password that will be
+          // refused again, which on Zero-K is counted against the IP address.
+          if (d.kind === "loginDenied" || d.kind === "registrationDenied") {
+            rt.denied = true;
+          }
+          // An autohost `!ring` is a transient event, not state - react to it directly
+          // (gong + reverberation + taskbar flash) rather than through the snapshot.
+          if (d.kind === "ring") triggerRing(d.from);
+          // A player transitioning to in-game is a transient moment, not just the
+          // resulting status (which the snapshot already carries). Flash the
+          // launcher's row briefly for everyone. When it's the founder of the
+          // battle we're in (and not ourselves), also fire the softer "it's
+          // starting, get in" cue - the host launching is the actionable
+          // "everyone's waiting on one person" case.
+          else if (d.kind === "playerWentIngame") {
+            const name = d.name;
+            updateConnection(serverKey, (c) => ({
+              ...c,
+              justWentIngame: new Set(c.justWentIngame).add(name),
+            }));
+            window.setTimeout(() => {
+              updateConnection(serverKey, (c) => {
+                if (!c.justWentIngame.has(name)) return c;
+                const next = new Set(c.justWentIngame);
+                next.delete(name);
+                return { ...c, justWentIngame: next };
+              });
+            }, 2500);
+            const st = rt.state;
+            const battle =
+              st?.currentBattle != null
+                ? st.battles[String(st.currentBattle)]
+                : undefined;
+            if (battle && battle.host === name && st?.myUsername !== name) {
+              triggerIngameCue(name);
             }
           }
-        })
-        .catch(() => {});
-    };
-    const queueSnapshot = (d: Delta) => {
-      pendingDeltas.push(d);
-      if (flushTimer == null) {
-        flushTimer = window.setTimeout(flush, SNAPSHOT_BATCH_MS);
-      }
-    };
-    onEvent.onmessage = (ev) => {
-      dispatch({ type: "event", ev });
-      if (ev.kind === "delta") {
-        const d = ev.delta;
-        // The server has refused these credentials. Recorded so the reconnect
-        // loop stops rather than spending attempts on a password that will be
-        // refused again, which on Zero-K is counted against the IP address.
-        if (d.kind === "loginDenied" || d.kind === "registrationDenied") {
-          deniedRef.current = true;
-        }
-        // An autohost `!ring` is a transient event, not state - react to it directly
-        // (gong + reverberation + taskbar flash) rather than through the snapshot.
-        if (d.kind === "ring") triggerRing(d.from);
-        // A player transitioning to in-game is a transient moment, not just the
-        // resulting status (which the snapshot already carries). Flash the launcher's
-        // row briefly for everyone; when it's the founder of the battle we're in (and
-        // not ourselves), also fire the softer "it's starting, get in" cue - the host
-        // launching is the actionable "everyone's waiting on one person" case.
-        else if (d.kind === "playerWentIngame") {
-          const name = d.name;
-          setIngameFlash((prev) => new Set(prev).add(name));
-          window.setTimeout(() => {
-            setIngameFlash((prev) => {
-              if (!prev.has(name)) return prev;
-              const next = new Set(prev);
-              next.delete(name);
-              return next;
+          // The server confirmed we joined a channel (a bare JOIN echo, sent only
+          // to the joining client): persist it to the autojoin list now, on
+          // confirm and not on the optimistic send, so a channel the server
+          // refuses is never remembered. Clear any prior failure record for it
+          // (it recovered).
+          else if (d.kind === "channelJoined") {
+            // Only persist channels the user asked to join (in the pending set), so a
+            // channel the server auto-joins us to isn't silently added to the list.
+            if (rt.pendingJoins.delete(d.channel)) {
+              rememberJoinedChannel(
+                serverKey,
+                d.channel,
+                undefined,
+                setJoinedChannelsRef.current,
+              );
+            }
+            rt.notifiedJoinFailures.delete(d.channel);
+            updateConnection(serverKey, (c) => {
+              if (c.channelJoinFailures[d.channel] === undefined) return c;
+              const next = { ...c.channelJoinFailures };
+              delete next[d.channel];
+              return { ...c, channelJoinFailures: next };
             });
-          }, 2500);
-          const st = stateRef.current;
-          const battle =
-            st?.currentBattle != null
-              ? st.battles[String(st.currentBattle)]
-              : undefined;
-          if (battle && battle.host === name && st?.myUsername !== name) {
-            triggerIngameCue(name);
           }
-        }
-        // The server confirmed we joined a channel (a bare JOIN echo, sent only to
-        // the joining client): persist it to the autojoin list now, on confirm —
-        // NOT on the optimistic send — so a channel the server refuses is never
-        // remembered. Clear any prior failure record for it (it recovered).
-        else if (d.kind === "channelJoined") {
-          // Only persist channels the user asked to join (in the pending set), so a
-          // channel the server auto-joins us to isn't silently added to the list.
-          if (pendingJoinsRef.current.delete(d.channel)) {
-            rememberChannelRef.current(d.channel);
+          // A refused JOIN (e.g. a restricted #moderators, or a channel that became
+          // passworded after we'd joined it). Keep the entry on the autojoin list,
+          // since the restriction may lift, but record it so the settings can flag
+          // it, and toast only once per session so a permanently-restricted channel
+          // doesn't nag on every reconnect. The raw JOINFAILED line stays in the
+          // console.
+          else if (d.kind === "joinChannelFailed") {
+            rt.pendingJoins.delete(d.channel);
+            updateConnection(serverKey, (c) =>
+              c.channelJoinFailures[d.channel] === d.reason
+                ? c
+                : {
+                    ...c,
+                    channelJoinFailures: {
+                      ...c.channelJoinFailures,
+                      [d.channel]: d.reason,
+                    },
+                  },
+            );
+            if (!rt.notifiedJoinFailures.has(d.channel)) {
+              rt.notifiedJoinFailures.add(d.channel);
+              void notify({
+                title: `Couldn't join ${d.channel}`,
+                body: d.reason || undefined,
+                level: "error",
+              });
+            }
           }
-          notifiedJoinFailuresRef.current.delete(d.channel);
-          setChannelJoinFailures((prev) => {
-            if (prev[d.channel] === undefined) return prev;
-            const next = { ...prev };
-            delete next[d.channel];
-            return next;
-          });
+          // A player is in our relayed battle and their traffic will not reach
+          // the game, because the relay would not take their address. Only the
+          // host is told, because only the host has anything to tell: the joiner
+          // sees a battle they are in and a game that never starts for them.
+          else if (d.kind === "joinerNotLetThrough") {
+            void notify({
+              title: `${d.username} cannot reach your relayed battle`,
+              body: d.reason || undefined,
+              level: "error",
+            });
+          }
+          // The lobby would not advertise the battle at the relay's address. Rust
+          // closes the room the lobby opened anyway and returns the reason as the
+          // hosting command's error, so a host still looking at the Host button
+          // has already seen it. This is for the host who is not: the refusal can
+          // arrive after they have stopped waiting, and without it they find out
+          // from players saying they cannot connect.
+          else if (d.kind === "relayedHostRefused") {
+            void notify({
+              title: "Your battle is not going through the relay",
+              body: d.reason || undefined,
+              level: "error",
+            });
+          }
+          // A battle changed address without closing. The reducer has already
+          // pointed us at the new one, so nothing here has to be repaired, and
+          // until issue #2073 that was the whole of it: everybody in the room was
+          // silently moved and never told. Recorded rather than notified, because
+          // it is a fact that keeps rather than a question waiting on an answer,
+          // and the panel that reads it decides who it is worth saying to.
+          else if (d.kind === "battleHostMoved") {
+            recordBattleMoved(d.id);
+          }
+          // The relay came back at a new address, the lobby was asked to move the
+          // battle to it, and the lobby either said no or said nothing. The battle
+          // is open, quite possibly with a game in it, and the address everybody
+          // was given has gone, so nobody new can join and nothing here can put
+          // that right. The host is the only person who can, by hosting again.
+          //
+          // One warning covers both, because to the person hosting they are the
+          // same battle in the same state. A lobby too old to know the command
+          // does not refuse it, so silence is what today's servers all give, and
+          // reading differently from a refusal would only make it look less
+          // serious than it is.
+          else if (
+            d.kind === "relayedHostMoveRefused" ||
+            d.kind === "relayedHostMoveUnanswered"
+          ) {
+            const reason = d.kind === "relayedHostMoveRefused" ? d.reason : "";
+            void notify({
+              title: "Nobody can reach your battle any more",
+              body: reason
+                ? `Its relay moved and the lobby would not update the address: ${reason}`
+                : "Its relay moved and the lobby would not update the address.",
+              level: "error",
+            });
+          }
+          // The relay credential the lobby minted has run out and it would not
+          // mint another. Nothing is broken yet and nothing looks wrong, which is
+          // exactly why the host has to be told: the game carries on until the
+          // relay has to be rebuilt, and then it ends for everybody at once.
+          // Hosting again is the only thing that gets a live credential.
+          else if (d.kind === "relayCredentialExpired") {
+            void notify({
+              title: "Your battle is running on an expired relay pass",
+              body: "The lobby would not issue another one. The game carries on, but if the relay has to reconnect everybody will be dropped. Host again when you can.",
+              level: "error",
+            });
+          } else if (d.kind === "commandFailed") {
+            // Ignore-sync commands are best-effort: a server without IGNORE support
+            // may reject them, but local hiding still applies, so degrade silently
+            // rather than nag the user (the raw FAILED line is still in the console).
+            const cmd = d.command.toUpperCase();
+            if (
+              cmd !== "IGNORE" &&
+              cmd !== "UNIGNORE" &&
+              cmd !== "IGNORELIST"
+            ) {
+              void notify({
+                title: d.command
+                  ? `Command failed: ${d.command}`
+                  : "Command failed",
+                body: d.reason || undefined,
+                level: "error",
+              });
+            }
+          }
+          // A server announcement is a transient event too. Plain SERVERMSG is an
+          // unobtrusive info toast; a SERVERMSGBOX was flagged important by the
+          // server, so it's queued into a blocking dialog. Empty payloads are
+          // ignored so a malformed line can't pop a contentless toast/modal. The raw
+          // line is already in the protocol console for history.
+          else if (d.kind === "serverMessage") {
+            // A command with no reply of its own (e.g. `CHANGEPASSWORD`) is
+            // answered by whatever `SERVERMSG` comes next, and this is the only
+            // place every one passes through. Fire every waiter rather than just
+            // the first, since nothing stops two such commands overlapping.
+            for (const waiter of rt.serverMessageWaiters) waiter(d.text);
+            const text = d.text.trim();
+            if (text) {
+              if (d.boxed) setServerMsgBoxes((q) => [...q, d.text]);
+              else void notify({ title: "Server message", body: d.text });
+            }
+          }
+          // A staff `BROADCAST` (issue #2775). It never answers a command the way
+          // a plain SERVERMSG can, so it doesn't feed `serverMessageWaiters`, and
+          // it's titled apart from a routine server message so a player can tell
+          // an admin sent it.
+          else if (d.kind === "broadcast") {
+            const text = d.text.trim();
+            if (text)
+              void notify({ title: "Staff announcement", body: d.text });
+          }
+          // A game we played has finished and the server has said what it did to
+          // everybody's rating. Only the id is recorded: the result itself is in
+          // the snapshot that follows, and the drawer waits for it. Zero-K only
+          // (issue #2003).
+          else if (d.kind === "debriefingReceived") {
+            const battleId = d.battleId;
+            updateConnection(serverKey, (c) => ({
+              ...c,
+              debriefingShown: battleId,
+            }));
+          }
+          // One labelled line of a `GETUSERINFO` answer. The three arrive
+          // separately, so a field that arrives null keeps whatever this already
+          // held rather than blanking it.
+          else if (d.kind === "accountInfo") {
+            updateConnection(serverKey, (c) => ({
+              ...c,
+              accountInfo: {
+                registrationDate:
+                  d.registrationDate ?? c.accountInfo?.registrationDate ?? null,
+                email: d.email ?? c.accountInfo?.email ?? null,
+                ingameHours:
+                  d.ingameHours ?? c.accountInfo?.ingameHours ?? null,
+              },
+            }));
+          }
+          // The paired accept/deny delta for whichever of `changeEmailRequest`,
+          // `changeEmail` or `resendVerification` is currently awaited. Fire
+          // every waiter rather than just the first, the same reasoning as
+          // `serverMessageWaiters` above: each filters to the pair it was
+          // registered for and ignores the rest.
+          else if (
+            d.kind === "changeEmailCodeSent" ||
+            d.kind === "changeEmailAccepted" ||
+            d.kind === "changeEmailDenied" ||
+            d.kind === "resendVerificationAccepted" ||
+            d.kind === "resendVerificationDenied"
+          ) {
+            for (const waiter of rt.accountDeltaWaiters) waiter(d);
+          }
+          queueSnapshot(d);
         }
-        // A refused JOIN (e.g. a restricted #moderators, or a channel that became
-        // passworded after we'd joined it). Keep the entry on the autojoin list —
-        // the restriction may lift — but record it so the settings can flag it, and
-        // toast only once per session so a permanently-restricted channel doesn't
-        // nag on every reconnect. The raw JOINFAILED line stays in the console.
-        else if (d.kind === "joinChannelFailed") {
-          pendingJoinsRef.current.delete(d.channel);
-          setChannelJoinFailures((prev) =>
-            prev[d.channel] === d.reason
-              ? prev
-              : { ...prev, [d.channel]: d.reason },
+        // The server can pause a new account's first login on the agreement or
+        // verification-code handshake. Surface that so the dialog can prompt.
+        // Any other phase (e.g. the resume after submitting the code) clears it.
+        if (ev.kind === "phase") {
+          // Mark a session as "logged in" once it reaches ready. Only such a
+          // session's later drop is worth auto-reconnecting.
+          if (ev.phase === "ready") rt.loggedIn = true;
+          const agreement =
+            ev.phase === "awaitAgreement" ? (ev.agreement ?? "") : null;
+          updateConnection(serverKey, (c) =>
+            c.agreement === agreement ? c : { ...c, agreement },
           );
-          if (!notifiedJoinFailuresRef.current.has(d.channel)) {
-            notifiedJoinFailuresRef.current.add(d.channel);
-            void notify({
-              title: `Couldn't join ${d.channel}`,
-              body: d.reason || undefined,
-              level: "error",
-            });
+        }
+        if (ev.kind === "disconnected") {
+          // Nothing left to snapshot: the Rust side has already evicted this
+          // connection, so a pending refresh would only fetch a dead key.
+          if (flushTimer != null) {
+            window.clearTimeout(flushTimer);
+            flushTimer = null;
+            pendingDeltas = [];
           }
+          updateConnection(serverKey, (c) =>
+            c.agreement == null ? c : { ...c, agreement: null },
+          );
+          // Whose drop this was decides the rest, so the key goes with it.
+          // Acting on every drop meant a connection somebody had stopped using
+          // could log them out of the one they were on, and start a reconnect
+          // loop for it too (issue #2149).
+          handleDropRef.current(serverKey, ev.reason);
         }
-        // A player is in our relayed battle and their traffic will not reach
-        // the game, because the relay would not take their address. Only the
-        // host is told, because only the host has anything to tell: the joiner
-        // sees a battle they are in and a game that never starts for them.
-        else if (d.kind === "joinerNotLetThrough") {
-          void notify({
-            title: `${d.username} cannot reach your relayed battle`,
-            body: d.reason || undefined,
-            level: "error",
-          });
-        }
-        // The lobby would not advertise the battle at the relay's address. Rust
-        // closes the room the lobby opened anyway and returns the reason as the
-        // hosting command's error, so a host still looking at the Host button
-        // has already seen it. This is for the host who is not: the refusal can
-        // arrive after they have stopped waiting, and without it they find out
-        // from players saying they cannot connect.
-        else if (d.kind === "relayedHostRefused") {
-          void notify({
-            title: "Your battle is not going through the relay",
-            body: d.reason || undefined,
-            level: "error",
-          });
-        }
-        // A battle changed address without closing. The reducer has already
-        // pointed us at the new one, so nothing here has to be repaired, and
-        // until issue #2073 that was the whole of it: everybody in the room was
-        // silently moved and never told. Recorded rather than notified, because
-        // it is a fact that keeps rather than a question waiting on an answer,
-        // and the panel that reads it decides who it is worth saying to.
-        else if (d.kind === "battleHostMoved") {
-          recordBattleMoved(d.id);
-        }
-        // The relay came back at a new address, the lobby was asked to move the
-        // battle to it, and the lobby either said no or said nothing. The battle
-        // is open, quite possibly with a game in it, and the address everybody
-        // was given has gone, so nobody new can join and nothing here can put
-        // that right. The host is the only person who can, by hosting again.
-        //
-        // One warning covers both, because to the person hosting they are the
-        // same battle in the same state. A lobby too old to know the command
-        // does not refuse it, so silence is what today's servers all give, and
-        // reading differently from a refusal would only make it look less
-        // serious than it is.
-        else if (
-          d.kind === "relayedHostMoveRefused" ||
-          d.kind === "relayedHostMoveUnanswered"
-        ) {
-          const reason = d.kind === "relayedHostMoveRefused" ? d.reason : "";
-          void notify({
-            title: "Nobody can reach your battle any more",
-            body: reason
-              ? `Its relay moved and the lobby would not update the address: ${reason}`
-              : "Its relay moved and the lobby would not update the address.",
-            level: "error",
-          });
-        }
-        // The relay credential the lobby minted has run out and it would not
-        // mint another. Nothing is broken yet and nothing looks wrong, which is
-        // exactly why the host has to be told: the game carries on until the
-        // relay has to be rebuilt, and then it ends for everybody at once.
-        // Hosting again is the only thing that gets a live credential.
-        else if (d.kind === "relayCredentialExpired") {
-          void notify({
-            title: "Your battle is running on an expired relay pass",
-            body: "The lobby would not issue another one. The game carries on, but if the relay has to reconnect everybody will be dropped. Host again when you can.",
-            level: "error",
-          });
-        } else if (d.kind === "commandFailed") {
-          // Ignore-sync commands are best-effort: a server without IGNORE support
-          // may reject them, but local hiding still applies, so degrade silently
-          // rather than nag the user (the raw FAILED line is still in the console).
-          const cmd = d.command.toUpperCase();
-          if (cmd !== "IGNORE" && cmd !== "UNIGNORE" && cmd !== "IGNORELIST") {
-            void notify({
-              title: d.command
-                ? `Command failed: ${d.command}`
-                : "Command failed",
-              body: d.reason || undefined,
-              level: "error",
-            });
-          }
-        }
-        // A server announcement is a transient event too. Plain SERVERMSG is an
-        // unobtrusive info toast; a SERVERMSGBOX was flagged important by the
-        // server, so it's queued into a blocking dialog. Empty payloads are
-        // ignored so a malformed line can't pop a contentless toast/modal. The raw
-        // line is already in the protocol console for history.
-        else if (d.kind === "serverMessage") {
-          // A command with no reply of its own (e.g. `CHANGEPASSWORD`) is
-          // answered by whatever `SERVERMSG` comes next, and this is the only
-          // place every one passes through. Fire every waiter rather than just
-          // the first, since nothing stops two such commands overlapping.
-          for (const waiter of serverMessageWaiters.current) waiter(d.text);
-          const text = d.text.trim();
-          if (text) {
-            if (d.boxed) setServerMsgBoxes((q) => [...q, d.text]);
-            else void notify({ title: "Server message", body: d.text });
-          }
-        }
-        // A staff `BROADCAST` (issue #2775). It never answers a command the way
-        // a plain SERVERMSG can, so it doesn't feed `serverMessageWaiters`, and
-        // it's titled apart from a routine server message so a player can tell
-        // an admin sent it.
-        else if (d.kind === "broadcast") {
-          const text = d.text.trim();
-          if (text) void notify({ title: "Staff announcement", body: d.text });
-        }
-        // A game we played has finished and the server has said what it did to
-        // everybody's rating. Only the id is recorded: the result itself is in
-        // the snapshot that follows, and the drawer waits for it. Zero-K only
-        // (issue #2003).
-        else if (d.kind === "debriefingReceived") {
-          setDebriefingShown(d.battleId);
-        }
-        // One labelled line of a `GETUSERINFO` answer. The three arrive
-        // separately, so a field that arrives null keeps whatever this already
-        // held rather than blanking it.
-        else if (d.kind === "accountInfo") {
-          setAccountInfo((prev) => ({
-            registrationDate:
-              d.registrationDate ?? prev?.registrationDate ?? null,
-            email: d.email ?? prev?.email ?? null,
-            ingameHours: d.ingameHours ?? prev?.ingameHours ?? null,
-          }));
-        }
-        // The paired accept/deny delta for whichever of `changeEmailRequest`,
-        // `changeEmail` or `resendVerification` is currently awaited. Fire
-        // every waiter rather than just the first, the same reasoning as
-        // `serverMessageWaiters` above: each filters to the pair it was
-        // registered for and ignores the rest.
-        else if (
-          d.kind === "changeEmailCodeSent" ||
-          d.kind === "changeEmailAccepted" ||
-          d.kind === "changeEmailDenied" ||
-          d.kind === "resendVerificationAccepted" ||
-          d.kind === "resendVerificationDenied"
-        ) {
-          for (const waiter of accountDeltaWaiters.current) waiter(d);
-        }
-        queueSnapshot(d);
-      }
-      // The server can pause a new account's first login on the agreement/
-      // verification-code handshake; surface that so the dialog can prompt. Any
-      // other phase (e.g. the resume after submitting the code) clears it.
-      if (ev.kind === "phase") {
-        // Mark a session as "logged in" once it reaches ready — only such a
-        // session's later drop is worth auto-reconnecting.
-        if (ev.phase === "ready") loggedInRef.current = true;
-        setPendingAgreement((p) =>
-          ev.phase === "awaitAgreement"
-            ? { serverKey, text: ev.agreement ?? "" }
-            : p?.serverKey === serverKey
-              ? null
-              : p,
-        );
-      }
-      if (ev.kind === "disconnected") {
-        // Nothing left to snapshot: the Rust side has already evicted this
-        // connection, so a pending refresh would only fetch a dead key.
-        if (flushTimer != null) {
-          window.clearTimeout(flushTimer);
-          flushTimer = null;
-          pendingDeltas = [];
-        }
-        setPendingAgreement((p) => (p?.serverKey === serverKey ? null : p));
-        // Whose drop this was decides the rest, the way the line above already
-        // decides it, so the key goes with it. Acting on every drop meant a
-        // connection somebody had stopped using could log them out of the one
-        // they were on, and start a reconnect loop for it too (issue #2149).
-        handleDropRef.current(serverKey, ev.reason);
-      }
-    };
-    return onEvent;
-  }, []);
+      };
+      return onEvent;
+    },
+    [dispatchMirror, updateConnection],
+  );
 
   // The core connect, shared by the public `connect` and the auto-reconnect loop.
   // Records the reconnect context and resets the per-session drop flags so a later
@@ -1551,10 +1210,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       );
       if (blocked) throw new Error(blocked);
       setBusy(true);
-      intentionalRef.current = false;
-      loggedInRef.current = false;
-      deniedRef.current = false;
-      reconnectCtxRef.current = { server, username, direct };
+      const rt = runtimeFor(serverKey);
+      rt.intentional = false;
+      rt.loggedIn = false;
+      rt.denied = false;
+      rt.reconnectCtx = { server, username, direct };
       connectingKeyRef.current = serverKey;
       try {
         const onEvent = openChannel(serverKey);
@@ -1573,7 +1233,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               "No stored password for this login (set one in Settings).",
             );
           }
-          dispatch({ type: "connecting" });
+          beginConnecting(serverKey);
           await mpConnectZerok({
             serverKey,
             host: server.host,
@@ -1587,7 +1247,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // No password to read and no handshake to run. The Rust side refreshes
           // the token the browser sign-in stored, so this never opens a browser,
           // which is what makes an auto-reconnect safe on a Tachyon server.
-          dispatch({ type: "connecting" });
+          beginConnecting(serverKey);
           await mpConnectTachyon({
             serverKey,
             host: server.host,
@@ -1613,7 +1273,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             }
             secret = cred.secret;
           }
-          dispatch({ type: "connecting" });
+          beginConnecting(serverKey);
           await mpConnect({
             serverKey,
             host: server.host,
@@ -1628,7 +1288,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           });
         }
         const snap = await mpSnapshot({ serverKey });
-        dispatch({ type: "snapshot", state: snap.state });
+        rt.state = snap.state;
+        dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
         applyActiveKey(serverKey);
         setRoomKeyRef.current(direct ? serverKey : "");
         setLoginPopoverOpen(false);
@@ -1643,10 +1304,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         // A user cancel aborts the in-flight connect, so `mpConnect` rejects by
-        // design: swallow it, clear the mirror, and leave the UI disconnected
-        // rather than surfacing it as a login error or triggering a reconnect.
-        if (intentionalRef.current) {
-          dispatch({ type: "reset" });
+        // design: swallow it, forget the connection, and leave the UI
+        // disconnected rather than surfacing it as a login error or triggering a
+        // reconnect.
+        if (rt.intentional) {
+          closeConnection(serverKey);
           return;
         }
         throw e;
@@ -1655,7 +1317,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         setBusy(false);
       }
     },
-    [applyActiveKey, openChannel],
+    [
+      applyActiveKey,
+      beginConnecting,
+      closeConnection,
+      dispatchMirror,
+      openChannel,
+      runtimeFor,
+    ],
   );
 
   // The browser sign-in that gives a Tachyon connect something to refresh. Kept
@@ -1676,6 +1345,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Public connect: a manual login supersedes any in-flight auto-reconnect loop.
+  // Every loop, not only this key's, because only one connection is allowed.
   const connect = useCallback(
     async (server: LobbyServer, username: string) => {
       stopReconnect();
@@ -1703,72 +1373,81 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // A socket that never logged in can do nothing and still holds the key,
         // so a second attempt would be refused as a duplicate. Drop it.
         await mpDisconnect({ serverKey }).catch(() => {});
-        dispatch({ type: "reset" });
+        closeConnection(serverKey);
         applyActiveKey(null);
         throw e;
       }
       return serverKey;
     },
-    [applyActiveKey, doConnect, stopReconnect],
+    [applyActiveKey, closeConnection, doConnect, stopReconnect],
   );
 
-  // Run the reconnect loop after an unexpected drop: retry `doConnect` on a bounded
-  // backoff. A monotonic generation lets a manual connect/disconnect invalidate it,
-  // and it self-stops on success or after exhausting the attempt budget.
-  const runReconnect = useCallback(() => {
-    const gen = ++reconnectGenRef.current;
-    reconnectAttemptRef.current = 0;
-    const step = async () => {
-      if (reconnectGenRef.current !== gen) return; // superseded
-      const ctx = reconnectCtxRef.current;
-      if (!ctx) return;
-      try {
-        await doConnect(ctx.server, ctx.username, ctx.direct);
-        if (reconnectGenRef.current !== gen) return;
-        void notify({ title: "Reconnected to multiplayer", level: "success" });
-      } catch {
-        if (reconnectGenRef.current !== gen) return;
-        // A password the server has already refused will be refused again, so a
-        // retry costs a failed attempt and buys nothing. On Zero-K it costs more
-        // than that: it logs failed attempts per IP address, so a loop bans the
-        // address rather than the account. Stop and let the person fix it.
-        if (deniedRef.current) {
+  // Run a connection's reconnect loop after an unexpected drop: retry
+  // `doConnect` on a bounded backoff. A generation on the connection's runtime
+  // lets a manual connect/disconnect invalidate it, and it self-stops on
+  // success, after exhausting the attempt budget, or once the connection is
+  // closed.
+  const runReconnect = useCallback(
+    (serverKey: string) => {
+      const rt = runtimesRef.current.get(serverKey);
+      if (!rt) return;
+      const gen = ++rt.reconnectGen;
+      rt.reconnectAttempt = 0;
+      const superseded = () =>
+        rt.reconnectGen !== gen || runtimesRef.current.get(serverKey) !== rt;
+      const step = async () => {
+        if (superseded()) return;
+        const ctx = rt.reconnectCtx;
+        if (!ctx) return;
+        try {
+          await doConnect(ctx.server, ctx.username, ctx.direct);
+          if (superseded()) return;
           void notify({
-            title: "Multiplayer login refused",
-            body: "Check the password in Settings, then log in again from the topbar.",
-            level: "error",
+            title: "Reconnected to multiplayer",
+            level: "success",
           });
-          return;
+        } catch {
+          if (superseded()) return;
+          // A password the server has already refused will be refused again, so a
+          // retry costs a failed attempt and buys nothing. On Zero-K it costs more
+          // than that: it logs failed attempts per IP address, so a loop bans the
+          // address rather than the account. Stop and let the person fix it.
+          if (rt.denied) {
+            void notify({
+              title: "Multiplayer login refused",
+              body: "Check the password in Settings, then log in again from the topbar.",
+              level: "error",
+            });
+            return;
+          }
+          // A Tachyon sign-in the server has refused will be refused again, so
+          // retrying it only delays the one thing that can fix it: another trip
+          // through the browser, which a reconnect must never open by itself.
+          if (await needsSignIn(ctx.server, ctx.username)) {
+            if (superseded()) return;
+            void notify({
+              title: "Signed out of multiplayer",
+              body: "The server no longer accepts your sign-in. Log in again from the topbar to sign in with your browser.",
+              level: "error",
+            });
+            return;
+          }
+          const attempt = ++rt.reconnectAttempt;
+          if (attempt >= RECONNECT_DELAYS_MS.length) {
+            void notify({
+              title: "Couldn't reconnect to multiplayer",
+              body: "Log in again from the topbar when you're ready.",
+              level: "error",
+            });
+            return;
+          }
+          rt.reconnectTimer = window.setTimeout(step, reconnectDelay(attempt));
         }
-        // A Tachyon sign-in the server has refused will be refused again, so
-        // retrying it only delays the one thing that can fix it: another trip
-        // through the browser, which a reconnect must never open by itself.
-        if (await needsSignIn(ctx.server, ctx.username)) {
-          if (reconnectGenRef.current !== gen) return;
-          void notify({
-            title: "Signed out of multiplayer",
-            body: "The server no longer accepts your sign-in. Log in again from the topbar to sign in with your browser.",
-            level: "error",
-          });
-          return;
-        }
-        const attempt = ++reconnectAttemptRef.current;
-        if (attempt >= RECONNECT_DELAYS_MS.length) {
-          void notify({
-            title: "Couldn't reconnect to multiplayer",
-            body: "Log in again from the topbar when you're ready.",
-            level: "error",
-          });
-          return;
-        }
-        reconnectTimerRef.current = window.setTimeout(
-          step,
-          reconnectDelay(attempt),
-        );
-      }
-    };
-    reconnectTimerRef.current = window.setTimeout(step, reconnectDelay(0));
-  }, [doConnect]);
+      };
+      rt.reconnectTimer = window.setTimeout(step, reconnectDelay(0));
+    },
+    [doConnect],
+  );
 
   // React to a `disconnected` event: return the UI to disconnected, and start the
   // reconnect loop only for a genuine, unexpected drop of a logged-in session
@@ -1783,69 +1462,40 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     (serverKey: string, reason: string | null) => {
       if (activeKeyRef.current !== serverKey) return;
       applyActiveKey(null);
-      if (intentionalRef.current) return;
+      const rt = runtimesRef.current.get(serverKey);
+      if (!rt || rt.intentional) return;
       // A room is one running process, not an address worth retrying: once it
       // has told us why it ended (a stop, and later a kick), reconnecting would
       // dial whatever else has since taken that address and port, and land us
       // in a battle nobody chose (issue #2733). An unnamed drop is still worth
       // the reconnect below, since that is the shape a network blip takes and
       // the same room is what is still there to reclaim a seat in.
-      if (reconnectCtxRef.current?.direct && reason) {
+      if (rt.reconnectCtx?.direct && reason) {
         void notify({ title: "Disconnected from the room", body: reason });
         return;
       }
       if (!autoRejoinRef.current) return;
-      if (!loggedInRef.current) return;
-      if (!reconnectCtxRef.current) return;
-      const st = stateRef.current;
+      if (!rt.loggedIn) return;
+      if (!rt.reconnectCtx) return;
+      const st = rt.state;
       if (st?.currentBattle != null) {
         const battle = st.battles[String(st.currentBattle)];
         const me = st.myUsername ? battle?.members[st.myUsername] : undefined;
-        rejoinBattleRef.current = {
+        rt.rejoinBattle = {
           id: st.currentBattle,
           scriptPassword: me?.scriptPassword ?? null,
         };
       } else {
-        rejoinBattleRef.current = null;
+        rt.rejoinBattle = null;
       }
       void notify({ title: "Connection lost — reconnecting…" });
-      runReconnect();
+      runReconnect(serverKey);
     },
     [applyActiveKey, runReconnect],
   );
   useEffect(() => {
     handleDropRef.current = handleDrop;
   }, [handleDrop]);
-
-  // After a reconnect reaches `ready`, rejoin the battle captured before the drop if
-  // it's still open (channels replay via the effect above). Once per connection and
-  // best-effort — a closed/passworded battle is skipped, never a crash.
-  const rejoinBattleDoneRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (activeKey == null) {
-      rejoinBattleDoneRef.current = null;
-      return;
-    }
-    if (mirror.phase !== "ready" || rejoinBattleDoneRef.current === activeKey) {
-      return;
-    }
-    rejoinBattleDoneRef.current = activeKey;
-    const target = rejoinBattleRef.current;
-    rejoinBattleRef.current = null;
-    if (!target) return;
-    const stillOpen = mirror.state?.battles[String(target.id)] != null;
-    if (!stillOpen) {
-      void notify({ title: "Your battle is no longer open" });
-      return;
-    }
-    mpJoinBattle({
-      serverKey: activeKey,
-      id: target.id,
-      // A fresh one when the server never echoed the old back: teiserver refuses a
-      // JOINBATTLE that carries no script password at all.
-      scriptPassword: target.scriptPassword ?? newScriptPassword(),
-    }).catch((e) => console.warn("multiplayer: auto-rejoin battle failed", e));
-  }, [activeKey, mirror.phase, mirror.state]);
 
   // Drop a move that is about a battle this client has left. Somebody who leaves
   // and rejoins the same battle is handed its address afresh and was never
@@ -2104,10 +1754,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // uberserver's exact success string as success: a stale saved password can
   // be retyped, one overwritten wrongly cannot.
   //
-  // Guarded against a second call overlapping the first: with no token, two
-  // pending calls would each register a waiter, and a single SERVERMSG would
-  // resolve both, handing one command's answer to the other. Refusing a
-  // second call outright while one is already pending closes that off.
+  // Guarded against a second call overlapping the first on the same
+  // connection: with no token, two pending calls would each register a waiter,
+  // and a single SERVERMSG would resolve both, handing one command's answer to
+  // the other. Refusing a second call outright while one is already pending
+  // closes that off.
   //
   // What stays unguarded, because nothing at any layer can tell a
   // CHANGEPASSWORD reply apart from any other SERVERMSG: an unrelated
@@ -2120,167 +1771,225 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // saved password with a wrong one. The worst it can do is show the wrong
   // message while the real and saved passwords stay exactly as they were,
   // which the user fixes by retyping it.
-  const changePassword = useCallback(async (current: string, next: string) => {
-    const key = activeKeyRef.current;
-    if (!key) throw new Error("Not connected.");
-    if (serverMessageWaiters.current.size > 0) {
-      throw new Error("A password change is already in progress.");
-    }
-    let waiter: (text: string) => void = () => {};
-    let timer: ReturnType<typeof setTimeout>;
-    const cleanup = () => {
-      clearTimeout(timer);
-      serverMessageWaiters.current.delete(waiter);
-    };
-    const reply = new Promise<{ message: string; succeeded: boolean }>(
-      (resolve, reject) => {
-        timer = setTimeout(() => {
-          cleanup();
-          reject(new Error("The server did not answer."));
-        }, SERVER_REPLY_TIMEOUT_MS);
-        waiter = (text: string) => {
-          cleanup();
-          resolve({
-            message: text,
-            succeeded: text === CHANGE_PASSWORD_SUCCESS,
-          });
-        };
-        serverMessageWaiters.current.add(waiter);
-      },
-    );
-    // If the send itself fails (not connected by the time it reaches Rust, or
-    // the connection just closed), no reply is ever coming: clean up now
-    // rather than leaving the waiter live to block a retry behind "already in
-    // progress" and the timer to reject into a promise nobody is holding.
-    try {
-      await mpChangePassword({
-        serverKey: key,
-        currentPassword: current,
-        newPassword: next,
-      });
-    } catch (e) {
-      cleanup();
-      throw e;
-    }
-    return reply;
+  const changePassword = useCallback(
+    async (current: string, next: string, serverKey?: string) => {
+      const key = serverKey ?? activeKeyRef.current;
+      const rt = key ? runtimesRef.current.get(key) : undefined;
+      if (!key || !rt) throw new Error("Not connected.");
+      const waiters = rt.serverMessageWaiters;
+      if (waiters.size > 0) {
+        throw new Error("A password change is already in progress.");
+      }
+      let waiter: (text: string) => void = () => {};
+      let timer: ReturnType<typeof setTimeout>;
+      const cleanup = () => {
+        clearTimeout(timer);
+        waiters.delete(waiter);
+      };
+      const reply = new Promise<{ message: string; succeeded: boolean }>(
+        (resolve, reject) => {
+          timer = setTimeout(() => {
+            cleanup();
+            reject(new Error("The server did not answer."));
+          }, SERVER_REPLY_TIMEOUT_MS);
+          waiter = (text: string) => {
+            cleanup();
+            resolve({
+              message: text,
+              succeeded: text === CHANGE_PASSWORD_SUCCESS,
+            });
+          };
+          waiters.add(waiter);
+        },
+      );
+      // If the send itself fails (not connected by the time it reaches Rust, or
+      // the connection just closed), no reply is ever coming: clean up now
+      // rather than leaving the waiter live to block a retry behind "already in
+      // progress" and the timer to reject into a promise nobody is holding.
+      try {
+        await mpChangePassword({
+          serverKey: key,
+          currentPassword: current,
+          newPassword: next,
+        });
+      } catch (e) {
+        cleanup();
+        throw e;
+      }
+      return reply;
+    },
+    [],
+  );
+
+  // The connection an account command goes to, with its runtime, or a throw
+  // when there is none.
+  const accountTarget = useCallback((serverKey?: string) => {
+    const key = serverKey ?? activeKeyRef.current;
+    const rt = key ? runtimesRef.current.get(key) : undefined;
+    if (!key || !rt) throw new Error("Not connected.");
+    return { key, rt };
   }, []);
 
-  const changeEmailRequest = useCallback(async (email: string) => {
-    const key = activeKeyRef.current;
-    if (!key) throw new Error("Not connected.");
-    const { promise, cleanup } = waitForAccountDelta(
-      accountDeltaWaiters,
-      "changeEmailCodeSent",
-      "changeEmailDenied",
-    );
-    try {
-      await mpChangeEmailRequest({ serverKey: key, email });
-    } catch (e) {
-      cleanup();
-      throw e;
-    }
-    await promise;
-  }, []);
+  const changeEmailRequest = useCallback(
+    async (email: string, serverKey?: string) => {
+      const { key, rt } = accountTarget(serverKey);
+      const { promise, cleanup } = waitForAccountDelta(
+        rt.accountDeltaWaiters,
+        "changeEmailCodeSent",
+        "changeEmailDenied",
+      );
+      try {
+        await mpChangeEmailRequest({ serverKey: key, email });
+      } catch (e) {
+        cleanup();
+        throw e;
+      }
+      await promise;
+    },
+    [accountTarget],
+  );
 
-  const changeEmail = useCallback(async (email: string, code: string) => {
-    const key = activeKeyRef.current;
-    if (!key) throw new Error("Not connected.");
-    const { promise, cleanup } = waitForAccountDelta(
-      accountDeltaWaiters,
-      "changeEmailAccepted",
-      "changeEmailDenied",
-    );
-    try {
-      await mpChangeEmail({ serverKey: key, email, code });
-    } catch (e) {
-      cleanup();
-      throw e;
-    }
-    await promise;
-  }, []);
+  const changeEmail = useCallback(
+    async (email: string, code: string, serverKey?: string) => {
+      const { key, rt } = accountTarget(serverKey);
+      const { promise, cleanup } = waitForAccountDelta(
+        rt.accountDeltaWaiters,
+        "changeEmailAccepted",
+        "changeEmailDenied",
+      );
+      try {
+        await mpChangeEmail({ serverKey: key, email, code });
+      } catch (e) {
+        cleanup();
+        throw e;
+      }
+      await promise;
+    },
+    [accountTarget],
+  );
 
-  const resendVerification = useCallback(async (email: string) => {
-    const key = activeKeyRef.current;
-    if (!key) throw new Error("Not connected.");
-    const { promise, cleanup } = waitForAccountDelta(
-      accountDeltaWaiters,
-      "resendVerificationAccepted",
-      "resendVerificationDenied",
-    );
-    try {
-      await mpResendVerification({ serverKey: key, email });
-    } catch (e) {
-      cleanup();
-      throw e;
-    }
-    await promise;
-  }, []);
+  const resendVerification = useCallback(
+    async (email: string, serverKey?: string) => {
+      const { key, rt } = accountTarget(serverKey);
+      const { promise, cleanup } = waitForAccountDelta(
+        rt.accountDeltaWaiters,
+        "resendVerificationAccepted",
+        "resendVerificationDenied",
+      );
+      try {
+        await mpResendVerification({ serverKey: key, email });
+      } catch (e) {
+        cleanup();
+        throw e;
+      }
+      await promise;
+    },
+    [accountTarget],
+  );
 
-  const getUserInfo = useCallback(() => {
-    const key = activeKeyRef.current;
+  const getUserInfo = useCallback((serverKey?: string) => {
+    const key = serverKey ?? activeKeyRef.current;
     if (!key) throw new Error("Not connected.");
     mpGetUserInfo({ serverKey: key }).catch(() => {});
   }, []);
 
+  // The connection parked on an agreement, preferring the one the context
+  // describes. Only one can be while one connection is allowed.
+  const pendingAgreement = useMemo(() => {
+    const parked = Object.values(connections).filter(
+      (c) => c.agreement != null,
+    );
+    const pick =
+      parked.find((c) => c.serverKey === focusKey) ?? parked[0] ?? null;
+    return pick
+      ? { serverKey: pick.serverKey, text: pick.agreement ?? "" }
+      : null;
+  }, [connections, focusKey]);
+
   const submitAgreementCode = useCallback(
     async (code: string) => {
       if (!pendingAgreement) return;
+      const { serverKey } = pendingAgreement;
       // No code at all rather than an empty one, which would go out as
       // `CONFIRMAGREEMENT ` with a trailing space.
-      await mpConfirmAgreement({
-        serverKey: pendingAgreement.serverKey,
-        code: code || null,
-      });
-      setPendingAgreement(null);
+      await mpConfirmAgreement({ serverKey, code: code || null });
+      updateConnection(serverKey, (c) => ({ ...c, agreement: null }));
     },
-    [pendingAgreement],
+    [pendingAgreement, updateConnection],
   );
 
   const cancelAgreement = useCallback(async () => {
     if (!pendingAgreement) return;
-    // User-abandoned login: its `disconnected` is intentional, not a drop.
-    intentionalRef.current = true;
     const serverKey = pendingAgreement.serverKey;
-    setPendingAgreement(null);
+    // User-abandoned login: its `disconnected` is intentional, not a drop.
+    markIntentional(serverKey);
+    updateConnection(serverKey, (c) => ({ ...c, agreement: null }));
     await mpDisconnect({ serverKey }).catch(() => {});
-  }, [pendingAgreement]);
+  }, [markIntentional, pendingAgreement, updateConnection]);
 
   // Abort a connect that is still mid-handshake (the "Connecting…" state). Marks
   // the abort intentional and stops any reconnect loop before firing the backend
   // cancel, so the resulting `mpConnect` rejection unwinds cleanly to disconnected
   // without an error toast or an auto-reconnect. Safe to call with nothing pending.
-  const cancelConnect = useCallback(async () => {
-    intentionalRef.current = true;
-    stopReconnect();
-    const serverKey = connectingKeyRef.current;
-    if (serverKey) await mpCancelConnect({ serverKey }).catch(() => {});
-  }, [stopReconnect]);
+  const cancelConnect = useCallback(
+    async (serverKey?: string) => {
+      markIntentional(serverKey);
+      stopReconnect(serverKey);
+      const key = serverKey ?? connectingKeyRef.current;
+      if (key) await mpCancelConnect({ serverKey: key }).catch(() => {});
+    },
+    [markIntentional, stopReconnect],
+  );
 
-  const disconnect = useCallback(async () => {
-    // Mark intentional and kill any reconnect loop before the guard, so a manual
-    // "log out" can't be mistaken for a drop even mid-reconnect (no active key).
-    intentionalRef.current = true;
-    stopReconnect();
-    if (!activeKey) return;
-    setBusy(true);
-    try {
-      await mpDisconnect({ serverKey: activeKey });
-    } finally {
-      dispatch({ type: "reset" });
-      applyActiveKey(null);
-      setBusy(false);
-    }
-  }, [activeKey, applyActiveKey, stopReconnect]);
+  const disconnect = useCallback(
+    async (serverKey?: string) => {
+      // Mark intentional and kill any reconnect loop before the guard, so a manual
+      // "log out" can't be mistaken for a drop even mid-reconnect (no active key).
+      markIntentional(serverKey);
+      stopReconnect(serverKey);
+      const key = serverKey ?? activeKeyRef.current;
+      if (!key) return;
+      setBusy(true);
+      try {
+        await mpDisconnect({ serverKey: key });
+      } finally {
+        closeConnection(key);
+        if (activeKeyRef.current === key) applyActiveKey(null);
+        setBusy(false);
+      }
+    },
+    [applyActiveKey, closeConnection, markIntentional, stopReconnect],
+  );
 
-  const clearJoinError = useCallback(() => {
-    dispatch({ type: "clearJoinError" });
+  const clearJoinError = useCallback(
+    (serverKey?: string) => {
+      const key = serverKey ?? focusKey;
+      if (key) dispatchMirror(key, { type: "clearJoinError" });
+    },
+    [dispatchMirror, focusKey],
+  );
+
+  const setIngame = useCallback((ingame: boolean, serverKey?: string) => {
+    const key = serverKey ?? activeKeyRef.current;
+    if (key) runtimesRef.current.get(key)?.away?.setIngame(ingame);
   }, []);
 
-  // After a webview reload the React state resets but the Rust connection task keeps
-  // running, so re-adopt any live connection on mount (via `mp_reattach`). Without
-  // this a Vite hot-reload / refresh strands the UI as "disconnected" while the
-  // backend is still logged in — and a fresh connect would be rejected as a
-  // duplicate login. Runs once.
+  const setManualAway = useCallback((away: boolean, serverKey?: string) => {
+    const key = serverKey ?? activeKeyRef.current;
+    if (key) runtimesRef.current.get(key)?.away?.setManualAway(away);
+  }, []);
+
+  const closeDebriefing = useCallback(() => {
+    if (focusKey) {
+      updateConnection(focusKey, (c) => ({ ...c, debriefingShown: null }));
+    }
+  }, [focusKey, updateConnection]);
+
+  // After a webview reload the React state resets but the Rust connection task
+  // keeps running, so re-adopt any live connection on mount (via `mp_reattach`).
+  // Without this a Vite hot-reload or refresh strands the UI as "disconnected"
+  // while the backend is still logged in, and a fresh connect would be rejected
+  // as a duplicate login. Runs once.
   const rehydratedRef = useRef(false);
   useEffect(() => {
     if (rehydratedRef.current) return;
@@ -2290,15 +1999,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         const { keys } = await mpActiveKeys({});
         const serverKey = keys[0];
         if (serverKey) {
+          const rt = runtimeFor(serverKey);
           const onEvent = openChannel(serverKey);
+          dispatchConn({ type: "open", serverKey });
           await mpReattach({ serverKey, onEvent });
           const snap = await mpSnapshot({ serverKey });
-          dispatch({ type: "snapshot", state: snap.state });
+          rt.state = snap.state;
+          dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
           applyActiveKey(serverKey);
           return;
         }
       } catch {
-        // No live connection to re-adopt; fall through to opt-in auto-connect.
+        // No live connection to re-adopt, so fall through to opt-in auto-connect.
       }
       // Fresh launch with nothing to reattach: if the user opted in and the last
       // login still resolves against the profile-filtered catalog, seed the same
@@ -2320,12 +2032,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         });
       });
     })();
-  }, [applyActiveKey, openChannel, connect]);
+  }, [applyActiveKey, dispatchMirror, openChannel, connect, runtimeFor]);
 
   return (
     <MultiplayerContext.Provider
       value={{
         mirror,
+        connections,
         activeKey,
         connected: activeKey != null,
         activeDirect: activeKey != null && activeKey === roomKey,
@@ -2344,7 +2057,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         changeEmail,
         resendVerification,
         getUserInfo,
-        accountInfo,
+        accountInfo: focus?.accountInfo ?? null,
         disconnect,
         cancelConnect,
         pendingAgreement,
@@ -2360,15 +2073,31 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         loginPopoverOpen,
         openLoginPopover,
         closeLoginPopover,
-        justWentIngame: ingameFlash,
-        channelJoinFailures,
-        status,
+        justWentIngame: focus?.justWentIngame ?? NO_NAMES,
+        channelJoinFailures: focus?.channelJoinFailures ?? NO_FAILURES,
+        status: focus?.status ?? NOT_AWAY,
         setIngame,
-        manualAway,
+        manualAway: focus?.manualAway ?? false,
         setManualAway,
       }}
     >
       {children}
+      {Object.values(connections).map((entry) => (
+        <ConnectionSession
+          key={entry.serverKey}
+          entry={entry}
+          runtime={runtimeFor(entry.serverKey)}
+          servers={protocolServers}
+          joinedChannels={joinedChannels}
+          setJoinedChannels={setJoinedChannels}
+          ignored={ignored}
+          setIgnored={setIgnored}
+          favourites={favourites}
+          requestJoinChannel={requestJoinChannel}
+          update={updateConnection}
+          onSeenChange={forceSeenTick}
+        />
+      ))}
       <VerificationCodeDialog />
       <MatchFoundPanel />
       <ServerMessageBoxDialog
@@ -2377,16 +2106,22 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       />
       <DebriefingDrawer
         open={
-          debriefingShown != null &&
-          mirror.state?.debriefing?.battleId === debriefingShown
+          focus?.debriefingShown != null &&
+          mirror.state?.debriefing?.battleId === focus.debriefingShown
         }
         report={mirror.state?.debriefing ?? null}
         myUsername={mirror.state?.myUsername ?? null}
-        onClose={() => setDebriefingShown(null)}
+        onClose={closeDebriefing}
       />
     </MultiplayerContext.Provider>
   );
 }
+
+// Stable empty values for the context when no connection is in focus, so a
+// consumer's effect keyed on one does not re-run every render.
+const NO_NAMES: ReadonlySet<string> = new Set();
+const NO_FAILURES: Record<string, string> = {};
+const NOT_AWAY: ClientFlags = { ingame: false, away: false };
 
 /** Access the app-level lobby connection. Must be used within the provider. */
 export function useMultiplayer(): MultiplayerContextValue {
@@ -2395,4 +2130,16 @@ export function useMultiplayer(): MultiplayerContextValue {
     throw new Error("useMultiplayer must be used within MultiplayerProvider");
   }
   return ctx;
+}
+
+/**
+ * One connection's state by server key, or null when there is no such
+ * connection (issue #2841). Actions that take an optional `serverKey` act on
+ * the same connection when given this key.
+ */
+export function useConnection(
+  serverKey: string | null | undefined,
+): ConnectionState | null {
+  const { connections } = useMultiplayer();
+  return serverKey != null ? (connections[serverKey] ?? null) : null;
 }
