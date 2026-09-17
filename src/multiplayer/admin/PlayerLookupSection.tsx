@@ -15,6 +15,8 @@ import { identifierFieldProps } from "@/lib/identifierField";
 import type { AdminUserInfo } from "../bindings";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { type AdminRequestState, useAdminRequest } from "./adminRequest";
+import { ToolGroup, ToolHeader } from "./ToolHeader";
+import { TOOL_PARAM } from "./toolNav";
 
 /** `FINDIP` has no end marker, so every search waits out the full timeout
  * (`ADMIN_REPLY_TIMEOUT` in `admin_command.rs`, 20s). Told to the moderator
@@ -109,7 +111,7 @@ function BotFlagAction({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-border p-3">
+    <div className="flex flex-col gap-2">
       <span className="flex items-center gap-2">
         <Switch
           id={id}
@@ -256,9 +258,9 @@ function ResetPasswordAction({
   );
 }
 
-/** The kick form and its result, for the account currently in view. Later
- * issues add more actions beside this one (ban #2778, password reset #2781,
- * access level #2786, delete #2787). */
+/** The kick form and its result, for the account currently in view, in a
+ * popover beside the other account actions (issue #2918) rather than open on
+ * the page. It stays open after Kick so the reply shows in the same place. */
 function KickAction({
   username,
   serverKey,
@@ -270,56 +272,63 @@ function KickAction({
   const kick = useAdminRequest(serverKey);
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-border p-3">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Actions
-      </span>
-      <form
-        className="flex items-end gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const trimmed = reason.trim();
-          void kick.send(
-            "KICK",
-            trimmed ? [username, trimmed] : [username],
-            "kick",
-          );
-        }}
-      >
-        <span className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
-          Reason (optional)
-          <Input
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder="reason"
-            aria-label="Kick reason"
-            className="h-8"
-          />
-        </span>
-        <Button type="submit" variant="destructive" size="sm" className="h-8">
-          Kick
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-8">
+          Kick…
         </Button>
-      </form>
-      <AdminRequestStatus
-        state={kick.state}
-        unanswered="The server did not answer."
-      >
-        {(reply) =>
-          reply.shape === "kick"
-            ? reply.kicked
-              ? `Kicked ${reply.username} from the server.`
-              : `${reply.username} was not online.`
-            : null
-        }
-      </AdminRequestStatus>
-    </div>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-80 flex-col gap-3">
+        <h3 className="text-sm font-medium">
+          Kick {username} from the server?
+        </h3>
+        <form
+          className="flex items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const trimmed = reason.trim();
+            void kick.send(
+              "KICK",
+              trimmed ? [username, trimmed] : [username],
+              "kick",
+            );
+          }}
+        >
+          <span className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+            Reason (optional)
+            <Input
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="reason"
+              aria-label="Kick reason"
+              className="h-8"
+            />
+          </span>
+          <Button type="submit" variant="destructive" size="sm" className="h-8">
+            Kick
+          </Button>
+        </form>
+        <AdminRequestStatus
+          state={kick.state}
+          unanswered="The server did not answer."
+        >
+          {(reply) =>
+            reply.shape === "kick"
+              ? reply.kicked
+                ? `Kicked ${reply.username} from the server.`
+                : `${reply.username} was not online.`
+              : null
+          }
+        </AdminRequestStatus>
+      </PopoverContent>
+    </Popover>
   );
 }
 
 /**
- * Opens the bans section below on the Server admin page with this account's
- * name filled into the `BAN` form (issue #2778). Handed off through `?ban=`
- * rather than a prop, so `PlayerLookupSection` and `BansSection` stay
+ * Opens the Bans tool on the Server admin page with this account's name
+ * filled into the `BAN` form (issues #2778 and #2918). Handed off through
+ * `?ban=` and `?tool=` rather than a prop, so `PlayerLookupSection` and `BansSection` stay
  * independent siblings on `ServerAdminPage`, the same URL-as-shared-state
  * pattern `useServerAdminKey` uses for `?server=`.
  */
@@ -337,6 +346,7 @@ function BanAction({ username }: { username: string }) {
           (prev) => {
             const next = new URLSearchParams(prev);
             next.set("ban", username);
+            next.set(TOOL_PARAM, "bans");
             return next;
           },
           { replace: true },
@@ -407,61 +417,78 @@ function AccountInfoView({
       );
     case "account":
       return (
-        <div className="flex flex-col gap-3">
-          <DetailField label="Username" value={info.username} />
-          <DetailField
-            label="Status"
-            value={
-              info.online
-                ? `Online (session ${dash(info.sessionId)})`
-                : "Offline"
-            }
-          />
-          <DetailField label="User ID" value={info.userId} />
-          <DetailField label="Client agent" value={dash(info.agent)} />
-          <DetailField label="Registered" value={info.registered} />
-          <DetailField label="Last login" value={info.lastLogin} />
-          <DetailField label="Access level" value={info.access} />
-          <BotFlagAction
-            username={info.username}
-            bot={info.bot}
-            serverKey={serverKey}
-            onChanged={() => onPickName(info.username)}
-          />
-          <DetailField
-            label="In-game time"
-            value={`${info.ingameHours} hours`}
-          />
-          <DetailField label="Email" value={dash(info.email)} />
-          <DetailField label="Last IP" value={dash(info.lastIp)} />
-          {info.lastIp && (
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 self-start"
-                onClick={() => info.lastIp && onFindIp(info.lastIp)}
-              >
-                Find other accounts on this IP
-              </Button>
-              {ipSearch.state.status !== "idle" && (
-                <IpSearchResults state={ipSearch.state} onPick={onPickName} />
-              )}
+        <article className="flex flex-col gap-6 text-foreground">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+            <div className="flex flex-col">
+              <h3 className="text-base font-semibold">{info.username}</h3>
+              <p className="text-sm text-muted-foreground">
+                {info.online
+                  ? `Online (session ${dash(info.sessionId)})`
+                  : "Offline"}
+              </p>
             </div>
-          )}
-          <DetailField label="Last hardware ID" value={dash(info.lastMacId)} />
-          <DetailField label="Last system ID" value={dash(info.lastSysId)} />
-          <div className="flex items-center justify-end gap-2">
-            <ResetPasswordAction
+            <div className="flex flex-wrap items-center gap-2">
+              <ResetPasswordAction
+                username={info.username}
+                email={info.email}
+                serverKey={serverKey}
+              />
+              <KickAction username={info.username} serverKey={serverKey} />
+              <BanAction username={info.username} />
+            </div>
+          </header>
+
+          <ToolGroup title="Account">
+            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              <DetailField label="User ID" value={info.userId} />
+              <DetailField label="Access level" value={info.access} />
+              <DetailField label="Registered" value={info.registered} />
+              <DetailField label="Last login" value={info.lastLogin} />
+              <DetailField
+                label="In-game time"
+                value={`${info.ingameHours} hours`}
+              />
+              <DetailField label="Client agent" value={dash(info.agent)} />
+            </div>
+            <BotFlagAction
               username={info.username}
-              email={info.email}
+              bot={info.bot}
               serverKey={serverKey}
+              onChanged={() => onPickName(info.username)}
             />
-            <BanAction username={info.username} />
-          </div>
-          <KickAction username={info.username} serverKey={serverKey} />
-        </div>
+          </ToolGroup>
+
+          <ToolGroup title="Contact and network">
+            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              <DetailField label="Email" value={dash(info.email)} />
+              <DetailField label="Last IP" value={dash(info.lastIp)} />
+              <DetailField
+                label="Last hardware ID"
+                value={dash(info.lastMacId)}
+              />
+              <DetailField
+                label="Last system ID"
+                value={dash(info.lastSysId)}
+              />
+            </div>
+            {info.lastIp && (
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 self-start"
+                  onClick={() => info.lastIp && onFindIp(info.lastIp)}
+                >
+                  Find other accounts on this IP
+                </Button>
+                {ipSearch.state.status !== "idle" && (
+                  <IpSearchResults state={ipSearch.state} onPick={onPickName} />
+                )}
+              </div>
+            )}
+          </ToolGroup>
+        </article>
       );
   }
 }
@@ -479,6 +506,9 @@ function AccountInfoView({
  * so a `FINDIP` in flight does not clobber the account details already
  * shown, and picking a name from a `FINDIP` result clears any earlier
  * search rather than leaving it beside the new account.
+ *
+ * On the Server admin page it is the Players tool (issue #2918), with Look up
+ * as its one primary action and the account actions beside the account.
  */
 export function PlayerLookupSection({ serverKey }: { serverKey: string }) {
   const [params, setParams] = useSearchParams();
@@ -507,10 +537,13 @@ export function PlayerLookupSection({ serverKey }: { serverKey: string }) {
   };
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-base font-semibold">Player lookup</h2>
+    <section className="flex flex-col gap-6">
+      <ToolHeader
+        title="Player lookup"
+        description="An account's details, the IP it last used, and the other accounts seen on that IP."
+      />
       <form
-        className="flex items-end gap-2"
+        className="flex max-w-md items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           runLookup(name);

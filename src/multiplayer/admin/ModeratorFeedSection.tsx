@@ -9,6 +9,7 @@ import {
   type ParsedAnnouncement,
   parseAnnouncement,
 } from "./moderatorFeed";
+import { ToolHeader } from "./ToolHeader";
 
 function fmtTime(ms: number): string {
   if (!ms) return "";
@@ -178,17 +179,20 @@ export function ModeratorFeedSection({ serverKey }: { serverKey: string }) {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-base font-semibold">Staff activity</h2>
-        <Link
-          to={channelHref}
-          className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-        >
-          Open #moderator in Chat
-        </Link>
-      </div>
+      <ToolHeader
+        title="Staff activity"
+        description="ChanServ's announcements of what moderators and admins did, from #moderator."
+        actions={
+          <Link
+            to={channelHref}
+            className="text-sm text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+          >
+            Open #moderator in Chat
+          </Link>
+        }
+      />
       {announcements.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-prose text-sm text-muted-foreground">
           No staff actions yet this session. #moderator does not keep history on
           this server by default, so this feed only shows announcements that
           arrive while coilbox stays connected, not anything from before now.

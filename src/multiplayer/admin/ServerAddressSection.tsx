@@ -5,6 +5,7 @@ import { AdminOnly } from "../AdminOnly";
 import type { AdminReply } from "../bindings";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { useAdminRequest } from "./adminRequest";
+import { ToolGroup, ToolHeader } from "./ToolHeader";
 
 function overrideText(pinned: string | null) {
   return pinned === null ? "Looked up by the server" : `Pinned to ${pinned}`;
@@ -58,12 +59,10 @@ function RefreshView({ reply }: { reply: AdminReply }) {
 function RefreshIpAction({ serverKey }: { serverKey: string }) {
   const refresh = useAdminRequest(serverKey);
   return (
-    <div className="flex flex-col gap-2 rounded border border-border p-3">
-      <p className="text-xs text-muted-foreground">
-        Makes the server look up its public IP address again. Battles opened
-        afterwards advertise the new address. Battles already open must be
-        rehosted.
-      </p>
+    <ToolGroup
+      title="Refresh the address (admins only)"
+      description="Makes the server look up its public IP address again. Battles opened afterwards advertise the new address. Battles already open must be rehosted."
+    >
       <Button
         size="sm"
         variant="outline"
@@ -79,7 +78,7 @@ function RefreshIpAction({ serverKey }: { serverKey: string }) {
       >
         {(reply) => <RefreshView reply={reply} />}
       </AdminRequestStatus>
-    </div>
+    </ToolGroup>
   );
 }
 
@@ -87,25 +86,28 @@ function RefreshIpAction({ serverKey }: { serverKey: string }) {
  * The address the server gives players for the battles they host (issue
  * #2782), through ChanServ. `:showip` is for moderators and says nothing
  * about players. `:refreship` is for admins, so it is behind `<AdminOnly>`.
+ * On the Server admin page it is the Server tool (issue #2918).
  */
 export function ServerAddressSection({ serverKey }: { serverKey: string }) {
   const show = useAdminRequest(serverKey);
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-base font-semibold">Server address</h2>
-      <div className="flex flex-col gap-2 rounded border border-border p-3">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 self-start"
-          onClick={() => void show.send("showip", [], "showIp")}
-        >
-          Show server IP
-        </Button>
-        <AdminRequestStatus state={show.state}>
-          {(reply) => <AddressView reply={reply} />}
-        </AdminRequestStatus>
-      </div>
+    <section className="flex flex-col gap-6">
+      <ToolHeader
+        title="Server address"
+        description="The addresses the server gives players for the battles they host."
+        actions={
+          <Button
+            size="sm"
+            className="h-8"
+            onClick={() => void show.send("showip", [], "showIp")}
+          >
+            Show server IP
+          </Button>
+        }
+      />
+      <AdminRequestStatus state={show.state}>
+        {(reply) => <AddressView reply={reply} />}
+      </AdminRequestStatus>
       <AdminOnly>
         <RefreshIpAction serverKey={serverKey} />
       </AdminOnly>

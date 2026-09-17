@@ -516,6 +516,11 @@ describe("the Ban action", () => {
     expect(screen.getByTestId("search-params").textContent).toContain(
       "ban=Alice",
     );
+    // The page shows one tool at a time (issue #2918), so the handoff also
+    // switches to Bans.
+    expect(screen.getByTestId("search-params").textContent).toContain(
+      "tool=bans",
+    );
   });
 });
 

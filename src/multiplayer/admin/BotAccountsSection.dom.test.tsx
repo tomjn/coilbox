@@ -40,9 +40,22 @@ afterEach(() => {
   mpAdminCommand.mockReset();
 });
 
+/** Draws the tool and opens its form, which sits in a drawer (issue #2918). */
 function draw() {
   render(<BotAccountsSection serverKey={SERVER_KEY} />);
+  fireEvent.click(screen.getByRole("button", { name: "Create bot account…" }));
 }
+
+describe("the form", () => {
+  it("stays closed until asked for", () => {
+    render(<BotAccountsSection serverKey={SERVER_KEY} />);
+    expect(screen.queryByLabelText("New bot account name")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create bot account…" }),
+    );
+    expect(screen.getByLabelText("New bot account name")).toBeTruthy();
+  });
+});
 
 function answered(reply: AdminReply): AdminOutcome {
   return { outcome: "answered", reply };
