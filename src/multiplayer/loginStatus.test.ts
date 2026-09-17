@@ -9,9 +9,10 @@ function entry(
     phase?: ConnectionState["mirror"]["phase"];
     error?: string | null;
     away?: boolean;
+    direct?: boolean;
   } = {},
 ): ConnectionState {
-  const base = newConnection(serverKey);
+  const base = newConnection(serverKey, opts.direct ?? false);
   return {
     ...base,
     live: opts.live ?? false,
@@ -78,5 +79,24 @@ describe("lobbyDotStatus", () => {
     expect(
       lobbyDotStatus(all(entry(A, { error: "connection reset" })), true),
     ).toBe("connecting");
+  });
+
+  // A LAN or direct-address room is not a lobby login (issue #2850), so it must
+  // not turn the dot on (issue #2904).
+  it("ignores a room, live or otherwise, when no login is connected", () => {
+    const readyRoom = entry(A, { live: true, phase: "ready", direct: true });
+    expect(lobbyDotStatus(all(readyRoom), false)).toBe("off");
+    const openingRoom = entry(A, {
+      live: true,
+      phase: "awaitGreeting",
+      direct: true,
+    });
+    expect(lobbyDotStatus(all(openingRoom), false)).toBe("off");
+  });
+
+  it("reports the login's status beside a live room", () => {
+    const room = entry(A, { live: true, phase: "ready", direct: true });
+    const login = entry(B, { live: true, phase: "ready" });
+    expect(lobbyDotStatus(all(room, login), false)).toBe("on");
   });
 });
