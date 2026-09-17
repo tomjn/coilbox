@@ -21,9 +21,12 @@ import {
   orderedAis,
 } from "@/play/gameAi";
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
-import { useMultiplayer } from "../store";
+import { useConnection } from "../store";
 import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
 import { type MemberControls, MemberRow } from "./MemberRow";
+
+// A stable empty set for a room with no connection behind it.
+const NO_NAMES: ReadonlySet<string> = new Set();
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
@@ -34,6 +37,7 @@ const range = (n: number) => Array.from({ length: n }, (_, i) => i);
  * `MemberRow` handles the read-only-vs-editable branching per cell.
  */
 export function BattleMembersTable({
+  serverKey,
   rows,
   sides,
   factionLogos,
@@ -134,8 +138,11 @@ export function BattleMembersTable({
   onTeam: (teamId: number) => void;
   onAlly: (ally: number) => void;
   onColor: (hex: string) => void;
+  /** The connection this battle is on, whose players' launches flash their
+   *  rows (issue #2844). */
+  serverKey: string | null;
 }) {
-  const { justWentIngame } = useMultiplayer();
+  const justWentIngame = useConnection(serverKey)?.justWentIngame ?? NO_NAMES;
   // The AI the host will add next; defaults to the first available.
   const [chosenAi, setChosenAi] = useState("");
   useEffect(() => {

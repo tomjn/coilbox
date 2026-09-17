@@ -19,9 +19,10 @@ import { hexToI32 } from "./config";
 const markSeen = vi.fn();
 
 vi.mock("../store", () => ({
-  useMultiplayer: () => ({
+  initialMirror: { state: null },
+  useMultiplayer: () => ({ markSeen }),
+  useConnection: () => ({
     mirror: { state: { myUsername: "Host", users: {} } },
-    markSeen,
   }),
 }));
 
@@ -139,6 +140,7 @@ function renderCard(
       hostControls={{ forceAlly, forceTeam }}
       onSetBattleStatusBatch={onSetBattleStatusBatch}
       onSetLocked={onSetLocked}
+      serverKey="Host@server:8200"
     />,
   );
   return {

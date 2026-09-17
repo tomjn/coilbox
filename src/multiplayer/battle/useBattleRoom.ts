@@ -44,17 +44,24 @@ import {
 import {
   carriesBotAlly,
   founderRunsTheGame,
+  protocolForKey,
   seatIsServerAssigned,
   startPositionsUnavailable,
   unitRestrictionsUnavailable,
 } from "../protocol";
-import { useMultiplayer } from "../store";
+import {
+  initialMirror,
+  useConnection,
+  useMultiplayer,
+  useProtocolServers,
+} from "../store";
 import {
   battleOptionTags,
   canEditBattleOptions,
   missingOptionTags,
   staleMapOptionTags,
 } from "./battleOptions";
+import { battleRoomHref } from "./battleRoomKey";
 import {
   battleStartable,
   clampBonus,
@@ -333,9 +340,30 @@ export interface BattleRoomView {
   rescan: () => Promise<void>;
 }
 
-export function useBattleRoom(): BattleRoomView {
-  const { mirror, activeKey, activeDirect, protocol, setIngame } =
-    useMultiplayer();
+/**
+ * `serverKey` is the connection whose battle this room draws (issue #2844),
+ * which need not be the focused one. Every read and every command below goes
+ * to that connection.
+ */
+export function useBattleRoom(serverKey: string | null): BattleRoomView {
+  const { directKey, setIngame: setIngameOn } = useMultiplayer();
+  const connection = useConnection(serverKey);
+  const mirror = connection?.mirror ?? initialMirror;
+  // Commands go nowhere once the connection is gone, as they did when this
+  // read the focused key and there was none.
+  const activeKey = connection ? serverKey : null;
+  const activeDirect = activeKey != null && activeKey === directKey;
+  const servers = useProtocolServers();
+  const protocol = useMemo(
+    () => protocolForKey(activeKey, servers),
+    [activeKey, servers],
+  );
+  const setIngame = useCallback(
+    (ingame: boolean) => {
+      if (activeKey) setIngameOn(ingame, activeKey);
+    },
+    [setIngameOn, activeKey],
+  );
   const state = mirror.state;
   // Tachyon assigns team colours when the match starts, and picks a member's
   // team within their ally team itself, so the colour, faction, team and
@@ -370,6 +398,7 @@ export function useBattleRoom(): BattleRoomView {
   // copy of it. `applyOptionTags`'s founder branch below never touches this:
   // writing every tag as one script-tag batch has nothing to pace.
   const presetDelivery = useTweakDelivery({
+    serverKey: activeKey,
     battleId: battle?.id ?? null,
     isFounder,
   });
@@ -527,20 +556,19 @@ export function useBattleRoom(): BattleRoomView {
   // Notify once per vote (issue #429): fire on the null -> set transition only, so
   // a re-render while the same vote stays open (tally/countdown ticking) doesn't
   // re-fire, and a new distinct vote opening after this one clears fires again.
-  // `to` routes back to the battle room, useful once the user has clicked through
-  // elsewhere in the app; the room has no id in its route (one active battle at a
-  // time), so `to` is always safe to include here.
+  // `to` routes back to this battle room, on its own server, useful once the
+  // user has clicked through elsewhere in the app.
   const prevVoteRef = useRef<Vote | null>(null);
   useEffect(() => {
     if (shouldNotifyVoteOpened(prevVoteRef.current, currentVote)) {
       void notify({
         title: "Vote called",
         body: currentVote?.subject || "A vote is open in your battle.",
-        to: "/battle",
+        to: battleRoomHref(activeKey),
       });
     }
     prevVoteRef.current = currentVote;
-  }, [currentVote]);
+  }, [currentVote, activeKey]);
 
   // The colour we last intended (as the `0xBBGGRR` int), so a status push that
   // omits `color` never reverts to 0 while our colour echo is still in flight —

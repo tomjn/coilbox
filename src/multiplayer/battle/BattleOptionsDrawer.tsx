@@ -43,6 +43,7 @@ export function BattleOptionsDrawer({
   startPositionsUnavailable,
   onRestrictChange,
   isFounder,
+  serverKey,
 }: {
   battle: Battle;
   modOptionsSchema: ConfigOption[];
@@ -66,6 +67,9 @@ export function BattleOptionsDrawer({
   /** Whether we opened this battle, which decides whether a workshop project's
    *  slots are written as script tags or asked of the autohost (issue #1279). */
   isFounder: boolean;
+  /** The connection this battle is on, which a workshop project's slots are
+   *  sent to (issue #2844). */
+  serverKey: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const { pending, setOption } = useBattleOptions(
@@ -175,6 +179,7 @@ export function BattleOptionsDrawer({
                 scriptTags={battle.scriptTags}
                 battleId={battle.id}
                 isFounder={isFounder}
+                serverKey={serverKey}
                 canEdit={canEdit}
               />
               <RestrictSection

@@ -41,6 +41,7 @@ export function TweakProjectSection({
   battleId,
   isFounder,
   canEdit,
+  serverKey,
 }: {
   /** The battle's game, which is what a project is written against. */
   gameName: string;
@@ -50,9 +51,11 @@ export function TweakProjectSection({
   battleId: number | null;
   isFounder: boolean;
   canEdit: boolean;
+  /** The connection the battle is on (issue #2844). */
+  serverKey: string | null;
 }) {
   const { projects } = useModProjects();
-  const delivery = useTweakDelivery({ battleId, isFounder });
+  const delivery = useTweakDelivery({ serverKey, battleId, isFounder });
   const [chosen, setChosen] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [packing, setPacking] = useState(false);

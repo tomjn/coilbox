@@ -1,4 +1,5 @@
-import { useMultiplayer } from "./store";
+import { useInBattleKey } from "./battle/useBattleRoomKey";
+import { useConnection, useMultiplayer } from "./store";
 
 /**
  * Nav/route predicate: has the user connected at least once this session? Gates
@@ -27,20 +28,22 @@ export function useMpMatchmaking(): boolean {
 }
 
 /**
- * Nav/route predicate: is the user currently in a battle? Gates the Battle Room
- * sidebar item + route so it appears on join and vanishes on leave.
+ * Nav/route predicate: is the user currently in a battle, on any connection?
+ * Gates the Battle Room sidebar item + route so it appears on join and vanishes
+ * on leave.
  */
 export function useMpInBattle(): boolean {
-  return useMultiplayer().mirror.state?.currentBattle != null;
+  return useInBattleKey() != null;
 }
 
 /**
- * The dynamic label for the Battle Room nav item: the joined battle's title, or
+ * The dynamic label for the Battle Room nav item: the joined battle's title,
+ * on whichever connection it is (issue #2844), or
  * a generic fallback. Read reactively so picoframe re-renders it as the battle
  * changes (`NavItem.useLabel`).
  */
 export function useBattleRoomLabel(): string {
-  const state = useMultiplayer().mirror.state;
+  const state = useConnection(useInBattleKey())?.mirror.state;
   const battle =
     state?.currentBattle != null
       ? state.battles[String(state.currentBattle)]
