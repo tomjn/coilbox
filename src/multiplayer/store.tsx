@@ -88,6 +88,8 @@ import {
   type Connections,
   connectionsReducer,
   newRuntime,
+  pendingAgreement as pickPendingAgreement,
+  pendingDebriefing as pickPendingDebriefing,
 } from "./connections";
 import { DebriefingDrawer } from "./DebriefingDrawer";
 import { useFavourites } from "./friends";
@@ -626,11 +628,16 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   }, []);
   const busy = busyKeys.size > 0;
 
-  // FIFO queue of `SERVERMSGBOX` texts awaiting acknowledgement. Boxed server
-  // messages are important enough that the server asked for a modal, so they're
-  // queued (never dropped) rather than overwriting each other. The dialog shows
-  // the front and dismissing pops it.
-  const [serverMsgBoxes, setServerMsgBoxes] = useState<string[]>([]);
+  // FIFO queue of `SERVERMSGBOX` texts awaiting acknowledgement, across every
+  // connection (issue #2847). Boxed server messages are important enough
+  // that the server asked for a modal, so they're queued (never dropped)
+  // rather than overwriting each other, and a box on a connection nobody is
+  // looking at still queues rather than being lost. The dialog shows the
+  // front, naming its server once there is more than one connection to tell
+  // apart, and dismissing pops it.
+  const [serverMsgBoxes, setServerMsgBoxes] = useState<
+    { serverKey: string; text: string }[]
+  >([]);
 
   // Highlight-word preferences (issue #193), mirrored into a ref so the frozen
   // event handler (openChannel is `useCallback(..., [])`) can read the current
@@ -1164,7 +1171,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             for (const waiter of rt.serverMessageWaiters) waiter(d.text);
             const text = d.text.trim();
             if (text) {
-              if (d.boxed) setServerMsgBoxes((q) => [...q, d.text]);
+              if (d.boxed)
+                setServerMsgBoxes((q) => [...q, { serverKey, text: d.text }]);
               else void notify({ title: "Server message", body: d.text });
             }
           }
@@ -1962,18 +1970,20 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     mpGetUserInfo({ serverKey: key }).catch(() => {});
   }, []);
 
-  // The connection parked on an agreement, preferring the one the context
-  // describes. Only one can be while one connection is allowed.
-  const pendingAgreement = useMemo(() => {
-    const parked = Object.values(connections).filter(
-      (c) => c.agreement != null,
-    );
-    const pick =
-      parked.find((c) => c.serverKey === focusKey) ?? parked[0] ?? null;
-    return pick
-      ? { serverKey: pick.serverKey, text: pick.agreement ?? "" }
-      : null;
-  }, [connections, focusKey]);
+  // The connection parked on an agreement, preferring the focused one. Two
+  // connections parking at once queue: the one not picked stays parked and
+  // is picked up next once the first clears its `agreement` (issue #2847).
+  const pendingAgreement = useMemo(
+    () => pickPendingAgreement(connections, focusKey),
+    [connections, focusKey],
+  );
+
+  // The connection whose debriefing drawer should be open, preferring the
+  // focused one, queuing the same way `pendingAgreement` does (issue #2847).
+  const activeDebriefing = useMemo(
+    () => pickPendingDebriefing(connections, focusKey),
+    [connections, focusKey],
+  );
 
   const submitAgreementCode = useCallback(
     async (code: string) => {
@@ -2056,10 +2066,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const closeDebriefing = useCallback(() => {
-    if (focusKey) {
-      updateConnection(focusKey, (c) => ({ ...c, debriefingShown: null }));
+    // Closes whichever connection's debriefing is actually shown, not the
+    // focused one (issue #2847): with two open at once the shown one may
+    // belong to the other connection, and closing the wrong one would leave
+    // the drawer open on a report nobody asked to dismiss.
+    if (activeDebriefing) {
+      updateConnection(activeDebriefing.serverKey, (c) => ({
+        ...c,
+        debriefingShown: null,
+      }));
     }
-  }, [focusKey, updateConnection]);
+  }, [activeDebriefing, updateConnection]);
 
   // After a webview reload the React state resets but the Rust connection
   // tasks keep running, so re-adopt every live connection on mount (via
@@ -2144,6 +2161,16 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     })();
   }, [dispatchMirror, openChannel, connect, runtimeFor, updateConnection]);
 
+  // Whether more than one connection exists at all (not only live ones, so
+  // two connections both still parked on an agreement still count). Gates
+  // naming the server on the boxed-message dialog and the debriefing drawer,
+  // the same "only once there's something to tell apart" rule
+  // `VerificationCodeDialog` applies to the agreement dialog and
+  // `ConversationSidebar` applies to its per-connection headings (issue
+  // #2847). With one connection every one of these looks exactly as it did
+  // before servers were told apart.
+  const multipleConnections = Object.keys(connections).length > 1;
+
   return (
     <MultiplayerContext.Provider
       value={{
@@ -2213,17 +2240,24 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       <VerificationCodeDialog />
       <MatchFoundPanel />
       <ServerMessageBoxDialog
-        text={serverMsgBoxes[0] ?? null}
+        text={serverMsgBoxes[0]?.text ?? null}
+        serverName={
+          serverMsgBoxes[0] && multipleConnections
+            ? serverNameFor(serverMsgBoxes[0].serverKey, protocolServers)
+            : null
+        }
         onDismiss={() => setServerMsgBoxes((q) => q.slice(1))}
       />
       <DebriefingDrawer
-        open={
-          focus?.debriefingShown != null &&
-          mirror.state?.debriefing?.battleId === focus.debriefingShown
+        open={activeDebriefing != null}
+        report={activeDebriefing?.report ?? null}
+        myUsername={activeDebriefing?.myUsername ?? null}
+        serverKey={activeDebriefing?.serverKey}
+        serverName={
+          activeDebriefing && multipleConnections
+            ? serverNameFor(activeDebriefing.serverKey, protocolServers)
+            : null
         }
-        report={mirror.state?.debriefing ?? null}
-        myUsername={mirror.state?.myUsername ?? null}
-        serverKey={focusKey}
         onClose={closeDebriefing}
       />
     </MultiplayerContext.Provider>

@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { agreementWantsCode } from "./agreement";
-import { useMultiplayer } from "./store";
+import { serverNameFor, useMultiplayer, useProtocolServers } from "./store";
 
 /**
  * App-level modal shown whenever a connection parks on the agreement /
@@ -18,10 +18,21 @@ import { useMultiplayer } from "./store";
  * there's no close affordance and escape/outside clicks are ignored; the user
  * either confirms, with a code when the server emailed one, or explicitly
  * disconnects.
+ *
+ * `pendingAgreement` already queues by server key (issue #2847): two
+ * connections parking on it at once show one at a time, the one not shown
+ * staying parked until this one clears. The server is named under the title
+ * once there is more than one connection to tell apart, so a queued second
+ * prompt does not read as the same one still open.
  */
 export function VerificationCodeDialog() {
-  const { pendingAgreement, submitAgreementCode, cancelAgreement } =
-    useMultiplayer();
+  const {
+    pendingAgreement,
+    submitAgreementCode,
+    cancelAgreement,
+    connections,
+  } = useMultiplayer();
+  const servers = useProtocolServers();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +40,10 @@ export function VerificationCodeDialog() {
   // The field stays either way, so a server whose agreement is worded
   // differently can still be given a code. It is only required when asked for.
   const wantsCode = agreementWantsCode(pendingAgreement?.text ?? "");
+  const serverName =
+    pendingAgreement && Object.keys(connections).length > 1
+      ? serverNameFor(pendingAgreement.serverKey, servers)
+      : null;
 
   // Fresh field/error each time a new prompt appears.
   useEffect(() => {
@@ -73,6 +88,9 @@ export function VerificationCodeDialog() {
               ? "Enter verification code"
               : "Accept the server's terms"}
           </DialogTitle>
+          {serverName ? (
+            <p className="text-xs text-muted-foreground">{serverName}</p>
+          ) : null}
           <DialogDescription>
             {wantsCode
               ? "The server sent a verification code to finish signing in. Enter it below to continue."
