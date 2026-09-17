@@ -3,7 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
-import { useMultiplayer } from "../multiplayer/store";
+import { serverKeyFor, useMultiplayer } from "../multiplayer/store";
 import { type LobbyServer, serverProtocol } from "./config";
 
 /**
@@ -27,7 +27,7 @@ export function PasswordRecoveryForm({
   onSignIn: (serverId: string, username: string) => void;
   onCancel: () => void;
 }) {
-  const { recoverPassword, submitRecoveryCode, cancelRecovery, busy } =
+  const { recoverPassword, submitRecoveryCode, cancelRecovery, busyKeys } =
     useMultiplayer();
   const recoverable = servers.filter((s) => serverProtocol(s) === "tasserver");
   const [serverId, setServerId] = useState(recoverable[0]?.id ?? "");
@@ -43,6 +43,13 @@ export function PasswordRecoveryForm({
   const [submitting, setSubmitting] = useState(false);
 
   const selected = recoverable.find((s) => s.id === serverId);
+  // Scoped to the account each stage targets, not the store-wide `busy`, so
+  // recovering one account does not grey out another's controls (issue
+  // #2846). The email stage doesn't have a `serverKey` yet (that's what
+  // `recoverPassword` returns), so it derives the same key from the form.
+  const emailStageBusy =
+    selected != null && busyKeys.has(serverKeyFor(selected, email.trim()));
+  const codeStageBusy = serverKey != null && busyKeys.has(serverKey);
 
   // Close an abandoned recovery connection on unmount. Only the "code" stage
   // ever leaves one open (`recoverPassword`'s `codeSent` outcome), so a ref
@@ -215,7 +222,7 @@ export function PasswordRecoveryForm({
           <Button
             type="submit"
             size="sm"
-            disabled={submitting || busy || code.trim() === ""}
+            disabled={submitting || codeStageBusy || code.trim() === ""}
           >
             {submitting ? "Resetting…" : "Reset password"}
           </Button>
@@ -264,7 +271,10 @@ export function PasswordRecoveryForm({
           type="submit"
           size="sm"
           disabled={
-            serverId === "" || email.trim() === "" || submitting || busy
+            serverId === "" ||
+            email.trim() === "" ||
+            submitting ||
+            emailStageBusy
           }
         >
           {submitting ? "Sending…" : "Send code"}

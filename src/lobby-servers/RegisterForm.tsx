@@ -2,7 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
-import { useMultiplayer } from "../multiplayer/store";
+import { serverKeyFor, useMultiplayer } from "../multiplayer/store";
 import { lsStoreCredential } from "./bindings";
 import { type LobbyServer, serverProtocol, useLobbyAccounts } from "./config";
 
@@ -26,7 +26,7 @@ export function RegisterForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
-  const { register, busy } = useMultiplayer();
+  const { register, busyKeys } = useMultiplayer();
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
   // A Tachyon server has no account for Coilbox to create, because signing in
   // there happens on the server's own page in the browser, so those servers are
@@ -44,12 +44,17 @@ export function RegisterForm({
 
   const selected = registrable.find((s) => s.id === serverId);
   const trimmedUser = username.trim();
+  // Scoped to the account this form would register, not the store-wide
+  // `busy`, so registering on one server does not grey out another's
+  // controls (issue #2846).
+  const isBusy =
+    selected != null && busyKeys.has(serverKeyFor(selected, trimmedUser));
   const canSubmit =
     serverId !== "" &&
     trimmedUser !== "" &&
     password !== "" &&
     !submitting &&
-    !busy;
+    !isBusy;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
