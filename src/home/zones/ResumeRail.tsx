@@ -6,6 +6,7 @@ import {
   type LastLogin,
   type LobbyAccount,
   type LobbyServer,
+  rememberedLogins,
   sortAccountsByRecency,
   useCustomServers,
   useLastLogin,
@@ -89,6 +90,32 @@ export function loginOffer(
 
 const EMPTY_TAKEN: ReadonlySet<string> = new Set();
 
+/**
+ * The saved logins to offer as cards: one per remembered login (open when
+ * coilbox last closed, per {@link rememberedLogins}) that is not `taken`, or,
+ * when none is remembered, the single {@link loginOffer} invite (issue #2849).
+ *
+ * The two never mix: `rememberedLogins` itself falls back to `lastLogin` only
+ * when nothing is flagged, so a remembered result and the invite fallback
+ * never both apply. Pure, so the remembered/invite split is a unit test
+ * without a UI.
+ */
+export function loginOffers(
+  accounts: readonly LobbyAccount[],
+  lastLogin: LastLogin | null,
+  servers: readonly LobbyServer[],
+  taken: ReadonlySet<string> = EMPTY_TAKEN,
+): LoginOffer[] {
+  const remembered = rememberedLogins([...accounts], lastLogin, [
+    ...servers,
+  ]).filter(
+    ({ account, server }) => !taken.has(serverKeyFor(server, account.username)),
+  );
+  if (remembered.length > 0) return remembered;
+  const fallback = loginOffer(accounts, lastLogin, servers, taken);
+  return fallback ? [fallback] : [];
+}
+
 /** A resume candidate as a card, worded by the collector rather than here. */
 function candidateCard(c: ResumeCandidate): RailCard {
   const { label, action } = RESUME_KIND_COPY[c.kind];
@@ -128,25 +155,31 @@ function loginCard({ account, server }: LoginOffer): RailCard {
 }
 
 /**
- * The rail's contents: the runners-up the hero did not take, plus the saved
- * login when there is one, capped at {@link RAIL_CAP}.
+ * The rail's contents: the runners-up the hero did not take, plus one card per
+ * saved login on offer, capped at {@link RAIL_CAP}.
  *
- * The login card is last and holds its slot rather than competing for one. The
- * issue asks for it to be "one of them", and a logged-out install with four
- * things to resume would otherwise never see it: the hero takes one and three
- * runners-up fill the rail exactly. So the runners-up get the slots the offer
- * leaves, and the offer is the card that goes when the cap is already met by
- * things you actually did.
+ * The login cards come last and hold their slots rather than competing for
+ * one. The issue asks for the login card to be "one of them", and a
+ * logged-out install with four things to resume would otherwise never see it:
+ * the hero takes one and three runners-up fill the rail exactly. So the
+ * runners-up get whatever slots the logins leave, and the logins are the
+ * cards that go when the cap is already met by things you actually did. With
+ * several logins remembered (issue #2849) they can claim every slot, leaving
+ * no room for a runner-up.
  *
- * Pure, so every count from four down to none is a unit test without a UI.
+ * Pure, so every count from four down to none, and any number of logins, is a
+ * unit test without a UI.
  */
 export function railCards(
   candidates: readonly ResumeCandidate[],
-  login: LoginOffer | null,
+  logins: readonly LoginOffer[],
 ): RailCard[] {
-  const offer = login ? [loginCard(login)] : [];
+  const offer = logins.map(loginCard);
   const runnersUp = candidates.slice(1).map(candidateCard);
-  return [...runnersUp.slice(0, RAIL_CAP - offer.length), ...offer];
+  return [
+    ...runnersUp.slice(0, Math.max(0, RAIL_CAP - offer.length)),
+    ...offer,
+  ];
 }
 
 /**
@@ -206,12 +239,14 @@ export const RAIL_CARD_CLASS =
  * space, rather than sizing to three full cards and dropping whole onto a
  * second row whenever they did not fit.
  *
- * ## The log-in card
+ * ## The log-in cards
  *
- * Offered when there is a login saved and it is not already connected or
- * connecting, and it is a link to the login screen at `/lobby`, not a
- * connect. Clicking it opens the account list with that user at the top and
- * one click left to make. It never reads the keychain, so it cannot raise a
+ * One per remembered login (open when coilbox last closed, issue #2849). With
+ * nothing remembered, the single most-recently-used saved login is offered
+ * instead, as an invite. Either way, only when it is not already connected or
+ * connecting. Each is a link to the login screen at `/lobby`, not a connect:
+ * clicking one opens the account list with that user at the top and one
+ * click left to make. It never reads the keychain, so it cannot raise a
  * macOS password prompt from the home page. The saved logins come from the
  * recency-sorted list of #458 rather than through the collector, because a
  * login is not something you were doing.
@@ -233,13 +268,13 @@ export default function ResumeRail() {
   for (const key of Object.keys(connections)) {
     if (connections[key].live) taken.add(key);
   }
-  const login = loginOffer(
+  const logins = loginOffers(
     accountsCfg.accounts,
     lastLogin,
     allServers(customCfg.servers),
     taken,
   );
-  const cards = railCards(candidates, login);
+  const cards = railCards(candidates, logins);
   if (loading || cards.length === 0) return null;
 
   return (

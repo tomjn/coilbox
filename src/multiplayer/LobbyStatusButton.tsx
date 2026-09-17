@@ -24,7 +24,7 @@ import {
   type LastLogin,
   type LobbyAccount,
   type LobbyServer,
-  resolveLastLogin,
+  rememberedLogins,
   resolveServer,
   serverProtocol,
   sortAccountsByRecency,
@@ -181,16 +181,26 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     ...Object.keys(connections).filter((key) => !connections[key].live),
   ];
 
-  // A one-click "reconnect" shortcut to the last-used account, earned only after
-  // a genuine connection this session (`revealed`). On a fresh open it would
-  // just duplicate the top row of the most-recent-first list below. Also hidden
-  // when startup auto-connect is on (the boot connect already ran), and while
-  // adding a second login. Resolved against the profile-filtered catalog, so a
-  // profile-disallowed server won't offer it.
-  const reconnect =
-    autoConnect || !revealed || liveKeys.length > 0
-      ? null
-      : resolveLastLogin(lastLogin, accounts, allServers(customCfg.servers));
+  // A one-click "reconnect" shortcut for each remembered login (the ones
+  // open-at-quit resolves, per issue #2849), earned only after a genuine
+  // connection this session (`revealed`). On a fresh open it would just
+  // duplicate the top rows of the most-recent-first list below. Also hidden
+  // when startup auto-connect is on, since the boot connect already tried
+  // every one of them. A login already showing its own row (live, opening, or
+  // dropped and still listed) is filtered out, so this never duplicates
+  // `AccountList` below it. Resolved against the profile-filtered catalog, so
+  // a profile-disallowed server won't offer it.
+  const reconnects =
+    autoConnect || !revealed
+      ? []
+      : rememberedLogins(
+          accounts,
+          lastLogin,
+          allServers(customCfg.servers),
+        ).filter(
+          ({ account, server }) =>
+            !(serverKeyFor(server, account.username) in connections),
+        );
 
   // Most recently used first. The last-used login is badged instead of getting
   // a dedicated connect button.
@@ -471,16 +481,17 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
         </p>
       )}
-      {reconnect && (
+      {reconnects.map(({ account: a, server }) => (
         <Button
-          onClick={() => void connectTo(reconnect.account)}
+          key={a.id}
+          onClick={() => void connectTo(a)}
           disabled={busy}
           className="mb-1 h-9 justify-start gap-2"
         >
           <RefreshCw className="size-4" />
-          Reconnect as {reconnect.account.username || "last account"}
+          Reconnect as {a.username || "last account"} on {server.name}
         </Button>
-      )}
+      ))}
       <AccountList
         accounts={sortedAccounts}
         customServers={customCfg.servers}

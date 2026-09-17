@@ -17,7 +17,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import type { ProfileLobby } from "../profile/profile";
 import {
   allServers,
-  autoConnectTarget,
+  autoConnectTargets,
   BUILTIN_SERVERS,
   buildCatalog,
   type CustomServersConfig,
@@ -26,6 +26,7 @@ import {
   type LobbyAccount,
   type LobbyServer,
   OFFICIAL_ID,
+  rememberedLogins,
   resolveProfileServerRules,
   resolveRecoveredAccount,
   resolveServer,
@@ -334,7 +335,7 @@ describe("buildCatalog", () => {
   });
 });
 
-describe("autoConnectTarget", () => {
+describe("autoConnectTargets", () => {
   const account: LobbyAccount = {
     id: "acc-1",
     serverId: "bar-ssl",
@@ -344,28 +345,85 @@ describe("autoConnectTarget", () => {
   const lastLogin = { serverId: "bar-ssl", username: "player" };
 
   it("returns the account + server when enabled and the last login resolves", () => {
-    const t = autoConnectTarget(true, lastLogin, [account], servers);
+    const [t] = autoConnectTargets(true, lastLogin, [account], servers);
     expect(t?.account).toBe(account);
     expect(t?.server.id).toBe("bar-ssl");
   });
 
-  it("returns null when auto-connect is off", () => {
-    expect(autoConnectTarget(false, lastLogin, [account], servers)).toBeNull();
+  it("returns nothing when auto-connect is off", () => {
+    expect(autoConnectTargets(false, lastLogin, [account], servers)).toEqual(
+      [],
+    );
   });
 
-  it("returns null when there is no last login", () => {
-    expect(autoConnectTarget(true, null, [account], servers)).toBeNull();
+  it("returns nothing when there is no last login", () => {
+    expect(autoConnectTargets(true, null, [account], servers)).toEqual([]);
   });
 
-  it("returns null when the account no longer exists", () => {
-    expect(autoConnectTarget(true, lastLogin, [], servers)).toBeNull();
+  it("returns nothing when the account no longer exists", () => {
+    expect(autoConnectTargets(true, lastLogin, [], servers)).toEqual([]);
   });
 
-  it("returns null when the profile catalog disallows the server", () => {
+  it("returns nothing when the profile catalog disallows the server", () => {
     // The account/last-login name `bar`, but the profile-filtered catalog only
     // offers `techa`, so the disallowed server never resolves and never connects.
     const narrowed = buildCatalog([], { presets: ["techa"] });
-    expect(autoConnectTarget(true, lastLogin, [account], narrowed)).toBeNull();
+    expect(autoConnectTargets(true, lastLogin, [account], narrowed)).toEqual(
+      [],
+    );
+  });
+
+  it("connects every flagged account rather than only the last login", () => {
+    const a = { ...account, id: "a1", openAtQuit: true };
+    const b: LobbyAccount = {
+      id: "a2",
+      serverId: "techa",
+      username: "second",
+      openAtQuit: true,
+    };
+    const targets = autoConnectTargets(true, lastLogin, [a, b], servers);
+    expect(targets.map((t) => t.account.id)).toEqual(["a1", "a2"]);
+  });
+});
+
+describe("rememberedLogins", () => {
+  const servers = allServers([]);
+  const lastLogin = { serverId: "bar-ssl", username: "player" };
+  const unflagged: LobbyAccount = {
+    id: "acc-1",
+    serverId: "bar-ssl",
+    username: "player",
+  };
+
+  it("returns every flagged account, ignoring lastLogin once any is flagged", () => {
+    const flagged: LobbyAccount = {
+      id: "acc-2",
+      serverId: "techa",
+      username: "other",
+      openAtQuit: true,
+    };
+    const out = rememberedLogins([unflagged, flagged], lastLogin, servers);
+    expect(out.map((o) => o.account.id)).toEqual(["acc-2"]);
+  });
+
+  it("falls back to lastLogin when nothing is flagged, for an upgrading player", () => {
+    const out = rememberedLogins([unflagged], lastLogin, servers);
+    expect(out.map((o) => o.account.id)).toEqual(["acc-1"]);
+  });
+
+  it("returns nothing when nothing is flagged and there is no lastLogin", () => {
+    expect(rememberedLogins([unflagged], null, servers)).toEqual([]);
+  });
+
+  it("drops a flagged account whose server the profile catalog disallows", () => {
+    const flagged: LobbyAccount = {
+      id: "acc-2",
+      serverId: "bar-ssl",
+      username: "other",
+      openAtQuit: true,
+    };
+    const narrowed = buildCatalog([], { presets: ["techa"] });
+    expect(rememberedLogins([flagged], null, narrowed)).toEqual([]);
   });
 });
 

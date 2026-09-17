@@ -15,7 +15,7 @@ import { directServer } from "../direct/room";
 import { lsGetCredential } from "../lobby-servers/bindings";
 import {
   allServers,
-  autoConnectTarget,
+  autoConnectTargets,
   BUILTIN_SERVERS,
   type LobbyProtocol,
   type LobbyServer,
@@ -872,8 +872,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     setLastLoginRef.current = setLastLogin;
   }, [setLastLogin]);
   // Stamp the connected account's recency + known-secret flag (a connect just
-  // read the password successfully), feeding the login panel's most-recent-first
-  // ordering. Ref'd like `setLastLoginRef` so `doConnect` stays stable.
+  // read the password successfully) and flag it `openAtQuit`, feeding the login
+  // panel's most-recent-first ordering and the boot reconnect list (issue
+  // #2849). Ref'd like `setLastLoginRef` so `doConnect` stays stable.
   const markAccountUsedRef = useRef(
     (_serverId: string, _username: string) => {},
   );
@@ -882,12 +883,39 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       setAccountsCfg({
         accounts: accountsCfg.accounts.map((a) =>
           a.serverId === serverId && a.username === username
-            ? { ...a, lastUsedAt: Date.now(), hasSecret: true }
+            ? {
+                ...a,
+                lastUsedAt: Date.now(),
+                hasSecret: true,
+                openAtQuit: true,
+              }
             : a,
         ),
       });
     };
   }, [accountsCfg.accounts, setAccountsCfg]);
+  // Clear `openAtQuit` on a manual log out, matched by server + username the
+  // same way `serverKeyFor` builds a key, so a player who logs out by hand is
+  // not reconnected at the next boot. Left alone by an unexpected drop, which
+  // is what lets a connection mid-reconnect, or one still open when coilbox
+  // quit, stay remembered. Ref'd for the same reason as `markAccountUsedRef`.
+  const clearOpenAtQuitRef = useRef((_serverKey: string) => {});
+  useEffect(() => {
+    clearOpenAtQuitRef.current = (serverKey: string) => {
+      const server = allServers(customCfg.servers).find((s) =>
+        serverKey.endsWith(`@${s.host}:${s.port}`),
+      );
+      if (!server) return;
+      const username = serverKey.slice(0, serverKey.indexOf("@"));
+      setAccountsCfg({
+        accounts: accountsCfg.accounts.map((a) =>
+          a.serverId === server.id && a.username === username
+            ? { ...a, openAtQuit: false }
+            : a,
+        ),
+      });
+    };
+  }, [accountsCfg.accounts, customCfg.servers, setAccountsCfg]);
   const bootRef = useRef({
     autoConnect,
     lastLogin,
@@ -2117,6 +2145,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       markIntentional(key);
       stopReconnect(key);
       if (!key) return;
+      clearOpenAtQuitRef.current(key);
       beginBusy(key);
       try {
         await mpDisconnect({ serverKey: key });
@@ -2227,31 +2256,55 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         focusOn(focused);
         return;
       }
-      // Fresh launch with nothing to reattach: if the user opted in and the last
-      // login still resolves against the profile-filtered catalog, seed the same
-      // connect path a manual login / mid-session reconnect uses. A single attempt,
-      // failing quietly (one notification) so a bad boot never blocks the app.
+      // Fresh launch with nothing to reattach: if the user opted in, connect
+      // every remembered login (every account flagged open at quit, or, for
+      // someone upgrading from a version that tracked only one, that single
+      // login) one after another (issue #2849). One failing does not stop the
+      // rest, and each raises its own notification, so a player logged in to
+      // two servers can tell which login needs attention. `doConnect` is
+      // called directly rather than through the public `connect`: nothing has
+      // connected yet at this point, so there is no other server's reconnect
+      // loop for `connect` to stop first. Every attempt is unfocused, the
+      // same rule `runReconnect` follows, and `doConnect`'s own fallback
+      // still focuses the first one to land since nothing else is focused yet.
       const b = bootRef.current;
-      const target = autoConnectTarget(
+      const targets = autoConnectTargets(
         b.autoConnect,
         b.lastLogin,
         b.accounts,
         allServers(b.custom),
       );
-      if (!target) return;
-      connect(target.server, target.account.username).catch(() => {
-        void notify({
-          title: "Couldn't connect to multiplayer",
-          body: "Log in from the topbar when you're ready.",
-          level: "error",
-        });
-      });
+      for (const { account, server } of targets) {
+        if (
+          serverProtocol(server) === "tachyon" &&
+          (await needsSignIn(server, account.username))
+        ) {
+          // Never open a browser at boot: skip this login with its own
+          // notification, same as the reconnect loop does for a Tachyon
+          // sign-in the server no longer accepts.
+          void notify({
+            title: "Signed out of multiplayer",
+            body: `${account.username} on ${server.name} needs a new sign-in. Log in again from the topbar to sign in with your browser.`,
+            level: "error",
+          });
+          continue;
+        }
+        try {
+          await doConnect(server, account.username, false, false);
+        } catch {
+          void notify({
+            title: "Couldn't connect to multiplayer",
+            body: `Log in as ${account.username} on ${server.name} from the topbar when you're ready.`,
+            level: "error",
+          });
+        }
+      }
     })();
   }, [
     dispatchMirror,
     focusOn,
     openChannel,
-    connect,
+    doConnect,
     runtimeFor,
     updateConnection,
   ]);
