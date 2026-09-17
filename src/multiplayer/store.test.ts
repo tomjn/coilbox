@@ -319,31 +319,83 @@ describe("mirrorReducer Tachyon battle start", () => {
 });
 
 describe("connectBlockedReason", () => {
-  const lobby = "AF_@server4.beyondallreason.info:8201";
+  const bar = "AF_@server4.beyondallreason.info:8201";
+  const barTachyon = "Bob@server4.beyondallreason.info:443";
+  const techa = "AF_@lobby.techa-rts.com:8200";
   const room = "AF@127.0.0.1:8200";
+  const live = (serverKey: string, direct = false) => ({
+    serverKey,
+    opening: false,
+    direct,
+  });
+  const opening = (serverKey: string, direct = false) => ({
+    serverKey,
+    opening: true,
+    direct,
+  });
 
   it("lets a connect through when there is nothing to be in the way", () => {
-    expect(connectBlockedReason(null, null, room)).toBeNull();
+    expect(connectBlockedReason([], techa, false)).toBeNull();
+    expect(connectBlockedReason([], room, true)).toBeNull();
   });
 
-  it("refuses a second connection and names where the first one is", () => {
-    const reason = connectBlockedReason(lobby, null, room);
-    expect(reason).toContain("server4.beyondallreason.info:8201");
-    expect(reason).toContain("one lobby connection");
+  it("lets a login to another server open beside a live one", () => {
+    expect(connectBlockedReason([live(bar)], techa, false)).toBeNull();
+    expect(connectBlockedReason([opening(bar)], techa, false)).toBeNull();
   });
 
-  it("refuses a connect racing one that is still shaking hands", () => {
-    const reason = connectBlockedReason(null, lobby, room);
-    expect(reason).toContain("server4.beyondallreason.info:8201");
+  it("refuses a second account on the same server and names the first", () => {
+    const reason = connectBlockedReason(
+      [live(bar)],
+      "Zed@server4.beyondallreason.info:8201",
+      false,
+    );
+    expect(reason).toContain("AF_");
+    expect(reason).toContain("server4.beyondallreason.info");
+  });
+
+  it("counts the same host on another port as the same server", () => {
+    // Beyond All Reason's TASServer and Tachyon entries share a host.
+    const reason = connectBlockedReason([live(bar)], barTachyon, false);
+    expect(reason).toContain("AF_");
+    expect(connectBlockedReason([live(barTachyon)], bar, false)).toContain(
+      "Bob",
+    );
+  });
+
+  it("compares hosts without regard to case", () => {
+    expect(
+      connectBlockedReason(
+        [live(bar)],
+        "Zed@Server4.BeyondAllReason.info:8201",
+        false,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("refuses a connect racing one to the same server that is still opening", () => {
+    const reason = connectBlockedReason([opening(bar)], barTachyon, false);
+    expect(reason).toContain("AF_");
     expect(reason).toContain("already opening");
   });
 
-  it("names the connection that exists over the one still opening", () => {
-    // Both can be set at once: a connect that has registered its key has not
-    // yet cleared it when the snapshot lands. The live one is the one somebody
-    // can act on, so it is the one worth naming.
-    expect(connectBlockedReason(lobby, room, "AF@127.0.0.1:8300")).toContain(
-      "server4.beyondallreason.info:8201",
+  it("names the live connection over the one still opening", () => {
+    const reason = connectBlockedReason(
+      [opening(barTachyon), live(bar)],
+      "Zed@server4.beyondallreason.info:8201",
+      false,
+    );
+    expect(reason).toContain("AF_");
+    expect(reason).not.toContain("already opening");
+  });
+
+  it("still gives a room the only connection (issue 2850 lifts this)", () => {
+    const beside = connectBlockedReason([live(techa)], room, true);
+    expect(beside).toContain("lobby.techa-rts.com:8200");
+    const racing = connectBlockedReason([opening(techa)], room, true);
+    expect(racing).toContain("already opening");
+    expect(connectBlockedReason([live(room, true)], techa, false)).toContain(
+      "127.0.0.1:8200",
     );
   });
 
@@ -351,8 +403,9 @@ describe("connectBlockedReason", () => {
     // Reconnecting under a live key is a duplicate, which the registry refuses
     // with its own words. This rule is about a *second* connection, so it says
     // nothing about that one rather than shadowing a better message.
-    expect(connectBlockedReason(lobby, null, lobby)).toBeNull();
-    expect(connectBlockedReason(null, lobby, lobby)).toBeNull();
+    expect(connectBlockedReason([live(bar)], bar, false)).toBeNull();
+    expect(connectBlockedReason([opening(bar)], bar, false)).toBeNull();
+    expect(connectBlockedReason([live(room, true)], room, true)).toBeNull();
   });
 
   it("never uses a word the room join failure reads as a socket error", () => {
@@ -361,10 +414,13 @@ describe("connectBlockedReason", () => {
     // and passes everything else through. This reason has to be everything
     // else, or the join drawer would tell somebody their address was wrong.
     const reasons = [
-      connectBlockedReason(lobby, null, room),
-      connectBlockedReason(null, lobby, room),
+      connectBlockedReason([live(techa)], room, true),
+      connectBlockedReason([opening(techa)], room, true),
+      connectBlockedReason([live(bar)], barTachyon, false),
+      connectBlockedReason([opening(bar)], barTachyon, false),
     ];
     for (const reason of reasons) {
+      expect(reason).not.toBeNull();
       const lower = String(reason).toLowerCase();
       for (const word of [
         "refused",

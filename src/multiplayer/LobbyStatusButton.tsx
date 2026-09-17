@@ -1,7 +1,6 @@
 import { Button, useSetting } from "@picoframe/frame";
 import {
   ArrowLeft,
-  ArrowLeftRight,
   ExternalLink,
   KeyRound,
   Loader2,
@@ -10,7 +9,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router";
 import {
   Popover,
@@ -36,9 +35,17 @@ import {
 import { PasswordRecoveryForm } from "../lobby-servers/PasswordRecoveryForm";
 import { RegisterForm } from "../lobby-servers/RegisterForm";
 import type { LoginPhase } from "./bindings";
-import { serverKeyFor, useMultiplayer } from "./store";
-
-type DotStatus = "off" | "connecting" | "on" | "away" | "error";
+import type { ConnectionState } from "./connections";
+import { type DotStatus, lobbyDotStatus } from "./loginStatus";
+import {
+  liveConnectionKeys,
+  serverHostFromKey,
+  serverKeyFor,
+  serverNameFor,
+  useMultiplayer,
+  useProtocolServers,
+  usernameFromKey,
+} from "./store";
 
 const DOT_CLASS: Record<DotStatus, string> = {
   off: "bg-muted-foreground/50",
@@ -66,27 +73,18 @@ const LABEL: Record<DotStatus, string> = {
 export default function LobbyStatusButton() {
   const [accountsCfg] = useLobbyAccounts();
   const {
-    mirror,
+    connections,
     activeKey,
     busy,
     loginPopoverOpen,
     openLoginPopover,
     closeLoginPopover,
-    status: clientStatus,
   } = useMultiplayer();
 
   const hasAccounts = accountsCfg.accounts.length > 0;
   if (!hasAccounts && activeKey == null) return null;
 
-  let status: DotStatus = "off";
-  if (activeKey != null) {
-    if (mirror.phase !== "ready") status = "connecting";
-    else status = clientStatus.away ? "away" : "on";
-  } else if (busy) {
-    status = "connecting";
-  } else if (mirror.error || mirror.phase === "denied") {
-    status = "error";
-  }
+  const status = lobbyDotStatus(connections, busy);
 
   return (
     <Popover
@@ -131,17 +129,20 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const accounts = accountsCfg.accounts;
   const {
     mirror,
+    connections,
     activeKey,
     revealed,
     busy,
+    busyKeys,
     connect,
     signIn,
     disconnect,
     cancelConnect,
-    status,
     manualAway,
     setManualAway,
   } = useMultiplayer();
+  const servers = useProtocolServers();
+  const rowId = useId();
 
   const [lastLogin] = useLastLogin();
   const [autoConnect] = useSetting<boolean>("multiplayer.autoConnect", false);
@@ -165,25 +166,46 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   // panel offers the browser as the way out rather than leaving them with a
   // message and nothing to press.
   const [needsSignIn, setNeedsSignIn] = useState<LobbyAccount | null>(null);
-  // True while a logged-in user is picking another login to switch to.
-  const [switching, setSwitching] = useState(false);
+  // True while a logged-in user is picking another login to add.
+  const [adding, setAdding] = useState(false);
   useEffect(() => {
-    if (activeKey == null) setSwitching(false);
+    if (activeKey == null) setAdding(false);
   }, [activeKey]);
 
-  // A one-click "reconnect" shortcut to the last-used account, earned only after a
-  // genuine connection this session (`revealed`) — on a fresh open it would just
-  // duplicate the top row of the most-recent-first list below. Also hidden when
-  // startup auto-connect is on (the boot connect already ran). Resolved against the
-  // profile-filtered catalog, so a profile-disallowed server won't offer it.
+  // Every connection, live ones first and the focused one first among those.
+  // A connection that dropped stays listed beside the live ones, so its reason
+  // can still be read and its reconnect stopped.
+  const liveKeys = liveConnectionKeys(connections, activeKey);
+  const listed = [
+    ...liveKeys,
+    ...Object.keys(connections).filter((key) => !connections[key].live),
+  ];
+
+  // A one-click "reconnect" shortcut to the last-used account, earned only after
+  // a genuine connection this session (`revealed`). On a fresh open it would
+  // just duplicate the top row of the most-recent-first list below. Also hidden
+  // when startup auto-connect is on (the boot connect already ran), and while
+  // adding a second login. Resolved against the profile-filtered catalog, so a
+  // profile-disallowed server won't offer it.
   const reconnect =
-    autoConnect || !revealed
+    autoConnect || !revealed || liveKeys.length > 0
       ? null
       : resolveLastLogin(lastLogin, accounts, allServers(customCfg.servers));
 
-  // Most recently used first; the last-used login is badged instead of getting a
-  // dedicated connect button.
+  // Most recently used first. The last-used login is badged instead of getting
+  // a dedicated connect button.
   const sortedAccounts = sortAccountsByRecency(accounts, lastLogin);
+
+  /** The connection a login would replace: another account on its server. */
+  function replacedBy(account: LobbyAccount): string | null {
+    const server = resolveServer(account.serverId, customCfg.servers);
+    if (!server) return null;
+    const key = serverKeyFor(server, account.username);
+    const host = serverHostFromKey(key);
+    return (
+      listed.find((k) => k !== key && serverHostFromKey(k) === host) ?? null
+    );
+  }
 
   /**
    * Connect as `account`. A Tachyon login has no password, so the first connect
@@ -211,6 +233,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         }
       }
       await connect(server, account.username);
+      setAdding(false);
     } catch (e) {
       setError(String(e));
       if (tachyon) setNeedsSignIn(account);
@@ -219,70 +242,88 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     }
   }
 
-  async function onDisconnect() {
+  async function logOut(serverKey: string) {
     setError(null);
     try {
-      await disconnect();
+      await disconnect(serverKey);
     } catch (e) {
       setError(String(e));
+    }
+  }
+
+  /** Log out of every connection, carrying on past one that fails. */
+  async function logOutAll() {
+    setError(null);
+    for (const key of listed) {
+      try {
+        await disconnect(key);
+      } catch (e) {
+        setError(String(e));
+      }
     }
   }
 
   /**
-   * Log out, then connect as `account`. Coilbox holds one lobby connection, so
-   * the old one has to close first. A failed log out stops here rather than
-   * opening a second socket beside one that may still be live.
+   * Connect as `account`. Coilbox holds one connection per server, so an
+   * account already on that server is logged out first, as switching account
+   * did. A failed log out stops here rather than opening a second socket beside
+   * one that may still be live.
    */
-  async function switchTo(account: LobbyAccount) {
-    setSwitching(false);
+  async function pick(account: LobbyAccount) {
     setError(null);
-    try {
-      await disconnect();
-    } catch (e) {
-      setError(String(e));
-      return;
+    const replaced = replacedBy(account);
+    if (replaced) {
+      try {
+        await disconnect(replaced);
+      } catch (e) {
+        setError(String(e));
+        return;
+      }
     }
     await connectTo(account);
   }
 
-  if (activeKey != null && switching) {
-    return (
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-1 pb-1">
-          <Button
-            variant="ghost"
-            onClick={() => setSwitching(false)}
-            className="h-8 gap-1.5 px-2"
-          >
-            <ArrowLeft className="size-4" />
-            Back
-          </Button>
-          <p className="text-sm font-medium">Switch account</p>
-        </div>
-        <AccountList
-          accounts={sortedAccounts}
-          customServers={customCfg.servers}
-          lastLogin={lastLogin}
-          activeKey={activeKey}
-          disabled={busy}
-          onPick={(a) => void switchTo(a)}
-          onNavigate={onNavigate}
-        />
-      </div>
+  if (liveKeys.length > 0 && !adding) {
+    const several = listed.length > 1;
+    const anyReady = liveKeys.some(
+      (key) => connections[key].mirror.phase === "ready",
     );
-  }
-
-  if (activeKey != null) {
-    const username = mirror.state?.myUsername ?? "Connected";
-    const ready = mirror.phase === "ready";
+    const idleAway = liveKeys.some((key) => connections[key].status.away);
     return (
       <div className="flex flex-col gap-3">
-        <div>
-          <p className="text-sm font-medium">{username}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {ready ? activeKey : `Connecting… (${mirror.phase ?? "…"})`}
-          </p>
-        </div>
+        <ul className="flex flex-col gap-2">
+          {listed.map((key, i) => {
+            const entry = connections[key];
+            const opening = !entry.live && busyKeys.has(key);
+            const nameId = `${rowId}-${i}`;
+            return (
+              <li key={key} className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p id={nameId} className="truncate text-sm font-medium">
+                    {entry.mirror.state?.myUsername ?? usernameFromKey(key)}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {serverNameFor(key, servers)}
+                  </p>
+                  <ConnectionLine entry={entry} opening={opening} />
+                </div>
+                {several && (
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      void (opening ? cancelConnect(key) : logOut(key))
+                    }
+                    disabled={busyKeys.has(key) && !opening}
+                    aria-describedby={nameId}
+                    className="h-7 shrink-0 px-2 text-xs"
+                  >
+                    {opening ? "Cancel" : "Log out"}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
         <label
           htmlFor="lobby-manual-away"
           className="flex items-center justify-between gap-3"
@@ -294,7 +335,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
                   so say which of the two is showing right now. */}
               {manualAway
                 ? "Others see you as away until you turn this off."
-                : status.away
+                : idleAway
                   ? "You've been set away automatically while idle."
                   : "Tell others you're not at the keyboard."}
             </span>
@@ -303,7 +344,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
             id="lobby-manual-away"
             checked={manualAway}
             onCheckedChange={setManualAway}
-            disabled={!ready}
+            disabled={!anyReady}
           />
         </label>
         <Link
@@ -315,15 +356,22 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         </Link>
         <Button
           variant="outline"
-          onClick={() => setSwitching(true)}
+          onClick={() => {
+            setError(null);
+            setAdding(true);
+          }}
           disabled={busy}
           className="h-8 gap-2"
         >
-          <ArrowLeftRight className="size-4" />
-          Switch account
+          <Plus className="size-4" />
+          Add another login
         </Button>
-        <Button onClick={onDisconnect} disabled={busy} className="h-8">
-          Log out
+        <Button
+          onClick={() => void (several ? logOutAll() : logOut(listed[0]))}
+          disabled={busy}
+          className="h-8"
+        >
+          {several ? "Log out of all" : "Log out"}
         </Button>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
@@ -364,8 +412,15 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     );
   }
 
-  if (busy) {
+  if ((busy && liveKeys.length === 0) || pending != null) {
     const phase = mirror.phase ? PHASE_LABEL[mirror.phase] : undefined;
+    const pendingServer = pending
+      ? resolveServer(pending.serverId, customCfg.servers)
+      : null;
+    const pendingKey =
+      pending && pendingServer
+        ? serverKeyFor(pendingServer, pending.username)
+        : undefined;
     return (
       <div className="flex flex-col items-center gap-3 py-4">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -382,7 +437,10 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         {/* Nothing can call off a sign-in that is happening in someone else's
             browser. It gives up on its own after a minute. */}
         {!signingIn && (
-          <Button onClick={() => void cancelConnect()} className="h-8 w-full">
+          <Button
+            onClick={() => void cancelConnect(pendingKey)}
+            className="h-8 w-full"
+          >
             Cancel
           </Button>
         )}
@@ -393,9 +451,26 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <p className="px-2 pb-1 text-sm font-medium">
-        {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
-      </p>
+      {adding ? (
+        <div className="flex items-center gap-1 pb-1">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setError(null);
+              setAdding(false);
+            }}
+            className="h-8 gap-1.5 px-2"
+          >
+            <ArrowLeft className="size-4" />
+            Back
+          </Button>
+          <p className="text-sm font-medium">Add another login</p>
+        </div>
+      ) : (
+        <p className="px-2 pb-1 text-sm font-medium">
+          {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
+        </p>
+      )}
       {reconnect && (
         <Button
           onClick={() => void connectTo(reconnect.account)}
@@ -410,9 +485,10 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         accounts={sortedAccounts}
         customServers={customCfg.servers}
         lastLogin={lastLogin}
-        activeKey={null}
+        liveKeys={liveKeys}
+        replacedBy={replacedBy}
         disabled={busy}
-        onPick={(a) => void connectTo(a)}
+        onPick={(a) => void pick(a)}
         onNavigate={onNavigate}
       />
       <button
@@ -461,7 +537,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           Sign in with your browser
         </Button>
       )}
-      {mirror.loginError ? (
+      {adding ? null : mirror.loginError ? (
         <p className="px-2 pt-1 text-xs text-destructive">
           Login failed: {mirror.loginError}
         </p>
@@ -478,14 +554,17 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
 
 /**
  * The saved logins as rows to press, followed by the link to add another. Shared
- * by the logged-out view and the switch view. `activeKey` marks the login already
- * connected, which is shown but cannot be picked.
+ * by the logged-out view and the add-a-login view. `liveKeys` marks the logins
+ * already connected, which are shown but cannot be picked, and `replacedBy`
+ * names the connection a login would log out, because its server already has
+ * another account.
  */
 function AccountList({
   accounts,
   customServers,
   lastLogin,
-  activeKey,
+  liveKeys,
+  replacedBy,
   disabled,
   onPick,
   onNavigate,
@@ -493,7 +572,8 @@ function AccountList({
   accounts: LobbyAccount[];
   customServers: LobbyServer[];
   lastLogin: LastLogin | null;
-  activeKey: string | null;
+  liveKeys: string[];
+  replacedBy: (account: LobbyAccount) => string | null;
   disabled: boolean;
   onPick: (account: LobbyAccount) => void;
   onNavigate: () => void;
@@ -503,7 +583,8 @@ function AccountList({
       {accounts.map((a) => {
         const server = resolveServer(a.serverId, customServers);
         const current =
-          server != null && serverKeyFor(server, a.username) === activeKey;
+          server != null && liveKeys.includes(serverKeyFor(server, a.username));
+        const replaced = current ? null : replacedBy(a);
         // A Tachyon login with no sign-in stored takes the user to their browser
         // when they press it, so say so before they press it.
         const opensBrowser =
@@ -548,6 +629,11 @@ function AccountList({
                 Signs in with your browser
               </span>
             )}
+            {replaced && (
+              <span className="text-xs text-muted-foreground">
+                Logs out {usernameFromKey(replaced)}
+              </span>
+            )}
           </button>
         );
       })}
@@ -561,4 +647,35 @@ function AccountList({
       </Link>
     </>
   );
+}
+
+/** Where one listed connection stands: logging in, online, away, or dropped. */
+function ConnectionLine({
+  entry,
+  opening,
+}: {
+  entry: ConnectionState;
+  opening: boolean;
+}) {
+  const m = entry.mirror;
+  if (entry.live) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {m.phase !== "ready"
+          ? `Connecting… (${m.phase ?? "…"})`
+          : entry.status.away
+            ? "Away"
+            : "Online"}
+      </p>
+    );
+  }
+  if (opening) {
+    return <p className="text-xs text-muted-foreground">Connecting…</p>;
+  }
+  const reason = m.loginError
+    ? `Login failed: ${m.loginError}`
+    : m.error
+      ? `Disconnected: ${m.error}`
+      : "Disconnected";
+  return <p className="text-xs text-destructive">{reason}</p>;
 }

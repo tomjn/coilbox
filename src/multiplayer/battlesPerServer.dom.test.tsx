@@ -327,12 +327,19 @@ describe("the battle room with two connections", () => {
     expect(wire.left).toEqual([KEY_B]);
   });
 
-  it("flags the running game on the battle's connection", async () => {
+  // The player is in the game whichever server the battle is on, so every
+  // connection says so (issue #2848).
+  it("flags the running game on every connection", async () => {
     await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
     await act(async () => {
       room.setIngame(true);
     });
     expect(store.connections[KEY_B].status.ingame).toBe(true);
+    expect(store.connections[KEY_A].status.ingame).toBe(true);
+    await act(async () => {
+      room.setIngame(false);
+    });
+    expect(store.connections[KEY_B].status.ingame).toBe(false);
     expect(store.connections[KEY_A].status.ingame).toBe(false);
   });
 
