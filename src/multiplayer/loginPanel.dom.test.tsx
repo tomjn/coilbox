@@ -48,6 +48,10 @@ const mp = {
   connect: vi.fn(async (_server: { id: string }, username: string) => {
     calls.push(`connect ${username}`);
   }),
+  reconnectAll: vi.fn(async (targets: { account: { username: string } }[]) => {
+    for (const { account } of targets)
+      calls.push(`connect ${account.username}`);
+  }),
   // The fields the logged-out view reads off the focused connection.
   mirror: { phase: null, state: null, error: null, loginError: null },
   status: { ingame: false, away: false },
@@ -159,6 +163,7 @@ beforeEach(() => {
   mp.revealed = true;
   mp.disconnect.mockClear();
   mp.connect.mockClear();
+  mp.reconnectAll.mockClear();
   mp.cancelConnect.mockClear();
   mp.setManualAway.mockClear();
   settings["lobbyServers.accounts"] = { accounts: BASE_ACCOUNTS };
@@ -376,13 +381,13 @@ describe("adding another login", () => {
   });
 });
 
-describe("the reconnect shortcut (issue #2849)", () => {
+describe("remembered logins in the account list (issue #2927)", () => {
   beforeEach(() => {
-    // Logged all the way out, which is the only state this shortcut shows in.
+    // Logged all the way out, which is the state the connect view shows in.
     connectAs();
   });
 
-  it("offers one button per remembered login, not the account nothing flagged", () => {
+  it("lists every account once, with no separate reconnect buttons", () => {
     settings["lobbyServers.accounts"] = {
       accounts: [
         { ...BASE_ACCOUNTS[0], openAtQuit: true },
@@ -392,65 +397,110 @@ describe("the reconnect shortcut (issue #2849)", () => {
     };
     draw();
 
-    expect(
-      screen.getByRole("button", {
-        name: "Reconnect as alice on Beyond All Reason",
-      }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", {
-        name: "Reconnect as carol on Tech Annihilation",
-      }),
-    ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: /Reconnect as bob/ }),
-    ).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^alice/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^bob/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^carol/ })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /^Reconnect as/ })).toBeNull();
   });
 
-  it("falls back to a single lastLogin button when nothing is flagged", () => {
-    // BASE_ACCOUNTS carries no `openAtQuit`, matching a settings file saved
-    // before the flag existed. lastLogin still names alice.
-    draw();
-
-    expect(
-      screen.getByRole("button", {
-        name: "Reconnect as alice on Beyond All Reason",
-      }),
-    ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: /Reconnect as bob/ }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /Reconnect as carol/ }),
-    ).toBeNull();
-  });
-
-  it("connects the account the button names", async () => {
+  it("marks remembered logins and sorts them to the top", () => {
     settings["lobbyServers.accounts"] = {
       accounts: [
         BASE_ACCOUNTS[0],
-        BASE_ACCOUNTS[1],
+        { ...BASE_ACCOUNTS[1], openAtQuit: true },
+        { ...BASE_ACCOUNTS[2], openAtQuit: true },
+      ],
+    };
+    draw();
+
+    expect(account("bob").textContent).toContain("Open last time");
+    expect(account("carol").textContent).toContain("Open last time");
+    expect(account("alice").textContent).not.toContain("Open last time");
+
+    const order = screen.getAllByRole("button").map((b) => b.textContent ?? "");
+    const indexOf = (name: string) =>
+      order.findIndex((t) => t.startsWith(name));
+    expect(indexOf("bob")).toBeLessThan(indexOf("alice"));
+    expect(indexOf("carol")).toBeLessThan(indexOf("alice"));
+  });
+
+  it("offers no Reconnect all with only one remembered login", () => {
+    // BASE_ACCOUNTS carries no `openAtQuit`, so this falls back to the
+    // single lastLogin account (alice).
+    draw();
+    expect(screen.queryByRole("button", { name: "Reconnect all" })).toBeNull();
+  });
+
+  it("offers Reconnect all with two or more remembered logins", () => {
+    settings["lobbyServers.accounts"] = {
+      accounts: [
+        { ...BASE_ACCOUNTS[0], openAtQuit: true },
+        { ...BASE_ACCOUNTS[2], openAtQuit: true },
+      ],
+    };
+    draw();
+    expect(screen.getByRole("button", { name: "Reconnect all" })).toBeTruthy();
+  });
+
+  it("skips a remembered login that would clash on the same host", async () => {
+    // alice (bar-ssl) and bob (bar-tachyon) share a host: BAR runs both
+    // protocols behind server4.beyondallreason.info. lastLogin names alice,
+    // so she is the more recently used of the pair and bob is dropped.
+    settings["lobbyServers.accounts"] = {
+      accounts: [
+        { ...BASE_ACCOUNTS[0], openAtQuit: true },
+        { ...BASE_ACCOUNTS[1], openAtQuit: true },
         { ...BASE_ACCOUNTS[2], openAtQuit: true },
       ],
     };
     draw();
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: "Reconnect as carol on Tech Annihilation",
-        }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: "Reconnect all" }));
     });
-    expect(calls).toEqual(["connect carol"]);
+
+    const targets = mp.reconnectAll.mock.calls[0][0] as {
+      account: { username: string };
+    }[];
+    expect(targets.map((t) => t.account.username).sort()).toEqual([
+      "alice",
+      "carol",
+    ]);
   });
 
-  it("hides every reconnect button once startup auto-connect is on", () => {
-    settings["multiplayer.autoConnect"] = true;
-    settings["lobbyServers.accounts"] = {
-      accounts: [{ ...BASE_ACCOUNTS[0], openAtQuit: true }],
+  it("skips a remembered login that is already connected", async () => {
+    const dave = {
+      id: "d",
+      serverId: "zero-k",
+      username: "dave",
+      hasSecret: true,
+      openAtQuit: true,
     };
+    settings["lobbyServers.accounts"] = {
+      accounts: [
+        { ...BASE_ACCOUNTS[0], openAtQuit: true },
+        { ...BASE_ACCOUNTS[2], openAtQuit: true },
+        dave,
+      ],
+    };
+    // alice is already connected, so Reconnect all must not try her again.
+    connectAs(connection(ALICE_KEY));
     draw();
+    fireEvent.click(screen.getByRole("button", { name: /Add another login/ }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Reconnect all" }));
+    });
 
-    expect(screen.queryByRole("button", { name: /Reconnect as/ })).toBeNull();
+    const targets = mp.reconnectAll.mock.calls[0][0] as {
+      account: { username: string };
+    }[];
+    expect(targets.map((t) => t.account.username).sort()).toEqual([
+      "carol",
+      "dave",
+    ]);
+  });
+
+  it("scrolls the account list inside a bounded container", () => {
+    const { container } = draw();
+    expect(container.querySelector(".overflow-y-auto")).toBeTruthy();
   });
 });
