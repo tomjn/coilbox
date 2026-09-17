@@ -1457,6 +1457,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             else void notify({ title: "Server message", body: d.text });
           }
         }
+        // A staff `BROADCAST` (issue #2775). It never answers a command the way
+        // a plain SERVERMSG can, so it doesn't feed `serverMessageWaiters`, and
+        // it's titled apart from a routine server message so a player can tell
+        // an admin sent it.
+        else if (d.kind === "broadcast") {
+          const text = d.text.trim();
+          if (text) void notify({ title: "Staff announcement", body: d.text });
+        }
         // A game we played has finished and the server has said what it did to
         // everybody's rating. Only the id is recorded: the result itself is in
         // the snapshot that follows, and the drawer waits for it. Zero-K only
