@@ -220,6 +220,7 @@ describe("the tool nav", () => {
     expect(names).toEqual([
       "Players",
       "Bans",
+      "Email domains",
       "Channels",
       "Bots",
       "Staff activity",

@@ -4,6 +4,7 @@ import {
   Bot,
   Hash,
   type LucideIcon,
+  Mail,
   Server,
   Users,
 } from "lucide-react";
@@ -11,6 +12,7 @@ import type { ComponentType } from "react";
 import { BansSection } from "./BansSection";
 import { BotAccountsSection } from "./BotAccountsSection";
 import { ChannelsSection } from "./ChannelsSection";
+import { EmailDomainsSection } from "./EmailDomainsSection";
 import { ModeratorFeedSection } from "./ModeratorFeedSection";
 import { PlayerLookupSection } from "./PlayerLookupSection";
 import { ServerAddressSection } from "./ServerAddressSection";
@@ -43,6 +45,12 @@ export const ADMIN_TOOLS: AdminTool[] = [
     Component: PlayerLookupSection,
   },
   { id: "bans", label: "Bans", icon: Ban, Component: BansSection },
+  {
+    id: "emailDomains",
+    label: "Email domains",
+    icon: Mail,
+    Component: EmailDomainsSection,
+  },
   { id: "channels", label: "Channels", icon: Hash, Component: ChannelsSection },
   { id: "bots", label: "Bots", icon: Bot, Component: BotAccountsSection },
   {

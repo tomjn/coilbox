@@ -56,6 +56,14 @@ pub enum AdminShape {
     /// `UNBAN <target>`: one line, `Successfully removed <n> bans relating
     /// to <target>` or `No matching bans for <target>`.
     Unban,
+    /// `BLACKLIST <domain> [reason]`: one line, `Successfully added <domain>
+    /// to blacklist` or an error such as `Domain <domain> is already
+    /// blacklisted`.
+    BlacklistDomain,
+    /// `UNBLACKLIST <domain>`: one line, `Sucessfully removed <domain> from
+    /// blacklist` (uberserver's own spelling) or `Unable to remove <domain>,
+    /// entry doesn't exist`.
+    UnblacklistDomain,
     /// `RESETUSERPASSWORD <username> [email]`: one line, `An email was sent
     /// to '<email>' containing a new password for <username>` on success,
     /// or one of several refusals such as `User <username> does not exist`
@@ -294,6 +302,14 @@ pub enum AdminReply {
         message: String,
     },
     Unban {
+        success: bool,
+        message: String,
+    },
+    BlacklistDomain {
+        success: bool,
+        message: String,
+    },
+    UnblacklistDomain {
         success: bool,
         message: String,
     },
@@ -820,6 +836,18 @@ impl AdminCollector {
                 Some((success, message)) => Heard::Finished(AdminReply::Unban { success, message }),
                 None => Heard::NotOurs,
             },
+            (AdminShape::BlacklistDomain, _) => match blacklist_domain_result_from(text) {
+                Some((success, message)) => {
+                    Heard::Finished(AdminReply::BlacklistDomain { success, message })
+                }
+                None => Heard::NotOurs,
+            },
+            (AdminShape::UnblacklistDomain, _) => match unblacklist_domain_result_from(text) {
+                Some((success, message)) => {
+                    Heard::Finished(AdminReply::UnblacklistDomain { success, message })
+                }
+                None => Heard::NotOurs,
+            },
             (AdminShape::ResetUserPassword, _) => match reset_user_password_result_from(text) {
                 Some((success, message)) => {
                     Heard::Finished(AdminReply::ResetUserPassword { success, message })
@@ -1212,6 +1240,42 @@ fn unban_result_from(text: &str) -> Option<(bool, String)> {
         return Some((false, text.to_string()));
     }
     if text.starts_with("Unable to match '") && text.ends_with("' to username/ip/email") {
+        return Some((false, text.to_string()));
+    }
+    None
+}
+
+/// `SQLUsers.blacklist`: `'Successfully added %s to blacklist' % domain` on
+/// success. Failure is one of `"invalid domain '%s', contains no '.'" %
+/// domain`, `"invalid domain '%s', do not include www or http(s) part,
+/// example: hawtmail.com" % domain`, or `'Domain %s is already blacklisted'
+/// % domain`.
+fn blacklist_domain_result_from(text: &str) -> Option<(bool, String)> {
+    if text.starts_with("Successfully added ") && text.ends_with(" to blacklist") {
+        return Some((true, text.to_string()));
+    }
+    if text.starts_with("invalid domain '") && text.ends_with("', contains no '.'") {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("invalid domain '")
+        && text.ends_with("', do not include www or http(s) part, example: hawtmail.com")
+    {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("Domain ") && text.ends_with(" is already blacklisted") {
+        return Some((false, text.to_string()));
+    }
+    None
+}
+
+/// `SQLUsers.unblacklist`: `"Sucessfully removed %s from blacklist" % domain`
+/// on success, uberserver's own spelling. Failure is `"Unable to remove %s,
+/// entry doesn't exist" % domain`.
+fn unblacklist_domain_result_from(text: &str) -> Option<(bool, String)> {
+    if text.starts_with("Sucessfully removed ") && text.ends_with(" from blacklist") {
+        return Some((true, text.to_string()));
+    }
+    if text.starts_with("Unable to remove ") && text.ends_with(", entry doesn't exist") {
         return Some((false, text.to_string()));
     }
     None
@@ -1830,6 +1894,53 @@ mod tests {
             assert_eq!(
                 heard,
                 vec![Heard::Finished(AdminReply::Unban {
+                    success,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `SQLUsers.blacklist`: success and its three refusals.
+    #[test]
+    fn a_blacklist_domain_reply_is_one_line() {
+        for (line, success) in [
+            ("Successfully added test2784.invalid to blacklist", true),
+            ("invalid domain 'nodot', contains no '.'", false),
+            (
+                "invalid domain 'http://evil.com', do not include www or http(s) part, example: hawtmail.com",
+                false,
+            ),
+            ("Domain test2784.invalid is already blacklisted", false),
+        ] {
+            let (_, heard) = hear_all(AdminShape::BlacklistDomain, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::BlacklistDomain {
+                    success,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `SQLUsers.unblacklist`: success, spelled `Sucessfully` by uberserver
+    /// itself, and its one refusal.
+    #[test]
+    fn an_unblacklist_domain_reply_is_one_line() {
+        for (line, success) in [
+            ("Sucessfully removed test2784.invalid from blacklist", true),
+            (
+                "Unable to remove test2784.invalid, entry doesn't exist",
+                false,
+            ),
+        ] {
+            let (_, heard) = hear_all(AdminShape::UnblacklistDomain, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::UnblacklistDomain {
                     success,
                     message: line.to_string(),
                 })],
@@ -2632,6 +2743,14 @@ mod tests {
             AdminReply::Unban {
                 success: true,
                 message: "Successfully removed 1 bans relating to Spammer".into(),
+            },
+            AdminReply::BlacklistDomain {
+                success: true,
+                message: "Successfully added test2784.invalid to blacklist".into(),
+            },
+            AdminReply::UnblacklistDomain {
+                success: true,
+                message: "Sucessfully removed test2784.invalid from blacklist".into(),
             },
             AdminReply::ResetUserPassword {
                 success: true,
