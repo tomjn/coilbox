@@ -670,6 +670,16 @@ describe("the password reset action", () => {
   });
 });
 
+describe("identifier field attributes (issue #2919)", () => {
+  it("stops the player name field auto-capitalising on macOS", () => {
+    draw();
+    const field = screen.getByLabelText("Player name");
+    expect(field.getAttribute("autocapitalize")).toBe("off");
+    expect(field.getAttribute("autocorrect")).toBe("off");
+    expect(field.getAttribute("spellcheck")).toBe("false");
+  });
+});
+
 describe("the name in the URL", () => {
   it("prefills the name from ?player=", () => {
     draw("/admin?player=Alice");

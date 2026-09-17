@@ -2,6 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { serverKeyFor, useMultiplayer } from "../multiplayer/store";
 import { lsStoreCredential } from "./bindings";
 import { type LobbyServer, serverProtocol, useLobbyAccounts } from "./config";
@@ -115,6 +116,7 @@ export function RegisterForm({
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="off"
+          {...identifierFieldProps}
         />
       </Field>
       <Field label="Password">
@@ -123,6 +125,7 @@ export function RegisterForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="new-password"
+          {...identifierFieldProps}
         />
       </Field>
       <Field
@@ -138,6 +141,7 @@ export function RegisterForm({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="off"
+          {...identifierFieldProps}
         />
       </Field>
       {error && <p className="text-xs text-destructive">{error}</p>}

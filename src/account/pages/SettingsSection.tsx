@@ -2,6 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { lsStoreCredential } from "../../lobby-servers/bindings";
 import {
   type LobbyAccount,
@@ -326,6 +327,7 @@ function ChangePasswordForm({
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
           autoComplete="current-password"
+          {...identifierFieldProps}
         />
       </Field>
       <Field label="New password">
@@ -334,6 +336,7 @@ function ChangePasswordForm({
           value={next}
           onChange={(e) => setNext(e.target.value)}
           autoComplete="new-password"
+          {...identifierFieldProps}
         />
       </Field>
       {message && (
@@ -462,6 +465,7 @@ function ChangeEmailForm({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             autoComplete="one-time-code"
+            {...identifierFieldProps}
           />
         </Field>
         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -495,6 +499,7 @@ function ChangeEmailForm({
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           autoComplete="off"
+          {...identifierFieldProps}
         />
       </Field>
       {error && <p className="text-xs text-destructive">{error}</p>}

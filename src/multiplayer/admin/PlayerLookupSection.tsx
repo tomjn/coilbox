@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { identifierFieldProps } from "@/lib/identifierField";
 import type { AdminUserInfo } from "../bindings";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { type AdminRequestState, useAdminRequest } from "./adminRequest";
@@ -217,6 +218,7 @@ function ResetPasswordAction({
               placeholder="name@example.com"
               aria-label="Email address to add"
               className="h-8"
+              {...identifierFieldProps}
             />
           </span>
         )}
@@ -523,6 +525,7 @@ export function PlayerLookupSection({ serverKey }: { serverKey: string }) {
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Username"
+            {...identifierFieldProps}
           />
         </span>
         <Button type="submit" disabled={!name.trim()}>

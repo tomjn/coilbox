@@ -6,6 +6,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { useConnection, usernameFromKey } from "../store";
 import { PRESENCE_META, userPresence } from "./presence";
 
@@ -76,6 +77,7 @@ export function UserPicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search online users…"
           autoFocus
+          {...identifierFieldProps}
         />
         <ul className="flex max-h-64 flex-col gap-0.5 overflow-auto">
           {matches.map((u) => {

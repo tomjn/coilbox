@@ -2,6 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { Info } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { useAdminRequest } from "./adminRequest";
 
@@ -62,6 +63,7 @@ export function BotAccountsSection({ serverKey }: { serverKey: string }) {
             onChange={(event) => setNewName(event.target.value)}
             aria-label="New bot account name"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -71,6 +73,7 @@ export function BotAccountsSection({ serverKey }: { serverKey: string }) {
             onChange={(event) => setFromUser(event.target.value)}
             aria-label="Copy the password from"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -80,6 +83,7 @@ export function BotAccountsSection({ serverKey }: { serverKey: string }) {
             onChange={(event) => setFounder(event.target.value)}
             aria-label="Battle founder"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         <Button

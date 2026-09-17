@@ -68,3 +68,11 @@ it("does not show another connection's join failure", () => {
   render(<AutojoinChannels serverKey={KEY_B} />);
   expect(screen.queryByText(/Last join failed/)).toBeNull();
 });
+
+it("stops the channel name field auto-capitalising on macOS (issue #2919)", () => {
+  render(<AutojoinChannels serverKey={KEY_A} />);
+  const field = screen.getByLabelText("Channel name");
+  expect(field.getAttribute("autocapitalize")).toBe("off");
+  expect(field.getAttribute("autocorrect")).toBe("off");
+  expect(field.getAttribute("spellcheck")).toBe("false");
+});
