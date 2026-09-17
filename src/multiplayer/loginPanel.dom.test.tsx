@@ -504,3 +504,22 @@ describe("remembered logins in the account list (issue #2927)", () => {
     expect(container.querySelector(".overflow-y-auto")).toBeTruthy();
   });
 });
+
+// The scrolling container from #2927 stopped the rows stretching to the
+// panel width, so their hover highlight covered only the text (issue #2933).
+describe("account rows fill the panel width (issue #2933)", () => {
+  it("gives every account row a full-width class", () => {
+    connectAs();
+    draw();
+    expect(account("alice").className).toMatch(/\bw-full\b/);
+    expect(account("bob").className).toMatch(/\bw-full\b/);
+  });
+
+  it("gives the Add a login row a full-width class", () => {
+    connectAs();
+    draw();
+    expect(screen.getByRole("link", { name: /Add a login/ }).className).toMatch(
+      /\bw-full\b/,
+    );
+  });
+});

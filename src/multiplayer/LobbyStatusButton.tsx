@@ -625,7 +625,7 @@ function AccountList({
             type="button"
             onClick={() => onPick(a)}
             disabled={disabled || current}
-            className="flex flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+            className="flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
           >
             <span className="flex w-full items-center gap-2 text-base font-semibold leading-tight">
               {a.username || "(no username)"}
@@ -668,7 +668,7 @@ function AccountList({
       <Link
         to="/settings/lobby-servers"
         onClick={onNavigate}
-        className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       >
         <Plus className="size-4" />
         Add a login
