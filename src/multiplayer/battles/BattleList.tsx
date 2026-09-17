@@ -11,6 +11,7 @@ type RowProps = {
   dataDir?: string;
   serverAddress?: string;
   directRoom?: boolean;
+  leaves?: string | null;
 };
 
 /**
@@ -33,6 +34,7 @@ export function BattleList({
   dataDir,
   serverAddress,
   directRoom,
+  leaves = null,
 }: {
   battles: Battle[];
   totalCount: number;
@@ -50,6 +52,9 @@ export function BattleList({
   /** Whether that connection is a room rather than a server, which decides which
    * kind of link the rows offer (issue #1617). */
   directRoom?: boolean;
+  /** What joining a battle here leaves behind under the one-battle rule
+   * (issue #2844), or null. */
+  leaves?: string | null;
 }) {
   // Passworded and running battles are both things you cannot simply drop into,
   // so they start collapsed and keep the joinable list short.
@@ -69,8 +74,18 @@ export function BattleList({
       dataDir,
       serverAddress,
       directRoom,
+      leaves,
     }),
-    [canJoin, onJoin, onLeave, enginePath, dataDir, serverAddress, directRoom],
+    [
+      canJoin,
+      onJoin,
+      onLeave,
+      enginePath,
+      dataDir,
+      serverAddress,
+      directRoom,
+      leaves,
+    ],
   );
 
   // Running wins over passworded: whether a battle has started is the first thing

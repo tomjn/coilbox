@@ -36,6 +36,7 @@ import { relayPingLabel, useRelayPing } from "../relayPing";
 import { hostBattleFailure } from "./hostBattle";
 import { hostEngineVersion } from "./hostEngineVersion";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
+import { leaveAndLabel } from "./oneBattle";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
 import { WindowsFirewall } from "./WindowsFirewall";
 
@@ -85,6 +86,7 @@ export function HostBattleForm({
   initialMap,
   initialGame,
   initialTitle,
+  leaves = null,
 }: {
   /** Whether this lobby server has a relay to host through, from
    *  `relayHostingAvailable`. The bottom rung of the ladder does not exist
@@ -103,6 +105,9 @@ export function HostBattleForm({
   initialGame?: string;
   /** Preselect this title (e.g. a skirmish preset's name). */
   initialTitle?: string;
+  /** What hosting leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
 }) {
   const drawer = useDrawer();
   // What the host picked last time (issue #2794), read once at mount. A jump
@@ -207,7 +212,8 @@ export function HostBattleForm({
   function hostButtonLabel(): string {
     if (hosting) return "Hosting…";
     if (checking) return "Checking your router…";
-    if (!gameName || !mapName || checksumsReady) return "Host battle";
+    if (!gameName || !mapName || checksumsReady)
+      return leaves ? leaveAndLabel("host") : "Host battle";
     if (gameInfo.status === "loading") return "Hashing game…";
     if (mapInfo.status === "loading") return "Hashing map…";
     // Both failed/idle: the button is disabled and the error row explains why.
@@ -577,6 +583,8 @@ export function HostBattleForm({
           {leftover && (
             <LeftoverRelayAgent pid={leftover.pid} ours={leftover.ours} />
           )}
+
+          {leaves && <p className="text-sm">{leaves}</p>}
 
           <div className="flex justify-end gap-2 pt-1">
             <Button

@@ -17,6 +17,7 @@ import {
   PLAYERS_PER_TEAM_RANGE,
   shapeLabel,
 } from "./createLobby";
+import { leaveAndLabel } from "./oneBattle";
 
 /** The `mpCreateLobby` argument shape, minus the connection key the parent supplies. */
 export type CreateLobbyArgs = Omit<
@@ -52,6 +53,7 @@ export function CreateLobbyPopover({
   onCreate,
   initialMap,
   autoOpen,
+  leaves = null,
 }: {
   disabled: boolean;
   onCreate: (args: CreateLobbyArgs) => void;
@@ -59,6 +61,9 @@ export function CreateLobbyPopover({
   initialMap?: string;
   /** Open the popover on mount, paired with `initialMap` for the same jump. */
   autoOpen?: boolean;
+  /** What creating leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
 }) {
   const [open, setOpen] = useState(!!autoOpen);
   const { target } = usePreferredTarget();
@@ -216,8 +221,10 @@ export function CreateLobbyPopover({
                 <p className="text-xs text-muted-foreground">{problem}</p>
               )}
 
+              {leaves && <p className="text-sm">{leaves}</p>}
+
               <Button type="submit" className="h-8" disabled={!!problem}>
-                Create lobby
+                {leaves ? leaveAndLabel("create") : "Create lobby"}
               </Button>
             </>
           )}

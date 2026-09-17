@@ -10,6 +10,7 @@ import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import type { mpZerokOpenBattle, ZerokBattleMode } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
+import { leaveAndLabel } from "./oneBattle";
 import {
   MAX_PLAYERS_RANGE,
   newZerokBattleProblem,
@@ -59,6 +60,7 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
   initialMap,
   initialTitle,
   autoOpen,
+  leaves = null,
 }: {
   disabled: boolean;
   /** Rejects when the battle did not open, which is what this form shows. */
@@ -69,6 +71,9 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
   initialTitle?: string;
   /** Open the popover on mount, paired with `initialMap` for the same jump. */
   autoOpen?: boolean;
+  /** What hosting leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
 }) {
   const [open, setOpen] = useState(!!autoOpen);
   const { target } = usePreferredTarget();
@@ -244,8 +249,14 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
             </p>
           )}
 
+          {leaves && <p className="text-sm">{leaves}</p>}
+
           <Button type="submit" className="h-8" disabled={!!problem || hosting}>
-            {hosting ? "Hosting…" : "Host battle"}
+            {hosting
+              ? "Hosting…"
+              : leaves
+                ? leaveAndLabel("host")
+                : "Host battle"}
           </Button>
         </form>
       </PopoverContent>
