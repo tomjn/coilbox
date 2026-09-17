@@ -25,7 +25,8 @@ If you are neither, no menu or topic control renders for that channel.
 > the `access=` line the answer carries, keeping it as `ConnectionState.adminLevel`
 > per connection. This chat member menu still does not read that level, so a
 > strictly admin-only verb (e.g. `BROADCAST`, `SETACCESS`) still is not
-> surfaced here.
+> surfaced here. It's offered instead on the [Server admin](/server-admin) page,
+> under its Announcements and Staff tools.
 
 ## Actions and the commands they send
 

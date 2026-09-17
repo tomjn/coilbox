@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { AccountPicker } from "../AccountPicker";
 import { useIsServerAdmin } from "../AdminOnly";
 import { AdminToolNav } from "../admin/AdminToolNav";
+import { ServerAdminHelp } from "../admin/ServerAdminHelp";
 import { chosenToolId, visibleTools } from "../admin/toolNav";
 import { ADMIN_TOOLS } from "../admin/tools";
 import { useMpServerAdmin } from "../navPredicates";
@@ -73,6 +74,8 @@ function ServerAdminPage() {
           )
         }
       />
+
+      <ServerAdminHelp />
 
       <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[13rem_minmax(0,1fr)]">
         <AdminToolNav tools={tools} current={current.id} />
