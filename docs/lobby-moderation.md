@@ -46,7 +46,10 @@ Server-moderator actions (first-class protocol verbs, gated by server access):
 | Kick from server | `KICK <nick> <reason>` |
 | Ban from server | `BAN <nick> <duration> <reason>` |
 
-`<duration>` uses ChanServ/uberserver spans like `10m`, `2h`, `3d`.
+ChanServ's `<duration>` (mute/ban above) uses spans like `10m`, `2h`, `3d`.
+`BAN`'s `<duration>` is different: a plain number of days, decimals allowed
+(e.g. `0.5`). uberserver runs `float(duration)` on it and rejects a span. `BAN`
+also has no default reason, so the client must not send it empty.
 
 ## Implementation notes
 
