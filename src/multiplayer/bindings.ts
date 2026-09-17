@@ -803,6 +803,7 @@ export const mpGetUserInfo = defineCommand<
  * - `ban`: `BAN <username> <days> <reason>`
  * - `banSpecific`: `BANSPECIFIC <target> <days> <reason>`
  * - `unban`: `UNBAN <target>`
+ * - `resetUserPassword`: `RESETUSERPASSWORD <username> [email]`
  * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
  */
 export type AdminShape =
@@ -817,6 +818,7 @@ export type AdminShape =
   | "ban"
   | "banSpecific"
   | "unban"
+  | "resetUserPassword"
   | "noReply";
 
 /** One `LISTBANS` line. uberserver's `None` arrives as null. */
@@ -898,7 +900,8 @@ export type AdminReply =
   | { shape: "kick"; username: string; kicked: boolean }
   | { shape: "ban"; success: boolean; message: string }
   | { shape: "banSpecific"; success: boolean; message: string }
-  | { shape: "unban"; success: boolean; message: string };
+  | { shape: "unban"; success: boolean; message: string }
+  | { shape: "resetUserPassword"; success: boolean; message: string };
 
 /** How an admin command ended. Mirrors the Rust `AdminOutcome`. */
 export type AdminOutcome =

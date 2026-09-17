@@ -1,8 +1,15 @@
 import { Button, Input } from "@picoframe/frame";
+import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { Field } from "@/components/Field";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import type { AdminUserInfo } from "../bindings";
 import { AdminRequestStatus } from "./AdminRequestStatus";
@@ -124,6 +131,126 @@ function BotFlagAction({
         }
       </AdminRequestStatus>
     </div>
+  );
+}
+
+/**
+ * Whether uberserver's own `valid_email_addr` (`SQLUsers.py`) would treat
+ * `email` as good enough to already be on file. Its checks, in order: not
+ * empty, no whitespace anywhere in it, and a match (not necessarily a full
+ * one, `re.match` only anchors the start) against
+ * `[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,6}`.
+ *
+ * `RESETUSERPASSWORD` decides from this whether an email is needed: pass
+ * one only when the account does not already have a valid one.
+ */
+function hasValidEmail(email: string | null): boolean {
+  if (!email || email.includes(" ")) return false;
+  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,6}/.test(email);
+}
+
+/**
+ * `RESETUSERPASSWORD <username> [email]` (issue #2781): uberserver
+ * generates a fresh password and emails it to the account, replacing the
+ * one it had. `email` is only sent when the account has no valid one on
+ * file already, per {@link hasValidEmail}. The confirm step asks for one
+ * there instead.
+ *
+ * A popover holds the confirmation rather than a modal dialog, matching the
+ * other lookup actions and the project's drawer/popover preference. It
+ * stays open after "Send reset email" so the reply is visible in the same
+ * place: `success` renders as plain text (it already names the address),
+ * and a refusal renders as an alert, the same wording uberserver used but
+ * shown as a refusal rather than as a fact, matching how `AdminRequestStatus`
+ * shows a protocol-level refusal (issue #2773). An unanswered request
+ * explains the most likely cause: a server with no email account set up
+ * throws before sending anything (ScarylePoo/uberserver#58), so coilbox sees
+ * silence rather than a refusal.
+ */
+function ResetPasswordAction({
+  username,
+  email,
+  serverKey,
+}: {
+  username: string;
+  email: string | null;
+  serverKey: string;
+}) {
+  const [newEmail, setNewEmail] = useState("");
+  const reset = useAdminRequest(serverKey);
+  const known = hasValidEmail(email);
+  const canSubmit = known || newEmail.trim() !== "";
+
+  const confirm = () => {
+    if (!canSubmit) return;
+    void reset.send(
+      "RESETUSERPASSWORD",
+      known ? [username] : [username, newEmail.trim()],
+      "resetUserPassword",
+    );
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-8">
+          Reset password…
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-80 flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium">
+            Email {username} a new password?
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            uberserver generates a fresh password and replaces {username}&apos;s
+            current one, then emails the new one to{" "}
+            {known ? email : "the address below"}.
+          </p>
+        </div>
+        {!known && (
+          <span className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Email address to add
+            <Input
+              value={newEmail}
+              onChange={(event) => setNewEmail(event.target.value)}
+              placeholder="name@example.com"
+              aria-label="Email address to add"
+              className="h-8"
+            />
+          </span>
+        )}
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            className="h-8"
+            onClick={confirm}
+            disabled={!canSubmit || reset.state.status === "sending"}
+          >
+            Send reset email
+          </Button>
+        </div>
+        <AdminRequestStatus
+          state={reset.state}
+          unanswered={`The server did not answer. A server with email switched off is the usual cause (a known uberserver bug, ScarylePoo/uberserver#58).`}
+        >
+          {(reply) =>
+            reply.shape === "resetUserPassword" ? (
+              reply.success ? (
+                <span>{reply.message}</span>
+              ) : (
+                <Alert variant="destructive">
+                  <TriangleAlert />
+                  <AlertTitle>The server refused</AlertTitle>
+                  <AlertDescription>{reply.message}</AlertDescription>
+                </Alert>
+              )
+            ) : null
+          }
+        </AdminRequestStatus>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -323,7 +450,12 @@ function AccountInfoView({
           )}
           <DetailField label="Last hardware ID" value={dash(info.lastMacId)} />
           <DetailField label="Last system ID" value={dash(info.lastSysId)} />
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <ResetPasswordAction
+              username={info.username}
+              email={info.email}
+              serverKey={serverKey}
+            />
             <BanAction username={info.username} />
           </div>
           <KickAction username={info.username} serverKey={serverKey} />
