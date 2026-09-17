@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import { identifierFieldProps } from "@/lib/identifierField";
 import {
   AUTO_AWAY_ENABLED_KEY,
   AUTO_AWAY_MINUTES_KEY,
@@ -633,6 +634,7 @@ function AccountForm({
         <Input
           value={a.username}
           onChange={(e) => onChange({ username: e.target.value })}
+          {...identifierFieldProps}
         />
       </Field>
       {serverProtocol(server ?? {}) === "tachyon" ? (
@@ -658,6 +660,7 @@ function AccountForm({
             onChange={(e) => setPassword(e.target.value)}
             onBlur={savePassword}
             placeholder={saved ? "•••••••• (saved)" : ""}
+            {...identifierFieldProps}
           />
         </Field>
       )}
@@ -910,6 +913,7 @@ function CustomServerForm({
             onChange={(e) => onChange({ host: e.target.value })}
             placeholder="lobby.example.org"
             className="font-mono text-xs"
+            {...identifierFieldProps}
           />
         </Field>
         <Field label="Port">

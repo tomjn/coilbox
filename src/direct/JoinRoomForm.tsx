@@ -14,6 +14,7 @@
 
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { useState } from "react";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { leaveAndLabel } from "../multiplayer/battles/oneBattle";
 import { addressProblem, splitHostPort } from "./lan";
 import { DEFAULT_ROOM_PORT, playerNameProblem, roomPortProblem } from "./room";
@@ -155,7 +156,7 @@ export function JoinRoomForm({
             onBlur={settleAddress}
             placeholder="192.168.1.5"
             autoComplete="off"
-            spellCheck={false}
+            {...identifierFieldProps}
           />
         </label>
 
@@ -190,6 +191,7 @@ export function JoinRoomForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="The name others see"
+          {...identifierFieldProps}
         />
         {nameProblem && (
           <span className="text-xs text-destructive">{nameProblem}</span>
@@ -211,6 +213,7 @@ export function JoinRoomForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder={target?.passworded ? "" : "Leave blank for an open room"}
+          {...identifierFieldProps}
         />
       </label>
 

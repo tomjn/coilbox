@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { identifierFieldProps } from "@/lib/identifierField";
 import type {
   AdminReply,
   AdminShape,
@@ -175,6 +176,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
             placeholder="main"
             aria-label="Channel"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         {suggestions.length > 0 && (
@@ -208,6 +210,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
             onChange={(event) => setFounder(event.target.value)}
             aria-label="Founder"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         <div className="flex flex-wrap gap-2">

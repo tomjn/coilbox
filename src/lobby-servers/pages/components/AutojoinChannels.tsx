@@ -1,5 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { Hash, Plus, Trash2 } from "lucide-react";
+import { identifierFieldProps } from "../../../lib/identifierField";
 import { updateStoredSetting } from "../../../lib/storedSetting";
 import {
   JOINED_CHANNELS_KEY,
@@ -74,6 +75,7 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
                     onChange={(e) => updateRow(i, { name: e.target.value })}
                     placeholder="channel"
                     aria-label="Channel name"
+                    {...identifierFieldProps}
                   />
                   <Input
                     value={c.key ?? ""}
@@ -82,6 +84,7 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
                     }
                     placeholder="key (optional)"
                     aria-label="Channel key"
+                    {...identifierFieldProps}
                   />
                   <Button
                     variant="outline"

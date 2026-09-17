@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { mpListChannels } from "../bindings";
 import { useConnection, useMultiplayer } from "../store";
 
@@ -131,6 +132,7 @@ export function ChannelBrowser({
             placeholder="Join or create a channel…"
             aria-label="Channel name to join or create"
             className="h-7"
+            {...identifierFieldProps}
           />
           <Button
             type="submit"

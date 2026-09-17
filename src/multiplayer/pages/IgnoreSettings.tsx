@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, UserX } from "lucide-react";
 import { useState } from "react";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { AccountPicker } from "../AccountPicker";
 import { useIgnoreActions } from "../ignore";
 import { liveConnectionKeys, useMultiplayer } from "../store";
@@ -69,6 +70,7 @@ export default function IgnoreSettings() {
           onChange={(e) => setDraft(e.target.value)}
           placeholder="username"
           aria-label="Username to ignore"
+          {...identifierFieldProps}
         />
         <Button type="submit" disabled={!draft.trim()}>
           <Plus className="size-4" /> Ignore

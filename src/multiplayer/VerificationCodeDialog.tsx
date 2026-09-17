@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { agreementWantsCode } from "./agreement";
 import { serverNameFor, useMultiplayer, useProtocolServers } from "./store";
 
@@ -121,6 +122,7 @@ export function VerificationCodeDialog() {
             }
             autoFocus
             disabled={busy}
+            {...identifierFieldProps}
           />
           {error && <p className="text-xs text-destructive">{error}</p>}
           <DialogFooter>

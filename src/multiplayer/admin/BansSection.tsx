@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { identifierFieldProps } from "@/lib/identifierField";
 import type { BanEntry } from "../bindings";
 import { DaysField } from "../DaysField";
 import { AdminRequestStatus } from "./AdminRequestStatus";
@@ -106,6 +107,7 @@ function BanForm({
             onChange={(event) => setName(event.target.value)}
             aria-label="Username"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         <DaysField value={days} onChange={setDays} />
@@ -185,6 +187,7 @@ function BanSpecificForm({
             onChange={(event) => setTarget(event.target.value)}
             aria-label="Username, IP or email to ban"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         <DaysField value={days} onChange={setDays} />
@@ -259,6 +262,7 @@ function UnbanForm({
             onChange={(event) => setTarget(event.target.value)}
             aria-label="Username, IP or email to unban"
             className="h-8"
+            {...identifierFieldProps}
           />
         </span>
         <Button

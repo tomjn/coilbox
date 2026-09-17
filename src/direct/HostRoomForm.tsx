@@ -20,6 +20,7 @@ import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUnitsyncThumbnails } from "@/content/config";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
 import {
   DEFAULT_HOST_PORT,
@@ -299,6 +300,7 @@ export function HostRoomForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="The name others see"
+            {...identifierFieldProps}
           />
         </label>
       </div>
@@ -383,6 +385,7 @@ export function HostRoomForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Leave blank for an open room"
+          {...identifierFieldProps}
         />
         {passwordProblem && (
           <span className="text-xs text-destructive">{passwordProblem}</span>

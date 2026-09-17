@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
+import { identifierFieldProps } from "@/lib/identifierField";
 import { serverKeyFor, useMultiplayer } from "../multiplayer/store";
 import { type LobbyServer, serverProtocol } from "./config";
 
@@ -206,6 +207,7 @@ export function PasswordRecoveryForm({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             autoComplete="one-time-code"
+            {...identifierFieldProps}
           />
         </Field>
         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -254,6 +256,7 @@ export function PasswordRecoveryForm({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="off"
+          {...identifierFieldProps}
         />
       </Field>
       {error && <p className="text-xs text-destructive">{error}</p>}
