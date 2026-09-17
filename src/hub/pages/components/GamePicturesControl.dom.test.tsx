@@ -41,7 +41,25 @@ vi.mock("@/play/config", () => ({
   }),
 }));
 
-import { GamePicturesControl } from "./GamePicturesControl";
+/** The installed games the picker offers, without a real unitsync scan. */
+vi.mock("@/content/config", () => ({
+  useUnitsyncScan: () => ({
+    data: {
+      games: [
+        {
+          name: "Tech Annihilation 1.2",
+          info: { name: "Tech Annihilation", shortname: "TechA" },
+        },
+        { name: "Balanced Annihilation V15", info: { shortname: "ba" } },
+        // A second install of one game is one option.
+        { name: "Balanced Annihilation V14", info: { shortname: "BA" } },
+        { name: "No shortname", info: {} },
+      ],
+    },
+  }),
+}));
+
+import { GamePicturesControl, gameOptions } from "./GamePicturesControl";
 
 const REPORT: PictureSweepReport = {
   found: 2,
@@ -76,7 +94,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const press = async () => {
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(
+    screen.getByRole("button", { name: /send pictures|drawing/i }),
+  );
   // The click starts a promise, so let it settle before reading the screen.
   await vi.waitFor(() => expect(sweep).toHaveBeenCalled());
 };
@@ -141,16 +161,18 @@ it("says how far along it is while it runs", async () => {
       }),
   );
   render(<GamePicturesControl hubUrl="https://hub.example" agreed />);
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(
+    screen.getByRole("button", { name: /send pictures|drawing/i }),
+  );
 
   await vi.waitFor(() => expect(reporters).toHaveLength(1));
   reporters[0]({ phase: "filling", done: 1, total: 3, game: "Evolution RTS" });
 
   await screen.findByText("Drawing 2 of 3: Evolution RTS");
   // And the button says it is going, so nobody presses it twice.
-  expect(screen.getByRole("button").textContent).toContain(
-    "Drawing your units",
-  );
+  expect(
+    screen.getByRole("button", { name: /send pictures|drawing/i }).textContent,
+  ).toContain("Drawing your units");
 });
 
 /**
@@ -178,4 +200,28 @@ it("says so when the sweep falls over rather than looking finished", async () =>
   await press();
 
   await screen.findByText("the hub is asleep");
+});
+
+it("sweeps every game unless one is picked", async () => {
+  render(<GamePicturesControl hubUrl="https://hub.example" agreed />);
+  await press();
+
+  expect(sweep.mock.calls[0][0]).not.toHaveProperty("only");
+});
+
+it("offers each installed game once, by name", () => {
+  expect(
+    gameOptions([
+      {
+        name: "Tech Annihilation 1.2",
+        info: { name: "Tech Annihilation", shortname: "TechA" },
+      },
+      { name: "Balanced Annihilation V15", info: { shortname: "ba" } },
+      { name: "Balanced Annihilation V14", info: { shortname: "BA" } },
+      { name: "No shortname", info: {} },
+    ] as never),
+  ).toEqual([
+    { value: "ba", label: "Balanced Annihilation V15" },
+    { value: "techa", label: "Tech Annihilation" },
+  ]);
 });
