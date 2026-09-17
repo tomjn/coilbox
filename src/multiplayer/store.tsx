@@ -82,7 +82,6 @@ import {
 } from "./clientId";
 import {
   type AccountInfo,
-  anotherLiveKey,
   type ConnectionRuntime,
   type ConnectionState,
   type Connections,
@@ -151,38 +150,77 @@ export function serverNameFor(
 }
 
 /**
+ * The host half of a `serverKey`, lower-cased, which is what decides whether two
+ * keys are the same lobby server. Beyond All Reason's TASServer and Tachyon
+ * entries share a host on different ports and are one server behind two
+ * protocols (issue #2848).
+ */
+export function serverHostFromKey(serverKey: string): string {
+  const address = serverAddressFromKey(serverKey);
+  const colon = address.lastIndexOf(":");
+  return (colon < 0 ? address : address.slice(0, colon)).toLowerCase();
+}
+
+/** A connection that stands in the way of another, for `connectBlockedReason`. */
+export interface OpenConnection {
+  serverKey: string;
+  /** Still in its handshake, rather than live. */
+  opening: boolean;
+  /** A room this client hosts or joined, rather than a lobby server. */
+  direct: boolean;
+}
+
+/**
  * Why a connect must not go ahead, or null when it may. Pure.
  *
- * Coilbox holds one lobby connection. `hostBlockedReason` and `joinBlockedReason`
- * already say so on the three forms that need it, but a form is handed to a
- * drawer as an element and the drawer keeps the element it was opened with, so a
- * connection arriving behind an open form walks past all three (issue #2149).
- * This is the same rule read where it can actually be enforced: at the moment
- * the connection is opened.
+ * Coilbox holds one connection per lobby server, where the same host is the
+ * same server whichever port or account (issue #2848). Two accounts on one
+ * server at once would be confusing to follow and could upset the server. A
+ * room still needs coilbox's only connection, until issue #2850 lets it sit
+ * beside lobby logins.
+ *
+ * This is read where the rule can actually be enforced, at the moment the
+ * connection is opened, because a form handed to a drawer keeps the element it
+ * was opened with and cannot see a connection arriving behind it (issue #2149).
  *
  * A connect still in its handshake counts as much as a live one. It is the case
  * a form cannot see at all, because an auto-reconnect halfway through has no
  * active key yet, and it is read from a ref written before the first `await`, so
- * two connects racing each other cannot both find the way clear.
+ * two connects racing each other cannot both find the way clear. A live
+ * connection is named in preference to one still opening, because it is the one
+ * somebody can act on.
  *
  * The address is named rather than "the lobby server" or "the room". Both are
  * `username@host:port` and nothing here can tell which is which, which is the
  * mistake behind issue #1618, so this says where instead of what.
  */
 export function connectBlockedReason(
-  activeKey: string | null,
-  /** The key of a connect still in its handshake, or null. */
-  connectingKey: string | null,
+  open: readonly OpenConnection[],
   /** The key the caller is about to open. */
   serverKey: string,
+  /** Whether that key is a room. */
+  direct: boolean,
 ): string | null {
-  if (activeKey != null && activeKey !== serverKey) {
-    return `Coilbox holds one lobby connection, and ${serverAddressFromKey(activeKey)} has it. Disconnect from that first.`;
+  const host = serverHostFromKey(serverKey);
+  const inTheWay = open.filter(
+    (c) =>
+      c.serverKey !== serverKey &&
+      (direct || c.direct || serverHostFromKey(c.serverKey) === host),
+  );
+  const other =
+    inTheWay.find((c) => !c.opening) ?? inTheWay.find((c) => c.opening);
+  if (!other) return null;
+  if (direct || other.direct) {
+    const address = serverAddressFromKey(other.serverKey);
+    return other.opening
+      ? `A room needs coilbox's only connection, and one to ${address} is already opening. Wait for that one to finish.`
+      : `A room needs coilbox's only connection, and ${address} has it. Disconnect from that first.`;
   }
-  if (connectingKey != null && connectingKey !== serverKey) {
-    return `Coilbox holds one lobby connection, and one to ${serverAddressFromKey(connectingKey)} is already opening. Wait for that one to finish.`;
-  }
-  return null;
+  const who = usernameFromKey(other.serverKey);
+  const where = serverHostFromKey(other.serverKey);
+  return other.opening
+    ? `A login to ${where} as ${who} is already opening. Wait for that one to finish.`
+    : `You are already logged in to ${where} as ${who}. Log out of that account first.`;
 }
 
 /**
@@ -590,24 +628,37 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // a Channel callback. Written here beside the state rather than synced from it
   // in an effect, so it is never a render behind.
   const activeKeyRef = useRef<string | null>(null);
-  const applyActiveKey = useCallback(
-    (key: string | null) => {
-      const prev = activeKeyRef.current;
-      // Clearing the key that was focused: refocus another live connection
-      // rather than leaving nothing focused, if one is still up (issue #2894).
-      const next =
-        key == null && prev != null ? anotherLiveKey(connections, prev) : key;
-      activeKeyRef.current = next;
-      setActiveKey(next);
-      if (prev != null && prev !== next) {
-        updateConnection(prev, (c) => (c.live ? { ...c, live: false } : c));
-      }
-      if (next != null) {
-        updateConnection(next, (c) => (c.live ? c : { ...c, live: true }));
-        setFocusKey(next);
-      }
+  // Every connection that finished opening and has not dropped since, the
+  // focused one among them. Kept as a ref for the same reason as the key above:
+  // the connect rule and the drop handler read it before React re-renders.
+  const liveKeysRef = useRef(new Set<string>());
+  const focusOn = useCallback((key: string | null) => {
+    activeKeyRef.current = key;
+    setActiveKey(key);
+    if (key != null) setFocusKey(key);
+  }, []);
+  // A connection has opened. It takes focus when asked to (a login somebody
+  // just pressed) or when nothing else has it.
+  const markLive = useCallback(
+    (key: string, focus: boolean) => {
+      liveKeysRef.current.add(key);
+      updateConnection(key, (c) => (c.live ? c : { ...c, live: true }));
+      if (focus || activeKeyRef.current == null) focusOn(key);
     },
-    [connections, updateConnection],
+    [focusOn, updateConnection],
+  );
+  // A connection has closed or dropped. Focus moves only if it was the focused
+  // one, to another live connection if one is still up (issue #2894). With none
+  // left the focus entry stays put, which keeps a drop's reason on screen.
+  const markGone = useCallback(
+    (key: string) => {
+      liveKeysRef.current.delete(key);
+      updateConnection(key, (c) => (c.live ? { ...c, live: false } : c));
+      if (activeKeyRef.current !== key) return;
+      const next = liveKeysRef.current.values().next().value ?? null;
+      focusOn(next);
+    },
+    [focusOn, updateConnection],
   );
   // Busy by server key rather than one shared flag, so an account command in
   // flight on one connection does not grey out another connection's controls
@@ -801,9 +852,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // outlives the connection it describes.
   const [roomKey, setRoomKey] = useSetting<string>("multiplayer.roomKey", "");
   const setRoomKeyRef = useRef(setRoomKey);
+  const roomKeyRef = useRef(roomKey);
   useEffect(() => {
     setRoomKeyRef.current = setRoomKey;
-  }, [setRoomKey]);
+    roomKeyRef.current = roomKey;
+  }, [roomKey, setRoomKey]);
 
   // Startup auto-connect (issue #404, opt-in, default off) + one-click reconnect.
   // The last-used login is written on every successful connect and read once at
@@ -848,10 +901,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     };
   }, [autoConnect, lastLogin, accountsCfg.accounts, customCfg.servers]);
 
-  // The serverKey of a connect still in its handshake (before it registers as a
-  // live connection), so `cancelConnect` knows which pending connect to abort.
-  // Cleared once the connect resolves either way.
-  const connectingKeyRef = useRef<string | null>(null);
+  // The server keys of connects still in their handshake (before they register
+  // as live connections), in the order they started, so the connect rule can
+  // see them and `cancelConnect` knows which pending connect to abort. Each is
+  // cleared once its connect resolves either way.
+  const connectingKeysRef = useRef(new Set<string>());
   // Late-bound so the frozen `openChannel` handler can invoke the latest logic.
   // It is handed the key that dropped, because which connection it was decides
   // everything the handler does (issue #2149).
@@ -881,10 +935,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
 
   // Mark a user-initiated disconnect or cancel as intended, so its clean
   // `disconnected` event isn't mistaken for an unexpected drop. With no key it
-  // marks every connection, which is what the one flag this replaced did.
+  // marks every connection that is not live, so a cancel with nothing named
+  // cannot stop a live connection's drop from reconnecting.
   const markIntentional = useCallback((serverKey?: string) => {
     if (serverKey === undefined) {
-      for (const rt of runtimesRef.current.values()) rt.intentional = true;
+      for (const [key, rt] of runtimesRef.current) {
+        if (!liveKeysRef.current.has(key)) rt.intentional = true;
+      }
     } else {
       const rt = runtimesRef.current.get(serverKey);
       if (rt) rt.intentional = true;
@@ -1267,18 +1324,35 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // Records the reconnect context and resets the per-session drop flags so a later
   // unexpected disconnect can rebuild the session.
   const doConnect = useCallback(
-    async (server: LobbyServer, username: string, direct = false) => {
+    async (
+      server: LobbyServer,
+      username: string,
+      direct = false,
+      /** Take focus once open, rather than only when nothing else has it. */
+      focus = true,
+    ) => {
       const serverKey = serverKeyFor(server, username);
-      // The one place every connection is opened, and so the one place the one-
-      // connection rule can hold. Read and thrown before anything is recorded,
-      // so a refused connect leaves no reconnect context and no busy flag behind
-      // (issue #2149). Every caller shows the message: the login panel, the host
-      // form and the join form all put a thrown reason on screen.
-      const blocked = connectBlockedReason(
-        activeKeyRef.current,
-        connectingKeyRef.current,
-        serverKey,
-      );
+      // The one place every connection is opened, and so the one place the
+      // one-connection-per-server rule can hold. Read and thrown before anything
+      // is recorded, so a refused connect leaves no reconnect context and no busy
+      // flag behind (issue #2149). Every caller shows the message: the login
+      // panel, the host form and the join form all put a thrown reason on screen.
+      const isDirect = (key: string) =>
+        runtimesRef.current.get(key)?.reconnectCtx?.direct ??
+        key === roomKeyRef.current;
+      const open: OpenConnection[] = [
+        ...[...liveKeysRef.current].map((key) => ({
+          serverKey: key,
+          opening: false,
+          direct: isDirect(key),
+        })),
+        ...[...connectingKeysRef.current].map((key) => ({
+          serverKey: key,
+          opening: true,
+          direct: isDirect(key),
+        })),
+      ];
+      const blocked = connectBlockedReason(open, serverKey, direct);
       if (blocked) throw new Error(blocked);
       beginBusy(serverKey);
       const rt = runtimeFor(serverKey);
@@ -1286,7 +1360,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       rt.loggedIn = false;
       rt.denied = false;
       rt.reconnectCtx = { server, username, direct };
-      connectingKeyRef.current = serverKey;
+      connectingKeysRef.current.add(serverKey);
       try {
         const onEvent = openChannel(serverKey);
         const protocol = serverProtocol(server);
@@ -1361,7 +1435,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         const snap = await mpSnapshot({ serverKey });
         rt.state = snap.state;
         dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
-        applyActiveKey(serverKey);
+        markLive(serverKey, focus);
         setRoomKeyRef.current(direct ? serverKey : "");
         setLoginPopoverOpen(false);
         // Remember this login as the last used, so opt-in auto-connect and the
@@ -1384,17 +1458,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         }
         throw e;
       } finally {
-        connectingKeyRef.current = null;
+        connectingKeysRef.current.delete(serverKey);
         endBusy(serverKey);
       }
     },
     [
-      applyActiveKey,
       beginBusy,
       beginConnecting,
       closeConnection,
       dispatchMirror,
       endBusy,
+      markLive,
       openChannel,
       runtimeFor,
     ],
@@ -1421,11 +1495,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [beginBusy, endBusy],
   );
 
-  // Public connect: a manual login supersedes any in-flight auto-reconnect loop.
-  // Every loop, not only this key's, because only one connection is allowed.
+  // Public connect: a manual login supersedes any auto-reconnect loop on the
+  // same server, whichever account it is for, since that server can hold only
+  // one of them. Loops for other servers carry on (issue #2848).
   const connect = useCallback(
     async (server: LobbyServer, username: string) => {
-      stopReconnect();
+      const host = serverHostFromKey(serverKeyFor(server, username));
+      for (const key of [...runtimesRef.current.keys()]) {
+        if (serverHostFromKey(key) === host) stopReconnect(key);
+      }
       await doConnect(server, username);
     },
     [doConnect, stopReconnect],
@@ -1433,7 +1511,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
 
   // Connect to a room we host. The key is returned rather than read off
   // `activeKey`, because a caller that starts a room then opens a battle in it
-  // does both before React has re-rendered with the new key.
+  // does both before React has re-rendered with the new key. It still stops
+  // every reconnect loop, because a room still needs the only connection
+  // until issue #2850.
   const connectDirect = useCallback(
     async (port: number, username: string, address?: string) => {
       stopReconnect();
@@ -1451,12 +1531,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // so a second attempt would be refused as a duplicate. Drop it.
         await mpDisconnect({ serverKey }).catch(() => {});
         closeConnection(serverKey);
-        applyActiveKey(null);
+        // Moves focus only if this room had it, so a connection that became
+        // focused meanwhile keeps it.
+        markGone(serverKey);
         throw e;
       }
       return serverKey;
     },
-    [applyActiveKey, closeConnection, doConnect, stopReconnect],
+    [closeConnection, doConnect, markGone, stopReconnect],
   );
 
   // Run a connection's reconnect loop after an unexpected drop: retry
@@ -1477,7 +1559,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         const ctx = rt.reconnectCtx;
         if (!ctx) return;
         try {
-          await doConnect(ctx.server, ctx.username, ctx.direct);
+          // A reconnect takes focus only when nothing else has it, so a
+          // connection coming back does not pull the interface away from the
+          // one somebody moved on to.
+          await doConnect(ctx.server, ctx.username, ctx.direct, false);
           if (superseded()) return;
           void notify({
             title: "Reconnected to multiplayer",
@@ -1531,14 +1616,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // (not a manual disconnect, a login denial, or when the feature is off).
   // Captures the current battle first so it can be rejoined once reconnected.
   //
-  // Nothing happens at all for a connection that is not the one in use. A
-  // connection somebody has moved on from still has a socket to lose, and losing
-  // it used to clear the key and start a reconnect for whoever held it next
-  // (issue #2149).
+  // Nothing happens at all for a connection that is not live. A connection
+  // somebody has closed still has a socket to lose, and losing it used to clear
+  // the key and start a reconnect for whoever held it next (issue #2149). A
+  // connect that fails in its handshake is not live either, and its own caller
+  // reports that.
   const handleDrop = useCallback(
     (serverKey: string, reason: string | null) => {
-      if (activeKeyRef.current !== serverKey) return;
-      applyActiveKey(null);
+      if (!liveKeysRef.current.has(serverKey)) return;
+      markGone(serverKey);
       const rt = runtimesRef.current.get(serverKey);
       if (!rt || rt.intentional) return;
       // A room is one running process, not an address worth retrying: once it
@@ -1568,7 +1654,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       void notify({ title: "Connection lost — reconnecting…" });
       runReconnect(serverKey);
     },
-    [applyActiveKey, runReconnect],
+    [markGone, runReconnect],
   );
   useEffect(() => {
     handleDropRef.current = handleDrop;
@@ -2012,9 +2098,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // without an error toast or an auto-reconnect. Safe to call with nothing pending.
   const cancelConnect = useCallback(
     async (serverKey?: string) => {
-      markIntentional(serverKey);
-      stopReconnect(serverKey);
-      const key = serverKey ?? connectingKeyRef.current;
+      // With no key, the most recent connect still opening, if there is one.
+      const key = serverKey ?? [...connectingKeysRef.current].pop();
+      markIntentional(key);
+      stopReconnect(key);
       if (key) await mpCancelConnect({ serverKey: key }).catch(() => {});
     },
     [markIntentional, stopReconnect],
@@ -2024,24 +2111,24 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     async (serverKey?: string) => {
       // Mark intentional and kill any reconnect loop before the guard, so a manual
       // "log out" can't be mistaken for a drop even mid-reconnect (no active key).
-      markIntentional(serverKey);
-      stopReconnect(serverKey);
-      const key = serverKey ?? activeKeyRef.current;
+      const key = serverKey ?? activeKeyRef.current ?? undefined;
+      markIntentional(key);
+      stopReconnect(key);
       if (!key) return;
       beginBusy(key);
       try {
         await mpDisconnect({ serverKey: key });
       } finally {
         closeConnection(key);
-        if (activeKeyRef.current === key) applyActiveKey(null);
+        markGone(key);
         endBusy(key);
       }
     },
     [
-      applyActiveKey,
       beginBusy,
       closeConnection,
       endBusy,
+      markGone,
       markIntentional,
       stopReconnect,
     ],
@@ -2102,6 +2189,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             const snap = await mpSnapshot({ serverKey });
             rt.state = snap.state;
             dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
+            liveKeysRef.current.add(serverKey);
             updateConnection(serverKey, (c) =>
               c.live ? c : { ...c, live: true },
             );
@@ -2134,9 +2222,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           (lastLoginKey && reattached.includes(lastLoginKey)
             ? lastLoginKey
             : null) ?? reattached[0];
-        activeKeyRef.current = focused;
-        setActiveKey(focused);
-        setFocusKey(focused);
+        focusOn(focused);
         return;
       }
       // Fresh launch with nothing to reattach: if the user opted in and the last
@@ -2159,7 +2245,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         });
       });
     })();
-  }, [dispatchMirror, openChannel, connect, runtimeFor, updateConnection]);
+  }, [
+    dispatchMirror,
+    focusOn,
+    openChannel,
+    connect,
+    runtimeFor,
+    updateConnection,
+  ]);
 
   // Whether more than one connection exists at all (not only live ones, so
   // two connections both still parked on an agreement still count). Gates
