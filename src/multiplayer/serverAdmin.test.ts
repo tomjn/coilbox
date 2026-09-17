@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { LobbyServer } from "../lobby-servers/config";
-import type { LobbyState } from "./bindings";
+import type { AdminOutcome, LobbyState } from "./bindings";
 import type { Connections } from "./connections";
-import { isUberserver, serverAdminKeys } from "./serverAdmin";
+import {
+  adminLevelFromOutcome,
+  isServerAdmin,
+  isUberserver,
+  serverAdminKeys,
+} from "./serverAdmin";
 
 const UBER_KEY = "mod@uber.example:8200";
 const TEI_KEY = "mod@tei.example:8201";
@@ -177,5 +182,107 @@ describe("serverAdminKeys", () => {
     expect(serverAdminKeys(withSecond, servers, secondUberKey)[0]).toBe(
       secondUberKey,
     );
+  });
+});
+
+describe("isServerAdmin", () => {
+  it("is true for a connection whose level is admin", () => {
+    const connections = {
+      [UBER_KEY]: { adminLevel: "admin" },
+    } as unknown as Connections;
+    expect(isServerAdmin(connections, UBER_KEY)).toBe(true);
+  });
+
+  it("is false for a connection whose level is mod", () => {
+    const connections = {
+      [UBER_KEY]: { adminLevel: "mod" },
+    } as unknown as Connections;
+    expect(isServerAdmin(connections, UBER_KEY)).toBe(false);
+  });
+
+  it("is false with no server key or no matching entry", () => {
+    const connections = {
+      [UBER_KEY]: { adminLevel: "admin" },
+    } as unknown as Connections;
+    expect(isServerAdmin(connections, null)).toBe(false);
+    expect(isServerAdmin(connections, "nobody@nowhere:1")).toBe(false);
+  });
+});
+
+function accountUserInfo(access: string) {
+  return {
+    kind: "account" as const,
+    username: "AF",
+    online: true,
+    userId: "1",
+    sessionId: "1",
+    agent: null,
+    registered: "Jan 01, 2020",
+    lastLogin: "Sep 16, 2026",
+    access,
+    bot: false,
+    ingameHours: "0",
+    email: null,
+    lastIp: null,
+    lastSysId: null,
+    lastMacId: null,
+  };
+}
+
+describe("adminLevelFromOutcome", () => {
+  it("reads an admin reply as admin", () => {
+    const outcome: AdminOutcome = {
+      outcome: "answered",
+      reply: { shape: "userInfo", info: accountUserInfo("admin") },
+    };
+    expect(adminLevelFromOutcome(outcome)).toBe("admin");
+  });
+
+  it("reads a moderator reply as mod", () => {
+    const outcome: AdminOutcome = {
+      outcome: "answered",
+      reply: { shape: "userInfo", info: accountUserInfo("mod") },
+    };
+    expect(adminLevelFromOutcome(outcome)).toBe("mod");
+  });
+
+  it("reads a plain user reply as mod rather than treating it as unknown", () => {
+    const outcome: AdminOutcome = {
+      outcome: "answered",
+      reply: { shape: "userInfo", info: accountUserInfo("user") },
+    };
+    expect(adminLevelFromOutcome(outcome)).toBe("mod");
+  });
+
+  it("settles nothing on a refusal", () => {
+    const outcome: AdminOutcome = {
+      outcome: "refused",
+      reason: "Insufficient rights.",
+    };
+    expect(adminLevelFromOutcome(outcome)).toBeNull();
+  });
+
+  it("settles nothing when there is no reply", () => {
+    const outcome: AdminOutcome = { outcome: "unanswered" };
+    expect(adminLevelFromOutcome(outcome)).toBeNull();
+  });
+
+  it("settles nothing for a reply that is not a normal account's", () => {
+    const outcome: AdminOutcome = {
+      outcome: "answered",
+      reply: {
+        shape: "userInfo",
+        info: { kind: "missing", username: "AF" },
+      },
+    };
+    expect(adminLevelFromOutcome(outcome)).toBeNull();
+  });
+
+  it("settles nothing for a reply of another shape", () => {
+    const outcome: AdminOutcome = {
+      outcome: "answered",
+      reply: { shape: "banList", entries: [] },
+    };
+    expect(adminLevelFromOutcome(outcome)).toBeNull();
   });
 });

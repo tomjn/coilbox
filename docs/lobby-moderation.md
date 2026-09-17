@@ -18,9 +18,14 @@ Two independent privilege sources decide which sections render:
 
 If you are neither, no menu or topic control renders for that channel.
 
-> Note: the `access` bit does not distinguish `mod` from `admin`, so a strictly
-> admin-only verb (e.g. `BROADCAST`, `SETACCESS`) can't be gated precisely from
-> client state alone. Those are intentionally not surfaced here yet.
+> Note: the `access` status bit alone does not distinguish `mod` from `admin`.
+> Since issue #2776, the Server admin page (`src/multiplayer/pages/ServerAdminPage.tsx`)
+> learns the level separately: once a connection's `access` bit is set,
+> `ConnectionSession` asks `GETUSERINFO <own username>` and reads the level off
+> the `access=` line the answer carries, keeping it as `ConnectionState.adminLevel`
+> per connection. This chat member menu still does not read that level, so a
+> strictly admin-only verb (e.g. `BROADCAST`, `SETACCESS`) still is not
+> surfaced here.
 
 ## Actions and the commands they send
 

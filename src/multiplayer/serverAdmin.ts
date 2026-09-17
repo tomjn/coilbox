@@ -1,5 +1,5 @@
 import type { LobbyProtocol, LobbyServer } from "../lobby-servers/config";
-import type { LobbyState } from "./bindings";
+import type { AdminOutcome, LobbyState } from "./bindings";
 import type { Connections } from "./connections";
 import { protocolForKey } from "./protocol";
 
@@ -50,4 +50,35 @@ export function serverAdminKeys(
   });
   if (focusKey == null || !keys.includes(focusKey)) return keys;
   return [focusKey, ...keys.filter((key) => key !== focusKey)];
+}
+
+/**
+ * Whether the connection `serverKey` names is an uberserver admin rather
+ * than only a moderator (issue #2776). Pure. The gate later admin-only
+ * sections (issues #2785-#2788) use: `null`, and a connection with no entry,
+ * both read as "not an admin", the same as a moderator does.
+ */
+export function isServerAdmin(
+  connections: Connections,
+  serverKey: string | null,
+): boolean {
+  return serverKey != null && connections[serverKey]?.adminLevel === "admin";
+}
+
+/**
+ * The level a `GETUSERINFO <own username>` answer settles
+ * `ConnectionState.adminLevel` on, or `null` when the answer says nothing
+ * about it: a refusal, no answer, or a reply that is not a normal account's
+ * (bridged, missing, static, none of which apply to a real moderator's own
+ * lookup, but are handled rather than assumed away). Pure.
+ */
+export function adminLevelFromOutcome(
+  outcome: AdminOutcome,
+): "mod" | "admin" | null {
+  if (outcome.outcome !== "answered") return null;
+  const { reply } = outcome;
+  if (reply.shape !== "userInfo" || reply.info.kind !== "account") {
+    return null;
+  }
+  return reply.info.access === "admin" ? "admin" : "mod";
 }

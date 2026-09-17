@@ -223,3 +223,48 @@ describe("hasLiveLogin", () => {
     expect(hasLiveLogin({ a: newConnection("a") })).toBe(false);
   });
 });
+
+// Issue #2776: the level starts at "mod" (see serverAdmin.test.ts for how a
+// GETUSERINFO answer settles it) and is kept per connection, not shared.
+describe("ConnectionState.adminLevel", () => {
+  it("starts at mod for a new connection", () => {
+    expect(newConnection("a").adminLevel).toBe("mod");
+  });
+
+  it("keeps two connections' levels independent", () => {
+    let connections = connectionsReducer({}, { type: "open", serverKey: "a" });
+    connections = connectionsReducer(connections, {
+      type: "open",
+      serverKey: "b",
+    });
+    connections = connectionsReducer(connections, {
+      type: "update",
+      serverKey: "a",
+      update: (c) => ({ ...c, adminLevel: "admin" }),
+    });
+    expect(connections.a.adminLevel).toBe("admin");
+    expect(connections.b.adminLevel).toBe("mod");
+  });
+
+  it("clears back to mod on disconnect: a reopened entry does not inherit the old level", () => {
+    let connections = connectionsReducer({}, { type: "open", serverKey: "a" });
+    connections = connectionsReducer(connections, {
+      type: "update",
+      serverKey: "a",
+      update: (c) => ({ ...c, adminLevel: "admin" }),
+    });
+    expect(connections.a.adminLevel).toBe("admin");
+
+    connections = connectionsReducer(connections, {
+      type: "close",
+      serverKey: "a",
+    });
+    expect(connections.a).toBeUndefined();
+
+    connections = connectionsReducer(connections, {
+      type: "open",
+      serverKey: "a",
+    });
+    expect(connections.a.adminLevel).toBe("mod");
+  });
+});
