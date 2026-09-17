@@ -1,6 +1,7 @@
 import { Button, NavGate } from "@picoframe/frame";
 import { AccountPicker } from "../AccountPicker";
 import { BansSection } from "../admin/BansSection";
+import { ModeratorFeedSection } from "../admin/ModeratorFeedSection";
 import { PlayerLookupSection } from "../admin/PlayerLookupSection";
 import { useMpServerAdmin } from "../navPredicates";
 import { serverAdminKeys } from "../serverAdmin";
@@ -57,6 +58,8 @@ function ServerAdminPage() {
       <PlayerLookupSection serverKey={serverKey} />
 
       <BansSection serverKey={serverKey} />
+
+      <ModeratorFeedSection serverKey={serverKey} />
 
       <p className="text-sm text-muted-foreground">
         More moderation and admin tools land here in later issues.
