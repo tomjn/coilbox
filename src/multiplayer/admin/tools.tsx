@@ -5,12 +5,14 @@ import {
   Hash,
   type LucideIcon,
   Mail,
+  Megaphone,
   Server,
   Shield,
   Users,
   Wrench,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { AnnouncementsSection } from "./AnnouncementsSection";
 import { BansSection } from "./BansSection";
 import { BotAccountsSection } from "./BotAccountsSection";
 import { ChannelsSection } from "./ChannelsSection";
@@ -82,5 +84,12 @@ export const ADMIN_TOOLS: AdminTool[] = [
     icon: Shield,
     adminOnly: true,
     Component: StaffSection,
+  },
+  {
+    id: "announcements",
+    label: "Announcements",
+    icon: Megaphone,
+    adminOnly: true,
+    Component: AnnouncementsSection,
   },
 ];

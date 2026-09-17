@@ -815,7 +815,10 @@ export const mpGetUserInfo = defineCommand<
  * - `setAccess`: `SETACCESS <username> user|mod|admin`. Success is a bare
  *   `OK`, which carries no data, so the frontend already knows what it
  *   asked for rather than reading it back.
- * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
+ * - `noReply`: `BROADCAST`, `BROADCASTEX`, never answered, not even to the
+ *   sender
+ * - `adminBroadcast`: `ADMINBROADCAST <message>`, which answers the sender
+ *   directly with `SERVERMSG Admin broadcast: <message>`
  *
  * The rest are ChanServ commands. Send the command word without its colon
  * (`register`), and the plugin sends `SAYPRIVATE ChanServ :register <args>`.
@@ -862,6 +865,7 @@ export type AdminShape =
   | "listMods"
   | "setAccess"
   | "noReply"
+  | "adminBroadcast"
   | "registerChannel"
   | "unregisterChannel"
   | "channelHistory"
@@ -982,6 +986,12 @@ export type AdminReply =
   | { shape: "cleanup"; message: string }
   | { shape: "listMods"; admins: string[]; mods: string[] }
   | { shape: "setAccess"; success: boolean; message: string }
+  | {
+      shape: "adminBroadcast";
+      /** As uberserver echoed it, with its `Admin broadcast: ` prefix
+       * stripped. */
+      message: string;
+    }
   | { shape: "registerChannel"; channel: string; founder: string }
   | { shape: "unregisterChannel"; channel: string }
   | { shape: "channelHistory"; channel: string; on: boolean }
