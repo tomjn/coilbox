@@ -4,6 +4,7 @@ import {
   serverProtocol,
 } from "../lobby-servers/config";
 import type { LobbyState } from "./bindings";
+import type { Connections } from "./connections";
 
 /**
  * The protocol spoken by the connection named by `serverKey`, matched on the
@@ -24,6 +25,27 @@ export function protocolForKey(
     serverKey.endsWith(`@${s.host}:${s.port}`),
   );
   return server ? serverProtocol(server) : "tasserver";
+}
+
+/**
+ * Every live connection speaking Tachyon, the focused one first when it is
+ * among them. Pure.
+ *
+ * Matchmaking only exists on Tachyon, and with more than one connection open
+ * it has to watch every one of them rather than only the focused connection
+ * (issue #2845).
+ */
+export function liveTachyonKeys(
+  connections: Connections,
+  servers: LobbyServer[],
+  focusKey: string | null,
+): string[] {
+  const keys = Object.keys(connections).filter(
+    (key) =>
+      connections[key].live && protocolForKey(key, servers) === "tachyon",
+  );
+  if (focusKey == null || !keys.includes(focusKey)) return keys;
+  return [focusKey, ...keys.filter((key) => key !== focusKey)];
 }
 
 /**

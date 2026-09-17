@@ -1,4 +1,7 @@
+import type { LobbyServer } from "../lobby-servers/config";
 import type { Matchmaking, MatchQueue } from "./bindings";
+import type { Connections } from "./connections";
+import { liveTachyonKeys } from "./protocol";
 
 /**
  * Pure helpers behind the matchmaking screen and the found-match panel.
@@ -36,4 +39,44 @@ export function searchingIn(state: Matchmaking): string[] {
   return state.searching.map(
     (id) => state.queues.find((queue) => queue.id === id)?.name ?? id,
   );
+}
+
+/**
+ * Every live Tachyon connection with a match waiting on it, focused one
+ * first. Pure: what the found-match panel renders one panel per (issue
+ * #2845, watching every connected Tachyon server rather than only the
+ * focused one).
+ */
+export function matchFoundKeys(
+  connections: Connections,
+  servers: LobbyServer[],
+  focusKey: string | null,
+): string[] {
+  return liveTachyonKeys(connections, servers, focusKey).filter(
+    (key) => connections[key].mirror.state?.matchmaking.found != null,
+  );
+}
+
+/**
+ * Why a found match must not launch, or null to go ahead. Pure.
+ *
+ * Only one engine runs at a time, so a match found while a game is already
+ * running, or while a lobby battle is joined on this connection or another
+ * one, refuses rather than starting a second (issue #2845). Checked in that
+ * order: a running game is the more urgent reason, since a joined battle can
+ * itself be about to launch the same engine a running game already is.
+ */
+export function matchLaunchBlockReason(
+  gameRunning: boolean,
+  inBattleKey: string | null,
+  serverKey: string,
+  serverName: (key: string) => string,
+): string | null {
+  if (gameRunning) {
+    return "A game is already running, so accepting this match would start a second one.";
+  }
+  if (inBattleKey == null) return null;
+  return inBattleKey === serverKey
+    ? "You are already in a battle here, so accepting this match would start a second game."
+    : `${serverName(inBattleKey)} owns the current battle room, so accepting this match would start a second game.`;
 }
