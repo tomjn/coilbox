@@ -30,22 +30,28 @@ function CountPill({ n }: { n: number }) {
 
 /**
  * Chat item badge: unread direct messages plus highlight-word hits across joined
- * channels (see {@link chatBadgeCount}). Nothing when there's nothing to flag.
+ * channels (see {@link chatBadgeCount}), summed across every live connection
+ * (issue #2843) so a mention on a second server still shows here even while
+ * the chat page has a different one open. Nothing when there's nothing to flag.
  */
 export function ChatNavBadge() {
-  const { mirror, unreadFor, activeKey } = useMultiplayer();
+  const { connections, unreadFor } = useMultiplayer();
   const [words] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
   const [own] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
   const [ignored] = useIgnored();
-  const state = mirror.state;
-  if (!state) return null;
 
-  const n = chatBadgeCount(
-    state,
-    unreadFor,
-    { words, ownEnabled: own },
-    (peer) => activeKey != null && isIgnored(ignored, activeKey, peer),
-  );
+  let n = 0;
+  for (const serverKey of Object.keys(connections)) {
+    if (!connections[serverKey].live) continue;
+    const state = connections[serverKey].mirror.state;
+    if (!state) continue;
+    n += chatBadgeCount(
+      state,
+      (id, count) => unreadFor(id, count, serverKey),
+      { words, ownEnabled: own },
+      (peer) => isIgnored(ignored, serverKey, peer),
+    );
+  }
   return <CountPill n={n} />;
 }
 

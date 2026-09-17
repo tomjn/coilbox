@@ -6,46 +6,50 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useMultiplayer } from "../store";
+import { useConnection, usernameFromKey } from "../store";
 import { PRESENCE_META, userPresence } from "./presence";
 
 /**
  * A "+" that opens a popover, searches the users currently online on the
- * connected server and hands back the one you pick. Next to Direct messages it
+ * chosen connection and hands back the one you pick. Next to Direct messages it
  * starts a DM (channel member lists remain the other entry), and in the Party
  * section it sends an invitation.
  *
- * Presence data only covers the live connection, so the list is exactly
+ * `serverKey` names which connection to search (issue #2843): with several
+ * connections open, "who is online" differs per server.
+ *
+ * Presence data only covers that connection, so the list is exactly its
  * `mirror.state.users` minus yourself and minus `exclude`. There is no
  * server-side user directory to search beyond who is online right now.
  */
 export function UserPicker({
+  serverKey,
   onPick,
   label = "New direct message",
   exclude = [],
 }: {
+  serverKey: string | null;
   onPick: (username: string) => void;
   /** What the "+" is for, read out to screen readers. */
   label?: string;
   /** Names to leave out, such as the people already in your party. */
   exclude?: string[];
 }) {
-  const { mirror, activeKey } = useMultiplayer();
+  const mirror = useConnection(serverKey)?.mirror;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  // Your own username is the local part of the connection key (`username@host:port`).
-  const self = activeKey ? activeKey.split("@")[0] : null;
+  const self = serverKey ? usernameFromKey(serverKey) : null;
 
   const matches = useMemo(() => {
-    const users = mirror.state ? Object.values(mirror.state.users) : [];
+    const users = mirror?.state ? Object.values(mirror.state.users) : [];
     const q = query.trim().toLowerCase();
     const leftOut = new Set(exclude);
     return users
       .filter((u) => u.name !== self && !leftOut.has(u.name))
       .filter((u) => (q ? u.name.toLowerCase().includes(q) : true))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [mirror.state, self, query, exclude]);
+  }, [mirror?.state, self, query, exclude]);
 
   function pick(username: string) {
     onPick(username);
@@ -75,7 +79,7 @@ export function UserPicker({
         />
         <ul className="flex max-h-64 flex-col gap-0.5 overflow-auto">
           {matches.map((u) => {
-            const presence = mirror.state
+            const presence = mirror?.state
               ? userPresence(mirror.state, u.name)
               : "online";
             const meta = PRESENCE_META[presence];

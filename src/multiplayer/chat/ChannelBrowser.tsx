@@ -2,53 +2,59 @@ import { Button, Input } from "@picoframe/frame";
 import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { mpListChannels } from "../bindings";
-import { useMultiplayer } from "../store";
+import { useConnection, useMultiplayer } from "../store";
 
 /**
- * A right-edge slide-in drawer listing the server's public channels. Requests the
- * directory each time it opens; Join sends `JOIN` and hands the name back so the
- * hub can select it once the join lands. Motion is disabled under
- * prefers-reduced-motion via the `motion-reduce:` variants.
+ * A right-edge slide-in drawer listing a connection's public channels.
+ * Requests the directory each time it opens. Join sends `JOIN` and hands the
+ * name back so the hub can select it once the join lands. Motion is disabled
+ * under prefers-reduced-motion via the `motion-reduce:` variants.
+ *
+ * `serverKey` names which connection to browse and join on (issue #2843), so
+ * opening the browser from one connection's sidebar group never joins a
+ * channel on another.
  */
 export function ChannelBrowser({
+  serverKey,
   open,
   onClose,
   onJoined,
 }: {
+  serverKey: string;
   open: boolean;
   onClose: () => void;
   onJoined: (name: string) => void;
 }) {
-  const { mirror, activeKey, requestJoinChannel } = useMultiplayer();
+  const { requestJoinChannel } = useMultiplayer();
+  const mirror = useConnection(serverKey)?.mirror;
   const [loading, setLoading] = useState(false);
   const [newName, setNewName] = useState("");
-  const directory = mirror.state?.channelDirectory ?? [];
+  const directory = mirror?.state?.channelDirectory ?? [];
   // Channels we're already in (keyed by bare name), so the directory can show
   // "Joined" instead of an active Join button for them.
-  const joinedChannels = mirror.state?.channels ?? {};
+  const joinedChannels = mirror?.state?.channels ?? {};
   // The server's `ENDOFCHANNELS` bumps this counter. We record its value when a
-  // request goes out and end loading once it advances past that — the honest
+  // request goes out and end loading once it advances past that, the honest
   // completion signal, which fires whether the directory is full or empty.
-  const receivedSeq = mirror.channelListReceivedSeq;
+  const receivedSeq = mirror?.channelListReceivedSeq;
   const requestedSeqRef = useRef(receivedSeq);
 
   function refresh() {
-    if (!activeKey) return;
     requestedSeqRef.current = receivedSeq;
     setLoading(true);
-    mpListChannels({ serverKey: activeKey }).catch(() => setLoading(false));
+    mpListChannels({ serverKey }).catch(() => setLoading(false));
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: request-on-open keyed intentionally on [open, activeKey]
+  // biome-ignore lint/correctness/useExhaustiveDependencies: request-on-open keyed intentionally on [open, serverKey]
   useEffect(() => {
-    if (!open || !activeKey) return;
+    if (!open) return;
     refresh();
     // Failsafe: if the server never sends ENDOFCHANNELS, resolve to the empty
     // state rather than spinning forever. The completion counter clears it first
     // in the normal case.
     const t = setTimeout(() => setLoading(false), 4000);
     return () => clearTimeout(t);
-  }, [open, activeKey]);
+  }, [open, serverKey]);
 
   // Completion (channelListReceived advances the counter) ends loading, so an
   // empty directory reaches its "no channels" state at once instead of on timeout.
@@ -57,13 +63,12 @@ export function ChannelBrowser({
   }, [receivedSeq]);
 
   async function join(name: string) {
-    if (!activeKey) return;
     try {
       // `requestJoinChannel` marks this as a user-chosen join; the store persists it
       // to the autojoin list only when the server confirms (the `channelJoined`
       // delta), so a channel the server refuses (JOINFAILED) is never remembered.
       // We still select it optimistically for responsiveness.
-      await requestJoinChannel(name);
+      await requestJoinChannel(name, undefined, serverKey);
       onJoined(name);
       onClose();
     } catch {
