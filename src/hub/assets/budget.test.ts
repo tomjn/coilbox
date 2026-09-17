@@ -60,6 +60,14 @@ describe("the ledger's arithmetic", () => {
     expect(unitsAffordable(ledger, "bar", NOW)).toBe(0);
   });
 
+  /** A roster sweep sends every build pic before it draws. An hour that a
+   *  large game's build pics use up entirely draws nothing, which is what the
+   *  limit used to do. */
+  it("leaves room for renders after an hour's worth of one game's build pics", () => {
+    const ledger = ledgerOf("techa", 80);
+    expect(unitsAffordable(ledger, "techa", NOW)).toBeGreaterThan(0);
+  });
+
   /** The reservation is per unit at both variants, and applied before anything
    *  is read, so a run can never finish over the limit. */
   it("reserves a whole unit's worth of pictures per unit", () => {

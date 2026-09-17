@@ -7,10 +7,11 @@
  * layout's own `buildings`, deduplicated, and there is no argument that widens
  * it.
  *
- * That matters more than the write volume suggests. Every accepted upload spends
- * a storage operation out of an allowance the whole community shares, and running
- * out is thirty days with no uploads at all and no way to pay through it. A
- * client that walked a roster on its own would spend it for everybody.
+ * That mattered more than the write volume suggests while the hub staged uploads
+ * in Vercel Blob, where every upload spent a storage operation out of an
+ * allowance the whole community shared. The hub now stages them in Supabase
+ * Storage, but a client walking a roster on its own is still work nobody asked
+ * for.
  *
  * Something does walk a roster now, and the distinction is who asked. Pressing
  * the button in Settings runs `./pictureSweep.ts`, which hands

@@ -7,10 +7,10 @@
  * the whole run. Staying under the hub's number means coilbox never has to learn
  * it the expensive way.
  *
- * The failure being prevented is bigger than the request, though. Every accepted
- * upload spends a storage operation out of an allowance the whole community
- * shares, and running out is thirty days with no uploads at all and no way to pay
- * through it. A client that walked a roster would spend it for everybody.
+ * This used to guard a shared allowance as well. The hub staged uploads in Vercel
+ * Blob, where every upload spent a storage operation and running out meant thirty
+ * days with no uploads for anybody. The hub now stages them in Supabase Storage,
+ * which counts no operations, so the limit is only about the hub's own rate.
  *
  * ## What is counted
  *
@@ -36,7 +36,7 @@
  * mean a second window onto the same file that only one of them writes.
  *
  * Times rather than a count and a window start, because a fixed window lets twice
- * the limit through across a boundary. Eighty numbers a game is nothing to store
+ * the limit through across a boundary. Four hundred numbers a game is nothing to store
  * and the arithmetic is a filter.
  */
 
@@ -45,18 +45,16 @@ import { RENDER_ANGLES } from "./vocabulary";
 /**
  * How many pictures coilbox will write for one game in a rolling hour.
  *
- * The hub's own `SUBJECT_UPLOADS_PER_HOUR` is 100, so this leaves room for the
+ * The hub's own `SUBJECT_UPLOADS_PER_HOUR` is 500, so this leaves room for the
  * hub to still be the authority on anything this misses, including uploads made
- * by another install signed in to the same account.
+ * by another install signed in to the same account. Four fifths of the hub's
+ * number, the same share as the eighty of a hundred it was before.
  *
- * Eighty against real use: a blueprint of 10 to 30 buildings is 20 to 60 pictures
- * at both variants, so a whole one always fits and it is a second one in the same
- * hour that runs out. A second blueprint of the same game is mostly the same
- * buildings, which the have check answers for nothing, so what actually gets
- * stopped here is a client uploading eighty distinct new pictures for one game in
- * an hour. Nothing that reads a blueprint does that.
+ * It was eighty while the hub staged uploads in Vercel Blob. Raised with the hub
+ * once the move to Supabase Storage took the operations allowance away, because
+ * at eighty a roster sweep spent a whole hour on build pics and drew nothing.
  */
-export const WRITES_PER_GAME_PER_HOUR = 80;
+export const WRITES_PER_GAME_PER_HOUR = 400;
 
 /**
  * How many pictures one unit can produce: a build pic, and a render at every
@@ -68,8 +66,8 @@ export const WRITES_PER_GAME_PER_HOUR = 80;
  * that had to be remembered separately would be the one that was not
  * (issue #1951).
  *
- * It costs coverage rather than correctness: at five, the eighty an hour is
- * sixteen units rather than forty.
+ * It costs coverage rather than correctness: at five, the four hundred an hour
+ * is eighty units rather than two hundred.
  */
 export const VARIANTS_PER_UNIT = 1 + RENDER_ANGLES.length;
 

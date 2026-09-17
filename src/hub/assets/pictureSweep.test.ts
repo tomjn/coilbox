@@ -482,6 +482,43 @@ describe("a sweep over the installed games", () => {
     expect(named.map((one) => one.game)).toContain("Beta");
     expect(named.every((one) => one.total === 2)).toBe(true);
   });
+
+  /** Somebody after one game should not wait on every other game first. */
+  it("sweeps only the game it was asked for", async () => {
+    const watch = watcher({
+      games: [game("Alpha", "a"), game("Tech Annihilation", "TechA")],
+    });
+    const report = await sweepGamePictures(
+      { ...TARGET, only: "techa" },
+      (p) => watch.progress.push(p),
+      watch.tools,
+    );
+
+    expect(report.games.map((one) => one.shortname)).toEqual(["TechA"]);
+    expect(watch.fills.map((one) => one.game)).toEqual(["TechA"]);
+    expect(watch.progress.filter((one) => one.game === "Alpha")).toEqual([]);
+  });
+
+  /** Picking a game by name does not get round the rule about releases. */
+  it("still leaves out a picked game that is a working folder", async () => {
+    const loose = game("SplinterFaction", "sf");
+    loose.primaryArchive = {
+      name: "SplinterFaction.sdd",
+      path: "/games/SplinterFaction.sdd",
+    } as GameItem["primaryArchive"];
+    const watch = watcher({ games: [game("Alpha", "a"), loose] });
+    const report = await sweepGamePictures(
+      { ...TARGET, only: "sf" },
+      () => {},
+      watch.tools,
+    );
+
+    expect(report.games).toEqual([]);
+    expect(report.skipped).toEqual([
+      { game: "SplinterFaction", reason: "development-folder" },
+    ]);
+    expect(watch.asked).toEqual([]);
+  });
 });
 
 describe("what a sweep is said to have done", () => {

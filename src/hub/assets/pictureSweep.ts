@@ -81,7 +81,7 @@ import { type AssetUpload, uploadAssetsToHub } from "./upload";
  *
  * ## Build pics before renders (issue #1953)
  *
- * Both classes are rationed the same way, at eighty writes a game an hour, and
+ * Both classes are rationed the same way, out of one hourly allowance of writes a game, and
  * that is what decides the order rather than which is cheaper to make.
  *
  * Eighty writes spent on build pics is eighty units that now have a picture on
@@ -214,7 +214,12 @@ export const livePictureSweepTools: PictureSweepTools = {
   record: recordBackfillWrites,
 };
 
-export type PictureSweepTarget = HubSweepTarget;
+export type PictureSweepTarget = HubSweepTarget & {
+  /** A game's shortname, to sweep that game alone. Without it the sweep covers
+   *  every released game, so somebody after one game is not left waiting on the
+   *  rest. */
+  only?: string;
+};
 
 /**
  * Every unit in a game's roster that a picture can be made of.
@@ -285,15 +290,32 @@ export async function sweepGamePictures(
   onProgress: (progress: PictureSweepProgress) => void = () => {},
   tools: PictureSweepTools = livePictureSweepTools,
 ): Promise<PictureSweepReport> {
-  const { hubUrl, enginePath, dataDir } = target;
+  const { hubUrl, enginePath, dataDir, only } = target;
 
   onProgress({ phase: "scanning", done: 0, total: 0 });
   const { md5s } = await tools.releases({ dataDir });
   const scanned = await tools.scan({ enginePath, dataDir });
-  const { sendable, skipped } = gamesToSend(
+  // Filtered after the release rules rather than before, so a game picked by
+  // name still has to be a release to be sent.
+  const released = gamesToSend(
     scanned.games,
     new Set(md5s.map((m) => m.toLowerCase())),
   );
+  const picked = only?.toLowerCase();
+  const sendable = picked
+    ? released.sendable.filter(
+        (entry) => entry.shortname.toLowerCase() === picked,
+      )
+    : released.sendable;
+  const skipped = picked
+    ? released.skipped.filter(
+        (one) =>
+          scanned.games
+            .find((game) => game.name === one.game)
+            ?.info?.shortname?.trim()
+            .toLowerCase() === picked,
+      )
+    : released.skipped;
   const report: PictureSweepReport = {
     ...nothing,
     found: scanned.games.length,
@@ -471,7 +493,7 @@ interface BuildpicPass {
  * is a mount and an encode, no GPU and no model, and it is 5 to 10 KB. A render
  * is seconds of drawing each and there are four of them a unit.
  *
- * Both are rationed the same way, at eighty writes a game an hour, and that is
+ * Both are rationed the same way, out of one hourly allowance of writes a game, and that is
  * what decides the order. Eighty writes spent on build pics is eighty units that
  * now have a picture on the hub. The same eighty spent on renders is sixteen
  * units with five pictures each and three hundred and sixty three units still

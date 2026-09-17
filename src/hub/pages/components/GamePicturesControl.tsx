@@ -1,5 +1,8 @@
 import { Button } from "@picoframe/frame";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
+import type { GameItem } from "@/content/bindings";
+import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import {
   type GamePictures,
@@ -43,6 +46,9 @@ export function GamePicturesControl({
   agreed: boolean;
 }) {
   const { target } = usePreferredTarget();
+  const { data: scan } = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const games = useMemo(() => gameOptions(scan?.games ?? []), [scan]);
+  const [only, setOnly] = useState(ALL_GAMES);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<PictureSweepProgress | null>(null);
   const [report, setReport] = useState<PictureSweepReport | null>(null);
@@ -63,6 +69,7 @@ export function GamePicturesControl({
           hubUrl,
           enginePath: target.enginePath,
           dataDir: target.dataDir,
+          ...(only === ALL_GAMES ? {} : { only }),
         },
         setProgress,
       );
@@ -95,6 +102,15 @@ export function GamePicturesControl({
         of this hour and picks up where it stopped the next time you press it.
       </p>
       <div className="flex items-center gap-3 pt-1">
+        <OptionSelect
+          value={only}
+          onValueChange={setOnly}
+          options={[{ value: ALL_GAMES, label: "All games" }, ...games]}
+          disabled={running}
+          size="sm"
+          className="w-56"
+          ariaLabel="Which game to send pictures of"
+        />
         <Button
           variant="outline"
           size="sm"
@@ -141,6 +157,32 @@ export function GamePicturesControl({
       {failed && <p className="text-sm text-destructive">{failed}</p>}
     </section>
   );
+}
+
+/** The picker's value for every game. Not a shortname any game could have,
+ *  since a shortname is what the other options carry. */
+const ALL_GAMES = "*";
+
+/**
+ * One option per shortname, which is what the sweep matches on and what it
+ * sends one install of. Whether a game is a release is left to the sweep, which
+ * says so when the one picked is not.
+ */
+export function gameOptions(
+  games: readonly GameItem[],
+): { value: string; label: string }[] {
+  const byShortname = new Map<string, string>();
+  for (const game of games) {
+    const shortname = game.info?.shortname?.trim();
+    if (!shortname || byShortname.has(shortname.toLowerCase())) continue;
+    byShortname.set(
+      shortname.toLowerCase(),
+      game.info?.name?.trim() || game.name,
+    );
+  }
+  return [...byShortname]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /** What a phase is called while it is running, counting games. */
