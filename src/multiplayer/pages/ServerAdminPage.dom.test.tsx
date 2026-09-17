@@ -25,6 +25,8 @@ vi.mock("@picoframe/frame", () => ({
   Input: (props: Record<string, unknown>) => <input {...props} />,
   NavGate: ({ children }: { children: ReactNode }) => <>{children}</>,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
+  // ChannelsSection reads the autojoin list through `useJoinedChannels`.
+  useSetting: () => [{}, () => {}],
 }));
 
 // AccountPicker composes a Radix Select, swapped for plain buttons so a test
@@ -154,6 +156,20 @@ describe("with a single qualifying connection", () => {
     expect(screen.getByRole("heading", { name: "Server admin" })).toBeTruthy();
     expect(screen.getByText(/Server A/)).toBeTruthy();
     expect(screen.queryByText(/^pick /)).toBeNull();
+  });
+});
+
+describe("the ChanServ sections", () => {
+  it("shows the channel and server address tools", () => {
+    setConnections({
+      [KEY_A]: connection(KEY_A, state(["u", "sp", "b"], "mod", true)),
+    });
+    draw();
+    expect(screen.getByRole("heading", { name: "Channels" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Server address" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show server IP" })).toBeTruthy();
   });
 });
 

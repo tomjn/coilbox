@@ -2,8 +2,10 @@ import { Button, NavGate } from "@picoframe/frame";
 import { AccountPicker } from "../AccountPicker";
 import { BansSection } from "../admin/BansSection";
 import { BotAccountsSection } from "../admin/BotAccountsSection";
+import { ChannelsSection } from "../admin/ChannelsSection";
 import { ModeratorFeedSection } from "../admin/ModeratorFeedSection";
 import { PlayerLookupSection } from "../admin/PlayerLookupSection";
+import { ServerAddressSection } from "../admin/ServerAddressSection";
 import { useMpServerAdmin } from "../navPredicates";
 import { serverAdminKeys } from "../serverAdmin";
 import {
@@ -61,6 +63,10 @@ function ServerAdminPage() {
       <BotAccountsSection serverKey={serverKey} />
 
       <BansSection serverKey={serverKey} />
+
+      <ChannelsSection serverKey={serverKey} />
+
+      <ServerAddressSection serverKey={serverKey} />
 
       <ModeratorFeedSection serverKey={serverKey} />
 
