@@ -86,6 +86,7 @@ import {
   type ConnectionState,
   type Connections,
   connectionsReducer,
+  hasLiveLogin,
   newRuntime,
   pendingAgreement as pickPendingAgreement,
   pendingDebriefing as pickPendingDebriefing,
@@ -102,7 +103,7 @@ import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
 export type { AccountInfo, ConnectionState, Connections } from "./connections";
-export { liveConnectionKeys, liveRoomKey } from "./connections";
+export { hasLiveLogin, liveConnectionKeys, liveRoomKey } from "./connections";
 export {
   initialMirror,
   type LobbyMirror,
@@ -374,7 +375,10 @@ interface MultiplayerContextValue {
   connections: Connections;
   /** The connected `serverKey`, or null when not connected. */
   activeKey: string | null;
-  /** Whether a connection is currently live (`activeKey != null`). */
+  /**
+   * Whether a lobby login is currently live. A room does not count (issue
+   * #2905), so it alone does not hold this open the way a login does.
+   */
   connected: boolean;
   /**
    * The wire protocol the live connection speaks, `tasserver` when there is none.
@@ -2356,7 +2360,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         mirror,
         connections,
         activeKey,
-        connected: activeKey != null,
+        connected: hasLiveLogin(connections),
         protocol,
         revealed,
         busy,
