@@ -59,12 +59,14 @@ export function removeIgnore(
   };
 }
 
+export const IGNORED_KEY = "multiplayer.ignored";
+
 /**
  * The per-`serverKey` ignore list. A client-side preference, so it lives in the
  * frame settings store rather than backend state and persists across restarts.
  */
 export function useIgnored() {
-  return useSetting<Record<string, string[]>>("multiplayer.ignored", {});
+  return useSetting<Record<string, string[]>>(IGNORED_KEY, {});
 }
 
 /**

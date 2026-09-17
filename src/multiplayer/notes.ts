@@ -14,7 +14,7 @@ import { useCallback } from "react";
 /** Hard cap so a pasted wall of text can't bloat the settings store. */
 export const NOTE_MAX_LENGTH = 280;
 
-const STORAGE_KEY = "multiplayer.notes";
+export const NOTES_KEY = "multiplayer.notes";
 
 /** serverKey -> identity key -> note text. */
 export type NotesMap = Record<string, Record<string, string>>;
@@ -73,7 +73,7 @@ export function setNote(
 
 /** The full notes store, persisted like `ignore.ts`'s settings-backed map. */
 export function useNotes() {
-  return useSetting<NotesMap>(STORAGE_KEY, {});
+  return useSetting<NotesMap>(NOTES_KEY, {});
 }
 
 /**

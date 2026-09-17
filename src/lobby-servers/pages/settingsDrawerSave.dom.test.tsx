@@ -117,6 +117,10 @@ const { PersistentStoreProvider } = await import("@picoframe/frame");
 const { installSettingsStorage, memorySettingsStorage, readStoredSetting } =
   await import("@/lib/storedSetting");
 const { default: LobbyServersSettings } = await import("./SettingsSection");
+const { JOINED_CHANNELS_KEY } = await import("../../multiplayer/channels");
+const { FAVOURITES_KEY } = await import("../../multiplayer/friends");
+const { IGNORED_KEY } = await import("../../multiplayer/ignore");
+const { NOTES_KEY } = await import("../../multiplayer/notes");
 type LobbyAccount = import("../config").LobbyAccount;
 type LobbyServer = import("../config").LobbyServer;
 
@@ -157,6 +161,10 @@ const storedAccounts = () =>
 const storedServers = () =>
   readStoredSetting<{ servers: LobbyServer[] }>(SERVERS_KEY, { servers: [] })
     .servers;
+
+/** The per-`serverKey` record stored under one of the server-keyed settings. */
+const storedKeyed = <T,>(key: string) =>
+  readStoredSetting<Record<string, T>>(key, {});
 
 /** The open drawer with this title, if there is one. Closed drawers stay in
  *  the page, marked inert, so the title alone does not say which is open. */
@@ -425,6 +433,65 @@ describe("editing a login", () => {
     expect(storedAccounts().map((a) => a.username)).toEqual(["alice", "bob"]);
     expect(lsBindings.lsStoreCredential).not.toHaveBeenCalled();
   });
+
+  it("moves auto-join channels, favourites, ignores and notes when the login is renamed", async () => {
+    const oldKey = "alice@test.example:8200";
+    const newKey = "alice2@test.example:8200";
+    storage.set(
+      JOINED_CHANNELS_KEY,
+      JSON.stringify({ [oldKey]: [{ name: "general" }] }),
+    );
+    storage.set(FAVOURITES_KEY, JSON.stringify({ [oldKey]: ["carol"] }));
+    storage.set(IGNORED_KEY, JSON.stringify({ [oldKey]: ["troll"] }));
+    storage.set(
+      NOTES_KEY,
+      JSON.stringify({ [oldKey]: { "name:carl": "friendly" } }),
+    );
+    keychain.set(credKey(SRV1.id, "alice"), "hunter2");
+    show({ accounts: [alice] });
+    openRow("alice");
+    const username = drawer("alice").getByLabelText("Username");
+    type(username, "alice2");
+    fireEvent.blur(username);
+
+    await waitFor(() =>
+      expect(storedAccounts()[0]).toMatchObject({ username: "alice2" }),
+    );
+    expect(storedKeyed(JOINED_CHANNELS_KEY)[newKey]).toEqual([
+      { name: "general" },
+    ]);
+    expect(storedKeyed(FAVOURITES_KEY)[newKey]).toEqual(["carol"]);
+    expect(storedKeyed(IGNORED_KEY)[newKey]).toEqual(["troll"]);
+    expect(storedKeyed(NOTES_KEY)[newKey]).toEqual({ "name:carl": "friendly" });
+    expect(storedKeyed(JOINED_CHANNELS_KEY)[oldKey]).toBeUndefined();
+    expect(storedKeyed(FAVOURITES_KEY)[oldKey]).toBeUndefined();
+    expect(storedKeyed(IGNORED_KEY)[oldKey]).toBeUndefined();
+    expect(storedKeyed(NOTES_KEY)[oldKey]).toBeUndefined();
+  });
+
+  it("does not overwrite server-key data already stored under the new key", async () => {
+    const oldKey = "alice@test.example:8200";
+    const newKey = "alice2@test.example:8200";
+    storage.set(
+      FAVOURITES_KEY,
+      JSON.stringify({
+        [oldKey]: ["carol"],
+        [newKey]: ["dave"],
+      }),
+    );
+    keychain.set(credKey(SRV1.id, "alice"), "hunter2");
+    show({ accounts: [alice] });
+    openRow("alice");
+    const username = drawer("alice").getByLabelText("Username");
+    type(username, "alice2");
+    fireEvent.blur(username);
+
+    await waitFor(() =>
+      expect(storedAccounts()[0]).toMatchObject({ username: "alice2" }),
+    );
+    expect(storedKeyed(FAVOURITES_KEY)[oldKey]).toEqual(["carol"]);
+    expect(storedKeyed(FAVOURITES_KEY)[newKey]).toEqual(["dave"]);
+  });
 });
 
 describe("adding a server", () => {
@@ -486,5 +553,45 @@ describe("editing a server", () => {
     expect(d.getByText("Saved")).toBeTruthy();
     fireEvent.click(d.getByRole("button", { name: "Done" }));
     expect(openDrawer("Test Server")).toBeUndefined();
+  });
+
+  it("moves server-key data for every login on the server when its port changes", () => {
+    const aliceOldKey = "alice@test.example:8200";
+    const bobOldKey = "bob@test.example:8200";
+    const aliceNewKey = "alice@test.example:8201";
+    const bobNewKey = "bob@test.example:8201";
+    storage.set(
+      JOINED_CHANNELS_KEY,
+      JSON.stringify({
+        [aliceOldKey]: [{ name: "general" }],
+        [bobOldKey]: [{ name: "help" }],
+      }),
+    );
+    show({
+      accounts: [
+        { id: "1", serverId: SRV1.id, username: "alice", hasSecret: false },
+        { id: "2", serverId: SRV1.id, username: "bob", hasSecret: false },
+      ],
+    });
+    // "Test Server" also names each account row, so scope the click to the
+    // Servers section's own row rather than the ambiguous `openRow` helper.
+    const serversSection = screen
+      .getByRole("heading", { name: "Servers" })
+      .closest("section");
+    if (!serversSection) throw new Error("no Servers section");
+    const serverButton = within(serversSection)
+      .getByText("Test Server")
+      .closest("button");
+    if (!serverButton) throw new Error("no row button for Test Server");
+    fireEvent.click(serverButton);
+    const d = drawer("Test Server");
+    type(d.getByLabelText("Port"), "8201");
+
+    expect(storedServers()[0].port).toBe(8201);
+    const channels = storedKeyed<{ name: string }[]>(JOINED_CHANNELS_KEY);
+    expect(channels[aliceNewKey]).toEqual([{ name: "general" }]);
+    expect(channels[bobNewKey]).toEqual([{ name: "help" }]);
+    expect(channels[aliceOldKey]).toBeUndefined();
+    expect(channels[bobOldKey]).toBeUndefined();
   });
 });

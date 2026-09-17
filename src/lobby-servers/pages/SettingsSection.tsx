@@ -30,6 +30,7 @@ import {
 } from "../../multiplayer/awayStatus";
 import { mpTachyonSignOut } from "../../multiplayer/bindings";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
+import { useMoveServerKeyData } from "../../multiplayer/serverKeyData";
 import {
   serverKeyFor,
   useConnection,
@@ -171,6 +172,7 @@ export default function LobbyServersSettings() {
     AUTO_AWAY_MINUTES_KEY,
     DEFAULT_AUTO_AWAY_MINUTES,
   );
+  const moveServerKeyData = useMoveServerKeyData();
 
   const servers = allServers(customCfg.servers);
 
@@ -258,10 +260,24 @@ export default function LobbyServersSettings() {
     setServerDrawer({ mode: "edit", id: s.id, added: true });
   };
 
-  const updateCustomServer = (id: string, patch: Partial<LobbyServer>) =>
+  const updateCustomServer = (id: string, patch: Partial<LobbyServer>) => {
+    const before = customCfg.servers.find((s) => s.id === id);
     writeServers((prev) =>
       prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
     );
+    // A host or port edit changes the server key of every login on this
+    // server, so move each of their auto-join/favourites/ignores/notes
+    // entries across (issue #2930).
+    if (!before) return;
+    const after = { ...before, ...patch };
+    if (after.host === before.host && after.port === before.port) return;
+    for (const acc of accountsCfg.accounts.filter((a) => a.serverId === id)) {
+      moveServerKeyData(
+        serverKeyFor(before, acc.username),
+        serverKeyFor(after, acc.username),
+      );
+    }
+  };
 
   const removeCustomServer = (s: LobbyServer) => {
     setServerDrawer(null);
@@ -884,6 +900,7 @@ function AccountForm({
   // Set while a rename's keychain move is under way, so a second rename
   // cannot start from the name the first is moving away from.
   const renaming = useRef(false);
+  const moveServerKeyData = useMoveServerKeyData();
   // Seed from the persisted flag for an instant render, then verify against the
   // keychain. A user opened this drawer, so the (macOS) prompt is expected.
   const [saved, setSaved] = useState<boolean | undefined>(a.hasSecret);
@@ -941,6 +958,17 @@ function AccountForm({
       } catch {
         lost = true;
       }
+    }
+    // The username and/or server just changed, which changes this login's
+    // server key, so its auto-join channels, favourites, ignores and notes
+    // need to move with it (issue #2930).
+    const oldServer = servers.find((s) => s.id === from.serverId);
+    const newServer = servers.find((s) => s.id === next.serverId);
+    if (oldServer && newServer) {
+      moveServerKeyData(
+        serverKeyFor(oldServer, from.username),
+        serverKeyFor(newServer, next.username),
+      );
     }
     onChange({ ...next, hasSecret: moved });
     setSaved(moved);
