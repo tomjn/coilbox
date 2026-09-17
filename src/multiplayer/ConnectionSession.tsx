@@ -4,6 +4,7 @@ import {
   profileOfficialServer,
 } from "../lobby-servers/config";
 import { notify } from "../notify/notify";
+import { sendAdminCommand } from "./admin/adminRequest";
 import {
   mpFriendList,
   mpFriendRequestList,
@@ -22,6 +23,7 @@ import { favouritesFor } from "./friends";
 import { addIgnore, ignoredFor } from "./ignore";
 import { autoJoinsChannels, protocolForKey, syncsOnReady } from "./protocol";
 import { newScriptPassword } from "./scriptPassword";
+import { adminLevelFromOutcome, isUberserver } from "./serverAdmin";
 import { useAwayStatus } from "./useAwayStatus";
 
 type NameLists = Record<string, string[]>;
@@ -240,6 +242,40 @@ export function ConnectionSession({
       mpFriendRequestList({ serverKey: activeKey }).catch(() => {});
     }
   }, [activeKey, protocol, mirror.phase]);
+
+  // Once this account's `access` status bit is set, ask uberserver whether it
+  // is an admin or only a moderator (issue #2776): the bit alone is set for
+  // both, but a moderator or admin can `GETUSERINFO` their own name and read
+  // the `access=` line it carries. Sent once per session, the same as the
+  // effects above. `ConnectionState.adminLevel` starts and stays "mod" until
+  // this settles it, so a refusal or no answer only ever hides a tool the
+  // server would refuse rather than shows one it would.
+  const adminLevelQueriedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeKey == null) {
+      adminLevelQueriedForRef.current = null;
+      return;
+    }
+    if (
+      mirror.phase !== "ready" ||
+      adminLevelQueriedForRef.current === activeKey
+    ) {
+      return;
+    }
+    const me = mirror.state?.myUsername;
+    const hasAccess = !!me && (mirror.state?.users[me]?.status.access ?? false);
+    if (!me || !hasAccess || !isUberserver(protocol, mirror.state)) return;
+    adminLevelQueriedForRef.current = activeKey;
+    sendAdminCommand(activeKey, "GETUSERINFO", [me], "userInfo")
+      .then((outcome) => {
+        const level = adminLevelFromOutcome(outcome);
+        if (level == null) return;
+        update(serverKey, (c) =>
+          c.adminLevel === level ? c : { ...c, adminLevel: level },
+        );
+      })
+      .catch(() => {});
+  }, [activeKey, protocol, mirror.phase, mirror.state, serverKey, update]);
 
   // Notify when a friend (server-side or a client-local favourite) comes online
   // or goes offline. The lobby has no friend presence event, so this diffs the

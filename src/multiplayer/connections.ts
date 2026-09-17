@@ -64,6 +64,17 @@ export interface ConnectionState {
    * no account behind it, and at most one is open at a time.
    */
   direct: boolean;
+  /**
+   * Whether this connection's account is an uberserver admin or only a
+   * moderator (issue #2776), for the Server admin page's admin-only
+   * sections. uberserver's `access` status bit is set for both, so this is
+   * learned separately: once that bit is set, `ConnectionSession` asks
+   * `GETUSERINFO <own username>` and reads the `access=` line it carries.
+   * Starts, and stays, `"mod"` until that answer says `admin`, which also
+   * covers a refusal or no answer at all, so this only ever hides a tool the
+   * server would refuse rather than shows one it would.
+   */
+  adminLevel: "mod" | "admin";
 }
 
 /** Every connection the provider holds, by server key. */
@@ -185,6 +196,7 @@ export function newConnection(
     status: { ingame: false, away: false },
     manualAway: false,
     direct,
+    adminLevel: "mod",
   };
 }
 
