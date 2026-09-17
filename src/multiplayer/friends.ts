@@ -54,10 +54,12 @@ export function removeFavourite(
   return { ...map, [serverKey]: cur.filter((n) => n !== name) };
 }
 
+export const FAVOURITES_KEY = "multiplayer.favourites";
+
 /**
  * The per-`serverKey` favourites list. A preference (client-local, no protocol),
  * so it lives in the frame settings store rather than backend state.
  */
 export function useFavourites() {
-  return useSetting<Record<string, string[]>>("multiplayer.favourites", {});
+  return useSetting<Record<string, string[]>>(FAVOURITES_KEY, {});
 }
