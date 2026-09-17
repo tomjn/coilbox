@@ -803,6 +803,8 @@ export const mpGetUserInfo = defineCommand<
  * - `ban`: `BAN <username> <days> <reason>`
  * - `banSpecific`: `BANSPECIFIC <target> <days> <reason>`
  * - `unban`: `UNBAN <target>`
+ * - `blacklistDomain`: `BLACKLIST <domain> [reason]`
+ * - `unblacklistDomain`: `UNBLACKLIST <domain>`
  * - `resetUserPassword`: `RESETUSERPASSWORD <username> [email]`
  * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
  *
@@ -835,6 +837,8 @@ export type AdminShape =
   | "ban"
   | "banSpecific"
   | "unban"
+  | "blacklistDomain"
+  | "unblacklistDomain"
   | "resetUserPassword"
   | "noReply"
   | "registerChannel"
@@ -947,6 +951,8 @@ export type AdminReply =
   | { shape: "ban"; success: boolean; message: string }
   | { shape: "banSpecific"; success: boolean; message: string }
   | { shape: "unban"; success: boolean; message: string }
+  | { shape: "blacklistDomain"; success: boolean; message: string }
+  | { shape: "unblacklistDomain"; success: boolean; message: string }
   | { shape: "resetUserPassword"; success: boolean; message: string }
   | { shape: "registerChannel"; channel: string; founder: string }
   | { shape: "unregisterChannel"; channel: string }
