@@ -55,8 +55,10 @@ use std::path::Path;
 /// read now names its units out of the game's localisation file too, not just
 /// the unit dataset (#2690), so a Beyond All Reason blob cached under either v17
 /// or v18 holds a unit list with no names and four sides whose start units are
-/// def keys.
-const INFO_CACHE_VERSION: u32 = 19;
+/// def keys. v20: the unit dataset now reads every numbered build option rather
+/// than stopping at the first gap in the numbering, so a Tech Annihilation blob
+/// cached under v19 holds builders with most of their menu missing.
+const INFO_CACHE_VERSION: u32 = 20;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.
