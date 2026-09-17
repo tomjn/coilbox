@@ -21,6 +21,7 @@ export function LinkedRoomJoin({
   target,
   defaultName,
   blocked,
+  leaves = null,
   onJoin,
 }: {
   /** The room the link named, or null when this page was not reached by one. */
@@ -30,6 +31,9 @@ export function LinkedRoomJoin({
   /** Why joining is unavailable, or null. Said inside the drawer rather than
    *  keeping it shut, so following a link is never a link that does nothing. */
   blocked: string | null;
+  /** What entering leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
   const drawer = useDrawer();
@@ -60,11 +64,12 @@ export function LinkedRoomJoin({
           }}
           defaultName={defaultName}
           blocked={blocked}
+          leaves={leaves}
           onJoin={onJoin}
         />
       ),
     });
-  }, [target, drawer, defaultName, blocked, onJoin]);
+  }, [target, drawer, defaultName, blocked, leaves, onJoin]);
 
   return null;
 }

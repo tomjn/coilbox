@@ -3,7 +3,12 @@
 import { describe, expect, it } from "vitest";
 import type { LobbyState } from "../bindings";
 import { type Connections, newConnection } from "../connections";
-import { leaveAndLabel, leavesBattleNotice, otherBattleKey } from "./oneBattle";
+import {
+  leaveAndLabel,
+  leavesBattleNotice,
+  otherBattleKey,
+  roomLeaveIsStale,
+} from "./oneBattle";
 
 const A = "alice@server-a:8200";
 const B = "alice@server-b:8200";
@@ -63,5 +68,31 @@ describe("the one-battle wording", () => {
     expect(leaveAndLabel("join")).toBe("Leave and join");
     expect(leaveAndLabel("host")).toBe("Leave and host");
     expect(leaveAndLabel("create")).toBe("Leave and create");
+  });
+});
+
+// Issue #2850: a room opens beside lobby logins, and its key is not known until
+// it is dialled, so the battle a room form leaves is whichever one the player
+// was in when the form opened. The drawer keeps that notice.
+describe("roomLeaveIsStale", () => {
+  it("goes ahead when the player is in the battle the form named", () => {
+    expect(roomLeaveIsStale(A, A)).toBe(false);
+  });
+
+  it("goes ahead when there was no battle and still is none", () => {
+    expect(roomLeaveIsStale(null, null)).toBe(false);
+  });
+
+  // Nothing left to leave, so nothing is left unasked.
+  it("goes ahead when the named battle ended while the form was open", () => {
+    expect(roomLeaveIsStale(A, null)).toBe(false);
+  });
+
+  it("refuses when a battle was joined after the form opened", () => {
+    expect(roomLeaveIsStale(null, A)).toBe(true);
+  });
+
+  it("refuses when the player moved to a battle on another server", () => {
+    expect(roomLeaveIsStale(A, B)).toBe(true);
   });
 });

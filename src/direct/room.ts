@@ -45,28 +45,43 @@ export function directServer(
 }
 
 /**
+ * The key of the connection this client's own room is filed under, or null
+ * when it hosts none. Pure.
+ *
+ * The host's client dials its room over loopback under the name it hosts as,
+ * so this is `serverKeyFor(directServer(port), host)`, spelled out here because
+ * the store imports this module.
+ */
+export function hostedRoomKey(
+  room: Pick<DirectRoomStatus, "host" | "port"> | null,
+): string | null {
+  return room ? `${room.host}@${LOOPBACK_HOST}:${room.port}` : null;
+}
+
+/** The `host:port` half of a room's key, which is what names it. */
+function roomAddress(roomKey: string): string {
+  return roomKey.slice(roomKey.indexOf("@") + 1);
+}
+
+/**
  * Why this client cannot host a room right now, or null when it can. Pure.
  *
- * Coilbox holds one lobby connection and a room needs it, so a connection of any
- * kind is in the way. Which kind decides what to do about it, and that is told
- * rather than read off the key: both are `username@host:port`, so a joiner in
- * somebody else's room used to be sent to log out of a lobby server they were
- * never on (issue #1618).
+ * A room sits beside lobby logins (issue #2850), so only another room is in the
+ * way: coilbox is in one room at a time. That room is named by its address
+ * rather than read as a server, because both keys are `username@host:port` and
+ * a joiner in somebody else's room used to be sent to log out of a lobby server
+ * they were never on (issue #1618).
  *
  * A host's own room is not a case here. The control shows the running room in
  * place of the form while there is one, so this is only ever read by somebody
  * who has no room of their own.
  */
 export function hostBlockedReason(
-  activeKey: string | null,
-  /** Whether the live connection is a room somebody is hosting. */
-  direct: boolean,
+  /** The live connection that is a room, or null. */
+  roomKey: string | null,
 ): string | null {
-  if (!activeKey) return null;
-  if (direct) {
-    return "You are connected to a room already. Disconnect from it first: coilbox holds one lobby connection, and hosting a room needs it.";
-  }
-  return "Log out of the lobby server first. Coilbox holds one lobby connection, and hosting a room needs it.";
+  if (!roomKey) return null;
+  return `You are in a room already, at ${roomAddress(roomKey)}. Leave it first: coilbox can be in one room at a time.`;
 }
 
 /**
@@ -78,25 +93,24 @@ export function hostBlockedReason(
  * listening, still holding its port and still announcing itself on the network,
  * under a confirmation that had just said it would disappear (issue #2057).
  *
- * All three have to hold. `hosting` is the room this client runs, `directRoom`
- * is the connection being that room rather than a lobby server, and `selfHost`
- * is this client being the founder of the battle on screen. A battle founded on
- * a real server is left and not closed, because there is no room of ours behind
- * it.
+ * Both have to hold. The battle's connection is the one this client's own room
+ * is on, and this client founded the battle on screen. A room runs beside lobby
+ * logins (issue #2850), so a battle founded on a real server while the room is
+ * up is left and not closed: the room is not behind it.
  */
 export function closeEndsTheRoom({
   selfHost,
-  directRoom,
-  hosting,
+  serverKey,
+  roomKey,
 }: {
   /** This client founded the battle on screen and runs it. */
   selfHost: boolean;
-  /** The live connection is a room somebody hosts rather than a lobby server. */
-  directRoom: boolean;
-  /** This client is hosting a room right now. */
-  hosting: boolean;
+  /** The connection the battle on screen is on. */
+  serverKey: string | null;
+  /** The connection this client's own room is on, from `hostedRoomKey`. */
+  roomKey: string | null;
 }): boolean {
-  return selfHost && directRoom && hosting;
+  return selfHost && roomKey != null && serverKey === roomKey;
 }
 
 /**

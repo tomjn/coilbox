@@ -34,6 +34,7 @@ export function HostRoomControl({
   room,
   heardOnNetwork,
   blocked,
+  leaves = null,
   defaultName,
   busy,
   error,
@@ -45,10 +46,13 @@ export function HostRoomControl({
   /** This client has heard its own room announcing itself, which is the only
    *  evidence a host has that the announcement left the machine. */
   heardOnNetwork: boolean;
-  /** Why hosting is unavailable, or null when it is available. There is one
-   *  lobby connection, so whatever already has it is in the way (see
+  /** Why hosting is unavailable, or null when it is available. Coilbox is in
+   *  one room at a time, so a room already open is in the way (see
    *  `hostBlockedReason`). */
   blocked: string | null;
+  /** What entering leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
   /** The name to offer as the host's, usually their last lobby login. */
   defaultName?: string;
   busy: boolean;
@@ -72,6 +76,7 @@ export function HostRoomControl({
   return (
     <HostRoomDrawerButton
       blocked={blocked}
+      leaves={leaves}
       defaultName={defaultName}
       onStart={onStart}
     />
@@ -256,10 +261,12 @@ function RoomAddresses({
  *  a new form rather than the one the last visit left behind. */
 function HostRoomDrawerButton({
   blocked,
+  leaves,
   defaultName,
   onStart,
 }: {
   blocked: string | null;
+  leaves: string | null;
   defaultName?: string;
   onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
@@ -283,6 +290,7 @@ function HostRoomDrawerButton({
             <HostRoomForm
               key={nextDrawerKey()}
               blocked={blocked}
+              leaves={leaves}
               defaultName={defaultName}
               onStart={onStart}
             />

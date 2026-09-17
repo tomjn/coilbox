@@ -14,6 +14,7 @@
 
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { useState } from "react";
+import { leaveAndLabel } from "../multiplayer/battles/oneBattle";
 import { addressProblem, splitHostPort } from "./lan";
 import { DEFAULT_ROOM_PORT, playerNameProblem, roomPortProblem } from "./room";
 
@@ -49,6 +50,7 @@ export function JoinRoomForm({
   target,
   defaultName,
   blocked,
+  leaves = null,
   onJoin,
 }: {
   /** The room this was opened for, or undefined for a typed address. */
@@ -58,6 +60,9 @@ export function JoinRoomForm({
   /** Why joining is unavailable, or null. Said rather than shown as a form that
    *  cannot work. */
   blocked: string | null;
+  /** What entering leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
   /** Dials the room and joins its battle. Rejects with what to tell the player. */
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
@@ -218,6 +223,8 @@ export function JoinRoomForm({
         </p>
       )}
 
+      {leaves && <p className="text-sm">{leaves}</p>}
+
       <div className="flex justify-end gap-2 pt-1">
         <Button
           type="button"
@@ -228,7 +235,7 @@ export function JoinRoomForm({
           Cancel
         </Button>
         <Button type="submit" className="h-9" disabled={!canJoin}>
-          {joining ? "Joining…" : "Join room"}
+          {joining ? "Joining…" : leaves ? leaveAndLabel("join") : "Join room"}
         </Button>
       </div>
     </form>

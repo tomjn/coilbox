@@ -34,6 +34,7 @@ import {
 import {
   battleOpened,
   hostBlockedReason,
+  hostedRoomKey,
   noBattleFailure,
   startRoomFailure,
 } from "../../direct/room";
@@ -58,7 +59,7 @@ import {
   HostZerokBattlePopover,
   type ZerokOpenBattleArgs,
 } from "../battles/HostZerokBattlePopover";
-import { useOneBattleRule } from "../battles/oneBattle";
+import { useOneBattleRule, useRoomBattleRule } from "../battles/oneBattle";
 import { useBattleFilters } from "../battles/useBattleFilters";
 import {
   type Battle,
@@ -72,6 +73,7 @@ import { protocolForKey, relayHostingAvailable } from "../protocol";
 import { newScriptPassword } from "../scriptPassword";
 import {
   initialMirror,
+  liveRoomKey,
   serverAddressFromKey,
   serverNameFor,
   useConnection,
@@ -133,11 +135,12 @@ function ServerBattles({
   /** The rooms on this network, drawn above the list in `page`. */
   lanSection?: ReactNode;
 }) {
-  const { busy, clearJoinError, directKey } = useMultiplayer();
-  const mirror = useConnection(serverKey)?.mirror ?? initialMirror;
+  const { busy, clearJoinError } = useMultiplayer();
+  const connection = useConnection(serverKey);
+  const mirror = connection?.mirror ?? initialMirror;
   const servers = useProtocolServers();
   const protocol = protocolForKey(serverKey, servers);
-  const directRoom = serverKey === directKey;
+  const directRoom = connection?.direct ?? false;
   const all = useMemo(
     () => Object.values(mirror.state?.battles ?? {}),
     [mirror.state?.battles],
@@ -462,14 +465,18 @@ function BattlesPage() {
   const {
     connections,
     activeKey,
-    activeDirect,
     busy,
     clearJoinError,
     openLoginPopover,
     connectDirect,
     disconnect,
-    directKey,
   } = useMultiplayer();
+  // The room this client is in, hosted or joined, which sits beside any lobby
+  // logins (issue #2850). Coilbox is in one room at a time.
+  const roomKey = liveRoomKey(connections);
+  // Entering a room leaves a battle on a lobby server first, once the form has
+  // said so (issue #2844).
+  const roomRule = useRoomBattleRule();
 
   // The room this client hosts, off the shared source that outlives this page.
   // Who is in it and whether it wants a password are the room's to know and the
@@ -514,8 +521,8 @@ function BattlesPage() {
       ),
     [liveKeys, connections, gameMatch, filters],
   );
-  const focusedBattles = Object.values(
-    (activeKey != null ? connections[activeKey] : undefined)?.mirror.state
+  const roomBattles = Object.values(
+    (roomKey != null ? connections[roomKey] : undefined)?.mirror.state
       ?.battles ?? {},
   );
 
@@ -588,6 +595,7 @@ function BattlesPage() {
   // one is the drawer they pressed Start in, and the drawer holds the element it
   // was opened with. So the form asking is the form told.
   async function onStartRoom(args: StartRoomArgs): Promise<string> {
+    await roomRule.leaveOther("host");
     setRoomBusy(true);
     let port: number;
     try {
@@ -640,10 +648,12 @@ function BattlesPage() {
     setRoomBusy(true);
     setStopError(null);
     try {
-      // The room's own connection rather than whichever is focused.
-      await stopHostedRoom(room?.host ?? "", () =>
-        disconnect(directKey ?? undefined),
-      );
+      // The room's own connection rather than whichever is focused, which may
+      // be a lobby login (issue #2850). With no room there is nothing to drop.
+      const ownKey = hostedRoomKey(room);
+      await stopHostedRoom(room?.host ?? "", async () => {
+        if (ownKey) await disconnect(ownKey);
+      });
     } catch (e) {
       setStopError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -658,6 +668,7 @@ function BattlesPage() {
   // Failures are thrown rather than stored, for the same reason a failed start
   // is: the only place they can be read is the drawer they were asked for in.
   async function onJoinRoom(args: JoinRoomArgs) {
+    await roomRule.leaveOther("join");
     let key: string;
     try {
       key = await connectDirect(args.port, args.name, args.address);
@@ -686,7 +697,7 @@ function BattlesPage() {
       });
     } catch (e) {
       // Connected to a room with nothing to join in it is worse than not
-      // connected: it holds the one lobby connection and shows an empty lobby.
+      // connected: it takes the one room slot and shows an empty lobby.
       pending.current = null;
       await disconnect(key).catch(() => {});
       throw e;
@@ -700,28 +711,28 @@ function BattlesPage() {
   // is the same duplicate: once connected, that room is the whole Open list
   // below, so it drops out of Local network too (issue #2734).
   //
-  // A direct room holds exactly one battle, so the first while `activeDirect` is
-  // it, and its title, host, game and map are the same four fields the room's
-  // own beacon is announcing (issue #2857). Reading those off the connected
+  // A direct room holds exactly one battle, so the first on the room's
+  // connection is it, and its title, host, game and map are the same four
+  // fields the room's own beacon is announcing (issue #2857). Reading those off the connected
   // battle instead of matching addresses means it still catches the room when a
   // joiner dialled a hostname the beacon has no way to know resolves to the IP
   // it is announcing.
-  const roomBattleNow = focusedBattles[0];
-  const connectedRoom =
-    activeDirect && activeKey && roomBattleNow
-      ? {
-          title: roomBattleNow.title,
-          host: roomBattleNow.host,
-          game: roomBattleNow.modname,
-          map: roomBattleNow.map,
-        }
-      : null;
+  const roomBattleNow = roomBattles[0];
+  const connectedRoom = roomBattleNow
+    ? {
+        title: roomBattleNow.title,
+        host: roomBattleNow.host,
+        game: roomBattleNow.modname,
+        map: roomBattleNow.map,
+      }
+    : null;
   const lanSection = (
     <>
       <LanRooms
         rooms={otherRooms(lan.rooms, connectedRoom)}
         error={lan.error}
-        blocked={joinBlockedReason(activeKey, activeDirect, room !== null)}
+        blocked={joinBlockedReason(roomKey, room !== null)}
+        leaves={roomRule.notice("join")}
         defaultName={lastLogin?.username}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
@@ -729,7 +740,8 @@ function BattlesPage() {
       />
       <LinkedRoomJoin
         target={deeplinkRoom}
-        blocked={joinBlockedReason(activeKey, activeDirect, room !== null)}
+        blocked={joinBlockedReason(roomKey, room !== null)}
+        leaves={roomRule.notice("join")}
         defaultName={lastLogin?.username}
         onJoin={onJoinRoom}
       />
@@ -740,7 +752,8 @@ function BattlesPage() {
     <HostRoomControl
       room={room}
       heardOnNetwork={ownRoomHeard(lan.rooms)}
-      blocked={hostBlockedReason(activeKey, activeDirect)}
+      blocked={hostBlockedReason(roomKey)}
+      leaves={roomRule.notice("host")}
       defaultName={lastLogin?.username}
       busy={roomBusy || busy}
       error={stopError}

@@ -10,6 +10,7 @@ import {
   directServer,
   gameAddressNote,
   hostBlockedReason,
+  hostedRoomKey,
   newPendingNames,
   pendingJoinsHeadline,
   playerNameProblem,
@@ -43,23 +44,33 @@ describe("directServer", () => {
 
 describe("hostBlockedReason", () => {
   it("lets a client with no connection host", () => {
-    expect(hostBlockedReason(null, false)).toBeNull();
-  });
-
-  it("says to log out of a server", () => {
-    expect(
-      hostBlockedReason("Tom@lobby.beyondallreason.info:8200", false),
-    ).toBe(
-      "Log out of the lobby server first. Coilbox holds one lobby connection, and hosting a room needs it.",
-    );
+    expect(hostBlockedReason(null)).toBeNull();
   });
 
   // The key of somebody else's room is `bob@192.168.1.45:8200`, which is the
   // shape of a server's and was read as one (issue #1618).
-  it("says to disconnect from somebody else's room", () => {
-    expect(hostBlockedReason("Tom@192.168.1.45:8200", true)).toContain(
-      "connected to a room already",
+  it("says to leave somebody else's room, and names it", () => {
+    const reason = hostBlockedReason("Tom@192.168.1.45:8200");
+    expect(reason).toContain("in a room already");
+    expect(reason).toContain("192.168.1.45:8200");
+  });
+
+  it("no longer says coilbox holds one lobby connection", () => {
+    const reason = String(hostBlockedReason("Tom@192.168.1.45:8200"));
+    expect(reason).not.toContain("one lobby connection");
+    expect(reason).not.toContain("Log out");
+  });
+});
+
+describe("hostedRoomKey", () => {
+  it("is the key the host's own loopback connection is filed under", () => {
+    expect(hostedRoomKey({ host: "Tom", port: 8300 })).toBe(
+      "Tom@127.0.0.1:8300",
     );
+  });
+
+  it("is null when this client hosts no room", () => {
+    expect(hostedRoomKey(null)).toBeNull();
   });
 });
 
@@ -99,28 +110,35 @@ describe("startRoomFailure", () => {
 });
 
 describe("closeEndsTheRoom", () => {
+  const ROOM = "Tom@127.0.0.1:8200";
+  const LOBBY = "Tom@server4.beyondallreason.info:8201";
+
   // The failure this exists for (issue #2057). The room and the battle in it are
   // one thing to the host who started them together, so closing the battle has
   // to take the room with it or the promise on the button is not kept.
   it("takes the room down with the battle the host opened in it", () => {
     expect(
-      closeEndsTheRoom({ selfHost: true, directRoom: true, hosting: true }),
+      closeEndsTheRoom({ selfHost: true, serverKey: ROOM, roomKey: ROOM }),
     ).toBe(true);
   });
 
-  // A battle this client founded on a lobby server. Leaving closes the battle
-  // and nothing else, because there is no room here to close and the connection
-  // is an account somebody logged in with.
-  it("leaves a battle on a server as a battle to leave", () => {
+  // A battle this client founded on a lobby server, while its own room runs
+  // beside it (issue #2850). Leaving closes the battle and nothing else,
+  // because the room is not behind this battle.
+  it("leaves a battle on a server alone while this client hosts a room", () => {
     expect(
-      closeEndsTheRoom({ selfHost: true, directRoom: false, hosting: true }),
+      closeEndsTheRoom({ selfHost: true, serverKey: LOBBY, roomKey: ROOM }),
     ).toBe(false);
   });
 
   // In somebody else's room. Their room is theirs, and this client hosts none.
   it("never closes a room this client is only a guest in", () => {
     expect(
-      closeEndsTheRoom({ selfHost: false, directRoom: true, hosting: false }),
+      closeEndsTheRoom({
+        selfHost: true,
+        serverKey: "Tom@192.168.1.45:8200",
+        roomKey: null,
+      }),
     ).toBe(false);
   });
 
@@ -128,7 +146,13 @@ describe("closeEndsTheRoom", () => {
   // room that somebody else founded is not ours to close either.
   it("wants the battle to be ours as well as the room", () => {
     expect(
-      closeEndsTheRoom({ selfHost: false, directRoom: true, hosting: true }),
+      closeEndsTheRoom({ selfHost: false, serverKey: ROOM, roomKey: ROOM }),
+    ).toBe(false);
+  });
+
+  it("closes nothing when the battle has no connection", () => {
+    expect(
+      closeEndsTheRoom({ selfHost: true, serverKey: null, roomKey: null }),
     ).toBe(false);
   });
 });

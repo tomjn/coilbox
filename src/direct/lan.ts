@@ -108,30 +108,27 @@ export function addressProblem(typed: string): string | null {
 /**
  * Why this client cannot join a room right now, or null when it can. Pure.
  *
- * Coilbox holds one lobby connection. Whatever has it, a join needs it, so the
- * reason is said out loud rather than shown as a button that does nothing.
+ * A room sits beside lobby logins (issue #2850), so only another room is in the
+ * way: coilbox is in one room at a time. The reason is said out loud rather than
+ * shown as a button that does nothing.
  *
- * Which of the two connections it is has to be told, not read off the key. A key
- * is `username@host:port` for a room and for a server alike, and the only thing
- * that ever set them apart was the host's own loopback address, so a joiner in
- * somebody else's room was sent to log out of a lobby server that does not exist
- * (issue #1618). The store knows which it dialled, so it says.
+ * The room is named by its address rather than read off as a server. A key is
+ * `username@host:port` for a room and for a server alike, and a joiner in
+ * somebody else's room was once sent to log out of a lobby server that does not
+ * exist (issue #1618). The store knows which it dialled, so it says.
  */
 export function joinBlockedReason(
-  activeKey: string | null,
-  /** Whether the live connection is a room somebody is hosting. */
-  direct: boolean,
+  /** The live connection that is a room, or null. */
+  roomKey: string | null,
   /** Whether this client is hosting a room of its own. */
   hosting: boolean,
 ): string | null {
   if (hosting) {
-    return "Stop your own room first. Coilbox holds one lobby connection, and joining needs it.";
+    return "Stop your own room first. Coilbox can be in one room at a time.";
   }
-  if (activeKey && direct) {
-    return "You are connected to a room already. Disconnect from it first: coilbox holds one lobby connection, and joining needs it.";
-  }
-  if (activeKey) {
-    return "Log out of the lobby server first. Coilbox holds one lobby connection, and joining needs it.";
+  if (roomKey) {
+    const address = roomKey.slice(roomKey.indexOf("@") + 1);
+    return `You are in a room already, at ${address}. Leave it first: coilbox can be in one room at a time.`;
   }
   return null;
 }

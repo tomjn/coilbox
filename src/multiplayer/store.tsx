@@ -102,7 +102,7 @@ import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
 export type { AccountInfo, ConnectionState, Connections } from "./connections";
-export { liveConnectionKeys } from "./connections";
+export { liveConnectionKeys, liveRoomKey } from "./connections";
 export {
   initialMirror,
   type LobbyMirror,
@@ -175,9 +175,10 @@ export interface OpenConnection {
  *
  * Coilbox holds one connection per lobby server, where the same host is the
  * same server whichever port or account (issue #2848). Two accounts on one
- * server at once would be confusing to follow and could upset the server. A
- * room still needs coilbox's only connection, until issue #2850 lets it sit
- * beside lobby logins.
+ * server at once would be confusing to follow and could upset the server.
+ * Beside those it holds at most one room (issue #2850). A room is not a lobby
+ * server, so a room and a lobby login never stand in each other's way, even
+ * when both are on this machine.
  *
  * This is read where the rule can actually be enforced, at the moment the
  * connection is opened, because a form handed to a drawer keeps the element it
@@ -190,9 +191,10 @@ export interface OpenConnection {
  * connection is named in preference to one still opening, because it is the one
  * somebody can act on.
  *
- * The address is named rather than "the lobby server" or "the room". Both are
- * `username@host:port` and nothing here can tell which is which, which is the
- * mistake behind issue #1618, so this says where instead of what.
+ * A room is named by its address rather than as "the room" someone hosts. Both
+ * kinds of key are `username@host:port`, and a room could be this client's own
+ * or somebody else's, which is the mistake behind issue #1618, so this says
+ * where instead of whose.
  */
 export function connectBlockedReason(
   open: readonly OpenConnection[],
@@ -205,16 +207,17 @@ export function connectBlockedReason(
   const inTheWay = open.filter(
     (c) =>
       c.serverKey !== serverKey &&
-      (direct || c.direct || serverHostFromKey(c.serverKey) === host),
+      c.direct === direct &&
+      (direct || serverHostFromKey(c.serverKey) === host),
   );
   const other =
     inTheWay.find((c) => !c.opening) ?? inTheWay.find((c) => c.opening);
   if (!other) return null;
-  if (direct || other.direct) {
+  if (direct) {
     const address = serverAddressFromKey(other.serverKey);
     return other.opening
-      ? `A room needs coilbox's only connection, and one to ${address} is already opening. Wait for that one to finish.`
-      : `A room needs coilbox's only connection, and ${address} has it. Disconnect from that first.`;
+      ? `A room at ${address} is already opening. Wait for that one to finish: coilbox can be in one room at a time.`
+      : `You are in a room already, at ${address}. Leave it first: coilbox can be in one room at a time.`;
   }
   const who = usernameFromKey(other.serverKey);
   const where = serverHostFromKey(other.serverKey);
@@ -373,19 +376,6 @@ interface MultiplayerContextValue {
   activeKey: string | null;
   /** Whether a connection is currently live (`activeKey != null`). */
   connected: boolean;
-  /**
-   * Whether the live connection is a room somebody is hosting themselves rather
-   * than a lobby server. Read by anything that passes the battle on: a room
-   * holds one battle and is reached by dialling it, so it is shared as a
-   * `coilbox://room` link rather than a `join` one (see `inviteLink`).
-   */
-  activeDirect: boolean;
-  /**
-   * The key of the connection that is a room somebody hosts rather than a
-   * lobby server, or null. `activeDirect` asks this of the focused connection,
-   * and a reader holding another connection's key asks it here (issue #2844).
-   */
-  directKey: string | null;
   /**
    * The wire protocol the live connection speaks, `tasserver` when there is none.
    * Surfaces with no Tachyon equivalent read this and hide themselves: named
@@ -843,15 +833,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     setZerokInstallId(fresh);
   }, [zerokInstallId, setZerokInstallId]);
 
-  // The key of the connection that is a room rather than a server, which is what
-  // tells the two apart: both are dialled as a TASServer at a `host:port`, and
-  // only a room's link is an address to dial (see `inviteLink`).
+  // The key of the connection that is a room rather than a server. The
+  // connection's own `direct` flag is what everything reads. This is only how
+  // that flag survives a reload.
   //
   // Kept in settings rather than in React state because the Rust connection
   // outlives a webview reload and is re-adopted below with nothing to say where
   // it came from, and a room re-adopted as a server hands out a link that
-  // reaches nobody (issue #1617). Every connect rewrites it, so it never
-  // outlives the connection it describes.
+  // reaches nobody (issue #1617). One key is enough, because coilbox is in one
+  // room at a time. A room connect writes it and closing that room clears it.
+  // A lobby login leaves it alone, since a room now sits beside lobby logins
+  // (issue #2850), unless the login has the very key it names.
   const [roomKey, setRoomKey] = useSetting<string>("multiplayer.roomKey", "");
   const setRoomKeyRef = useRef(setRoomKey);
   const roomKeyRef = useRef(roomKey);
@@ -859,6 +851,28 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     setRoomKeyRef.current = setRoomKey;
     roomKeyRef.current = roomKey;
   }, [roomKey, setRoomKey]);
+  // Written through here so the ref is right before React re-renders, for a
+  // close that follows a connect in the same tick.
+  const saveRoomKey = useCallback((key: string) => {
+    roomKeyRef.current = key;
+    setRoomKeyRef.current(key);
+  }, []);
+  // Whether a connection is a room, for the connect rule, which runs before
+  // React has re-rendered. A reattached connection has no connect behind it,
+  // so the saved key answers for it.
+  const isRoomKey = useCallback(
+    (key: string) =>
+      runtimesRef.current.get(key)?.reconnectCtx?.direct ??
+      key === roomKeyRef.current,
+    [],
+  );
+  // The saved key can arrive after the reload's reattach has run, because
+  // settings load asynchronously, so the reattached room is marked here too.
+  const roomEntryOpen = roomKey !== "" && connections[roomKey] !== undefined;
+  useEffect(() => {
+    if (roomEntryOpen)
+      dispatchConn({ type: "open", serverKey: roomKey, direct: true });
+  }, [roomEntryOpen, roomKey]);
 
   // Startup auto-connect (issue #404, opt-in, default off) + one-click reconnect.
   // The last-used login is written on every successful connect and read once at
@@ -979,12 +993,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // A connect is past its checks and about to open: give it an entry, reset
-  // its mirror, and point the context at it.
+  // its mirror, and point the context at it when it is to take focus, the
+  // same rule `markLive` follows. A room or a reconnect opening beside a live
+  // login leaves the context on that login (issue #2850).
   const beginConnecting = useCallback(
-    (serverKey: string) => {
-      dispatchConn({ type: "open", serverKey });
+    (serverKey: string, direct: boolean, focus: boolean) => {
+      dispatchConn({ type: "open", serverKey, direct });
       dispatchMirror(serverKey, { type: "connecting" });
-      setFocusKey(serverKey);
+      if (focus || activeKeyRef.current == null) setFocusKey(serverKey);
     },
     [dispatchMirror],
   );
@@ -996,8 +1012,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       stopReconnect(serverKey);
       runtimesRef.current.delete(serverKey);
       dispatchConn({ type: "close", serverKey });
+      if (roomKeyRef.current === serverKey) saveRoomKey("");
     },
-    [stopReconnect],
+    [saveRoomKey, stopReconnect],
   );
 
   // Build the event Channel for a connection and wire it to that connection's
@@ -1367,19 +1384,16 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       // is recorded, so a refused connect leaves no reconnect context and no busy
       // flag behind (issue #2149). Every caller shows the message: the login
       // panel, the host form and the join form all put a thrown reason on screen.
-      const isDirect = (key: string) =>
-        runtimesRef.current.get(key)?.reconnectCtx?.direct ??
-        key === roomKeyRef.current;
       const open: OpenConnection[] = [
         ...[...liveKeysRef.current].map((key) => ({
           serverKey: key,
           opening: false,
-          direct: isDirect(key),
+          direct: isRoomKey(key),
         })),
         ...[...connectingKeysRef.current].map((key) => ({
           serverKey: key,
           opening: true,
-          direct: isDirect(key),
+          direct: isRoomKey(key),
         })),
       ];
       const blocked = connectBlockedReason(open, serverKey, direct);
@@ -1408,7 +1422,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               "No stored password for this login (set one in Settings).",
             );
           }
-          beginConnecting(serverKey);
+          beginConnecting(serverKey, direct, focus);
           await mpConnectZerok({
             serverKey,
             host: server.host,
@@ -1422,7 +1436,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // No password to read and no handshake to run. The Rust side refreshes
           // the token the browser sign-in stored, so this never opens a browser,
           // which is what makes an auto-reconnect safe on a Tachyon server.
-          beginConnecting(serverKey);
+          beginConnecting(serverKey, direct, focus);
           await mpConnectTachyon({
             serverKey,
             host: server.host,
@@ -1448,7 +1462,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             }
             secret = cred.secret;
           }
-          beginConnecting(serverKey);
+          beginConnecting(serverKey, direct, focus);
           await mpConnect({
             serverKey,
             host: server.host,
@@ -1466,7 +1480,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         rt.state = snap.state;
         dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
         markLive(serverKey, focus);
-        setRoomKeyRef.current(direct ? serverKey : "");
+        if (direct) saveRoomKey(serverKey);
+        else if (roomKeyRef.current === serverKey) saveRoomKey("");
         setLoginPopoverOpen(false);
         // Remember this login as the last used, so opt-in auto-connect and the
         // one-click reconnect row can seed it next launch. Keyed by id+username so
@@ -1498,9 +1513,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       closeConnection,
       dispatchMirror,
       endBusy,
+      isRoomKey,
       markLive,
       openChannel,
       runtimeFor,
+      saveRoomKey,
     ],
   );
 
@@ -1539,16 +1556,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [doConnect, stopReconnect],
   );
 
-  // Connect to a room we host. The key is returned rather than read off
-  // `activeKey`, because a caller that starts a room then opens a battle in it
-  // does both before React has re-rendered with the new key. It still stops
-  // every reconnect loop, because a room still needs the only connection
-  // until issue #2850.
+  // Connect to a room, ours or somebody else's. The key is returned rather
+  // than read off `activeKey`, because a caller that starts a room then opens a
+  // battle in it does both before React has re-rendered with the new key, and a
+  // room does not take focus from a lobby login (issue #2850).
+  //
+  // Only a room's reconnect loop is stopped, because coilbox is in one room at
+  // a time and a loop for an old room would dial into the way of this one. A
+  // lobby login's loop carries on beside it.
   const connectDirect = useCallback(
     async (port: number, username: string, address?: string) => {
-      stopReconnect();
+      for (const [key, rt] of runtimesRef.current) {
+        if (rt.reconnectCtx?.direct) stopReconnect(key);
+      }
       const server = directServer(port, address);
-      await doConnect(server, username, true);
+      await doConnect(server, username, true, false);
       const serverKey = serverKeyFor(server, username);
       // Connected is not logged in. `mpConnect` answers as soon as the socket is
       // up, and the caller's next act is to open a battle, which a room refuses
@@ -2145,7 +2167,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       markIntentional(key);
       stopReconnect(key);
       if (!key) return;
-      clearOpenAtQuitRef.current(key);
+      // A room is not a remembered login, so there is no flag to clear, and a
+      // lobby server on this machine could share its address.
+      if (!isRoomKey(key)) clearOpenAtQuitRef.current(key);
       beginBusy(key);
       try {
         await mpDisconnect({ serverKey: key });
@@ -2159,6 +2183,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       beginBusy,
       closeConnection,
       endBusy,
+      isRoomKey,
       markGone,
       markIntentional,
       stopReconnect,
@@ -2215,7 +2240,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           try {
             const rt = runtimeFor(serverKey);
             const onEvent = openChannel(serverKey);
-            dispatchConn({ type: "open", serverKey });
+            dispatchConn({
+              type: "open",
+              serverKey,
+              direct: serverKey === roomKeyRef.current,
+            });
             await mpReattach({ serverKey, onEvent });
             const snap = await mpSnapshot({ serverKey });
             rt.state = snap.state;
@@ -2237,9 +2266,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       }
       if (reattached.length > 0) {
         // The last login stays focused across the reload if it's one of the
-        // connections just reattached. Otherwise the first key is, matching
-        // the pre-#2842 single-connection behaviour when there's no better
-        // signal to go on.
+        // connections just reattached. Otherwise the first lobby login is,
+        // since a room does not take focus from one (issue #2850), and the
+        // first key when there is nothing else to go on.
         const b = bootRef.current;
         const resolved = resolveLastLogin(
           b.lastLogin,
@@ -2252,7 +2281,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         const focused =
           (lastLoginKey && reattached.includes(lastLoginKey)
             ? lastLoginKey
-            : null) ?? reattached[0];
+            : null) ??
+          reattached.find((key) => key !== roomKeyRef.current) ??
+          reattached[0];
         focusOn(focused);
         return;
       }
@@ -2326,8 +2357,6 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         connections,
         activeKey,
         connected: activeKey != null,
-        activeDirect: activeKey != null && activeKey === roomKey,
-        directKey: roomKey || null,
         protocol,
         revealed,
         busy,

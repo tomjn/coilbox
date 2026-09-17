@@ -389,14 +389,36 @@ describe("connectBlockedReason", () => {
     expect(reason).not.toContain("already opening");
   });
 
-  it("still gives a room the only connection (issue 2850 lifts this)", () => {
-    const beside = connectBlockedReason([live(techa)], room, true);
-    expect(beside).toContain("lobby.techa-rts.com:8200");
-    const racing = connectBlockedReason([opening(techa)], room, true);
-    expect(racing).toContain("already opening");
-    expect(connectBlockedReason([live(room, true)], techa, false)).toContain(
-      "127.0.0.1:8200",
+  // Issue #2850: a room sits beside lobby logins, in either order.
+  it("lets a room open beside lobby logins, and a login beside a room", () => {
+    expect(connectBlockedReason([live(techa)], room, true)).toBeNull();
+    expect(connectBlockedReason([opening(techa)], room, true)).toBeNull();
+    expect(connectBlockedReason([live(room, true)], techa, false)).toBeNull();
+    expect(
+      connectBlockedReason([opening(room, true)], techa, false),
+    ).toBeNull();
+  });
+
+  // A lobby server on this machine shares a host with a room, and is still
+  // not the same thing as one.
+  it("does not count a room as a lobby server on the same host", () => {
+    const local = "AF_@127.0.0.1:8300";
+    expect(connectBlockedReason([live(room, true)], local, false)).toBeNull();
+    expect(connectBlockedReason([live(local)], room, true)).toBeNull();
+  });
+
+  it("refuses a second room and names the first", () => {
+    const other = "AF@192.168.1.45:8200";
+    const reason = connectBlockedReason(
+      [live(techa), live(room, true)],
+      other,
+      true,
     );
+    expect(reason).toContain("127.0.0.1:8200");
+    expect(reason).not.toContain("lobby.techa-rts.com");
+    expect(reason).not.toContain("only connection");
+    const racing = connectBlockedReason([opening(room, true)], other, true);
+    expect(racing).toContain("already opening");
   });
 
   it("leaves a connect to the key it already holds to the Rust side", () => {
@@ -414,8 +436,8 @@ describe("connectBlockedReason", () => {
     // and passes everything else through. This reason has to be everything
     // else, or the join drawer would tell somebody their address was wrong.
     const reasons = [
-      connectBlockedReason([live(techa)], room, true),
-      connectBlockedReason([opening(techa)], room, true),
+      connectBlockedReason([live(room, true)], "AF@10.0.0.2:8200", true),
+      connectBlockedReason([opening(room, true)], "AF@10.0.0.2:8200", true),
       connectBlockedReason([live(bar)], barTachyon, false),
       connectBlockedReason([opening(bar)], barTachyon, false),
     ];
