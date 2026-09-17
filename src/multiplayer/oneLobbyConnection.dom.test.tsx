@@ -43,6 +43,8 @@ const wire = vi.hoisted(() => ({
   /** Held while a room is meant to be mid-greeting, then answered. */
   readyGate: null as Promise<void> | null,
   readyFails: false,
+  /** Every `MYSTATUS` sent, as `key ingame away`. */
+  statuses: [] as string[],
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -143,7 +145,14 @@ vi.mock("./bindings", () => {
     mpJoinChannel: async () => ({}),
     mpRegister: async () => ({}),
     mpRegisterZerok: async () => ({}),
-    mpSetStatus: async () => ({}),
+    mpSetStatus: async (args: {
+      serverKey: string;
+      ingame: boolean;
+      away: boolean;
+    }) => {
+      wire.statuses.push(`${args.serverKey} ${args.ingame} ${args.away}`);
+      return {};
+    },
     mpTachyonSignedIn: async () => ({ signedIn: true }),
     mpTachyonSignIn: async () => ({}),
   };
@@ -262,6 +271,7 @@ beforeEach(() => {
   wire.activeKeysGate = null;
   wire.readyGate = null;
   wire.readyFails = false;
+  wire.statuses.length = 0;
 });
 
 afterEach(() => {
@@ -540,6 +550,78 @@ describe("a room still needs the only connection (issue #2850)", () => {
     expect(live(ROOM_KEY)).toBe(false);
     expect(wire.notified).toContain(RECONNECTING);
     expect(live(BAR_KEY)).toBe(true);
+  });
+});
+
+describe("status on every connection", () => {
+  it("sends away and in-game on every connection, including one opened later", async () => {
+    await twoLogins();
+
+    await act(async () => {
+      store.setManualAway(true);
+      store.setIngame(true);
+    });
+    expect(store.connections[BAR_KEY].status).toEqual({
+      ingame: true,
+      away: true,
+    });
+    expect(store.connections[TECHA_KEY].status).toEqual({
+      ingame: true,
+      away: true,
+    });
+    expect(wire.statuses).toContain(`${BAR_KEY} true true`);
+    expect(wire.statuses).toContain(`${TECHA_KEY} true true`);
+
+    await act(async () => {
+      await store.connect(RECOIL, "AF_");
+    });
+    await ready(RECOIL_KEY);
+    expect(store.connections[RECOIL_KEY].status).toEqual({
+      ingame: true,
+      away: true,
+    });
+    expect(wire.statuses).toContain(`${RECOIL_KEY} true true`);
+
+    await act(async () => {
+      store.setIngame(false);
+    });
+    for (const key of [BAR_KEY, TECHA_KEY, RECOIL_KEY]) {
+      expect(store.connections[key].status.ingame).toBe(false);
+    }
+  });
+
+  it("keeps reporting in-game on a connection that reconnects mid-game", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    await twoLogins();
+    await act(async () => {
+      store.setIngame(true);
+    });
+    await fire(BAR_KEY, { kind: "disconnected", reason: "connection reset" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(live(BAR_KEY)).toBe(true);
+    await ready(BAR_KEY);
+
+    expect(store.connections[BAR_KEY].status.ingame).toBe(true);
+    expect(store.connections[TECHA_KEY].status.ingame).toBe(true);
+  });
+
+  it("clears manual away once the last connection is logged out", async () => {
+    await twoLogins();
+    await act(async () => {
+      store.setManualAway(true);
+    });
+    await act(async () => {
+      await store.disconnect(BAR_KEY);
+      await store.disconnect(TECHA_KEY);
+    });
+    await act(async () => {
+      await store.connect(RECOIL, "AF_");
+    });
+    await ready(RECOIL_KEY);
+    expect(store.manualAway).toBe(false);
+    expect(store.connections[RECOIL_KEY].status.away).toBe(false);
   });
 });
 
