@@ -955,6 +955,147 @@ mod tests {
         );
     }
 
+    /// `SETMINSPRINGVERSION`'s reply is claimed like any other `SERVERMSG`
+    /// answer (issue #2785).
+    #[test]
+    fn a_set_min_spring_version_reply_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (set, mut answered) = request("SETMINSPRINGVERSION", AdminShape::SetMinSpringVersion);
+        queue.push(set, now);
+        assert_eq!(
+            queue.hear(&said("Set Spring engine version to 105.0"), now),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::SetMinSpringVersion {
+                    version: "105.0".to_string(),
+                }
+            })
+        );
+    }
+
+    /// `RELOAD` and `CLEANUP` also announce in `#moderator` before their
+    /// direct reply, but that announcement is a channel `SAID`, not a
+    /// `SERVERMSG`, so it never reaches the queue and cannot be mistaken for
+    /// the answer.
+    #[test]
+    fn a_reload_reply_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (reload, mut answered) = request("RELOAD", AdminShape::Reload);
+        queue.push(reload, now);
+        assert_eq!(queue.hear(&said("Reload successful"), now), claimed());
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::Reload {
+                    success: true,
+                    message: "Reload successful".to_string(),
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn a_cleanup_reply_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (cleanup, mut answered) = request("CLEANUP", AdminShape::Cleanup);
+        queue.push(cleanup, now);
+        assert_eq!(
+            queue.hear(&said("Cleanup complete: 0 deletions, 0 mismatches"), now),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::Cleanup {
+                    message: "Cleanup complete: 0 deletions, 0 mismatches".to_string(),
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn a_stats_reply_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (stats, mut answered) = request("STATS", AdminShape::Stats);
+        queue.push(stats, now);
+        assert_eq!(
+            queue.hear(&said("Stats were printed in the server logfile"), now),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::Stats
+            })
+        );
+    }
+
+    /// Every one of these four is in uberserver's `restricted['admin']` set,
+    /// so a mod calling one is refused at dispatch before its handler ever
+    /// runs, in the same generic `<COMMAND> failed. Insufficient rights.`
+    /// shape as any other admin command.
+    #[test]
+    fn a_mod_calling_an_admin_only_command_is_refused() {
+        for (command, shape) in [
+            ("SETMINSPRINGVERSION", AdminShape::SetMinSpringVersion),
+            ("STATS", AdminShape::Stats),
+            ("RELOAD", AdminShape::Reload),
+            ("CLEANUP", AdminShape::Cleanup),
+        ] {
+            let mut queue = AdminQueue::default();
+            let now = Instant::now();
+            let (req, mut answered) = request(command, shape);
+            queue.push(req, now);
+            assert_eq!(
+                queue.hear(
+                    &said(&format!("{command} failed. Insufficient rights.")),
+                    now
+                ),
+                claimed(),
+                "for {command}"
+            );
+            assert_eq!(
+                queue.hear(
+                    &Delta::CommandFailed {
+                        command: command.to_string(),
+                        reason: "Insufficient rights.".to_string(),
+                    },
+                    now
+                ),
+                claimed(),
+                "for {command}"
+            );
+            assert_eq!(
+                answered.try_recv(),
+                Ok(AdminOutcome::Refused {
+                    reason: "Insufficient rights.".to_string()
+                }),
+                "for {command}"
+            );
+        }
+    }
+
+    /// A cleanup that raised an exception sends no reply at all
+    /// (`DataHandler.cleanup`'s `except` branch returns before building the
+    /// closing line), so the admin sees the same silence as any other
+    /// unanswered command.
+    #[test]
+    fn a_cleanup_with_no_reply_times_out() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (cleanup, mut answered) = request("CLEANUP", AdminShape::Cleanup);
+        queue.push(cleanup, now);
+        assert_eq!(queue.expire(now + PATIENCE), None);
+        assert_eq!(answered.try_recv(), Ok(AdminOutcome::Unanswered));
+    }
+
     /// A refresh whose result never came is answered with what did.
     #[test]
     fn a_refresh_with_no_result_is_answered_at_the_deadline() {

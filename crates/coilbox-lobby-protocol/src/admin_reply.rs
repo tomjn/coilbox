@@ -70,6 +70,25 @@ pub enum AdminShape {
     /// or `User <username> already has a valid email address (<email>),
     /// please try again without specifying an email address`.
     ResetUserPassword,
+    /// `SETMINSPRINGVERSION <version>`: one line, `Set Spring engine version
+    /// to <version>`. Also closes every open bot-hosted battle on an older
+    /// engine, after posting a notice in each one's chat, but that is not
+    /// answered here.
+    SetMinSpringVersion,
+    /// `STATS`: one line, `Stats were printed in the server logfile`. The
+    /// figures themselves go to the server's own log, not to this reply.
+    Stats,
+    /// `RELOAD`: one line, `Reload successful` or `Reload failed`. Also
+    /// announces `Reload initiated by <admin>` in `#moderator` immediately,
+    /// and the same result there, but neither is a `SERVERMSG` so neither
+    /// is read here.
+    Reload,
+    /// `CLEANUP`: one line, `Cleanup complete: <n> deletions, <n>
+    /// mismatches`, only ever sent on success (an exception leaves the
+    /// admin with no reply at all). Also announces `Cleanup initiated by
+    /// <admin>` in `#moderator`, and the same result there, neither read
+    /// here for the same reason as `RELOAD`.
+    Cleanup,
     /// `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`: never answered.
     NoReply,
     /// ChanServ's `:register <chan> [founder]`: `#<chan>: Successfully
@@ -315,6 +334,17 @@ pub enum AdminReply {
     },
     ResetUserPassword {
         success: bool,
+        message: String,
+    },
+    SetMinSpringVersion {
+        version: String,
+    },
+    Stats,
+    Reload {
+        success: bool,
+        message: String,
+    },
+    Cleanup {
         message: String,
     },
     RegisterChannel {
@@ -854,6 +884,29 @@ impl AdminCollector {
                 }
                 None => Heard::NotOurs,
             },
+            (AdminShape::SetMinSpringVersion, _) => {
+                match set_min_spring_version_result_from(text) {
+                    Some(version) => Heard::Finished(AdminReply::SetMinSpringVersion { version }),
+                    None => Heard::NotOurs,
+                }
+            }
+            (AdminShape::Stats, _) => {
+                if text == "Stats were printed in the server logfile" {
+                    Heard::Finished(AdminReply::Stats)
+                } else {
+                    Heard::NotOurs
+                }
+            }
+            (AdminShape::Reload, _) => match reload_result_from(text) {
+                Some((success, message)) => {
+                    Heard::Finished(AdminReply::Reload { success, message })
+                }
+                None => Heard::NotOurs,
+            },
+            (AdminShape::Cleanup, _) => match cleanup_result_from(text) {
+                Some(message) => Heard::Finished(AdminReply::Cleanup { message }),
+                None => Heard::NotOurs,
+            },
             _ => Heard::NotOurs,
         }
     }
@@ -1334,6 +1387,38 @@ fn reset_user_password_result_from(text: &str) -> Option<(bool, String)> {
         return Some((false, text.to_string()));
     }
     None
+}
+
+/// `in_SETMINSPRINGVERSION`: `'Set Spring engine version to %s' % version`,
+/// always sent, uberserver never refuses this by itself once the caller is
+/// an admin (checked before the handler runs, so a rejection is uberserver's
+/// generic `<COMMAND> failed.` shape, not read here).
+fn set_min_spring_version_result_from(text: &str) -> Option<String> {
+    text.strip_prefix("Set Spring engine version to ")
+        .map(str::to_string)
+}
+
+/// `DataHandler.reload`: `'Reload successful'` or `'Reload failed'`, the one
+/// line `in_RELOAD` sends straight to the admin. It also announces the same
+/// two words in `#moderator`, and `'Reload initiated by <admin>'` before
+/// that, but both travel as a channel `SAID` rather than a `SERVERMSG`, so
+/// neither is offered here.
+fn reload_result_from(text: &str) -> Option<(bool, String)> {
+    match text {
+        "Reload successful" => Some((true, text.to_string())),
+        "Reload failed" => Some((false, text.to_string())),
+        _ => None,
+    }
+}
+
+/// `DataHandler.cleanup`'s closing line: `'Cleanup complete: %s deletions,
+/// %s mismatches' % (n_delete, n_mismatch)`. Only ever sent when cleanup
+/// finished: an exception inside it returns before this line is built, so a
+/// failed cleanup is silence rather than a refusal, read as `Unanswered` by
+/// the caller.
+fn cleanup_result_from(text: &str) -> Option<String> {
+    text.starts_with("Cleanup complete: ")
+        .then(|| text.to_string())
 }
 
 #[cfg(test)]
@@ -1999,6 +2084,70 @@ mod tests {
             &["Server error processing RESETUSERPASSWORD."],
         );
         assert_eq!(heard, vec![Heard::NotOurs]);
+    }
+
+    /// `in_SETMINSPRINGVERSION`'s one line, captured from a local uberserver
+    /// on 17 September 2026 (issue #2785).
+    #[test]
+    fn a_set_min_spring_version_reply_is_one_line() {
+        let (_, heard) = hear_all(
+            AdminShape::SetMinSpringVersion,
+            &["Set Spring engine version to 105.0"],
+        );
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::SetMinSpringVersion {
+                version: "105.0".to_string(),
+            })]
+        );
+    }
+
+    /// `in_STATS`'s one line. The figures themselves went to the server's
+    /// own log, not to this line.
+    #[test]
+    fn a_stats_reply_is_one_line() {
+        let (_, heard) = hear_all(
+            AdminShape::Stats,
+            &["Stats were printed in the server logfile"],
+        );
+        assert_eq!(heard, vec![Heard::Finished(AdminReply::Stats)]);
+    }
+
+    /// `DataHandler.reload`'s two possible results, the one line `in_RELOAD`
+    /// sends straight to the admin. It also announces the attempt and the
+    /// result in `#moderator`, but through `broadcast_Moderator`, a channel
+    /// `SAID` rather than a `SERVERMSG`, so neither reaches this collector.
+    #[test]
+    fn a_reload_reply_is_one_line() {
+        for (line, success) in [("Reload successful", true), ("Reload failed", false)] {
+            let (_, heard) = hear_all(AdminShape::Reload, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::Reload {
+                    success,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `DataHandler.cleanup`'s closing line, captured from a local uberserver
+    /// on 17 September 2026. `in_CLEANUP` also announces the attempt in
+    /// `#moderator` first, through `broadcast_Moderator`, so it never reaches
+    /// this collector either.
+    #[test]
+    fn a_cleanup_reply_is_one_line() {
+        let (_, heard) = hear_all(
+            AdminShape::Cleanup,
+            &["Cleanup complete: 0 deletions, 0 mismatches"],
+        );
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::Cleanup {
+                message: "Cleanup complete: 0 deletions, 0 mismatches".to_string(),
+            })]
+        );
     }
 
     /// A command with no reply claims nothing, not even a line that answers
@@ -2756,6 +2905,17 @@ mod tests {
                 success: true,
                 message: "An email was sent to 'a@b.c' containing a new password for <Alice>"
                     .into(),
+            },
+            AdminReply::SetMinSpringVersion {
+                version: "105.0".into(),
+            },
+            AdminReply::Stats,
+            AdminReply::Reload {
+                success: true,
+                message: "Reload successful".into(),
+            },
+            AdminReply::Cleanup {
+                message: "Cleanup complete: 0 deletions, 0 mismatches".into(),
             },
             AdminReply::RegisterChannel {
                 channel: "main".into(),

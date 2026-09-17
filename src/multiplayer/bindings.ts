@@ -806,6 +806,11 @@ export const mpGetUserInfo = defineCommand<
  * - `blacklistDomain`: `BLACKLIST <domain> [reason]`
  * - `unblacklistDomain`: `UNBLACKLIST <domain>`
  * - `resetUserPassword`: `RESETUSERPASSWORD <username> [email]`
+ * - `setMinSpringVersion`: `SETMINSPRINGVERSION <version>`
+ * - `stats`: `STATS`, whose figures go to the server's own log, not to the
+ *   reply
+ * - `reload`: `RELOAD`
+ * - `cleanup`: `CLEANUP`
  * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
  *
  * The rest are ChanServ commands. Send the command word without its colon
@@ -840,6 +845,10 @@ export type AdminShape =
   | "blacklistDomain"
   | "unblacklistDomain"
   | "resetUserPassword"
+  | "setMinSpringVersion"
+  | "stats"
+  | "reload"
+  | "cleanup"
   | "noReply"
   | "registerChannel"
   | "unregisterChannel"
@@ -954,6 +963,10 @@ export type AdminReply =
   | { shape: "blacklistDomain"; success: boolean; message: string }
   | { shape: "unblacklistDomain"; success: boolean; message: string }
   | { shape: "resetUserPassword"; success: boolean; message: string }
+  | { shape: "setMinSpringVersion"; version: string }
+  | { shape: "stats" }
+  | { shape: "reload"; success: boolean; message: string }
+  | { shape: "cleanup"; message: string }
   | { shape: "registerChannel"; channel: string; founder: string }
   | { shape: "unregisterChannel"; channel: string }
   | { shape: "channelHistory"; channel: string; on: boolean }
