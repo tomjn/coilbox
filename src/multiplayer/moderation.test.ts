@@ -55,7 +55,8 @@ describe("moderator verb builders", () => {
     expect(modGetIp("bob")).toBe("GETIP bob");
     expect(modKick("bob", "rude")).toBe("KICK bob rude");
     expect(modKick("bob", "")).toBe("KICK bob");
-    expect(modBan("bob", "7d", "cheating")).toBe("BAN bob 7d cheating");
+    expect(modBan("bob", "0.5", "cheating")).toBe("BAN bob 0.5 cheating");
+    expect(modBan("bob", "7", "cheating")).toBe("BAN bob 7 cheating");
   });
 });
 

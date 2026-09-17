@@ -46,16 +46,44 @@ type FormKind = "chanMute" | "chanBan" | "modKick" | "modBan";
 
 const FORM_META: Record<
   FormKind,
-  { title: string; duration: boolean; defaultDuration: string }
+  {
+    title: string;
+    duration: boolean;
+    defaultDuration: string;
+    durationLabel: string;
+    durationPlaceholder: string;
+  }
 > = {
   chanMute: {
     title: "Mute in channel",
     duration: true,
     defaultDuration: "10m",
+    durationLabel: "Duration",
+    durationPlaceholder: "e.g. 10m, 2h, 3d",
   },
-  chanBan: { title: "Ban from channel", duration: true, defaultDuration: "1d" },
-  modKick: { title: "Kick from server", duration: false, defaultDuration: "" },
-  modBan: { title: "Ban from server", duration: true, defaultDuration: "7d" },
+  chanBan: {
+    title: "Ban from channel",
+    duration: true,
+    defaultDuration: "1d",
+    durationLabel: "Duration",
+    durationPlaceholder: "e.g. 10m, 2h, 3d",
+  },
+  modKick: {
+    title: "Kick from server",
+    duration: false,
+    defaultDuration: "",
+    durationLabel: "Duration",
+    durationPlaceholder: "",
+  },
+  modBan: {
+    // Server-wide BAN takes a plain number of days (decimals allowed), not a
+    // ChanServ-style span. See src/multiplayer/moderation.ts:modBan.
+    title: "Ban from server",
+    duration: true,
+    defaultDuration: "1",
+    durationLabel: "Days",
+    durationPlaceholder: "e.g. 0.5, 1, 7",
+  },
 };
 
 function MenuItem({
@@ -118,11 +146,15 @@ export function MemberActionsMenu({
     if (!form) return;
     const d = duration.trim() || FORM_META[form].defaultDuration;
     const r = reason.trim();
+    // uberserver's BAN has no default reason and refuses the command
+    // without one, so the form must not send it empty.
+    if (form === "modBan" && !r) return;
     if (form === "chanMute") run(mod.chanServMute(channel, nick, d, r));
     else if (form === "chanBan") run(mod.chanServBan(channel, nick, d, r));
     else if (form === "modKick") run(mod.modKick(nick, r));
     else if (form === "modBan") run(mod.modBan(nick, d, r));
   };
+  const reasonMissing = form === "modBan" && reason.trim() === "";
 
   return (
     <Popover
@@ -155,19 +187,20 @@ export function MemberActionsMenu({
             </p>
             {FORM_META[form].duration && (
               <span className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
-                Duration
+                {FORM_META[form].durationLabel}
                 <Input
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
-                  placeholder="e.g. 10m, 2h, 3d"
-                  aria-label="Duration"
+                  placeholder={FORM_META[form].durationPlaceholder}
+                  aria-label={FORM_META[form].durationLabel}
                   className="h-8"
                   autoFocus
                 />
               </span>
             )}
             <span className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
-              Reason {form === "modKick" ? "" : "(optional)"}
+              Reason{" "}
+              {form === "modKick" || form === "modBan" ? "" : "(optional)"}
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -187,7 +220,12 @@ export function MemberActionsMenu({
               >
                 Back
               </Button>
-              <Button type="submit" size="sm" className="h-8">
+              <Button
+                type="submit"
+                size="sm"
+                className="h-8"
+                disabled={reasonMissing}
+              >
                 Confirm
               </Button>
             </div>

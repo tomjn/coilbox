@@ -89,9 +89,15 @@ export function modKick(nick: string, reason: string): string {
   return reason ? `KICK ${nick} ${reason}` : `KICK ${nick}`;
 }
 
-/** Ban a user from the server. `duration` is a server span (e.g. `7d`). */
-export function modBan(nick: string, duration: string, reason: string): string {
-  return `BAN ${nick} ${duration} ${reason}`.trimEnd();
+/**
+ * Ban a user from the server. `days` is a plain number of days, decimals
+ * allowed (e.g. `0.5`). This is unlike ChanServ's `mute`/`ban` spans (`10m`,
+ * `2h`, `3d`). uberserver's `BAN` runs `float(duration)` and rejects
+ * anything else. `reason` is required: the server has no default for it and
+ * refuses the command without one.
+ */
+export function modBan(nick: string, days: string, reason: string): string {
+  return `BAN ${nick} ${days} ${reason}`.trimEnd();
 }
 
 /**
