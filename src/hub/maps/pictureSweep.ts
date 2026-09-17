@@ -56,16 +56,15 @@ import {
  *
  * ## One hourly allowance for every map, not one per map
  *
- * A game's pictures are rationed at eighty writes an hour for that game, and the
+ * A game's pictures are rationed at `WRITES_PER_GAME_PER_HOUR` for that game, and the
  * hub's own cap is per subject too, so a client walking one roster is bounded
  * twice over. Neither of those bounds a map walk. Three thousand maps is three
  * thousand subjects with one picture each, so the hub's per subject cap never
  * bites and a per map cap here would be no cap at all.
  *
- * So the ration is one bucket over every map: eighty map pictures an hour from
- * this machine, whichever maps they are. It is the only thing standing between a
- * large library and an upload allowance the whole community shares, and running
- * that out is thirty days with no uploads at all.
+ * So the ration is one bucket over every map: the same number of map pictures an
+ * hour from this machine, whichever maps they are. The hub counts every map as
+ * one subject too, so this keeps a large library under the hub's own cap.
  */
 
 /**
