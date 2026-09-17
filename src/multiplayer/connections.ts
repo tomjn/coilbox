@@ -230,11 +230,6 @@ export interface ConnectionRuntime {
   serverMessageWaiters: Set<(text: string) => void>;
   /** Callbacks waiting on an account command's accept or deny delta. */
   accountDeltaWaiters: Set<(d: Delta) => void>;
-  /** The away-status setters of this connection's session, once mounted. */
-  away: {
-    setIngame: (ingame: boolean) => void;
-    setManualAway: (away: boolean) => void;
-  } | null;
 }
 
 export function newRuntime(): ConnectionRuntime {
@@ -254,6 +249,5 @@ export function newRuntime(): ConnectionRuntime {
     baselineDone: false,
     serverMessageWaiters: new Set(),
     accountDeltaWaiters: new Set(),
-    away: null,
   };
 }

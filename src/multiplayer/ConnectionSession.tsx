@@ -47,6 +47,10 @@ export interface ConnectionSessionProps {
   ) => void;
   /** Tell the provider a seen mark moved, so unread counts re-render. */
   onSeenChange: () => void;
+  /** Whether a game is running, which every connection reports (issue #2848). */
+  ingame: boolean;
+  /** Whether the user set themselves away by hand, on every connection. */
+  manualAway: boolean;
 }
 
 /**
@@ -69,6 +73,8 @@ export function ConnectionSession({
   requestJoinChannel,
   update,
   onSeenChange,
+  ingame,
+  manualAway: manualAwayWanted,
 }: ConnectionSessionProps) {
   const serverKey = entry.serverKey;
   const mirror = entry.mirror;
@@ -265,17 +271,25 @@ export function ConnectionSession({
     }
   }, [activeKey, mirror.phase, mirror.state, favourites]);
 
-  // Away status (issue #333): see useAwayStatus for the design. The setters
-  // are handed to the provider through the runtime, and the resolved pair is
-  // copied into the entry for the context to read.
+  // Away status (issue #333): see useAwayStatus for the design. The provider
+  // owns the in-game and manual away choices, because one person at one
+  // keyboard is in a game or away on every connection at once (issue #2848).
+  // They are copied in here after the hook's own reset on a session change,
+  // so a connection that opens mid-game still reports it. The resolved pair
+  // is copied into the entry for the context to read.
   const { status, setIngame, manualAway, setManualAway } = useAwayStatus(
     activeKey,
     protocol,
     mirror.phase,
   );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeKey is the re-apply trigger, after the hook resets on a session change
   useEffect(() => {
-    runtime.away = { setIngame, setManualAway };
-  }, [runtime, setIngame, setManualAway]);
+    setIngame(ingame);
+  }, [activeKey, ingame, setIngame]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeKey is the re-apply trigger, after the hook resets on a session change
+  useEffect(() => {
+    setManualAway(manualAwayWanted);
+  }, [activeKey, manualAwayWanted, setManualAway]);
   useEffect(() => {
     update(serverKey, (c) =>
       c.status === status && c.manualAway === manualAway

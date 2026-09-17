@@ -565,13 +565,15 @@ interface MultiplayerContextValue {
    * bits together, so the provider owns the pair and is its only sender.
    */
   status: ClientFlags;
-  /** Flag the running game, from the battle room's launch/exit path. */
-  setIngame: (ingame: boolean, serverKey?: string) => void;
+  /** Flag the running game, from the battle room's launch/exit path. Sent on
+   *  every connection, since the player is in the game on all of them. */
+  setIngame: (ingame: boolean) => void;
   /** Whether the user has set themselves away by hand. */
   manualAway: boolean;
-  /** Set (or clear) away by hand. Sticky: activity won't clear it, only the
-   *  user will, and it survives the idle watcher being off. */
-  setManualAway: (away: boolean, serverKey?: string) => void;
+  /** Set (or clear) away by hand, on every connection. Sticky: activity won't
+   *  clear it, only the user will, and it survives the idle watcher being
+   *  off. Cleared once no connection is left. */
+  setManualAway: (away: boolean) => void;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -2142,15 +2144,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [dispatchMirror, focusKey],
   );
 
-  const setIngame = useCallback((ingame: boolean, serverKey?: string) => {
-    const key = serverKey ?? activeKeyRef.current;
-    if (key) runtimesRef.current.get(key)?.away?.setIngame(ingame);
-  }, []);
-
-  const setManualAway = useCallback((away: boolean, serverKey?: string) => {
-    const key = serverKey ?? activeKeyRef.current;
-    if (key) runtimesRef.current.get(key)?.away?.setManualAway(away);
-  }, []);
+  // One person is in a game, or away, on every connection at once, so both
+  // choices are held here and handed to every session (issue #2848).
+  const [ingame, setIngame] = useState(false);
+  const [manualAwayWanted, setManualAway] = useState(false);
+  // Manual away is session state: logging out of the last connection clears
+  // it, as closing the one connection did before.
+  useEffect(() => {
+    if (activeKey == null) setManualAway(false);
+  }, [activeKey]);
 
   const closeDebriefing = useCallback(() => {
     // Closes whichever connection's debriefing is actually shown, not the
@@ -2328,6 +2330,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           requestJoinChannel={requestJoinChannel}
           update={updateConnection}
           onSeenChange={forceSeenTick}
+          ingame={ingame}
+          manualAway={manualAwayWanted}
         />
       ))}
       <VerificationCodeDialog />

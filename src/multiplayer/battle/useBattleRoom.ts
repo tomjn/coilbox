@@ -360,7 +360,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   );
   const setIngame = useCallback(
     (ingame: boolean) => {
-      if (activeKey) setIngameOn(ingame, activeKey);
+      if (activeKey) setIngameOn(ingame);
     },
     [setIngameOn, activeKey],
   );
