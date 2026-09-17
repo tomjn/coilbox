@@ -1,5 +1,6 @@
 import { useInBattleKey } from "./battle/useBattleRoomKey";
-import { useConnection, useMultiplayer } from "./store";
+import { liveTachyonKeys } from "./protocol";
+import { useConnection, useMultiplayer, useProtocolServers } from "./store";
 
 /**
  * Nav/route predicate: has the user connected at least once this session? Gates
@@ -18,13 +19,15 @@ export function useMpDisconnected(): boolean {
 }
 
 /**
- * Nav/route predicate: does the live connection have matchmaking? Gates the
- * Matchmaking sidebar item and route. Tachyon only, and only while connected,
- * because the queues come from the server rather than from anything stored.
+ * Nav/route predicate: does any live connection have matchmaking? Gates the
+ * Matchmaking sidebar item and route. Tachyon only, and watches every
+ * connection rather than only the focused one, so a second Tachyon server
+ * still reveals the item once the first is what's focused (issue #2845).
  */
 export function useMpMatchmaking(): boolean {
-  const { connected, protocol } = useMultiplayer();
-  return connected && protocol === "tachyon";
+  const { connections, activeKey } = useMultiplayer();
+  const servers = useProtocolServers();
+  return liveTachyonKeys(connections, servers, activeKey).length > 0;
 }
 
 /**

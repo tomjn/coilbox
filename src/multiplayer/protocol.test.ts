@@ -14,10 +14,12 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import type { LobbyState } from "./bindings";
+import { type Connections, newConnection } from "./connections";
 import {
   autoJoinsChannels,
   carriesBotAlly,
   founderRunsTheGame,
+  liveTachyonKeys,
   messageLimit,
   protocolForKey,
   publishesStatus,
@@ -86,6 +88,60 @@ describe("protocolForKey", () => {
     expect(protocolForKey("player@lobby.example:443", [custom])).toBe(
       "tachyon",
     );
+  });
+});
+
+describe("liveTachyonKeys", () => {
+  const t1 = `p@${tachyon.host}:${tachyon.port}`;
+  const t2 = "q@lobby.example:443";
+  const bar1 = `p@${bar.host}:${bar.port}`;
+  const custom: LobbyServer = {
+    id: "mine",
+    name: "Mine",
+    host: "lobby.example",
+    port: 443,
+    tls: true,
+    allowSelfSigned: false,
+    protocol: "tachyon",
+  };
+  const servers = [...BUILTIN_SERVERS, custom];
+
+  function conns(...entries: [string, boolean][]): Connections {
+    return Object.fromEntries(
+      entries.map(([key, live]) => [key, { ...newConnection(key), live }]),
+    );
+  }
+
+  it("finds every live Tachyon connection", () => {
+    expect(
+      liveTachyonKeys(
+        conns([t1, true], [t2, true], [bar1, true]),
+        servers,
+        null,
+      ),
+    ).toEqual([t1, t2]);
+  });
+
+  it("skips a Tachyon connection that has dropped", () => {
+    expect(
+      liveTachyonKeys(conns([t1, false], [t2, true]), servers, null),
+    ).toEqual([t2]);
+  });
+
+  it("puts the focused connection first when it is among them", () => {
+    expect(liveTachyonKeys(conns([t1, true], [t2, true]), servers, t2)).toEqual(
+      [t2, t1],
+    );
+  });
+
+  it("leaves the order alone when the focused connection is not Tachyon", () => {
+    expect(
+      liveTachyonKeys(conns([t1, true], [bar1, true]), servers, bar1),
+    ).toEqual([t1]);
+  });
+
+  it("is empty with no live Tachyon connection", () => {
+    expect(liveTachyonKeys(conns([bar1, true]), servers, null)).toEqual([]);
   });
 });
 
