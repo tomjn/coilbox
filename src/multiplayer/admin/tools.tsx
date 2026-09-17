@@ -6,6 +6,7 @@ import {
   type LucideIcon,
   Mail,
   Server,
+  Shield,
   Users,
   Wrench,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import { MaintenanceSection } from "./MaintenanceSection";
 import { ModeratorFeedSection } from "./ModeratorFeedSection";
 import { PlayerLookupSection } from "./PlayerLookupSection";
 import { ServerAddressSection } from "./ServerAddressSection";
+import { StaffSection } from "./StaffSection";
 import type { AdminToolEntry } from "./toolNav";
 
 /**
@@ -73,5 +75,12 @@ export const ADMIN_TOOLS: AdminTool[] = [
     icon: Wrench,
     adminOnly: true,
     Component: MaintenanceSection,
+  },
+  {
+    id: "staff",
+    label: "Staff",
+    icon: Shield,
+    adminOnly: true,
+    Component: StaffSection,
   },
 ];

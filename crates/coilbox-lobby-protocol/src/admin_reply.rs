@@ -89,6 +89,18 @@ pub enum AdminShape {
     /// <admin>` in `#moderator`, and the same result there, neither read
     /// here for the same reason as `RELOAD`.
     Cleanup,
+    /// `LISTMODS`: two lines, `Admins: <names>` then `Mods: <names>`, each a
+    /// list of usernames separated by single spaces (`SQLUsers.list_mods`
+    /// writes each name followed by a space, so an empty level is an empty
+    /// string after the label).
+    ListMods,
+    /// `SETACCESS <username> user|mod|admin`: success is a bare `OK
+    /// cmd=SETACCESS`, which carries no data at all, so it is read by the
+    /// admin queue (issue #2786) rather than this collector: see
+    /// [`AdminCollector::hear_ok`]. Failure is one of two `SERVERMSG`
+    /// sentences: `User not found.` or `Invalid access mode, only user, mod,
+    /// admin is valid.`
+    SetAccess,
     /// `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`: never answered.
     NoReply,
     /// ChanServ's `:register <chan> [founder]`: `#<chan>: Successfully
@@ -347,6 +359,16 @@ pub enum AdminReply {
     Cleanup {
         message: String,
     },
+    ListMods {
+        admins: Vec<String>,
+        mods: Vec<String>,
+    },
+    SetAccess {
+        success: bool,
+        /// The failure sentence uberserver gave. Empty on success, since its
+        /// `OK cmd=SETACCESS` carries no message of its own.
+        message: String,
+    },
     RegisterChannel {
         channel: String,
         founder: String,
@@ -444,6 +466,8 @@ enum Progress {
     Bindings(Vec<IpBinding>),
     ChannelBans(Vec<ChannelBanEntry>),
     ChannelMutes(Vec<ChannelMuteEntry>),
+    /// `LISTMODS`'s `Admins: ...` line has arrived, waiting on `Mods: ...`.
+    ListModsAdmins(Vec<String>),
     /// `:showip`'s online line has arrived: the address and its override.
     OnlineIp(String, Option<String>),
     /// `:refreship`'s first line has arrived.
@@ -907,6 +931,46 @@ impl AdminCollector {
                 Some(message) => Heard::Finished(AdminReply::Cleanup { message }),
                 None => Heard::NotOurs,
             },
+            (AdminShape::ListMods, Progress::Waiting) => match text.strip_prefix("Admins: ") {
+                Some(rest) => {
+                    self.progress = Progress::ListModsAdmins(
+                        rest.split_whitespace().map(str::to_string).collect(),
+                    );
+                    Heard::Collected
+                }
+                None => Heard::NotOurs,
+            },
+            (AdminShape::ListMods, Progress::ListModsAdmins(admins)) => {
+                match text.strip_prefix("Mods: ") {
+                    Some(rest) => Heard::Finished(AdminReply::ListMods {
+                        admins: std::mem::take(admins),
+                        mods: rest.split_whitespace().map(str::to_string).collect(),
+                    }),
+                    None => Heard::NotOurs,
+                }
+            }
+            (AdminShape::SetAccess, _) => match set_access_result_from(text) {
+                Some(message) => Heard::Finished(AdminReply::SetAccess {
+                    success: false,
+                    message,
+                }),
+                None => Heard::NotOurs,
+            },
+            _ => Heard::NotOurs,
+        }
+    }
+
+    /// Read the server's generic `OK cmd=..` acknowledgement, once the admin
+    /// queue (`admin_command.rs`) has confirmed the tag names the command
+    /// waiting. Only `SETACCESS` finishes this way (issue #2786): its `OK`
+    /// carries no data at all, unlike every other command's `SERVERMSG`
+    /// reply, so there is no line here to read.
+    pub fn hear_ok(&mut self) -> Heard {
+        match self.shape {
+            AdminShape::SetAccess => Heard::Finished(AdminReply::SetAccess {
+                success: true,
+                message: String::new(),
+            }),
             _ => Heard::NotOurs,
         }
     }
@@ -1419,6 +1483,20 @@ fn reload_result_from(text: &str) -> Option<(bool, String)> {
 fn cleanup_result_from(text: &str) -> Option<String> {
     text.starts_with("Cleanup complete: ")
         .then(|| text.to_string())
+}
+
+/// `in_SETACCESS`'s two refusal sentences, written straight away rather than
+/// through a callback: `"User not found."` when `username` names nobody, and
+/// `"Invalid access mode, only user, mod, admin is valid."` for anything but
+/// `user`, `mod` or `admin`. Success is a bare `OK cmd=SETACCESS`, read by
+/// [`AdminCollector::hear_ok`] instead.
+fn set_access_result_from(text: &str) -> Option<String> {
+    match text {
+        "User not found." | "Invalid access mode, only user, mod, admin is valid." => {
+            Some(text.to_string())
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -2147,6 +2225,84 @@ mod tests {
             vec![Heard::Finished(AdminReply::Cleanup {
                 message: "Cleanup complete: 0 deletions, 0 mismatches".to_string(),
             })]
+        );
+    }
+
+    /// `_listmods_done`: `"Admins: %s" % admins` then `"Mods: %s" % mods`,
+    /// each built by `SQLUsers.list_mods` as every matching username
+    /// followed by a space, so a populated level ends in a trailing space
+    /// before the next line and an empty one is just the label.
+    #[test]
+    fn a_listmods_reply_is_read_from_its_two_lines() {
+        let (_, heard) = hear_all(
+            AdminShape::ListMods,
+            &["Admins: cbadmin ", "Mods: cbmod cbmod2 "],
+        );
+        assert_eq!(
+            heard,
+            vec![
+                Heard::Collected,
+                Heard::Finished(AdminReply::ListMods {
+                    admins: vec!["cbadmin".to_string()],
+                    mods: vec!["cbmod".to_string(), "cbmod2".to_string()],
+                }),
+            ]
+        );
+    }
+
+    /// An empty level is `"Admins: "` or `"Mods: "` with nothing after the
+    /// label, rather than an omitted line.
+    #[test]
+    fn a_listmods_reply_with_an_empty_level_is_an_empty_list() {
+        let (_, heard) = hear_all(AdminShape::ListMods, &["Admins: ", "Mods: cbmod "]);
+        assert_eq!(
+            heard,
+            vec![
+                Heard::Collected,
+                Heard::Finished(AdminReply::ListMods {
+                    admins: vec![],
+                    mods: vec!["cbmod".to_string()],
+                }),
+            ]
+        );
+    }
+
+    /// `in_SETACCESS`'s two refusal sentences. Success is a bare `OK
+    /// cmd=SETACCESS`, which never reaches `hear`, so it is not a
+    /// `SERVERMSG` this collector can read: see `hear_ok` and
+    /// `admin_command.rs`, where the queue claims it.
+    #[test]
+    fn a_setaccess_failure_is_one_line() {
+        for line in [
+            "User not found.",
+            "Invalid access mode, only user, mod, admin is valid.",
+        ] {
+            let (_, heard) = hear_all(AdminShape::SetAccess, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::SetAccess {
+                    success: false,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `hear_ok` finishes only `SETACCESS`, since it is the only shape
+    /// answered by a bare `OK` rather than a `SERVERMSG`.
+    #[test]
+    fn hear_ok_finishes_only_setaccess() {
+        assert_eq!(
+            AdminCollector::new(AdminShape::SetAccess).hear_ok(),
+            Heard::Finished(AdminReply::SetAccess {
+                success: true,
+                message: String::new(),
+            })
+        );
+        assert_eq!(
+            AdminCollector::new(AdminShape::BanList).hear_ok(),
+            Heard::NotOurs
         );
     }
 
@@ -2916,6 +3072,14 @@ mod tests {
             },
             AdminReply::Cleanup {
                 message: "Cleanup complete: 0 deletions, 0 mismatches".into(),
+            },
+            AdminReply::ListMods {
+                admins: vec!["cbadmin".into()],
+                mods: vec!["cbmod".into()],
+            },
+            AdminReply::SetAccess {
+                success: true,
+                message: String::new(),
             },
             AdminReply::RegisterChannel {
                 channel: "main".into(),

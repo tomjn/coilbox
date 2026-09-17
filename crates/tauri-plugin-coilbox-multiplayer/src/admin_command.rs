@@ -273,6 +273,19 @@ impl AdminQueue {
                     reason: reason.clone(),
                 }
             }
+            Delta::CommandOk { command } if command.eq_ignore_ascii_case(&current.command) => {
+                match current.collector.hear_ok() {
+                    Heard::NotOurs => return Hearing::default(),
+                    Heard::Collected => {
+                        return Hearing {
+                            claimed: true,
+                            send: None,
+                        }
+                    }
+                    Heard::Finished(reply) => AdminOutcome::Answered { reply },
+                    Heard::Refused(reason) => AdminOutcome::Refused { reason },
+                }
+            }
             _ => return Hearing::default(),
         };
         Hearing {
@@ -1037,7 +1050,98 @@ mod tests {
         );
     }
 
-    /// Every one of these four is in uberserver's `restricted['admin']` set,
+    /// `LISTMODS`'s two-line reply is claimed like `LISTBANS`'s (issue
+    /// #2786).
+    #[test]
+    fn a_listmods_reply_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (listmods, mut answered) = request("LISTMODS", AdminShape::ListMods);
+        queue.push(listmods, now);
+        assert_eq!(queue.hear(&said("Admins: cbadmin "), now), claimed());
+        assert_eq!(queue.hear(&said("Mods: cbmod "), now), claimed());
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::ListMods {
+                    admins: vec!["cbadmin".to_string()],
+                    mods: vec!["cbmod".to_string()],
+                }
+            })
+        );
+    }
+
+    /// `SETACCESS`'s success is a bare `OK cmd=SETACCESS`, carried as
+    /// `Delta::CommandOk` rather than a `SERVERMSG`, so it needs its own
+    /// claim in `hear` (issue #2786).
+    #[test]
+    fn a_set_access_success_is_claimed_from_the_ok_line() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (set, mut answered) = request("SETACCESS", AdminShape::SetAccess);
+        queue.push(set, now);
+        assert_eq!(
+            queue.hear(
+                &Delta::CommandOk {
+                    command: "SETACCESS".to_string()
+                },
+                now
+            ),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::SetAccess {
+                    success: true,
+                    message: String::new(),
+                }
+            })
+        );
+        assert_eq!(queue.deadline(), None);
+    }
+
+    /// `SETACCESS`'s two refusal sentences are ordinary `SERVERMSG` lines,
+    /// unlike its success.
+    #[test]
+    fn a_set_access_failure_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (set, mut answered) = request("SETACCESS", AdminShape::SetAccess);
+        queue.push(set, now);
+        assert_eq!(queue.hear(&said("User not found."), now), claimed());
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::SetAccess {
+                    success: false,
+                    message: "User not found.".to_string(),
+                }
+            })
+        );
+    }
+
+    /// An `OK` for a command other than the one on the wire is nobody's
+    /// answer, the same as an unrelated `SERVERMSG` or `FAILED`.
+    #[test]
+    fn an_ok_for_a_different_command_is_not_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (set, mut answered) = request("SETACCESS", AdminShape::SetAccess);
+        queue.push(set, now);
+        assert_eq!(
+            queue.hear(
+                &Delta::CommandOk {
+                    command: "CHANGEPASSWORD".to_string()
+                },
+                now
+            ),
+            Hearing::default()
+        );
+        assert!(answered.try_recv().is_err(), "still waiting");
+    }
+
+    /// Every one of these six is in uberserver's `restricted['admin']` set,
     /// so a mod calling one is refused at dispatch before its handler ever
     /// runs, in the same generic `<COMMAND> failed. Insufficient rights.`
     /// shape as any other admin command.
@@ -1048,6 +1152,8 @@ mod tests {
             ("STATS", AdminShape::Stats),
             ("RELOAD", AdminShape::Reload),
             ("CLEANUP", AdminShape::Cleanup),
+            ("LISTMODS", AdminShape::ListMods),
+            ("SETACCESS", AdminShape::SetAccess),
         ] {
             let mut queue = AdminQueue::default();
             let now = Instant::now();

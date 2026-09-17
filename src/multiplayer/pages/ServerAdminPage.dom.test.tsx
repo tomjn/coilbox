@@ -128,26 +128,6 @@ vi.mock("../store", () => ({
   usernameFromKey: (key: string) => key.split("@")[0],
 }));
 
-// Maintenance (issue #2785) is the first real admin-only tool. More are
-// coming (issues #2786 to #2788), so the registry also gains a stand-in, to
-// check the nav's grouping with more than one admin-only entry.
-vi.mock("../admin/tools", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../admin/tools")>();
-  return {
-    ...actual,
-    ADMIN_TOOLS: [
-      ...actual.ADMIN_TOOLS,
-      {
-        id: "staff",
-        label: "Staff",
-        icon: actual.ADMIN_TOOLS[0].icon,
-        adminOnly: true,
-        Component: () => <h2>Staff stand-in</h2>,
-      },
-    ],
-  };
-});
-
 import ServerAdminRoute from "./ServerAdminPage";
 
 const KEY_A = "mod@uber-a.example:8200";
@@ -293,16 +273,19 @@ describe("admin-only tools", () => {
     draw("/admin?tool=staff");
     expect(within(toolNav()).queryByText("Admin only")).toBeNull();
     expect(within(toolNav()).queryByRole("link", { name: "Staff" })).toBeNull();
-    expect(screen.queryByText("Staff stand-in")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Staff" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Player lookup" })).toBeTruthy();
   });
 
-  it("shows them to an admin in their own group", () => {
+  it("shows them to an admin in their own group, more than one of them", () => {
     oneModerator("admin");
     draw("/admin?tool=staff");
     const group = within(toolNav()).getByRole("list", { name: "Admin only" });
+    expect(
+      within(group).getByRole("link", { name: "Maintenance" }),
+    ).toBeTruthy();
     expect(within(group).getByRole("link", { name: "Staff" })).toBeTruthy();
-    expect(screen.getByText("Staff stand-in")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Staff" })).toBeTruthy();
   });
 });
 

@@ -301,6 +301,13 @@ pub enum Delta {
         command: String,
         reason: String,
     },
+    /// A generic `OK`: the server's bare acknowledgement of a command,
+    /// carrying its `cmd=..` tag. Read by the admin queue (`admin_command.rs`)
+    /// to finish a command whose success carries no further information, such
+    /// as `SETACCESS` (issue #2786).
+    CommandOk {
+        command: String,
+    },
     ChannelListReceived,
     /// The server confirmed a user is now ignored (its `IGNORE` ack).
     Ignored {
@@ -1042,6 +1049,11 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             let (command, reason) = parse_failed(&text);
             vec![Delta::CommandFailed { command, reason }]
         }
+        ServerMessage::Ok { text } => {
+            vec![Delta::CommandOk {
+                command: parse_ok(&text),
+            }]
+        }
         ServerMessage::Motd { line } => {
             vec![Delta::Motd { line }]
         }
@@ -1111,7 +1123,6 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         | ServerMessage::RequestBattleStatus
         | ServerMessage::Ping { .. }
         | ServerMessage::Pong { .. }
-        | ServerMessage::Ok { .. }
         | ServerMessage::Agreement { .. }
         | ServerMessage::AgreementEnd
         | ServerMessage::Json { .. }
@@ -1152,6 +1163,13 @@ fn parse_failed(text: &str) -> (String, String) {
         reason = text.to_string();
     }
     (command, reason)
+}
+
+/// `OK cmd=..`'s tag, `_dictToTags({'cmd': cmd})` in uberserver's
+/// `protocol/Protocol.py`: always exactly one `cmd=` field, unlike `FAILED`'s
+/// `cmd=..\tmsg=..`.
+fn parse_ok(text: &str) -> String {
+    text.strip_prefix("cmd=").unwrap_or(text).to_string()
 }
 
 /// What to tell somebody about a refusal the server gave no reason for.
@@ -1737,6 +1755,20 @@ mod tests {
             vec![Delta::CommandFailed {
                 command: String::new(),
                 reason: "something went wrong".into()
+            }]
+        );
+    }
+
+    /// `OK cmd=..`, uberserver's bare acknowledgement, e.g. `SETACCESS`'s
+    /// success (issue #2786).
+    #[test]
+    fn ok_parses_the_cmd_tag() {
+        let mut s = LobbyState::new();
+        let d = reduce(&mut s, parse_line("OK cmd=SETACCESS"));
+        assert_eq!(
+            d,
+            vec![Delta::CommandOk {
+                command: "SETACCESS".into()
             }]
         );
     }
