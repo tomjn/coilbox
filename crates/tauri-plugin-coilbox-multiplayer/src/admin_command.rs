@@ -445,6 +445,61 @@ mod tests {
         );
     }
 
+    /// `RESETUSERPASSWORD`'s success line is claimed and answered like any
+    /// other `SERVERMSG` reply (issue #2781).
+    #[test]
+    fn a_reset_user_password_success_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (reset, mut answered) = request("RESETUSERPASSWORD", AdminShape::ResetUserPassword);
+        queue.push(reset, now);
+        let line = "An email was sent to 'alice@example.com' containing a new password for <Alice>";
+        assert_eq!(queue.hear(&said(line), now), claimed());
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::ResetUserPassword {
+                    success: true,
+                    message: line.to_string(),
+                }
+            })
+        );
+    }
+
+    /// `_resetuserpassword_failed` writes the same generic database-error
+    /// sentence every callback-answered command can send, read by
+    /// `server_error_of` rather than by `AdminCollector`.
+    #[test]
+    fn a_reset_user_password_database_error_is_a_refusal() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (reset, mut answered) = request("RESETUSERPASSWORD", AdminShape::ResetUserPassword);
+        queue.push(reset, now);
+        assert_eq!(
+            queue.hear(&said("Server error processing RESETUSERPASSWORD."), now),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Refused {
+                reason: "Server error processing RESETUSERPASSWORD.".to_string()
+            })
+        );
+    }
+
+    /// When the server has no email account set up, `in_RESETUSERPASSWORD`
+    /// throws before sending anything (ScarylePoo/uberserver#58), so
+    /// coilbox sees silence and the deadline is the only way this ends.
+    #[test]
+    fn a_reset_user_password_with_email_off_times_out() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (reset, mut answered) = request("RESETUSERPASSWORD", AdminShape::ResetUserPassword);
+        queue.push(reset, now);
+        assert_eq!(queue.expire(now + PATIENCE), None);
+        assert_eq!(answered.try_recv(), Ok(AdminOutcome::Unanswered));
+    }
+
     /// A server announcement mid-answer is not part of it, so it goes to the
     /// frontend and becomes a toast as it always did.
     #[test]

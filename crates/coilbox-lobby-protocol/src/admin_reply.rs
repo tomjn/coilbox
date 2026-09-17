@@ -56,6 +56,12 @@ pub enum AdminShape {
     /// `UNBAN <target>`: one line, `Successfully removed <n> bans relating
     /// to <target>` or `No matching bans for <target>`.
     Unban,
+    /// `RESETUSERPASSWORD <username> [email]`: one line, `An email was sent
+    /// to '<email>' containing a new password for <username>` on success,
+    /// or one of several refusals such as `User <username> does not exist`
+    /// or `User <username> already has a valid email address (<email>),
+    /// please try again without specifying an email address`.
+    ResetUserPassword,
     /// `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`: never answered.
     NoReply,
 }
@@ -196,6 +202,10 @@ pub enum AdminReply {
         message: String,
     },
     Unban {
+        success: bool,
+        message: String,
+    },
+    ResetUserPassword {
         success: bool,
         message: String,
     },
@@ -373,6 +383,12 @@ impl AdminCollector {
             },
             (AdminShape::Unban, _) => match unban_result_from(text) {
                 Some((success, message)) => Heard::Finished(AdminReply::Unban { success, message }),
+                None => Heard::NotOurs,
+            },
+            (AdminShape::ResetUserPassword, _) => match reset_user_password_result_from(text) {
+                Some((success, message)) => {
+                    Heard::Finished(AdminReply::ResetUserPassword { success, message })
+                }
                 None => Heard::NotOurs,
             },
             _ => Heard::NotOurs,
@@ -684,6 +700,61 @@ fn unban_result_from(text: &str) -> Option<(bool, String)> {
         return Some((false, text.to_string()));
     }
     if text.starts_with("Unable to match '") && text.ends_with("' to username/ip/email") {
+        return Some((false, text.to_string()));
+    }
+    None
+}
+
+/// `in_RESETUSERPASSWORD`'s own six sentences. Success, written by
+/// `_resetuserpassword_done`, is `"An email was sent to '%s' containing a
+/// new password for <%s>" % (email, username)`. Four refusals are written
+/// straight away by `in_RESETUSERPASSWORD` itself: `"User <%s> does not
+/// exist" % username`, `"User <%s> already has a valid email address (%s),
+/// please try again without specifying an email address" % (username,
+/// email)`, `"User <%s> does not have a valid email address, please
+/// specify an email address to add to their account" % username`, and
+/// `"The email address '%s' is not valid: %s" % (newmail, reason)`. Two more
+/// come back through `do_set_password`'s `'denied'` verdict, also written by
+/// `_resetuserpassword_done`: the literal `"User no longer exists"` and
+/// `"another user is already registered to the email address '%s'" %
+/// new_email`.
+///
+/// `"Server error processing RESETUSERPASSWORD."` is not read here. It is
+/// the generic database-error sentence every callback-answered command can
+/// send, already read by `server_error_of` in the plugin. When the server
+/// has no email account set up, `in_RESETUSERPASSWORD` throws before
+/// sending anything at all (`out_SERVERMSG` called without its `client`
+/// argument, ScarylePoo/uberserver#58), so coilbox sees a timeout rather
+/// than a line to read.
+fn reset_user_password_result_from(text: &str) -> Option<(bool, String)> {
+    if text.starts_with("An email was sent to '")
+        && text.contains("' containing a new password for <")
+        && text.ends_with('>')
+    {
+        return Some((true, text.to_string()));
+    }
+    if text.starts_with("User <") && text.ends_with("> does not exist") {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("User <") && text.contains("> already has a valid email address (") {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("User <")
+        && text.ends_with(
+            "> does not have a valid email address, please specify an email address to add to their account",
+        )
+    {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("The email address '") && text.contains("' is not valid: ") {
+        return Some((false, text.to_string()));
+    }
+    if text == "User no longer exists" {
+        return Some((false, text.to_string()));
+    }
+    if text.starts_with("another user is already registered to the email address '")
+        && text.ends_with('\'')
+    {
         return Some((false, text.to_string()));
     }
     None
@@ -1096,6 +1167,7 @@ mod tests {
             AdminShape::Ban,
             AdminShape::BanSpecific,
             AdminShape::Unban,
+            AdminShape::ResetUserPassword,
             AdminShape::NoReply,
             AdminShape::UserInfo,
         ] {
@@ -1252,6 +1324,58 @@ mod tests {
                 "for {line}"
             );
         }
+    }
+
+    /// `in_RESETUSERPASSWORD`'s success line and every refusal it can send,
+    /// copied from `Protocol.py` and `SQLUsers.py`'s `do_set_password`.
+    #[test]
+    fn a_reset_user_password_reply_is_one_line() {
+        for (line, success) in [
+            (
+                "An email was sent to 'alice@example.com' containing a new password for <Alice>",
+                true,
+            ),
+            ("User <Nobody> does not exist", false),
+            (
+                "User <Alice> already has a valid email address (alice@example.com), please try again without specifying an email address",
+                false,
+            ),
+            (
+                "User <Alice> does not have a valid email address, please specify an email address to add to their account",
+                false,
+            ),
+            (
+                "The email address 'not-an-email' is not valid: Invalid email address format.",
+                false,
+            ),
+            ("User no longer exists", false),
+            (
+                "another user is already registered to the email address 'taken@example.com'",
+                false,
+            ),
+        ] {
+            let (_, heard) = hear_all(AdminShape::ResetUserPassword, &[line]);
+            assert_eq!(
+                heard,
+                vec![Heard::Finished(AdminReply::ResetUserPassword {
+                    success,
+                    message: line.to_string(),
+                })],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `"Server error processing RESETUSERPASSWORD."` is the plugin's
+    /// generic database-error sentence (`server_error_of`), not one of this
+    /// collector's own lines, so it is not claimed here.
+    #[test]
+    fn a_reset_user_password_database_error_is_not_read_here() {
+        let (_, heard) = hear_all(
+            AdminShape::ResetUserPassword,
+            &["Server error processing RESETUSERPASSWORD."],
+        );
+        assert_eq!(heard, vec![Heard::NotOurs]);
     }
 
     /// A command with no reply claims nothing, not even a line that answers

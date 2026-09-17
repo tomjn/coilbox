@@ -16,6 +16,13 @@
  * And the bot flag toggle (issue #2780's `SETBOTMODE`): shown, changed, and
  * refreshed after a change so it matches the server. `CREATEBOTACCOUNT`,
  * the other half of #2780, is `BotAccountsSection.dom.test.tsx`'s.
+ *
+ * And the password reset action (issue #2781's `RESETUSERPASSWORD`): the
+ * popover confirm step, whether the email argument is sent, the success
+ * and refusal wording, and the timeout explanation. The refusal and
+ * success sentences themselves are uberserver's own wording, parsed and
+ * fixture-tested in `admin_reply.rs`. This only covers how the section
+ * reads and shows the reply it gets back.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -35,6 +42,20 @@ vi.mock("@picoframe/frame", () => ({
   ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
+}));
+
+// The popover's real Radix implementation only draws its content once open,
+// which needs positioning APIs jsdom/happy-dom does not implement. Stood in
+// for so the content is always drawn, matching the pattern in
+// MemberActionsMenu.dom.test.tsx and relayIndicator.dom.test.tsx.
+vi.mock("@/components/ui/popover", () => ({
+  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  PopoverContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 const mpAdminCommand = vi.hoisted(() =>
@@ -495,6 +516,157 @@ describe("the Ban action", () => {
     expect(screen.getByTestId("search-params").textContent).toContain(
       "ban=Alice",
     );
+  });
+});
+
+describe("the password reset action", () => {
+  function accountReply(email: string | null) {
+    return answered({
+      shape: "userInfo" as const,
+      info: {
+        kind: "account" as const,
+        username: "Alice",
+        online: true,
+        userId: "42",
+        sessionId: "7",
+        agent: null,
+        registered: "Jan 02, 2020",
+        lastLogin: "Sep 16, 2026",
+        access: "mod",
+        bot: false,
+        ingameHours: "12",
+        email,
+        lastIp: null,
+        lastSysId: null,
+        lastMacId: null,
+      },
+    });
+  }
+
+  it("sends no email when the account already has a valid one, and does not offer to type one", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply("alice@example.com"));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    expect(screen.queryByLabelText("Email address to add")).toBeNull();
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "resetUserPassword",
+        success: true,
+        message:
+          "An email was sent to 'alice@example.com' containing a new password for <Alice>",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send reset email" }));
+    expect(mpAdminCommand).toHaveBeenLastCalledWith({
+      serverKey: SERVER_KEY,
+      command: "RESETUSERPASSWORD",
+      args: ["Alice"],
+      shape: "resetUserPassword",
+    });
+    expect(
+      await screen.findByText(
+        "An email was sent to 'alice@example.com' containing a new password for <Alice>",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("sends the typed email when the account has no valid one on file", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply(null));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    // The confirm step: nothing is sent until "Send reset email" is
+    // clicked, and it stays disabled with no address typed in yet.
+    const send = screen.getByRole("button", { name: "Send reset email" });
+    expect(send).toHaveProperty("disabled", true);
+    expect(mpAdminCommand).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText("Email address to add"), {
+      target: { value: "new@example.com" },
+    });
+    expect(send).toHaveProperty("disabled", false);
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "resetUserPassword",
+        success: true,
+        message:
+          "An email was sent to 'new@example.com' containing a new password for <Alice>",
+      }),
+    );
+    fireEvent.click(send);
+    expect(mpAdminCommand).toHaveBeenLastCalledWith({
+      serverKey: SERVER_KEY,
+      command: "RESETUSERPASSWORD",
+      args: ["Alice", "new@example.com"],
+      shape: "resetUserPassword",
+    });
+    expect(
+      await screen.findByText(
+        "An email was sent to 'new@example.com' containing a new password for <Alice>",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows 'does not exist' as a refusal", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply("alice@example.com"));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "resetUserPassword",
+        success: false,
+        message: "User <Alice> does not exist",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send reset email" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("User <Alice> does not exist");
+    expect(screen.getByText("The server refused")).toBeTruthy();
+  });
+
+  it("shows 'already has a valid email' as a refusal", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply(null));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    fireEvent.change(screen.getByLabelText("Email address to add"), {
+      target: { value: "new@example.com" },
+    });
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "resetUserPassword",
+        success: false,
+        message:
+          "User <Alice> already has a valid email address (alice@example.com), please try again without specifying an email address",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send reset email" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("already has a valid email address");
+    expect(screen.getByText("The server refused")).toBeTruthy();
+  });
+
+  it("explains a timeout as a server with email switched off", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply("alice@example.com"));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    mpAdminCommand.mockResolvedValueOnce({ outcome: "unanswered" });
+    fireEvent.click(screen.getByRole("button", { name: "Send reset email" }));
+    expect(
+      await screen.findByText(/A server with email switched off/),
+    ).toBeTruthy();
+    expect(screen.getByText(/ScarylePoo\/uberserver#58/)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 
