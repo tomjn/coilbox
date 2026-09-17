@@ -27,3 +27,22 @@ describe("the Maintenance tool", () => {
     ).toBe(false);
   });
 });
+
+/** The Staff tool (issue #2786): `LISTMODS` and `SETACCESS` are both in
+ * uberserver's `restricted['admin']` set, so the tool itself is admin-only,
+ * the same as Maintenance. */
+describe("the Staff tool", () => {
+  it("is admin-only", () => {
+    const staff = ADMIN_TOOLS.find((tool) => tool.id === "staff");
+    expect(staff?.adminOnly).toBe(true);
+  });
+
+  it("is offered to an admin and not to a moderator", () => {
+    expect(
+      visibleTools(ADMIN_TOOLS, true).some((tool) => tool.id === "staff"),
+    ).toBe(true);
+    expect(
+      visibleTools(ADMIN_TOOLS, false).some((tool) => tool.id === "staff"),
+    ).toBe(false);
+  });
+});

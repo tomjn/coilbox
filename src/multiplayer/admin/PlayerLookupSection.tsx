@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { identifierFieldProps } from "@/lib/identifierField";
+import { AdminOnly } from "../AdminOnly";
 import type { AdminUserInfo } from "../bindings";
 import { AdminRequestStatus } from "./AdminRequestStatus";
 import { type AdminRequestState, useAdminRequest } from "./adminRequest";
+import { SetAccessAction } from "./StaffSection";
 import { ToolGroup, ToolHeader } from "./ToolHeader";
 import { TOOL_PARAM } from "./toolNav";
 
@@ -435,6 +437,13 @@ function AccountInfoView({
               />
               <KickAction username={info.username} serverKey={serverKey} />
               <BanAction username={info.username} />
+              <AdminOnly>
+                <SetAccessAction
+                  username={info.username}
+                  serverKey={serverKey}
+                  onChanged={() => onPickName(info.username)}
+                />
+              </AdminOnly>
             </div>
           </header>
 

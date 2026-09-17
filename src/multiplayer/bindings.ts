@@ -811,6 +811,10 @@ export const mpGetUserInfo = defineCommand<
  *   reply
  * - `reload`: `RELOAD`
  * - `cleanup`: `CLEANUP`
+ * - `listMods`: `LISTMODS`
+ * - `setAccess`: `SETACCESS <username> user|mod|admin`. Success is a bare
+ *   `OK`, which carries no data, so the frontend already knows what it
+ *   asked for rather than reading it back.
  * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
  *
  * The rest are ChanServ commands. Send the command word without its colon
@@ -849,6 +853,8 @@ export type AdminShape =
   | "stats"
   | "reload"
   | "cleanup"
+  | "listMods"
+  | "setAccess"
   | "noReply"
   | "registerChannel"
   | "unregisterChannel"
@@ -967,6 +973,8 @@ export type AdminReply =
   | { shape: "stats" }
   | { shape: "reload"; success: boolean; message: string }
   | { shape: "cleanup"; message: string }
+  | { shape: "listMods"; admins: string[]; mods: string[] }
+  | { shape: "setAccess"; success: boolean; message: string }
   | { shape: "registerChannel"; channel: string; founder: string }
   | { shape: "unregisterChannel"; channel: string }
   | { shape: "channelHistory"; channel: string; on: boolean }

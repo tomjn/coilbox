@@ -58,18 +58,63 @@ vi.mock("@/components/ui/popover", () => ({
   ),
 }));
 
+vi.mock("@/components/OptionSelect", () => ({
+  OptionSelect: ({
+    value,
+    onValueChange,
+    options,
+    ariaLabel,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    ariaLabel?: string;
+  }) => (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(event) => onValueChange(event.target.value)}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  ),
+}));
+
 const mpAdminCommand = vi.hoisted(() =>
   vi.fn<(args: unknown) => Promise<AdminOutcome>>(),
 );
 vi.mock("../bindings", () => ({ mpAdminCommand }));
 
-import { PlayerLookupSection } from "./PlayerLookupSection";
-
 const SERVER_KEY = "mod@uber.example:8200";
+const wire = vi.hoisted(() => ({ adminLevel: "mod" as "mod" | "admin" }));
+
+// `AdminOnly` (the Access level action's gate, issue #2786) reads the
+// connection's level through `useMultiplayer`, and `SetAccessAction` reads
+// the signed-in username through `usernameFromKey`, a pure function rather
+// than a hook.
+vi.mock("../store", () => ({
+  useMultiplayer: () => ({
+    connections: {
+      [SERVER_KEY]: { adminLevel: wire.adminLevel },
+    },
+  }),
+  usernameFromKey: (key: string) => key.split("@")[0],
+}));
+
+vi.mock("../useServerAdminKey", () => ({
+  useServerAdminKey: () => [SERVER_KEY, () => {}],
+}));
+
+import { PlayerLookupSection } from "./PlayerLookupSection";
 
 afterEach(() => {
   cleanup();
   mpAdminCommand.mockReset();
+  wire.adminLevel = "mod";
 });
 
 /** Renders the current URL search params as text, so a test can see what a
@@ -521,6 +566,92 @@ describe("the Ban action", () => {
     expect(screen.getByTestId("search-params").textContent).toContain(
       "tool=bans",
     );
+  });
+});
+
+/** `SETACCESS <username> user|mod|admin` (issue #2786): admin-only, so it
+ * sits behind `<AdminOnly>` unlike the rest of the lookup's actions. The
+ * confirm wording and the queue-level `OK` claim are covered where the
+ * action is defined, `StaffSection.dom.test.tsx` and Rust's
+ * `admin_command.rs`. This only covers that the lookup offers it to an
+ * admin, hides it from a moderator, and refreshes the account after a
+ * successful change. */
+describe("the access level action", () => {
+  function accountReply(username: string, access: string): AdminReply {
+    return {
+      shape: "userInfo",
+      info: {
+        kind: "account",
+        username,
+        online: true,
+        userId: "42",
+        sessionId: "7",
+        agent: null,
+        registered: "Jan 02, 2020",
+        lastLogin: "Sep 16, 2026",
+        access,
+        bot: false,
+        ingameHours: "12",
+        email: null,
+        lastIp: null,
+        lastSysId: null,
+        lastMacId: null,
+      },
+    };
+  }
+
+  it("is hidden from a moderator", async () => {
+    wire.adminLevel = "mod";
+    mpAdminCommand.mockResolvedValueOnce(
+      answered(accountReply("Alice", "user")),
+    );
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    expect(screen.queryByRole("button", { name: "Change access…" })).toBeNull();
+  });
+
+  it("is offered to an admin", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand.mockResolvedValueOnce(
+      answered(accountReply("Alice", "user")),
+    );
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    expect(screen.getByRole("button", { name: "Change access…" })).toBeTruthy();
+  });
+
+  it("re-runs the lookup after a successful change", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand
+      .mockResolvedValueOnce(answered(accountReply("Alice", "user")))
+      .mockResolvedValueOnce(
+        answered({ shape: "setAccess", success: true, message: "" }),
+      )
+      .mockResolvedValueOnce(answered(accountReply("Alice", "mod")));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    fireEvent.change(screen.getByLabelText("New access level"), {
+      target: { value: "mod" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Change access" }));
+
+    expect(mpAdminCommand).toHaveBeenNthCalledWith(2, {
+      serverKey: SERVER_KEY,
+      command: "SETACCESS",
+      args: ["Alice", "mod"],
+      shape: "setAccess",
+    });
+    await screen.findByText("mod");
+    expect(mpAdminCommand).toHaveBeenNthCalledWith(3, {
+      serverKey: SERVER_KEY,
+      command: "GETUSERINFO",
+      args: ["Alice"],
+      shape: "userInfo",
+    });
   });
 });
 
