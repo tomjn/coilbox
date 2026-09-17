@@ -334,9 +334,18 @@ function factsFor(
     ...(factions.length > 0 ? { factions } : {}),
     units: units.map((unit): GameUnitFacts => {
       const key = keys.get(unit.name.toLowerCase());
+      // The name a player reads, falling back to the name the game knows the
+      // unit by. A unitdef that declares no `name`, or declares it as a space,
+      // still has to print as something in a list, and `armcom` is the truest
+      // thing coilbox can say about a unit whose author never wrote "Arm
+      // Commander". Trimmed before it is judged, the way the game's own name
+      // and description above are: an untrimmed test reads a space as a name,
+      // which is how Journeywar's two blank unitdefs used to cost the game all
+      // 314 of its units.
+      const fullName = unit.fullName?.trim() || unit.name;
       return {
         name: unit.name,
-        ...(unit.fullName ? { fullName: unit.fullName } : {}),
+        fullName,
         ...(key ? { factionKey: key } : {}),
         buildOptions: unit.buildOptions ?? [],
         // Passed through as the worker read them (issue #2063). A worker too
