@@ -19,6 +19,15 @@ import {
  * The words say released games only, because somebody with a checkout in their
  * games folder should be able to see that coilbox left it alone rather than
  * having to trust that it did. See `sweepGameFacts`.
+ *
+ * A game that did not land is named, with whatever turned it away quoted under
+ * the summary. The summary counts those games and says no more, which is enough
+ * to know something went wrong and not enough to do anything about it: the
+ * reason is already in the report and used to stop here. It matters more than
+ * the count does, because `failed` catches every throw out of the send and only
+ * some of them are the hub declining anything. A refused sign-in, a hub that was
+ * not answering, and a game the local checks would not let out all arrive as one
+ * line saying the hub would not take a game.
  */
 export function GameFactsControl({
   hubUrl,
@@ -100,6 +109,15 @@ export function GameFactsControl({
         <p className="text-sm text-muted-foreground">
           {gameSweepSummary(report)}
         </p>
+      )}
+      {report && report.failed.length > 0 && (
+        <ul className="space-y-1 text-sm text-destructive">
+          {report.failed.map(({ game, said }) => (
+            <li key={game}>
+              {game}: {said}
+            </li>
+          ))}
+        </ul>
       )}
       {failed && <p className="text-sm text-destructive">{failed}</p>}
     </section>

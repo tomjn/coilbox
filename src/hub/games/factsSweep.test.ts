@@ -582,6 +582,27 @@ describe("sweepGameFacts", () => {
     expect(lab.morphTargets).toEqual([]);
   });
 
+  /// A unit whose author never wrote a readable name is filed under the name
+  /// the game knows it by, because something has to print in a list. A space
+  /// counts as no name: untrimmed it reads as one, and that is how Journeywar's
+  /// two blank unitdefs used to cost the game all 314 of its units.
+  it("falls back to a unit's internal name when it has no readable one", async () => {
+    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {
+      "ba1224.sdz": [
+        unit("armsolar", [], "Solar Collector"),
+        unit("armblank", [], " "),
+        unit("armnone"),
+      ],
+    });
+
+    await sweepGameFacts(target, () => {}, kit);
+    const [solar, blank, none] = kit.sent()[0].units;
+
+    expect(solar.fullName).toBe("Solar Collector");
+    expect(blank.fullName).toBe("armblank");
+    expect(none.fullName).toBe("armnone");
+  });
+
   /// The whole point of the skip rules, end to end: a working folder's archives
   /// are never even mounted.
   it("never reads or sends a working folder", async () => {

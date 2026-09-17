@@ -345,10 +345,10 @@ fn check_game(game: &GameFacts) -> Result<(), String> {
     }
 
     if let Some(name) = &game.name {
-        text("name", name, MAX_NAME)?;
+        optional_text("name", name, MAX_NAME)?;
     }
     if let Some(description) = &game.description {
-        text("description", description, MAX_DESCRIPTION)?;
+        optional_text("description", description, MAX_DESCRIPTION)?;
     }
     if let Some(links) = &game.links {
         if links.len() > MAX_LINKS {
@@ -372,10 +372,10 @@ fn check_game(game: &GameFacts) -> Result<(), String> {
         text("a unit name", &unit.name, MAX_UNIT_NAME)?;
         let about = |field: &str| format!("{}'s {field}", unit.name);
         if let Some(full_name) = &unit.full_name {
-            text(&about("full name"), full_name, MAX_FULL_NAME)?;
+            optional_text(&about("full name"), full_name, MAX_FULL_NAME)?;
         }
         if let Some(faction_key) = &unit.faction_key {
-            text(&about("faction"), faction_key, MAX_FACTION_KEY)?;
+            optional_text(&about("faction"), faction_key, MAX_FACTION_KEY)?;
         }
         if unit.build_options.len() > MAX_UNITS {
             return Err(format!(
@@ -394,6 +394,24 @@ fn check_game(game: &GameFacts) -> Result<(), String> {
                 stats.len()
             ));
         }
+    }
+    Ok(())
+}
+
+/// One optional string, held to a length but not to being there.
+///
+/// The hub takes a blank `fullName`, `factionKey`, `name` or `description`
+/// without complaint, so refusing one here blocks a whole game over a field the
+/// hub never asked for. It is the same all-or-nothing that makes the checks
+/// above worth doing, pointed the wrong way: there is no 400 to pre-empt.
+///
+/// Journeywar declares two unitdefs whose `name` is a single space, and every
+/// one of the game's 314 units was lost to them for as long as this was `text`.
+fn optional_text(what: &str, value: &str, max: usize) -> Result<(), String> {
+    if value.trim().chars().count() > max {
+        return Err(format!(
+            "{what} is longer than the {max} characters the hub stores."
+        ));
     }
     Ok(())
 }
@@ -844,6 +862,57 @@ mod tests {
         .unwrap_err();
         assert!(refused.contains("armcom"), "{refused}");
         assert!(refused.contains("full name"), "{refused}");
+    }
+
+    /// The four optional fields the hub takes blank. Refusing one here costs
+    /// the whole game, and there is no 400 to pre-empt: `parseGameFactsBody`
+    /// accepts every one of these. Journeywar's `ginfernalmachine` declares its
+    /// name as a single space, which used to lose all 314 of the game's units.
+    #[test]
+    fn a_blank_optional_field_does_not_lose_the_game() {
+        let blank = GameFacts {
+            name: Some(" ".into()),
+            description: Some(" ".into()),
+            units: vec![GameUnitFacts {
+                full_name: Some(" ".into()),
+                faction_key: Some(" ".into()),
+                ..unit("ginfernalmachine")
+            }],
+            ..game()
+        };
+
+        assert!(check_game(&blank).is_ok(), "{:?}", check_game(&blank));
+        assert!(check_and_build(&blank).is_ok());
+    }
+
+    /// The fields either side of it are still required, because the hub really
+    /// does answer 400 for the whole game on each: an empty unit name, an empty
+    /// faction key and an empty start unit.
+    #[test]
+    fn the_fields_the_hub_requires_are_still_refused() {
+        let no_unit_name = check_game(&GameFacts {
+            units: vec![GameUnitFacts {
+                name: " ".into(),
+                ..unit("armcom")
+            }],
+            ..game()
+        })
+        .unwrap_err();
+        assert!(no_unit_name.contains("unit name"), "{no_unit_name}");
+
+        let no_faction_key = check_game(&GameFacts {
+            factions: Some(vec![faction(" ", "Armada")]),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(no_faction_key.contains("faction key"), "{no_faction_key}");
+
+        let no_start = check_game(&GameFacts {
+            start_units: vec![" ".into()],
+            ..game()
+        })
+        .unwrap_err();
+        assert!(no_start.contains("start unit"), "{no_start}");
     }
 
     #[test]
