@@ -21,6 +21,7 @@ import {
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
 import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
+import { orderRapidVersions } from "../../rapidVersionOrder";
 import { QueueProgress } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";
 
@@ -124,7 +125,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     setVersionFilter("");
     try {
       const { versions } = await dlVersions({ repoUrl: repo.url });
-      setVersions(versions);
+      setVersions(orderRapidVersions(versions));
     } catch (e) {
       setVersionsError(errMessage(e));
     } finally {
