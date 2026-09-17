@@ -1,6 +1,7 @@
 import { Button, cn, Input, useSetting } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+  Check,
   ExternalLink,
   KeyRound,
   Plus,
@@ -13,11 +14,12 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { SlideDrawer } from "@/components/SlideDrawer";
 import { identifierFieldProps } from "@/lib/identifierField";
+import { updateStoredSetting } from "@/lib/storedSetting";
 import {
   AUTO_AWAY_ENABLED_KEY,
   AUTO_AWAY_MINUTES_KEY,
@@ -39,7 +41,13 @@ import {
   lsStoreCredential,
 } from "../bindings";
 import {
+  type AccountsConfig,
   allServers,
+  CUSTOM_SERVERS_KEY,
+  type CustomServersConfig,
+  defaultAccounts,
+  defaultCustomServers,
+  LOBBY_ACCOUNTS_KEY,
   type LobbyAccount,
   type LobbyServer,
   resolveRecoveredAccount,
@@ -64,10 +72,70 @@ const EMPTY_CLASS =
 const UBERSERVER_URL = "https://github.com/ScarylePoo/uberserver";
 
 /**
+ * What a login or server drawer is showing. Adding edits a `draft` that is only
+ * written when the player presses Add, so closing it leaves nothing behind.
+ * Editing saves as the player goes. `added` marks an entry the player has just
+ * added, so the drawer can say so.
+ */
+type DrawerState<T> =
+  | { mode: "add"; draft: T }
+  | { mode: "edit"; id: string; added?: boolean };
+
+/** What the save line at the foot of an edit drawer says. */
+type SaveStatus =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved"; text: string }
+  | { kind: "error"; text: string };
+
+const IDLE: SaveStatus = { kind: "idle" };
+const SAVED: SaveStatus = { kind: "saved", text: "Saved" };
+
+/** The two halves of a keychain key. */
+type LoginIdentity = Pick<LobbyAccount, "serverId" | "username">;
+
+/**
+ * Move a saved secret from one login's keychain key to another's. Resolves with
+ * whether there was a secret to move, and rejects when the keychain refused a
+ * read or a write. The old entry is removed last, and only best effort, so a
+ * failure part way never loses the only copy.
+ */
+async function moveCredential(
+  from: LoginIdentity,
+  to: LoginIdentity,
+): Promise<boolean> {
+  const { secret } = await lsGetCredential(from);
+  if (secret == null) return false;
+  await lsStoreCredential({ ...to, secret });
+  lsDeleteCredential(from).catch(() => {
+    // a leftover keychain entry is harmless
+  });
+  return true;
+}
+
+/** Whether another saved login already uses this server and username. */
+function loginTaken(
+  accounts: LobbyAccount[],
+  identity: LoginIdentity,
+  exceptId?: string,
+) {
+  return accounts.some(
+    (a) =>
+      a.id !== exceptId &&
+      a.serverId === identity.serverId &&
+      a.username === identity.username,
+  );
+}
+
+const validPort = (port: number) =>
+  Number.isInteger(port) && port >= 1 && port <= 65535;
+
+/**
  * The lobby-servers settings section (`/settings/lobby-servers`). Splits into
  * Accounts (logins the user manages) and Servers (one list of built-ins and the
- * user's own, the latter editable through a drawer). Fields persist immediately via
- * the frame settings store. Passwords live only in the OS keychain
+ * user's own, the latter editable through a drawer). A new login or server is a
+ * draft until the player presses Add. After that its fields persist as they
+ * change, via the frame settings store. Passwords live only in the OS keychain
  * (`ls_*_credential`).
  */
 export default function LobbyServersSettings() {
@@ -81,11 +149,12 @@ export default function LobbyServersSettings() {
   const [consoleServerKey, setConsoleServerKey] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
-  // The account whose editor drawer is open (null = closed).
-  const [editingId, setEditingId] = useState<string | null>(null);
-  // The custom server whose editor drawer is open (null = closed). Built-ins never
-  // open one, so this only ever holds a custom server's id.
-  const [editingServerId, setEditingServerId] = useState<string | null>(null);
+  // The login drawer: a draft being added, or a saved login (null = closed).
+  const [accountDrawer, setAccountDrawer] =
+    useState<DrawerState<LobbyAccount> | null>(null);
+  // The custom server drawer, the same way. Built-ins never open one.
+  const [serverDrawer, setServerDrawer] =
+    useState<DrawerState<LobbyServer> | null>(null);
   const [autoRejoin, setAutoRejoin] = useSetting<boolean>(
     "multiplayer.autoRejoin",
     true,
@@ -105,97 +174,105 @@ export default function LobbyServersSettings() {
 
   const servers = allServers(customCfg.servers);
 
-  const addAccount = () => {
-    const id = crypto.randomUUID();
-    setAccountsCfg({
-      accounts: [
-        ...accountsCfg.accounts,
-        {
-          id,
-          serverId: servers[0]?.id ?? "",
-          username: "",
-          hasSecret: false,
-        },
-      ],
+  // Writes fold over what is stored rather than this render's copy, because a
+  // keychain move finishes renders later and must not undo what happened since.
+  const writeAccounts = (change: (prev: LobbyAccount[]) => LobbyAccount[]) =>
+    updateStoredSetting<AccountsConfig>(
+      LOBBY_ACCOUNTS_KEY,
+      defaultAccounts,
+      setAccountsCfg,
+      (prev) => ({ ...prev, accounts: change(prev.accounts) }),
+    );
+  const writeServers = (change: (prev: LobbyServer[]) => LobbyServer[]) =>
+    updateStoredSetting<CustomServersConfig>(
+      CUSTOM_SERVERS_KEY,
+      defaultCustomServers,
+      setCustomCfg,
+      (prev) => ({ ...prev, servers: change(prev.servers) }),
+    );
+
+  const addAccount = () =>
+    setAccountDrawer({
+      mode: "add",
+      draft: {
+        id: crypto.randomUUID(),
+        serverId: servers[0]?.id ?? "",
+        username: "",
+        hasSecret: false,
+      },
     });
-    // A blank login is only editable through its drawer, so open it straight away.
-    setEditingId(id);
-  };
 
   // Recovery hands back a username, not a password (the server emailed that
-  // straight to the user), so this finds or creates the login and opens its
-  // editor for them to paste the emailed password into the keychain. Same
-  // "open the drawer straight away" pattern `addAccount` uses above.
+  // straight to the user). An existing login opens for editing, so the player
+  // can paste the emailed password in. Otherwise the add drawer opens with the
+  // username filled in, and nothing is saved until the player adds it.
   const handleRecoverySignIn = (serverId: string, username: string) => {
     const result = resolveRecoveredAccount(
       accountsCfg.accounts,
       serverId,
       username,
     );
-    if (result.accounts !== accountsCfg.accounts) {
-      setAccountsCfg({ accounts: result.accounts });
-    }
     setRecoveryOpen(false);
-    setEditingId(result.id);
+    const draft = result.accounts.find((a) => a.id === result.id);
+    if (result.accounts === accountsCfg.accounts || !draft) {
+      setAccountDrawer({ mode: "edit", id: result.id });
+    } else {
+      setAccountDrawer({ mode: "add", draft });
+    }
+  };
+
+  const commitAccount = (a: LobbyAccount) => {
+    writeAccounts((prev) => [...prev, a]);
+    setAccountDrawer({ mode: "edit", id: a.id, added: true });
   };
 
   const updateAccount = (id: string, patch: Partial<LobbyAccount>) =>
-    setAccountsCfg({
-      accounts: accountsCfg.accounts.map((a) =>
-        a.id === id ? { ...a, ...patch } : a,
-      ),
-    });
+    writeAccounts((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+    );
 
   const removeAccount = (a: LobbyAccount) => {
-    if (editingId === a.id) setEditingId(null);
-    setAccountsCfg({
-      accounts: accountsCfg.accounts.filter((x) => x.id !== a.id),
-    });
+    setAccountDrawer(null);
+    writeAccounts((prev) => prev.filter((x) => x.id !== a.id));
+    // Best effort. A leftover keychain entry is harmless.
     lsDeleteCredential({ serverId: a.serverId, username: a.username }).catch(
-      () => {
-        // best-effort cleanup; a leftover keychain entry is harmless
-      },
+      () => {},
     );
   };
 
-  const addCustomServer = () => {
-    const id = crypto.randomUUID();
-    setCustomCfg({
-      servers: [
-        ...customCfg.servers,
-        {
-          id,
-          name: "",
-          host: "",
-          port: 8200,
-          tls: false,
-          allowSelfSigned: false,
-        },
-      ],
+  const addCustomServer = () =>
+    setServerDrawer({
+      mode: "add",
+      draft: {
+        id: crypto.randomUUID(),
+        name: "",
+        host: "",
+        port: 8200,
+        tls: false,
+        allowSelfSigned: false,
+      },
     });
-    // A blank server is only editable through its drawer, so open it straight away.
-    setEditingServerId(id);
+
+  const commitCustomServer = (s: LobbyServer) => {
+    writeServers((prev) => [...prev, s]);
+    setServerDrawer({ mode: "edit", id: s.id, added: true });
   };
 
   const updateCustomServer = (id: string, patch: Partial<LobbyServer>) =>
-    setCustomCfg({
-      servers: customCfg.servers.map((s) =>
-        s.id === id ? { ...s, ...patch } : s,
-      ),
-    });
+    writeServers((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    );
 
   const removeCustomServer = (s: LobbyServer) => {
-    if (editingServerId === s.id) setEditingServerId(null);
+    setServerDrawer(null);
     // Drop accounts pointing at this server (and best-effort delete their secrets).
     for (const a of accountsCfg.accounts.filter((x) => x.serverId === s.id)) {
       lsDeleteCredential({ serverId: a.serverId, username: a.username }).catch(
         () => {},
       );
     }
-    setAccountsCfg({
-      accounts: accountsCfg.accounts.filter((a) => a.serverId !== s.id),
-    });
-    setCustomCfg({ servers: customCfg.servers.filter((x) => x.id !== s.id) });
+    writeAccounts((prev) => prev.filter((a) => a.serverId !== s.id));
+    writeServers((prev) => prev.filter((x) => x.id !== s.id));
   };
 
   return (
@@ -264,7 +341,7 @@ export default function LobbyServersSettings() {
                 key={a.id}
                 account={a}
                 servers={servers}
-                onOpen={() => setEditingId(a.id)}
+                onOpen={() => setAccountDrawer({ mode: "edit", id: a.id })}
               />
             ))}
           </ul>
@@ -314,7 +391,11 @@ export default function LobbyServersSettings() {
             <ServerListRow
               key={s.id}
               server={s}
-              onOpen={s.builtin ? undefined : () => setEditingServerId(s.id)}
+              onOpen={
+                s.builtin
+                  ? undefined
+                  : () => setServerDrawer({ mode: "edit", id: s.id })
+              }
             />
           ))}
         </ul>
@@ -353,21 +434,25 @@ export default function LobbyServersSettings() {
         onSignIn={handleRecoverySignIn}
       />
       <AccountDrawer
-        account={accountsCfg.accounts.find((a) => a.id === editingId) ?? null}
+        state={accountDrawer}
+        accounts={accountsCfg.accounts}
         servers={servers}
-        onChange={(id, patch) => updateAccount(id, patch)}
+        onAdd={commitAccount}
+        onChange={updateAccount}
         onRemove={removeAccount}
         onOpenConsole={(serverKey) => {
           setConsoleServerKey(serverKey);
           setConsoleOpen(true);
         }}
-        onClose={() => setEditingId(null)}
+        onClose={() => setAccountDrawer(null)}
       />
       <ServerDrawer
-        server={customCfg.servers.find((s) => s.id === editingServerId) ?? null}
+        state={serverDrawer}
+        servers={customCfg.servers}
+        onAdd={commitCustomServer}
         onChange={updateCustomServer}
         onRemove={removeCustomServer}
-        onClose={() => setEditingServerId(null)}
+        onClose={() => setServerDrawer(null)}
       />
       <ConsoleDrawer
         open={consoleOpen}
@@ -439,45 +524,269 @@ function AccountListRow({
 }
 
 /**
- * The editor drawer for one login (opened by clicking its list row). Same
- * viewport-anchored slide-in as `ConsoleDrawer`. Because opening it is a user
- * action, it's the one place that reads the keychain to verify a secret exists —
- * an OS prompt here is expected, unlike the old always-on per-row check — and it
- * heals the account's persisted `hasSecret` flag with the answer. The password
- * itself lives in local state and syncs to the keychain on blur.
+ * The login drawer. Adding shows {@link AddAccountForm}, which writes nothing
+ * until the player presses Add. Editing a saved login (opened by clicking its
+ * list row) shows {@link AccountForm}, which saves as the player goes. Same
+ * viewport-anchored slide-in as `ConsoleDrawer`.
  */
 function AccountDrawer({
-  account,
+  state,
+  accounts,
   servers,
+  onAdd,
   onChange,
   onRemove,
   onOpenConsole,
   onClose,
 }: {
-  account: LobbyAccount | null;
+  state: DrawerState<LobbyAccount> | null;
+  accounts: LobbyAccount[];
   servers: LobbyServer[];
+  onAdd: (a: LobbyAccount) => void;
   onChange: (id: string, patch: Partial<LobbyAccount>) => void;
   onRemove: (a: LobbyAccount) => void;
   onOpenConsole: (serverKey: string) => void;
   onClose: () => void;
 }) {
+  const account =
+    state?.mode === "edit"
+      ? (accounts.find((a) => a.id === state.id) ?? null)
+      : null;
+  const adding = state?.mode === "add";
+  let title = "New login";
+  if (account) title = account.username.trim() || "Unnamed login";
   return (
     <SlideDrawer
-      open={account != null}
-      title={account?.username.trim() ? account.username : "New login"}
+      open={adding || account != null}
+      title={title}
       onClose={onClose}
     >
+      {state?.mode === "add" && (
+        <AddAccountForm
+          key={state.draft.id}
+          draft={state.draft}
+          accounts={accounts}
+          servers={servers}
+          onAdd={onAdd}
+          onCancel={onClose}
+        />
+      )}
       {account && (
         <AccountForm
           key={account.id}
           account={account}
+          accounts={accounts}
           servers={servers}
+          added={state?.mode === "edit" && state.added === true}
           onChange={(patch) => onChange(account.id, patch)}
           onRemove={() => onRemove(account)}
           onOpenConsole={onOpenConsole}
+          onDone={onClose}
         />
       )}
     </SlideDrawer>
+  );
+}
+
+/** The labels a server picker shows, built-ins by name and the player's own marked. */
+function serverOptions(servers: LobbyServer[]) {
+  return servers.map((s) => ({
+    value: s.id,
+    label: `${s.builtin ? s.name : `${s.name || s.host} (custom)`}${
+      s.alpha ? " (alpha)" : ""
+    }`,
+  }));
+}
+
+/** The foot of an add drawer: Cancel, and the button that saves the draft. */
+function AddFooter({
+  label,
+  disabled,
+  onCancel,
+}: {
+  label: string;
+  disabled: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+      <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="submit" size="sm" disabled={disabled}>
+        <Plus /> {label}
+      </Button>
+    </footer>
+  );
+}
+
+/**
+ * The foot of an edit drawer. It says that changes save as the player makes
+ * them, confirms the last one, and closes the drawer on Done.
+ */
+function EditFooter({
+  status,
+  onDone,
+}: {
+  status: SaveStatus;
+  onDone: () => void;
+}) {
+  return (
+    <footer className="flex items-center gap-3 border-t border-border px-4 py-3">
+      <div className="min-w-0 flex-1 space-y-0.5 text-xs leading-snug">
+        <p className="text-muted-foreground">Changes save automatically.</p>
+        <p
+          role="status"
+          className={cn(
+            "flex items-start gap-1",
+            status.kind === "saved" && "text-emerald-600 dark:text-emerald-400",
+            status.kind === "error" && "text-destructive",
+            status.kind === "saving" && "text-muted-foreground",
+          )}
+        >
+          {status.kind === "saved" && (
+            <Check className="mt-px size-3.5 shrink-0" aria-hidden />
+          )}
+          {status.kind === "saving" && "Saving…"}
+          {(status.kind === "saved" || status.kind === "error") && (
+            <span>{status.text}</span>
+          )}
+        </p>
+      </div>
+      <Button type="button" size="sm" onClick={onDone}>
+        Done
+      </Button>
+    </footer>
+  );
+}
+
+/** Whether the component that called this is still mounted. */
+function useMounted() {
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  return mounted;
+}
+
+/**
+ * The add-login drawer's body. Everything here is a draft. The login is written
+ * to settings, and its password to the keychain, only when the player presses
+ * Add, after which the drawer switches to editing the saved login. Auto-join
+ * channels are keyed by the saved login, so they are offered from that point.
+ */
+function AddAccountForm({
+  draft,
+  accounts,
+  servers,
+  onAdd,
+  onCancel,
+}: {
+  draft: LobbyAccount;
+  accounts: LobbyAccount[];
+  servers: LobbyServer[];
+  onAdd: (a: LobbyAccount) => void;
+  onCancel: () => void;
+}) {
+  const [serverId, setServerId] = useState(draft.serverId);
+  const [username, setUsername] = useState(draft.username);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mounted = useMounted();
+
+  const server = servers.find((s) => s.id === serverId);
+  const tachyon = serverProtocol(server ?? {}) === "tachyon";
+  const identity = { serverId, username: username.trim() };
+  const taken = identity.username !== "" && loginTaken(accounts, identity);
+  const ready = server != null && identity.username !== "" && !taken;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!ready || busy) return;
+    const secret = tachyon ? "" : password;
+    setBusy(true);
+    setError(null);
+    if (secret !== "") {
+      try {
+        await lsStoreCredential({ ...identity, secret });
+      } catch (err) {
+        if (mounted.current) {
+          setBusy(false);
+          setError(
+            `Coilbox could not save the password to your keychain, so the login was not added. ${String(err)}`,
+          );
+        }
+        return;
+      }
+      // Closed while the keychain was busy, which is a cancel.
+      if (!mounted.current) {
+        lsDeleteCredential(identity).catch(() => {});
+        return;
+      }
+    }
+    onAdd({ ...draft, ...identity, hasSecret: secret !== "" });
+  };
+
+  return (
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <p className="text-xs leading-snug text-muted-foreground">
+          Nothing is saved until you add the login.
+          {!tachyon &&
+            " You can choose channels to join automatically once it is added."}
+        </p>
+        <Field label="Server">
+          <OptionSelect
+            value={serverId}
+            onValueChange={setServerId}
+            options={serverOptions(servers)}
+            placeholder="Select a server"
+          />
+        </Field>
+        <Field
+          label="Username"
+          hint={taken ? "You already have this login." : undefined}
+        >
+          <Input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            {...identifierFieldProps}
+          />
+        </Field>
+        {tachyon ? (
+          <p className="text-xs leading-snug text-muted-foreground">
+            This server has no password. Add the login, then sign in with your
+            browser.
+          </p>
+        ) : (
+          <Field
+            label="Password"
+            hint="Saved in your keychain when you add the login."
+          >
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              {...identifierFieldProps}
+            />
+          </Field>
+        )}
+        {error && (
+          <p role="alert" className="text-xs text-destructive">
+            {error}
+          </p>
+        )}
+      </div>
+      <AddFooter
+        label="Add login"
+        disabled={!ready || busy}
+        onCancel={onCancel}
+      />
+    </form>
   );
 }
 
@@ -537,23 +846,46 @@ function RecoveryDrawer({
   );
 }
 
-/** The drawer's body: server/username/password fields + channels + actions. */
+/**
+ * The edit-login drawer's body: server, username and password, channels, and
+ * actions. Opening it is a user action, so it is the one place that reads the
+ * keychain to check a secret exists (an OS prompt here is expected), and it
+ * heals the login's stored `hasSecret` flag with the answer.
+ *
+ * The username saves when the field loses focus rather than on each keystroke,
+ * because the keychain entry is keyed by it. A login with a saved secret has
+ * that secret moved to the new name, and the player is asked for the password
+ * again if the keychain refuses.
+ */
 function AccountForm({
   account: a,
+  accounts,
   servers,
+  added,
   onChange,
   onRemove,
   onOpenConsole,
+  onDone,
 }: {
   account: LobbyAccount;
+  accounts: LobbyAccount[];
   servers: LobbyServer[];
+  added: boolean;
   onChange: (patch: Partial<LobbyAccount>) => void;
   onRemove: () => void;
   onOpenConsole: (serverKey: string) => void;
+  onDone: () => void;
 }) {
   const [password, setPassword] = useState("");
+  const [usernameInput, setUsernameInput] = useState(a.username);
+  const [status, setStatus] = useState<SaveStatus>(
+    added ? { kind: "saved", text: "Login added" } : IDLE,
+  );
+  // Set while a rename's keychain move is under way, so a second rename
+  // cannot start from the name the first is moving away from.
+  const renaming = useRef(false);
   // Seed from the persisted flag for an instant render, then verify against the
-  // keychain — a user opened this drawer, so the (macOS) prompt is expected.
+  // keychain. A user opened this drawer, so the (macOS) prompt is expected.
   const [saved, setSaved] = useState<boolean | undefined>(a.hasSecret);
   const server = servers.find((s) => s.id === a.serverId);
   const { connected, onlineCount } = useAccountConnection(a, server);
@@ -570,7 +902,7 @@ function AccountForm({
   }, [onChange]);
 
   const { serverId, username, hasSecret } = a;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `hasSecret` is the probe's answer, not a trigger — keying on it would re-fire after the heal.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `hasSecret` is the probe's answer, not a trigger. Keying on it would re-fire after the heal.
   useEffect(() => {
     lsGetCredential({ serverId, username })
       .then(({ secret }) => {
@@ -581,8 +913,51 @@ function AccountForm({
       .catch(() => {});
   }, [serverId, username]);
 
+  const rename = async (next: LoginIdentity) => {
+    const from = { serverId: a.serverId, username: a.username };
+    if (
+      renaming.current ||
+      (next.serverId === from.serverId && next.username === from.username)
+    ) {
+      return;
+    }
+    if (next.username === "") {
+      setUsernameInput(a.username);
+      setStatus({ kind: "error", text: "A login needs a username." });
+      return;
+    }
+    if (loginTaken(accounts, next, a.id)) {
+      setUsernameInput(a.username);
+      setStatus({ kind: "error", text: "You already have this login." });
+      return;
+    }
+    renaming.current = true;
+    setStatus({ kind: "saving" });
+    let moved = false;
+    let lost = false;
+    if (saved !== false) {
+      try {
+        moved = await moveCredential(from, next);
+      } catch {
+        lost = true;
+      }
+    }
+    onChange({ ...next, hasSecret: moved });
+    setSaved(moved);
+    renaming.current = false;
+    setStatus(
+      lost
+        ? {
+            kind: "error",
+            text: "Coilbox could not move the saved password to the new name. Enter the password again.",
+          }
+        : SAVED,
+    );
+  };
+
   const savePassword = () => {
     if (password === "") return;
+    setStatus({ kind: "saving" });
     lsStoreCredential({
       serverId: a.serverId,
       username: a.username,
@@ -591,97 +966,126 @@ function AccountForm({
       .then(() => {
         setSaved(true);
         onChange({ hasSecret: true });
+        setStatus({ kind: "saved", text: "Password saved" });
       })
       .catch(() => {
         setSaved(false);
         onChange({ hasSecret: false });
+        setStatus({
+          kind: "error",
+          text: "Coilbox could not save the password to your keychain.",
+        });
       });
   };
 
+  const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
+  };
+
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-4">
-      {connected && (
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
-            Connected · {onlineCount} online
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto"
-            onClick={() => accountKey && onOpenConsole(accountKey)}
-            aria-label="Open protocol console"
-          >
-            <Terminal />
-          </Button>
-        </div>
-      )}
-      <Field label="Server">
-        <OptionSelect
-          value={a.serverId}
-          onValueChange={(v) => onChange({ serverId: v })}
-          options={servers.map((s) => ({
-            value: s.id,
-            label: `${s.builtin ? s.name : `${s.name || s.host} (custom)`}${
-              s.alpha ? " (alpha)" : ""
-            }`,
-          }))}
-          placeholder="Select a server"
-        />
-      </Field>
-      <Field label="Username">
-        <Input
-          value={a.username}
-          onChange={(e) => onChange({ username: e.target.value })}
-          {...identifierFieldProps}
-        />
-      </Field>
-      {serverProtocol(server ?? {}) === "tachyon" ? (
-        <TachyonSignIn
-          account={a}
-          server={server}
-          signedIn={saved}
-          onChanged={(exists) => {
-            setSaved(exists);
-            onChange({ hasSecret: exists });
-          }}
-        />
-      ) : (
-        <Field
-          label="Password"
-          hint={
-            saved == null ? undefined : saved ? "Saved in keychain" : "Not set"
-          }
-        >
+    <>
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {connected && (
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <span
+                className="size-2 rounded-full bg-emerald-500"
+                aria-hidden
+              />
+              Connected · {onlineCount} online
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              onClick={() => accountKey && onOpenConsole(accountKey)}
+              aria-label="Open protocol console"
+            >
+              <Terminal />
+            </Button>
+          </div>
+        )}
+        <Field label="Server">
+          <OptionSelect
+            value={a.serverId}
+            onValueChange={(v) =>
+              void rename({ serverId: v, username: a.username })
+            }
+            options={serverOptions(servers)}
+            placeholder="Select a server"
+          />
+        </Field>
+        <Field label="Username">
           <Input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onBlur={savePassword}
-            placeholder={saved ? "•••••••• (saved)" : ""}
+            value={usernameInput}
+            onChange={(e) => setUsernameInput(e.target.value)}
+            onBlur={() =>
+              void rename({
+                serverId: a.serverId,
+                username: usernameInput.trim(),
+              })
+            }
+            onKeyDown={blurOnEnter}
+            readOnly={status.kind === "saving"}
             {...identifierFieldProps}
           />
         </Field>
-      )}
-      {/* A Tachyon server has no named channels, so there is nothing to auto-join
-          (see `docs/tachyon-protocol.md`). */}
-      {server &&
-        serverProtocol(server) !== "tachyon" &&
-        a.username.trim() !== "" && (
-          <AutojoinChannels serverKey={serverKeyFor(server, a.username)} />
+        {serverProtocol(server ?? {}) === "tachyon" ? (
+          <TachyonSignIn
+            account={a}
+            server={server}
+            signedIn={saved}
+            onChanged={(exists) => {
+              setSaved(exists);
+              onChange({ hasSecret: exists });
+              setStatus({
+                kind: "saved",
+                text: exists ? "Signed in" : "Signed out",
+              });
+            }}
+          />
+        ) : (
+          <Field
+            label="Password"
+            hint={
+              saved == null
+                ? undefined
+                : saved
+                  ? "Saved in keychain"
+                  : "Not set"
+            }
+          >
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onBlur={savePassword}
+              onKeyDown={blurOnEnter}
+              placeholder={saved ? "•••••••• (saved)" : ""}
+              {...identifierFieldProps}
+            />
+          </Field>
         )}
-      <div className="border-t border-border pt-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRemove}
-          aria-label={`Remove ${a.username || "login"}`}
-        >
-          <Trash2 /> Remove login
-        </Button>
+        {/* A Tachyon server has no named channels, so there is nothing to auto-join
+            (see `docs/tachyon-protocol.md`). */}
+        {server &&
+          serverProtocol(server) !== "tachyon" &&
+          a.username.trim() !== "" && (
+            <AutojoinChannels serverKey={serverKeyFor(server, a.username)} />
+          )}
+        <div className="border-t border-border pt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRemove}
+            aria-label={`Remove ${a.username || "login"}`}
+          >
+            <Trash2 /> Remove login
+          </Button>
+        </div>
       </div>
-    </div>
+      <EditFooter status={status} onDone={onDone} />
+    </>
   );
 }
 
@@ -855,50 +1259,148 @@ function ServerListRow({
 }
 
 /**
- * The editor drawer for one custom server, in the same slide-in as the login
- * editor. Built-ins never reach it.
+ * The custom server drawer, in the same slide-in as the login drawer. Adding
+ * edits a draft that is written only on Add, and editing saves as the player
+ * goes. Built-ins never reach it.
  */
 function ServerDrawer({
-  server,
+  state,
+  servers,
+  onAdd,
   onChange,
   onRemove,
   onClose,
 }: {
-  server: LobbyServer | null;
+  state: DrawerState<LobbyServer> | null;
+  servers: LobbyServer[];
+  onAdd: (s: LobbyServer) => void;
   onChange: (id: string, patch: Partial<LobbyServer>) => void;
   onRemove: (s: LobbyServer) => void;
   onClose: () => void;
 }) {
+  const server =
+    state?.mode === "edit"
+      ? (servers.find((s) => s.id === state.id) ?? null)
+      : null;
+  const adding = state?.mode === "add";
+  let title = "New server";
+  if (server) title = server.name.trim() || server.host || "Unnamed server";
   return (
     <SlideDrawer
-      open={server != null}
-      title={server?.name.trim() ? server.name : "New server"}
+      open={adding || server != null}
+      title={title}
       onClose={onClose}
     >
+      {state?.mode === "add" && (
+        <AddServerForm
+          key={state.draft.id}
+          draft={state.draft}
+          onAdd={onAdd}
+          onCancel={onClose}
+        />
+      )}
       {server && (
         <CustomServerForm
           key={server.id}
           server={server}
+          added={state?.mode === "edit" && state.added === true}
           onChange={(patch) => onChange(server.id, patch)}
           onRemove={() => onRemove(server)}
+          onDone={onClose}
         />
       )}
     </SlideDrawer>
   );
 }
 
-/** The drawer's body: one custom server's fields. Usernames and passwords belong to accounts, not here. */
+/** The add-server drawer's body. Nothing is written until the player presses Add. */
+function AddServerForm({
+  draft: initial,
+  onAdd,
+  onCancel,
+}: {
+  draft: LobbyServer;
+  onAdd: (s: LobbyServer) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const ready = draft.host.trim() !== "" && validPort(draft.port);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!ready) return;
+    onAdd({ ...draft, name: draft.name.trim(), host: draft.host.trim() });
+  };
+
+  return (
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <p className="text-xs leading-snug text-muted-foreground">
+          Nothing is saved until you add the server.
+        </p>
+        <ServerFields
+          server={draft}
+          onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+        />
+      </div>
+      <AddFooter label="Add server" disabled={!ready} onCancel={onCancel} />
+    </form>
+  );
+}
+
+/** The edit-server drawer's body. Each change saves straight away and says so. */
 function CustomServerForm({
   server: s,
+  added,
   onChange,
   onRemove,
+  onDone,
+}: {
+  server: LobbyServer;
+  added: boolean;
+  onChange: (patch: Partial<LobbyServer>) => void;
+  onRemove: () => void;
+  onDone: () => void;
+}) {
+  const [status, setStatus] = useState<SaveStatus>(
+    added ? { kind: "saved", text: "Server added" } : IDLE,
+  );
+  return (
+    <>
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <ServerFields
+          server={s}
+          onChange={(patch) => {
+            onChange(patch);
+            setStatus(SAVED);
+          }}
+        />
+        <div className="border-t border-border pt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRemove}
+            aria-label={`Remove ${s.name || s.host || "server"}`}
+          >
+            <Trash2 /> Remove server
+          </Button>
+        </div>
+      </div>
+      <EditFooter status={status} onDone={onDone} />
+    </>
+  );
+}
+
+/** One custom server's fields. Usernames and passwords belong to logins, not here. */
+function ServerFields({
+  server: s,
+  onChange,
 }: {
   server: LobbyServer;
   onChange: (patch: Partial<LobbyServer>) => void;
-  onRemove: () => void;
 }) {
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-4">
+    <>
       <Field label="Name">
         <Input
           value={s.name}
@@ -919,6 +1421,8 @@ function CustomServerForm({
         <Field label="Port">
           <Input
             type="number"
+            min={1}
+            max={65535}
             value={s.port}
             onChange={(e) => onChange({ port: Number(e.target.value) })}
           />
@@ -952,16 +1456,6 @@ function CustomServerForm({
           onChange={(v) => onChange({ allowSelfSigned: v })}
         />
       </div>
-      <div className="border-t border-border pt-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRemove}
-          aria-label={`Remove ${s.name || s.host || "server"}`}
-        >
-          <Trash2 /> Remove server
-        </Button>
-      </div>
-    </div>
+    </>
   );
 }
