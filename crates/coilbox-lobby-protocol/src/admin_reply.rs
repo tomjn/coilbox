@@ -241,8 +241,21 @@ pub enum UserInfo {
 }
 
 /// A whole answer, parsed.
+///
+/// `rename_all` on an internally tagged enum (`tag = "shape"`) only renames
+/// the tag value, never a struct variant's own field names: a serde nuance
+/// that shipped `historyOn`/`antispamOn` as `history_on`/`antispam_on` on the
+/// wire (issue #2923), then the same bug again on `ShowIp` and
+/// `CreateBotAccount.from_username` (issue #2938). `rename_all_fields`
+/// (serde 1.0.180+) reaches every struct variant's fields as well, so a new
+/// multi-word field is covered without remembering a per-field
+/// `#[serde(rename)]`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(tag = "shape", rename_all = "camelCase")]
+#[serde(
+    tag = "shape",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum AdminReply {
     BanList {
         entries: Vec<BanEntry>,
@@ -319,14 +332,7 @@ pub enum AdminReply {
     },
     ChannelInfo {
         channel: String,
-        // `rename_all` on an internally tagged enum (`tag = "shape"`) only
-        // renames the tag value, never a struct variant's own field names
-        // (a serde nuance: ShowIp's four fields and CreateBotAccount's
-        // `from_username` have the same latent bug, filed as a follow-up
-        // rather than fixed here). Named explicitly so this one is right.
-        #[serde(rename = "historyOn")]
         history_on: bool,
-        #[serde(rename = "antispamOn")]
         antispam_on: bool,
     },
     ShowIp {
@@ -2500,13 +2506,13 @@ mod tests {
         );
     }
 
-    /// A field directly on an `AdminReply` variant needs its own
-    /// `#[serde(rename)]`: the enum's `rename_all` only renames the `shape`
-    /// tag value on an internally tagged enum, never a struct variant's own
-    /// field names. Caught live (issue #2923): the wire genuinely sent
-    /// `history_on`/`antispam_on`, not `historyOn`/`antispamOn`, so the
-    /// frontend read `undefined` and rendered both as off no matter the
-    /// channel's real setting.
+    /// Caught live (issue #2923): the wire genuinely sent
+    /// `history_on`/`antispam_on`, not `historyOn`/`antispamOn`, because the
+    /// enum's `rename_all` only renamed the `shape` tag value, never a
+    /// struct variant's own field names. The frontend read `undefined` and
+    /// rendered both switches as off no matter the channel's real setting.
+    /// Now covered by `rename_all_fields` on the enum, kept as its own test
+    /// since it is what was caught live.
     #[test]
     fn channel_info_fields_serialise_as_camel_case() {
         let json = serde_json::to_value(AdminReply::ChannelInfo {
@@ -2519,5 +2525,180 @@ mod tests {
         assert_eq!(json["antispamOn"], false);
         assert!(json.get("history_on").is_none());
         assert!(json.get("antispam_on").is_none());
+    }
+
+    /// A regression net for the whole enum, so a future variant or field with
+    /// the same `rename_all`-does-not-reach-variant-fields mistake fails a
+    /// test instead of shipping quietly, the way `ShowIp` and
+    /// `CreateBotAccount.from_username` did (issue #2938).
+    #[test]
+    fn every_admin_reply_variant_serialises_with_no_snake_case_key() {
+        fn assert_no_snake_case_keys(value: &serde_json::Value, path: &str) {
+            match value {
+                serde_json::Value::Object(map) => {
+                    for (key, v) in map {
+                        assert!(
+                            !key.contains('_'),
+                            "snake_case key {key:?} at {path} in {value}"
+                        );
+                        assert_no_snake_case_keys(v, &format!("{path}.{key}"));
+                    }
+                }
+                serde_json::Value::Array(items) => {
+                    for (i, v) in items.iter().enumerate() {
+                        assert_no_snake_case_keys(v, &format!("{path}[{i}]"));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let samples = vec![
+            AdminReply::BanList {
+                entries: vec![BanEntry {
+                    username: Some("Spammer".into()),
+                    ip: Some("203.0.113.7".into()),
+                    email: Some("spam@example.com".into()),
+                    reason: "flooding".into(),
+                    ends: "2026-10-01".into(),
+                    issuer: "Moderator".into(),
+                }],
+            },
+            AdminReply::Blacklist {
+                entries: vec![BlacklistEntry {
+                    domain: "mailinator.com".into(),
+                    reason: "disposable".into(),
+                    issuer: "Moderator".into(),
+                }],
+            },
+            AdminReply::UserInfo {
+                info: UserInfo::Account(Box::default()),
+            },
+            AdminReply::UserInfo {
+                info: UserInfo::Bridged(Box::default()),
+            },
+            AdminReply::UserInfo {
+                info: UserInfo::Missing {
+                    username: "Nobody".into(),
+                },
+            },
+            AdminReply::UserInfo {
+                info: UserInfo::BridgedMissing {
+                    username: "Nobody:discord".into(),
+                },
+            },
+            AdminReply::UserInfo {
+                info: UserInfo::Static {
+                    username: "ChanServ".into(),
+                },
+            },
+            AdminReply::IpLookup {
+                binding: IpBinding {
+                    username: "Alice".into(),
+                    address: "203.0.113.7".into(),
+                    online: true,
+                    last_seen: Some("Sep 16, 2026".into()),
+                },
+            },
+            AdminReply::IpSearch {
+                bindings: vec![IpBinding {
+                    username: "Alice".into(),
+                    address: "203.0.113.7".into(),
+                    online: false,
+                    last_seen: None,
+                }],
+            },
+            AdminReply::BotMode {
+                username: "Autohost1".into(),
+                bot: true,
+            },
+            AdminReply::CreateBotAccount {
+                username: "Autohost1".into(),
+                from_username: "Alice".into(),
+                founder: Some("Alice".into()),
+            },
+            AdminReply::Kick {
+                username: "Spammer".into(),
+                kicked: true,
+            },
+            AdminReply::Ban {
+                success: true,
+                message: "Successfully banned Spammer for 7 days.".into(),
+            },
+            AdminReply::BanSpecific {
+                success: true,
+                message: "Successfully banned Spammer for 7 days".into(),
+            },
+            AdminReply::Unban {
+                success: true,
+                message: "Successfully removed 1 bans relating to Spammer".into(),
+            },
+            AdminReply::ResetUserPassword {
+                success: true,
+                message: "An email was sent to 'a@b.c' containing a new password for <Alice>"
+                    .into(),
+            },
+            AdminReply::RegisterChannel {
+                channel: "main".into(),
+                founder: "cbmod".into(),
+            },
+            AdminReply::UnregisterChannel {
+                channel: "main".into(),
+            },
+            AdminReply::ChannelHistory {
+                channel: "main".into(),
+                on: true,
+            },
+            AdminReply::ChannelAntispam {
+                channel: "main".into(),
+                on: true,
+            },
+            AdminReply::ChannelBanList {
+                entries: vec![ChannelBanEntry {
+                    username: "Spammer".into(),
+                    ip: Some("203.0.113.7".into()),
+                    reason: "flooding".into(),
+                    ends: "2026-10-01".into(),
+                    issuer: "Moderator".into(),
+                }],
+            },
+            AdminReply::ChannelMuteList {
+                entries: vec![ChannelMuteEntry {
+                    username: "Spammer".into(),
+                    reason: "flooding".into(),
+                    ends: "2026-10-01".into(),
+                    issuer: "Moderator".into(),
+                }],
+            },
+            AdminReply::ChannelUnban {
+                channel: "main".into(),
+                username: "Spammer".into(),
+            },
+            AdminReply::ChannelUnmute {
+                channel: "main".into(),
+                username: "Spammer".into(),
+            },
+            AdminReply::ChannelInfo {
+                channel: "main".into(),
+                history_on: true,
+                antispam_on: false,
+            },
+            AdminReply::ShowIp {
+                online_ip: "203.0.113.7".into(),
+                online_override: Some("198.51.100.4".into()),
+                local_ip: "10.0.0.2".into(),
+                local_override: None,
+            },
+            AdminReply::RefreshIp {
+                started: "Refreshing server IP".into(),
+                result: Some("IP refresh complete.".into()),
+                failed: false,
+            },
+        ];
+
+        for sample in samples {
+            let json = serde_json::to_value(&sample).unwrap();
+            assert_no_snake_case_keys(&json, "$");
+        }
     }
 }
