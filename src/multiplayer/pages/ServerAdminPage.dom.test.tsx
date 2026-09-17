@@ -22,6 +22,7 @@ vi.mock("@picoframe/frame", () => ({
       {children}
     </button>
   ),
+  Input: (props: Record<string, unknown>) => <input {...props} />,
   NavGate: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 

@@ -194,6 +194,11 @@ function ChatPage() {
           send={(line) => {
             void mpSend({ serverKey: activeServerKey, line }).catch(() => {});
           }}
+          onLookUp={() => {
+            navigate(
+              `/admin?server=${encodeURIComponent(activeServerKey)}&player=${encodeURIComponent(username)}`,
+            );
+          }}
         />
       );
     },
@@ -203,6 +208,7 @@ function ChatPage() {
       hasChannels,
       iAmChannelOp,
       iAmServerMod,
+      navigate,
       me,
       activeChannel,
     ],

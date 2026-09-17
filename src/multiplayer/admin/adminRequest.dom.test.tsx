@@ -172,6 +172,18 @@ describe("AdminRequestStatus", () => {
     );
   });
 
+  it("words the wait the way the tool asks, for a command with no early end marker", () => {
+    render(
+      <AdminRequestStatus
+        state={{ status: "sending" }}
+        sending="This can take up to 20 seconds…"
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toBe(
+      "This can take up to 20 seconds…",
+    );
+  });
+
   it("shows the answer the way the tool draws it", () => {
     render(
       <AdminRequestStatus

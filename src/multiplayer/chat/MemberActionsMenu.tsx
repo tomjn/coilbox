@@ -5,6 +5,7 @@ import {
   Gavel,
   MoreVertical,
   Network,
+  Search,
   Shield,
   ShieldOff,
   UserMinus,
@@ -26,7 +27,8 @@ import * as mod from "../moderation";
  * duration + reason, server kick reason) expand into an inline form inside the
  * same popover — no separate modal (see the project's drawer/popover preference).
  * Every action is a raw wire line handed to `send` (which the caller wires to
- * `mpSend`).
+ * `mpSend`), except "Look up in Server admin" (issue #2777), which calls
+ * `onLookUp` to open that page's player lookup section for `nick` instead.
  */
 interface MemberActionsMenuProps {
   nick: string;
@@ -39,6 +41,9 @@ interface MemberActionsMenuProps {
   /** Whether `nick` is currently a channel operator (op vs deop label). */
   targetIsOp: boolean;
   send: (line: string) => void;
+  /** Open the Server admin page's player lookup section for `nick`
+   * (issue #2777). Only offered alongside the other moderator actions. */
+  onLookUp: () => void;
 }
 
 /** The forms that need extra input before firing. */
@@ -118,6 +123,7 @@ export function MemberActionsMenu({
   serverMod,
   targetIsOp,
   send,
+  onLookUp,
 }: MemberActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormKind | null>(null);
@@ -136,6 +142,10 @@ export function MemberActionsMenu({
   const run = (line: string) => {
     send(line);
     close();
+  };
+  const lookUp = () => {
+    close();
+    onLookUp();
   };
   const openForm = (kind: FormKind) => {
     setDuration(FORM_META[kind].defaultDuration);
@@ -284,6 +294,11 @@ export function MemberActionsMenu({
                 <p className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Moderator
                 </p>
+                <MenuItem
+                  icon={<Search className="size-4" />}
+                  label="Look up in Server admin"
+                  onClick={lookUp}
+                />
                 <MenuItem
                   icon={<Network className="size-4" />}
                   label="Get IP"

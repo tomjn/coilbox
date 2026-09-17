@@ -797,6 +797,7 @@ export const mpGetUserInfo = defineCommand<
  * - `ipSearch`: `FINDIP <address>`, silent when nothing matches, and only
  *   complete when the wait runs out
  * - `botMode`: `SETBOTMODE <name> <mode>`, silent for a missing user
+ * - `kick`: `KICK <name> [reason]`
  * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
  */
 export type AdminShape =
@@ -806,6 +807,7 @@ export type AdminShape =
   | "ipLookup"
   | "ipSearch"
   | "botMode"
+  | "kick"
   | "noReply";
 
 /** One `LISTBANS` line. uberserver's `None` arrives as null. */
@@ -877,7 +879,8 @@ export type AdminReply =
   | { shape: "userInfo"; info: AdminUserInfo }
   | { shape: "ipLookup"; binding: IpBinding }
   | { shape: "ipSearch"; bindings: IpBinding[] }
-  | { shape: "botMode"; username: string; bot: boolean };
+  | { shape: "botMode"; username: string; bot: boolean }
+  | { shape: "kick"; username: string; kicked: boolean };
 
 /** How an admin command ended. Mirrors the Rust `AdminOutcome`. */
 export type AdminOutcome =

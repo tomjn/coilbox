@@ -18,10 +18,17 @@ import type { AdminRequestState } from "./adminRequest";
  */
 export function AdminRequestStatus({
   state,
+  sending = "Waiting for the server…",
   unanswered = "The server did not answer.",
   children,
 }: {
   state: AdminRequestState;
+  /**
+   * What "still going" says for this command. `FINDIP` has no end marker
+   * and always waits out the full timeout, so it overrides this to say so
+   * rather than leave the default wording looking stuck.
+   */
+  sending?: string;
   /** What silence means for this command. */
   unanswered?: string;
   /** How this tool shows its answer. Without it, an answer reads "Done." */
@@ -55,7 +62,7 @@ export function AdminRequestStatus({
       {state.status === "sending" && (
         <span className="flex items-center gap-1.5">
           <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" />
-          Waiting for the server…
+          {sending}
         </span>
       )}
       {state.status === "unanswered" && <span>{unanswered}</span>}

@@ -38,6 +38,9 @@ pub enum AdminShape {
     IpSearch,
     /// `SETBOTMODE <name> <mode>`: one line, or nothing for a missing user.
     BotMode,
+    /// `KICK <name> [reason]`: one line, `Kicked <name> from the server` or
+    /// `User <name> was not online`.
+    Kick,
     /// `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`: never answered.
     NoReply,
 }
@@ -147,6 +150,7 @@ pub enum AdminReply {
     IpLookup { binding: IpBinding },
     IpSearch { bindings: Vec<IpBinding> },
     BotMode { username: String, bot: bool },
+    Kick { username: String, kicked: bool },
 }
 
 /// What one `SERVERMSG` meant to the command waiting.
@@ -293,6 +297,10 @@ impl AdminCollector {
             }
             (AdminShape::BotMode, _) => match bot_mode_from(text) {
                 Some((username, bot)) => Heard::Finished(AdminReply::BotMode { username, bot }),
+                None => Heard::NotOurs,
+            },
+            (AdminShape::Kick, _) => match kick_result_from(text) {
+                Some((username, kicked)) => Heard::Finished(AdminReply::Kick { username, kicked }),
                 None => Heard::NotOurs,
             },
             _ => Heard::NotOurs,
@@ -521,6 +529,21 @@ fn bot_mode_from(text: &str) -> Option<(String, bool)> {
         _ => return None,
     };
     Some((name.to_string(), bot))
+}
+
+/// `in_KICK`: `'Kicked <%s> from the server'` for an online target, or
+/// `'User <%s> was not online'` when it was not connected.
+fn kick_result_from(text: &str) -> Option<(String, bool)> {
+    if let Some(name) = text
+        .strip_prefix("Kicked <")
+        .and_then(|t| t.strip_suffix("> from the server"))
+    {
+        return Some((name.to_string(), true));
+    }
+    let name = text
+        .strip_prefix("User <")
+        .and_then(|t| t.strip_suffix("> was not online"))?;
+    Some((name.to_string(), false))
 }
 
 #[cfg(test)]
@@ -925,6 +948,7 @@ mod tests {
             AdminShape::IpSearch,
             AdminShape::IpLookup,
             AdminShape::BotMode,
+            AdminShape::Kick,
             AdminShape::NoReply,
             AdminShape::UserInfo,
         ] {
@@ -955,6 +979,27 @@ mod tests {
                 })]
             );
         }
+    }
+
+    /// `in_KICK`: an online target and one that was not connected.
+    #[test]
+    fn a_kick_reply_is_one_line() {
+        let (_, heard) = hear_all(AdminShape::Kick, &["Kicked <Alice> from the server"]);
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::Kick {
+                username: "Alice".into(),
+                kicked: true,
+            })]
+        );
+        let (_, heard) = hear_all(AdminShape::Kick, &["User <Bob> was not online"]);
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::Kick {
+                username: "Bob".into(),
+                kicked: false,
+            })]
+        );
     }
 
     /// A command with no reply claims nothing, not even a line that answers
