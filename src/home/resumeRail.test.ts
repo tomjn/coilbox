@@ -26,8 +26,10 @@ vi.mock("./continue", async (importOriginal) => ({
 type Lobby = {
   connections: Record<string, { live: boolean }>;
   busyKeys: Set<string>;
+  reconnectAll: (targets: unknown[]) => Promise<void>;
 };
 const lobby = vi.fn<() => Lobby>();
+const reconnectAll = vi.fn<(targets: unknown[]) => Promise<void>>();
 // A lightweight stand-in for the real `serverKeyFor` (store.tsx), which the
 // component and `loginOffer` both use to match an offered account against a
 // live/busy connection. Kept in step with the real formula rather than
@@ -119,7 +121,13 @@ function text(): string {
 
 beforeEach(() => {
   resume.mockReturnValue({ candidates: [], loading: false });
-  lobby.mockReturnValue({ connections: {}, busyKeys: new Set() });
+  reconnectAll.mockClear();
+  reconnectAll.mockResolvedValue(undefined);
+  lobby.mockReturnValue({
+    connections: {},
+    busyKeys: new Set(),
+    reconnectAll,
+  });
   accounts.mockReturnValue([]);
   servers.mockReturnValue([BAR, TECHA]);
 });
@@ -207,20 +215,41 @@ describe("the log-in card's slot", () => {
     expect(railCards([], [offer])[0].to).toBe("/lobby");
   });
 
-  it("shows one card per offer when there is more than one", () => {
+  it("collapses more than one offer into a single card (issue #2936)", () => {
     const second = { account: account("a3", "Other"), server: TECHA };
     const cards = railCards([], [offer, second]);
-    expect(cards.map((c) => c.title)).toEqual(["AF_", "Other"]);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].title).toBe("AF_ and 1 other");
+    expect(cards[0].action).toBe("Reconnect all");
+    expect(cards[0].to).toBeUndefined();
   });
 
-  it("leaves no room for a runner-up once the logins fill the cap", () => {
+  it("names the first offer and counts the rest, however many there are", () => {
+    const three = [
+      offer,
+      { account: account("a3", "Other"), server: TECHA },
+      { account: account("a4", "Third"), server: BAR },
+    ];
+    expect(railCards([], three)[0].title).toBe("AF_ and 2 others");
+  });
+
+  it("calls reconnectAll with every offer when the combined card acts", () => {
+    const second = { account: account("a3", "Other"), server: TECHA };
+    const spy = vi.fn(async () => {});
+    const [card] = railCards([], [offer, second], spy);
+    expect(card.onClick).toBeDefined();
+    card.onClick?.();
+    expect(spy).toHaveBeenCalledWith([offer, second]);
+  });
+
+  it("leaves room for a runner-up once there is only the one login card", () => {
     const two = [
       offer,
       { account: account("a3", "Other"), server: TECHA },
       { account: account("a4", "Third"), server: BAR },
     ];
     const cards = railCards([HERO, WARPATH], two);
-    expect(cards.map((c) => c.title)).toEqual(["AF_", "Other", "Third"]);
+    expect(cards.map((c) => c.title)).toEqual(["Kestrel", "AF_ and 2 others"]);
   });
 });
 
@@ -279,7 +308,7 @@ describe("loginOffer", () => {
 });
 
 describe("loginOffers", () => {
-  it("offers one card per remembered login rather than only the invite", () => {
+  it("offers one entry per remembered login rather than only the invite", () => {
     const first = account("a1", "First", { openAtQuit: true });
     const second = account("a2", "Second", {
       serverId: "techa",
@@ -287,6 +316,23 @@ describe("loginOffers", () => {
     });
     const out = loginOffers([first, second], null, [BAR, TECHA]);
     expect(out.map((o) => o.account.username)).toEqual(["First", "Second"]);
+  });
+
+  it("orders several remembered logins most-recently-used first", () => {
+    // The combined login card (issue #2936) names `loginOffers`' first entry, so
+    // this function has to put the right one there rather than leaving it to
+    // `rememberedLogins`' own (unsorted) order.
+    const older = account("a1", "Older", {
+      openAtQuit: true,
+      lastUsedAt: 1000,
+    });
+    const newer = account("a2", "Newer", {
+      serverId: "techa",
+      openAtQuit: true,
+      lastUsedAt: 2000,
+    });
+    const out = loginOffers([older, newer], null, [BAR, TECHA]);
+    expect(out.map((o) => o.account.username)).toEqual(["Newer", "Older"]);
   });
 
   it("falls back to the invite when nothing is remembered", () => {
@@ -336,7 +382,7 @@ describe("the rail on the page", () => {
     expect(render()).toContain('href="/lobby"');
   });
 
-  it("offers a card for each remembered login rather than only one", () => {
+  it("collapses several remembered logins into one card rather than one each (issue #2936)", () => {
     const first = account("a1", "First", { openAtQuit: true });
     const second = account("a2", "Second", {
       serverId: "techa",
@@ -345,9 +391,10 @@ describe("the rail on the page", () => {
     accounts.mockReturnValue([first, second]);
     servers.mockReturnValue([BAR, TECHA]);
     expect(text()).toBe(
-      "Multiplayer First Beyond All Reason Log in " +
-        "Multiplayer Second Tech Annihilation Log in",
+      "Multiplayer First and 1 other Beyond All Reason Reconnect all",
     );
+    // A single card, not a link: its action reconnects rather than navigating.
+    expect(render()).not.toContain("href=");
   });
 
   it("offers no login when that account is already connected", () => {
@@ -355,6 +402,7 @@ describe("the rail on the page", () => {
     lobby.mockReturnValue({
       connections: { [fakeServerKeyFor(BAR, "AF_")]: { live: true } },
       busyKeys: new Set(),
+      reconnectAll,
     });
     expect(render()).toBe("");
   });
@@ -365,6 +413,7 @@ describe("the rail on the page", () => {
     lobby.mockReturnValue({
       connections: {},
       busyKeys: new Set([fakeServerKeyFor(BAR, "AF_")]),
+      reconnectAll,
     });
     expect(render()).toBe("");
   });
@@ -382,6 +431,7 @@ describe("the rail on the page", () => {
     lobby.mockReturnValue({
       connections: { [fakeServerKeyFor(BAR, "Other")]: { live: true } },
       busyKeys: new Set(),
+      reconnectAll,
     });
     expect(text()).toBe("Multiplayer AF_ Beyond All Reason Log in");
   });
