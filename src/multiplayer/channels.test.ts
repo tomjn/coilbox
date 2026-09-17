@@ -20,6 +20,7 @@ import {
 import {
   addChannel,
   defaultChannelsFrom,
+  firstConnectChannels,
   forgetJoinedChannel,
   JOINED_CHANNELS_KEY,
   type JoinedChannel,
@@ -28,6 +29,7 @@ import {
   rememberJoinedChannel,
   removeChannel,
   type StoredChannel,
+  seedJoinedChannels,
 } from "./channels";
 
 describe("normalizeChannelList", () => {
@@ -184,6 +186,83 @@ describe("rememberJoinedChannel", () => {
     rememberJoinedChannel("other@lobby.example:8200", "main", undefined, write);
     rememberJoinedChannel(serverKey, "help", undefined, write);
     expect(stored()).toEqual([{ name: "help" }]);
+    expect(
+      readStoredSetting<JoinedChannels>(JOINED_CHANNELS_KEY, {})[
+        "other@lobby.example:8200"
+      ],
+    ).toEqual([{ name: "main" }]);
+  });
+});
+
+describe("firstConnectChannels", () => {
+  it("seeds main for a TASServer login (uberserver, Teiserver) with no profile channels", () => {
+    expect(firstConnectChannels("tasserver", [])).toEqual([{ name: "main" }]);
+  });
+
+  it("leaves Zero-K unchanged, since it force-joins its own defaults", () => {
+    expect(firstConnectChannels("zerok", [])).toEqual([]);
+  });
+
+  it("leaves Tachyon unchanged, since it has no named channels", () => {
+    expect(firstConnectChannels("tachyon", [])).toEqual([]);
+  });
+
+  it("lets the profile seed win over main on TASServer", () => {
+    expect(firstConnectChannels("tasserver", [{ name: "welcome" }])).toEqual([
+      { name: "welcome" },
+    ]);
+  });
+
+  it("lets the profile seed win even on Zero-K or Tachyon", () => {
+    expect(firstConnectChannels("zerok", [{ name: "welcome" }])).toEqual([
+      { name: "welcome" },
+    ]);
+    expect(firstConnectChannels("tachyon", [{ name: "welcome" }])).toEqual([
+      { name: "welcome" },
+    ]);
+  });
+});
+
+describe("seedJoinedChannels", () => {
+  const serverKey = "me@lobby.example:8200";
+
+  function bank() {
+    const storage = memorySettingsStorage();
+    installSettingsStorage(storage);
+    return {
+      write: (next: JoinedChannels) =>
+        storage.set(JOINED_CHANNELS_KEY, JSON.stringify(next)),
+      stored: () =>
+        readStoredSetting<JoinedChannels>(JOINED_CHANNELS_KEY, {})[serverKey],
+    };
+  }
+
+  it("seeds a first connect that has no stored list at all", () => {
+    const { write, stored } = bank();
+    seedJoinedChannels(serverKey, [{ name: "main" }], write);
+    expect(stored()).toEqual([{ name: "main" }]);
+  });
+
+  it("leaves a stored empty list empty, so a leave stays gone on reconnect", () => {
+    const { write, stored } = bank();
+    // Simulate the login already having connected once and left every
+    // channel: the stored list is `[]`, not undefined.
+    write({ [serverKey]: [] });
+    seedJoinedChannels(serverKey, [{ name: "main" }], write);
+    expect(stored()).toEqual([]);
+  });
+
+  it("does not reseed once a channel is already stored", () => {
+    const { write, stored } = bank();
+    write({ [serverKey]: [{ name: "off-topic" }] });
+    seedJoinedChannels(serverKey, [{ name: "main" }], write);
+    expect(stored()).toEqual([{ name: "off-topic" }]);
+  });
+
+  it("leaves another server's list alone", () => {
+    const { write, stored } = bank();
+    seedJoinedChannels("other@lobby.example:8200", [{ name: "main" }], write);
+    expect(stored()).toBeUndefined();
     expect(
       readStoredSetting<JoinedChannels>(JOINED_CHANNELS_KEY, {})[
         "other@lobby.example:8200"

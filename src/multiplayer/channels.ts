@@ -1,5 +1,6 @@
 import { useSetting } from "@picoframe/frame";
 import { updateStoredSetting } from "../lib/storedSetting";
+import type { LobbyProtocol } from "../lobby-servers/config";
 import type { ProfileLobby } from "../profile/profile";
 import { getProfile } from "../profile/profile";
 
@@ -86,6 +87,24 @@ export function profileDefaultChannels(): JoinedChannel[] {
 }
 
 /**
+ * The channels to seed on a login's first connect (no stored list yet). Pure,
+ * so it's unit-testable without a store or a protocol connection.
+ *
+ * `profileSeed` wins where it applies: the distribution names channels for its
+ * own official server. Otherwise a TASServer login (uberserver, Teiserver)
+ * seeds `main`, the general channel on both. Tachyon has no named channels and
+ * Zero-K force-joins its own defaults, so neither gets anything here (issue
+ * #2920).
+ */
+export function firstConnectChannels(
+  protocol: LobbyProtocol,
+  profileSeed: JoinedChannel[],
+): JoinedChannel[] {
+  if (profileSeed.length > 0) return profileSeed;
+  return protocol === "tasserver" ? [{ name: "main" }] : [];
+}
+
+/**
  * The per-`serverKey` autojoin/remembered channel list. A preference (re-derivable
  * by rejoining), so it lives in the frame settings store rather than backend state.
  * The value tolerates the legacy `string[]` shape on read via `normalizeChannelList`.
@@ -138,5 +157,24 @@ export function forgetJoinedChannel(
       ...all,
       [serverKey]: removeChannel(normalizeChannelList(all[serverKey]), name),
     }),
+  );
+}
+
+/**
+ * Seed a server's stored list on a login's first connect. Folds over storage
+ * rather than a render's snapshot, so a second login connecting in the same
+ * pass can't overwrite this one's seed (issue #1375, #2920).
+ *
+ * Writes only when nothing is stored yet for `serverKey`: seeding is once per
+ * login, so leaving the seeded channels (or emptying the list by hand)
+ * afterwards keeps it that way on the next connect.
+ */
+export function seedJoinedChannels(
+  serverKey: string,
+  seed: JoinedChannel[],
+  write: (next: JoinedChannels) => void,
+) {
+  updateStoredSetting<JoinedChannels>(JOINED_CHANNELS_KEY, {}, write, (all) =>
+    all[serverKey] === undefined ? { ...all, [serverKey]: seed } : all,
   );
 }

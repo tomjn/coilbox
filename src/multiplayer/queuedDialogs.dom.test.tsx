@@ -20,6 +20,10 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_SERVERS } from "../lobby-servers/config";
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+} from "../lib/storedSetting";
 import type { LobbyEvent, LobbyState } from "./bindings";
 
 interface FakeChannel {
@@ -174,6 +178,9 @@ async function settleSnapshot() {
 }
 
 beforeEach(() => {
+  // `seedJoinedChannels` reads through the storage singleton before seeding a
+  // first connect's auto-join channels (issue #2920).
+  installSettingsStorage(memorySettingsStorage());
   wire.channels.clear();
   wire.activeKeys = [];
   wire.states.clear();

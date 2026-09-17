@@ -13,9 +13,11 @@ import {
   mpJoinBattle,
 } from "./bindings";
 import {
+  firstConnectChannels,
   type JoinedChannels,
   normalizeChannelList,
   profileDefaultChannels,
+  seedJoinedChannels,
 } from "./channels";
 import { backfilledCounts, conversationCounts } from "./chat/conversation";
 import type { ConnectionRuntime, ConnectionState } from "./connections";
@@ -145,20 +147,23 @@ export function ConnectionSession({
     if (!autoJoinsChannels(protocol)) return;
     if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
       rejoinedForRef.current = activeKey;
-      // First-ever connect for this login (no stored list yet) to the
-      // profile's official server: seed the distribution's default channels.
-      // Seed-once, so the user can leave them afterwards and they stay gone.
+      // First-ever connect for this login (no stored list yet): seed a
+      // default. The profile's channels win on its own official server.
+      // Otherwise a TASServer login (uberserver, Teiserver) seeds `main`.
+      // Seed-once, so the user can leave it afterwards and it stays gone.
       let entries = normalizeChannelList(joinedChannels[activeKey]);
-      const official = profileOfficialServer();
-      if (
-        joinedChannels[activeKey] === undefined &&
-        official != null &&
-        activeKey.endsWith(`@${official.host}:${official.port}`)
-      ) {
-        const seed = profileDefaultChannels();
+      if (joinedChannels[activeKey] === undefined) {
+        const official = profileOfficialServer();
+        const isOfficialServer =
+          official != null &&
+          activeKey.endsWith(`@${official.host}:${official.port}`);
+        const seed = firstConnectChannels(
+          protocol,
+          isOfficialServer ? profileDefaultChannels() : [],
+        );
         if (seed.length > 0) {
           entries = seed;
-          setJoinedChannels({ ...joinedChannels, [activeKey]: seed });
+          seedJoinedChannels(activeKey, seed, setJoinedChannels);
         }
       }
       for (const { name, key } of entries) {
