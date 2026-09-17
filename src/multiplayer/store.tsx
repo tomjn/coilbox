@@ -19,6 +19,7 @@ import {
   BUILTIN_SERVERS,
   type LobbyProtocol,
   type LobbyServer,
+  resolveLastLogin,
   serverProtocol,
   tachyonBaseUrl,
   tlsModeFor,
@@ -1985,32 +1986,66 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
   }, [focusKey, updateConnection]);
 
-  // After a webview reload the React state resets but the Rust connection task
-  // keeps running, so re-adopt any live connection on mount (via `mp_reattach`).
-  // Without this a Vite hot-reload or refresh strands the UI as "disconnected"
-  // while the backend is still logged in, and a fresh connect would be rejected
-  // as a duplicate login. Runs once.
+  // After a webview reload the React state resets but the Rust connection
+  // tasks keep running, so re-adopt every live connection on mount (via
+  // `mp_reattach`), not only the first (issue #2842). Without this a Vite
+  // hot-reload or refresh strands the UI as "disconnected" while the backend
+  // is still logged in, and a fresh connect would be rejected as a duplicate
+  // login. A second open connection left behind this way used to be reachable
+  // from nowhere on screen. Runs once.
   const rehydratedRef = useRef(false);
   useEffect(() => {
     if (rehydratedRef.current) return;
     rehydratedRef.current = true;
     (async () => {
+      const reattached: string[] = [];
       try {
         const { keys } = await mpActiveKeys({});
-        const serverKey = keys[0];
-        if (serverKey) {
-          const rt = runtimeFor(serverKey);
-          const onEvent = openChannel(serverKey);
-          dispatchConn({ type: "open", serverKey });
-          await mpReattach({ serverKey, onEvent });
-          const snap = await mpSnapshot({ serverKey });
-          rt.state = snap.state;
-          dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
-          applyActiveKey(serverKey);
-          return;
+        for (const serverKey of keys) {
+          try {
+            const rt = runtimeFor(serverKey);
+            const onEvent = openChannel(serverKey);
+            dispatchConn({ type: "open", serverKey });
+            await mpReattach({ serverKey, onEvent });
+            const snap = await mpSnapshot({ serverKey });
+            rt.state = snap.state;
+            dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
+            updateConnection(serverKey, (c) =>
+              c.live ? c : { ...c, live: true },
+            );
+            reattached.push(serverKey);
+          } catch {
+            // This one key failed to reattach (e.g. Rust evicted it between the
+            // list and the attempt). Its entry stays behind, not live, so its
+            // error is still reachable from the interface. Move on to the rest.
+          }
         }
       } catch {
-        // No live connection to re-adopt, so fall through to opt-in auto-connect.
+        // Couldn't ask Rust for the live keys at all: nothing to reattach, so
+        // fall through to opt-in auto-connect below.
+      }
+      if (reattached.length > 0) {
+        // The last login stays focused across the reload if it's one of the
+        // connections just reattached. Otherwise the first key is, matching
+        // the pre-#2842 single-connection behaviour when there's no better
+        // signal to go on.
+        const b = bootRef.current;
+        const resolved = resolveLastLogin(
+          b.lastLogin,
+          b.accounts,
+          allServers(b.custom),
+        );
+        const lastLoginKey = resolved
+          ? serverKeyFor(resolved.server, resolved.account.username)
+          : null;
+        const focused =
+          (lastLoginKey && reattached.includes(lastLoginKey)
+            ? lastLoginKey
+            : null) ?? reattached[0];
+        activeKeyRef.current = focused;
+        setActiveKey(focused);
+        setFocusKey(focused);
+        return;
       }
       // Fresh launch with nothing to reattach: if the user opted in and the last
       // login still resolves against the profile-filtered catalog, seed the same
@@ -2032,7 +2067,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         });
       });
     })();
-  }, [applyActiveKey, dispatchMirror, openChannel, connect, runtimeFor]);
+  }, [dispatchMirror, openChannel, connect, runtimeFor, updateConnection]);
 
   return (
     <MultiplayerContext.Provider
