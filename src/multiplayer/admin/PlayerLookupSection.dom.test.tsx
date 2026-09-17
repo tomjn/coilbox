@@ -655,6 +655,203 @@ describe("the access level action", () => {
   });
 });
 
+/** `DELETEACCOUNT <username>` (issue #2787): admin-only like the access
+ * level action, and its reply is Rust's to parse and fixture-test
+ * (`admin_reply.rs`). This covers the typed-name gate, that all three
+ * reply lines are shown when they arrive, that the section copes when
+ * only the late scheduling line came through, and that both refusals read
+ * as refusals. */
+describe("the delete account action", () => {
+  function accountReply(username: string, email: string | null): AdminReply {
+    return {
+      shape: "userInfo",
+      info: {
+        kind: "account",
+        username,
+        online: true,
+        userId: "42",
+        sessionId: "7",
+        agent: null,
+        registered: "Jan 02, 2020",
+        lastLogin: "Sep 16, 2026",
+        access: "user",
+        bot: false,
+        ingameHours: "12",
+        email,
+        lastIp: null,
+        lastSysId: null,
+        lastMacId: null,
+      },
+    };
+  }
+
+  function openConfirm(name: string) {
+    fireEvent.click(screen.getByRole("button", { name: "Delete account…" }));
+    fireEvent.change(screen.getByLabelText(`Type ${name} to confirm`), {
+      target: { value: name },
+    });
+  }
+
+  it("is hidden from a moderator", async () => {
+    wire.adminLevel = "mod";
+    mpAdminCommand.mockResolvedValueOnce(answered(accountReply("Alice", null)));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    expect(
+      screen.queryByRole("button", { name: "Delete account…" }),
+    ).toBeNull();
+  });
+
+  it("is offered to an admin", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand.mockResolvedValueOnce(answered(accountReply("Alice", null)));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    expect(
+      screen.getByRole("button", { name: "Delete account…" }),
+    ).toBeTruthy();
+  });
+
+  it("does not send until the typed name matches the account", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand.mockResolvedValueOnce(answered(accountReply("Alice", null)));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete account…" }));
+    const confirm = screen.getByRole("button", { name: "Delete account" });
+    expect(confirm).toHaveProperty("disabled", true);
+
+    fireEvent.change(screen.getByLabelText("Type Alice to confirm"), {
+      target: { value: "Alic" },
+    });
+    expect(confirm).toHaveProperty("disabled", true);
+
+    fireEvent.change(screen.getByLabelText("Type Alice to confirm"), {
+      target: { value: "Alice" },
+    });
+    expect(confirm).toHaveProperty("disabled", false);
+    expect(mpAdminCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends DELETEACCOUNT and shows all three reply lines", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand.mockResolvedValueOnce(
+      answered(accountReply("Alice", "alice@example.com")),
+    );
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    openConfirm("Alice");
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "deleteAccount",
+        refusal: null,
+        banMessage: "Successfully banned alice@example.com for 28.0 days",
+        kicked: true,
+        scheduled: "Account deletion of <Alice> scheduled by <cbadmin>",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    expect(mpAdminCommand).toHaveBeenLastCalledWith({
+      serverKey: SERVER_KEY,
+      command: "DELETEACCOUNT",
+      args: ["Alice"],
+      shape: "deleteAccount",
+    });
+
+    expect(
+      await screen.findByText(
+        "Successfully banned alice@example.com for 28.0 days",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Kicked Alice from the server.")).toBeTruthy();
+    expect(
+      screen.getByText("Account deletion of <Alice> scheduled by <cbadmin>"),
+    ).toBeTruthy();
+  });
+
+  it("shows only the scheduling line when that is all that came through", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand.mockResolvedValueOnce(answered(accountReply("Alice", null)));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    openConfirm("Alice");
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "deleteAccount",
+        refusal: null,
+        banMessage: null,
+        kicked: null,
+        scheduled: "Account deletion of <Alice> scheduled by <cbadmin>",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+
+    expect(
+      await screen.findByText(
+        "Account deletion of <Alice> scheduled by <cbadmin>",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Kicked/)).toBeNull();
+    expect(screen.queryByText(/was not online/)).toBeNull();
+  });
+
+  it("shows 'does not exist' as a refusal", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand.mockResolvedValueOnce(
+      answered(accountReply("Nobody", null)),
+    );
+    draw();
+    lookUp("Nobody");
+    await screen.findByText(/Online \(session 7\)/);
+    openConfirm("Nobody");
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "deleteAccount",
+        refusal: "User <Nobody> does not exist",
+        banMessage: null,
+        kicked: null,
+        scheduled: null,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("User <Nobody> does not exist");
+    expect(screen.getByText("The server refused")).toBeTruthy();
+  });
+
+  it("shows 'no longer exists' as a refusal", async () => {
+    wire.adminLevel = "admin";
+    mpAdminCommand.mockResolvedValueOnce(answered(accountReply("Alice", null)));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    openConfirm("Alice");
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "deleteAccount",
+        refusal: "User <Alice> no longer exists",
+        banMessage: null,
+        kicked: true,
+        scheduled: null,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("User <Alice> no longer exists");
+    expect(screen.getByText("The server refused")).toBeTruthy();
+  });
+});
+
 describe("the password reset action", () => {
   function accountReply(email: string | null) {
     return answered({

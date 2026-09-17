@@ -1121,6 +1121,48 @@ mod tests {
         );
     }
 
+    /// `DELETEACCOUNT` (issue #2787) claims its ban and kick lines as they
+    /// arrive, then finishes on the scheduling line, which the next queued
+    /// command waits behind.
+    #[test]
+    fn a_delete_account_waits_for_its_scheduling_line() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (delete, mut answered) = request("DELETEACCOUNT", AdminShape::DeleteAccount);
+        let (listbans, _l) = request("LISTBANS", AdminShape::BanList);
+        queue.push(delete, now);
+        queue.push(listbans, now);
+
+        let ban = "Successfully banned trash2787a@example.com for 28.0 days";
+        assert_eq!(queue.hear(&said(ban), now), claimed());
+        let kick = "Kicked <trash2787a> from the server";
+        assert_eq!(queue.hear(&said(kick), now), claimed());
+        assert!(
+            answered.try_recv().is_err(),
+            "the scheduling line is still to come"
+        );
+
+        let scheduled = "Account deletion of <trash2787a> scheduled by <cbadmin>";
+        assert_eq!(
+            queue.hear(&said(scheduled), now),
+            Hearing {
+                claimed: true,
+                send: Some("LISTBANS".to_string()),
+            }
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::DeleteAccount {
+                    refusal: None,
+                    ban_message: Some(ban.to_string()),
+                    kicked: Some(true),
+                    scheduled: Some(scheduled.to_string()),
+                }
+            })
+        );
+    }
+
     /// An `OK` for a command other than the one on the wire is nobody's
     /// answer, the same as an unrelated `SERVERMSG` or `FAILED`.
     #[test]
@@ -1154,6 +1196,7 @@ mod tests {
             ("CLEANUP", AdminShape::Cleanup),
             ("LISTMODS", AdminShape::ListMods),
             ("SETACCESS", AdminShape::SetAccess),
+            ("DELETEACCOUNT", AdminShape::DeleteAccount),
         ] {
             let mut queue = AdminQueue::default();
             let now = Instant::now();

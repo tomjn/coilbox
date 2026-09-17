@@ -833,6 +833,12 @@ export const mpGetUserInfo = defineCommand<
  * - `showIp`: `:showip`
  * - `refreshIp`: `:refreship`, answered twice, and waits up to 70 seconds
  *   for the second line
+ * - `deleteAccount`: `DELETEACCOUNT <username>`. Up to three lines: the
+ *   email ban (only with an email on file), the kick, then the scheduling
+ *   line from a database callback that can land a moment later. `User
+ *   <username> does not exist` and `User <username> no longer exists` are
+ *   read here as a refusal rather than as uberserver's generic
+ *   `<COMMAND> failed.` shape.
  */
 export type AdminShape =
   | "banList"
@@ -866,7 +872,8 @@ export type AdminShape =
   | "channelUnmute"
   | "channelInfo"
   | "showIp"
-  | "refreshIp";
+  | "refreshIp"
+  | "deleteAccount";
 
 /** One `LISTBANS` line. uberserver's `None` arrives as null. */
 export interface BanEntry {
@@ -1004,6 +1011,21 @@ export type AdminReply =
       /** ChanServ's second line, or null if it had not arrived in time. */
       result: string | null;
       failed: boolean;
+    }
+  | {
+      shape: "deleteAccount";
+      /** `User <username> does not exist` or `User <username> no longer
+       * exists`, uberserver's own wording. Null on success. */
+      refusal: string | null;
+      /** The email ban's line, only when the account had an email on file. */
+      banMessage: string | null;
+      /** Whether the kick line said it was kicked, rather than not online.
+       * Null when refused before it ran. */
+      kicked: boolean | null;
+      /** The scheduling line, from a database callback that can land a
+       * moment after the ban and kick lines. Null when refused, or when
+       * the wait ran out first. */
+      scheduled: string | null;
     };
 
 /** How an admin command ended. Mirrors the Rust `AdminOutcome`. */
