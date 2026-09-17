@@ -7,12 +7,14 @@ import {
   Mail,
   Server,
   Users,
+  Wrench,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { BansSection } from "./BansSection";
 import { BotAccountsSection } from "./BotAccountsSection";
 import { ChannelsSection } from "./ChannelsSection";
 import { EmailDomainsSection } from "./EmailDomainsSection";
+import { MaintenanceSection } from "./MaintenanceSection";
 import { ModeratorFeedSection } from "./ModeratorFeedSection";
 import { PlayerLookupSection } from "./PlayerLookupSection";
 import { ServerAddressSection } from "./ServerAddressSection";
@@ -64,5 +66,12 @@ export const ADMIN_TOOLS: AdminTool[] = [
     label: "Server",
     icon: Server,
     Component: ServerAddressSection,
+  },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    icon: Wrench,
+    adminOnly: true,
+    Component: MaintenanceSection,
   },
 ];

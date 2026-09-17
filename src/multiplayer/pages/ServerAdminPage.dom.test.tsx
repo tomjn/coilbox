@@ -128,8 +128,9 @@ vi.mock("../store", () => ({
   usernameFromKey: (key: string) => key.split("@")[0],
 }));
 
-// No admin-only tool is built yet (issues #2785 to #2788 add them), so the
-// registry gains a stand-in to check the nav's admin group against.
+// Maintenance (issue #2785) is the first real admin-only tool. More are
+// coming (issues #2786 to #2788), so the registry also gains a stand-in, to
+// check the nav's grouping with more than one admin-only entry.
 vi.mock("../admin/tools", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../admin/tools")>();
   return {
