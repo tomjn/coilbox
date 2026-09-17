@@ -290,4 +290,183 @@ describe("bans and mutes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show mutes" }));
     expect(await screen.findByText("No one is muted in #main.")).toBeTruthy();
   });
+
+  it("lifts a ban from its row, with :unban, and refreshes the list", async () => {
+    mpAdminCommand
+      .mockResolvedValueOnce(
+        answered({
+          shape: "channelBanList",
+          entries: [
+            {
+              username: "cbplayer2",
+              ip: "127.0.0.1",
+              reason: "probe ban",
+              ends: "2026-09-17 15:17:34",
+              issuer: "cbmod",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        answered({
+          shape: "channelUnban",
+          channel: "main",
+          username: "cbplayer2",
+        }),
+      )
+      .mockResolvedValueOnce(
+        answered({ shape: "channelBanList", entries: [] }),
+      );
+    draw();
+    typeChannel("main");
+    fireEvent.click(screen.getByRole("button", { name: "Show bans" }));
+    expect(await screen.findByText("cbplayer2")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Unban cbplayer2" }));
+    sentWith("unban", ["main", "cbplayer2"], "channelUnban");
+    expect(
+      await screen.findByText("cbplayer2 was unbanned from #main."),
+    ).toBeTruthy();
+    expect(mpAdminCommand).toHaveBeenLastCalledWith({
+      serverKey: SERVER_KEY,
+      command: "listbans",
+      args: ["main"],
+      shape: "channelBanList",
+    });
+    expect(
+      await screen.findByText("No one is banned from #main."),
+    ).toBeTruthy();
+  });
+
+  it("mutes a row, with :unmute, and refreshes the list", async () => {
+    mpAdminCommand
+      .mockResolvedValueOnce(
+        answered({
+          shape: "channelMuteList",
+          entries: [
+            {
+              username: "cbplayer2",
+              reason: "probe mute",
+              ends: "2026-09-17 15:17:35",
+              issuer: "cbmod",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        answered({
+          shape: "channelUnmute",
+          channel: "main",
+          username: "cbplayer2",
+        }),
+      )
+      .mockResolvedValueOnce(
+        answered({ shape: "channelMuteList", entries: [] }),
+      );
+    draw();
+    typeChannel("main");
+    fireEvent.click(screen.getByRole("button", { name: "Show mutes" }));
+    expect(await screen.findByText("cbplayer2")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Unmute cbplayer2" }));
+    sentWith("unmute", ["main", "cbplayer2"], "channelUnmute");
+    expect(
+      await screen.findByText("cbplayer2 was unmuted in #main."),
+    ).toBeTruthy();
+    expect(mpAdminCommand).toHaveBeenLastCalledWith({
+      serverKey: SERVER_KEY,
+      command: "listmutes",
+      args: ["main"],
+      shape: "channelMuteList",
+    });
+    expect(await screen.findByText("No one is muted in #main.")).toBeTruthy();
+  });
+
+  it("shows ChanServ's refusal to unban as an alert", async () => {
+    const reason = "#main: User <cbplayer2> not found in banlist";
+    mpAdminCommand
+      .mockResolvedValueOnce(
+        answered({
+          shape: "channelBanList",
+          entries: [
+            {
+              username: "cbplayer2",
+              ip: null,
+              reason: "probe ban",
+              ends: "2026-09-17 15:17:34",
+              issuer: "cbmod",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce({ outcome: "refused", reason });
+    draw();
+    typeChannel("main");
+    fireEvent.click(screen.getByRole("button", { name: "Show bans" }));
+    expect(await screen.findByText("cbplayer2")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Unban cbplayer2" }));
+    expect(await screen.findByText("The server refused")).toBeTruthy();
+    expect(screen.getByText(reason)).toBeTruthy();
+  });
+});
+
+describe("the channel's real history and antispam state", () => {
+  it("is read from :info when a channel is picked, and shown", async () => {
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({
+        shape: "channelInfo",
+        channel: "main",
+        historyOn: false,
+        antispamOn: false,
+      }),
+    );
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: "#main" }));
+    sentWith("info", ["main"], "channelInfo");
+    expect(
+      await screen.findByText(
+        "Currently, history is off and antispam is off for #main.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("is asked again after a history or antispam change answers", async () => {
+    mpAdminCommand
+      .mockResolvedValueOnce(
+        answered({
+          shape: "channelInfo",
+          channel: "main",
+          historyOn: false,
+          antispamOn: false,
+        }),
+      )
+      .mockResolvedValueOnce(
+        answered({ shape: "channelHistory", channel: "main", on: true }),
+      )
+      .mockResolvedValueOnce(
+        answered({
+          shape: "channelInfo",
+          channel: "main",
+          historyOn: true,
+          antispamOn: false,
+        }),
+      );
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: "#main" }));
+    expect(
+      await screen.findByText(
+        "Currently, history is off and antispam is off for #main.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "History on" }));
+    sentWith("history", ["main", "on"], "channelHistory");
+    expect(await screen.findByText("History is on for #main.")).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "Currently, history is on and antispam is off for #main.",
+      ),
+    ).toBeTruthy();
+  });
 });
