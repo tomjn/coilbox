@@ -64,6 +64,51 @@ pub enum AdminShape {
     ResetUserPassword,
     /// `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`: never answered.
     NoReply,
+    /// ChanServ's `:register <chan> [founder]`: `#<chan>: Successfully
+    /// registered to <founder>`.
+    RegisterChannel,
+    /// ChanServ's `:unregister <chan>`: `#<chan>: Successfully
+    /// unregistered.`
+    UnregisterChannel,
+    /// ChanServ's `:history <chan> on|off`.
+    ChannelHistory,
+    /// ChanServ's `:antispam <chan> on|off`.
+    ChannelAntispam,
+    /// ChanServ's `:listbans <chan>`: a marked list, or `The banlist is
+    /// empty.`
+    ChannelBanList,
+    /// ChanServ's `:listmutes <chan>`: a marked list, or `The mutelist is
+    /// empty.`
+    ChannelMuteList,
+    /// ChanServ's `:showip`: two lines, the online address then the local.
+    ShowIp,
+    /// ChanServ's `:refreship`: a line straight away, and a second when the
+    /// server has looked its address up again.
+    RefreshIp,
+}
+
+impl AdminShape {
+    /// ChanServ answers this command in private messages, rather than the
+    /// server in `SERVERMSG` lines. The plugin sends it as `SAYPRIVATE
+    /// ChanServ :<command> <args>`.
+    pub fn is_chanserv(self) -> bool {
+        matches!(
+            self,
+            Self::RegisterChannel
+                | Self::UnregisterChannel
+                | Self::ChannelHistory
+                | Self::ChannelAntispam
+                | Self::ChannelBanList
+                | Self::ChannelMuteList
+                | Self::ShowIp
+                | Self::RefreshIp
+        )
+    }
+
+    /// The command's first argument is the channel its answer names.
+    pub fn names_channel(self) -> bool {
+        self.is_chanserv() && !matches!(self, Self::ShowIp | Self::RefreshIp)
+    }
 }
 
 /// One line of `LISTBANS`.
@@ -87,6 +132,29 @@ pub struct BanEntry {
 pub struct BlacklistEntry {
     pub domain: String,
     pub reason: String,
+    pub issuer: String,
+}
+
+/// One line of ChanServ's `:listbans <chan>`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelBanEntry {
+    pub username: String,
+    /// `None` for a bridged user, whose ban names no address.
+    pub ip: Option<String>,
+    pub reason: String,
+    pub ends: String,
+    /// The moderator who banned, or `unknown`.
+    pub issuer: String,
+}
+
+/// One line of ChanServ's `:listmutes <chan>`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelMuteEntry {
+    pub username: String,
+    pub reason: String,
+    pub ends: String,
     pub issuer: String,
 }
 
@@ -209,6 +277,44 @@ pub enum AdminReply {
         success: bool,
         message: String,
     },
+    RegisterChannel {
+        channel: String,
+        founder: String,
+    },
+    UnregisterChannel {
+        channel: String,
+    },
+    ChannelHistory {
+        channel: String,
+        on: bool,
+    },
+    ChannelAntispam {
+        channel: String,
+        on: bool,
+    },
+    ChannelBanList {
+        entries: Vec<ChannelBanEntry>,
+    },
+    ChannelMuteList {
+        entries: Vec<ChannelMuteEntry>,
+    },
+    ShowIp {
+        online_ip: String,
+        /// `None` when the server looks the address up itself.
+        online_override: Option<String>,
+        local_ip: String,
+        local_override: Option<String>,
+    },
+    RefreshIp {
+        /// ChanServ's first line, which says whether the online address is
+        /// pinned and so cannot change.
+        started: String,
+        /// ChanServ's second line, or `None` when it had not arrived by the
+        /// time the wait ran out.
+        result: Option<String>,
+        /// The second line reports a failed lookup.
+        failed: bool,
+    },
 }
 
 /// What one `SERVERMSG` meant to the command waiting.
@@ -220,12 +326,19 @@ pub enum Heard {
     Collected,
     /// The last line of this answer.
     Finished(AdminReply),
+    /// ChanServ would not do it, in its own words. `SERVERMSG` refusals are
+    /// read by the plugin instead, so only ChanServ's lines end this way.
+    Refused(String),
 }
 
-/// Reads the `SERVERMSG` lines that answer one command.
+/// Reads the `SERVERMSG` lines that answer one command, or ChanServ's private
+/// replies for a ChanServ command.
 #[derive(Clone, Debug)]
 pub struct AdminCollector {
     shape: AdminShape,
+    /// The channel a ChanServ channel command names, which its answer
+    /// repeats. A line about another channel is somebody else's.
+    channel: Option<String>,
     progress: Progress,
 }
 
@@ -246,6 +359,12 @@ enum Progress {
         next: usize,
     },
     Bindings(Vec<IpBinding>),
+    ChannelBans(Vec<ChannelBanEntry>),
+    ChannelMutes(Vec<ChannelMuteEntry>),
+    /// `:showip`'s online line has arrived: the address and its override.
+    OnlineIp(String, Option<String>),
+    /// `:refreship`'s first line has arrived.
+    RefreshStarted(String),
 }
 
 /// The lines after the first of a normal account's answer.
@@ -257,8 +376,234 @@ impl AdminCollector {
     pub fn new(shape: AdminShape) -> Self {
         Self {
             shape,
+            channel: None,
             progress: Progress::Waiting,
         }
+    }
+
+    /// Wait on `channel`, the one a ChanServ channel command names.
+    pub fn on_channel(mut self, channel: Option<String>) -> Self {
+        self.channel = channel;
+        self
+    }
+
+    /// Read one private message from ChanServ.
+    ///
+    /// ChanServ writes each line of a reply as its own message, so a list
+    /// arrives the same way a `SERVERMSG` list does. `ChanServ.py` writes the
+    /// list markers with a space either side, which is trimmed here.
+    pub fn hear_chanserv(&mut self, text: &str) -> Heard {
+        if !self.shape.is_chanserv() {
+            return Heard::NotOurs;
+        }
+        let trimmed = text.trim();
+        if let Some(reason) = self.chanserv_refusal(trimmed) {
+            if matches!(self.progress, Progress::Waiting) {
+                return Heard::Refused(reason);
+            }
+        }
+        let chan = self.channel.as_deref().unwrap_or_default();
+        // The line with this channel's `#<chan>: ` prefix taken off.
+        let about = trimmed
+            .strip_prefix('#')
+            .and_then(|t| t.strip_prefix(chan))
+            .and_then(|t| t.strip_prefix(": "));
+        let channel = || chan.to_string();
+        match (self.shape, &mut self.progress, about) {
+            (AdminShape::RegisterChannel, _, Some(rest)) => {
+                match rest
+                    .strip_prefix("Successfully registered to <")
+                    .and_then(|t| t.strip_suffix('>'))
+                {
+                    Some(founder) => Heard::Finished(AdminReply::RegisterChannel {
+                        channel: channel(),
+                        founder: founder.to_string(),
+                    }),
+                    None => Heard::NotOurs,
+                }
+            }
+            (AdminShape::UnregisterChannel, _, Some("Successfully unregistered.")) => {
+                Heard::Finished(AdminReply::UnregisterChannel { channel: channel() })
+            }
+            (AdminShape::ChannelHistory, _, Some(rest)) => match rest {
+                "History enabled" => Heard::Finished(AdminReply::ChannelHistory {
+                    channel: channel(),
+                    on: true,
+                }),
+                "History disabled" => Heard::Finished(AdminReply::ChannelHistory {
+                    channel: channel(),
+                    on: false,
+                }),
+                _ => Heard::NotOurs,
+            },
+            (AdminShape::ChannelAntispam, _, Some(rest)) => match rest {
+                "Anti-spam protection is on." => Heard::Finished(AdminReply::ChannelAntispam {
+                    channel: channel(),
+                    on: true,
+                }),
+                "Anti-spam protection is off." => Heard::Finished(AdminReply::ChannelAntispam {
+                    channel: channel(),
+                    on: false,
+                }),
+                _ => Heard::NotOurs,
+            },
+            (AdminShape::ChannelBanList, Progress::Waiting, _) => {
+                if trimmed == "The banlist is empty." {
+                    Heard::Finished(AdminReply::ChannelBanList {
+                        entries: Vec::new(),
+                    })
+                } else if trimmed == format!("-- Banlist for {chan} --") {
+                    self.progress = Progress::ChannelBans(Vec::new());
+                    Heard::Collected
+                } else {
+                    Heard::NotOurs
+                }
+            }
+            (AdminShape::ChannelBanList, Progress::ChannelBans(entries), _) => {
+                if trimmed == "-- End Banlist --" {
+                    return Heard::Finished(AdminReply::ChannelBanList {
+                        entries: std::mem::take(entries),
+                    });
+                }
+                collect(entries, channel_ban_entry_from(trimmed))
+            }
+            (AdminShape::ChannelMuteList, Progress::Waiting, _) => {
+                if trimmed == "The mutelist is empty." {
+                    Heard::Finished(AdminReply::ChannelMuteList {
+                        entries: Vec::new(),
+                    })
+                } else if trimmed == format!("-- Mutelist for {chan} --") {
+                    self.progress = Progress::ChannelMutes(Vec::new());
+                    Heard::Collected
+                } else {
+                    Heard::NotOurs
+                }
+            }
+            (AdminShape::ChannelMuteList, Progress::ChannelMutes(entries), _) => {
+                if trimmed == "-- End Mutelist --" {
+                    return Heard::Finished(AdminReply::ChannelMuteList {
+                        entries: std::mem::take(entries),
+                    });
+                }
+                collect(entries, channel_mute_entry_from(trimmed))
+            }
+            (AdminShape::ShowIp, Progress::Waiting, _) => {
+                match address_line(trimmed, "Server online IP: ") {
+                    Some((ip, pinned)) => {
+                        self.progress = Progress::OnlineIp(ip, pinned);
+                        Heard::Collected
+                    }
+                    None => Heard::NotOurs,
+                }
+            }
+            (AdminShape::ShowIp, Progress::OnlineIp(online_ip, online_override), _) => {
+                match address_line(trimmed, "Server local IP: ") {
+                    Some((local_ip, local_override)) => Heard::Finished(AdminReply::ShowIp {
+                        online_ip: std::mem::take(online_ip),
+                        online_override: online_override.take(),
+                        local_ip,
+                        local_override,
+                    }),
+                    None => Heard::NotOurs,
+                }
+            }
+            (AdminShape::RefreshIp, Progress::Waiting, _) => {
+                if trimmed.starts_with("Refreshing server IP") {
+                    self.progress = Progress::RefreshStarted(trimmed.to_string());
+                    Heard::Collected
+                } else {
+                    Heard::NotOurs
+                }
+            }
+            (AdminShape::RefreshIp, Progress::RefreshStarted(started), _) => {
+                let failed = trimmed.starts_with("IP refresh failed: ");
+                if failed || trimmed.starts_with("IP refresh complete. ") {
+                    Heard::Finished(AdminReply::RefreshIp {
+                        started: std::mem::take(started),
+                        result: Some(trimmed.to_string()),
+                        failed,
+                    })
+                } else {
+                    Heard::NotOurs
+                }
+            }
+            _ => Heard::NotOurs,
+        }
+    }
+
+    /// ChanServ's refusal of the command waiting, as the reason to show.
+    ///
+    /// Only the sentences `ChanServ.py` can write for this command are read,
+    /// so a refusal of something else sent meanwhile, such as a mute from the
+    /// chat member menu, is not taken for this one.
+    fn chanserv_refusal(&self, text: &str) -> Option<String> {
+        let mine = |sentence: &str| (text == sentence).then(|| text.to_string());
+        if let Some(command) = match self.shape {
+            AdminShape::ShowIp => Some("showip"),
+            AdminShape::RefreshIp => Some("refreship"),
+            _ => None,
+        } {
+            // A ChanServ with no such command reads it as a channel command
+            // missing its channel.
+            if text == "Channel not specified" {
+                return Some(format!("This server's ChanServ has no :{command} command."));
+            }
+            return match self.shape {
+                AdminShape::ShowIp => {
+                    mine("You must be a moderator or admin to view server IP configuration")
+                }
+                _ => mine("You must be an admin to refresh the server IP")
+                    .or_else(|| mine("An IP refresh is already in progress, please wait.")),
+            };
+        }
+        let chan = self.channel.as_deref().unwrap_or_default();
+        let generic = mine("Channel not specified").or_else(|| {
+            mine(
+                "ChanServ commands do not permit the # character to prefix channel names, please retry",
+            )
+        });
+        if generic.is_some() {
+            return generic;
+        }
+        if self.shape == AdminShape::RegisterChannel {
+            // `:register` is checked before ChanServ looks for the channel,
+            // and names it without quotes.
+            if text == format!("Channel {chan} does not exist") {
+                return Some(text.to_string());
+            }
+        } else if text == format!("Channel '{chan}' does not exist")
+            || text == format!("ChanServ is not present in channel '{chan}' (unregistered?)")
+        {
+            return Some(text.to_string());
+        }
+        let rest = text
+            .strip_prefix('#')?
+            .strip_prefix(chan)?
+            .strip_prefix(": ")?;
+        let refused = match self.shape {
+            AdminShape::RegisterChannel => {
+                rest == "You must contact one of the server moderators to register a channel"
+                    || rest == "Already registered"
+                    || (rest.starts_with("User <") && rest.ends_with("> not found"))
+            }
+            AdminShape::UnregisterChannel => {
+                rest == "You must contact one of the server moderators or the owner of the channel to unregister a channel"
+                    || rest == "Not registered"
+            }
+            AdminShape::ChannelHistory => {
+                rest == "You do not have permission to change history settings in the channel"
+                    || rest == "Unknown value for history setting (expected: on, off)."
+            }
+            AdminShape::ChannelAntispam => {
+                rest == "You must contact one of the server moderators or the owner of the channel to change the antispam settings"
+                    || rest == "Unknown value for anti-spam setting (expected: on, off)."
+            }
+            AdminShape::ChannelBanList | AdminShape::ChannelMuteList => {
+                rest == "You do not have permission to execute this command"
+            }
+            _ => false,
+        };
+        refused.then(|| text.to_string())
     }
 
     /// Read one `SERVERMSG` text.
@@ -402,9 +747,70 @@ impl AdminCollector {
     pub fn give_up(self) -> Option<AdminReply> {
         match self.progress {
             Progress::Bindings(bindings) => Some(AdminReply::IpSearch { bindings }),
+            // The refresh started, so the moderator is told that much even
+            // though the result never came.
+            Progress::RefreshStarted(started) => Some(AdminReply::RefreshIp {
+                started,
+                result: None,
+                failed: false,
+            }),
             _ => None,
         }
     }
+}
+
+/// `"%s :: %s :: %s :: ends %s (%s)"` (user, ip, reason, end, issuer) for an
+/// account, or `"%s :: %s :: ends %s (%s)"` with no address for a bridged
+/// user, from `ChanServ.py`'s `listbans`. A bridged name has a `:` in it,
+/// which is what `ChanServ.py` itself checks, and the reason is free text.
+fn channel_ban_entry_from(text: &str) -> Option<ChannelBanEntry> {
+    let (head, ends, issuer) = ends_and_issuer(text)?;
+    let (username, rest) = head.split_once(" :: ")?;
+    let (ip, reason) = if username.contains(':') {
+        (None, rest)
+    } else {
+        let (ip, reason) = rest.split_once(" :: ")?;
+        (Some(ip.to_string()), reason)
+    };
+    Some(ChannelBanEntry {
+        username: username.to_string(),
+        ip,
+        reason: reason.to_string(),
+        ends,
+        issuer,
+    })
+}
+
+/// `"%s :: %s :: ends %s (%s)"` (user, reason, end, issuer) from
+/// `ChanServ.py`'s `listmutes`.
+fn channel_mute_entry_from(text: &str) -> Option<ChannelMuteEntry> {
+    let (head, ends, issuer) = ends_and_issuer(text)?;
+    let (username, reason) = head.split_once(" :: ")?;
+    Some(ChannelMuteEntry {
+        username: username.to_string(),
+        reason: reason.to_string(),
+        ends,
+        issuer,
+    })
+}
+
+/// A ChanServ list line's `<head> :: ends <when> (<issuer>)`, as its parts.
+fn ends_and_issuer(text: &str) -> Option<(&str, String, String)> {
+    let (head, tail) = text.rsplit_once(" :: ends ")?;
+    let (ends, issuer) = tail.strip_suffix(')')?.rsplit_once(" (")?;
+    Some((head, ends.to_string(), issuer.to_string()))
+}
+
+/// `:showip`'s `<label><ip> (override: <ip or none>)`.
+fn address_line(text: &str, label: &str) -> Option<(String, Option<String>)> {
+    let (ip, pinned) = text
+        .strip_prefix(label)?
+        .strip_suffix(')')?
+        .split_once(" (override: ")?;
+    Some((
+        ip.to_string(),
+        (pinned != "none").then(|| pinned.to_string()),
+    ))
 }
 
 /// Keep `entry` if the line was one.
@@ -1390,6 +1796,459 @@ mod tests {
             ],
         );
         assert_eq!(heard, vec![Heard::NotOurs, Heard::NotOurs]);
+    }
+
+    /// Feed ChanServ's private replies to a collector waiting on `channel`.
+    fn hear_chanserv(shape: AdminShape, channel: Option<&str>, lines: &[&str]) -> Vec<Heard> {
+        let mut c = AdminCollector::new(shape).on_channel(channel.map(str::to_string));
+        lines.iter().map(|l| c.hear_chanserv(l)).collect()
+    }
+
+    fn refused(reason: &str) -> Heard {
+        Heard::Refused(reason.to_string())
+    }
+
+    /// ChanServ's lines are private messages, so a `SERVERMSG` with the same
+    /// words is not one of them, and a ChanServ line never answers a
+    /// `SERVERMSG` command.
+    #[test]
+    fn chanserv_and_servermsg_answers_do_not_cross() {
+        let mut c = AdminCollector::new(AdminShape::ChannelBanList).on_channel(Some("main".into()));
+        assert_eq!(c.hear("The banlist is empty."), Heard::NotOurs);
+        let mut c = AdminCollector::new(AdminShape::BanList);
+        assert_eq!(c.hear_chanserv("Banlist is empty"), Heard::NotOurs);
+    }
+
+    /// `:register`. Every line here was captured from a local uberserver on
+    /// 17 September 2026, except "Channel not specified", read from
+    /// `ChanServ.py`.
+    #[test]
+    fn a_channel_registration_is_one_line() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::RegisterChannel,
+                Some("cbtest2782"),
+                &["#cbtest2782: Successfully registered to <cbmod>"],
+            ),
+            vec![Heard::Finished(AdminReply::RegisterChannel {
+                channel: "cbtest2782".into(),
+                founder: "cbmod".into(),
+            })]
+        );
+        for line in [
+            "#cbtest2782: You must contact one of the server moderators to register a channel",
+            "#cbtest2782: User <nosuchuser2782> not found",
+            "#cbtest2782: Already registered",
+            "Channel cbtest2782 does not exist",
+            "ChanServ commands do not permit the # character to prefix channel names, please retry",
+            "Channel not specified",
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::RegisterChannel, Some("cbtest2782"), &[line]),
+                vec![refused(line)],
+                "for {line}"
+            );
+        }
+    }
+
+    /// Another channel's answer, and an answer for this channel to a
+    /// different command, are somebody else's.
+    #[test]
+    fn a_reply_about_another_channel_or_command_is_not_ours() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::RegisterChannel,
+                Some("cbtest2782"),
+                &[
+                    "#main: Successfully registered to <cbmod>",
+                    "#main: Already registered",
+                    "Channel main does not exist",
+                    "#cbtest2782: History enabled",
+                    "#cbtest2782: muted <cbuser> for 1 hours",
+                    "hello there",
+                ],
+            ),
+            vec![Heard::NotOurs; 6]
+        );
+    }
+
+    /// `:unregister`. The success line and the "not present" refusal were
+    /// captured live. The other two are from `ChanServ.py`.
+    #[test]
+    fn a_channel_unregistration_is_one_line() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::UnregisterChannel,
+                Some("cbtest2782"),
+                &["#cbtest2782: Successfully unregistered."],
+            ),
+            vec![Heard::Finished(AdminReply::UnregisterChannel {
+                channel: "cbtest2782".into(),
+            })]
+        );
+        for line in [
+            "ChanServ is not present in channel 'cbtest2782' (unregistered?)",
+            "Channel 'cbtest2782' does not exist",
+            "#cbtest2782: You must contact one of the server moderators or the owner of the channel to unregister a channel",
+            "#cbtest2782: Not registered",
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::UnregisterChannel, Some("cbtest2782"), &[line]),
+                vec![refused(line)],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `:history`, all captured live.
+    #[test]
+    fn a_history_change_is_one_line() {
+        for (line, on) in [
+            ("#cbtest2782: History enabled", true),
+            ("#cbtest2782: History disabled", false),
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::ChannelHistory, Some("cbtest2782"), &[line]),
+                vec![Heard::Finished(AdminReply::ChannelHistory {
+                    channel: "cbtest2782".into(),
+                    on,
+                })]
+            );
+        }
+        for line in [
+            "#cbtest2782: You do not have permission to change history settings in the channel",
+            "#cbtest2782: Unknown value for history setting (expected: on, off).",
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::ChannelHistory, Some("cbtest2782"), &[line]),
+                vec![refused(line)],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `:antispam`. The unknown-value refusal is from `ChanServ.py`, the rest
+    /// were captured live.
+    #[test]
+    fn an_antispam_change_is_one_line() {
+        for (line, on) in [
+            ("#cbtest2782: Anti-spam protection is on.", true),
+            ("#cbtest2782: Anti-spam protection is off.", false),
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::ChannelAntispam, Some("cbtest2782"), &[line]),
+                vec![Heard::Finished(AdminReply::ChannelAntispam {
+                    channel: "cbtest2782".into(),
+                    on,
+                })]
+            );
+        }
+        for line in [
+            "#cbtest2782: You must contact one of the server moderators or the owner of the channel to change the antispam settings",
+            "#cbtest2782: Unknown value for anti-spam setting (expected: on, off).",
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::ChannelAntispam, Some("cbtest2782"), &[line]),
+                vec![refused(line)],
+                "for {line}"
+            );
+        }
+    }
+
+    /// `:listbans`, captured live. The header and footer keep ChanServ's
+    /// leading and trailing spaces. The bridged entry, which has no address,
+    /// is from `ChanServ.py`.
+    #[test]
+    fn a_channel_ban_list_is_read_between_its_markers() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelBanList,
+                Some("cbtest2782"),
+                &[
+                    " -- Banlist for cbtest2782 -- ",
+                    "cbplayer2 :: 127.0.0.1 :: probe ban :: ends 2026-09-19 11:19:16 (cbmod)",
+                    "Relay:discord :: spam :: links (again) :: ends 9999-12-31 23:59:59 (unknown)",
+                    " -- End Banlist -- ",
+                ],
+            ),
+            vec![
+                Heard::Collected,
+                Heard::Collected,
+                Heard::Collected,
+                Heard::Finished(AdminReply::ChannelBanList {
+                    entries: vec![
+                        ChannelBanEntry {
+                            username: "cbplayer2".into(),
+                            ip: Some("127.0.0.1".into()),
+                            reason: "probe ban".into(),
+                            ends: "2026-09-19 11:19:16".into(),
+                            issuer: "cbmod".into(),
+                        },
+                        ChannelBanEntry {
+                            username: "Relay:discord".into(),
+                            ip: None,
+                            reason: "spam :: links (again)".into(),
+                            ends: "9999-12-31 23:59:59".into(),
+                            issuer: "unknown".into(),
+                        },
+                    ]
+                }),
+            ]
+        );
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelBanList,
+                Some("cbtest2782"),
+                &["The banlist is empty."]
+            ),
+            vec![Heard::Finished(AdminReply::ChannelBanList {
+                entries: vec![]
+            })]
+        );
+        let line = "#cbtest2782: You do not have permission to execute this command";
+        assert_eq!(
+            hear_chanserv(AdminShape::ChannelBanList, Some("cbtest2782"), &[line]),
+            vec![refused(line)]
+        );
+    }
+
+    /// Another channel's list is not this one's.
+    #[test]
+    fn another_channels_ban_list_is_not_ours() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelBanList,
+                Some("cbtest2782"),
+                &[
+                    " -- Banlist for main -- ",
+                    " -- Mutelist for cbtest2782 -- "
+                ],
+            ),
+            vec![Heard::NotOurs, Heard::NotOurs]
+        );
+    }
+
+    /// `:listmutes`, captured live.
+    #[test]
+    fn a_channel_mute_list_is_read_between_its_markers() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelMuteList,
+                Some("cbtest2782"),
+                &[
+                    " -- Mutelist for cbtest2782 -- ",
+                    "cbuser :: probe mute :: ends 2026-09-17 12:19:15 (cbmod)",
+                    "hello from someone else",
+                    " -- End Mutelist -- ",
+                ],
+            ),
+            vec![
+                Heard::Collected,
+                Heard::Collected,
+                Heard::NotOurs,
+                Heard::Finished(AdminReply::ChannelMuteList {
+                    entries: vec![ChannelMuteEntry {
+                        username: "cbuser".into(),
+                        reason: "probe mute".into(),
+                        ends: "2026-09-17 12:19:15".into(),
+                        issuer: "cbmod".into(),
+                    }]
+                }),
+            ]
+        );
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ChannelMuteList,
+                Some("cbtest2782"),
+                &["The mutelist is empty."]
+            ),
+            vec![Heard::Finished(AdminReply::ChannelMuteList {
+                entries: vec![]
+            })]
+        );
+    }
+
+    /// `:showip`, captured live with both overrides set. `none` is how
+    /// `ChanServ.py` writes an unset override.
+    #[test]
+    fn show_ip_is_two_lines() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ShowIp,
+                None,
+                &[
+                    "Server online IP: 127.0.0.1 (override: 127.0.0.1)",
+                    "Server local IP: 192.168.1.4 (override: none)",
+                ],
+            ),
+            vec![
+                Heard::Collected,
+                Heard::Finished(AdminReply::ShowIp {
+                    online_ip: "127.0.0.1".into(),
+                    online_override: Some("127.0.0.1".into()),
+                    local_ip: "192.168.1.4".into(),
+                    local_override: None,
+                }),
+            ]
+        );
+        let line = "You must be a moderator or admin to view server IP configuration";
+        assert_eq!(
+            hear_chanserv(AdminShape::ShowIp, None, &[line]),
+            vec![refused(line)]
+        );
+        // The local line alone is not an answer.
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::ShowIp,
+                None,
+                &["Server local IP: 192.168.1.4 (override: none)"]
+            ),
+            vec![Heard::NotOurs]
+        );
+    }
+
+    /// A ChanServ from before `:showip` and `:refreship` reads the command as
+    /// a channel command with no channel.
+    #[test]
+    fn an_older_chanserv_says_it_has_no_server_address_commands() {
+        for (shape, command) in [
+            (AdminShape::ShowIp, "showip"),
+            (AdminShape::RefreshIp, "refreship"),
+        ] {
+            assert_eq!(
+                hear_chanserv(shape, None, &["Channel not specified"]),
+                vec![refused(&format!(
+                    "This server's ChanServ has no :{command} command."
+                ))]
+            );
+        }
+    }
+
+    /// `:refreship` answers straight away and again when the lookup ends.
+    /// The pinned start line and the unchanged result were captured live. The
+    /// others are from `ChanServ.py`.
+    #[test]
+    fn refresh_ip_is_two_lines() {
+        let pinned = "Refreshing server IP. Note ONLINE_IP/--onlineip is pinned to 127.0.0.1, so the online IP will not change.";
+        let unchanged = "IP refresh complete. Unchanged: online 127.0.0.1, local 127.0.0.1";
+        assert_eq!(
+            hear_chanserv(AdminShape::RefreshIp, None, &[pinned, unchanged]),
+            vec![
+                Heard::Collected,
+                Heard::Finished(AdminReply::RefreshIp {
+                    started: pinned.into(),
+                    result: Some(unchanged.into()),
+                    failed: false,
+                }),
+            ]
+        );
+
+        let started = "Refreshing server IP (current: 203.0.113.7). This may take a few seconds...";
+        let changed = "IP refresh complete. Online IP 203.0.113.7 -> 198.51.100.4 (local 10.0.0.2). New battles will advertise the updated address; battles already open must be rehosted.";
+        assert_eq!(
+            hear_chanserv(AdminShape::RefreshIp, None, &[started, "hello", changed]),
+            vec![
+                Heard::Collected,
+                Heard::NotOurs,
+                Heard::Finished(AdminReply::RefreshIp {
+                    started: started.into(),
+                    result: Some(changed.into()),
+                    failed: false,
+                }),
+            ]
+        );
+
+        let failed = "IP refresh failed: timed out";
+        assert_eq!(
+            hear_chanserv(AdminShape::RefreshIp, None, &[started, failed]),
+            vec![
+                Heard::Collected,
+                Heard::Finished(AdminReply::RefreshIp {
+                    started: started.into(),
+                    result: Some(failed.into()),
+                    failed: true,
+                }),
+            ]
+        );
+    }
+
+    /// A result with no start line before it belongs to an earlier refresh.
+    #[test]
+    fn a_refresh_result_before_the_start_is_not_ours() {
+        assert_eq!(
+            hear_chanserv(
+                AdminShape::RefreshIp,
+                None,
+                &["IP refresh complete. Unchanged: online 127.0.0.1, local 127.0.0.1"]
+            ),
+            vec![Heard::NotOurs]
+        );
+    }
+
+    #[test]
+    fn refresh_ip_refusals() {
+        // The first was captured live from a moderator.
+        for line in [
+            "You must be an admin to refresh the server IP",
+            "An IP refresh is already in progress, please wait.",
+        ] {
+            assert_eq!(
+                hear_chanserv(AdminShape::RefreshIp, None, &[line]),
+                vec![refused(line)]
+            );
+        }
+    }
+
+    /// A refresh that started but never reported is still an answer when the
+    /// wait runs out, with no result. One that never started is not.
+    #[test]
+    fn a_refresh_with_no_result_is_answered_at_the_deadline() {
+        let started = "Refreshing server IP (current: 203.0.113.7). This may take a few seconds...";
+        let mut c = AdminCollector::new(AdminShape::RefreshIp);
+        assert_eq!(c.hear_chanserv(started), Heard::Collected);
+        assert_eq!(
+            c.give_up(),
+            Some(AdminReply::RefreshIp {
+                started: started.into(),
+                result: None,
+                failed: false,
+            })
+        );
+        assert_eq!(AdminCollector::new(AdminShape::RefreshIp).give_up(), None);
+        let (collector, _) = (
+            {
+                let mut c = AdminCollector::new(AdminShape::ShowIp);
+                c.hear_chanserv("Server online IP: 127.0.0.1 (override: none)");
+                c
+            },
+            (),
+        );
+        assert_eq!(
+            collector.give_up(),
+            None,
+            "half of :showip is not an answer"
+        );
+    }
+
+    #[test]
+    fn which_shapes_chanserv_answers() {
+        for shape in [
+            AdminShape::RegisterChannel,
+            AdminShape::UnregisterChannel,
+            AdminShape::ChannelHistory,
+            AdminShape::ChannelAntispam,
+            AdminShape::ChannelBanList,
+            AdminShape::ChannelMuteList,
+        ] {
+            assert!(shape.is_chanserv(), "{shape:?}");
+            assert!(shape.names_channel(), "{shape:?}");
+        }
+        for shape in [AdminShape::ShowIp, AdminShape::RefreshIp] {
+            assert!(shape.is_chanserv(), "{shape:?}");
+            assert!(!shape.names_channel(), "{shape:?}");
+        }
+        assert!(!AdminShape::BanList.is_chanserv());
+        assert!(!AdminShape::BanList.names_channel());
     }
 
     /// The frontend reads these by field name, so the names are part of the

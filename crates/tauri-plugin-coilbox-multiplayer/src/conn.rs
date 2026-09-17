@@ -610,8 +610,28 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                         }
                     }
 
+                    // ChanServ's reply to a ChanServ admin command is a private
+                    // message. Offered to the command before the reducer, which
+                    // would otherwise store and log it as chat.
+                    let claimed = match &msg {
+                        ServerMessage::SaidPrivate { username, message } => {
+                            let heard = admin.hear_private(
+                                username,
+                                message,
+                                tokio::time::Instant::now(),
+                            );
+                            outbound.extend(heard.send);
+                            heard.claimed
+                        }
+                        _ => false,
+                    };
+
                     let now = now_ms();
-                    let deltas = reduce_at(&mut lock_or_recover(&state), msg, now);
+                    let deltas = if claimed {
+                        Vec::new()
+                    } else {
+                        reduce_at(&mut lock_or_recover(&state), msg, now)
+                    };
                     for delta in deltas {
                         if let Delta::PrivateMessage { from } = &delta {
                             let last = lock_or_recover(&state)
@@ -1347,6 +1367,66 @@ mod tests {
             !heard.contains(r#""text":"GETIP failed."#),
             "the refusal sentence must not be a toast:\n{heard}"
         );
+    }
+
+    /// Issue #2782. ChanServ's private reply to a ChanServ command goes to the
+    /// command, and never into the ChanServ chat thread. A ChanServ message
+    /// that is not the answer still does.
+    #[tokio::test]
+    async fn a_chanserv_answer_goes_to_the_command_and_not_the_chat() {
+        let (addr, lobby_says, mut heard) = lobby_that_listens().await;
+        let (seen, events) = recording_channel();
+        let (registry, key, _logs) = handshake(addr, LoginMode::Login, events).await;
+
+        let asked = tokio::spawn({
+            let (registry, key) = (registry.clone(), key.clone());
+            async move {
+                crate::admin_command::send(
+                    &registry,
+                    &key,
+                    "listmutes",
+                    &["main".to_string()],
+                    coilbox_lobby_protocol::AdminShape::ChannelMuteList,
+                    PATIENCE,
+                )
+                .await
+            }
+        });
+        lobby_hears(&mut heard, "SAYPRIVATE ChanServ :listmutes main").await;
+        for line in [
+            // uberserver echoes the sender's own private message first.
+            "SAYPRIVATE ChanServ :listmutes main",
+            "SAIDPRIVATE ChanServ  -- Mutelist for main -- ",
+            "SAIDPRIVATE ChanServ Hello from ChanServ",
+            "SAIDPRIVATE ChanServ Spammer :: flooding :: ends 2026-09-17 12:19:15 (cbmod)",
+            "SAIDPRIVATE ChanServ  -- End Mutelist -- ",
+        ] {
+            lobby_says
+                .send(line.to_string())
+                .expect("the lobby is listening");
+        }
+
+        let outcome = asked.await.expect("the command task").expect("an outcome");
+        let crate::admin_command::AdminOutcome::Answered {
+            reply: coilbox_lobby_protocol::AdminReply::ChannelMuteList { entries },
+        } = outcome
+        else {
+            panic!("expected a mute list, got {outcome:?}");
+        };
+        assert_eq!(entries.len(), 1);
+
+        wait_until_heard(&seen, r#""from":"ChanServ""#).await;
+        let state = lock_or_recover(&registry)
+            .get(&key)
+            .expect("still connected")
+            .state
+            .clone();
+        let thread: Vec<String> = lock_or_recover(&state)
+            .dms
+            .get("ChanServ")
+            .map(|t| t.iter().map(|m| m.text.clone()).collect())
+            .unwrap_or_default();
+        assert_eq!(thread, vec!["Hello from ChanServ".to_string()]);
     }
 
     /// The second command is not written until the first has answered, so a

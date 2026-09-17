@@ -929,7 +929,7 @@ fn mp_get_user_info(registry: State<'_, Registry>, server_key: String) -> CliRes
 
 /// `mp_admin_command` - send a moderator or admin command to uberserver and
 /// wait for its outcome: the parsed answer, the server's refusal, or nothing
-/// within [`admin_command::ADMIN_REPLY_TIMEOUT`].
+/// within [`admin_command::patience_for`] the reply shape.
 ///
 /// Commands on one connection go one at a time, so this can take several
 /// timeouts to settle behind others. The lines that answer never reach the
@@ -949,7 +949,7 @@ async fn mp_admin_command(
         &command,
         &args,
         shape,
-        admin_command::ADMIN_REPLY_TIMEOUT,
+        admin_command::patience_for(shape),
     )
     .await;
     Ok(match sent.map(serde_json::to_value) {

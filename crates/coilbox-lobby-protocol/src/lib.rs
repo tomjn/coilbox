@@ -32,7 +32,7 @@ mod vote;
 
 pub use admin_reply::{
     AccountDetails, AdminCollector, AdminReply, AdminShape, BanEntry, BlacklistEntry,
-    BridgedDetails, Heard, IpBinding, UserInfo,
+    BridgedDetails, ChannelBanEntry, ChannelMuteEntry, Heard, IpBinding, UserInfo,
 };
 pub use hash::password_hash;
 pub use login::{LoginConfig, LoginMachine, LoginMode, LoginPhase};
