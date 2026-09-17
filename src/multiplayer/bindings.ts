@@ -805,6 +805,20 @@ export const mpGetUserInfo = defineCommand<
  * - `unban`: `UNBAN <target>`
  * - `resetUserPassword`: `RESETUSERPASSWORD <username> [email]`
  * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
+ *
+ * The rest are ChanServ commands. Send the command word without its colon
+ * (`register`), and the plugin sends `SAYPRIVATE ChanServ :register <args>`.
+ * Channel commands take the bare channel name first, with no `#`.
+ *
+ * - `registerChannel`: `:register <chan> [founder]`
+ * - `unregisterChannel`: `:unregister <chan>`
+ * - `channelHistory`: `:history <chan> on|off`
+ * - `channelAntispam`: `:antispam <chan> on|off`
+ * - `channelBanList`: `:listbans <chan>`
+ * - `channelMuteList`: `:listmutes <chan>`
+ * - `showIp`: `:showip`
+ * - `refreshIp`: `:refreship`, answered twice, and waits up to 70 seconds
+ *   for the second line
  */
 export type AdminShape =
   | "banList"
@@ -819,7 +833,15 @@ export type AdminShape =
   | "banSpecific"
   | "unban"
   | "resetUserPassword"
-  | "noReply";
+  | "noReply"
+  | "registerChannel"
+  | "unregisterChannel"
+  | "channelHistory"
+  | "channelAntispam"
+  | "channelBanList"
+  | "channelMuteList"
+  | "showIp"
+  | "refreshIp";
 
 /** One `LISTBANS` line. uberserver's `None` arrives as null. */
 export interface BanEntry {
@@ -835,6 +857,24 @@ export interface BanEntry {
 export interface BlacklistEntry {
   domain: string;
   reason: string;
+  issuer: string;
+}
+
+/** One line of ChanServ's `:listbans <chan>`. */
+export interface ChannelBanEntry {
+  username: string;
+  /** Null for a bridged user, whose ban names no address. */
+  ip: string | null;
+  reason: string;
+  ends: string;
+  issuer: string;
+}
+
+/** One line of ChanServ's `:listmutes <chan>`. */
+export interface ChannelMuteEntry {
+  username: string;
+  reason: string;
+  ends: string;
   issuer: string;
 }
 
@@ -901,7 +941,29 @@ export type AdminReply =
   | { shape: "ban"; success: boolean; message: string }
   | { shape: "banSpecific"; success: boolean; message: string }
   | { shape: "unban"; success: boolean; message: string }
-  | { shape: "resetUserPassword"; success: boolean; message: string };
+  | { shape: "resetUserPassword"; success: boolean; message: string }
+  | { shape: "registerChannel"; channel: string; founder: string }
+  | { shape: "unregisterChannel"; channel: string }
+  | { shape: "channelHistory"; channel: string; on: boolean }
+  | { shape: "channelAntispam"; channel: string; on: boolean }
+  | { shape: "channelBanList"; entries: ChannelBanEntry[] }
+  | { shape: "channelMuteList"; entries: ChannelMuteEntry[] }
+  | {
+      shape: "showIp";
+      onlineIp: string;
+      /** Null when the server looks the address up itself. */
+      onlineOverride: string | null;
+      localIp: string;
+      localOverride: string | null;
+    }
+  | {
+      shape: "refreshIp";
+      /** ChanServ's first line. */
+      started: string;
+      /** ChanServ's second line, or null if it had not arrived in time. */
+      result: string | null;
+      failed: boolean;
+    };
 
 /** How an admin command ended. Mirrors the Rust `AdminOutcome`. */
 export type AdminOutcome =
