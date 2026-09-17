@@ -123,6 +123,29 @@ export function serverAddressFromKey(serverKey: string): string {
   return serverKey.slice(serverKey.indexOf("@") + 1);
 }
 
+/** The `username` half of a `serverKey`, e.g. for a sidebar heading that
+ * names which account a grouped connection belongs to (issue #2843). */
+export function usernameFromKey(serverKey: string): string {
+  return serverKey.slice(0, serverKey.indexOf("@"));
+}
+
+/**
+ * The configured display name of the server a `serverKey` names, matched the
+ * same way {@link protocolForKey} matches protocol (host:port against the
+ * built-in catalog plus the user's own servers, not the profile-filtered
+ * list). Falls back to the bare `host:port` for a key naming a server no
+ * longer in the catalog, or a direct room, which has no catalog entry at all.
+ */
+export function serverNameFor(
+  serverKey: string,
+  servers: LobbyServer[],
+): string {
+  const server = servers.find((s) =>
+    serverKey.endsWith(`@${s.host}:${s.port}`),
+  );
+  return server?.name ?? serverAddressFromKey(serverKey);
+}
+
 /**
  * Why a connect must not go ahead, or null when it may. Pure.
  *
@@ -2146,6 +2169,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         }
         report={mirror.state?.debriefing ?? null}
         myUsername={mirror.state?.myUsername ?? null}
+        serverKey={focusKey}
         onClose={closeDebriefing}
       />
     </MultiplayerContext.Provider>
@@ -2177,4 +2201,19 @@ export function useConnection(
 ): ConnectionState | null {
   const { connections } = useMultiplayer();
   return serverKey != null ? (connections[serverKey] ?? null) : null;
+}
+
+/**
+ * The server catalog {@link protocolForKey} and {@link serverNameFor} match
+ * against, for a caller reading a connection's protocol or display name by a
+ * `serverKey` that is not necessarily the active one (issue #2843). Built-ins
+ * plus the user's own servers, deliberately not profile-filtered, matching
+ * the reasoning behind the provider's own `protocol` field.
+ */
+export function useProtocolServers(): LobbyServer[] {
+  const [customCfg] = useCustomServers();
+  return useMemo(
+    () => [...BUILTIN_SERVERS, ...customCfg.servers],
+    [customCfg.servers],
+  );
 }

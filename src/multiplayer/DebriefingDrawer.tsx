@@ -44,18 +44,28 @@ export function DebriefingDrawer({
   open,
   report,
   myUsername,
+  serverKey,
   onClose,
 }: {
   open: boolean;
   report: Debriefing | null;
   myUsername: string | null;
+  /** The connection this debriefing arrived on (issue #2843), so "Open chat"
+   * lands on that server even when another is focused. Omitted falls back to
+   * the active connection, same as any other old-style chat link. */
+  serverKey?: string | null;
   onClose: () => void;
 }) {
   const me = report?.players.find((player) => player.name === myUsername);
   const navigate = useNavigate();
   function openChatChannel(channel: string) {
     onClose();
-    navigate(conversationHref({ kind: "channel", name: channel }));
+    navigate(
+      conversationHref(
+        { kind: "channel", name: channel },
+        serverKey ?? undefined,
+      ),
+    );
   }
 
   return createPortal(

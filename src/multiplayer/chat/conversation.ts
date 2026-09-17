@@ -8,6 +8,15 @@ export type ConversationDescriptor =
   | { kind: "dm"; peer: string }
   | { kind: "battle"; id: number; channel: string };
 
+/** A conversation plus the connection it is open on (issue #2843): the chat
+ * page's current selection. A `#main` on one server and a `#main` on another
+ * are different rooms with the same `convId`, so the active conversation is
+ * never just a descriptor once more than one connection can be open. */
+export interface ActiveConversation {
+  serverKey: string;
+  desc: ConversationDescriptor;
+}
+
 /** The TASServer auto-joins a per-battle channel named `__battle__<id>`; these
  * are surfaced as battle conversations, not listed among real channels. */
 export function isBattleChannel(name: string): boolean {
@@ -96,14 +105,24 @@ export function conversationMessages(
  * A battle points here by its underlying channel, the same one `convId`
  * uses. Arriving this way opens it as a plain channel rather than the
  * battle-flavoured view the room itself shows, which is close enough for
- * "read what was said here", the only thing an outside link needs. */
-export function conversationHref(d: ConversationDescriptor): string {
+ * "read what was said here", the only thing an outside link needs.
+ *
+ * `serverKey` names which connection the conversation is on (issue #2843), so
+ * a link built while logged in to several servers opens the right one rather
+ * than whichever happens to be active when it's followed. Omitted it falls
+ * back to the active connection, which keeps every pre-existing caller and
+ * link working unchanged. */
+export function conversationHref(
+  d: ConversationDescriptor,
+  serverKey?: string,
+): string {
   const params =
     d.kind === "dm"
       ? new URLSearchParams({ dm: d.peer })
       : new URLSearchParams({
           channel: d.kind === "channel" ? d.name : d.channel,
         });
+  if (serverKey) params.set("server", serverKey);
   return `/chat?${params.toString()}`;
 }
 

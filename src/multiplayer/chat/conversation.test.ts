@@ -122,6 +122,23 @@ describe("conversationHref", () => {
       conversationHref({ kind: "battle", id: 42, channel: "__battle__42" }),
     ).toBe("/chat?channel=__battle__42");
   });
+
+  // Issue #2843: naming a connection so a link opens the right server rather
+  // than whichever happens to be active when it's followed.
+  it("names the connection when given a serverKey", () => {
+    expect(
+      conversationHref(
+        { kind: "channel", name: "main" },
+        "AF@server4.beyondallreason.info:8201",
+      ),
+    ).toBe(
+      "/chat?channel=main&server=AF%40server4.beyondallreason.info%3A8201",
+    );
+  });
+
+  it("omits the server param when no serverKey is given, matching an old link", () => {
+    expect(conversationHref({ kind: "dm", peer: "bob" })).toBe("/chat?dm=bob");
+  });
 });
 
 describe("resolveConversationRequest", () => {
