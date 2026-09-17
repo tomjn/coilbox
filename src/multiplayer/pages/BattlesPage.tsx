@@ -119,8 +119,10 @@ function ServerBattles({
   /** This connection's battles, scoped but not filtered. */
   totalCount: number;
   pending: MutableRefObject<PendingEntry>;
-  /** Only the focused connection is handed a jump's draft, map and title. */
+  /** Only the connection `SkirmishPage` resolved hosting to (issue #2847,
+   * `hostTargetKey` above) is handed a "Host as battle" draft and title. */
   hostDraft?: SkirmishDraft;
+  /** Only the focused connection is handed a map jump. */
   hostMap?: string;
   hostTitle?: string;
   /** Only the focused connection is handed a deep link to join. */
@@ -526,11 +528,19 @@ function BattlesPage() {
   // draft to host and a title. Preselect its game/map/title and, once the room
   // opens, forward the same draft to the battle room so it can seed the room's
   // options, start boxes, host seat and bots (see `BattleRoomPage`'s apply effect).
+  //
+  // `hostServerKey` is the connection `SkirmishPage` resolved it to when more
+  // than one could host (issue #2847): the draft is seeded there rather than
+  // wherever happens to be focused, which used to strand it on a connection
+  // that could not host at all (a live Tachyon connection focused ahead of
+  // the TASServer one the player actually meant).
   const hostState = location.state as {
     hostDraft?: SkirmishDraft;
     hostTitle?: string;
+    hostServerKey?: string;
   } | null;
   const hostDraft = hostState?.hostDraft;
+  const hostTargetKey = hostState?.hostServerKey ?? activeKey;
 
   // A confirmed coilbox://join deep link (issue #388) navigates here with the
   // target server and battle id. Join only when already connected to a server
@@ -840,6 +850,7 @@ function BattlesPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         {liveKeys.map((key) => {
           const focused = key === activeKey;
+          const hosting = key === hostTargetKey;
           return (
             <ServerBattles
               key={key}
@@ -848,9 +859,9 @@ function BattlesPage() {
               battles={lists[key]?.shown ?? []}
               totalCount={lists[key]?.scoped.length ?? 0}
               pending={pending}
-              hostDraft={focused ? hostDraft : undefined}
+              hostDraft={hosting ? hostDraft : undefined}
               hostMap={focused ? hostMap : undefined}
-              hostTitle={focused ? hostState?.hostTitle : undefined}
+              hostTitle={hosting ? hostState?.hostTitle : undefined}
               deeplinkJoin={focused ? deeplinkJoin : undefined}
               deeplinkHandled={deeplinkJoinHandledRef}
             />

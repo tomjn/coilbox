@@ -5,6 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -41,7 +47,9 @@ import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { mostRecentOpen } from "@/lib/recency";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
-import { useMultiplayer } from "@/multiplayer/store";
+import { AccountPicker } from "@/multiplayer/AccountPicker";
+import { liveHostableKeys } from "@/multiplayer/protocol";
+import { useMultiplayer, useProtocolServers } from "@/multiplayer/store";
 import { notify } from "@/notify/notify";
 import type { StartRect } from "@/startbox/geometry";
 import { isBoxMode, startPosNote } from "@/startbox/mode";
@@ -189,10 +197,24 @@ export default function SkirmishPage() {
   // Under Tachyon the server allocates a dedicated autohost from its own pool and a
   // client cannot host at all, so the same button is hidden while connected to one
   // (see `docs/tachyon-protocol.md`).
-  const { connected: mpConnected, protocol: mpProtocol } = useMultiplayer();
+  //
+  // With more than one connection open, hosting is possible as long as any of
+  // them can (issue #2847): `hostableKeys` is every live connection that is
+  // not Tachyon, focused first.
+  const { connections, activeKey } = useMultiplayer();
+  const hostServers = useProtocolServers();
+  const liveKeys = useMemo(
+    () => Object.keys(connections).filter((k) => connections[k].live),
+    [connections],
+  );
+  const hostableKeys = useMemo(
+    () => liveHostableKeys(connections, hostServers, activeKey),
+    [connections, hostServers, activeKey],
+  );
   // Logged out this stays true, so the preset drawer's "Host as battle" keeps
-  // showing the way it does today. Only a live Tachyon connection removes it.
-  const hostingPossible = mpProtocol !== "tachyon";
+  // showing the way it does today. Only being live on nothing but Tachyon
+  // connections removes it.
+  const hostingPossible = liveKeys.length === 0 || hostableKeys.length > 0;
 
   // Header overflow fix (issue #514): the Continue affordance goes icon-only,
   // with its full "Continue: <preset name>" text moved into this popover so a
@@ -536,17 +558,38 @@ export default function SkirmishPage() {
   const [pendingHost, setPendingHost] = useState<{
     draft: SkirmishDraft;
     title: string;
+    serverKey: string | null;
+  } | null>(null);
+  // A draft/title waiting on which server to host it on (issue #2847), when
+  // more than one live connection can. Cleared once the picker answers.
+  const [hostPick, setHostPick] = useState<{
+    draft: SkirmishDraft;
+    title: string;
   } | null>(null);
 
-  function hostAsBattle(draft: SkirmishDraft, title: string) {
+  function proceedHost(
+    draft: SkirmishDraft,
+    title: string,
+    serverKey: string | null,
+  ) {
     const installed =
       games.some((g) => g.name === draft.gameName) &&
       maps.some((m) => m.name === draft.mapName);
     if (installed) {
-      navigate("/battles", { state: { hostDraft: draft, hostTitle: title } });
+      navigate("/battles", {
+        state: { hostDraft: draft, hostTitle: title, hostServerKey: serverKey },
+      });
       return;
     }
-    setPendingHost({ draft, title });
+    setPendingHost({ draft, title, serverKey });
+  }
+
+  function hostAsBattle(draft: SkirmishDraft, title: string) {
+    if (hostableKeys.length > 1) {
+      setHostPick({ draft, title });
+      return;
+    }
+    proceedHost(draft, title, hostableKeys[0] ?? null);
   }
 
   async function onStart(parts: Participant[] = participants) {
@@ -825,7 +868,7 @@ export default function SkirmishPage() {
               </TooltipTrigger>
               <TooltipContent>Presets</TooltipContent>
             </Tooltip>
-            {mpConnected && hostingPossible && (
+            {hostableKeys.length > 0 && (
               <Button
                 variant="outline"
                 onClick={() =>
@@ -900,12 +943,37 @@ export default function SkirmishPage() {
               state: {
                 hostDraft: pendingHost.draft,
                 hostTitle: pendingHost.title,
+                hostServerKey: pendingHost.serverKey,
               },
             });
             setPendingHost(null);
           }}
           onCancel={() => setPendingHost(null)}
         />
+      )}
+
+      {hostPick && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setHostPick(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Host on which server?</DialogTitle>
+            </DialogHeader>
+            <AccountPicker
+              keys={hostableKeys}
+              value={hostableKeys[0]}
+              onChange={(serverKey) => {
+                const picked = hostPick;
+                setHostPick(null);
+                proceedHost(picked.draft, picked.title, serverKey);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
       <DebriefDrawer

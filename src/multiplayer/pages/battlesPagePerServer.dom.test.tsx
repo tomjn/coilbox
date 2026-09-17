@@ -106,7 +106,21 @@ vi.mock("../battles/BattleRowMapThumb", () => ({
   BattleRowMapThumb: () => null,
 }));
 vi.mock("../battles/HostBattleButton", () => ({
-  HostBattleButton: () => <button type="button">Host a battle</button>,
+  // Renders the seeded title when a "Host as battle" jump opened this
+  // section's form, so a test can see which server's section it landed on
+  // without driving the real popover open.
+  HostBattleButton: ({
+    initialTitle,
+    autoOpen,
+  }: {
+    initialTitle?: string;
+    autoOpen?: boolean;
+  }) => (
+    <button type="button">
+      Host a battle
+      {autoOpen && initialTitle ? ` (seeded: ${initialTitle})` : ""}
+    </button>
+  ),
 }));
 
 vi.mock("../bindings", () => ({
@@ -231,9 +245,9 @@ async function fire(serverKey: string, ev: LobbyEvent) {
   });
 }
 
-async function openPage() {
+async function openPage(state?: unknown) {
   render(
-    <MemoryRouter initialEntries={["/battles"]}>
+    <MemoryRouter initialEntries={[{ pathname: "/battles", state }]}>
       <MultiplayerProvider>
         <Routes>
           <Route path="/battles" element={<BattlesRoute />} />
@@ -302,6 +316,35 @@ describe("the Battles page with two connections", () => {
     });
 
     expect(location).toBe(`/battle?server=${encodeURIComponent(KEY_B)}`);
+  });
+});
+
+describe("Host as battle: which server gets the seeded draft", () => {
+  it("seeds the connection SkirmishPage resolved, not the focused one", async () => {
+    // Neither connection is in a battle, so the page is the plain two-section
+    // list rather than the "leave and join" prompt the other block covers.
+    wire.states.set(KEY_A, lobbyState("AF", [], null));
+    wire.states.set(KEY_B, lobbyState("Zeta", [], null));
+    await openPage({
+      hostDraft: {
+        participants: [],
+        gameName: "Game",
+        mapName: "Map",
+        startPosType: 0,
+        modOptionValues: {},
+      },
+      hostTitle: "My hosted skirmish",
+      hostServerKey: KEY_B,
+    });
+
+    // KEY_A is focused (first of the reattached keys) and renders first, but
+    // SkirmishPage asked for the draft to land on KEY_B (issue #2847), so
+    // only KEY_B's section shows it seeded.
+    const buttons = screen.getAllByRole("button", { name: /Host a battle/ });
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "Host a battle",
+      "Host a battle (seeded: My hosted skirmish)",
+    ]);
   });
 });
 
