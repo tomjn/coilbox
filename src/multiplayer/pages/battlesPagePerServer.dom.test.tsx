@@ -22,11 +22,11 @@ import {
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Battle, LobbyEvent, LobbyState } from "../bindings";
 import {
   installSettingsStorage,
   memorySettingsStorage,
 } from "../../lib/storedSetting";
+import type { Battle, LobbyEvent, LobbyState } from "../bindings";
 
 interface FakeChannel {
   onmessage?: (ev: LobbyEvent) => void;

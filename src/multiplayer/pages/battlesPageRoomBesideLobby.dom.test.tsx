@@ -21,11 +21,11 @@ import { act, cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Battle, LobbyEvent, LobbyState } from "../bindings";
 import {
   installSettingsStorage,
   memorySettingsStorage,
 } from "../../lib/storedSetting";
+import type { Battle, LobbyEvent, LobbyState } from "../bindings";
 
 interface FakeChannel {
   onmessage?: (ev: LobbyEvent) => void;

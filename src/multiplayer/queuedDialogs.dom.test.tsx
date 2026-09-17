@@ -19,11 +19,11 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BUILTIN_SERVERS } from "../lobby-servers/config";
 import {
   installSettingsStorage,
   memorySettingsStorage,
 } from "../lib/storedSetting";
+import { BUILTIN_SERVERS } from "../lobby-servers/config";
 import type { LobbyEvent, LobbyState } from "./bindings";
 
 interface FakeChannel {

@@ -19,11 +19,11 @@
 
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import {
   installSettingsStorage,
   memorySettingsStorage,
 } from "../lib/storedSetting";
+import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import type { LobbyEvent, LobbyState } from "./bindings";
 
 interface FakeChannel {
