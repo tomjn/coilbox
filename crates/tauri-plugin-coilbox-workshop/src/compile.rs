@@ -592,7 +592,22 @@ fn menu_block(builder: &str, ops: &[BuildMenuOp]) -> String {
         "        end".to_string(),
         "      end".to_string(),
         "    end".to_string(),
-        "    local list = def[key] or {}".to_string(),
+        // Every numbered entry in key order, closed up. Games comment entries
+        // out and leave gaps in the numbering, and the engine keeps what
+        // follows a gap, which `#` and `table.remove` would not.
+        "    local list = {}".to_string(),
+        "    if type(def[key]) == \"table\" then".to_string(),
+        "      local keys = {}".to_string(),
+        "      for i in pairs(def[key]) do".to_string(),
+        "        if type(i) == \"number\" then".to_string(),
+        "          keys[#keys + 1] = i".to_string(),
+        "        end".to_string(),
+        "      end".to_string(),
+        "      table.sort(keys)".to_string(),
+        "      for _, i in ipairs(keys) do".to_string(),
+        "        list[#list + 1] = def[key][i]".to_string(),
+        "      end".to_string(),
+        "    end".to_string(),
         "    local function at(unit)".to_string(),
         "      for i = 1, #list do".to_string(),
         "        if string.lower(tostring(list[i])) == unit then".to_string(),
@@ -662,8 +677,15 @@ fn disabled_block(disabled: &[String]) -> String {
          \x20 for _, def in pairs(UnitDefs) do\n\
          \x20   for key, list in pairs(def) do\n\
          \x20     if string.lower(key) == \"buildoptions\" and type(list) == \"table\" then\n\
+         \x20       local keys = {{}}\n\
+         \x20       for i in pairs(list) do\n\
+         \x20         if type(i) == \"number\" then\n\
+         \x20           keys[#keys + 1] = i\n\
+         \x20         end\n\
+         \x20       end\n\
+         \x20       table.sort(keys)\n\
          \x20       local kept = {{}}\n\
-         \x20       for i = 1, #list do\n\
+         \x20       for _, i in ipairs(keys) do\n\
          \x20         if not off[string.lower(tostring(list[i]))] then\n\
          \x20           kept[#kept + 1] = list[i]\n\
          \x20         end\n\

@@ -64,6 +64,23 @@ fn a_build_menu_block_replays_the_operations_the_editor_recorded() {
     );
 }
 
+/// Tech Annihilation comments entries out of its build lists and leaves the
+/// numbers after them as they were. The engine keeps every numbered entry, so
+/// a replay that stopped at the first gap would drop the rest from the game.
+#[test]
+fn a_build_menu_with_gaps_keeps_every_entry_after_them() {
+    let out = run(
+        json!({ "menus": { "armcom": [{ "op": "add", "unit": "armpw" }] } }),
+        r#"{ armcom = { buildoptions = {
+            [1] = "armwin", [2] = "armsolar", [4] = "armgeo_mini", [9] = "armmstor",
+        } } }"#,
+    );
+    assert_eq!(
+        out["armcom"]["buildoptions"],
+        json!(["armwin", "armsolar", "armgeo_mini", "armmstor", "armpw"])
+    );
+}
+
 /// The game spells the key, not us. A definition writing `buildOptions` has to
 /// come back with `buildOptions` rewritten and no second key beside it.
 #[test]
@@ -120,6 +137,22 @@ fn switching_a_unit_off_clears_it_from_every_build_menu() {
         .map(|list| list.is_empty())
         .unwrap_or(true));
     assert_eq!(out["armflash"]["maxdamage"], json!(100));
+}
+
+/// Switching a unit off rewrites every list, so a list with gaps in its
+/// numbering has to come back with everything after the gaps still in it.
+#[test]
+fn switching_a_unit_off_keeps_the_entries_after_a_gap() {
+    let out = run(
+        json!({ "disabled": ["armsolar"] }),
+        r#"{ armcom = { buildoptions = {
+            [1] = "armwin", [2] = "armsolar", [4] = "armgeo_mini", [9] = "armmstor",
+        } } }"#,
+    );
+    assert_eq!(
+        out["armcom"]["buildoptions"],
+        json!(["armwin", "armgeo_mini", "armmstor"])
+    );
 }
 
 /// A whole definition standing in for one the game loaded replaces it rather
