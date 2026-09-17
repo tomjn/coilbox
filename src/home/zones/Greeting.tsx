@@ -133,11 +133,14 @@ export function connectedNames(
   connections: Connections,
   focusKey: string | null,
 ): string[] {
-  return liveConnectionKeys(connections, focusKey)
+  const names = liveConnectionKeys(connections, focusKey)
     .map((key) => connections[key])
     .filter((c) => c.mirror.phase === "ready")
     .map((c) => c.mirror.state?.myUsername ?? null)
     .filter((name): name is string => name != null);
+  // The same account can be logged in to more than one server, and the
+  // heading names a person once (#2915).
+  return [...new Set(names)];
 }
 
 /**

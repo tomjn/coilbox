@@ -397,6 +397,61 @@ describe("Greeting zone", () => {
     expect(render().heading).toBe("Welcome back Kip and 2 others");
   });
 
+  it("greets once when the same account is logged in to two servers", () => {
+    lobby.mockReturnValue({
+      activeKey: "a",
+      connections: {
+        a: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "AF_" } },
+        },
+        b: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "AF_" } },
+        },
+      },
+    });
+    expect(render().heading).toBe("Welcome back AF_");
+  });
+
+  it("still greets both when two connections carry different names", () => {
+    lobby.mockReturnValue({
+      activeKey: "a",
+      connections: {
+        a: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Zephyr" } },
+        },
+        b: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Kip" } },
+        },
+      },
+    });
+    expect(render().heading).toBe("Welcome back Zephyr and Kip");
+  });
+
+  it("collapses a repeat among three connections down to the two distinct names", () => {
+    lobby.mockReturnValue({
+      activeKey: "a",
+      connections: {
+        a: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Zephyr" } },
+        },
+        b: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Kip" } },
+        },
+        c: {
+          live: true,
+          mirror: { phase: "ready", state: { myUsername: "Zephyr" } },
+        },
+      },
+    });
+    expect(render().heading).toBe("Welcome back Zephyr and Kip");
+  });
+
   it("leaves out a connection that is live but has not reached ready yet", () => {
     lobby.mockReturnValue({
       activeKey: "a",
