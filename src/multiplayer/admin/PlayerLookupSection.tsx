@@ -328,6 +328,118 @@ function KickAction({
 }
 
 /**
+ * `DELETEACCOUNT <username>` (issue #2787): admin-only, in uberserver's
+ * `restricted['admin']` set like `SETACCESS`, so it sits behind
+ * `<AdminOnly>` the same way. It cannot be undone, so the confirm step
+ * lists what `in_DELETEACCOUNT` does, in order, and stays disabled until
+ * the admin types the account's name: banning its email for 28 days (only
+ * when it has one), kicking it, scrubbing it (a fresh password, cleared
+ * email, access reset to `user`, bot flag and in-game time cleared), and
+ * the scrubbed account's own inactivity rule deleting it 28 days after
+ * that with no login.
+ *
+ * The reply is up to three lines: the email ban, the kick, and the
+ * scheduling line, the last from a database callback that can land a
+ * moment after the first two. `User <username> does not exist` and `User
+ * <username> no longer exists` are shown as a refusal rather than as
+ * whichever of the other lines happened to arrive.
+ */
+function DeleteAccountAction({
+  username,
+  email,
+  serverKey,
+}: {
+  username: string;
+  email: string | null;
+  serverKey: string;
+}) {
+  const [typed, setTyped] = useState("");
+  const request = useAdminRequest(serverKey);
+  const canSubmit = typed.trim() === username;
+
+  const confirm = () => {
+    if (!canSubmit) return;
+    void request.send("DELETEACCOUNT", [username], "deleteAccount");
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="destructive" size="sm" className="h-8">
+          Delete account…
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-80 flex-col gap-3">
+        <h3 className="text-sm font-medium">Delete {username}?</h3>
+        <p className="text-xs text-muted-foreground">This cannot be undone:</p>
+        <ul className="list-disc pl-4 text-xs text-muted-foreground">
+          {email && <li>Bans {email} for 28 days.</li>}
+          <li>Kicks {username} from the server.</li>
+          <li>
+            Sets a new password, clears its email, resets its access to user,
+            and clears its bot flag and in-game time.
+          </li>
+          <li>
+            With no in-game time left, the server deletes the account 28 days
+            after its last login.
+          </li>
+        </ul>
+        <span className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Type {username} to confirm
+          <Input
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            aria-label={`Type ${username} to confirm`}
+            className="h-8"
+            {...identifierFieldProps}
+          />
+        </span>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            className="h-8"
+            onClick={confirm}
+            disabled={!canSubmit || request.state.status === "sending"}
+          >
+            Delete account
+          </Button>
+        </div>
+        <AdminRequestStatus
+          state={request.state}
+          unanswered="The server did not answer."
+        >
+          {(reply) =>
+            reply.shape === "deleteAccount" ? (
+              reply.refusal ? (
+                <Alert variant="destructive">
+                  <TriangleAlert />
+                  <AlertTitle>The server refused</AlertTitle>
+                  <AlertDescription>{reply.refusal}</AlertDescription>
+                </Alert>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {reply.banMessage && <li>{reply.banMessage}</li>}
+                  {reply.kicked !== null && (
+                    <li>
+                      {reply.kicked
+                        ? `Kicked ${username} from the server.`
+                        : `${username} was not online.`}
+                    </li>
+                  )}
+                  {reply.scheduled && <li>{reply.scheduled}</li>}
+                </ul>
+              )
+            ) : null
+          }
+        </AdminRequestStatus>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
  * Opens the Bans tool on the Server admin page with this account's name
  * filled into the `BAN` form (issues #2778 and #2918). Handed off through
  * `?ban=` and `?tool=` rather than a prop, so `PlayerLookupSection` and `BansSection` stay
@@ -442,6 +554,13 @@ function AccountInfoView({
                   username={info.username}
                   serverKey={serverKey}
                   onChanged={() => onPickName(info.username)}
+                />
+              </AdminOnly>
+              <AdminOnly>
+                <DeleteAccountAction
+                  username={info.username}
+                  email={info.email}
+                  serverKey={serverKey}
                 />
               </AdminOnly>
             </div>

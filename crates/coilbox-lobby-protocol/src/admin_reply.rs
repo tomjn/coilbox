@@ -132,6 +132,14 @@ pub enum AdminShape {
     /// ChanServ's `:refreship`: a line straight away, and a second when the
     /// server has looked its address up again.
     RefreshIp,
+    /// `DELETEACCOUNT <username>`: up to three lines. `User <username> does
+    /// not exist` on its own when there is no such account. Otherwise the
+    /// email ban's `BANSPECIFIC`-shaped line (only when the account has an
+    /// email on file), then the `KICK`-shaped line, then either `Account
+    /// deletion of <username> scheduled by <admin>` or `User <username> no
+    /// longer exists`, the last from a database callback that can land a
+    /// moment after the first two.
+    DeleteAccount,
 }
 
 impl AdminShape {
@@ -420,6 +428,22 @@ pub enum AdminReply {
         /// The second line reports a failed lookup.
         failed: bool,
     },
+    DeleteAccount {
+        /// `User <username> does not exist` or `User <username> no longer
+        /// exists`, uberserver's own wording for a refusal. `None` on
+        /// success.
+        refusal: Option<String>,
+        /// The email ban's `BANSPECIFIC`-shaped line, only when the account
+        /// had an email on file.
+        ban_message: Option<String>,
+        /// The `KICK`-shaped line: `true` when it was kicked, `false` when
+        /// it was not online. `None` when refused before it ran.
+        kicked: Option<bool>,
+        /// `Account deletion of <username> scheduled by <admin>`, from a
+        /// database callback that can land a moment after the ban and kick
+        /// lines. `None` when refused, or when the wait ran out first.
+        scheduled: Option<String>,
+    },
 }
 
 /// What one `SERVERMSG` meant to the command waiting.
@@ -472,6 +496,15 @@ enum Progress {
     OnlineIp(String, Option<String>),
     /// `:refreship`'s first line has arrived.
     RefreshStarted(String),
+    /// `DELETEACCOUNT`'s ban and/or kick line has arrived, waiting on the
+    /// scheduling line or `no longer exists`. `kicked` is `None` until the
+    /// kick line lands, which tells the next line whether it is still the
+    /// kick line (an email present means the ban line comes first) or the
+    /// late one.
+    DeleteAccount {
+        ban_message: Option<String>,
+        kicked: Option<bool>,
+    },
 }
 
 /// The lines after the first of a normal account's answer.
@@ -956,6 +989,68 @@ impl AdminCollector {
                 }),
                 None => Heard::NotOurs,
             },
+            (AdminShape::DeleteAccount, Progress::Waiting) => {
+                if delete_account_missing_from(text) {
+                    return Heard::Finished(AdminReply::DeleteAccount {
+                        refusal: Some(text.to_string()),
+                        ban_message: None,
+                        kicked: None,
+                        scheduled: None,
+                    });
+                }
+                // No email on file: `in_KICK` runs unconditionally, so this
+                // is the kick line rather than the email ban's.
+                if let Some((_, kicked)) = kick_result_from(text) {
+                    self.progress = Progress::DeleteAccount {
+                        ban_message: None,
+                        kicked: Some(kicked),
+                    };
+                    return Heard::Collected;
+                }
+                // An email on file: the ban runs before the kick.
+                if let Some((_, message)) = ban_specific_result_from(text) {
+                    self.progress = Progress::DeleteAccount {
+                        ban_message: Some(message),
+                        kicked: None,
+                    };
+                    return Heard::Collected;
+                }
+                Heard::NotOurs
+            }
+            (AdminShape::DeleteAccount, Progress::DeleteAccount { kicked, .. })
+                if kicked.is_none() =>
+            {
+                let Some((_, k)) = kick_result_from(text) else {
+                    return Heard::NotOurs;
+                };
+                *kicked = Some(k);
+                Heard::Collected
+            }
+            (
+                AdminShape::DeleteAccount,
+                Progress::DeleteAccount {
+                    ban_message,
+                    kicked,
+                },
+            ) => {
+                if delete_account_scheduled_from(text) {
+                    return Heard::Finished(AdminReply::DeleteAccount {
+                        refusal: None,
+                        ban_message: ban_message.take(),
+                        kicked: *kicked,
+                        scheduled: Some(text.to_string()),
+                    });
+                }
+                if delete_account_gone_midway_from(text) {
+                    return Heard::Finished(AdminReply::DeleteAccount {
+                        refusal: Some(text.to_string()),
+                        ban_message: ban_message.take(),
+                        kicked: *kicked,
+                        scheduled: None,
+                    });
+                }
+                Heard::NotOurs
+            }
             _ => Heard::NotOurs,
         }
     }
@@ -988,6 +1083,17 @@ impl AdminCollector {
                 started,
                 result: None,
                 failed: false,
+            }),
+            // The ban and/or kick line arrived, so the admin is told that
+            // much even though the scheduling line never came.
+            Progress::DeleteAccount {
+                ban_message,
+                kicked,
+            } => Some(AdminReply::DeleteAccount {
+                refusal: None,
+                ban_message,
+                kicked,
+                scheduled: None,
             }),
             _ => None,
         }
@@ -1497,6 +1603,25 @@ fn set_access_result_from(text: &str) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// `in_DELETEACCOUNT`: `"User <%s> does not exist" % username`, sent alone
+/// when no account was found at all.
+fn delete_account_missing_from(text: &str) -> bool {
+    text.starts_with("User <") && text.ends_with("> does not exist")
+}
+
+/// `_deleteaccount_done`: `"User <%s> no longer exists" % username`, sent in
+/// place of the scheduling line when the account vanished between the kick
+/// and the scrub landing.
+fn delete_account_gone_midway_from(text: &str) -> bool {
+    text.starts_with("User <") && text.ends_with("> no longer exists")
+}
+
+/// `_deleteaccount_done`: `"Account deletion of <%s> scheduled by <%s>" %
+/// (username, admin)`.
+fn delete_account_scheduled_from(text: &str) -> bool {
+    text.starts_with("Account deletion of <") && text.contains("> scheduled by <")
 }
 
 #[cfg(test)]
@@ -2303,6 +2428,129 @@ mod tests {
         assert_eq!(
             AdminCollector::new(AdminShape::BanList).hear_ok(),
             Heard::NotOurs
+        );
+    }
+
+    /// `in_DELETEACCOUNT` with an account that has an email on file: the
+    /// `BANSPECIFIC`-shaped ban line, the `KICK`-shaped line, then the
+    /// scheduling line, which lands from a database callback that can be a
+    /// moment behind the first two (captured live against server B, issue
+    /// #2787).
+    #[test]
+    fn a_delete_account_with_an_email_is_three_lines() {
+        let (_, heard) = hear_all(
+            AdminShape::DeleteAccount,
+            &[
+                "Successfully banned trash2787a@example.com for 28.0 days",
+                "Kicked <trash2787a> from the server",
+                "Account deletion of <trash2787a> scheduled by <cbadmin>",
+            ],
+        );
+        assert_eq!(
+            heard,
+            vec![
+                Heard::Collected,
+                Heard::Collected,
+                Heard::Finished(AdminReply::DeleteAccount {
+                    refusal: None,
+                    ban_message: Some(
+                        "Successfully banned trash2787a@example.com for 28.0 days".into()
+                    ),
+                    kicked: Some(true),
+                    scheduled: Some(
+                        "Account deletion of <trash2787a> scheduled by <cbadmin>".into()
+                    ),
+                }),
+            ]
+        );
+    }
+
+    /// With no email on file, `in_KICK` alone runs before the scrub, so the
+    /// answer is two lines rather than three.
+    #[test]
+    fn a_delete_account_with_no_email_is_two_lines() {
+        let (_, heard) = hear_all(
+            AdminShape::DeleteAccount,
+            &[
+                "User <trash2787b> was not online",
+                "Account deletion of <trash2787b> scheduled by <cbadmin>",
+            ],
+        );
+        assert_eq!(
+            heard,
+            vec![
+                Heard::Collected,
+                Heard::Finished(AdminReply::DeleteAccount {
+                    refusal: None,
+                    ban_message: None,
+                    kicked: Some(false),
+                    scheduled: Some(
+                        "Account deletion of <trash2787b> scheduled by <cbadmin>".into()
+                    ),
+                }),
+            ]
+        );
+    }
+
+    /// A missing account is refused in one line, with no ban, kick or
+    /// scheduling line to follow.
+    #[test]
+    fn a_delete_account_of_a_missing_user_is_one_line() {
+        let (_, heard) = hear_all(AdminShape::DeleteAccount, &["User <Nobody> does not exist"]);
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::DeleteAccount {
+                refusal: Some("User <Nobody> does not exist".into()),
+                ban_message: None,
+                kicked: None,
+                scheduled: None,
+            })]
+        );
+    }
+
+    /// The account vanished between the kick and the scrub committing, so
+    /// `_deleteaccount_done` sends `no longer exists` instead of scheduling
+    /// it.
+    #[test]
+    fn a_delete_account_gone_midway_ends_on_the_late_line() {
+        let (_, heard) = hear_all(
+            AdminShape::DeleteAccount,
+            &[
+                "Kicked <trash2787c> from the server",
+                "User <trash2787c> no longer exists",
+            ],
+        );
+        assert_eq!(
+            heard,
+            vec![
+                Heard::Collected,
+                Heard::Finished(AdminReply::DeleteAccount {
+                    refusal: Some("User <trash2787c> no longer exists".into()),
+                    ban_message: None,
+                    kicked: Some(true),
+                    scheduled: None,
+                }),
+            ]
+        );
+    }
+
+    /// The wait can run out before the late line lands. The admin is told
+    /// what did happen rather than being left with a bare timeout.
+    #[test]
+    fn a_delete_account_with_no_late_line_is_answered_at_the_deadline() {
+        let mut c = AdminCollector::new(AdminShape::DeleteAccount);
+        assert_eq!(
+            c.hear("Kicked <trash2787d> from the server"),
+            Heard::Collected
+        );
+        assert_eq!(
+            c.give_up(),
+            Some(AdminReply::DeleteAccount {
+                refusal: None,
+                ban_message: None,
+                kicked: Some(true),
+                scheduled: None,
+            })
         );
     }
 
@@ -3136,6 +3384,14 @@ mod tests {
                 started: "Refreshing server IP".into(),
                 result: Some("IP refresh complete.".into()),
                 failed: false,
+            },
+            AdminReply::DeleteAccount {
+                refusal: None,
+                ban_message: Some(
+                    "Successfully banned trash2787a@example.com for 28.0 days".into(),
+                ),
+                kicked: Some(true),
+                scheduled: Some("Account deletion of <trash2787a> scheduled by <cbadmin>".into()),
             },
         ];
 
