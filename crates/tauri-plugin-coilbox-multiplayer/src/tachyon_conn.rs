@@ -593,6 +593,7 @@ async fn run_loop(mut socket: TachyonSocket, ctx: TachyonConnContext) {
                     break None;
                 }
                 Outbound::Line(line) => not_sent(&sink, &line),
+                Outbound::Admin(request) => not_sent(&sink, &request.line),
                 Outbound::SayPrivate { peer, .. } => not_sent(&sink, &format!("SAYPRIVATE {peer}")),
                 Outbound::SayPrivateEx { peer, .. } => {
                     not_sent(&sink, &format!("SAYPRIVATEEX {peer}"))

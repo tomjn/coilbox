@@ -412,8 +412,11 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                 // Zero-K has no `EXIT` to write and no agreement to confirm, and
                 // a Tachyon action never reaches a connection without a Tachyon
                 // client. A private message is queued by a command that refuses
-                // this connection before it gets here.
+                // this connection before it gets here, and so is an admin
+                // command, which dropped here tells its caller the connection
+                // ended.
                 Outbound::ConfirmAgreement { .. }
+                | Outbound::Admin(_)
                 | Outbound::SubmitRecoveryCode { .. }
                 | Outbound::Tachyon(_)
                 | Outbound::SayPrivate { .. }

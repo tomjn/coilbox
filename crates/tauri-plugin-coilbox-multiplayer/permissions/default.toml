@@ -16,6 +16,7 @@ permissions = [
   "allow-mp-change-email",
   "allow-mp-resend-verification",
   "allow-mp-get-user-info",
+  "allow-mp-admin-command",
   "allow-mp-disconnect",
   "allow-mp-cancel-connect",
   "allow-mp-wait-until-ready",

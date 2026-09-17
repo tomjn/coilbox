@@ -22,6 +22,7 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::sync::watch;
 use tokio_util::codec::{Framed, LinesCodec};
 
+use crate::admin_command::AdminQueue;
 use crate::dmlog::DmLog;
 use crate::lock_or_recover;
 use crate::relay_host::{OpenAnswer, OpenSlot};
@@ -50,9 +51,11 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 /// `Tachyon` is an action with no wire line at all, carried out by the Tachyon
 /// task in [`crate::tachyon_conn`]. `Zerok` is an action turned into one of
 /// Zero-K's own commands by [`crate::zerok_conn`], which owns the types it is
-/// built from.
+/// built from. `Admin` is a moderator or admin command that waits its turn
+/// and its answer (see [`crate::admin_command`]).
 pub enum Outbound {
     Line(String),
+    Admin(crate::admin_command::AdminRequest),
     SayPrivate { peer: String, text: String },
     SayPrivateEx { peer: String, text: String },
     ConfirmAgreement { code: Option<String> },
@@ -478,11 +481,15 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
     // never mistaken for why a later, unrelated drop happened.
     let mut last_server_msg: Option<String> = None;
 
+    // Moderator and admin commands, one on the wire at a time.
+    let mut admin = AdminQueue::default();
+
     let reason: Option<String> = 'conn: loop {
         // Each iteration collects the lines to write, then flushes them at the end,
         // so the single owned sink is only ever borrowed in one place.
         let mut outbound: Vec<String> = Vec::new();
         let mut shutdown = false;
+        let admin_deadline = admin.deadline();
 
         tokio::select! {
             item = framed.next() => match item {
@@ -693,7 +700,13 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                                 },
                             );
                         }
-                        emit(&sink, LobbyEvent::Delta { delta });
+                        // A line that answers the admin command on the wire
+                        // goes to that command and not to the frontend.
+                        let heard = admin.hear(&delta, tokio::time::Instant::now());
+                        outbound.extend(heard.send);
+                        if !heard.claimed {
+                            emit(&sink, LobbyEvent::Delta { delta });
+                        }
                     }
 
                     // Now that the denial delta has been emitted, tear the
@@ -710,6 +723,9 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
             },
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),
+                Outbound::Admin(request) => {
+                    outbound.extend(admin.push(request, tokio::time::Instant::now()));
+                }
                 Outbound::ConfirmAgreement { code } => {
                     let before = login.phase();
                     outbound.extend(login.submit_agreement_code(code.as_deref()));
@@ -788,6 +804,13 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                 }
             },
             _ = ping.tick() => outbound.push(command::ping(None)),
+            // The precondition keeps this branch off while nothing is on the
+            // wire. The sleep is still built, so it needs some instant.
+            _ = tokio::time::sleep_until(admin_deadline.unwrap_or_else(tokio::time::Instant::now)),
+                if admin_deadline.is_some() =>
+            {
+                outbound.extend(admin.expire(tokio::time::Instant::now()));
+            }
         }
 
         for line in outbound {
@@ -908,11 +931,23 @@ mod tests {
     /// `CLIENTIP` is one of those: it arrives because somebody else joined a
     /// battle, at a moment nothing on this connection chose.
     async fn lobby_that_says_what_it_is_told() -> (std::net::SocketAddr, UnboundedSender<String>) {
+        let (addr, says, _heard) = lobby_that_listens().await;
+        (addr, says)
+    }
+
+    /// The same lobby, handing back every line the client sent it after the
+    /// login, so a test can see what reached the wire and when.
+    async fn lobby_that_listens() -> (
+        std::net::SocketAddr,
+        UnboundedSender<String>,
+        mpsc::UnboundedReceiver<String>,
+    ) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("a free port");
         let addr = listener.local_addr().expect("a bound address");
         let (says, mut told) = mpsc::unbounded_channel::<String>();
+        let (hears, heard) = mpsc::unbounded_channel::<String>();
         tokio::spawn(async move {
             let Ok((stream, _)) = listener.accept().await else {
                 return;
@@ -937,7 +972,11 @@ mod tests {
                                 }
                                 line::login_info_end()
                             }
-                            _ => continue,
+                            _ => {
+                                // Nobody listening is fine: most tests only talk.
+                                let _ = hears.send(read);
+                                continue;
+                            }
                         };
                         if framed.send(reply).await.is_err() {
                             return;
@@ -951,7 +990,7 @@ mod tests {
                 }
             }
         });
-        (addr, says)
+        (addr, says, heard)
     }
 
     /// Run `mode`'s handshake against `addr` through the real connection task,
@@ -1185,6 +1224,222 @@ mod tests {
         assert!(
             lock_or_recover(&registry).contains_key(&key),
             "the connection ended on a CLIENTIP"
+        );
+    }
+
+    /// Wait for the lobby to be sent `wanted`, skipping the keepalive.
+    async fn lobby_hears(heard: &mut mpsc::UnboundedReceiver<String>, wanted: &str) {
+        loop {
+            let line = tokio::time::timeout(PATIENCE, heard.recv())
+                .await
+                .unwrap_or_else(|_| panic!("the lobby was never sent {wanted:?}"))
+                .expect("the lobby is listening");
+            if line == wanted {
+                return;
+            }
+            assert!(
+                line.starts_with("PING"),
+                "the lobby was sent {line:?} first"
+            );
+        }
+    }
+
+    /// Issue #2773. The lines that answer an admin command go to the command,
+    /// and a server announcement arriving in the middle of them still reaches
+    /// the frontend, where it becomes a toast.
+    #[tokio::test]
+    async fn an_admin_answer_goes_to_the_command_and_not_the_frontend() {
+        let (addr, lobby_says, mut heard) = lobby_that_listens().await;
+        let (seen, events) = recording_channel();
+        let (registry, key, _logs) = handshake(addr, LoginMode::Login, events).await;
+
+        let asked = tokio::spawn({
+            let (registry, key) = (registry.clone(), key.clone());
+            async move {
+                crate::admin_command::send(
+                    &registry,
+                    &key,
+                    "LISTBANS",
+                    &[],
+                    coilbox_lobby_protocol::AdminShape::BanList,
+                    PATIENCE,
+                )
+                .await
+            }
+        });
+        lobby_hears(&mut heard, "LISTBANS").await;
+        for line in [
+            "SERVERMSG -- Banlist --",
+            "SERVERMSG Server restarting in 5 minutes",
+            "SERVERMSG Spammer, 203.0.113.7, None :: 'flooding' :: ends 2026-10-01 00:00:00 (Mod)",
+            "SERVERMSG -- End Banlist --",
+        ] {
+            lobby_says
+                .send(line.to_string())
+                .expect("the lobby is listening");
+        }
+
+        let outcome = asked.await.expect("the command task").expect("an outcome");
+        let crate::admin_command::AdminOutcome::Answered {
+            reply: coilbox_lobby_protocol::AdminReply::BanList { entries },
+        } = outcome
+        else {
+            panic!("expected a ban list, got {outcome:?}");
+        };
+        assert_eq!(entries.len(), 1);
+
+        wait_until_heard(&seen, r#""text":"Server restarting in 5 minutes""#).await;
+        let heard = lock_or_recover(&seen).join("\n");
+        for answer in ["-- Banlist --", "Spammer, ", "-- End Banlist --"] {
+            assert!(
+                !heard.contains(&format!(r#""text":"{answer}"#)),
+                "{answer:?} answers the command and must not be a toast:\n{heard}"
+            );
+        }
+    }
+
+    /// uberserver refuses with a sentence and a tagged line. The command gets
+    /// the reason and the frontend gets neither, so no toast says it twice.
+    #[tokio::test]
+    async fn an_admin_refusal_goes_to_the_command_and_not_the_frontend() {
+        let (addr, lobby_says, mut heard) = lobby_that_listens().await;
+        let (seen, events) = recording_channel();
+        let (registry, key, _logs) = handshake(addr, LoginMode::Login, events).await;
+
+        let asked = tokio::spawn({
+            let (registry, key) = (registry.clone(), key.clone());
+            async move {
+                crate::admin_command::send(
+                    &registry,
+                    &key,
+                    "getip",
+                    &["Bob".to_string()],
+                    coilbox_lobby_protocol::AdminShape::IpLookup,
+                    PATIENCE,
+                )
+                .await
+            }
+        });
+        lobby_hears(&mut heard, "GETIP Bob").await;
+        for line in [
+            "SERVERMSG GETIP failed. Insufficient rights.",
+            "FAILED msg=Insufficient rights.\tcmd=GETIP",
+            "SERVERMSG after the refusal",
+        ] {
+            lobby_says
+                .send(line.to_string())
+                .expect("the lobby is listening");
+        }
+
+        assert_eq!(
+            asked.await.expect("the command task"),
+            Ok(crate::admin_command::AdminOutcome::Refused {
+                reason: "Insufficient rights.".to_string()
+            })
+        );
+        wait_until_heard(&seen, r#""text":"after the refusal""#).await;
+        let heard = lock_or_recover(&seen).join("\n");
+        assert!(
+            !heard.contains(r#""kind":"commandFailed""#),
+            "the tagged refusal must not be a toast:\n{heard}"
+        );
+        assert!(
+            !heard.contains(r#""text":"GETIP failed."#),
+            "the refusal sentence must not be a toast:\n{heard}"
+        );
+    }
+
+    /// The second command is not written until the first has answered, so a
+    /// slow answer to the first can never be read as the second's.
+    #[tokio::test]
+    async fn admin_commands_go_on_the_wire_one_at_a_time() {
+        let (addr, lobby_says, mut heard) = lobby_that_listens().await;
+        let (registry, key, _logs) =
+            handshake(addr, LoginMode::Login, Channel::new(|_| Ok(()))).await;
+        let ask = |command: &'static str, args: Vec<String>, shape| {
+            let (registry, key) = (registry.clone(), key.clone());
+            tokio::spawn(async move {
+                crate::admin_command::send(&registry, &key, command, &args, shape, PATIENCE).await
+            })
+        };
+
+        let bans = ask(
+            "LISTBANS",
+            vec![],
+            coilbox_lobby_protocol::AdminShape::BanList,
+        );
+        lobby_hears(&mut heard, "LISTBANS").await;
+        let ip = ask(
+            "GETIP",
+            vec!["Bob".to_string()],
+            coilbox_lobby_protocol::AdminShape::IpLookup,
+        );
+        // Long enough for the task to have taken the second request. It must
+        // still be holding it.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(
+            heard.try_recv().is_err(),
+            "GETIP was written while LISTBANS was waiting"
+        );
+
+        lobby_says
+            .send("SERVERMSG Banlist is empty".to_string())
+            .expect("the lobby is listening");
+        lobby_hears(&mut heard, "GETIP Bob").await;
+        lobby_says
+            .send("SERVERMSG <Bob> was recently bound to 198.51.100.4".to_string())
+            .expect("the lobby is listening");
+
+        assert!(matches!(
+            bans.await.expect("the command task"),
+            Ok(crate::admin_command::AdminOutcome::Answered {
+                reply: coilbox_lobby_protocol::AdminReply::BanList { .. }
+            })
+        ));
+        assert!(matches!(
+            ip.await.expect("the command task"),
+            Ok(crate::admin_command::AdminOutcome::Answered {
+                reply: coilbox_lobby_protocol::AdminReply::IpLookup { .. }
+            })
+        ));
+    }
+
+    /// Two servers at once. A line on one never answers a command waiting on
+    /// the other: that command runs out of time, and the line is an ordinary
+    /// toast on its own connection.
+    #[tokio::test]
+    async fn an_answer_on_one_connection_does_not_answer_another() {
+        let (addr_a, _a_says, mut a_heard) = lobby_that_listens().await;
+        let (addr_b, b_says, _b_heard) = lobby_that_listens().await;
+        let (registry_a, key_a, _logs_a) =
+            handshake(addr_a, LoginMode::Login, Channel::new(|_| Ok(()))).await;
+        let (b_seen, b_events) = recording_channel();
+        let (_registry_b, _key_b, _logs_b) = handshake(addr_b, LoginMode::Login, b_events).await;
+
+        let asked = tokio::spawn(async move {
+            crate::admin_command::send(
+                &registry_a,
+                &key_a,
+                "GETIP",
+                &["Bob".to_string()],
+                coilbox_lobby_protocol::AdminShape::IpLookup,
+                Duration::from_millis(300),
+            )
+            .await
+        });
+        lobby_hears(&mut a_heard, "GETIP Bob").await;
+        b_says
+            .send("SERVERMSG <Bob> was recently bound to 198.51.100.4".to_string())
+            .expect("the lobby is listening");
+
+        wait_until_heard(
+            &b_seen,
+            r#""text":"<Bob> was recently bound to 198.51.100.4""#,
+        )
+        .await;
+        assert_eq!(
+            asked.await.expect("the command task"),
+            Ok(crate::admin_command::AdminOutcome::Unanswered)
         );
     }
 
