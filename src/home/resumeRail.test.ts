@@ -56,6 +56,7 @@ vi.mock("../lobby-servers/config", async (importOriginal) => ({
 
 import ResumeRail, {
   loginOffer,
+  loginOffers,
   RAIL_CAP,
   RAIL_CARD_CLASS,
   RAIL_DIM_CLASS,
@@ -127,7 +128,7 @@ describe("railCards", () => {
   it("caps four runners-up at three", () => {
     const cards = railCards(
       [HERO, WARPATH, CONQUEST, CAMPAIGN, candidate("battle", "8v8")],
-      null,
+      [],
     );
     expect(cards).toHaveLength(RAIL_CAP);
     expect(cards.map((c) => c.title)).toEqual([
@@ -139,32 +140,32 @@ describe("railCards", () => {
 
   it("shows exactly two when there are two runners-up", () => {
     expect(
-      railCards([HERO, WARPATH, CONQUEST], null).map((c) => c.title),
+      railCards([HERO, WARPATH, CONQUEST], []).map((c) => c.title),
     ).toEqual(["Kestrel", "Orion Reach"]);
   });
 
   it("shows exactly one when there is one runner-up", () => {
-    expect(railCards([HERO, WARPATH], null).map((c) => c.title)).toEqual([
+    expect(railCards([HERO, WARPATH], []).map((c) => c.title)).toEqual([
       "Kestrel",
     ]);
   });
 
   it("shows nothing when the hero took the only candidate", () => {
-    expect(railCards([HERO], null)).toEqual([]);
+    expect(railCards([HERO], [])).toEqual([]);
   });
 
   it("shows nothing at all on a fresh install", () => {
-    expect(railCards([], null)).toEqual([]);
+    expect(railCards([], [])).toEqual([]);
   });
 
   it("never takes the head of the list, which is the hero's", () => {
-    expect(railCards([HERO, WARPATH], null).map((c) => c.title)).not.toContain(
+    expect(railCards([HERO, WARPATH], []).map((c) => c.title)).not.toContain(
       "Last setup",
     );
   });
 
   it("words each card from the collector, not from the zone", () => {
-    const [card] = railCards([HERO, CONQUEST], null);
+    const [card] = railCards([HERO, CONQUEST], []);
     // The same strings the Continue hero uses for the same run.
     expect(card.label).toBe("Conquest");
     expect(card.action).toBe("Resume conquest");
@@ -179,21 +180,21 @@ describe("the log-in card's slot", () => {
   it("holds a slot rather than competing for one", () => {
     // Four candidates with the hero taking one would fill the rail exactly, so a
     // login card that queued behind them would never appear.
-    const cards = railCards([HERO, WARPATH, CONQUEST, CAMPAIGN], offer);
+    const cards = railCards([HERO, WARPATH, CONQUEST, CAMPAIGN], [offer]);
     expect(cards).toHaveLength(RAIL_CAP);
     expect(cards.at(-1)?.title).toBe("AF_");
     expect(cards.map((c) => c.title)).not.toContain("Core Contingency");
   });
 
   it("comes last, so what you were doing reads first", () => {
-    expect(railCards([HERO, WARPATH], offer).map((c) => c.title)).toEqual([
+    expect(railCards([HERO, WARPATH], [offer]).map((c) => c.title)).toEqual([
       "Kestrel",
       "AF_",
     ]);
   });
 
   it("is the whole rail when there is nothing to resume", () => {
-    const cards = railCards([], offer);
+    const cards = railCards([], [offer]);
     expect(cards.map((c) => c.title)).toEqual(["AF_"]);
     expect(cards[0].label).toBe("Multiplayer");
     expect(cards[0].detail).toBe("Beyond All Reason");
@@ -203,7 +204,23 @@ describe("the log-in card's slot", () => {
   it("goes to the login screen, not to a connect", () => {
     // Clicking must never read the keychain, so the card is a link to the panel
     // that already lists this account, with the connect left to the user.
-    expect(railCards([], offer)[0].to).toBe("/lobby");
+    expect(railCards([], [offer])[0].to).toBe("/lobby");
+  });
+
+  it("shows one card per offer when there is more than one", () => {
+    const second = { account: account("a3", "Other"), server: TECHA };
+    const cards = railCards([], [offer, second]);
+    expect(cards.map((c) => c.title)).toEqual(["AF_", "Other"]);
+  });
+
+  it("leaves no room for a runner-up once the logins fill the cap", () => {
+    const two = [
+      offer,
+      { account: account("a3", "Other"), server: TECHA },
+      { account: account("a4", "Third"), server: BAR },
+    ];
+    const cards = railCards([HERO, WARPATH], two);
+    expect(cards.map((c) => c.title)).toEqual(["AF_", "Other", "Third"]);
   });
 });
 
@@ -261,6 +278,30 @@ describe("loginOffer", () => {
   });
 });
 
+describe("loginOffers", () => {
+  it("offers one card per remembered login rather than only the invite", () => {
+    const first = account("a1", "First", { openAtQuit: true });
+    const second = account("a2", "Second", {
+      serverId: "techa",
+      openAtQuit: true,
+    });
+    const out = loginOffers([first, second], null, [BAR, TECHA]);
+    expect(out.map((o) => o.account.username)).toEqual(["First", "Second"]);
+  });
+
+  it("falls back to the invite when nothing is remembered", () => {
+    expect(
+      loginOffers([SAVED], null, [BAR]).map((o) => o.account.username),
+    ).toEqual(["AF_"]);
+  });
+
+  it("drops a remembered login whose own connection is already taken", () => {
+    const remembered = account("a1", "First", { openAtQuit: true });
+    const taken = new Set([fakeServerKeyFor(BAR, "First")]);
+    expect(loginOffers([remembered], null, [BAR], taken)).toEqual([]);
+  });
+});
+
 describe("the rail on the page", () => {
   it("renders nothing while the sources are still loading", () => {
     // The hero waits for the same flag, so the two arrive together rather than
@@ -293,6 +334,20 @@ describe("the rail on the page", () => {
     accounts.mockReturnValue([SAVED]);
     expect(text()).toBe("Multiplayer AF_ Beyond All Reason Log in");
     expect(render()).toContain('href="/lobby"');
+  });
+
+  it("offers a card for each remembered login rather than only one", () => {
+    const first = account("a1", "First", { openAtQuit: true });
+    const second = account("a2", "Second", {
+      serverId: "techa",
+      openAtQuit: true,
+    });
+    accounts.mockReturnValue([first, second]);
+    servers.mockReturnValue([BAR, TECHA]);
+    expect(text()).toBe(
+      "Multiplayer First Beyond All Reason Log in " +
+        "Multiplayer Second Tech Annihilation Log in",
+    );
   });
 
   it("offers no login when that account is already connected", () => {

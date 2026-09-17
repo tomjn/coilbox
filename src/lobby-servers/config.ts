@@ -329,6 +329,16 @@ export interface LobbyAccount {
    * this flag; checking would require reading the secret, which prompts on macOS.
    */
   hasSecret?: boolean;
+  /**
+   * This login was connected the last time it was touched. Set on every
+   * successful connect, cleared on a manual log out, but not on an unexpected
+   * drop, so a connection mid-reconnect, or one still open when coilbox quit,
+   * stays flagged. Read by {@link rememberedLogins} to decide what auto-connect
+   * reopens at the next boot (issue #2849). Absent on a login saved before this
+   * flag existed, which is why {@link rememberedLogins} falls back to
+   * `lastLogin` when nothing is flagged.
+   */
+  openAtQuit?: boolean;
 }
 export interface AccountsConfig {
   accounts: LobbyAccount[];
@@ -433,15 +443,53 @@ export function resolveLastLogin(
 }
 
 /**
- * The account to auto-connect at startup, or null when auto-connect is off or the
- * last login can't be resolved (see {@link resolveLastLogin}). Pure so the boot-seed
- * decision is unit-testable without a live store.
+ * The logins to reconnect at boot: every account flagged {@link
+ * LobbyAccount.openAtQuit} (open when coilbox last closed), resolved against
+ * `servers` the same way {@link resolveLastLogin} does, so a profile-disallowed
+ * server is silently dropped rather than auto-connected.
+ *
+ * Falls back to the single `lastLogin` account when nothing is flagged, which
+ * is what carries a player upgrading from a version that tracked only one
+ * login (issue #2849). That covers today's saved accounts, none of which have
+ * ever had `openAtQuit` written. Once a flagged account exists, `lastLogin` is
+ * not consulted: the flags are a strict superset once anything has connected
+ * since the upgrade, and mixing the two would double up whichever account is
+ * both.
+ *
+ * Pure, so the boot-seed decision is unit-testable without a live store.
  */
-export function autoConnectTarget(
+export function rememberedLogins(
+  accounts: LobbyAccount[],
+  lastLogin: LastLogin | null,
+  servers: LobbyServer[],
+): { account: LobbyAccount; server: LobbyServer }[] {
+  const resolve = (
+    account: LobbyAccount,
+  ): { account: LobbyAccount; server: LobbyServer } | null => {
+    const server = servers.find((s) => s.id === account.serverId);
+    return server ? { account, server } : null;
+  };
+  const flagged = accounts
+    .filter((a) => a.openAtQuit)
+    .map(resolve)
+    .filter(
+      (x): x is { account: LobbyAccount; server: LobbyServer } => x != null,
+    );
+  if (flagged.length > 0) return flagged;
+  const last = resolveLastLogin(lastLogin, accounts, servers);
+  return last ? [last] : [];
+}
+
+/**
+ * The accounts to auto-connect at startup, or an empty array when auto-connect
+ * is off. See {@link rememberedLogins} for which accounts that is. Pure so the
+ * boot-seed decision is unit-testable without a live store.
+ */
+export function autoConnectTargets(
   enabled: boolean,
   lastLogin: LastLogin | null,
   accounts: LobbyAccount[],
   servers: LobbyServer[],
-): { account: LobbyAccount; server: LobbyServer } | null {
-  return enabled ? resolveLastLogin(lastLogin, accounts, servers) : null;
+): { account: LobbyAccount; server: LobbyServer }[] {
+  return enabled ? rememberedLogins(accounts, lastLogin, servers) : [];
 }
