@@ -304,11 +304,12 @@ export interface CustomServersConfig {
   servers: LobbyServer[];
 }
 export const defaultCustomServers: CustomServersConfig = { servers: [] };
+export const CUSTOM_SERVERS_KEY = "lobbyServers.servers";
 
 /** The user's custom servers (built-ins live in code, not here). */
 export function useCustomServers() {
   return useSetting<CustomServersConfig>(
-    "lobbyServers.servers",
+    CUSTOM_SERVERS_KEY,
     defaultCustomServers,
   );
 }
@@ -344,10 +345,11 @@ export interface AccountsConfig {
   accounts: LobbyAccount[];
 }
 export const defaultAccounts: AccountsConfig = { accounts: [] };
+export const LOBBY_ACCOUNTS_KEY = "lobbyServers.accounts";
 
 /** The user's saved logins, persisted under `lobbyServers.accounts`. */
 export function useLobbyAccounts() {
-  return useSetting<AccountsConfig>("lobbyServers.accounts", defaultAccounts);
+  return useSetting<AccountsConfig>(LOBBY_ACCOUNTS_KEY, defaultAccounts);
 }
 
 /**
