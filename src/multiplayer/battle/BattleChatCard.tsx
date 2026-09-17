@@ -80,13 +80,16 @@ export function BattleChatCard({
   onSetBattleStatusBatch: (patch: { ally?: number; teamId?: number }) => void;
   onSetLocked: (locked: boolean) => void;
 }) {
-  const { mirror, markSeen } = useMultiplayer();
+  const { mirror, activeKey, markSeen } = useMultiplayer();
   const me = mirror.state?.myUsername ?? null;
   const channel = battle.channel;
   const desc: ConversationDescriptor | null = channel
     ? { kind: "battle", id: battle.id, channel }
     : null;
-  const conv = useConversation(desc);
+  // Bound to the app's active connection, same as every other battle-room
+  // surface today. Picking the battle's own connection when several are open
+  // is issue #2844's job, not this card's.
+  const conv = useConversation(desc, activeKey);
 
   // Reading the room is reading its chat, so being here marks it seen. Without
   // this the Battle Room nav badge counted every line while you sat in front of

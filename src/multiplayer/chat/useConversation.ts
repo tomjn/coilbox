@@ -9,8 +9,8 @@ import {
   mpSayPrivateEx,
 } from "../bindings";
 import { isIgnored, useIgnored } from "../ignore";
-import { messageLimit } from "../protocol";
-import { useMultiplayer } from "../store";
+import { messageLimit, protocolForKey } from "../protocol";
+import { useConnection, useProtocolServers } from "../store";
 import { coalesceMessages } from "./coalesce";
 import {
   type ConversationDescriptor,
@@ -41,16 +41,24 @@ export interface ConversationView {
 }
 
 /**
- * Bind a conversation descriptor to the live mirror: its title, messages,
- * members, and a `send` that targets the right wire command. This is the single
- * place that knows channel-vs-DM differences, so `ChatPane` stays presentational
- * and the future battle GUI reuses the same component.
+ * Bind a conversation descriptor to a connection's mirror: its title,
+ * messages, members, and a `send` that targets the right wire command. This is
+ * the single place that knows channel-vs-DM differences, so `ChatPane` stays
+ * presentational and the future battle GUI reuses the same component.
+ *
+ * `serverKey` names which connection the conversation belongs to (issue
+ * #2843): a `#main` on one server and a `#main` on another are different
+ * rooms, so every read and every send here is scoped to this one connection,
+ * never the app's globally active one.
  */
 export function useConversation(
   desc: ConversationDescriptor | null,
+  serverKey: string | null,
 ): ConversationView {
-  const { mirror, activeKey, protocol } = useMultiplayer();
-  const state = mirror.state;
+  const connection = useConnection(serverKey);
+  const servers = useProtocolServers();
+  const protocol = protocolForKey(serverKey, servers);
+  const state = connection?.mirror.state ?? null;
   const [ignored] = useIgnored();
 
   // Hide ignored senders client-side (channels, battles, and DMs alike). This local
@@ -68,11 +76,11 @@ export function useConversation(
     [state, desc],
   );
   const messages = useMemo(() => {
-    const visible = activeKey
-      ? all.filter((m) => !isIgnored(ignored, activeKey, m.from))
+    const visible = serverKey
+      ? all.filter((m) => !isIgnored(ignored, serverKey, m.from))
       : all;
     return coalesceMessages(visible);
-  }, [all, ignored, activeKey]);
+  }, [all, ignored, serverKey]);
   const members = useMemo(
     () => (state && desc ? conversationMembers(state, desc) : []),
     [state, desc],
@@ -81,7 +89,7 @@ export function useConversation(
   const send = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!activeKey || !desc || !trimmed) return;
+      if (!serverKey || !desc || !trimmed) return;
       // `/me <text>` is an IRC-style action: strip the prefix and route to the
       // EX (action) wire command. Bare `/me` with no body is a no-op.
       const action = trimmed.match(/^\/me\s+(.+)$/s);
@@ -89,15 +97,15 @@ export function useConversation(
         const body = action[1];
         if (desc.kind === "channel") {
           await mpSayEx({
-            serverKey: activeKey,
+            serverKey,
             channel: desc.name,
             message: body,
           });
         } else if (desc.kind === "battle") {
-          await mpSayBattleEx({ serverKey: activeKey, message: body });
+          await mpSayBattleEx({ serverKey, message: body });
         } else {
           await mpSayPrivateEx({
-            serverKey: activeKey,
+            serverKey,
             username: desc.peer,
             message: body,
           });
@@ -106,21 +114,21 @@ export function useConversation(
       }
       if (desc.kind === "channel") {
         await mpSay({
-          serverKey: activeKey,
+          serverKey,
           channel: desc.name,
           message: trimmed,
         });
       } else if (desc.kind === "battle") {
-        await mpSayBattle({ serverKey: activeKey, message: trimmed });
+        await mpSayBattle({ serverKey, message: trimmed });
       } else {
         await mpSayPrivate({
-          serverKey: activeKey,
+          serverKey,
           username: desc.peer,
           message: trimmed,
         });
       }
     },
-    [activeKey, desc],
+    [serverKey, desc],
   );
 
   const battle =

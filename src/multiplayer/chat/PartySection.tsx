@@ -10,7 +10,7 @@ import {
   mpPartyKickMember,
   mpPartyLeave,
 } from "../bindings";
-import { useMultiplayer } from "../store";
+import { useConnection } from "../store";
 import { Section } from "./Section";
 import { UserPicker } from "./UserPicker";
 
@@ -47,16 +47,19 @@ function RowAction({
  * There is no leader in the protocol, so every member is offered the controls
  * and a server that only lets one person use them answers with a refusal, which
  * reaches the user as a server message.
+ *
+ * `serverKey` names the connection this party belongs to (issue #2843): a
+ * party is per-connection state, so the sidebar renders one of these per
+ * Tachyon connection rather than reading the app's globally active one.
  */
-export function PartySection() {
-  const { mirror, activeKey } = useMultiplayer();
-  const state = mirror.state;
+export function PartySection({ serverKey }: { serverKey: string }) {
+  const connection = useConnection(serverKey);
+  const state = connection?.mirror.state;
   const party = state?.party ?? null;
   const invites = state?.partyInvites ?? [];
   const me = state?.myUsername ?? null;
 
-  if (!activeKey) return null;
-  const key = activeKey;
+  const key = serverKey;
   const swallow = () => {};
 
   return (
@@ -172,6 +175,7 @@ export function PartySection() {
           </ul>
           <div className="flex items-center gap-2 px-4 py-2">
             <UserPicker
+              serverKey={key}
               label="Invite someone to your party"
               exclude={[...party.members, ...party.invited]}
               onPick={(username) =>
