@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { identifierFieldProps } from "@/lib/identifierField";
 import type { LobbyProtocol } from "../lobby-servers/config";
 import { AccountPicker } from "./AccountPicker";
 import { mpSend, mpTachyonRequest } from "./bindings";
@@ -136,6 +137,7 @@ export function ConsoleDrawer({
               }
               disabled={!pickedKey}
               className="font-mono text-xs"
+              {...identifierFieldProps}
             />
             <Button type="submit" disabled={!pickedKey || !command.trim()}>
               Send
@@ -200,6 +202,7 @@ function TachyonSendBox({ serverKey }: { serverKey: string | null }) {
           placeholder="lobby/list"
           disabled={!serverKey}
           className="font-mono text-xs"
+          {...identifierFieldProps}
         />
       </div>
       <div className="space-y-1">
