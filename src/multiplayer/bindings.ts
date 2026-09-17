@@ -504,6 +504,12 @@ export type Delta =
       ingameHours: string | null;
     }
   | { kind: "serverMessage"; text: string; boxed: boolean }
+  /**
+   * A staff `BROADCAST` (issue #2775). Kept apart from `serverMessage` so it
+   * can't be mistaken for the reply a command like `CHANGEPASSWORD` is
+   * waiting on, and so the toast can be titled as a staff announcement.
+   */
+  | { kind: "broadcast"; text: string }
   | { kind: "motd"; line: string }
   | { kind: "ring"; from: string }
   | { kind: "joinBattleFailed"; reason: string }

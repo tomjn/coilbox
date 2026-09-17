@@ -300,6 +300,12 @@ pub enum ServerMessage {
     Ring { username: String },
     /// `SERVERMSG <text>`
     ServerMsg { text: String },
+    /// `BROADCAST <text>`, an admin's server-wide announcement (`in_BROADCAST`
+    /// in uberserver's `protocol/Protocol.py`). Kept apart from
+    /// [`Self::ServerMsg`] so the frontend can title it as a staff
+    /// announcement instead of a routine server message. `BROADCASTEX`
+    /// arrives as `SERVERMSGBOX` and needs no separate handling.
+    Broadcast { text: String },
     /// teiserver's extension announcement, sent on login as
     /// `SERVERMSG @PROTOCOL_EXTENSIONS@ {"ring:originator":1}`. It is addressed to
     /// the client, not the player, so it is kept apart from [`Self::ServerMsg`] to
@@ -793,6 +799,9 @@ pub fn parse_line(line: &str) -> ServerMessage {
         },
         "RING" => ServerMessage::Ring {
             username: rest.to_string(),
+        },
+        "BROADCAST" => ServerMessage::Broadcast {
+            text: rest.to_string(),
         },
         "SERVERMSG" => match rest.strip_prefix(PROTOCOL_EXTENSIONS_PREFIX) {
             Some(json) => ServerMessage::ProtocolExtensions {
@@ -1584,6 +1593,19 @@ mod tests {
                 "a line that names no battle says nothing about one: {line}"
             );
         }
+    }
+
+    /// An admin's `BROADCAST` (issue #2775). It must not fall to
+    /// `ServerMessage::Unknown` the way it did before this was parsed, or the
+    /// announcement never reaches the frontend at all.
+    #[test]
+    fn parses_a_broadcast() {
+        assert_eq!(
+            parse_line("BROADCAST Server restarting in 5 minutes"),
+            ServerMessage::Broadcast {
+                text: "Server restarting in 5 minutes".into()
+            }
+        );
     }
 
     /// The refusal to move an open battle. Same shape as the one about opening,

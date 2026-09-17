@@ -267,6 +267,13 @@ pub enum Delta {
         text: String,
         boxed: bool,
     },
+    /// A staff `BROADCAST` (issue #2775). Kept apart from [`Self::ServerMessage`]
+    /// rather than folded in as another flag, because a `ServerMessage` also
+    /// answers command waiters (e.g. `CHANGEPASSWORD`) and an unprompted
+    /// announcement must not be mistaken for one of those replies.
+    Broadcast {
+        text: String,
+    },
     /// One line of the server's message-of-the-day, sent as a run of `MOTD`
     /// lines right after login. Carries the line verbatim so the frontend can
     /// log the welcome/news the server greets every client with.
@@ -983,6 +990,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             }
             deltas
         }
+        ServerMessage::Broadcast { text } => vec![Delta::Broadcast { text }],
         // Client-to-client bookkeeping, not an announcement to show. The raw line
         // is still in the protocol console for anyone who wants it.
         ServerMessage::ProtocolExtensions { .. } => vec![],
@@ -1753,6 +1761,24 @@ mod tests {
             vec![Delta::ServerMessage {
                 text: "Read this: https://example.com".into(),
                 boxed: true,
+            }]
+        );
+    }
+
+    /// A staff `BROADCAST` (issue #2775) must produce its own delta, not fold
+    /// into `Delta::ServerMessage`, so it can't be mistaken for the reply a
+    /// command like `CHANGEPASSWORD` is waiting on.
+    #[test]
+    fn broadcast_produces_its_own_delta() {
+        let mut s = LobbyState::new();
+        let d = reduce(
+            &mut s,
+            parse_line("BROADCAST Server restarting in 5 minutes"),
+        );
+        assert_eq!(
+            d,
+            vec![Delta::Broadcast {
+                text: "Server restarting in 5 minutes".into(),
             }]
         );
     }

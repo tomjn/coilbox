@@ -321,3 +321,25 @@ describe("one lobby connection", () => {
     expect(wire.notified).toContain("Connection lost — reconnecting…");
   });
 });
+
+// Issue #2775: uberserver sends a staff `BROADCAST` to every client as a bare
+// `BROADCAST <message>` line. It used to fall to `ServerMessage::Unknown` and
+// never reach the player. It must surface as its own toast, titled apart from
+// a routine `SERVERMSG`, so a player can tell an admin sent it.
+describe("server broadcast", () => {
+  it("shows a BROADCAST as a titled toast", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await fire(ROOM_KEY, { kind: "phase", phase: "ready", agreement: null });
+    wire.notified.length = 0;
+
+    await fire(ROOM_KEY, {
+      kind: "delta",
+      delta: { kind: "broadcast", text: "Server restarting in 5 minutes" },
+    });
+
+    expect(wire.notified).toContain("Staff announcement");
+  });
+});
