@@ -1,5 +1,6 @@
 import { Button, NavGate } from "@picoframe/frame";
 import { AccountPicker } from "../AccountPicker";
+import { PlayerLookupSection } from "../admin/PlayerLookupSection";
 import { useMpServerAdmin } from "../navPredicates";
 import { serverAdminKeys } from "../serverAdmin";
 import {
@@ -52,8 +53,10 @@ function ServerAdminPage() {
         <AccountPicker keys={keys} value={serverKey} onChange={setServerKey} />
       )}
 
+      <PlayerLookupSection serverKey={serverKey} />
+
       <p className="text-sm text-muted-foreground">
-        Moderation and admin tools land here in later issues.
+        More moderation and admin tools land here in later issues.
       </p>
     </main>
   );

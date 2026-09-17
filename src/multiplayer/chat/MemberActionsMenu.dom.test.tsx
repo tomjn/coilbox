@@ -29,9 +29,11 @@ vi.mock("@/components/ui/popover", () => ({
 import { MemberActionsMenu } from "./MemberActionsMenu";
 
 const send = vi.fn();
+const onLookUp = vi.fn();
 
 beforeEach(() => {
   send.mockReset();
+  onLookUp.mockReset();
 });
 
 afterEach(() => {
@@ -47,6 +49,7 @@ function openBanForm() {
       serverMod={true}
       targetIsOp={false}
       send={send}
+      onLookUp={onLookUp}
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Ban from server…" }));
@@ -80,4 +83,40 @@ it("does not submit a server ban with no reason", () => {
   expect(send).not.toHaveBeenCalled();
   // Still on the form, not closed as if it had sent.
   expect(screen.getByLabelText("Days")).toBeTruthy();
+});
+
+it("offers to look up the member in Server admin, gated on serverMod", () => {
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={false}
+      serverMod={true}
+      targetIsOp={false}
+      send={send}
+      onLookUp={onLookUp}
+    />,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Look up in Server admin" }),
+  );
+  expect(onLookUp).toHaveBeenCalledTimes(1);
+  expect(send).not.toHaveBeenCalled();
+});
+
+it("does not offer the Server admin look-up to a channel op who is not a server mod", () => {
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={true}
+      serverMod={false}
+      targetIsOp={false}
+      send={send}
+      onLookUp={onLookUp}
+    />,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Look up in Server admin" }),
+  ).toBeNull();
 });

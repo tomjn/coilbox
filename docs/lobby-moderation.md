@@ -46,10 +46,20 @@ Server-moderator actions (first-class protocol verbs, gated by server access):
 
 | Action | Wire |
 | --- | --- |
+| Look up in Server admin | opens `/admin?server=<key>&player=<nick>` |
 | Get IP | `GETIP <nick>` |
 | Get user ID | `GETUSERID <nick>` |
 | Kick from server | `KICK <nick> <reason>` |
 | Ban from server | `BAN <nick> <duration> <reason>` |
+
+"Look up in Server admin" (issue #2777) is the odd one out here: rather than
+sending a wire line through `send`, it calls the menu's `onLookUp` prop, which
+`ChatPage` wires to `navigate`. It opens the Server admin page's player
+lookup section (`src/multiplayer/admin/PlayerLookupSection.tsx`) with the
+member's name filled in, where their `GETUSERINFO` fields, IP and hardware
+IDs show as labelled rows instead of raw server text, and `GETIP` and
+`GETUSERID`'s answers (still toasts from this menu) are folded into that
+same `GETUSERINFO` reply.
 
 ChanServ's `<duration>` (mute/ban above) uses spans like `10m`, `2h`, `3d`.
 `BAN`'s `<duration>` is different: a plain number of days, decimals allowed
@@ -61,3 +71,4 @@ also has no default reason, so the client must not send it empty.
 - The `:info` reply is parsed in the protocol crate (`crates/coilbox-lobby-protocol/src/reduce.rs`, `parse_chanserv_info`) and folds into `ChannelState.founder`/`operators`. The reference server's operator-list formatting is buggy for multiple operators (it can emit `[bob] carol]`); the parser is robust to both that and the clean form.
 - Command builders and the `canChannelModerate` gate live in `src/multiplayer/moderation.ts` (pure, unit-tested). The UI is `src/multiplayer/chat/MemberActionsMenu.tsx` and `ChannelTopicMenu.tsx`, wired in `src/multiplayer/pages/ChatPage.tsx`.
 - No new Tauri commands or ACL entries: outgoing actions reuse the existing `mp_send`, and the new channel state rides the standard snapshot refresh.
+- The Server admin page's own tools (issue #2772 onward) are a separate system: they send moderator/admin commands through `useAdminRequest`/`sendAdminCommand` (`src/multiplayer/admin/adminRequest.ts`) rather than `mp_send`, so their replies are parsed (`AdminReply`) instead of arriving as chat toasts. `KICK`'s reply added its own `AdminShape::Kick` in `crates/coilbox-lobby-protocol/src/admin_reply.rs` for issue #2777.
