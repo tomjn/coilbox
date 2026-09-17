@@ -3,6 +3,7 @@ import type { ChannelState } from "./bindings";
 import {
   canChannelModerate,
   chanServBan,
+  chanServChannel,
   chanServInfo,
   chanServKick,
   chanServMute,
@@ -47,6 +48,15 @@ describe("ChanServ command builders", () => {
     expect(chanServBan("lobby", "bob", "1d", "")).toBe(
       "SAYPRIVATE ChanServ :ban lobby bob 1d",
     );
+  });
+});
+
+describe("chanServChannel", () => {
+  it("drops the # ChanServ refuses, and surrounding space", () => {
+    expect(chanServChannel("#main")).toBe("main");
+    expect(chanServChannel("  ##main ")).toBe("main");
+    expect(chanServChannel("main")).toBe("main");
+    expect(chanServChannel("#")).toBe("");
   });
 });
 

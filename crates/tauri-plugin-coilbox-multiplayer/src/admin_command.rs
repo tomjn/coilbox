@@ -22,6 +22,15 @@
 //! the toast path and the `CHANGEPASSWORD` waiter separately. It is also per
 //! connection by construction: each connection has its own task, so one
 //! server's lines never reach another server's queue.
+//!
+//! ChanServ commands (issue #2782) go through the same queue. They are sent as
+//! `SAYPRIVATE ChanServ :<command> <args>`, and ChanServ answers each line as a
+//! private message rather than a `SERVERMSG`. The connection task offers every
+//! `SAIDPRIVATE` to [`AdminQueue::hear_private`] before the reducer sees it.
+//! A message is claimed only when it is from ChanServ, a ChanServ command is on
+//! the wire, and the text is one `ChanServ.py` writes for that command and that
+//! channel. A claimed message never reaches the ChanServ chat thread or the
+//! message log. Anything else, from ChanServ or anybody, is chat as usual.
 
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -42,6 +51,28 @@ use crate::uberserver::{rejection_of, server_error_of};
 /// behind a slow link, and bounded. `FINDIP` has no end marker, so every
 /// `FINDIP` takes this long.
 pub const ADMIN_REPLY_TIMEOUT: Duration = crate::conn::READY_TIMEOUT;
+
+/// How long ChanServ's `:refreship` waits for its second line.
+///
+/// uberserver's `detectIp` tries its five lookup services in turn with a five
+/// second socket timeout, which can apply to both the connect and the read of
+/// each. That is fifty seconds before it gives up, and the usual wait is added
+/// on top for the reply to travel. Name resolution is not covered by the
+/// socket timeout, so a refresh can still outlast this, and then the answer
+/// says the result did not arrive.
+pub const REFRESH_IP_TIMEOUT: Duration =
+    Duration::from_secs(5 * 2 * 5 + ADMIN_REPLY_TIMEOUT.as_secs());
+
+/// How long a command with this reply shape waits for its answer.
+pub fn patience_for(shape: AdminShape) -> Duration {
+    match shape {
+        AdminShape::RefreshIp => REFRESH_IP_TIMEOUT,
+        _ => ADMIN_REPLY_TIMEOUT,
+    }
+}
+
+/// The bot account that answers ChanServ commands.
+const CHANSERV: &str = "ChanServ";
 
 /// How a command ended.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -65,21 +96,39 @@ pub struct AdminRequest {
     pub command: String,
     pub line: String,
     pub shape: AdminShape,
+    /// The channel a ChanServ channel command names.
+    pub channel: Option<String>,
     pub patience: Duration,
     pub answer: oneshot::Sender<AdminOutcome>,
 }
 
-/// Build the wire line for `command` and `args`, returning the upper-cased
-/// command word with it.
+/// Build the wire line for `command` and `args`, returning with it the
+/// command word uberserver names in a refusal.
 ///
 /// uberserver gathers every word after the last required argument into the
 /// last one, so only the last argument may hold spaces (a ban reason, a
 /// broadcast). Any other with a space in it would move the rest along.
-pub fn admin_line(command: &str, args: &[String]) -> Result<(String, String), String> {
+/// ChanServ splits its commands the same way.
+///
+/// A ChanServ `shape` sends `command` to ChanServ as `:<command>`, in a
+/// `SAYPRIVATE`, which is the command a refusal then names.
+pub fn admin_line(
+    command: &str,
+    args: &[String],
+    shape: AdminShape,
+) -> Result<(String, String), String> {
     if command.is_empty() || !command.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Err(format!("not a command name: {command:?}"));
     }
-    let word = command.to_ascii_uppercase();
+    let (word, head) = if shape.is_chanserv() {
+        (
+            "SAYPRIVATE".to_string(),
+            format!("SAYPRIVATE {CHANSERV} :{}", command.to_ascii_lowercase()),
+        )
+    } else {
+        let word = command.to_ascii_uppercase();
+        (word.clone(), word)
+    };
     if let Some((_, leading)) = args.split_last() {
         if leading
             .iter()
@@ -88,7 +137,7 @@ pub fn admin_line(command: &str, args: &[String]) -> Result<(String, String), St
             return Err("only the last argument can be empty or contain spaces".to_string());
         }
     }
-    let line = std::iter::once(word.as_str())
+    let line = std::iter::once(head.as_str())
         .chain(args.iter().map(String::as_str))
         .collect::<Vec<_>>()
         .join(" ");
@@ -108,7 +157,11 @@ pub async fn send(
     shape: AdminShape,
     patience: Duration,
 ) -> Result<AdminOutcome, String> {
-    let (word, line) = admin_line(command, args)?;
+    let (word, line) = admin_line(command, args, shape)?;
+    let channel = shape
+        .names_channel()
+        .then(|| args.first().cloned())
+        .flatten();
     let (answer, answered) = oneshot::channel();
     {
         let map = lock_or_recover(registry);
@@ -123,6 +176,7 @@ pub async fn send(
                 command: word,
                 line,
                 shape,
+                channel,
                 patience,
                 answer,
             }))
@@ -208,6 +262,7 @@ impl AdminQueue {
                             }
                         }
                         Heard::Finished(reply) => AdminOutcome::Answered { reply },
+                        Heard::Refused(reason) => AdminOutcome::Refused { reason },
                     }
                 }
             }
@@ -219,6 +274,32 @@ impl AdminQueue {
                 }
             }
             _ => return Hearing::default(),
+        };
+        Hearing {
+            claimed: true,
+            send: self.finish(outcome, now),
+        }
+    }
+
+    /// Offer one private message to the command on the wire. Only a ChanServ
+    /// command takes one, and only from ChanServ.
+    pub fn hear_private(&mut self, from: &str, text: &str, now: Instant) -> Hearing {
+        let Some(current) = self.current.as_mut() else {
+            return Hearing::default();
+        };
+        if from != CHANSERV {
+            return Hearing::default();
+        }
+        let outcome = match current.collector.hear_chanserv(text) {
+            Heard::NotOurs => return Hearing::default(),
+            Heard::Collected => {
+                return Hearing {
+                    claimed: true,
+                    send: None,
+                }
+            }
+            Heard::Finished(reply) => AdminOutcome::Answered { reply },
+            Heard::Refused(reason) => AdminOutcome::Refused { reason },
         };
         Hearing {
             claimed: true,
@@ -253,7 +334,7 @@ impl AdminQueue {
         let request = self.waiting.pop_front()?;
         self.current = Some(InFlight {
             command: request.command,
-            collector: AdminCollector::new(request.shape),
+            collector: AdminCollector::new(request.shape).on_channel(request.channel),
             answer: request.answer,
             deadline: now + request.patience,
         });
@@ -284,6 +365,7 @@ mod tests {
                 command: command.to_string(),
                 line: command.to_string(),
                 shape,
+                channel: None,
                 patience: PATIENCE,
                 answer,
             },
@@ -642,10 +724,12 @@ mod tests {
 
     #[test]
     fn a_line_is_built_with_only_the_last_argument_free() {
+        let ban = AdminShape::Ban;
         assert_eq!(
             admin_line(
                 "ban",
-                &["Spammer".into(), "7".into(), "flooding the channel".into()]
+                &["Spammer".into(), "7".into(), "flooding the channel".into()],
+                ban
             ),
             Ok((
                 "BAN".to_string(),
@@ -653,13 +737,252 @@ mod tests {
             ))
         );
         assert_eq!(
-            admin_line("LISTBANS", &[]),
+            admin_line("LISTBANS", &[], AdminShape::BanList),
             Ok(("LISTBANS".to_string(), "LISTBANS".to_string()))
         );
-        assert!(admin_line("BAN", &["two words".into(), "7".into()]).is_err());
-        assert!(admin_line("BAN", &["".into(), "7".into()]).is_err());
-        assert!(admin_line("BAN X", &[]).is_err());
-        assert!(admin_line("", &[]).is_err());
-        assert!(admin_line("BROADCAST", &["hi\nEXIT".into()]).is_err());
+        assert!(admin_line("BAN", &["two words".into(), "7".into()], ban).is_err());
+        assert!(admin_line("BAN", &["".into(), "7".into()], ban).is_err());
+        assert!(admin_line("BAN X", &[], ban).is_err());
+        assert!(admin_line("", &[], ban).is_err());
+        assert!(admin_line("BROADCAST", &["hi\nEXIT".into()], AdminShape::NoReply).is_err());
+    }
+
+    /// A ChanServ command goes out as a private message to ChanServ, and a
+    /// refusal of it names `SAYPRIVATE`.
+    #[test]
+    fn a_chanserv_command_is_a_private_message() {
+        assert_eq!(
+            admin_line(
+                "REGISTER",
+                &["main".into(), "Alice".into()],
+                AdminShape::RegisterChannel
+            ),
+            Ok((
+                "SAYPRIVATE".to_string(),
+                "SAYPRIVATE ChanServ :register main Alice".to_string()
+            ))
+        );
+        assert_eq!(
+            admin_line("showip", &[], AdminShape::ShowIp),
+            Ok((
+                "SAYPRIVATE".to_string(),
+                "SAYPRIVATE ChanServ :showip".to_string()
+            ))
+        );
+        assert!(admin_line(
+            "history",
+            &["main".into(), "on\nEXIT".into()],
+            AdminShape::ChannelHistory
+        )
+        .is_err());
+        assert!(admin_line(
+            "history",
+            &["two words".into(), "on".into()],
+            AdminShape::ChannelHistory
+        )
+        .is_err());
+    }
+
+    fn chanserv_request(
+        command: &str,
+        channel: Option<&str>,
+        shape: AdminShape,
+    ) -> (AdminRequest, oneshot::Receiver<AdminOutcome>) {
+        let (mut request, answered) = request("SAYPRIVATE", shape);
+        request.line = format!("SAYPRIVATE ChanServ :{command}");
+        request.channel = channel.map(str::to_string);
+        (request, answered)
+    }
+
+    /// Issue #2782. ChanServ's private reply answers the command waiting on
+    /// it, and so is kept out of the private message thread.
+    #[test]
+    fn a_chanserv_reply_answers_the_command() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (register, mut answered) =
+            chanserv_request("register main", Some("main"), AdminShape::RegisterChannel);
+        assert_eq!(
+            queue.push(register, now),
+            Some("SAYPRIVATE ChanServ :register main".to_string())
+        );
+        assert_eq!(
+            queue.hear_private("ChanServ", "#main: Successfully registered to <cbmod>", now),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::RegisterChannel {
+                    channel: "main".to_string(),
+                    founder: "cbmod".to_string(),
+                }
+            })
+        );
+        assert_eq!(queue.deadline(), None);
+    }
+
+    #[test]
+    fn a_chanserv_refusal_is_a_refusal() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (history, mut answered) =
+            chanserv_request("history main on", Some("main"), AdminShape::ChannelHistory);
+        queue.push(history, now);
+        let line = "#main: You do not have permission to change history settings in the channel";
+        assert_eq!(queue.hear_private("ChanServ", line, now), claimed());
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Refused {
+                reason: line.to_string()
+            })
+        );
+    }
+
+    /// Captured from a local uberserver: an account that is not logged in
+    /// properly cannot send private messages at all, and the server says so
+    /// as it would for any command.
+    #[test]
+    fn a_refused_private_message_is_a_refusal() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (refresh, mut answered) = chanserv_request("refreship", None, AdminShape::RefreshIp);
+        queue.push(refresh, now);
+        assert_eq!(
+            queue.hear(&said("SAYPRIVATE failed. Insufficient rights."), now),
+            claimed()
+        );
+        assert_eq!(
+            queue.hear(
+                &Delta::CommandFailed {
+                    command: "SAYPRIVATE".to_string(),
+                    reason: "Insufficient rights.".to_string(),
+                },
+                now
+            ),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Refused {
+                reason: "Insufficient rights.".to_string()
+            })
+        );
+    }
+
+    /// A ChanServ message that is not the answer, and the same words from
+    /// anybody else, still reach chat.
+    #[test]
+    fn an_unrelated_private_message_is_not_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        assert_eq!(
+            queue.hear_private("ChanServ", "#main: History enabled", now),
+            Hearing::default(),
+            "nothing is waiting"
+        );
+
+        let (history, mut answered) =
+            chanserv_request("history main on", Some("main"), AdminShape::ChannelHistory);
+        queue.push(history, now);
+        for (from, text) in [
+            ("ChanServ", "Hello, cbmod!"),
+            ("ChanServ", "#main: muted <Spammer> for 1 hours"),
+            ("ChanServ", "#other: History enabled"),
+            ("Mallory", "#main: History enabled"),
+        ] {
+            assert_eq!(
+                queue.hear_private(from, text, now),
+                Hearing::default(),
+                "{from}: {text}"
+            );
+        }
+        assert!(answered.try_recv().is_err(), "still waiting");
+        // And a SERVERMSG with ChanServ's words is not ChanServ's answer.
+        assert_eq!(
+            queue.hear(&said("#main: History enabled"), now),
+            Hearing::default()
+        );
+    }
+
+    /// A ChanServ line while a `SERVERMSG` command waits is not its answer.
+    #[test]
+    fn a_private_message_does_not_answer_a_servermsg_command() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (listbans, mut answered) = request("LISTBANS", AdminShape::BanList);
+        queue.push(listbans, now);
+        assert_eq!(
+            queue.hear_private("ChanServ", "Banlist is empty", now),
+            Hearing::default()
+        );
+        assert!(answered.try_recv().is_err());
+    }
+
+    /// `:refreship` answers twice, a few seconds apart. The request stays
+    /// open, and the queue stays held, until the second line.
+    #[test]
+    fn a_refresh_waits_for_its_second_line() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (refresh, mut answered) = chanserv_request("refreship", None, AdminShape::RefreshIp);
+        let (listbans, _l) = request("LISTBANS", AdminShape::BanList);
+        queue.push(refresh, now);
+        queue.push(listbans, now);
+
+        let started = "Refreshing server IP (current: 203.0.113.7). This may take a few seconds...";
+        assert_eq!(queue.hear_private("ChanServ", started, now), claimed());
+        assert!(answered.try_recv().is_err(), "the result is still to come");
+
+        let later = now + Duration::from_secs(3);
+        let result = "IP refresh complete. Unchanged: online 203.0.113.7, local 10.0.0.2";
+        assert_eq!(
+            queue.hear_private("ChanServ", result, later),
+            Hearing {
+                claimed: true,
+                send: Some("LISTBANS".to_string())
+            }
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::RefreshIp {
+                    started: started.to_string(),
+                    result: Some(result.to_string()),
+                    failed: false,
+                }
+            })
+        );
+    }
+
+    /// A refresh whose result never came is answered with what did.
+    #[test]
+    fn a_refresh_with_no_result_is_answered_at_the_deadline() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (refresh, mut answered) = chanserv_request("refreship", None, AdminShape::RefreshIp);
+        queue.push(refresh, now);
+        let started = "Refreshing server IP (current: 203.0.113.7). This may take a few seconds...";
+        queue.hear_private("ChanServ", started, now);
+        queue.expire(now + PATIENCE);
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::RefreshIp {
+                    started: started.to_string(),
+                    result: None,
+                    failed: false,
+                }
+            })
+        );
+    }
+
+    /// uberserver tries five lookup services with a five second socket
+    /// timeout each, so a refresh can take far longer than other commands.
+    #[test]
+    fn a_refresh_waits_longer_than_other_commands() {
+        assert_eq!(patience_for(AdminShape::BanList), ADMIN_REPLY_TIMEOUT);
+        assert_eq!(patience_for(AdminShape::ShowIp), ADMIN_REPLY_TIMEOUT);
+        assert!(patience_for(AdminShape::RefreshIp) > Duration::from_secs(5 * 2 * 5));
     }
 }

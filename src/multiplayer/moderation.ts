@@ -16,6 +16,15 @@ import type { ChannelState } from "./bindings";
 
 const CHANSERV = "SAYPRIVATE ChanServ";
 
+/**
+ * A channel name as ChanServ takes it: trimmed, with no leading `#`. The
+ * Server admin page's channel tools (issue #2782) pass a typed name through
+ * this, since a moderator is likely to type the `#` a channel is shown with.
+ */
+export function chanServChannel(name: string): string {
+  return name.trim().replace(/^#+/, "");
+}
+
 /** Query a channel's founder/operators; the reply is parsed in the protocol crate. */
 export function chanServInfo(channel: string): string {
   return `${CHANSERV} :info ${channel}`;
