@@ -26,6 +26,7 @@ import {
   type OpenBattleArgs,
 } from "../multiplayer/battles/HostBattleForm";
 import { hostEngineVersion } from "../multiplayer/battles/hostEngineVersion";
+import { leaveAndLabel } from "../multiplayer/battles/oneBattle";
 import {
   hashFailureMessage,
   useHostContent,
@@ -73,13 +74,17 @@ export interface StartRoomArgs {
 
 export function HostRoomForm({
   blocked,
+  leaves = null,
   defaultName,
   onStart,
 }: {
-  /** Why hosting is unavailable, or null when it is available. There is one
-   *  lobby connection, so whatever already has it is in the way (see
+  /** Why hosting is unavailable, or null when it is available. Coilbox is in
+   *  one room at a time, so a room already open is in the way (see
    *  `hostBlockedReason`). */
   blocked: string | null;
+  /** What entering leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
   /** The name to offer as the host's, usually their last lobby login. */
   defaultName?: string;
   /** Starts the room and opens the battle in it, resolving with the room's
@@ -478,6 +483,8 @@ export function HostRoomForm({
         </p>
       )}
 
+      {leaves && <p className="text-sm">{leaves}</p>}
+
       <div className="flex justify-end gap-2 pt-1">
         <Button
           type="button"
@@ -488,7 +495,9 @@ export function HostRoomForm({
           Cancel
         </Button>
         <Button type="submit" className="h-9" disabled={!canStart}>
-          {startButtonLabel(starting, content.checksumsReady)}
+          {leaves && !starting && content.checksumsReady
+            ? leaveAndLabel("host")
+            : startButtonLabel(starting, content.checksumsReady)}
         </Button>
       </div>
     </form>

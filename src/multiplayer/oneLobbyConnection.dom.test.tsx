@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 
 /**
- * Coilbox holds one connection per lobby server, driven through the provider
- * that owns them (issues #2149 and #2848).
+ * Coilbox holds one connection per lobby server, and one room beside them,
+ * driven through the provider that owns them (issues #2149, #2848 and #2850).
  *
  * The rule used to be one connection in all. #2149 found it written on three
  * forms and enforced nowhere: a connection landing behind an open drawer was a
@@ -45,6 +45,10 @@ const wire = vi.hoisted(() => ({
   readyFails: false,
   /** Every `MYSTATUS` sent, as `key ingame away`. */
   statuses: [] as string[],
+  /** Every channel join sent, as `key channel`. */
+  joins: [] as string[],
+  /** Saved settings, kept across a remount the way a reload keeps them. */
+  settings: new Map<string, unknown>(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -55,11 +59,24 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 // The settings store, as much of it as the provider reads: a value per key that
 // starts at the default and can be set. Every list the provider keeps (channels,
-// favourites, ignores, accounts) goes through this.
+// favourites, ignores, accounts) goes through this. Values outlive a remount,
+// which is what a reload does to them.
 vi.mock("@picoframe/frame", async () => {
   const react = await import("react");
   return {
-    useSetting: <T,>(_key: string, initial: T) => react.useState<T>(initial),
+    useSetting: <T,>(key: string, initial: T) => {
+      const [value, setValue] = react.useState<T>(() =>
+        wire.settings.has(key) ? (wire.settings.get(key) as T) : initial,
+      );
+      const save = react.useCallback(
+        (next: T) => {
+          wire.settings.set(key, next);
+          setValue(next);
+        },
+        [key],
+      );
+      return [value, save] as const;
+    },
   };
 });
 
@@ -142,7 +159,10 @@ vi.mock("./bindings", () => {
     mpIgnore: async () => ({}),
     mpIgnoreList: async () => ({}),
     mpJoinBattle: async () => ({}),
-    mpJoinChannel: async () => ({}),
+    mpJoinChannel: async (args: { serverKey: string; channel: string }) => {
+      wire.joins.push(`${args.serverKey} ${args.channel}`);
+      return {};
+    },
     mpRegister: async () => ({}),
     mpRegisterZerok: async () => ({}),
     mpSetStatus: async (args: {
@@ -238,25 +258,16 @@ async function twoLogins() {
   wire.notified.length = 0;
 }
 
-/**
- * A room open beside a lobby login. A room still takes the only connection
- * (issue #2850), so the one way the two meet today is a reload's reattach
- * landing while a room is being opened.
- */
+/** Logged in to Beyond All Reason, with a room of our own beside it. */
 async function roomBesideLobby() {
-  let release = () => {};
-  wire.activeKeysGate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  wire.activeKeys = [BAR_KEY];
   await mount();
+  await act(async () => {
+    await store.connect(BAR, "AF_");
+  });
   await act(async () => {
     await store.connectDirect(8200, "AF");
   });
-  await act(async () => {
-    release();
-  });
-  await act(async () => {});
+  await ready(BAR_KEY);
   await ready(ROOM_KEY);
   wire.notified.length = 0;
 }
@@ -272,6 +283,8 @@ beforeEach(() => {
   wire.readyGate = null;
   wire.readyFails = false;
   wire.statuses.length = 0;
+  wire.joins.length = 0;
+  wire.settings.clear();
 });
 
 afterEach(() => {
@@ -428,43 +441,173 @@ describe("reconnect loops beside a manual login", () => {
   });
 });
 
-describe("a room still needs the only connection (issue #2850)", () => {
-  it("refuses a room beside lobby logins and says which one is in the way", async () => {
+describe("a room beside lobby logins (issue #2850)", () => {
+  it("hosts a room while logged in to two lobby servers, and keeps both", async () => {
     await twoLogins();
 
-    // The traced sequence from #2149: a host form opened while disconnected, a
-    // connection arriving behind it, and Start pressed against a gate decided
-    // minutes ago.
-    await expect(store.connectDirect(8200, "AF")).rejects.toThrow(
-      /server4\.beyondallreason\.info:8201/,
-    );
-    expect(wire.channels.has(ROOM_KEY)).toBe(false);
+    let key = "";
+    await act(async () => {
+      key = await store.connectDirect(8200, "AF");
+    });
+
+    expect(key).toBe(ROOM_KEY);
+    expect(live(ROOM_KEY)).toBe(true);
+    expect(live(BAR_KEY)).toBe(true);
+    expect(live(TECHA_KEY)).toBe(true);
+    expect(store.connections[ROOM_KEY].direct).toBe(true);
+    expect(store.connections[BAR_KEY].direct).toBe(false);
+    expect(store.connections[TECHA_KEY].direct).toBe(false);
+    expect(wire.closed).toEqual([]);
+  });
+
+  // Chat, and everything else that reads the focused connection, stays on the
+  // lobby login somebody was using. A room is reached through its own key.
+  it("keeps the lobby login focused, so chat still goes to it", async () => {
+    await twoLogins();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await ready(ROOM_KEY);
+
+    expect(store.activeKey).toBe(TECHA_KEY);
+    // The fields read off the focused connection describe the login too.
+    expect(store.mirror).toBe(store.connections[TECHA_KEY].mirror);
+    await act(async () => {
+      await store.requestJoinChannel("main");
+    });
+    expect(wire.joins).toEqual([`${TECHA_KEY} main`]);
+  });
+
+  it("closes the room and leaves the lobby logins alone", async () => {
+    await twoLogins();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await ready(ROOM_KEY);
+
+    await act(async () => {
+      await store.disconnect(ROOM_KEY);
+    });
+    // The room's own clean close, which must not read as a drop anywhere.
+    await fire(ROOM_KEY, { kind: "disconnected", reason: null });
+
+    expect(wire.closed).toEqual([ROOM_KEY]);
+    expect(store.connections[ROOM_KEY]).toBeUndefined();
     expect(live(BAR_KEY)).toBe(true);
     expect(live(TECHA_KEY)).toBe(true);
     expect(store.activeKey).toBe(TECHA_KEY);
+    expect(wire.notified).not.toContain(RECONNECTING);
   });
 
-  it("refuses a room racing a login that is still shaking hands", async () => {
+  it("logs in to a lobby server beside a room, and keeps the room", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    // Nothing else had focus, so the room took it.
+    expect(store.activeKey).toBe(ROOM_KEY);
+
+    await act(async () => {
+      await store.connect(BAR, "AF_");
+    });
+
+    expect(live(ROOM_KEY)).toBe(true);
+    expect(store.connections[ROOM_KEY].direct).toBe(true);
+    expect(live(BAR_KEY)).toBe(true);
+    expect(store.activeKey).toBe(BAR_KEY);
+  });
+
+  it("refuses a second room and names the first, leaving the lobby alone", async () => {
+    await roomBesideLobby();
+
+    await expect(
+      store.connectDirect(8200, "AF", "192.168.1.45"),
+    ).rejects.toThrow(/127\.0\.0\.1:8200/);
+
+    expect(wire.channels.has("AF@192.168.1.45:8200")).toBe(false);
+    expect(live(ROOM_KEY)).toBe(true);
+    expect(live(BAR_KEY)).toBe(true);
+  });
+
+  it("refuses a room racing another room still opening", async () => {
     await mount();
     await act(async () => {
       await store.connect(TECHA, "AF_");
     });
-    // Dropped before it logged in, so it stays listed with no loop behind it.
-    await fire(TECHA_KEY, { kind: "disconnected", reason: "connection reset" });
-    const release = hold(BAR_KEY);
-    const first = store.connect(BAR, "AF_");
+    const release = hold(ROOM_KEY);
+    const first = store.connectDirect(8200, "AF");
 
-    await expect(store.connectDirect(8200, "AF")).rejects.toThrow(
-      /already opening/,
-    );
+    await expect(
+      store.connectDirect(8200, "AF", "192.168.1.45"),
+    ).rejects.toThrow(/already opening/);
 
     await act(async () => {
       release();
       await first;
     });
-    expect(store.activeKey).toBe(BAR_KEY);
-    expect(live(TECHA_KEY)).toBe(false);
-    expect(store.connections[TECHA_KEY]).toBeDefined();
+    expect(live(ROOM_KEY)).toBe(true);
+    expect(live(TECHA_KEY)).toBe(true);
+  });
+
+  // A room is not a lobby server, so opening one is no reason to give up on
+  // a lobby login that dropped a moment ago.
+  it("keeps reconnecting a dropped lobby login while a room opens", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    await twoLogins();
+    await fire(BAR_KEY, { kind: "disconnected", reason: "connection reset" });
+    expect(wire.notified).toContain(RECONNECTING);
+
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(wire.opened.filter((k) => k === BAR_KEY)).toHaveLength(2);
+    expect(live(BAR_KEY)).toBe(true);
+    expect(live(ROOM_KEY)).toBe(true);
+  });
+
+  // The room was only told apart by a saved key, and a lobby login used to
+  // wipe it. A reload then re-adopted the room as a lobby server.
+  it("still knows which connection is the room after a lobby login and a reload", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await act(async () => {
+      await store.connect(TECHA, "AF_");
+    });
+    cleanup();
+
+    wire.activeKeys = [ROOM_KEY, TECHA_KEY];
+    await mount();
+
+    expect(live(ROOM_KEY)).toBe(true);
+    expect(live(TECHA_KEY)).toBe(true);
+    expect(store.connections[ROOM_KEY].direct).toBe(true);
+    expect(store.connections[TECHA_KEY].direct).toBe(false);
+    // The last lobby login keeps focus across the reload, not the room.
+    expect(store.activeKey).toBe(TECHA_KEY);
+  });
+
+  it("forgets the room once it is closed, so a reload adopts nothing as one", async () => {
+    await mount();
+    await act(async () => {
+      await store.connectDirect(8200, "AF");
+    });
+    await act(async () => {
+      await store.disconnect(ROOM_KEY);
+    });
+    cleanup();
+
+    // A lobby server on this machine, under the key the room had.
+    wire.activeKeys = [ROOM_KEY];
+    await mount();
+
+    expect(live(ROOM_KEY)).toBe(true);
+    expect(store.connections[ROOM_KEY].direct).toBe(false);
   });
 
   it("leaves focus on the connection that took it when a room never greets us", async () => {

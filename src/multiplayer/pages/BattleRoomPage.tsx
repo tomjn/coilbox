@@ -6,7 +6,7 @@ import { useBrandingEntry } from "@/content/branding";
 import { useHostedRoom } from "@/direct/hostedRoom";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
 import { RoomMovedPanel } from "@/direct/RoomMoved";
-import { closeEndsTheRoom } from "@/direct/room";
+import { closeEndsTheRoom, hostedRoomKey } from "@/direct/room";
 import { stopHostedRoom } from "@/direct/stopRoom";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
@@ -402,8 +402,8 @@ function BattleRoomPage() {
   // decides both what the button does and what its confirmation promises.
   const endsTheRoom = closeEndsTheRoom({
     selfHost: room.selfHost,
-    directRoom: room.directRoom,
-    hosting: !!hostedRoom,
+    serverKey: room.serverKey,
+    roomKey: hostedRoomKey(hostedRoom),
   });
 
   async function onLeave() {

@@ -346,13 +346,14 @@ export interface BattleRoomView {
  * to that connection.
  */
 export function useBattleRoom(serverKey: string | null): BattleRoomView {
-  const { directKey, setIngame: setIngameOn } = useMultiplayer();
+  const { setIngame: setIngameOn } = useMultiplayer();
   const connection = useConnection(serverKey);
   const mirror = connection?.mirror ?? initialMirror;
   // Commands go nowhere once the connection is gone, as they did when this
   // read the focused key and there was none.
   const activeKey = connection ? serverKey : null;
-  const activeDirect = activeKey != null && activeKey === directKey;
+  // Whether this connection is a room rather than a lobby server (issue #2850).
+  const activeDirect = connection?.direct ?? false;
   const servers = useProtocolServers();
   const protocol = useMemo(
     () => protocolForKey(activeKey, servers),

@@ -96,7 +96,12 @@ vi.mock("../lobby-servers/PasswordRecoveryForm", () => ({
 
 function connection(
   serverKey: string,
-  opts: { live?: boolean; away?: boolean; error?: string } = {},
+  opts: {
+    live?: boolean;
+    away?: boolean;
+    error?: string;
+    direct?: boolean;
+  } = {},
 ): ConnectionState {
   const username = serverKey.slice(0, serverKey.indexOf("@"));
   return {
@@ -115,6 +120,7 @@ function connection(
     justWentIngame: new Set(),
     status: { ingame: false, away: opts.away ?? false },
     manualAway: false,
+    direct: opts.direct ?? false,
   } as unknown as ConnectionState;
 }
 
@@ -231,6 +237,34 @@ describe("the login panel with two connections", () => {
       );
     });
     expect(calls).toEqual([`disconnect ${CAROL_KEY}`]);
+  });
+});
+
+// A room is not a login (issue #2850). It is closed from the Battles page, and
+// logging out of every login must not drop the host's own client from a room
+// that is still running.
+describe("the login panel beside a room", () => {
+  const ROOM_KEY = "AF@127.0.0.1:8200";
+
+  it("lists the logins and leaves the room out", async () => {
+    connectAs(connection(ALICE_KEY), connection(ROOM_KEY, { direct: true }));
+    draw();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.queryByText("AF")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Log out of all" })).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+    });
+    expect(calls).toEqual([`disconnect ${ALICE_KEY}`]);
+  });
+
+  it("offers the logins to connect when the room is the only connection", () => {
+    connectAs(connection(ROOM_KEY, { direct: true }));
+    draw();
+    expect(screen.queryByRole("button", { name: "Log out" })).toBeNull();
+    expect(account("alice")).toBeTruthy();
+    expect(account("carol")).toBeTruthy();
   });
 });
 

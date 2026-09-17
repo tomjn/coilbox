@@ -34,14 +34,14 @@ export type { JoinRoomArgs } from "./JoinRoomForm";
  * heading rather than behind the empty state, and why nothing here spins.
  *
  * Shown whether or not there is a lobby connection, because somebody with no
- * server is who this is for. When something else already holds the one lobby
- * connection, the rooms are still listed and the reason a join is unavailable is
- * said out loud.
+ * server is who this is for. When a room is already open, the rooms are still
+ * listed and the reason a join is unavailable is said out loud.
  */
 export function LanRooms({
   rooms,
   error,
   blocked,
+  leaves = null,
   defaultName,
   enginePath,
   dataDir,
@@ -53,6 +53,9 @@ export function LanRooms({
   error: string | null;
   /** Why a join is unavailable, or null. */
   blocked: string | null;
+  /** What entering leaves behind under the one-battle rule (issue #2844), or
+   *  null. Said above the button, which then confirms leaving. */
+  leaves?: string | null;
   /** The name to offer as this player's, usually their last lobby login. */
   defaultName?: string;
   /** The local engine and data root, for the minimaps, exactly as the battle
@@ -88,6 +91,7 @@ export function LanRooms({
         <JoinRoomDrawerButton
           defaultName={defaultName}
           blocked={blocked}
+          leaves={leaves}
           onJoin={onJoin}
         />
       </div>
@@ -117,6 +121,7 @@ export function LanRooms({
                 key={room.id}
                 room={room}
                 blocked={blocked}
+                leaves={leaves}
                 defaultName={defaultName}
                 enginePath={enginePath}
                 dataDir={dataDir}
@@ -138,6 +143,7 @@ export function LanRooms({
 function LanRoomRow({
   room,
   blocked,
+  leaves,
   defaultName,
   enginePath,
   dataDir,
@@ -145,6 +151,7 @@ function LanRoomRow({
 }: {
   room: DirectLanRoom;
   blocked: string | null;
+  leaves: string | null;
   defaultName?: string;
   enginePath?: string;
   dataDir?: string;
@@ -195,6 +202,7 @@ function LanRoomRow({
         }}
         defaultName={defaultName}
         blocked={blocked}
+        leaves={leaves}
         onJoin={onJoin}
       />
     </li>
@@ -208,16 +216,18 @@ function JoinRoomDrawerButton({
   target,
   defaultName,
   blocked,
+  leaves,
   onJoin,
 }: {
   target?: JoinRoomTarget;
   defaultName?: string;
   blocked: string | null;
+  leaves: string | null;
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
   const drawer = useDrawer();
   return (
-    // Deliberately not disabled while something else holds the connection: a
+    // Deliberately not disabled while a join is unavailable: a
     // button that does nothing and says nothing is the failure this milestone is
     // about. The drawer opens and says why joining is unavailable.
     <Button
@@ -236,6 +246,7 @@ function JoinRoomDrawerButton({
               target={target}
               defaultName={defaultName}
               blocked={blocked}
+              leaves={leaves}
               onJoin={onJoin}
             />
           ),

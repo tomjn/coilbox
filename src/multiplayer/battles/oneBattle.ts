@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { inBattleKey } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
 import type { Connections } from "../connections";
@@ -77,4 +77,55 @@ export function useOneBattleRule(targetKey: string | null): {
     if (other) await leaveBattle(other);
   }, [other]);
   return { notice, leaveOther };
+}
+
+/**
+ * Whether a room form's press must be refused because the battle it would
+ * leave is not the one the form named (issue #2850). Pure.
+ *
+ * `shown` is the battle the player was in when the form opened, and `now` the
+ * one they are in at the press. A drawer keeps the notice it was opened with,
+ * so a battle joined after that has not been agreed to. A battle that ended
+ * meanwhile leaves nothing to leave, so that press goes ahead.
+ */
+export function roomLeaveIsStale(
+  shown: string | null,
+  now: string | null,
+): boolean {
+  return now != null && now !== shown;
+}
+
+/**
+ * The one-battle rule for entering a room (issue #2850). A room opens beside
+ * lobby logins, and its key is not known until it is dialled, so the battle to
+ * leave is whichever one the player is in. A room form that is not blocked has
+ * no room open behind it, so that battle is always on a lobby server.
+ *
+ * `leaveOther` belongs to the render the form was opened in, which is what
+ * lets it tell the battle the form named from one joined since.
+ */
+export function useRoomBattleRule(): {
+  notice: (entry: BattleEntry) => string | null;
+  leaveOther: (entry: BattleEntry) => Promise<void>;
+} {
+  const { connections, activeKey } = useMultiplayer();
+  const servers = useProtocolServers();
+  const shown = inBattleKey(connections, activeKey);
+  const latest = useRef(shown);
+  latest.current = shown;
+  const noticeFor = (key: string, entry: BattleEntry) =>
+    leavesBattleNotice(serverNameFor(key, servers), entry);
+  return {
+    notice: (entry) => (shown ? noticeFor(shown, entry) : null),
+    leaveOther: async (entry) => {
+      const now = latest.current;
+      if (now == null) return;
+      if (roomLeaveIsStale(shown, now)) {
+        throw new Error(
+          `${noticeFor(now, entry)} Close this form and open it again to go ahead.`,
+        );
+      }
+      await leaveBattle(now);
+    },
+  };
 }
