@@ -91,8 +91,9 @@ export function HostBattleForm({
    *  without it. */
   relayAvailable: boolean;
   /** This connection's key, for the relay ping preview beside the relay
-   *  choice below (issue #2798). Null or missing hides the preview rather
-   *  than asking with a key that names no connection. */
+   *  choice below (issue #2798) and for recording the route the battle took
+   *  against the connection it is on (issue #2844). Null or missing hides the
+   *  preview rather than asking with a key that names no connection. */
   serverKey?: string | null;
   /** Rejects when the battle did not open, which is what this form shows. */
   onHost: (args: OpenBattleArgs) => Promise<void>;
@@ -232,7 +233,7 @@ export function HostBattleForm({
     setHosting(true);
     // Dropped before the attempt rather than after it, so a host that fails
     // leaves no route behind for the next reader to believe.
-    recordHostingRoute(null);
+    if (serverKey) recordHostingRoute(serverKey, null);
     try {
       const version = await hostEngineVersion(target);
       await onHost({
@@ -258,7 +259,7 @@ export function HostBattleForm({
       // Only once the battle is actually open, so nothing downstream describes a
       // route for a battle that never happened. Read back by the battle room
       // (issue #2022).
-      recordHostingRoute(route);
+      if (serverKey) recordHostingRoute(serverKey, route);
       // Remembered for the next battle (issue #2794), except the password,
       // per the keys above.
       setLastGame(gameName);

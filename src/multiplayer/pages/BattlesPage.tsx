@@ -325,7 +325,7 @@ function BattlesPage() {
   // Failures are thrown rather than stored, because the only place a host can read
   // one is the drawer they pressed Start in, and the drawer holds the element it
   // was opened with. So the form asking is the form told.
-  async function onStartRoom(args: StartRoomArgs) {
+  async function onStartRoom(args: StartRoomArgs): Promise<string> {
     setRoomBusy(true);
     let port: number;
     try {
@@ -358,6 +358,7 @@ function BattlesPage() {
       if (!opened) throw new Error(noBattleFailure());
       setStopError(null);
       setHostedRoom(opened);
+      return key;
     } catch (e) {
       // The room is up but we are not in it, which is a room nobody can host.
       // Take it down rather than leave a listener with no owner behind.

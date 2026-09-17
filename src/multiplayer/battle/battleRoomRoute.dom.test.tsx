@@ -80,15 +80,20 @@ function battle(relayed = false): Battle {
  * puts it, rather than through a prop. Handing it in directly would test the
  * wording and nothing else, and the wording already has its own tests.
  */
+const KEY = "me@server-a:8200";
+const OTHER_KEY = "me@server-b:8200";
+
 function drawHeader(
   over: {
     selfHost?: boolean;
     directRoom?: boolean;
     route?: HostingRoute;
     relayed?: boolean;
+    /** The connection the route is recorded against, when not this room's. */
+    routeKey?: string;
   } = {},
 ) {
-  if (over.route) recordHostingRoute(over.route);
+  if (over.route) recordHostingRoute(over.routeKey ?? KEY, over.route);
   render(
     <BattleRoomHeader
       battle={battle(over.relayed)}
@@ -107,7 +112,7 @@ function drawHeader(
       closesRoom={false}
       locked={false}
       onToggleLock={() => {}}
-      serverKey={null}
+      serverKey={KEY}
       directRoom={over.directRoom ?? false}
     />,
   );
@@ -124,14 +129,17 @@ function routeShown(): boolean {
   return !!document.querySelector('[data-slot="tooltip-trigger"]');
 }
 
+function forget() {
+  recordHostingRoute(KEY, null);
+  recordHostingRoute(OTHER_KEY, null);
+}
+
 afterEach(() => {
   cleanup();
-  recordHostingRoute(null);
+  forget();
 });
 
-beforeEach(() => {
-  recordHostingRoute(null);
-});
+beforeEach(forget);
 
 describe("the battle room's route word", () => {
   // The top bar says a battle is relayed, on every page and with the way back
@@ -153,7 +161,7 @@ describe("the battle room's route word", () => {
     expect(routeShown()).toBe(false);
 
     act(() => {
-      recordHostingRoute("direct");
+      recordHostingRoute(KEY, "direct");
     });
 
     expect(screen.getByText("Direct")).toBeTruthy();
@@ -186,6 +194,13 @@ describe("the battle room's route word", () => {
   it("shows a joiner nothing, whatever route this client last hosted", () => {
     drawHeader({ selfHost: false, route: "direct" });
     expect(screen.queryByText("Direct")).toBe(null);
+    expect(routeShown()).toBe(false);
+  });
+
+  // Issue #2844. A battle hosted on another server, still open there, has a
+  // route of its own, and it is not this battle's.
+  it("shows nothing for a route recorded on another connection", () => {
+    drawHeader({ route: "direct", routeKey: OTHER_KEY });
     expect(routeShown()).toBe(false);
   });
 

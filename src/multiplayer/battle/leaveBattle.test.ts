@@ -21,7 +21,8 @@ vi.mock("../bindings", () => ({ mpLeaveBattle }));
 beforeEach(() => {
   mpLeaveBattle.mockReset();
   mpLeaveBattle.mockResolvedValue({ sent: true });
-  recordHostingRoute("relay");
+  recordHostingRoute("alice@bar:8200", "relay");
+  recordHostingRoute("alice@other:8200", "direct");
 });
 
 describe("leaving a battle", () => {
@@ -29,7 +30,15 @@ describe("leaving a battle", () => {
     await leaveBattle("alice@bar:8200");
 
     expect(mpLeaveBattle).toHaveBeenCalledWith({ serverKey: "alice@bar:8200" });
-    expect(chosenHostingRoute()).toBe(null);
+    expect(chosenHostingRoute("alice@bar:8200")).toBe(null);
+  });
+
+  // Issue #2844. Leaving a battle on one server says nothing about a battle
+  // hosted on another.
+  it("keeps the route of a battle on another connection", async () => {
+    await leaveBattle("alice@bar:8200");
+
+    expect(chosenHostingRoute("alice@other:8200")).toBe("direct");
   });
 
   /**
@@ -43,6 +52,6 @@ describe("leaving a battle", () => {
 
     await expect(leaveBattle("alice@bar:8200")).rejects.toThrow();
 
-    expect(chosenHostingRoute()).toBe("relay");
+    expect(chosenHostingRoute("alice@bar:8200")).toBe("relay");
   });
 });

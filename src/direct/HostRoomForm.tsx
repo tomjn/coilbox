@@ -82,9 +82,10 @@ export function HostRoomForm({
   blocked: string | null;
   /** The name to offer as the host's, usually their last lobby login. */
   defaultName?: string;
-  /** Starts the room and opens the battle in it. Rejects with what to tell the
-   *  host when either half fails. */
-  onStart: (args: StartRoomArgs) => Promise<void>;
+  /** Starts the room and opens the battle in it, resolving with the room's
+   *  connection key. Rejects with what to tell the host when either half
+   *  fails. */
+  onStart: (args: StartRoomArgs) => Promise<string | void>;
 }) {
   const drawer = useDrawer();
   const content = useHostContent();
@@ -150,12 +151,9 @@ export function HostRoomForm({
     if (!canStart || !content.target) return;
     setStarting(true);
     setError(null);
-    // Dropped before the attempt rather than after it, so a room that fails to
-    // start leaves no route behind for the next reader to believe.
-    recordHostingRoute(null);
     try {
       const version = await hostEngineVersion(content.target);
-      await onStart({
+      const serverKey = await onStart({
         host: trimmedName,
         port: Number(port),
         advertise,
@@ -207,7 +205,10 @@ export function HostRoomForm({
           modname: content.gameName,
         },
       });
-      recordHostingRoute(route);
+      // Against the room's own connection, whose key only exists once the room
+      // is up. A room that fails to start is taken down, so it leaves no battle
+      // for a stale route to describe (issue #2844).
+      if (serverKey) recordHostingRoute(serverKey, route);
       // Deliberately left open on success too. A room that starts lands the host
       // in its battle room, and that navigation closes every drawer, so there is
       // nothing here to close and nothing to race with.

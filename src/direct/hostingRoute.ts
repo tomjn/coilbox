@@ -366,83 +366,91 @@ export function joinedBattleRouteLabel(
 }
 
 /**
- * The route the battle this client last opened actually took.
+ * The route each connection's hosted battle actually took, by server key.
  *
- * A module singleton, like `hostedRoom.ts`, because the route is decided in a
- * form and read in the battle room, which is a different page reached by a
+ * A module store, like `hostedRoom.ts`, because the route is decided in a form
+ * and read in the battle room, which is a different page reached by a
  * navigation that unmounts the form. Held in memory rather than in settings: a
  * route is a fact about a battle that is open now, and a stale one read back
  * after a restart would be worse than none.
  *
  * # Who reads it
  *
- * One reader, and it is the route word in {@link BattleRoomHeader}, which says
- * which route a battle took so a worse ping has an explanation (issue #2022).
- * The launch used to read it as well, to decide whether the game it was
- * starting went through this machine's relay. That was issue #2099, and it asks
- * the connection now, which holds that answer for its own battle rather than
- * for the last battle hosted anywhere.
+ * The route word in {@link BattleRoomHeader}, which says which route a battle
+ * took so a worse ping has an explanation (issue #2022), and the relay pill in
+ * the top bar. The launch does not: it asks the connection whose battle it is
+ * launching whether that battle is relayed (issue #2099).
  *
- * # What it cannot say, and why nothing has fixed that
+ * # Why a server key is enough
  *
- * There is no battle in here and no connection either, so it means "the route
- * of the last battle this client hosted anywhere". A host with two hosted
- * battles open would read one word on both rooms (issue #2147).
- *
- * There is only ever one battle room to draw, which is why the word is right
- * today. `store.tsx` holds a single `activeKey` and a single mirror, and
- * nothing sets that key to a connection that already exists, so there is no way
- * to move the page from one connection's battle to another's.
- *
- * That is a weaker guarantee than the hosting forms make it sound.
- * `hostBlockedReason` and `joinBlockedReason` say "Coilbox holds one lobby
- * connection" and mean it, but they are read when a drawer opens and a drawer
- * keeps the element it was opened with, so a reconnect landing while the form
- * is on screen walks straight past them. `doConnect` refuses nothing and
- * disconnects nothing, so two connections can be live in the registry at once.
- * What stops a second battle room is the one mirror, not the copy.
- *
- * The connection cannot be asked this the way the launch asks it. What a
- * connection holds is a relay handle, so all it can answer is relayed or not,
- * and three of the label's four words are rungs of a ladder climbed in the
- * hosting form against a reachability report the connection never sees.
- *
- * Keying this by server key is the other suggestion in issue #2147, and it does
- * not work either. The key the header has is `room.serverKey`, which is
- * `activeKey`, while the battle it is drawing comes from `currentBattle` in the
- * one mirror every live connection writes into. With two of them those two can
- * already disagree, so a key check would be wrong in the same cases `selfHost`
- * is. Whoever gives a connection a mirror of its own fixes both at once, and
- * until then this is a line of that work rather than a fix that stands up
- * alone.
+ * This used to be one value for "the last battle this client hosted anywhere",
+ * which only described the battle on screen because coilbox held one lobby
+ * connection (issue #2147). Each connection now has its own mirror, and the
+ * battle room is built from the connection its battle is on (issue #2844), so
+ * the key the room reads with is the key the battle belongs to. A connection is
+ * in one battle at a time. Both hosting forms drop that connection's record
+ * before they try and set it once the battle exists, and leaving drops it, so
+ * the record under a key describes the battle that connection holds.
  *
  * # The one thing a reader has to do
  *
- * This says nothing about whether that battle is still open. Both forms clear it
- * before they try to host and set it once the battle exists, so it never
- * describes a host that failed and never carries over into the next one. It does
- * survive leaving the battle, because nothing here is told about that. So a
- * reader must ask whether this client is in the battle it is describing, which
- * it needs the lobby state for anyway.
+ * This says nothing about whether that battle is still open. Being kicked, or
+ * the host closing the battle, arrives as lobby state and does not clear it. So
+ * a reader must ask whether this client is running the battle it is
+ * describing, which it needs the lobby state for anyway.
  */
-let chosen: HostingRoute | null = null;
+const chosen = new Map<string, HostingRoute>();
 const listeners = new Set<() => void>();
+// Bumped on every change, so a subscriber reading through a snapshot sees a
+// new value and redraws.
+let version = 0;
 
-/** Say which route the battle just hosted took, or null when there is none. */
-export function recordHostingRoute(route: HostingRoute | null): void {
-  if (chosen === route) return;
-  chosen = route;
+/**
+ * Say which route the battle just hosted on `serverKey` took, or null when
+ * there is none.
+ */
+export function recordHostingRoute(
+  serverKey: string,
+  route: HostingRoute | null,
+): void {
+  if ((chosen.get(serverKey) ?? null) === route) return;
+  if (route === null) chosen.delete(serverKey);
+  else chosen.set(serverKey, route);
+  version++;
   for (const listener of listeners) listener();
 }
 
-/** The recorded route, without subscribing to it. The hook below reads through
- *  this rather than reaching for the variable, so there is one way in. */
-export function chosenHostingRoute(): HostingRoute | null {
-  return chosen;
+/** The route recorded for `serverKey`, without subscribing to it. The hooks
+ *  below read through this rather than reaching for the map, so there is one
+ *  way in. */
+export function chosenHostingRoute(
+  serverKey: string | null,
+): HostingRoute | null {
+  return serverKey == null ? null : (chosen.get(serverKey) ?? null);
 }
 
 /**
- * The recorded route, for a component that should redraw when it changes.
+ * The connection whose hosted battle goes through the relay, or null. There is
+ * one relay sidecar on the machine and one battle a player can be in, so there
+ * is at most one.
+ */
+export function relayHostingKey(): string | null {
+  for (const [key, route] of chosen) if (route === "relay") return key;
+  return null;
+}
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  return () => {
+    listeners.delete(onChange);
+  };
+}
+
+const currentVersion = () => version;
+
+/**
+ * The route recorded for `serverKey`, for a component that should redraw when
+ * it changes.
  *
  * A subscription rather than a plain read, and the battle room needs it to be
  * one. A relayed host's `mp_open_battle` waits for the lobby's answer, and that
@@ -451,15 +459,15 @@ export function chosenHostingRoute(): HostingRoute | null {
  * hosted it gets its promise back and records the route, and a header that read
  * once on mount would show a relayed host no word at all.
  */
-export function useChosenHostingRoute(): HostingRoute | null {
-  return useSyncExternalStore(
-    (onChange) => {
-      listeners.add(onChange);
-      return () => {
-        listeners.delete(onChange);
-      };
-    },
-    chosenHostingRoute,
-    chosenHostingRoute,
-  );
+export function useChosenHostingRoute(
+  serverKey: string | null,
+): HostingRoute | null {
+  useSyncExternalStore(subscribe, currentVersion, currentVersion);
+  return chosenHostingRoute(serverKey);
+}
+
+/** {@link relayHostingKey}, for a component that should redraw when it changes. */
+export function useRelayHostingKey(): string | null {
+  useSyncExternalStore(subscribe, currentVersion, currentVersion);
+  return relayHostingKey();
 }

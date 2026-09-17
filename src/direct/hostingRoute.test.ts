@@ -9,6 +9,7 @@ import {
   NAT_TYPE_DIRECT,
   RELAY_EXPLAINED,
   recordHostingRoute,
+  relayHostingKey,
   relayModeFrom,
   relayModeMeaning,
 } from "./hostingRoute";
@@ -469,17 +470,45 @@ describe("the word a battle room shows for its route", () => {
 });
 
 describe("the recorded route", () => {
-  it("holds the route the last host took, for the pages that come after", () => {
-    recordHostingRoute("relay");
-    expect(chosenHostingRoute()).toBe("relay");
+  const A = "alice@server-a:8200";
+  const B = "alice@server-b:8200";
+
+  it("holds the route a connection's host took, for the pages that come after", () => {
+    recordHostingRoute(A, "relay");
+    expect(chosenHostingRoute(A)).toBe("relay");
+    recordHostingRoute(A, null);
   });
 
   // Both forms clear it before they try, so what a failed host leaves behind is
   // nothing rather than the route of the battle before it.
   it("can be dropped, so a failed host describes no route at all", () => {
-    recordHostingRoute("portMapped");
-    recordHostingRoute(null);
-    expect(chosenHostingRoute()).toBe(null);
+    recordHostingRoute(A, "portMapped");
+    recordHostingRoute(A, null);
+    expect(chosenHostingRoute(A)).toBe(null);
+  });
+
+  // Issue #2844. With two servers open, a battle hosted on one must not lend
+  // its route to a battle on the other.
+  it("keeps each connection's route to that connection", () => {
+    recordHostingRoute(A, "relay");
+    expect(chosenHostingRoute(B)).toBe(null);
+    expect(chosenHostingRoute(null)).toBe(null);
+    recordHostingRoute(B, "direct");
+    expect(chosenHostingRoute(A)).toBe("relay");
+    expect(chosenHostingRoute(B)).toBe("direct");
+    recordHostingRoute(A, null);
+    expect(chosenHostingRoute(B)).toBe("direct");
+    recordHostingRoute(B, null);
+  });
+
+  it("names the connection whose battle goes through the relay", () => {
+    expect(relayHostingKey()).toBe(null);
+    recordHostingRoute(A, "direct");
+    recordHostingRoute(B, "relay");
+    expect(relayHostingKey()).toBe(B);
+    recordHostingRoute(B, null);
+    expect(relayHostingKey()).toBe(null);
+    recordHostingRoute(A, null);
   });
 });
 

@@ -6,10 +6,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useChosenHostingRoute } from "@/direct/hostingRoute";
+import { useRelayHostingKey } from "@/direct/hostingRoute";
 import { notify } from "@/notify/notify";
 import { usePlay } from "@/play/PlayProvider";
 import { ASK_EVERY_MS, relayCarryingLabel } from "@/play/relayCarrying";
+import { battleRoomHref } from "./battle/battleRoomKey";
 import { leaveBattle } from "./battle/leaveBattle";
 import { LeftoverRelayAgent } from "./battles/LeftoverRelayAgent";
 import {
@@ -18,7 +19,6 @@ import {
   mpRelayTraffic,
 } from "./bindings";
 import { relayPingLabel, useRelayPing } from "./relayPing";
-import { useMultiplayer } from "./store";
 
 /**
  * topbar.right slot: one pill for the relay on this machine, on every page,
@@ -38,11 +38,13 @@ import { useMultiplayer } from "./store";
  */
 export default function RelayIndicator() {
   const { running, relayed } = usePlay();
-  const hosting = useChosenHostingRoute() === "relay";
-  const ours = useOurRelay(hosting);
+  // The connection whose battle goes through the relay, which need not be the
+  // one in focus once several servers are open (issue #2844).
+  const hostingKey = useRelayHostingKey();
+  const ours = useOurRelay(hostingKey !== null);
   const leftover = useRelayLeftRunning(ours !== null);
   if (running && relayed) return null;
-  if (ours) return <OurRelay {...ours} />;
+  if (ours && hostingKey) return <OurRelay serverKey={hostingKey} {...ours} />;
   if (leftover) return <LeftRelay bytesPerSecond={leftover.bytesPerSecond} />;
   return null;
 }
@@ -166,18 +168,18 @@ function useRelayLeftRunning(ours: boolean): Carrying | null {
  * removes everybody in the battle.
  */
 function OurRelay({
+  serverKey,
   bytesPerSecond,
   letThrough,
   heardFrom,
   overTls,
-}: OurCarrying) {
-  const { activeKey } = useMultiplayer();
+}: OurCarrying & { serverKey: string }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   // This component only renders while hosting through the relay, so the
   // measurement runs for as long as it is on screen (issue #2798).
-  const ping = useRelayPing(activeKey, true);
+  const ping = useRelayPing(serverKey, true);
 
   function choose(next: boolean) {
     setOpen(next);
@@ -186,9 +188,8 @@ function OurRelay({
 
   async function close() {
     choose(false);
-    if (!activeKey) return;
     try {
-      await leaveBattle(activeKey);
+      await leaveBattle(serverKey);
       navigate("/battles");
     } catch (e) {
       void notify({
@@ -254,7 +255,7 @@ function OurRelay({
                 size="sm"
                 onClick={() => {
                   choose(false);
-                  navigate("/battle");
+                  navigate(battleRoomHref(serverKey));
                 }}
               >
                 Go to battle

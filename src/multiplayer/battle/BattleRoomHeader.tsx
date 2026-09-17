@@ -95,10 +95,11 @@ export function BattleRoomHeader({
   directRoom: boolean;
 }) {
   const ready = myStatus?.battleStatus.ready ?? false;
-  // The route the last battle this client opened took. Read here rather than
-  // handed down from the page, because the check that it belongs to the battle
-  // on screen is right below and the two should not be able to drift apart.
-  const hostingRoute = useChosenHostingRoute();
+  // The route the battle hosted on this room's connection took. Read here
+  // rather than handed down from the page, because the check that it belongs to
+  // the battle on screen is right below and the two should not be able to drift
+  // apart.
+  const hostingRoute = useChosenHostingRoute(serverKey);
   const spectator = myStatus ? !myStatus.battleStatus.mode : false;
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
@@ -127,11 +128,9 @@ export function BattleRoomHeader({
   // the match rather than the founder, so a route left behind by a battle on
   // another server cannot surface in a room that never recorded one.
   //
-  // That holds because there is one battle room to be in. It would not hold for
-  // two: a host with a battle on each of two connections founded both, so both
-  // pass, and the record describes whichever they hosted last (issue #2147).
-  // `hostingRoute.ts` says why the record is not keyed and what asking the
-  // connection instead would and would not answer.
+  // The record is kept per connection, and this room's `serverKey` is the
+  // connection its battle is on (issue #2844), so a battle hosted on another
+  // server never lends this one its route.
   //
   // A joiner is told only whether the battle is relayed, which is the one route
   // the lobby names. A relayed battle is advertised at the relay's own address

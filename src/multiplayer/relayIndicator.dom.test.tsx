@@ -43,7 +43,9 @@ vi.mock("./bindings", () => ({
 vi.mock("@/play/PlayProvider", () => ({ usePlay: () => play }));
 
 vi.mock("./store", () => ({
-  useMultiplayer: () => ({ activeKey: "alice@bar:8200" }),
+  // The focused connection is not the one hosting through the relay, so a pill
+  // acting on the focus would leave or open the wrong battle (issue #2844).
+  useMultiplayer: () => ({ activeKey: "alice@other:8200" }),
 }));
 
 vi.mock("./battle/leaveBattle", () => ({
@@ -66,6 +68,9 @@ vi.mock("@/components/ui/popover", () => ({
     <div>{children}</div>
   ),
 }));
+
+const KEY = "alice@bar:8200";
+const OTHER_KEY = "alice@other:8200";
 
 /** Draw the pill and let the first answers land. */
 async function draw() {
@@ -97,13 +102,15 @@ beforeEach(() => {
   leave.mockResolvedValue({});
   play.running = false;
   play.relayed = false;
-  recordHostingRoute(null);
+  recordHostingRoute(KEY, null);
+  recordHostingRoute(OTHER_KEY, null);
 });
 
 afterEach(() => {
   vi.useRealTimers();
   cleanup();
-  recordHostingRoute(null);
+  recordHostingRoute(KEY, null);
+  recordHostingRoute(OTHER_KEY, null);
 });
 
 /** Nearly every session. There is nothing to draw and nothing to keep asking. */
@@ -120,7 +127,7 @@ it("draws nothing and asks nothing more when there is no relay", async () => {
 
 describe("our own relayed battle", () => {
   beforeEach(() => {
-    recordHostingRoute("relay");
+    recordHostingRoute(KEY, "relay");
     traffic.mockResolvedValue({ relaying: true, bytesPerSecond: 0 });
   });
 
@@ -176,10 +183,10 @@ describe("our own relayed battle", () => {
     expect(screen.getByText(/reaches the relay over TLS/)).toBeTruthy();
   });
 
-  it("takes the host back to the battle", async () => {
+  it("takes the host back to the battle, on the server it is on", async () => {
     await draw();
     fireEvent.click(screen.getByRole("button", { name: "Go to battle" }));
-    expect(navigate).toHaveBeenCalledWith("/battle");
+    expect(navigate).toHaveBeenCalledWith("/battle?server=alice%40bar%3A8200");
   });
 
   // Everybody in the battle is removed, so it asks, and only closes on the
