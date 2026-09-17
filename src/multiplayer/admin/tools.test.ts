@@ -46,3 +46,28 @@ describe("the Staff tool", () => {
     ).toBe(false);
   });
 });
+
+/** The Announcements tool (issue #2788): `BROADCAST`, `BROADCASTEX` and
+ * `ADMINBROADCAST` are all in uberserver's `restricted['admin']` set, so the
+ * tool itself is admin-only, the same as Maintenance and Staff. */
+describe("the Announcements tool", () => {
+  it("is admin-only", () => {
+    const announcements = ADMIN_TOOLS.find(
+      (tool) => tool.id === "announcements",
+    );
+    expect(announcements?.adminOnly).toBe(true);
+  });
+
+  it("is offered to an admin and not to a moderator", () => {
+    expect(
+      visibleTools(ADMIN_TOOLS, true).some(
+        (tool) => tool.id === "announcements",
+      ),
+    ).toBe(true);
+    expect(
+      visibleTools(ADMIN_TOOLS, false).some(
+        (tool) => tool.id === "announcements",
+      ),
+    ).toBe(false);
+  });
+});

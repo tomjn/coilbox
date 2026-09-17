@@ -101,8 +101,18 @@ pub enum AdminShape {
     /// sentences: `User not found.` or `Invalid access mode, only user, mod,
     /// admin is valid.`
     SetAccess,
-    /// `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`: never answered.
+    /// `BROADCAST`, `BROADCASTEX`: never answered, not even to the sender.
+    /// `ADMINBROADCAST` has its own shape below, because it does answer the
+    /// sender.
     NoReply,
+    /// `ADMINBROADCAST <message>`: `DataHandler.admin_broadcast` sends every
+    /// online admin, the sender included, `SERVERMSG Admin broadcast:
+    /// <message>`. Without its own shape that line is just another
+    /// unclaimed `SERVERMSG`: it would sit the queue open until the 20
+    /// second timeout rather than finishing the command straight away, and
+    /// it would reach the frontend as an ordinary toast rather than the
+    /// tool's own confirmation.
+    AdminBroadcast,
     /// ChanServ's `:register <chan> [founder]`: `#<chan>: Successfully
     /// registered to <founder>`.
     RegisterChannel,
@@ -375,6 +385,11 @@ pub enum AdminReply {
         success: bool,
         /// The failure sentence uberserver gave. Empty on success, since its
         /// `OK cmd=SETACCESS` carries no message of its own.
+        message: String,
+    },
+    AdminBroadcast {
+        /// The message as uberserver echoed it back, with its `Admin
+        /// broadcast: ` prefix stripped.
         message: String,
     },
     RegisterChannel {
@@ -987,6 +1002,10 @@ impl AdminCollector {
                     success: false,
                     message,
                 }),
+                None => Heard::NotOurs,
+            },
+            (AdminShape::AdminBroadcast, _) => match admin_broadcast_result_from(text) {
+                Some(message) => Heard::Finished(AdminReply::AdminBroadcast { message }),
                 None => Heard::NotOurs,
             },
             (AdminShape::DeleteAccount, Progress::Waiting) => {
@@ -1605,6 +1624,12 @@ fn set_access_result_from(text: &str) -> Option<String> {
     }
 }
 
+/// `DataHandler.admin_broadcast`: `'SERVERMSG Admin broadcast: %s' % msg`,
+/// sent to every online admin, the sender included.
+fn admin_broadcast_result_from(text: &str) -> Option<String> {
+    text.strip_prefix("Admin broadcast: ").map(str::to_string)
+}
+
 /// `in_DELETEACCOUNT`: `"User <%s> does not exist" % username`, sent alone
 /// when no account was found at all.
 fn delete_account_missing_from(text: &str) -> bool {
@@ -2033,6 +2058,7 @@ mod tests {
             AdminShape::Unban,
             AdminShape::ResetUserPassword,
             AdminShape::NoReply,
+            AdminShape::AdminBroadcast,
             AdminShape::UserInfo,
         ] {
             assert_eq!(AdminCollector::new(shape).give_up(), None, "for {shape:?}");
@@ -2428,6 +2454,22 @@ mod tests {
         assert_eq!(
             AdminCollector::new(AdminShape::BanList).hear_ok(),
             Heard::NotOurs
+        );
+    }
+
+    /// `DataHandler.admin_broadcast`'s one line to each online admin,
+    /// including the sender (issue #2788).
+    #[test]
+    fn an_admin_broadcast_reply_is_one_line() {
+        let (_, heard) = hear_all(
+            AdminShape::AdminBroadcast,
+            &["Admin broadcast: Server restarting in 5 minutes"],
+        );
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::AdminBroadcast {
+                message: "Server restarting in 5 minutes".to_string(),
+            })]
         );
     }
 
@@ -3328,6 +3370,9 @@ mod tests {
             AdminReply::SetAccess {
                 success: true,
                 message: String::new(),
+            },
+            AdminReply::AdminBroadcast {
+                message: "Server restarting in 5 minutes".into(),
             },
             AdminReply::RegisterChannel {
                 channel: "main".into(),

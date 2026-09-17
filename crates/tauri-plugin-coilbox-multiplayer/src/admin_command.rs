@@ -990,6 +990,35 @@ mod tests {
         );
     }
 
+    /// `ADMINBROADCAST` echoes back to the sender as `SERVERMSG Admin
+    /// broadcast: <message>` (issue #2788). Its own shape claims that line
+    /// and finishes the command straight away, rather than leaving it to
+    /// leak through as an ordinary toast and hold the queue open until the
+    /// timeout the way `NoReply` would.
+    #[test]
+    fn an_admin_broadcast_reply_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (broadcast, mut answered) = request("ADMINBROADCAST", AdminShape::AdminBroadcast);
+        queue.push(broadcast, now);
+        assert_eq!(
+            queue.hear(
+                &said("Admin broadcast: Server restarting in 5 minutes"),
+                now
+            ),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::AdminBroadcast {
+                    message: "Server restarting in 5 minutes".to_string(),
+                }
+            })
+        );
+        assert_eq!(queue.deadline(), None);
+    }
+
     /// `RELOAD` and `CLEANUP` also announce in `#moderator` before their
     /// direct reply, but that announcement is a channel `SAID`, not a
     /// `SERVERMSG`, so it never reaches the queue and cannot be mistaken for
@@ -1183,7 +1212,7 @@ mod tests {
         assert!(answered.try_recv().is_err(), "still waiting");
     }
 
-    /// Every one of these six is in uberserver's `restricted['admin']` set,
+    /// Every one of these is in uberserver's `restricted['admin']` set,
     /// so a mod calling one is refused at dispatch before its handler ever
     /// runs, in the same generic `<COMMAND> failed. Insufficient rights.`
     /// shape as any other admin command.
@@ -1197,6 +1226,7 @@ mod tests {
             ("LISTMODS", AdminShape::ListMods),
             ("SETACCESS", AdminShape::SetAccess),
             ("DELETEACCOUNT", AdminShape::DeleteAccount),
+            ("ADMINBROADCAST", AdminShape::AdminBroadcast),
         ] {
             let mut queue = AdminQueue::default();
             let now = Instant::now();
