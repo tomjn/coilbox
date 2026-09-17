@@ -787,6 +787,116 @@ export const mpGetUserInfo = defineCommand<
 >("coilbox-multiplayer", "mp_get_user_info");
 
 /**
+ * The reply a moderator or admin command waits for. Mirrors the Rust
+ * `AdminShape`.
+ *
+ * - `banList`: `LISTBANS`
+ * - `blacklist`: `LISTBLACKLIST`
+ * - `userInfo`: `GETUSERINFO <name>`
+ * - `ipLookup`: `GETIP <name>`, silent when no address is known
+ * - `ipSearch`: `FINDIP <address>`, silent when nothing matches, and only
+ *   complete when the wait runs out
+ * - `botMode`: `SETBOTMODE <name> <mode>`, silent for a missing user
+ * - `noReply`: `BROADCAST`, `BROADCASTEX`, `ADMINBROADCAST`
+ */
+export type AdminShape =
+  | "banList"
+  | "blacklist"
+  | "userInfo"
+  | "ipLookup"
+  | "ipSearch"
+  | "botMode"
+  | "noReply";
+
+/** One `LISTBANS` line. uberserver's `None` arrives as null. */
+export interface BanEntry {
+  username: string | null;
+  ip: string | null;
+  email: string | null;
+  reason: string;
+  ends: string;
+  issuer: string;
+}
+
+/** One `LISTBLACKLIST` line. */
+export interface BlacklistEntry {
+  domain: string;
+  reason: string;
+  issuer: string;
+}
+
+/** An account and an address it was seen on, from `GETIP` or `FINDIP`. */
+export interface IpBinding {
+  username: string;
+  /** As written. Behind a trusted proxy: `<local> via proxy <proxy>`. */
+  address: string;
+  /** Logged in now, rather than seen before. */
+  online: boolean;
+  /** When `FINDIP` last saw an offline account there. */
+  lastSeen: string | null;
+}
+
+/** What `GETUSERINFO <name>` said. Mirrors the Rust `UserInfo`. */
+export type AdminUserInfo =
+  | {
+      kind: "account";
+      username: string;
+      online: boolean;
+      userId: string;
+      sessionId: string | null;
+      agent: string | null;
+      registered: string;
+      lastLogin: string;
+      access: string;
+      bot: boolean;
+      ingameHours: string;
+      email: string | null;
+      lastIp: string | null;
+      lastSysId: string | null;
+      lastMacId: string | null;
+    }
+  | {
+      kind: "bridged";
+      username: string;
+      bridged: boolean;
+      bridgedId: string;
+      bridgeUserId: string | null;
+      lastBridged: string;
+      externalId: string;
+      location: string;
+      externalUsername: string;
+    }
+  | { kind: "missing"; username: string }
+  | { kind: "bridgedMissing"; username: string }
+  | { kind: "static"; username: string };
+
+/** A parsed answer. Mirrors the Rust `AdminReply`. */
+export type AdminReply =
+  | { shape: "banList"; entries: BanEntry[] }
+  | { shape: "blacklist"; entries: BlacklistEntry[] }
+  | { shape: "userInfo"; info: AdminUserInfo }
+  | { shape: "ipLookup"; binding: IpBinding }
+  | { shape: "ipSearch"; bindings: IpBinding[] }
+  | { shape: "botMode"; username: string; bot: boolean };
+
+/** How an admin command ended. Mirrors the Rust `AdminOutcome`. */
+export type AdminOutcome =
+  | { outcome: "answered"; reply: AdminReply }
+  | { outcome: "refused"; reason: string }
+  | { outcome: "unanswered" };
+
+/**
+ * Send a moderator or admin command and wait for how it ended. Commands on
+ * one connection go one at a time, so this can wait behind others. The lines
+ * that answer never arrive as deltas, so none of them becomes a toast. Only
+ * the last of `args` may contain spaces.
+ */
+export const mpAdminCommand = defineCommand<
+  { serverKey: string; command: string; args: string[]; shape: AdminShape },
+  AdminOutcome
+>("coilbox-multiplayer", "mp_admin_command");
+
+/**
  * Resume a login parked awaiting the emailed verification code: sends
  * `CONFIRMAGREEMENT [code]`, and the server logs the connection in. Omit `code` for
  * agreements that need none.
