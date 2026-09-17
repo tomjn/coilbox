@@ -115,7 +115,10 @@ function withDebriefing(
     mirror: {
       ...base.mirror,
       state: report
-        ? ({ debriefing: report, myUsername: null } as unknown as ConnectionState["mirror"]["state"])
+        ? ({
+            debriefing: report,
+            myUsername: null,
+          } as unknown as ConnectionState["mirror"]["state"])
         : null,
     },
   };

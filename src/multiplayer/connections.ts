@@ -106,7 +106,9 @@ export function pendingAgreement(
   const parked = Object.values(connections).filter((c) => c.agreement != null);
   const pick =
     parked.find((c) => c.serverKey === focusKey) ?? parked[0] ?? null;
-  return pick ? { serverKey: pick.serverKey, text: pick.agreement ?? "" } : null;
+  return pick
+    ? { serverKey: pick.serverKey, text: pick.agreement ?? "" }
+    : null;
 }
 
 /**
