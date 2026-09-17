@@ -7,9 +7,15 @@
  * acts on it without asking.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LobbyState } from "../bindings";
 
@@ -89,8 +95,18 @@ function state(compflags: string[], me: string, access: boolean): LobbyState {
   } as unknown as LobbyState;
 }
 
-function connection(serverKey: string, s: LobbyState) {
-  return { serverKey, live: true, direct: false, mirror: { state: s } };
+function connection(
+  serverKey: string,
+  s: LobbyState,
+  adminLevel: "mod" | "admin" = "mod",
+) {
+  return {
+    serverKey,
+    live: true,
+    direct: false,
+    adminLevel,
+    mirror: { state: s },
+  };
 }
 
 const wireConnections = vi.hoisted(() => ({
@@ -112,6 +128,25 @@ vi.mock("../store", () => ({
   usernameFromKey: (key: string) => key.split("@")[0],
 }));
 
+// No admin-only tool is built yet (issues #2785 to #2788 add them), so the
+// registry gains a stand-in to check the nav's admin group against.
+vi.mock("../admin/tools", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../admin/tools")>();
+  return {
+    ...actual,
+    ADMIN_TOOLS: [
+      ...actual.ADMIN_TOOLS,
+      {
+        id: "staff",
+        label: "Staff",
+        icon: actual.ADMIN_TOOLS[0].icon,
+        adminOnly: true,
+        Component: () => <h2>Staff stand-in</h2>,
+      },
+    ],
+  };
+});
+
 import ServerAdminRoute from "./ServerAdminPage";
 
 const KEY_A = "mod@uber-a.example:8200";
@@ -123,12 +158,27 @@ function setConnections(
   wireConnections.connections = entries;
 }
 
+function SearchProbe() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
+
 function draw(initialPath = "/admin") {
   render(
     <MemoryRouter initialEntries={[initialPath]}>
       <ServerAdminRoute />
+      <SearchProbe />
     </MemoryRouter>,
   );
+}
+
+function oneModerator(level: "mod" | "admin" = "mod") {
+  setConnections({
+    [KEY_A]: connection(KEY_A, state(["u", "sp", "b"], "mod", true), level),
+  });
+}
+
+function toolNav() {
+  return screen.getByRole("navigation", { name: "Server admin tools" });
 }
 
 afterEach(() => {
@@ -159,17 +209,98 @@ describe("with a single qualifying connection", () => {
   });
 });
 
-describe("the ChanServ sections", () => {
-  it("shows the channel and server address tools", () => {
-    setConnections({
-      [KEY_A]: connection(KEY_A, state(["u", "sp", "b"], "mod", true)),
-    });
+describe("the tool nav", () => {
+  it("lists the moderation tools and opens Players first", () => {
+    oneModerator();
     draw();
+    const nav = toolNav();
+    const names = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(names).toEqual([
+      "Players",
+      "Bans",
+      "Channels",
+      "Bots",
+      "Staff activity",
+      "Server",
+    ]);
+    expect(
+      within(nav)
+        .getByRole("link", { name: "Players" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("heading", { name: "Player lookup" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Bans" })).toBeNull();
+  });
+
+  it("shows one tool at a time and puts it in the URL", () => {
+    oneModerator();
+    draw(`/admin?server=${encodeURIComponent(KEY_A)}`);
+    fireEvent.click(within(toolNav()).getByRole("link", { name: "Channels" }));
     expect(screen.getByRole("heading", { name: "Channels" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Player lookup" })).toBeNull();
+    const search = new URLSearchParams(
+      screen.getByTestId("search").textContent ?? "",
+    );
+    expect(search.get("tool")).toBe("channels");
+    expect(search.get("server")).toBe(KEY_A);
+  });
+
+  it("opens the tool named by ?tool=", () => {
+    oneModerator();
+    draw("/admin?tool=server");
     expect(
       screen.getByRole("heading", { name: "Server address" }),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Show server IP" })).toBeTruthy();
+  });
+
+  it("opens Players with the name filled for a ?player= link", () => {
+    oneModerator();
+    draw(`/admin?server=${encodeURIComponent(KEY_A)}&player=Alice`);
+    expect(screen.getByRole("heading", { name: "Player lookup" })).toBeTruthy();
+    expect(
+      (screen.getByLabelText("Player name") as HTMLInputElement).value,
+    ).toBe("Alice");
+  });
+
+  it("opens Bans with the ban form filled for a ?ban= handoff", () => {
+    oneModerator();
+    draw("/admin?tool=players&player=Alice&ban=Alice");
+    expect(screen.getByRole("heading", { name: "Bans" })).toBeTruthy();
+    const form = screen.getByRole("group", { name: "Ban an account" });
+    expect(
+      (within(form).getByLabelText("Username") as HTMLInputElement).value,
+    ).toBe("Alice");
+  });
+
+  it("opens a secondary form only on demand", () => {
+    oneModerator();
+    draw("/admin?tool=bans");
+    const name = "Ban a specific username, IP or email";
+    expect(screen.queryByRole("group", { name })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ban IP or email…" }));
+    expect(screen.getByRole("group", { name })).toBeTruthy();
+  });
+});
+
+describe("admin-only tools", () => {
+  it("hides the admin group, and its tools, from a moderator", () => {
+    oneModerator("mod");
+    draw("/admin?tool=staff");
+    expect(within(toolNav()).queryByText("Admin only")).toBeNull();
+    expect(within(toolNav()).queryByRole("link", { name: "Staff" })).toBeNull();
+    expect(screen.queryByText("Staff stand-in")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Player lookup" })).toBeTruthy();
+  });
+
+  it("shows them to an admin in their own group", () => {
+    oneModerator("admin");
+    draw("/admin?tool=staff");
+    const group = within(toolNav()).getByRole("list", { name: "Admin only" });
+    expect(within(group).getByRole("link", { name: "Staff" })).toBeTruthy();
+    expect(screen.getByText("Staff stand-in")).toBeTruthy();
   });
 });
 
