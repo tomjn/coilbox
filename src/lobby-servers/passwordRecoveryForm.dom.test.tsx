@@ -25,8 +25,10 @@ vi.mock("../multiplayer/store", () => ({
     recoverPassword: mp.recoverPassword,
     submitRecoveryCode: mp.submitRecoveryCode,
     cancelRecovery: mp.cancelRecovery,
-    busy: false,
+    busyKeys: new Set<string>(),
   }),
+  serverKeyFor: (server: LobbyServer, username: string) =>
+    `${username}@${server.host}:${server.port}`,
 }));
 
 import type { RecoveryStart } from "../multiplayer/store";

@@ -3,41 +3,79 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
 import { SlideDrawer } from "@/components/SlideDrawer";
 import { lsStoreCredential } from "../../lobby-servers/bindings";
-import { useLastLogin } from "../../lobby-servers/config";
-import { useMultiplayer } from "../../multiplayer/store";
+import {
+  type LobbyAccount,
+  type LobbyServer,
+  useLastLogin,
+  useLobbyAccounts,
+} from "../../lobby-servers/config";
+import { AccountPicker } from "../../multiplayer/AccountPicker";
+import { protocolForKey } from "../../multiplayer/protocol";
+import {
+  liveConnectionKeys,
+  useConnection,
+  useMultiplayer,
+  useProtocolServers,
+  usernameFromKey,
+} from "../../multiplayer/store";
 
 const H2_CLASS =
   "flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
 
 /**
- * Account management for the one lobby account currently signed in
- * (`/settings/account`). Separate from `/settings/lobby-servers`, which owns the
- * local list of servers and logins and whose edits are instant and offline:
- * everything here goes to the server and can fail there, which is why the page
- * has three states rather than one form.
+ * Account management for the signed-in lobby account (`/settings/account`).
+ * Separate from `/settings/lobby-servers`, which owns the local list of
+ * servers and logins and whose edits are instant and offline: everything here
+ * goes to the server and can fail there, which is why the page has three
+ * states rather than one form.
+ *
+ * With more than one connection live, a picker chooses which account every
+ * action below runs against (issue #2846). With one, the page acts on it
+ * without asking, exactly as it did before a second connection was possible.
  */
 export default function AccountSettings() {
-  const { connected, protocol, mirror, accountInfo, getUserInfo } =
-    useMultiplayer();
+  const { connections, activeKey, getUserInfo } = useMultiplayer();
+  const servers = useProtocolServers();
 
-  // Requested once per session, not on every render: `connected`/`protocol`
-  // only change on connect/disconnect, and `getUserInfo` is a stable callback.
+  const liveKeys = liveConnectionKeys(connections, activeKey);
+  const [manualPick, setManualPick] = useState<string | null>(null);
+  const pickedKey =
+    manualPick && liveKeys.includes(manualPick)
+      ? manualPick
+      : (liveKeys[0] ?? null);
+
+  const picked = useConnection(pickedKey);
+  const protocol = protocolForKey(pickedKey, servers);
+
+  // Requested once per session, not on every render: `pickedKey`/`protocol`
+  // only change on connect/disconnect or a picker change, and `getUserInfo`
+  // is a stable callback.
   useEffect(() => {
-    if (connected && protocol === "tasserver") getUserInfo();
-  }, [connected, protocol, getUserInfo]);
+    if (pickedKey && protocol === "tasserver") getUserInfo(pickedKey);
+  }, [pickedKey, protocol, getUserInfo]);
 
-  if (!connected) return <DisconnectedPanel />;
+  if (!pickedKey) return <DisconnectedPanel />;
   if (protocol !== "tasserver") return <OtherProtocolPanel />;
 
   return (
     <div className="space-y-6 pb-8">
+      {liveKeys.length > 1 && (
+        <AccountPicker
+          keys={liveKeys}
+          value={pickedKey}
+          onChange={setManualPick}
+        />
+      )}
       <AccountDetails
-        username={mirror.state?.myUsername ?? null}
-        registrationDate={accountInfo?.registrationDate ?? null}
-        email={accountInfo?.email ?? null}
-        ingameHours={accountInfo?.ingameHours ?? null}
+        username={picked?.mirror.state?.myUsername ?? null}
+        registrationDate={picked?.accountInfo?.registrationDate ?? null}
+        email={picked?.accountInfo?.email ?? null}
+        ingameHours={picked?.accountInfo?.ingameHours ?? null}
       />
-      <AccountActions email={accountInfo?.email ?? null} />
+      <AccountActions
+        email={picked?.accountInfo?.email ?? null}
+        serverKey={pickedKey}
+      />
     </div>
   );
 }
@@ -97,7 +135,13 @@ function AccountDetails({
   );
 }
 
-function AccountActions({ email }: { email: string | null }) {
+function AccountActions({
+  email,
+  serverKey,
+}: {
+  email: string | null;
+  serverKey: string;
+}) {
   const { resendVerification } = useMultiplayer();
   const [drawer, setDrawer] = useState<"password" | "email" | null>(null);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
@@ -108,7 +152,7 @@ function AccountActions({ email }: { email: string | null }) {
     setResending(true);
     setResendStatus(null);
     try {
-      await resendVerification(email);
+      await resendVerification(email, serverKey);
       setResendStatus("Verification email sent.");
     } catch (err) {
       setResendStatus(String(err));
@@ -145,14 +189,39 @@ function AccountActions({ email }: { email: string | null }) {
       )}
       <ChangePasswordDrawer
         open={drawer === "password"}
+        serverKey={serverKey}
         onClose={() => setDrawer(null)}
       />
       <ChangeEmailDrawer
         open={drawer === "email"}
         email={email}
+        serverKey={serverKey}
         onClose={() => setDrawer(null)}
       />
     </section>
+  );
+}
+
+/**
+ * The saved login the given connection's own key names, or undefined when it
+ * doesn't match one (e.g. a login typed and connected but never saved). Used
+ * to find which keychain entry a successful password change should update -
+ * derived from the connection being edited rather than from `lastLogin`
+ * (issue #2846: with two connections open, `lastLogin` names whichever
+ * connected most recently, not necessarily the one this form is for).
+ */
+function accountForKey(
+  serverKey: string,
+  servers: LobbyServer[],
+  accounts: LobbyAccount[],
+): LobbyAccount | undefined {
+  const server = servers.find((s) =>
+    serverKey.endsWith(`@${s.host}:${s.port}`),
+  );
+  if (!server) return undefined;
+  const username = usernameFromKey(serverKey);
+  return accounts.find(
+    (a) => a.serverId === server.id && a.username === username,
   );
 }
 
@@ -161,23 +230,25 @@ function AccountActions({ email }: { email: string | null }) {
  * accept/deny reply of its own, only a bare `SERVERMSG`, so whatever the server
  * says is shown verbatim rather than interpreted. The saved keychain entry is
  * only touched when `succeeded` is true and the drawer can tell which saved
- * login this session came from (`lastLogin`, written on every successful
- * connect). A stale saved password is fixed by retyping it, but one
- * overwritten on a change that did not happen locks the user out of their own
- * saved login. A change that succeeded but whose keychain write then fails is
- * a third case: the server-side password is now correct and the saved one is
- * wrong, so that failure is surfaced rather than swallowed (see `submit`).
+ * login this connection is (`accountForKey`, matched against `serverKey`). A
+ * stale saved password is fixed by retyping it, but one overwritten on a
+ * change that did not happen locks the user out of their own saved login. A
+ * change that succeeded but whose keychain write then fails is a third case:
+ * the server-side password is now correct and the saved one is wrong, so
+ * that failure is surfaced rather than swallowed (see `submit`).
  */
 function ChangePasswordDrawer({
   open,
+  serverKey,
   onClose,
 }: {
   open: boolean;
+  serverKey: string;
   onClose: () => void;
 }) {
   return (
     <SlideDrawer open={open} title="Change password" onClose={onClose}>
-      <ChangePasswordForm onClose={onClose} />
+      <ChangePasswordForm serverKey={serverKey} onClose={onClose} />
     </SlideDrawer>
   );
 }
@@ -189,9 +260,16 @@ function ChangePasswordDrawer({
  * reopen, rather than a typed-in password or an old result outliving the
  * close that should have cleared it.
  */
-function ChangePasswordForm({ onClose }: { onClose: () => void }) {
-  const { changePassword, mirror } = useMultiplayer();
-  const [lastLogin] = useLastLogin();
+function ChangePasswordForm({
+  serverKey,
+  onClose,
+}: {
+  serverKey: string;
+  onClose: () => void;
+}) {
+  const { changePassword } = useMultiplayer();
+  const servers = useProtocolServers();
+  const [accountsCfg] = useLobbyAccounts();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -206,18 +284,17 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
     setError(null);
     setKeychainWarning(null);
     try {
-      const result = await changePassword(current, next);
+      const result = await changePassword(current, next, serverKey);
       setMessage(result.message);
       setSucceeded(result.succeeded);
-      if (
-        result.succeeded &&
-        lastLogin &&
-        lastLogin.username === mirror.state?.myUsername
-      ) {
+      const account = result.succeeded
+        ? accountForKey(serverKey, servers, accountsCfg.accounts)
+        : undefined;
+      if (account) {
         try {
           await lsStoreCredential({
-            serverId: lastLogin.serverId,
-            username: lastLogin.username,
+            serverId: account.serverId,
+            username: account.username,
             secret: next,
           });
         } catch {
@@ -293,15 +370,17 @@ function ChangePasswordForm({ onClose }: { onClose: () => void }) {
 function ChangeEmailDrawer({
   open,
   email,
+  serverKey,
   onClose,
 }: {
   open: boolean;
   email: string | null;
+  serverKey: string;
   onClose: () => void;
 }) {
   return (
     <SlideDrawer open={open} title="Change email" onClose={onClose}>
-      <ChangeEmailForm email={email} onClose={onClose} />
+      <ChangeEmailForm email={email} serverKey={serverKey} onClose={onClose} />
     </SlideDrawer>
   );
 }
@@ -314,9 +393,11 @@ function ChangeEmailDrawer({
  */
 function ChangeEmailForm({
   email,
+  serverKey,
   onClose,
 }: {
   email: string | null;
+  serverKey: string;
   onClose: () => void;
 }) {
   const { changeEmailRequest, changeEmail } = useMultiplayer();
@@ -331,7 +412,7 @@ function ChangeEmailForm({
     setSubmitting(true);
     setError(null);
     try {
-      await changeEmailRequest(address.trim());
+      await changeEmailRequest(address.trim(), serverKey);
       setStage("code");
     } catch (err) {
       setError(String(err));
@@ -345,7 +426,7 @@ function ChangeEmailForm({
     setSubmitting(true);
     setError(null);
     try {
-      await changeEmail(address.trim(), code.trim());
+      await changeEmail(address.trim(), code.trim(), serverKey);
       setStage("done");
     } catch (err) {
       setError(String(err));

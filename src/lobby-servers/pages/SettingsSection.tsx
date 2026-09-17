@@ -27,7 +27,11 @@ import {
 } from "../../multiplayer/awayStatus";
 import { mpTachyonSignOut } from "../../multiplayer/bindings";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
-import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
+import {
+  serverKeyFor,
+  useConnection,
+  useMultiplayer,
+} from "../../multiplayer/store";
 import {
   lsDeleteCredential,
   lsGetCredential,
@@ -361,18 +365,20 @@ export default function LobbyServersSettings() {
   );
 }
 
-/** Whether an account is the live connection, and how many users it sees. */
+/**
+ * Whether an account has a live connection, and how many users it sees. Reads
+ * that account's own connection rather than the app's one focused connection,
+ * so every connected login is marked, not only the focused one (issue #2846).
+ */
 function useAccountConnection(
   a: LobbyAccount,
   server: LobbyServer | undefined,
 ) {
-  const { mirror, activeKey } = useMultiplayer();
-  const connected =
-    mirror.connected &&
-    server != null &&
-    activeKey === serverKeyFor(server, a.username);
+  const key = server ? serverKeyFor(server, a.username) : null;
+  const conn = useConnection(key);
+  const connected = conn?.live ?? false;
   const onlineCount = connected
-    ? Object.keys(mirror.state?.users ?? {}).length
+    ? Object.keys(conn?.mirror.state?.users ?? {}).length
     : 0;
   return { connected, onlineCount };
 }
@@ -683,9 +689,12 @@ function TachyonSignIn({
   signedIn: boolean | undefined;
   onChanged: (signedIn: boolean) => void;
 }) {
-  const { signIn, busy } = useMultiplayer();
+  const { signIn, busyKeys } = useMultiplayer();
   const [error, setError] = useState<string | null>(null);
   const named = a.username.trim() !== "";
+  // Scoped to this login's own key, not the store-wide `busy`, so signing in
+  // or out on one account does not grey out another's controls (issue #2846).
+  const busy = server != null && busyKeys.has(serverKeyFor(server, a.username));
 
   const run = async (action: Promise<unknown>, outcome: boolean) => {
     setError(null);

@@ -1,22 +1,33 @@
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, UserX } from "lucide-react";
 import { useState } from "react";
+import { AccountPicker } from "../AccountPicker";
 import { useIgnoreActions } from "../ignore";
-import { useMultiplayer } from "../store";
+import { liveConnectionKeys, useMultiplayer } from "../store";
 
 /**
  * Settings section for the ignore list. Ignores are per-account, keyed by the live
- * `serverKey` (`username@host:port`), so the editor targets the connected account;
- * when disconnected it explains that a connection is required. Ignored users'
- * channel and private messages are hidden client-side (see `useConversation`), and
- * the change is synced to the server's ignore list where supported.
+ * `serverKey` (`username@host:port`), so the editor targets one connected account.
+ * When disconnected it explains that a connection is required. With more than one
+ * connection live, a picker chooses which one (issue #2846). With one, the editor
+ * targets it without asking, exactly as it did before a second connection was
+ * possible. Ignored users' channel and private messages are hidden client-side
+ * (see `useConversation`), and the change is synced to the server's ignore list
+ * where supported.
  */
 export default function IgnoreSettings() {
-  const { activeKey } = useMultiplayer();
-  const { list, ignore, unignore } = useIgnoreActions(activeKey);
+  const { connections, activeKey } = useMultiplayer();
+  const liveKeys = liveConnectionKeys(connections, activeKey);
+  const [manualPick, setManualPick] = useState<string | null>(null);
+  const pickedKey =
+    manualPick && liveKeys.includes(manualPick)
+      ? manualPick
+      : (liveKeys[0] ?? null);
+
+  const { list, ignore, unignore } = useIgnoreActions(pickedKey);
   const [draft, setDraft] = useState("");
 
-  if (!activeKey) {
+  if (!pickedKey) {
     return (
       <p className="text-sm text-muted-foreground">
         Ignores are per-account. Connect to a lobby server to manage the ignore
@@ -37,6 +48,14 @@ export default function IgnoreSettings() {
       <p className="text-sm text-muted-foreground">
         Hidden users' channel and private messages are hidden in the client.
       </p>
+
+      {liveKeys.length > 1 && (
+        <AccountPicker
+          keys={liveKeys}
+          value={pickedKey}
+          onChange={setManualPick}
+        />
+      )}
 
       <form
         className="flex items-center gap-2"

@@ -77,6 +77,21 @@ export function anotherLiveKey(
   return null;
 }
 
+/**
+ * Every live connection's key, the focused one first when it is among them.
+ * Pure. Settings pages that act on one connected account use this to build an
+ * account picker once more than one is connected (issue #2846), the same
+ * "focused first" ordering {@link liveTachyonKeys} in `protocol.ts` uses.
+ */
+export function liveConnectionKeys(
+  connections: Connections,
+  focusKey: string | null,
+): string[] {
+  const keys = Object.keys(connections).filter((key) => connections[key].live);
+  if (focusKey == null || !keys.includes(focusKey)) return keys;
+  return [focusKey, ...keys.filter((key) => key !== focusKey)];
+}
+
 export type ConnectionAction =
   /** Make an entry for a connection, keeping one that already exists. */
   | { type: "open"; serverKey: string }

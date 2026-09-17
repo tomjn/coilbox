@@ -8,7 +8,7 @@ import {
   normalizeChannelList,
   useJoinedChannels,
 } from "../../../multiplayer/channels";
-import { useMultiplayer } from "../../../multiplayer/store";
+import { useConnection } from "../../../multiplayer/store";
 
 /**
  * Editor for an account's auto-join channel list, keyed by its `serverKey`
@@ -23,9 +23,11 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
 
   // Channels the server refused to (re)join this session, flagged so the user can
   // see why an entry isn't working and remove it. Only meaningful for the account
-  // that's actually connected, so scope it to the active connection.
-  const { activeKey, channelJoinFailures } = useMultiplayer();
-  const failures = serverKey === activeKey ? channelJoinFailures : {};
+  // that's actually connected, so read the connection matching this editor's own
+  // server key rather than whichever connection the app happens to focus. With
+  // two logins open, editing the second must not show the first's failures
+  // (issue #2846).
+  const failures = useConnection(serverKey)?.channelJoinFailures ?? {};
 
   // Only this account's list is edited here, so fold it into the other accounts'
   // lists as stored. A join confirmed while this editor is open writes the same

@@ -23,6 +23,28 @@ import type { LastLogin } from "../../lobby-servers/config";
 const lsStoreCredential = vi.hoisted(() => vi.fn(async () => ({})));
 vi.mock("../../lobby-servers/bindings", () => ({ lsStoreCredential }));
 
+// `AccountPicker` composes `OptionSelect`, a Radix `Select`, and is exercised
+// on its own. Here it's swapped for plain buttons so a test can pick an
+// account with a click rather than driving a listbox.
+vi.mock("../../multiplayer/AccountPicker", () => ({
+  AccountPicker: ({
+    keys,
+    onChange,
+  }: {
+    keys: string[];
+    value: string;
+    onChange: (key: string) => void;
+  }) => (
+    <div>
+      {keys.map((key) => (
+        <button key={key} type="button" onClick={() => onChange(key)}>
+          pick {key}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 const mp = vi.hoisted(() => ({
   getUserInfo: vi.fn(),
   changePassword: vi.fn(),
@@ -32,35 +54,56 @@ const mp = vi.hoisted(() => ({
   openLoginPopover: vi.fn(),
 }));
 
-interface MultiplayerMockState {
-  connected: boolean;
-  protocol: "tasserver" | "tachyon" | "zerok";
-  myUsername: string | null;
-  changePasswordResult?: { message: string; succeeded: boolean };
-  accountEmail?: string | null;
+type Protocol = "tasserver" | "tachyon" | "zerok";
+
+interface ConnEntry {
+  serverKey: string;
+  live: boolean;
+  mirror: { state: { myUsername: string } | null };
+  accountInfo: {
+    registrationDate: string | null;
+    email: string | null;
+    ingameHours: string | null;
+  } | null;
 }
 
-let current: MultiplayerMockState = {
-  connected: false,
-  protocol: "tasserver",
-  myUsername: null,
+const SERVER = {
+  id: "bar-ssl",
+  name: "BAR",
+  host: "bar.example",
+  port: 8200,
+  tls: false,
+  allowSelfSigned: false,
 };
+
+function keyFor(username: string) {
+  return `${username}@${SERVER.host}:${SERVER.port}`;
+}
+
+function connectionFor(
+  username: string,
+  accountEmail: string | null | undefined,
+): ConnEntry {
+  const key = keyFor(username);
+  return {
+    serverKey: key,
+    live: true,
+    mirror: { state: { myUsername: username } },
+    accountInfo:
+      accountEmail == null
+        ? null
+        : { registrationDate: null, email: accountEmail, ingameHours: null },
+  };
+}
+
+let connections: Record<string, ConnEntry> = {};
+let activeKey: string | null = null;
+let servers: (typeof SERVER & { protocol?: Protocol })[] = [];
 
 vi.mock("../../multiplayer/store", () => ({
   useMultiplayer: () => ({
-    connected: current.connected,
-    protocol: current.protocol,
-    mirror: {
-      state: current.myUsername ? { myUsername: current.myUsername } : null,
-    },
-    accountInfo:
-      current.accountEmail == null
-        ? null
-        : {
-            registrationDate: null,
-            email: current.accountEmail,
-            ingameHours: null,
-          },
+    connections,
+    activeKey,
     getUserInfo: mp.getUserInfo,
     changePassword: mp.changePassword,
     changeEmailRequest: mp.changeEmailRequest,
@@ -68,15 +111,29 @@ vi.mock("../../multiplayer/store", () => ({
     resendVerification: mp.resendVerification,
     openLoginPopover: mp.openLoginPopover,
   }),
+  useConnection: (key: string | null) =>
+    key ? (connections[key] ?? null) : null,
+  useProtocolServers: () => servers,
+  usernameFromKey: (key: string) => key.split("@")[0],
+  liveConnectionKeys: (
+    conns: Record<string, ConnEntry>,
+    focusKey: string | null,
+  ) => {
+    const keys = Object.keys(conns).filter((k) => conns[k].live);
+    if (focusKey == null || !keys.includes(focusKey)) return keys;
+    return [focusKey, ...keys.filter((k) => k !== focusKey)];
+  },
 }));
 
 let lastLogin: LastLogin | null = null;
+let accounts: { id: string; serverId: string; username: string }[] = [];
 vi.mock("../../lobby-servers/config", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../lobby-servers/config")>();
   return {
     ...actual,
     useLastLogin: () => [lastLogin, vi.fn()],
+    useLobbyAccounts: () => [{ accounts }, vi.fn()],
   };
 });
 
@@ -91,6 +148,10 @@ beforeEach(() => {
   mp.openLoginPopover.mockClear();
   lsStoreCredential.mockClear();
   lastLogin = null;
+  accounts = [];
+  connections = {};
+  activeKey = null;
+  servers = [];
 });
 
 afterEach(() => {
@@ -99,26 +160,48 @@ afterEach(() => {
 
 function renderPage({
   connected,
-  protocol,
+  protocol = "tasserver",
   myUsername,
   changePasswordResult,
   accountEmail,
-}: MultiplayerMockState) {
-  current = {
-    connected,
-    protocol,
-    myUsername,
-    changePasswordResult,
-    accountEmail,
-  };
+}: {
+  connected: boolean;
+  protocol?: Protocol;
+  myUsername: string | null;
+  changePasswordResult?: { message: string; succeeded: boolean };
+  accountEmail?: string | null;
+}) {
   if (changePasswordResult) {
     mp.changePassword.mockResolvedValue(changePasswordResult);
   }
-  if (connected && protocol === "tasserver" && myUsername) {
-    lastLogin = { serverId: "bar-ssl", username: myUsername };
+  servers = [{ ...SERVER, protocol }];
+  if (connected && myUsername) {
+    const key = keyFor(myUsername);
+    connections = { [key]: connectionFor(myUsername, accountEmail) };
+    activeKey = key;
+    lastLogin = { serverId: SERVER.id, username: myUsername };
+    accounts = [{ id: "a", serverId: SERVER.id, username: myUsername }];
+  } else {
+    connections = {};
+    activeKey = null;
   }
   render(<AccountSettings />);
   return { lsStoreCredential };
+}
+
+/** Two live tasserver connections, `alice` focused. */
+function renderTwoAccounts() {
+  servers = [{ ...SERVER, protocol: "tasserver" }];
+  connections = {
+    [keyFor("alice")]: connectionFor("alice", "alice@example.com"),
+    [keyFor("bob")]: connectionFor("bob", "bob@example.com"),
+  };
+  activeKey = keyFor("alice");
+  accounts = [
+    { id: "a", serverId: SERVER.id, username: "alice" },
+    { id: "b", serverId: SERVER.id, username: "bob" },
+  ];
+  render(<AccountSettings />);
 }
 
 function typeInto(el: HTMLElement, value: string) {
@@ -269,12 +352,19 @@ it("requests a code then submits it to change the email address", async () => {
   typeInto(screen.getByLabelText("New email address"), "new@example.com");
   fireEvent.click(screen.getByRole("button", { name: "Send code" }));
   expect(await screen.findByLabelText("Verification code")).toBeTruthy();
-  expect(mp.changeEmailRequest).toHaveBeenCalledWith("new@example.com");
+  expect(mp.changeEmailRequest).toHaveBeenCalledWith(
+    "new@example.com",
+    keyFor("alice"),
+  );
 
   typeInto(screen.getByLabelText("Verification code"), "12345678");
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() =>
-    expect(mp.changeEmail).toHaveBeenCalledWith("new@example.com", "12345678"),
+    expect(mp.changeEmail).toHaveBeenCalledWith(
+      "new@example.com",
+      "12345678",
+      keyFor("alice"),
+    ),
   );
 });
 
@@ -297,7 +387,10 @@ it("resends verification to the known email address", async () => {
     screen.getByRole("button", { name: "Resend verification email" }),
   );
   await waitFor(() =>
-    expect(mp.resendVerification).toHaveBeenCalledWith("alice@example.com"),
+    expect(mp.resendVerification).toHaveBeenCalledWith(
+      "alice@example.com",
+      keyFor("alice"),
+    ),
   );
 });
 
@@ -352,4 +445,96 @@ it("does not say the verification email was sent when the server refuses the res
   );
   expect(await screen.findByText(/verification is off/)).toBeTruthy();
   expect(screen.queryByText(/Verification email sent/)).toBeNull();
+});
+
+/**
+ * With two connections a picker is needed to say which one every action
+ * below acts on (issue #2846). With one, there is nothing to pick.
+ */
+it("does not show an account picker with a single connection", () => {
+  renderPage({ connected: true, protocol: "tasserver", myUsername: "alice" });
+  expect(screen.queryByText(/^pick /)).toBeNull();
+});
+
+it("shows an account picker when more than one connection is live", () => {
+  renderTwoAccounts();
+  expect(screen.getByText(`pick ${keyFor("alice")}`)).toBeTruthy();
+  expect(screen.getByText(`pick ${keyFor("bob")}`)).toBeTruthy();
+});
+
+it("shows the focused account's details until another is picked", () => {
+  renderTwoAccounts();
+  expect(screen.getByText("alice")).toBeTruthy();
+  expect(screen.getByText("alice@example.com")).toBeTruthy();
+});
+
+it("shows the picked account's details once a different one is chosen", () => {
+  renderTwoAccounts();
+  fireEvent.click(screen.getByText(`pick ${keyFor("bob")}`));
+  expect(screen.getByText("bob")).toBeTruthy();
+  expect(screen.getByText("bob@example.com")).toBeTruthy();
+  expect(screen.queryByText("alice@example.com")).toBeNull();
+});
+
+it("changes the password on the picked account, not the focused one", async () => {
+  renderTwoAccounts();
+  mp.changePassword.mockResolvedValue({
+    message: "Password changed successfully.",
+    succeeded: true,
+  });
+  fireEvent.click(screen.getByText(`pick ${keyFor("bob")}`));
+  fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+  typeInto(screen.getByLabelText("Current password"), "old");
+  typeInto(screen.getByLabelText("New password"), "new");
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(mp.changePassword).toHaveBeenCalledWith("old", "new", keyFor("bob")),
+  );
+});
+
+/**
+ * `lastLogin` names whichever of two connections connected most recently,
+ * not necessarily the one being edited (issue #2846). The keychain write
+ * must follow the picked account, not that global marker, which is why this
+ * test leaves `lastLogin` unset entirely.
+ */
+it("saves the changed password under the picked account's own login even when it is not lastLogin", async () => {
+  renderTwoAccounts();
+  mp.changePassword.mockResolvedValue({
+    message: "Password changed successfully.",
+    succeeded: true,
+  });
+  fireEvent.click(screen.getByText(`pick ${keyFor("bob")}`));
+  fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+  typeInto(screen.getByLabelText("Current password"), "old");
+  typeInto(screen.getByLabelText("New password"), "new");
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(lsStoreCredential).toHaveBeenCalledWith({
+      serverId: SERVER.id,
+      username: "bob",
+      secret: "new",
+    }),
+  );
+});
+
+it("resends verification for the picked account, not the focused one", async () => {
+  renderTwoAccounts();
+  fireEvent.click(screen.getByText(`pick ${keyFor("bob")}`));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Resend verification email" }),
+  );
+  await waitFor(() =>
+    expect(mp.resendVerification).toHaveBeenCalledWith(
+      "bob@example.com",
+      keyFor("bob"),
+    ),
+  );
+});
+
+it("requests account details for the picked account once it is chosen", () => {
+  renderTwoAccounts();
+  mp.getUserInfo.mockClear();
+  fireEvent.click(screen.getByText(`pick ${keyFor("bob")}`));
+  expect(mp.getUserInfo).toHaveBeenCalledWith(keyFor("bob"));
 });

@@ -101,6 +101,7 @@ import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
 export type { AccountInfo, ConnectionState, Connections } from "./connections";
+export { liveConnectionKeys } from "./connections";
 export {
   initialMirror,
   type LobbyMirror,
@@ -357,7 +358,17 @@ interface MultiplayerContextValue {
    * items so they appear on first connect and stay until the app is closed.
    */
   revealed: boolean;
+  /** Whether anything at all is busy: connecting, disconnecting, registering,
+   * signing in or recovering, on any connection. For a caller that gates on
+   * one specific account rather than the whole app, see {@link busyKeys}. */
   busy: boolean;
+  /**
+   * The server keys with a connect, disconnect, sign-in, registration or
+   * recovery in flight against them (issue #2846). A register or recovery
+   * key is the account it targets, computed the same way {@link connect}
+   * does, even before that account has a live connection entry.
+   */
+  busyKeys: ReadonlySet<string>;
   /** Open a connection as `username` to `server` (throws if no stored password). */
   connect: (server: LobbyServer, username: string) => Promise<void>;
   /**
@@ -596,7 +607,24 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     },
     [connections, updateConnection],
   );
-  const [busy, setBusy] = useState(false);
+  // Busy by server key rather than one shared flag, so an account command in
+  // flight on one connection does not grey out another connection's controls
+  // (issue #2846). `busy` below stays a single boolean for callers that
+  // genuinely want "anything busy at all" (the login panel, the battles join
+  // gate). A caller that cares about one account reads `busyKeys` instead.
+  const [busyKeys, setBusyKeys] = useState<ReadonlySet<string>>(new Set());
+  const beginBusy = useCallback((key: string) => {
+    setBusyKeys((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }, []);
+  const endBusy = useCallback((key: string) => {
+    setBusyKeys((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+  const busy = busyKeys.size > 0;
 
   // FIFO queue of `SERVERMSGBOX` texts awaiting acknowledgement. Boxed server
   // messages are important enough that the server asked for a modal, so they're
@@ -1244,7 +1272,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         serverKey,
       );
       if (blocked) throw new Error(blocked);
-      setBusy(true);
+      beginBusy(serverKey);
       const rt = runtimeFor(serverKey);
       rt.intentional = false;
       rt.loggedIn = false;
@@ -1349,14 +1377,16 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         throw e;
       } finally {
         connectingKeyRef.current = null;
-        setBusy(false);
+        endBusy(serverKey);
       }
     },
     [
       applyActiveKey,
+      beginBusy,
       beginConnecting,
       closeConnection,
       dispatchMirror,
+      endBusy,
       openChannel,
       runtimeFor,
     ],
@@ -1365,19 +1395,23 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // The browser sign-in that gives a Tachyon connect something to refresh. Kept
   // out of `connect` deliberately: a reconnect must never put a browser window in
   // front of someone who has walked away from a dropped connection.
-  const signIn = useCallback(async (server: LobbyServer, username: string) => {
-    setBusy(true);
-    try {
-      await mpTachyonSignIn({
-        baseUrl: tachyonBaseUrl(server),
-        serverId: server.id,
-        username,
-      });
-      markAccountUsedRef.current(server.id, username);
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  const signIn = useCallback(
+    async (server: LobbyServer, username: string) => {
+      const serverKey = serverKeyFor(server, username);
+      beginBusy(serverKey);
+      try {
+        await mpTachyonSignIn({
+          baseUrl: tachyonBaseUrl(server),
+          serverId: server.id,
+          username,
+        });
+        markAccountUsedRef.current(server.id, username);
+      } finally {
+        endBusy(serverKey);
+      }
+    },
+    [beginBusy, endBusy],
+  );
 
   // Public connect: a manual login supersedes any in-flight auto-reconnect loop.
   // Every loop, not only this key's, because only one connection is allowed.
@@ -1556,8 +1590,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       password: string,
       email?: string,
     ) => {
-      setBusy(true);
       const serverKey = serverKeyFor(server, username);
+      beginBusy(serverKey);
       try {
         await new Promise<void>((resolve, reject) => {
           let settled = false;
@@ -1625,10 +1659,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         await mpDisconnect({ serverKey }).catch((e) =>
           console.warn("multiplayer: disconnect cleanup failed", e),
         );
-        setBusy(false);
+        endBusy(serverKey);
       }
     },
-    [],
+    [beginBusy, endBusy],
   );
 
   // The recovery connection's event channel, kept while parked awaiting the
@@ -1650,8 +1684,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // because the code step needs that same connection.
   const recoverPassword = useCallback(
     async (server: LobbyServer, email: string): Promise<RecoveryStart> => {
-      setBusy(true);
       const serverKey = serverKeyFor(server, email);
+      beginBusy(serverKey);
       const onEvent = new Channel<LobbyEvent>();
       let outcome: RecoveryStart | null = null;
       try {
@@ -1701,10 +1735,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             console.warn("multiplayer: disconnect cleanup failed", e),
           );
         }
-        setBusy(false);
+        endBusy(serverKey);
       }
     },
-    [],
+    [beginBusy, endBusy],
   );
 
   // Finish account recovery with the emailed code, on the connection
@@ -1731,7 +1765,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     async (serverKey: string, code: string) => {
       const onEvent = recoveryChannelsRef.current.get(serverKey);
       if (!onEvent) throw new Error("Not awaiting a recovery code.");
-      setBusy(true);
+      beginBusy(serverKey);
       let disconnect = true;
       try {
         return await new Promise<{ username: string | null }>(
@@ -1764,10 +1798,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             console.warn("multiplayer: disconnect cleanup failed", e),
           );
         }
-        setBusy(false);
+        endBusy(serverKey);
       }
     },
-    [],
+    [beginBusy, endBusy],
   );
 
   // Tear down a recovery connection `recoverPassword` left open awaiting the
@@ -1984,16 +2018,23 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       stopReconnect(serverKey);
       const key = serverKey ?? activeKeyRef.current;
       if (!key) return;
-      setBusy(true);
+      beginBusy(key);
       try {
         await mpDisconnect({ serverKey: key });
       } finally {
         closeConnection(key);
         if (activeKeyRef.current === key) applyActiveKey(null);
-        setBusy(false);
+        endBusy(key);
       }
     },
-    [applyActiveKey, closeConnection, markIntentional, stopReconnect],
+    [
+      applyActiveKey,
+      beginBusy,
+      closeConnection,
+      endBusy,
+      markIntentional,
+      stopReconnect,
+    ],
   );
 
   const clearJoinError = useCallback(
@@ -2115,6 +2156,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         protocol,
         revealed,
         busy,
+        busyKeys,
         connect,
         connectDirect,
         signIn,
