@@ -19,6 +19,7 @@ import {
   autoJoinsChannels,
   carriesBotAlly,
   founderRunsTheGame,
+  liveHostableKeys,
   liveTachyonKeys,
   messageLimit,
   protocolForKey,
@@ -142,6 +143,54 @@ describe("liveTachyonKeys", () => {
 
   it("is empty with no live Tachyon connection", () => {
     expect(liveTachyonKeys(conns([bar1, true]), servers, null)).toEqual([]);
+  });
+});
+
+describe("liveHostableKeys", () => {
+  const t1 = `p@${tachyon.host}:${tachyon.port}`;
+  const bar1 = `p@${bar.host}:${bar.port}`;
+  const bar2 = `q@${bar.host}:${bar.port + 1}`;
+
+  function conns(...entries: [string, boolean][]): Connections {
+    return Object.fromEntries(
+      entries.map(([key, live]) => [key, { ...newConnection(key), live }]),
+    );
+  }
+
+  it("finds every live connection that is not Tachyon", () => {
+    expect(
+      liveHostableKeys(
+        conns([bar1, true], [bar2, true], [t1, true]),
+        BUILTIN_SERVERS,
+        null,
+      ),
+    ).toEqual([bar1, bar2]);
+  });
+
+  it("skips a hostable connection that has dropped", () => {
+    expect(
+      liveHostableKeys(
+        conns([bar1, false], [bar2, true]),
+        BUILTIN_SERVERS,
+        null,
+      ),
+    ).toEqual([bar2]);
+  });
+
+  it("puts the focused connection first when it can host", () => {
+    expect(
+      liveHostableKeys(
+        conns([bar1, true], [bar2, true]),
+        BUILTIN_SERVERS,
+        bar2,
+      ),
+    ).toEqual([bar2, bar1]);
+  });
+
+  it("is empty with no live connection that can host", () => {
+    expect(liveHostableKeys(conns([t1, true]), BUILTIN_SERVERS, null)).toEqual(
+      [],
+    );
   });
 });
 
