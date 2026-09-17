@@ -87,7 +87,7 @@ function Host({ useRoom }: { useRoom: () => DirectRoomStatus | null }) {
         blocked={null}
         busy={false}
         error={null}
-        onStart={async () => {}}
+        onStart={async () => undefined}
         onStop={() => {}}
       />
     </DrawerProvider>

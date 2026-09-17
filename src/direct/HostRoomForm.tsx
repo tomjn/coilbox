@@ -85,7 +85,7 @@ export function HostRoomForm({
   /** Starts the room and opens the battle in it, resolving with the room's
    *  connection key. Rejects with what to tell the host when either half
    *  fails. */
-  onStart: (args: StartRoomArgs) => Promise<string | void>;
+  onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
   const drawer = useDrawer();
   const content = useHostContent();

@@ -100,7 +100,9 @@ async function startedWith(
   answer.current = report;
   // Typed with the signature the form calls it with, so the arguments come back
   // as `StartRoomArgs` rather than out of an empty tuple that has to be cast.
-  const onStart = vi.fn<(args: StartRoomArgs) => Promise<void>>(async () => {});
+  const onStart = vi.fn<(args: StartRoomArgs) => Promise<string | undefined>>(
+    async () => undefined,
+  );
   // The form reads the drawer it lives in, for its Cancel button.
   render(
     <DrawerProvider>
