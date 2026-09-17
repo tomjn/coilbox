@@ -1,5 +1,7 @@
+import { isProfileHidden } from "../profile/hidden";
 import { useInBattleKey } from "./battle/useBattleRoomKey";
 import { liveTachyonKeys } from "./protocol";
+import { serverAdminKeys } from "./serverAdmin";
 import { useConnection, useMultiplayer, useProtocolServers } from "./store";
 
 /**
@@ -37,6 +39,21 @@ export function useMpMatchmaking(): boolean {
  */
 export function useMpInBattle(): boolean {
   return useInBattleKey() != null;
+}
+
+/**
+ * Nav/route predicate: does any live lobby login (not a room) qualify for the
+ * Server admin page? Qualifying means uberserver, with the connection's own
+ * account carrying the `access` status bit. Gates the Server admin sidebar
+ * item and its route (via `useVisible` / `NavGate`), and folds in
+ * `isProfileHidden` so both respect a distribution profile that hides
+ * `multiplayer.admin` the same way (issue #2772).
+ */
+export function useMpServerAdmin(): boolean {
+  const { connections, activeKey } = useMultiplayer();
+  const servers = useProtocolServers();
+  const qualifies = serverAdminKeys(connections, servers, activeKey).length > 0;
+  return qualifies && !isProfileHidden("multiplayer.admin");
 }
 
 /**

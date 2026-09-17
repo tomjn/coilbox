@@ -6,6 +6,7 @@ import {
   Gamepad2,
   LogIn,
   MessagesSquare,
+  ShieldCheck,
   Swords,
   Users,
   UserX,
@@ -21,6 +22,7 @@ import {
   useMpInBattle,
   useMpMatchmaking,
   useMpRevealed,
+  useMpServerAdmin,
 } from "./navPredicates";
 import HighlightsSettings from "./pages/HighlightsSettings";
 import IgnoreSettings from "./pages/IgnoreSettings";
@@ -128,6 +130,17 @@ const multiplayerPlugin: FramePlugin = {
           // A distribution profile can hide the stats view like any other nav item.
           useVisible: () => !isProfileHidden("multiplayer.stats"),
         },
+        {
+          id: "multiplayer.admin",
+          label: "Server admin",
+          to: "/admin",
+          end: true,
+          order: 6,
+          icon: ShieldCheck,
+          // uberserver moderators and admins only (issue #2772). Also folds in
+          // isProfileHidden("multiplayer.admin"), same as the page's NavGate.
+          useVisible: useMpServerAdmin,
+        },
       ],
     },
   ],
@@ -171,6 +184,11 @@ const multiplayerPlugin: FramePlugin = {
       path: "battle",
       lazy: () => import("./pages/BattleRoomPage"),
       crumb: "Battle Room",
+    },
+    {
+      path: "admin",
+      lazy: () => import("./pages/ServerAdminPage"),
+      crumb: "Server admin",
     },
   ],
   settings: [
