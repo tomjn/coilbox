@@ -340,6 +340,12 @@ interface MultiplayerContextValue {
    */
   activeDirect: boolean;
   /**
+   * The key of the connection that is a room somebody hosts rather than a
+   * lobby server, or null. `activeDirect` asks this of the focused connection,
+   * and a reader holding another connection's key asks it here (issue #2844).
+   */
+  directKey: string | null;
+  /**
    * The wire protocol the live connection speaks, `tasserver` when there is none.
    * Surfaces with no Tachyon equivalent read this and hide themselves: named
    * channels, moderation, and hosting a battle. See `docs/tachyon-protocol.md`.
@@ -2105,6 +2111,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         activeKey,
         connected: activeKey != null,
         activeDirect: activeKey != null && activeKey === roomKey,
+        directKey: roomKey || null,
         protocol,
         revealed,
         busy,

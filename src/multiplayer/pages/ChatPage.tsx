@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { notify } from "@/notify/notify";
+import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
 import { type ChatMsg, mpLeaveChannel, mpSend } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
@@ -493,7 +494,7 @@ function ChatPage() {
                     <Button
                       variant="secondary"
                       className="h-7 gap-1.5 px-2"
-                      onClick={() => navigate("/battle")}
+                      onClick={() => navigate(battleRoomHref(activeServerKey))}
                     >
                       <Gamepad2 className="size-4" />
                       Go to battle

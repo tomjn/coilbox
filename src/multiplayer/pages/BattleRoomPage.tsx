@@ -46,6 +46,7 @@ import { unsyncedPlayers } from "../battle/startBlockers";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
+import { useBattleRoomKey } from "../battle/useBattleRoomKey";
 import { VotePanel } from "../battle/VotePanel";
 import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
@@ -55,15 +56,19 @@ import { useMultiplayer } from "../store";
 
 /**
  * The battle room for a joined multiplayer battle. Reads the live battle from the
- * mirror via `useBattleRoom` and lays out a header + two columns: the roster with
+ * mirror of the connection its `?server=` names (issue #2844) via
+ * `useBattleRoom` and lays out a header + two columns: the roster with
  * the battle chat filling the remaining height on the left, and the map/game/
  * start-position/host-command panel on the right. The engine launches itself when
  * the autohost starts the match (host goes in-game), so the only manual launch is
  * the Rejoin button shown after our engine exits mid-match.
  */
 function BattleRoomPage() {
-  const room = useBattleRoom();
+  const room = useBattleRoom(useBattleRoomKey());
   const { disconnect } = useMultiplayer();
+  // The room's own connection, which is the one a battle in our own LAN room
+  // is on, rather than whichever connection is focused.
+  const disconnectRoom = () => disconnect(room.serverKey ?? undefined);
   // The room this client hosts, if it hosts one. Read here because the battle on
   // screen may be the one inside it, and then closing the battle is closing the
   // room (issue #2057).
@@ -408,7 +413,7 @@ function BattleRoomPage() {
     // buttons now do the same thing in the same order.
     if (endsTheRoom) {
       try {
-        await stopHostedRoom(hostedRoom?.host ?? "", disconnect);
+        await stopHostedRoom(hostedRoom?.host ?? "", disconnectRoom);
       } catch (e) {
         // Said out here rather than in the room's own line, which is on the page
         // this is about to leave for and describes a room that is still up. The
@@ -518,6 +523,7 @@ function BattleRoomPage() {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
           <BattleMembersTable
+            serverKey={room.serverKey}
             rows={room.rows}
             sides={room.sides}
             factionLogos={factionLogos}
@@ -547,6 +553,7 @@ function BattleRoomPage() {
             onColor={room.setColor}
           />
           <BattleChatCard
+            serverKey={room.serverKey}
             battle={battle}
             enginePath={room.enginePath}
             dataDir={room.dataDir}
@@ -652,6 +659,7 @@ function BattleRoomPage() {
             startPositionsUnavailable={room.startPositionsUnavailable}
             onRestrictChange={room.setRestrictions}
             isFounder={room.isFounder}
+            serverKey={room.serverKey}
           />
           {room.canEditOptions && (
             <>

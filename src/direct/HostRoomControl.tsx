@@ -55,7 +55,7 @@ export function HostRoomControl({
   /** Why the last attempt to stop the room failed, or null. A failed start is
    *  said in the drawer, by the form that asked for it. */
   error: string | null;
-  onStart: (args: StartRoomArgs) => Promise<void>;
+  onStart: (args: StartRoomArgs) => Promise<string | undefined>;
   onStop: () => void;
 }) {
   if (room) {
@@ -261,7 +261,7 @@ function HostRoomDrawerButton({
 }: {
   blocked: string | null;
   defaultName?: string;
-  onStart: (args: StartRoomArgs) => Promise<void>;
+  onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
   const drawer = useDrawer();
   return (

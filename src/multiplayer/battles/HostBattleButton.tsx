@@ -24,6 +24,7 @@ export function HostBattleButton({
   initialGame,
   initialTitle,
   autoOpen,
+  leaves = null,
 }: {
   disabled: boolean;
   /** Whether this lobby server has a relay to host through, from
@@ -44,10 +45,28 @@ export function HostBattleButton({
   /** Open the drawer on arrival, paired with `initialMap`/`initialGame` for the
    *  same jump. */
   autoOpen?: boolean;
+  /** What hosting leaves behind under the one-battle rule (issue #2844), or
+   *  null. */
+  leaves?: string | null;
 }) {
   const drawer = useDrawer();
   const latest = useRef(onHost);
   latest.current = onHost;
+  const latestLeaves = useRef(leaves);
+  latestLeaves.current = leaves;
+
+  // The drawer keeps the notice it was opened with. A battle joined elsewhere
+  // after that has not been agreed to, so hosting is refused until the form is
+  // opened again and says so.
+  const hostIfAgreed = (shown: string | null) => (args: OpenBattleArgs) => {
+    const now = latestLeaves.current;
+    if (now && now !== shown) {
+      return Promise.reject(
+        new Error(`${now} Close this form and open it again to host.`),
+      );
+    }
+    return latest.current(args);
+  };
 
   const open = () =>
     drawer.open({
@@ -61,10 +80,11 @@ export function HostBattleButton({
           key={nextDrawerKey()}
           relayAvailable={relayAvailable}
           serverKey={serverKey}
-          onHost={(args) => latest.current(args)}
+          onHost={hostIfAgreed(leaves)}
           initialMap={initialMap}
           initialGame={initialGame}
           initialTitle={initialTitle}
+          leaves={leaves}
         />
       ),
     });

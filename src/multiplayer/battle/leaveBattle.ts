@@ -4,8 +4,8 @@ import { mpLeaveBattle } from "../bindings";
 /**
  * Leave the battle this connection is in, and forget the route it took.
  *
- * The route is a module singleton with no battle in it, so anything that reads
- * it after the battle has gone is reading a sentence about a battle this client
+ * The route is recorded per connection with no battle in it, so anything that
+ * reads it after the battle has gone is reading a sentence about a battle this client
  * is no longer in. Issue #2097 is what that cost: the in-game pill called a
  * later skirmish relayed and offered to end it for everybody. Dropping the
  * route here is not what fixed that, and it is not enough to fix it on its own,
@@ -34,7 +34,7 @@ import { mpLeaveBattle } from "../bindings";
  */
 export function leaveBattle(serverKey: string) {
   return mpLeaveBattle({ serverKey }).then((answer) => {
-    recordHostingRoute(null);
+    recordHostingRoute(serverKey, null);
     return answer;
   });
 }

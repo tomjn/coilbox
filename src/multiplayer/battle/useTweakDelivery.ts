@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { mpSayBattle, mpSetScriptTags } from "../bindings";
-import { serverMessagesSince, useMultiplayer } from "../store";
+import { initialMirror, serverMessagesSince, useConnection } from "../store";
 import {
   type DeliveryProgress,
   runDelivery,
@@ -33,15 +33,19 @@ export interface TweakDelivery {
 }
 
 export function useTweakDelivery({
+  serverKey,
   battleId,
   isFounder,
 }: {
+  /** The connection the battle is on, which need not be the focused one
+   *  (issue #2844). */
+  serverKey: string | null;
   battleId: number | null;
   /** The founder writes the script tag itself. Everybody else asks the autohost,
    *  which is what the pacing and the confirmation wait are sized for. */
   isFounder: boolean;
 }): TweakDelivery {
-  const { mirror, activeKey: serverKey } = useMultiplayer();
+  const mirror = useConnection(serverKey)?.mirror ?? initialMirror;
   const [progress, setProgress] = useState<DeliveryProgress | null>(null);
   const [running, setRunning] = useState(false);
 

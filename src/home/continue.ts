@@ -13,8 +13,9 @@ import { resumeMissionId } from "../campaign/progress";
 import { useConquestState, useGalaxies } from "../conquest/conquests";
 import type { ConquestStateFile, GalaxyDoc } from "../conquest/model";
 import { mostRecentOpen } from "../lib/recency";
+import { useInBattleKey } from "../multiplayer/battle/useBattleRoomKey";
 import type { Battle, LobbyState } from "../multiplayer/bindings";
-import { useMultiplayer } from "../multiplayer/store";
+import { initialMirror, useConnection } from "../multiplayer/store";
 import type { StoredSkirmishDraft } from "../play/drafts";
 import { useSkirmishDraft } from "../play/drafts";
 import type { SkirmishPreset } from "../play/presets";
@@ -488,7 +489,9 @@ export function useResume(): {
   const conquests = useConquestState();
   const { presets } = useSkirmishPresets();
   const [draft] = useSkirmishDraft();
-  const { mirror } = useMultiplayer();
+  // The connection the player is in a battle on, which need not be the focused
+  // one (issue #2844). Its battle room opens from a bare `/battle`.
+  const mirror = useConnection(useInBattleKey())?.mirror ?? initialMirror;
   // Not part of `loading`: the updater checks over the network after launch, so
   // there is no settled point to wait for, and an update found while the page
   // sits open is new information rather than a late answer. Same reasoning as

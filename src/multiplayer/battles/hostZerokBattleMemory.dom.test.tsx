@@ -64,7 +64,9 @@ function stubScan(mapNames: string[]) {
   });
 }
 
-function popover(props: { initialMap?: string; initialTitle?: string } = {}) {
+function popover(
+  props: { initialMap?: string; initialTitle?: string; leaves?: string } = {},
+) {
   const hosted: ZerokOpenBattleArgs[] = [];
   render(
     <PersistentStoreProvider>
@@ -167,5 +169,22 @@ describe("remembering the last battle hosted on Zero-K", () => {
     expect(
       (screen.getByLabelText("Password (optional)") as HTMLInputElement).value,
     ).toBe("");
+  });
+});
+
+// Issue #2844. Hosting while in a battle on another server says so, and the
+// button that hosts is the one that agrees to leave.
+describe("hosting while in a battle on another server", () => {
+  it("says which battle is left and asks with the host button", async () => {
+    stubScan(["Zed Map"]);
+    const notice =
+      "You are in a battle on BAR. Hosting a battle here leaves it.";
+    const hosted = popover({ leaves: notice });
+    expect(screen.getByText(notice)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Friday night pubs" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Leave and host" }));
+    await vi.waitFor(() => expect(hosted).toHaveLength(1));
   });
 });

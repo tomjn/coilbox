@@ -9,6 +9,7 @@
  * changing the parent item's hook count.
  */
 import { useSetting } from "@picoframe/frame";
+import { useInBattleKey } from "../battle/useBattleRoomKey";
 import { HIGHLIGHT_OWN_KEY, HIGHLIGHT_WORDS_KEY } from "../chat/highlight";
 import {
   battleBadgeCount,
@@ -16,7 +17,7 @@ import {
   chatBadgeCount,
 } from "../chat/unreadSummary";
 import { isIgnored, useIgnored } from "../ignore";
-import { useMultiplayer } from "../store";
+import { useConnection, useMultiplayer } from "../store";
 
 /** Count pill matching the per-conversation badge in `ConversationSidebar`. */
 function CountPill({ n }: { n: number }) {
@@ -58,14 +59,19 @@ export function ChatNavBadge() {
 /**
  * Battle Room item badge: unread battle-chat count, plus an accent status dot when
  * the game is running (host in-game) — an actionable "your game has started" cue
- * shown even at zero unread.
+ * shown even at zero unread. Read off the connection the battle is on.
  */
 export function BattleNavBadge() {
-  const { mirror, unreadFor } = useMultiplayer();
-  const state = mirror.state;
-  if (!state) return null;
+  const { unreadFor } = useMultiplayer();
+  // The battle's own connection, which need not be the focused one (issue
+  // #2844). With no battle anywhere there is nothing to count.
+  const serverKey = useInBattleKey();
+  const state = useConnection(serverKey)?.mirror.state;
+  if (!state || !serverKey) return null;
 
-  const n = battleBadgeCount(state, unreadFor);
+  const n = battleBadgeCount(state, (id, count) =>
+    unreadFor(id, count, serverKey),
+  );
   const live = battleLive(state);
   if (n <= 0 && !live) return null;
 

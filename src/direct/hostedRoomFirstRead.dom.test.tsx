@@ -71,7 +71,7 @@ function Host() {
       blocked={null}
       busy={false}
       error={null}
-      onStart={async () => {}}
+      onStart={async () => undefined}
       onStop={() => {}}
     />
   );

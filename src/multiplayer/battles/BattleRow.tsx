@@ -37,6 +37,7 @@ function BattleRowInner({
   dataDir,
   serverAddress,
   directRoom = false,
+  leaves = null,
 }: {
   battle: Battle;
   joined: boolean;
@@ -55,6 +56,9 @@ function BattleRowInner({
    * server, which is passed on as an address to dial rather than as a battle on
    * a server nobody else is on (issue #1617). */
   directRoom?: boolean;
+  /** What joining this battle leaves behind under the one-battle rule (issue
+   * #2844), or null. When set, joining asks first. */
+  leaves?: string | null;
 }) {
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
@@ -71,8 +75,9 @@ function BattleRowInner({
   // passworded battles open the password popover, others act directly (join, or
   // watch a running battle). Only reachable when actionable (the region is a plain
   // div otherwise).
+  const asks = battle.passworded || !!leaves;
   const activate = () => {
-    if (battle.passworded) setPwOpen(true);
+    if (asks) setPwOpen(true);
     else onJoin(battle);
   };
 
@@ -150,13 +155,18 @@ function BattleRowInner({
           <LogOut className="size-4" />
           Leave
         </Button>
-      ) : battle.passworded ? (
+      ) : asks ? (
         <JoinBattlePopover
           title={battle.title}
           disabled={disabled}
-          onSubmit={(key) => onJoin(battle, key)}
+          onSubmit={(key) =>
+            battle.passworded ? onJoin(battle, key) : onJoin(battle)
+          }
           open={pwOpen}
           onOpenChange={setPwOpen}
+          needsPassword={battle.passworded}
+          notice={leaves}
+          triggerLabel={battle.passworded ? "Join" : action.label}
         />
       ) : (
         <Button

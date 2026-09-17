@@ -5,7 +5,7 @@ import type { Battle, ChatMsg } from "../bindings";
 import { ChatPane } from "../chat/ChatPane";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
 import { useConversation } from "../chat/useConversation";
-import { useMultiplayer } from "../store";
+import { initialMirror, useConnection, useMultiplayer } from "../store";
 import { colorIntToHex, type MemberRow } from "./config";
 import { applyLayoutDirectly, balanceLayoutForRows } from "./gameTypePresets";
 import { HostSuggestionAction } from "./HostSuggestionAction";
@@ -43,6 +43,7 @@ import { useMapChangeQueue } from "./useMapChangeQueue";
  * new.
  */
 export function BattleChatCard({
+  serverKey,
   battle,
   enginePath,
   dataDir,
@@ -79,17 +80,19 @@ export function BattleChatCard({
   };
   onSetBattleStatusBatch: (patch: { ally?: number; teamId?: number }) => void;
   onSetLocked: (locked: boolean) => void;
+  /** The connection this battle is on (issue #2844). */
+  serverKey: string | null;
 }) {
-  const { mirror, activeKey, markSeen } = useMultiplayer();
+  const { markSeen } = useMultiplayer();
+  const mirror = useConnection(serverKey)?.mirror ?? initialMirror;
   const me = mirror.state?.myUsername ?? null;
   const channel = battle.channel;
   const desc: ConversationDescriptor | null = channel
     ? { kind: "battle", id: battle.id, channel }
     : null;
-  // Bound to the app's active connection, same as every other battle-room
-  // surface today. Picking the battle's own connection when several are open
-  // is issue #2844's job, not this card's.
-  const conv = useConversation(desc, activeKey);
+  // Bound to the battle's own connection, which need not be the focused one
+  // when several are open (issue #2844).
+  const conv = useConversation(desc, serverKey);
 
   // Reading the room is reading its chat, so being here marks it seen. Without
   // this the Battle Room nav badge counted every line while you sat in front of
@@ -98,8 +101,8 @@ export function BattleChatCard({
   const seenId = desc ? convId(desc) : null;
   const seen = conv.total;
   useEffect(() => {
-    if (seenId) markSeen(seenId, seen);
-  }, [seenId, seen, markSeen]);
+    if (seenId && serverKey) markSeen(seenId, seen, serverKey);
+  }, [seenId, seen, markSeen, serverKey]);
 
   const senderColor = useCallback(
     (from: string): string | undefined => {

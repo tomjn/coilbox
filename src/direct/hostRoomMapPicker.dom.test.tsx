@@ -72,7 +72,9 @@ function form() {
       <HostRoomForm
         blocked={null}
         defaultName="alice"
-        onStart={vi.fn<(args: StartRoomArgs) => Promise<void>>(async () => {})}
+        onStart={vi.fn<(args: StartRoomArgs) => Promise<string | undefined>>(
+          async () => undefined,
+        )}
       />
     </DrawerProvider>,
   );

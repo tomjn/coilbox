@@ -100,8 +100,8 @@ describe("the engine version a hosted battle advertises", () => {
   });
 
   it("is what the engine reports in a room, not its folder name", async () => {
-    const onStart = vi.fn<(args: StartRoomArgs) => Promise<void>>(
-      async () => {},
+    const onStart = vi.fn<(args: StartRoomArgs) => Promise<string | undefined>>(
+      async () => undefined,
     );
     render(
       <DrawerProvider>

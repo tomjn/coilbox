@@ -107,6 +107,7 @@ const render1 = (options: ConfigOption[]) =>
       battleId={7}
       isFounder={false}
       canEdit={true}
+      serverKey="me@server:8200"
     />,
   );
 

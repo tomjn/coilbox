@@ -153,9 +153,8 @@ export function useBattleLaunch(
       // connection and this is that same handle said out loud. Nothing out here
       // can pair the config for one battle with the verdict for another. The
       // route the hosting form settled on is deliberately not read: it is a
-      // module singleton with no battle in it, so it means "the last battle
-      // this client hosted anywhere", and coilbox holding one lobby connection
-      // is the only reason that has been the same thing.
+      // record of what the form chose, not of what the connection is doing,
+      // and `serverKey` here is the battle room's own connection (issue #2844).
       //
       // A joiner is never relaying. Only the host runs a sidecar, and only for
       // the battle they opened.
