@@ -102,6 +102,8 @@ vi.mock("../store", () => ({
     activeKey: wireConnections.activeKey,
     openLoginPopover: () => {},
   }),
+  useConnection: (serverKey: string | null) =>
+    serverKey ? (wireConnections.connections[serverKey] ?? null) : null,
   useProtocolServers: () => servers,
   serverNameFor: (key: string, list: typeof servers) =>
     list.find((s) => key.endsWith(`@${s.host}:${s.port}`))?.name ?? key,
