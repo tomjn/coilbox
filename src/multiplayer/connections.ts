@@ -56,6 +56,14 @@ export interface ConnectionState {
   status: ClientFlags;
   /** Whether the user set themselves away by hand on this connection. */
   manualAway: boolean;
+  /**
+   * Whether this connection is a room, hosted by this client or somebody
+   * else, rather than a lobby server (issue #2850). Both are dialled as a
+   * TASServer at `username@host:port`, so this is the only thing that tells
+   * them apart. A room is shared as an address to dial (see `inviteLink`), has
+   * no account behind it, and at most one is open at a time.
+   */
+  direct: boolean;
 }
 
 /** Every connection the provider holds, by server key. */
@@ -74,6 +82,18 @@ export function liveConnectionKeys(
   const keys = Object.keys(connections).filter((key) => connections[key].live);
   if (focusKey == null || !keys.includes(focusKey)) return keys;
   return [focusKey, ...keys.filter((key) => key !== focusKey)];
+}
+
+/**
+ * The live connection that is a room, or null when there is none (issue
+ * #2850). Pure. At most one room is open at a time, which the connect rule
+ * enforces, so the first found is the only one.
+ */
+export function liveRoomKey(connections: Connections): string | null {
+  for (const c of Object.values(connections)) {
+    if (c.live && c.direct) return c.serverKey;
+  }
+  return null;
 }
 
 /**
@@ -125,8 +145,11 @@ export function pendingDebriefing(
 }
 
 export type ConnectionAction =
-  /** Make an entry for a connection, keeping one that already exists. */
-  | { type: "open"; serverKey: string }
+  /**
+   * Make an entry for a connection, keeping one that already exists. `direct`
+   * marks it as a room, and is applied to an existing entry too.
+   */
+  | { type: "open"; serverKey: string; direct?: boolean }
   | { type: "close"; serverKey: string }
   | { type: "mirror"; serverKey: string; action: MirrorAction }
   /** Apply a pure updater to one entry. Returning the entry unchanged is a no-op. */
@@ -136,7 +159,10 @@ export type ConnectionAction =
       update: (c: ConnectionState) => ConnectionState;
     };
 
-export function newConnection(serverKey: string): ConnectionState {
+export function newConnection(
+  serverKey: string,
+  direct = false,
+): ConnectionState {
   return {
     serverKey,
     live: false,
@@ -148,6 +174,7 @@ export function newConnection(serverKey: string): ConnectionState {
     justWentIngame: new Set(),
     status: { ingame: false, away: false },
     manualAway: false,
+    direct,
   };
 }
 
@@ -163,8 +190,15 @@ export function connectionsReducer(
   const { serverKey } = action;
   const current = all[serverKey];
   switch (action.type) {
-    case "open":
-      return current ? all : { ...all, [serverKey]: newConnection(serverKey) };
+    case "open": {
+      const direct = action.direct ?? false;
+      if (!current) {
+        return { ...all, [serverKey]: newConnection(serverKey, direct) };
+      }
+      return action.direct === undefined || current.direct === direct
+        ? all
+        : { ...all, [serverKey]: { ...current, direct } };
+    }
     case "close": {
       if (!current) return all;
       const { [serverKey]: _closed, ...rest } = all;

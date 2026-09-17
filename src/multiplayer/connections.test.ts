@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { Debriefing } from "./bindings";
 import {
   type ConnectionState,
+  connectionsReducer,
   liveConnectionKeys,
+  liveRoomKey,
   newConnection,
   pendingAgreement,
   pendingDebriefing,
@@ -153,5 +155,45 @@ describe("pendingDebriefing", () => {
     const b = withDebriefing("b", 2, debriefing(2));
     // `a` no longer has anything shown, matching a `closeDebriefing()` call.
     expect(pendingDebriefing({ b }, "a")?.serverKey).toBe("b");
+  });
+});
+
+describe("a connection that is a room (issue #2850)", () => {
+  it("records whether a connection is a room when it opens", () => {
+    const opened = connectionsReducer(
+      {},
+      { type: "open", serverKey: "AF@127.0.0.1:8200", direct: true },
+    );
+    expect(opened["AF@127.0.0.1:8200"].direct).toBe(true);
+    const lobby = connectionsReducer(
+      {},
+      { type: "open", serverKey: "AF@lobby:8200" },
+    );
+    expect(lobby["AF@lobby:8200"].direct).toBe(false);
+  });
+
+  it("marks an entry that already exists when it reopens as a room", () => {
+    const before = { a: dropped("a") };
+    const after = connectionsReducer(before, {
+      type: "open",
+      serverKey: "a",
+      direct: true,
+    });
+    expect(after.a.direct).toBe(true);
+    // Reopening with nothing to change keeps the same object.
+    expect(connectionsReducer(after, { type: "open", serverKey: "a" })).toBe(
+      after,
+    );
+  });
+
+  it("names the live room among lobby logins", () => {
+    const room = { ...live("room"), direct: true };
+    expect(liveRoomKey({ a: live("a"), room, b: live("b") })).toBe("room");
+  });
+
+  it("names no room when there is none, or when the room has dropped", () => {
+    expect(liveRoomKey({ a: live("a") })).toBeNull();
+    const gone = { ...dropped("room"), direct: true };
+    expect(liveRoomKey({ a: live("a"), room: gone })).toBeNull();
   });
 });
