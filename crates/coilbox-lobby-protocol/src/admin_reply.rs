@@ -38,6 +38,10 @@ pub enum AdminShape {
     IpSearch,
     /// `SETBOTMODE <name> <mode>`: one line, or nothing for a missing user.
     BotMode,
+    /// `CREATEBOTACCOUNT <newname> <fromuser> [founder]`: one line on
+    /// success. A refusal arrives as a tagged `FAILED` instead, read
+    /// generically by the plugin, never by this collector.
+    CreateBotAccount,
     /// `KICK <name> [reason]`: one line, `Kicked <name> from the server` or
     /// `User <name> was not online`.
     Kick,
@@ -155,16 +159,46 @@ pub enum UserInfo {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "shape", rename_all = "camelCase")]
 pub enum AdminReply {
-    BanList { entries: Vec<BanEntry> },
-    Blacklist { entries: Vec<BlacklistEntry> },
-    UserInfo { info: UserInfo },
-    IpLookup { binding: IpBinding },
-    IpSearch { bindings: Vec<IpBinding> },
-    BotMode { username: String, bot: bool },
-    Kick { username: String, kicked: bool },
-    Ban { success: bool, message: String },
-    BanSpecific { success: bool, message: String },
-    Unban { success: bool, message: String },
+    BanList {
+        entries: Vec<BanEntry>,
+    },
+    Blacklist {
+        entries: Vec<BlacklistEntry>,
+    },
+    UserInfo {
+        info: UserInfo,
+    },
+    IpLookup {
+        binding: IpBinding,
+    },
+    IpSearch {
+        bindings: Vec<IpBinding>,
+    },
+    BotMode {
+        username: String,
+        bot: bool,
+    },
+    CreateBotAccount {
+        username: String,
+        from_username: String,
+        founder: Option<String>,
+    },
+    Kick {
+        username: String,
+        kicked: bool,
+    },
+    Ban {
+        success: bool,
+        message: String,
+    },
+    BanSpecific {
+        success: bool,
+        message: String,
+    },
+    Unban {
+        success: bool,
+        message: String,
+    },
 }
 
 /// What one `SERVERMSG` meant to the command waiting.
@@ -311,6 +345,16 @@ impl AdminCollector {
             }
             (AdminShape::BotMode, _) => match bot_mode_from(text) {
                 Some((username, bot)) => Heard::Finished(AdminReply::BotMode { username, bot }),
+                None => Heard::NotOurs,
+            },
+            (AdminShape::CreateBotAccount, _) => match create_bot_account_result_from(text) {
+                Some((username, from_username, founder)) => {
+                    Heard::Finished(AdminReply::CreateBotAccount {
+                        username,
+                        from_username,
+                        founder,
+                    })
+                }
                 None => Heard::NotOurs,
             },
             (AdminShape::Kick, _) => match kick_result_from(text) {
@@ -557,6 +601,26 @@ fn bot_mode_from(text: &str) -> Option<(String, bool)> {
         _ => return None,
     };
     Some((name.to_string(), bot))
+}
+
+/// `in_CREATEBOTACCOUNT`'s success line: `"A new bot account <%s> has been
+/// created, with the same password as <%s>"`, plus `", and battle founder
+/// <%s>"` when a founder was given. A refusal never reaches here: it is a
+/// tagged `FAILED`, read by the plugin before a line is offered to this
+/// collector.
+fn create_bot_account_result_from(text: &str) -> Option<(String, String, Option<String>)> {
+    let rest = text.strip_prefix("A new bot account <")?;
+    let (username, rest) = rest.split_once("> has been created, with the same password as <")?;
+    if let Some((from_username, founder)) = rest.split_once(">, and battle founder <") {
+        let founder = founder.strip_suffix('>')?;
+        return Some((
+            username.to_string(),
+            from_username.to_string(),
+            Some(founder.to_string()),
+        ));
+    }
+    let from_username = rest.strip_suffix('>')?;
+    Some((username.to_string(), from_username.to_string(), None))
 }
 
 /// `in_KICK`: `'Kicked <%s> from the server'` for an online target, or
@@ -1027,6 +1091,7 @@ mod tests {
             AdminShape::IpSearch,
             AdminShape::IpLookup,
             AdminShape::BotMode,
+            AdminShape::CreateBotAccount,
             AdminShape::Kick,
             AdminShape::Ban,
             AdminShape::BanSpecific,
@@ -1061,6 +1126,36 @@ mod tests {
                 })]
             );
         }
+    }
+
+    /// `in_CREATEBOTACCOUNT`'s success line, with and without a founder.
+    #[test]
+    fn a_create_bot_account_reply_is_one_line() {
+        let (_, heard) = hear_all(
+            AdminShape::CreateBotAccount,
+            &["A new bot account <Autohost1> has been created, with the same password as <Alice>"],
+        );
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::CreateBotAccount {
+                username: "Autohost1".into(),
+                from_username: "Alice".into(),
+                founder: None,
+            })]
+        );
+
+        let (_, heard) = hear_all(
+            AdminShape::CreateBotAccount,
+            &["A new bot account <Autohost1> has been created, with the same password as <Alice>, and battle founder <Bob>"],
+        );
+        assert_eq!(
+            heard,
+            vec![Heard::Finished(AdminReply::CreateBotAccount {
+                username: "Autohost1".into(),
+                from_username: "Alice".into(),
+                founder: Some("Bob".into()),
+            })]
+        );
     }
 
     /// `in_KICK`: an online target and one that was not connected.

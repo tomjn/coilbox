@@ -348,12 +348,13 @@ mod tests {
         assert_eq!(queue.deadline(), None);
     }
 
-    /// A handler like `CREATEBOTACCOUNT` refuses with the tagged line alone.
+    /// `CREATEBOTACCOUNT` refuses with the tagged line alone, with no
+    /// preceding `<COMMAND> failed.` sentence.
     #[test]
     fn a_tagged_refusal_on_its_own_is_a_refusal() {
         let mut queue = AdminQueue::default();
         let now = Instant::now();
-        let (create, mut answered) = request("CREATEBOTACCOUNT", AdminShape::NoReply);
+        let (create, mut answered) = request("CREATEBOTACCOUNT", AdminShape::CreateBotAccount);
         queue.push(create, now);
         assert_eq!(
             queue.hear(
@@ -369,6 +370,35 @@ mod tests {
             answered.try_recv(),
             Ok(AdminOutcome::Refused {
                 reason: "Invalid username 'x y'".to_string()
+            })
+        );
+    }
+
+    /// `CREATEBOTACCOUNT`'s success line is claimed and answered like any
+    /// other `SERVERMSG` reply.
+    #[test]
+    fn a_create_bot_account_success_is_claimed() {
+        let mut queue = AdminQueue::default();
+        let now = Instant::now();
+        let (create, mut answered) = request("CREATEBOTACCOUNT", AdminShape::CreateBotAccount);
+        queue.push(create, now);
+        assert_eq!(
+            queue.hear(
+                &said(
+                    "A new bot account <Autohost1> has been created, with the same password as <Alice>"
+                ),
+                now
+            ),
+            claimed()
+        );
+        assert_eq!(
+            answered.try_recv(),
+            Ok(AdminOutcome::Answered {
+                reply: AdminReply::CreateBotAccount {
+                    username: "Autohost1".to_string(),
+                    from_username: "Alice".to_string(),
+                    founder: None,
+                }
             })
         );
     }

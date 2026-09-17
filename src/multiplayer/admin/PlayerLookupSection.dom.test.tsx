@@ -12,6 +12,10 @@
  * the bans section through `?ban=` rather than banning directly, so this
  * only checks that the param is set, not any `BAN` request (that belongs
  * to `BansSection.dom.test.tsx`).
+ *
+ * And the bot flag toggle (issue #2780's `SETBOTMODE`): shown, changed, and
+ * refreshed after a change so it matches the server. `CREATEBOTACCOUNT`,
+ * the other half of #2780, is `BotAccountsSection.dom.test.tsx`'s.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -263,6 +267,117 @@ describe("following an account's IP with FINDIP", () => {
     });
     await screen.findByText(/Offline/);
     expect(screen.getByLabelText("Player name")).toHaveProperty("value", "Bob");
+  });
+});
+
+describe("the bot flag toggle", () => {
+  function accountReply(bot: boolean) {
+    return answered({
+      shape: "userInfo" as const,
+      info: {
+        kind: "account" as const,
+        username: "Alice",
+        online: true,
+        userId: "42",
+        sessionId: "7",
+        agent: null,
+        registered: "Jan 02, 2020",
+        lastLogin: "Sep 16, 2026",
+        access: "mod",
+        bot,
+        ingameHours: "12",
+        email: null,
+        lastIp: null,
+        lastSysId: null,
+        lastMacId: null,
+      },
+    });
+  }
+
+  it("shows the current flag", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply(true));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe(
+      "true",
+    );
+  });
+
+  it("turns the flag on and refreshes the lookup so it matches the server", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply(false));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe(
+      "false",
+    );
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({ shape: "botMode", username: "Alice", bot: true }),
+    );
+    mpAdminCommand.mockResolvedValueOnce(accountReply(true));
+
+    fireEvent.click(screen.getByRole("switch"));
+    expect(mpAdminCommand).toHaveBeenNthCalledWith(2, {
+      serverKey: SERVER_KEY,
+      command: "SETBOTMODE",
+      args: ["Alice", "true"],
+      shape: "botMode",
+    });
+    expect(
+      await screen.findByText("Bot flag for Alice is now on."),
+    ).toBeTruthy();
+    expect(mpAdminCommand).toHaveBeenNthCalledWith(3, {
+      serverKey: SERVER_KEY,
+      command: "GETUSERINFO",
+      args: ["Alice"],
+      shape: "userInfo",
+    });
+    await screen.findByText(/Online \(session 7\)/);
+    expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe(
+      "true",
+    );
+  });
+
+  it("turns the flag off", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply(true));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    mpAdminCommand.mockResolvedValueOnce(
+      answered({ shape: "botMode", username: "Alice", bot: false }),
+    );
+    mpAdminCommand.mockResolvedValueOnce(accountReply(false));
+
+    fireEvent.click(screen.getByRole("switch"));
+    expect(mpAdminCommand).toHaveBeenNthCalledWith(2, {
+      serverKey: SERVER_KEY,
+      command: "SETBOTMODE",
+      args: ["Alice", "false"],
+      shape: "botMode",
+    });
+    expect(
+      await screen.findByText("Bot flag for Alice is now off."),
+    ).toBeTruthy();
+  });
+
+  it("shows a missing account timing out as an unanswered message, not an error", async () => {
+    mpAdminCommand.mockResolvedValueOnce(accountReply(false));
+    draw();
+    lookUp("Alice");
+    await screen.findByText(/Online \(session 7\)/);
+
+    mpAdminCommand.mockResolvedValueOnce({ outcome: "unanswered" });
+
+    fireEvent.click(screen.getByRole("switch"));
+    expect(
+      await screen.findByText("Alice may no longer exist, so nothing changed."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    // No refresh follows an unanswered toggle.
+    expect(mpAdminCommand).toHaveBeenCalledTimes(2);
   });
 });
 

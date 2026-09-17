@@ -1,6 +1,7 @@
 import { Button, NavGate } from "@picoframe/frame";
 import { AccountPicker } from "../AccountPicker";
 import { BansSection } from "../admin/BansSection";
+import { BotAccountsSection } from "../admin/BotAccountsSection";
 import { ModeratorFeedSection } from "../admin/ModeratorFeedSection";
 import { PlayerLookupSection } from "../admin/PlayerLookupSection";
 import { useMpServerAdmin } from "../navPredicates";
@@ -56,6 +57,8 @@ function ServerAdminPage() {
       )}
 
       <PlayerLookupSection serverKey={serverKey} />
+
+      <BotAccountsSection serverKey={serverKey} />
 
       <BansSection serverKey={serverKey} />
 
