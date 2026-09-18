@@ -234,6 +234,7 @@ const KIND_TINT: Record<HubKind, string> = {
   "setup-pack": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   scenario: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
   blueprint: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  "mod-project": "bg-teal-500/10 text-teal-600 dark:text-teal-400",
 };
 
 /** Fetch one item's container and read it into a preview, or null when the

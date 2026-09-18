@@ -341,7 +341,7 @@ describe("fetchHubGames", () => {
 describe("the kinds, as a sentence", () => {
   it("lists every kind the hub carries, in the plural", () => {
     expect(kindsPlural()).toBe(
-      "Singleplayer presets, challenges, setup packs, scenarios and base blueprints",
+      "Singleplayer presets, challenges, setup packs, scenarios, base blueprints and unit tweak projects",
     );
   });
 
@@ -372,6 +372,11 @@ describe("what a filter chip calls a kind", () => {
   it("opens with a capital, because a chip is not part of a sentence", () => {
     expect(kindLabelPlural("preset")).toBe("Singleplayer presets");
     expect(kindLabelPlural("blueprint")).toBe("Base blueprints");
+  });
+
+  it("carries a unit tweak project, now the hub accepts the kind (issue #2727)", () => {
+    expect(HUB_KINDS).toContain("mod-project");
+    expect(kindLabelPlural("mod-project")).toBe("Unit tweak projects");
   });
 });
 

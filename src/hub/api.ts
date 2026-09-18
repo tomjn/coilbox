@@ -39,12 +39,13 @@ export const HUB_API_VERSION = 1;
  * Campaigns are absent on purpose: they inline images and audio as data URIs and
  * blow past the import size ceiling.
  *
- * `blueprint` is here before the hub has it, and it has to be: the hub vendors
+ * `blueprint` was here before the hub had it, and it had to be: the hub vendors
  * coilbox's container code pinned by blob hash, so the kind exists on this side
  * first and the hub builds on it afterwards (issue #1417, and
- * tomjn/coilbox-hub#84). Until that ships, filtering by Blueprints asks the hub
- * for a kind it does not carry and gets its 400 back, worded as the hub words
- * it.
+ * tomjn/coilbox-hub#84). Until that shipped, filtering by Blueprints asked the
+ * hub for a kind it did not carry and got its 400 back, worded as the hub words
+ * it. `mod-project` followed the same order: the kind waited here unlisted
+ * until tomjn/coilbox-hub#323 taught the hub to accept it (issue #2727).
  */
 export const HUB_KINDS = [
   "preset",
@@ -52,6 +53,7 @@ export const HUB_KINDS = [
   "setup-pack",
   "scenario",
   "blueprint",
+  "mod-project",
 ] as const;
 
 export type HubKind = (typeof HUB_KINDS)[number];
