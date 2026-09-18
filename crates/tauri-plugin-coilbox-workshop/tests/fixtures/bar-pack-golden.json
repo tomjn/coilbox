@@ -1,0 +1,1008 @@
+[
+  {
+    "chunks": [
+      {
+        "form": "block",
+        "lua": "-- Units switched off, taken out of every build menu in the game.\ndo\n  local off = {\n    [\"corak\"] = true,\n  }\n  for _, def in pairs(UnitDefs) do\n    for key, list in pairs(def) do\n      if string.lower(key) == \"buildoptions\" and type(list) == \"table\" then\n        local keys = {}\n        for i in pairs(list) do\n          if type(i) == \"number\" then\n            keys[#keys + 1] = i\n          end\n        end\n        table.sort(keys)\n        local kept = {}\n        for _, i in ipairs(keys) do\n          if not off[string.lower(tostring(list[i]))] then\n            kept[#kept + 1] = list[i]\n          end\n        end\n        def[key] = kept\n      end\n    end\n  end\nend",
+        "reason": "It reads every builder in the game before it writes to any of them.",
+        "title": "1 unit switched off"
+      }
+    ],
+    "name": "One unit switched off",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [
+        "!bset tweakdefs ZG8gbG9jYWwgb2ZmID0geyBbImNvcmFrIl0gPSB0cnVlLCB9IGZvciBfLCBkZWYgaW4gcGFpcnMoVW5pdERlZnMpIGRvIGZvciBrZXksIGxpc3QgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoa2V5KSA9PSAiYnVpbGRvcHRpb25zIiBhbmQgdHlwZShsaXN0KSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGxpc3QpIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBsb2NhbCBrZXB0ID0ge30gZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGlmIG5vdCBvZmZbc3RyaW5nLmxvd2VyKHRvc3RyaW5nKGxpc3RbaV0pKV0gdGhlbiBrZXB0WyNrZXB0ICsgMV0gPSBsaXN0W2ldIGVuZCBlbmQgZGVmW2tleV0gPSBrZXB0IGVuZCBlbmQgZW5kIGVuZA"
+      ],
+      "tweakunits": [],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "disabled": [
+          "corak"
+        ]
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "One unit switched off"
+    }
+  },
+  {
+    "chunks": [
+      {
+        "form": "table",
+        "lua": "{\n  [\"armcom\"] = {\n    buildCostMetal = 12.5,\n    canMove = false,\n    customParams = {\n      note = \"he said \\\"hi\\\"\\nthen left\",\n      [\"repeat\"] = \"yes\",\n    },\n    maxDamage = 5000,\n    turnRate = 0.1,\n    weaponDefs = {\n      laser = {\n        damage = { default = 75 },\n      },\n    },\n    weapons = {\n      [2] = { name = \"CANNON\" },\n    },\n  },\n  [\"corak\"] = { name = \"Танк -- not a comment\", speed = -3 },\n}",
+        "reason": "Each one is a value the user typed, so none of them has to read the game's own first.",
+        "title": "10 field changes"
+      }
+    ],
+    "name": "Field changes",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [],
+      "tweakunits": [
+        "!bset tweakunits eyBbImFybWNvbSJdID0geyBidWlsZENvc3RNZXRhbCA9IDEyLjUsIGNhbk1vdmUgPSBmYWxzZSwgY3VzdG9tUGFyYW1zID0geyBub3RlID0gImhlIHNhaWQgXCJoaVwiXG50aGVuIGxlZnQiLCBbInJlcGVhdCJdID0gInllcyIsIH0sIG1heERhbWFnZSA9IDUwMDAsIHR1cm5SYXRlID0gMC4xLCB3ZWFwb25EZWZzID0geyBsYXNlciA9IHsgZGFtYWdlID0geyBkZWZhdWx0ID0gNzUgfSwgfSwgfSwgd2VhcG9ucyA9IHsgWzJdID0geyBuYW1lID0gIkNBTk5PTiIgfSwgfSwgfSwgWyJjb3JhayJdID0geyBuYW1lID0gItCi0LDQvdC6IC0tIG5vdCBhIGNvbW1lbnQiLCBzcGVlZCA9IC0zIH0sIH0"
+      ],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "overrides": {
+          "armcom": {
+            "buildCostMetal": 12.5,
+            "canMove": false,
+            "customParams.note": "he said \"hi\"\nthen left",
+            "customParams.repeat": "yes",
+            "maxDamage": 5000,
+            "turnRate": 0.1,
+            "weaponDefs.laser.damage.default": 75,
+            "weapons.1.name": "CANNON"
+          },
+          "corak": {
+            "name": "Танк -- not a comment",
+            "speed": -3
+          }
+        }
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "Field changes"
+    }
+  },
+  {
+    "chunks": [
+      {
+        "form": "table",
+        "lua": "{\n  [\"supercom\"] = {\n    buildoptions = { [1] = \"armsolar\", [2] = \"armlab\" },\n    collisionVolumeScales = { [1] = 10, [2] = 20, [3] = 30 },\n    customParams = {},\n    maxDamage = 9500,\n    sfx = {\n      explosion = { [1] = \"boom\" },\n    },\n  },\n}",
+        "reason": "A copy owns its whole definition, so nothing about it depends on what the game says.",
+        "title": "1 unit added"
+      }
+    ],
+    "name": "A unit added",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [],
+      "tweakunits": [
+        "!bset tweakunits eyBbInN1cGVyY29tIl0gPSB7IGJ1aWxkb3B0aW9ucyA9IHsgWzFdID0gImFybXNvbGFyIiwgWzJdID0gImFybWxhYiIgfSwgY29sbGlzaW9uVm9sdW1lU2NhbGVzID0geyBbMV0gPSAxMCwgWzJdID0gMjAsIFszXSA9IDMwIH0sIGN1c3RvbVBhcmFtcyA9IHt9LCBtYXhEYW1hZ2UgPSA5NTAwLCBzZnggPSB7IGV4cGxvc2lvbiA9IHsgWzFdID0gImJvb20iIH0sIH0sIH0sIH0"
+      ],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "clones": {
+          "supercom": {
+            "def": {
+              "buildoptions": [
+                "armsolar",
+                "ArmMex",
+                "armsolar"
+              ],
+              "collisionVolumeScales": {
+                "1": 10,
+                "2": 20,
+                "3": 30
+              },
+              "customParams": {},
+              "maxDamage": 9000
+            },
+            "key": "supercom",
+            "replacesGameUnit": false,
+            "source": "armcom"
+          }
+        },
+        "menus": {
+          "supercom": [
+            {
+              "op": "add",
+              "unit": "armlab"
+            },
+            {
+              "op": "remove",
+              "unit": "armmex"
+            }
+          ]
+        },
+        "overrides": {
+          "supercom": {
+            "maxDamage": 9500,
+            "sfx.explosion.0": "boom"
+          }
+        }
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "A unit added"
+    }
+  },
+  {
+    "chunks": [
+      {
+        "form": "block",
+        "lua": "-- Replaces the game's own \"armpw\". Copied from armpw.\ndo\n  UnitDefs[\"armpw\"] = { maxDamage = 1, name = \"Peewee\" }\nend",
+        "reason": "The game defines armpw too, so this has to be written after its definitions have loaded, and it replaces rather than merges.",
+        "title": "armpw replaced"
+      }
+    ],
+    "name": "A game unit replaced",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [
+        "!bset tweakdefs ZG8gVW5pdERlZnNbImFybXB3Il0gPSB7IG1heERhbWFnZSA9IDEsIG5hbWUgPSAiUGVld2VlIiB9IGVuZA"
+      ],
+      "tweakunits": [],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "clones": {
+          "slot1": {
+            "def": {
+              "maxDamage": 1,
+              "name": "Peewee"
+            },
+            "key": "armpw",
+            "replacesGameUnit": true,
+            "source": "armpw"
+          },
+          "slot2": {
+            "def": {
+              "maxDamage": 2
+            },
+            "key": "Bad Key",
+            "replacesGameUnit": false
+          }
+        }
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "A game unit replaced"
+    }
+  },
+  {
+    "chunks": [
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab0.\ndo\n  local def = UnitDefs[\"armlab0\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit0\") then\n      list[#list + 1] = \"newunit0\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab0 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab1.\ndo\n  local def = UnitDefs[\"armlab1\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit1\") then\n      list[#list + 1] = \"newunit1\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab1 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab10.\ndo\n  local def = UnitDefs[\"armlab10\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit10\") then\n      list[#list + 1] = \"newunit10\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab10 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab11.\ndo\n  local def = UnitDefs[\"armlab11\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit11\") then\n      list[#list + 1] = \"newunit11\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab11 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab12.\ndo\n  local def = UnitDefs[\"armlab12\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit12\") then\n      list[#list + 1] = \"newunit12\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab12 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab13.\ndo\n  local def = UnitDefs[\"armlab13\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit13\") then\n      list[#list + 1] = \"newunit13\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab13 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab14.\ndo\n  local def = UnitDefs[\"armlab14\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit14\") then\n      list[#list + 1] = \"newunit14\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab14 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab15.\ndo\n  local def = UnitDefs[\"armlab15\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit15\") then\n      list[#list + 1] = \"newunit15\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab15 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab16.\ndo\n  local def = UnitDefs[\"armlab16\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit16\") then\n      list[#list + 1] = \"newunit16\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab16 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab17.\ndo\n  local def = UnitDefs[\"armlab17\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit17\") then\n      list[#list + 1] = \"newunit17\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab17 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab18.\ndo\n  local def = UnitDefs[\"armlab18\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit18\") then\n      list[#list + 1] = \"newunit18\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab18 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab19.\ndo\n  local def = UnitDefs[\"armlab19\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit19\") then\n      list[#list + 1] = \"newunit19\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab19 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab2.\ndo\n  local def = UnitDefs[\"armlab2\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit2\") then\n      list[#list + 1] = \"newunit2\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab2 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab20.\ndo\n  local def = UnitDefs[\"armlab20\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit20\") then\n      list[#list + 1] = \"newunit20\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab20 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab21.\ndo\n  local def = UnitDefs[\"armlab21\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit21\") then\n      list[#list + 1] = \"newunit21\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab21 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab22.\ndo\n  local def = UnitDefs[\"armlab22\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit22\") then\n      list[#list + 1] = \"newunit22\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab22 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab23.\ndo\n  local def = UnitDefs[\"armlab23\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit23\") then\n      list[#list + 1] = \"newunit23\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab23 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab3.\ndo\n  local def = UnitDefs[\"armlab3\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit3\") then\n      list[#list + 1] = \"newunit3\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab3 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab4.\ndo\n  local def = UnitDefs[\"armlab4\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit4\") then\n      list[#list + 1] = \"newunit4\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab4 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab5.\ndo\n  local def = UnitDefs[\"armlab5\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit5\") then\n      list[#list + 1] = \"newunit5\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab5 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab6.\ndo\n  local def = UnitDefs[\"armlab6\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit6\") then\n      list[#list + 1] = \"newunit6\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab6 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab7.\ndo\n  local def = UnitDefs[\"armlab7\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit7\") then\n      list[#list + 1] = \"newunit7\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab7 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab8.\ndo\n  local def = UnitDefs[\"armlab8\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit8\") then\n      list[#list + 1] = \"newunit8\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab8 build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armlab9.\ndo\n  local def = UnitDefs[\"armlab9\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"newunit9\") then\n      list[#list + 1] = \"newunit9\"\n    end\n    do\n      local i = at(\"armflash\")\n      if i then\n        table.remove(list, i)\n      end\n    end\n    do\n      local i = at(\"armrock\")\n      if i then\n        local moved = table.remove(list, i)\n        local before = at(\"armham\")\n        if before then\n          table.insert(list, before, moved)\n        else\n          list[#list + 1] = moved\n        end\n      end\n    end\n    do\n      local i = at(\"armpw\")\n      if i then\n        local moved = table.remove(list, i)\n        list[#list + 1] = moved\n      end\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armlab9 build menu"
+      }
+    ],
+    "name": "Build menus across two slots",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [
+        "!bset tweakdefs ZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjAiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDAiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0MCIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjEiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDEiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0MSIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjEwIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxMCIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxMCIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjExIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxMSIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxMSIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjEyIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxMiIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxMiIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjEzIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxMyIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxMyIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjE0Il0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxNCIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxNCIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjE1Il0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxNSIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxNSIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjE2Il0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxNiIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxNiIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjE3Il0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxNyIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxNyIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjE4Il0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxOCIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxOCIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjE5Il0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQxOSIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQxOSIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQ",
+        "!bset tweakdefs1 ZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjIiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDIiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0MiIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjIwIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQyMCIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQyMCIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjIxIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQyMSIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQyMSIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjIyIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQyMiIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQyMiIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjIzIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoIm5ld3VuaXQyMyIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gIm5ld3VuaXQyMyIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjMiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDMiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0MyIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjQiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDQiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0NCIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjUiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDUiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0NSIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjYiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDYiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0NiIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjciXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDciKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0NyIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjgiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDgiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0OCIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQgZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybWxhYjkiXSBpZiBkZWYgdGhlbiBsb2NhbCBrZXkgPSAiYnVpbGRvcHRpb25zIiBpZiBkZWZba2V5XSA9PSBuaWwgdGhlbiBmb3IgayBpbiBwYWlycyhkZWYpIGRvIGlmIHN0cmluZy5sb3dlcihrKSA9PSAiYnVpbGRvcHRpb25zIiB0aGVuIGtleSA9IGsgYnJlYWsgZW5kIGVuZCBlbmQgbG9jYWwgbGlzdCA9IHt9IGlmIHR5cGUoZGVmW2tleV0pID09ICJ0YWJsZSIgdGhlbiBsb2NhbCBrZXlzID0ge30gZm9yIGkgaW4gcGFpcnMoZGVmW2tleV0pIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBmb3IgXywgaSBpbiBpcGFpcnMoa2V5cykgZG8gbGlzdFsjbGlzdCArIDFdID0gZGVmW2tleV1baV0gZW5kIGVuZCBsb2NhbCBmdW5jdGlvbiBhdCh1bml0KSBmb3IgaSA9IDEsICNsaXN0IGRvIGlmIHN0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSkgPT0gdW5pdCB0aGVuIHJldHVybiBpIGVuZCBlbmQgZW5kIGlmIG5vdCBhdCgibmV3dW5pdDkiKSB0aGVuIGxpc3RbI2xpc3QgKyAxXSA9ICJuZXd1bml0OSIgZW5kIGRvIGxvY2FsIGkgPSBhdCgiYXJtZmxhc2giKSBpZiBpIHRoZW4gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGVuZCBlbmQgZG8gbG9jYWwgaSA9IGF0KCJhcm1yb2NrIikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxvY2FsIGJlZm9yZSA9IGF0KCJhcm1oYW0iKSBpZiBiZWZvcmUgdGhlbiB0YWJsZS5pbnNlcnQobGlzdCwgYmVmb3JlLCBtb3ZlZCkgZWxzZSBsaXN0WyNsaXN0ICsgMV0gPSBtb3ZlZCBlbmQgZW5kIGVuZCBkbyBsb2NhbCBpID0gYXQoImFybXB3IikgaWYgaSB0aGVuIGxvY2FsIG1vdmVkID0gdGFibGUucmVtb3ZlKGxpc3QsIGkpIGxpc3RbI2xpc3QgKyAxXSA9IG1vdmVkIGVuZCBlbmQgZGVmW2tleV0gPSBsaXN0IGVuZCBlbmQ"
+      ],
+      "tweakunits": [],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "menus": {
+          "armlab0": [
+            {
+              "op": "add",
+              "unit": "newunit0"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab1": [
+            {
+              "op": "add",
+              "unit": "newunit1"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab10": [
+            {
+              "op": "add",
+              "unit": "newunit10"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab11": [
+            {
+              "op": "add",
+              "unit": "newunit11"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab12": [
+            {
+              "op": "add",
+              "unit": "newunit12"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab13": [
+            {
+              "op": "add",
+              "unit": "newunit13"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab14": [
+            {
+              "op": "add",
+              "unit": "newunit14"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab15": [
+            {
+              "op": "add",
+              "unit": "newunit15"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab16": [
+            {
+              "op": "add",
+              "unit": "newunit16"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab17": [
+            {
+              "op": "add",
+              "unit": "newunit17"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab18": [
+            {
+              "op": "add",
+              "unit": "newunit18"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab19": [
+            {
+              "op": "add",
+              "unit": "newunit19"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab2": [
+            {
+              "op": "add",
+              "unit": "newunit2"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab20": [
+            {
+              "op": "add",
+              "unit": "newunit20"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab21": [
+            {
+              "op": "add",
+              "unit": "newunit21"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab22": [
+            {
+              "op": "add",
+              "unit": "newunit22"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab23": [
+            {
+              "op": "add",
+              "unit": "newunit23"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab3": [
+            {
+              "op": "add",
+              "unit": "newunit3"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab4": [
+            {
+              "op": "add",
+              "unit": "newunit4"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab5": [
+            {
+              "op": "add",
+              "unit": "newunit5"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab6": [
+            {
+              "op": "add",
+              "unit": "newunit6"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab7": [
+            {
+              "op": "add",
+              "unit": "newunit7"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab8": [
+            {
+              "op": "add",
+              "unit": "newunit8"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ],
+          "armlab9": [
+            {
+              "op": "add",
+              "unit": "newunit9"
+            },
+            {
+              "op": "remove",
+              "unit": "armflash"
+            },
+            {
+              "before": "armham",
+              "op": "move",
+              "unit": "armrock"
+            },
+            {
+              "before": null,
+              "op": "move",
+              "unit": "armpw"
+            }
+          ]
+        }
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "Build menus across two slots"
+    }
+  },
+  {
+    "chunks": [
+      {
+        "form": "table",
+        "lua": "{\n  [\"armnew\"] = { maxDamage = 10 },\n}",
+        "reason": "A copy owns its whole definition, so nothing about it depends on what the game says.",
+        "title": "1 unit added"
+      },
+      {
+        "form": "table",
+        "lua": "{\n  [\"armflash\"] = { maxVelocity = 99 },\n}",
+        "reason": "Each one is a value the user typed, so none of them has to read the game's own first.",
+        "title": "1 field change"
+      },
+      {
+        "form": "block",
+        "lua": "-- Build menu for armvp.\ndo\n  local def = UnitDefs[\"armvp\"]\n  if def then\n    local key = \"buildoptions\"\n    if def[key] == nil then\n      for k in pairs(def) do\n        if string.lower(k) == \"buildoptions\" then\n          key = k\n          break\n        end\n      end\n    end\n    local list = {}\n    if type(def[key]) == \"table\" then\n      local keys = {}\n      for i in pairs(def[key]) do\n        if type(i) == \"number\" then\n          keys[#keys + 1] = i\n        end\n      end\n      table.sort(keys)\n      for _, i in ipairs(keys) do\n        list[#list + 1] = def[key][i]\n      end\n    end\n    local function at(unit)\n      for i = 1, #list do\n        if string.lower(tostring(list[i])) == unit then\n          return i\n        end\n      end\n    end\n    if not at(\"armnew\") then\n      list[#list + 1] = \"armnew\"\n    end\n    def[key] = list\n  end\nend",
+        "reason": "Replayed over the list the game ships, so a unit it adds to this builder later is still there.",
+        "title": "armvp build menu"
+      },
+      {
+        "form": "block",
+        "lua": "-- Units switched off, taken out of every build menu in the game.\ndo\n  local off = {\n    [\"armfav\"] = true,\n    [\"corfav\"] = true,\n  }\n  for _, def in pairs(UnitDefs) do\n    for key, list in pairs(def) do\n      if string.lower(key) == \"buildoptions\" and type(list) == \"table\" then\n        local keys = {}\n        for i in pairs(list) do\n          if type(i) == \"number\" then\n            keys[#keys + 1] = i\n          end\n        end\n        table.sort(keys)\n        local kept = {}\n        for _, i in ipairs(keys) do\n          if not off[string.lower(tostring(list[i]))] then\n            kept[#kept + 1] = list[i]\n          end\n        end\n        def[key] = kept\n      end\n    end\n  end\nend",
+        "reason": "It reads every builder in the game before it writes to any of them.",
+        "title": "2 units switched off"
+      }
+    ],
+    "name": "Everything at once",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [
+        "!bset tweakdefs ZG8gbG9jYWwgZGVmID0gVW5pdERlZnNbImFybXZwIl0gaWYgZGVmIHRoZW4gbG9jYWwga2V5ID0gImJ1aWxkb3B0aW9ucyIgaWYgZGVmW2tleV0gPT0gbmlsIHRoZW4gZm9yIGsgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoaykgPT0gImJ1aWxkb3B0aW9ucyIgdGhlbiBrZXkgPSBrIGJyZWFrIGVuZCBlbmQgZW5kIGxvY2FsIGxpc3QgPSB7fSBpZiB0eXBlKGRlZltrZXldKSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGRlZltrZXldKSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGxpc3RbI2xpc3QgKyAxXSA9IGRlZltrZXldW2ldIGVuZCBlbmQgbG9jYWwgZnVuY3Rpb24gYXQodW5pdCkgZm9yIGkgPSAxLCAjbGlzdCBkbyBpZiBzdHJpbmcubG93ZXIodG9zdHJpbmcobGlzdFtpXSkpID09IHVuaXQgdGhlbiByZXR1cm4gaSBlbmQgZW5kIGVuZCBpZiBub3QgYXQoImFybW5ldyIpIHRoZW4gbGlzdFsjbGlzdCArIDFdID0gImFybW5ldyIgZW5kIGRlZltrZXldID0gbGlzdCBlbmQgZW5kIGRvIGxvY2FsIG9mZiA9IHsgWyJhcm1mYXYiXSA9IHRydWUsIFsiY29yZmF2Il0gPSB0cnVlLCB9IGZvciBfLCBkZWYgaW4gcGFpcnMoVW5pdERlZnMpIGRvIGZvciBrZXksIGxpc3QgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoa2V5KSA9PSAiYnVpbGRvcHRpb25zIiBhbmQgdHlwZShsaXN0KSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGxpc3QpIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBsb2NhbCBrZXB0ID0ge30gZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGlmIG5vdCBvZmZbc3RyaW5nLmxvd2VyKHRvc3RyaW5nKGxpc3RbaV0pKV0gdGhlbiBrZXB0WyNrZXB0ICsgMV0gPSBsaXN0W2ldIGVuZCBlbmQgZGVmW2tleV0gPSBrZXB0IGVuZCBlbmQgZW5kIGVuZA"
+      ],
+      "tweakunits": [
+        "!bset tweakunits eyBbImFybW5ldyJdID0geyBtYXhEYW1hZ2UgPSAxMCB9LCB9",
+        "!bset tweakunits1 eyBbImFybWZsYXNoIl0gPSB7IG1heFZlbG9jaXR5ID0gOTkgfSwgfQ"
+      ],
+      "unplaced": []
+    },
+    "project": {
+      "description": "All five stores",
+      "edits": {
+        "clones": {
+          "armnew": {
+            "def": {
+              "maxDamage": 10
+            },
+            "key": "armnew"
+          }
+        },
+        "disabled": [
+          "armfav",
+          "corfav"
+        ],
+        "menus": {
+          "armvp": [
+            {
+              "op": "add",
+              "unit": "armnew"
+            }
+          ]
+        },
+        "overrides": {
+          "armflash": {
+            "maxVelocity": 99
+          }
+        },
+        "text": {
+          "armflash": {
+            "en": {
+              "name": "Flash!"
+            }
+          }
+        }
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "Everything at once",
+      "readOnlyLua": [
+        {
+          "lua": "x()",
+          "note": "n",
+          "title": "t"
+        }
+      ]
+    }
+  },
+  {
+    "chunks": [
+      {
+        "form": "table",
+        "lua": "{\n  [\"armhuge\"] = {\n    description = \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\n  },\n}",
+        "reason": "A copy owns its whole definition, so nothing about it depends on what the game says.",
+        "title": "1 unit added"
+      },
+      {
+        "form": "block",
+        "lua": "-- Units switched off, taken out of every build menu in the game.\ndo\n  local off = {\n    [\"corak\"] = true,\n  }\n  for _, def in pairs(UnitDefs) do\n    for key, list in pairs(def) do\n      if string.lower(key) == \"buildoptions\" and type(list) == \"table\" then\n        local keys = {}\n        for i in pairs(list) do\n          if type(i) == \"number\" then\n            keys[#keys + 1] = i\n          end\n        end\n        table.sort(keys)\n        local kept = {}\n        for _, i in ipairs(keys) do\n          if not off[string.lower(tostring(list[i]))] then\n            kept[#kept + 1] = list[i]\n          end\n        end\n        def[key] = kept\n      end\n    end\n  end\nend",
+        "reason": "It reads every builder in the game before it writes to any of them.",
+        "title": "1 unit switched off"
+      }
+    ],
+    "name": "A unit too big for a slot",
+    "pack": {
+      "oversized": [
+        "1 unit added"
+      ],
+      "tweakdefs": [
+        "!bset tweakdefs ZG8gbG9jYWwgb2ZmID0geyBbImNvcmFrIl0gPSB0cnVlLCB9IGZvciBfLCBkZWYgaW4gcGFpcnMoVW5pdERlZnMpIGRvIGZvciBrZXksIGxpc3QgaW4gcGFpcnMoZGVmKSBkbyBpZiBzdHJpbmcubG93ZXIoa2V5KSA9PSAiYnVpbGRvcHRpb25zIiBhbmQgdHlwZShsaXN0KSA9PSAidGFibGUiIHRoZW4gbG9jYWwga2V5cyA9IHt9IGZvciBpIGluIHBhaXJzKGxpc3QpIGRvIGlmIHR5cGUoaSkgPT0gIm51bWJlciIgdGhlbiBrZXlzWyNrZXlzICsgMV0gPSBpIGVuZCBlbmQgdGFibGUuc29ydChrZXlzKSBsb2NhbCBrZXB0ID0ge30gZm9yIF8sIGkgaW4gaXBhaXJzKGtleXMpIGRvIGlmIG5vdCBvZmZbc3RyaW5nLmxvd2VyKHRvc3RyaW5nKGxpc3RbaV0pKV0gdGhlbiBrZXB0WyNrZXB0ICsgMV0gPSBsaXN0W2ldIGVuZCBlbmQgZGVmW2tleV0gPSBrZXB0IGVuZCBlbmQgZW5kIGVuZA"
+      ],
+      "tweakunits": [],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "clones": {
+          "armhuge": {
+            "def": {
+              "description": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            "key": "armhuge"
+          }
+        },
+        "disabled": [
+          "corak"
+        ]
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "A unit too big for a slot"
+    }
+  },
+  {
+    "chunks": [
+      {
+        "form": "table",
+        "lua": "{\n  [\"armdup\"] = { maxDamage = 1 },\n  [\"armdup\"] = { maxDamage = 2 },\n}",
+        "reason": "A copy owns its whole definition, so nothing about it depends on what the game says.",
+        "title": "2 units added"
+      }
+    ],
+    "name": "Two copies claiming one name",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [],
+      "tweakunits": [
+        "!bset tweakunits eyBbImFybWR1cCJdID0geyBtYXhEYW1hZ2UgPSAxIH0sIFsiYXJtZHVwIl0gPSB7IG1heERhbWFnZSA9IDIgfSwgfQ"
+      ],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "clones": {
+          "first": {
+            "def": {
+              "maxDamage": 1
+            },
+            "key": "armdup"
+          },
+          "second": {
+            "def": {
+              "maxDamage": 2
+            },
+            "key": "armdup"
+          }
+        }
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "Two copies claiming one name"
+    }
+  },
+  {
+    "chunks": [],
+    "name": "Nothing at all",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [],
+      "tweakunits": [],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {},
+      "gameName": "Beyond All Reason test-1",
+      "name": "Nothing at all"
+    }
+  }
+]
