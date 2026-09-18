@@ -10,7 +10,12 @@ import {
 } from "../challenge/nodeMaps";
 import { clamp } from "../lib/helpers";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
-import { applyChallengeMaps, generateGalaxy } from "./generate";
+import {
+  applyChallengeFactions,
+  applyChallengeMaps,
+  applyChallengeNames,
+  generateGalaxy,
+} from "./generate";
 import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
 import type { FactionPreset } from "./names";
 
@@ -259,14 +264,16 @@ export function optionsFromChallenge(
 }
 
 /**
- * Build the galaxy a challenge describes: generate from the seed, then put each
- * system on the map the challenge names (issue #1393). The two steps belong
- * together, because a galaxy generated without the second one is the silently
- * different galaxy this exists to prevent.
+ * Build the galaxy a challenge describes: generate from the seed, then put
+ * each system on the name and map the challenge gave it and each faction on
+ * the name, colour and side it gave (issue #1393, coilbox-hub#397). The steps
+ * belong together, because a galaxy generated without them is the silently
+ * different galaxy this exists to prevent: the same topology under a
+ * different sky.
  *
  * `hub/preview.ts` deliberately calls {@link optionsFromChallenge} on its own
- * instead: it draws topology with no maps installed at all, so there is nothing
- * for the naming step to honour.
+ * instead: it draws topology with no maps installed at all, so there is
+ * nothing for the naming or map steps to honour.
  */
 export function galaxyFromChallenge(
   settings: ConquestChallengeSettings,
@@ -275,7 +282,9 @@ export function galaxyFromChallenge(
   now?: string,
 ): GalaxyDoc {
   const doc = generateGalaxy(optionsFromChallenge(settings, env, id), now);
-  return applyChallengeMaps(doc, settings.nodeMaps, env.maps);
+  const named = applyChallengeNames(doc, settings.nodeNames);
+  const factioned = applyChallengeFactions(named, settings.factions);
+  return applyChallengeMaps(factioned, settings.nodeMaps, env.maps);
 }
 
 /** How many of a galaxy's systems stand in for a map this install cannot offer.

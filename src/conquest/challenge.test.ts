@@ -234,13 +234,118 @@ describe("conquest challenge codec", () => {
     );
     // And this is not the seed doing the work. Generating with the recipient's
     // own pools is what gave the same stars different names.
-    const theirs = generateGalaxy(
-      { ...base, names: { starNames: ["Wolf", "Kapteyn"] } },
-      "t1",
-    );
-    expect(theirs.nodes.map((n) => n.name)).not.toEqual(
+    const theirs = { starNames: ["Wolf", "Kapteyn"] };
+    const localDraw = generateGalaxy({ ...base, names: theirs }, "t1");
+    expect(localDraw.nodes.map((n) => n.name)).not.toEqual(
       galaxy.nodes.map((n) => n.name),
     );
+    // Importing the challenge on that same install reconciles the names back
+    // to the ones the challenge shared, rather than stopping at the round-trip.
+    const rebuilt = galaxyFromChallenge(
+      result.settings,
+      { maps, names: theirs },
+      "generated-4242",
+      "t1",
+    );
+    expect(rebuilt.nodes.map((n) => n.name)).toEqual(
+      galaxy.nodes.map((n) => n.name),
+    );
+  });
+
+  it("rebuilds the same factions on an install with different lore factions", () => {
+    const galaxy = generateGalaxy(
+      {
+        ...base,
+        names: {
+          factions: [
+            { name: "Arm", color: "#22aa44", side: "ARM" },
+            { name: "Cortex", color: "#cc2244", side: "COR" },
+          ],
+        },
+      },
+      "t0",
+    );
+    const result = decodeConquestChallenge(
+      encodeConquestChallenge(galaxy) as string,
+    );
+    if (!result.ok) throw new Error("expected a successful decode");
+    // A second install with its own lore factions, which on its own would hand
+    // the same seed a different name, colour and side for every faction.
+    const theirs = {
+      factions: [
+        { name: "Legion", color: "#111111", side: "LEGION" },
+        { name: "Empire", color: "#222222", side: "EMPIRE" },
+      ],
+    };
+    const localDraw = generateGalaxy(
+      { ...base, names: theirs, seed: result.settings.seed },
+      "t1",
+    );
+    expect(localDraw.factions.map((f) => f.name)).not.toEqual(
+      galaxy.factions.map((f) => f.name),
+    );
+    const rebuilt = galaxyFromChallenge(
+      result.settings,
+      { maps, names: theirs },
+      "generated-4242",
+      "t1",
+    );
+    expect(
+      rebuilt.factions.map(({ name, color, side }) => ({
+        name,
+        color,
+        side,
+      })),
+    ).toEqual(
+      galaxy.factions.map(({ name, color, side }) => ({ name, color, side })),
+    );
+  });
+
+  it("honours the challenge's side verbatim, since this install cannot check it against installed sides at import time", () => {
+    const galaxy = generateGalaxy(
+      {
+        ...base,
+        names: {
+          factions: [
+            { name: "Arm", color: "#22aa44", side: "NOT-A-REAL-SIDE" },
+          ],
+        },
+      },
+      "t0",
+    );
+    const result = decodeConquestChallenge(
+      encodeConquestChallenge(galaxy) as string,
+    );
+    if (!result.ok) throw new Error("expected a successful decode");
+    const rebuilt = galaxyFromChallenge(
+      result.settings,
+      { maps, names: undefined },
+      "generated-4242",
+      "t1",
+    );
+    expect(rebuilt.factions[0].side).toBe("NOT-A-REAL-SIDE");
+  });
+
+  it("keeps a faction's locally resolved name and colour when the challenge names none for that slot", () => {
+    const galaxy = generateGalaxy(base, "t0");
+    const settings = challengeSettingsFromGalaxy(galaxy);
+    if (!settings) throw new Error("expected shareable settings");
+    const withGap = {
+      ...settings,
+      factions: [{ name: "" }, { name: "Cortex", color: "#cc2244" }],
+    };
+    const rebuilt = galaxyFromChallenge(
+      withGap,
+      { maps, names: undefined },
+      "generated-4242",
+      "t1",
+    );
+    // The first faction names nothing, so it keeps this install's own draw...
+    expect(rebuilt.factions[0].name).toBe(galaxy.factions[0].name);
+    expect(rebuilt.factions[0].color).toBe(galaxy.factions[0].color);
+    // ...but the second is overridden by what the challenge named.
+    expect(rebuilt.factions[1].name).toBe("Cortex");
+    expect(rebuilt.factions[1].color).toBe("#cc2244");
   });
 
   it("opens a challenge shared before names were published", () => {

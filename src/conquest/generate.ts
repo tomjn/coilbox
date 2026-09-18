@@ -691,6 +691,93 @@ export function applyChallengeMaps(
 }
 
 /**
+ * Put every system's name to what the challenge called it (coilbox-hub#397).
+ *
+ * Unlike a map, a name is always honourable: nothing about this install can
+ * make a challenge's name impossible to show, so there is no stand-in and
+ * nothing to record.
+ *
+ * Returns the doc unchanged when the challenge names nothing, so a challenge
+ * shared before coilbox-hub#397 falls straight through to whatever generation
+ * picked.
+ */
+export function applyChallengeNames(
+  galaxy: GalaxyDoc,
+  nodeNames: NodeMaps | undefined,
+): GalaxyDoc {
+  if (!nodeNames) return galaxy;
+  let changed = false;
+  const nodes = galaxy.nodes.map((node) => {
+    const wanted = nodeNames[node.id];
+    if (!wanted || node.name === wanted) return node;
+    changed = true;
+    return { ...node, name: wanted };
+  });
+  return changed ? { ...galaxy, nodes } : galaxy;
+}
+
+/**
+ * A challenge's faction entry, by position (coilbox-hub#397): name, colour
+ * and side only, no tuning. Kept structural rather than imported from
+ * `./challenge.ts` (whose `ChallengeFaction` this matches), since that module
+ * already imports from here.
+ */
+export interface ChallengeFactionSpec {
+  name: string;
+  color?: string;
+  side?: string;
+}
+
+/**
+ * Put each faction's name, colour and side to what the challenge said, by
+ * position (coilbox-hub#397). Name and colour win whenever the challenge sets
+ * one: a game's lore factions are just this install's local resolution, and
+ * the challenge's own flavour is the one both players should see.
+ *
+ * `side` decides which in-game side a faction's AI plays, which is not
+ * cosmetic the way a name or colour is. The safer answer would check this
+ * install's sides and stand in a local one when the challenge's is not
+ * installed, the way {@link applyChallengeMaps} does for maps. But nothing
+ * upstream of this call has loaded the game's sides, and enumerating them
+ * means mounting the whole game archive (`unitsyncGameInfo`), which the
+ * import flow does not do and which this function has no business
+ * triggering. So `side` is honoured verbatim whenever the challenge sets one,
+ * with no stand-in and no "cannot honour" case: the same as name and colour,
+ * just without a local value to prefer when the challenge is silent.
+ *
+ * A faction the challenge names nothing for (an empty `name`, e.g. a slot
+ * `parseChallengeFactions` kept open) keeps this install's own resolution
+ * untouched.
+ *
+ * Returns the doc unchanged when the challenge names no factions, so a
+ * challenge shared before coilbox-hub#397 falls straight through.
+ */
+export function applyChallengeFactions(
+  galaxy: GalaxyDoc,
+  factions: ChallengeFactionSpec[] | undefined,
+): GalaxyDoc {
+  if (!factions) return galaxy;
+  let changed = false;
+  const next = galaxy.factions.map((faction, i) => {
+    const wanted = factions[i];
+    if (!wanted) return faction;
+    const name = wanted.name !== "" ? wanted.name : faction.name;
+    const color = wanted.color ?? faction.color;
+    const side = wanted.side ?? faction.side;
+    if (
+      name === faction.name &&
+      color === faction.color &&
+      side === faction.side
+    ) {
+      return faction;
+    }
+    changed = true;
+    return { ...faction, name, color, side };
+  });
+  return changed ? { ...galaxy, factions: next } : galaxy;
+}
+
+/**
  * Put one system back on the map its challenge named, now that this install can
  * offer it (issue #1834).
  *
