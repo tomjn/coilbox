@@ -192,6 +192,111 @@ describe("conquest challenge codec", () => {
     expect(substitutedMapCount(rebuilt)).toBe(0);
   });
 
+  it("names every system and every faction, player first", () => {
+    const galaxy = generateGalaxy(
+      {
+        ...base,
+        names: {
+          starNames: ["Sol", "Luyten", "Ross 128"],
+          factions: [
+            { name: "Arm", color: "#22aa44", side: "ARM" },
+            { name: "Cortex", color: "#cc2244", side: "COR" },
+          ],
+        },
+      },
+      "t0",
+    );
+    const settings = challengeSettingsFromGalaxy(galaxy);
+    expect(settings?.nodeNames).toEqual(
+      Object.fromEntries(galaxy.nodes.map((n) => [n.id, n.name])),
+    );
+    expect(settings?.factions).toEqual([
+      { name: "Arm", color: "#22aa44", side: "ARM" },
+      { name: "Cortex", color: "#cc2244", side: "COR" },
+      { name: galaxy.factions[2].name, color: galaxy.factions[2].color },
+    ]);
+    // The player is the first of them, on any install, which is what lets a
+    // reader line them up by position.
+    expect(galaxy.factions[0].id).toBe(galaxy.playerFactionId);
+  });
+
+  it("rebuilds the same names on an install with different naming pools", () => {
+    const galaxy = generateGalaxy(
+      { ...base, names: { starNames: ["Sol", "Luyten", "Ross 128"] } },
+      "t0",
+    );
+    const result = decodeConquestChallenge(
+      encodeConquestChallenge(galaxy) as string,
+    );
+    if (!result.ok) throw new Error("expected a successful decode");
+    expect(result.settings.nodeNames).toEqual(
+      Object.fromEntries(galaxy.nodes.map((n) => [n.id, n.name])),
+    );
+    // And this is not the seed doing the work. Generating with the recipient's
+    // own pools is what gave the same stars different names.
+    const theirs = generateGalaxy(
+      { ...base, names: { starNames: ["Wolf", "Kapteyn"] } },
+      "t1",
+    );
+    expect(theirs.nodes.map((n) => n.name)).not.toEqual(
+      galaxy.nodes.map((n) => n.name),
+    );
+  });
+
+  it("opens a challenge shared before names were published", () => {
+    const galaxy = generateGalaxy(base, "t0");
+    const settings = challengeSettingsFromGalaxy(galaxy);
+    if (!settings) throw new Error("expected shareable settings");
+    const { nodeNames: _n, factions: _f, ...old } = settings;
+    const result = decodeConquestChallenge(encodeChallenge("conquest", old));
+    if (!result.ok) throw new Error("expected a successful decode");
+    expect(result.settings.nodeNames).toBeUndefined();
+    expect(result.settings.factions).toBeUndefined();
+    expect(
+      galaxyFromChallenge(
+        result.settings,
+        { maps, names: undefined },
+        "generated-4242",
+        "t1",
+      ).nodes.map((n) => n.name),
+    ).toEqual(galaxy.nodes.map((n) => n.name));
+  });
+
+  it("keeps a nameless faction in its own slot", () => {
+    // Closing the gap would hand the second faction's name to the third, which
+    // is worse than a challenge that names nobody.
+    const settings = challengeSettingsFromGalaxy(generateGalaxy(base, "t0"));
+    if (!settings) throw new Error("expected shareable settings");
+    const result = decodeConquestChallenge(
+      encodeChallenge("conquest", {
+        ...settings,
+        factions: [
+          { name: "Arm" },
+          { colour: "wrong key" },
+          { name: "Legion" },
+        ],
+      }),
+    );
+    if (!result.ok) throw new Error("expected a successful decode");
+    expect(result.settings.factions?.map((f) => f.name)).toEqual([
+      "Arm",
+      "",
+      "Legion",
+    ]);
+  });
+
+  it("ignores factions that are not a list of factions", () => {
+    const settings = challengeSettingsFromGalaxy(generateGalaxy(base, "t0"));
+    if (!settings) throw new Error("expected shareable settings");
+    for (const factions of ["Arm", 7, null, [], [null, 4]]) {
+      const result = decodeConquestChallenge(
+        encodeChallenge("conquest", { ...settings, factions }),
+      );
+      if (!result.ok) throw new Error("expected a successful decode");
+      expect(result.settings.factions, String(factions)).toBeUndefined();
+    }
+  });
+
   it("stays small enough to paste for the biggest galaxy coilbox makes", () => {
     const big = generateGalaxy(
       {
