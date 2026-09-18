@@ -2,12 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { containerKindName, containerKindPlural } from "@/container/names";
 import {
   describeItem,
+  fetchHubGames,
   fetchHubItems,
   HUB_KINDS,
+  hubGamesUrl,
   hubItemsUrl,
   hubItemUrl,
   kindLabelPlural,
   kindsPlural,
+  readGamesBody,
   readItemBody,
   readItemsBody,
 } from "./api";
@@ -214,6 +217,119 @@ describe("fetchHubItems", () => {
     });
     const result = await fetchHubItems(BASE, { q: "x" });
     expect(result).toMatchObject({ ok: true, value: { total: 1 } });
+  });
+});
+
+function gamesBody(games: unknown[] = []) {
+  return {
+    format: "coilbox-hub-games",
+    version: 1,
+    games,
+  };
+}
+
+const A_GAME = {
+  shortname: "BA",
+  title: "Balanced Annihilation",
+  description: null,
+  featured: true,
+  downloads: [{ kind: "rapid", value: "ba:stable" }],
+  logo: null,
+  card: null,
+  faction_count: 2,
+  unit_count: 400,
+  item_count: 12,
+};
+
+describe("hubGamesUrl", () => {
+  it("builds the games listing address", () => {
+    expect(hubGamesUrl(BASE)).toBe(`${BASE}/api/v1/games`);
+  });
+
+  it("keeps a hub served under a path prefix working", () => {
+    expect(hubGamesUrl("https://example.com/hub/")).toBe(
+      "https://example.com/hub/api/v1/games",
+    );
+  });
+});
+
+describe("readGamesBody", () => {
+  it("reads a listing", () => {
+    const result = readGamesBody(gamesBody([A_GAME]));
+    expect(result).toEqual({ ok: true, value: [A_GAME] });
+  });
+
+  it("reads an empty listing as no games, not a failure", () => {
+    const result = readGamesBody(gamesBody([]));
+    expect(result).toEqual({ ok: true, value: [] });
+  });
+
+  it("refuses a version this build predates", () => {
+    const result = readGamesBody({ ...gamesBody(), version: 2 });
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) expect(result.reason).toContain("newer than this copy");
+  });
+
+  it("refuses a response that is not the hub's games route at all", () => {
+    const result = readGamesBody({ hello: "world" });
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) expect(result.reason).toContain("not a coilbox hub");
+  });
+
+  it("refuses a listing whose games are missing", () => {
+    const result = readGamesBody({ ...gamesBody(), games: undefined });
+    expect(result).toMatchObject({ ok: false });
+  });
+});
+
+describe("fetchHubGames", () => {
+  it("names the host when the hub cannot be reached", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    const result = await fetchHubGames(BASE);
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) {
+      expect(result.reason).toContain("hub.example");
+      expect(result.reason).toContain("waking up");
+    }
+  });
+
+  // The hub deliberately answers 503 rather than an empty list when its
+  // catalog cannot be read (`GET /api/v1/games` in coilbox-hub): an empty list
+  // is a claim the hub holds no games, and a 503 says it could not check.
+  it("blames a cold start for a 503, rather than reading it as no games", async () => {
+    stubFetch({
+      ok: false,
+      status: 503,
+      json: async () => ({ error: "The catalog could not be read just now." }),
+    });
+    const result = await fetchHubGames(BASE);
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) expect(result.reason).toContain("waking up");
+  });
+
+  it("passes a 4xx back in the hub's own words", async () => {
+    stubFetch({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: "nope" }),
+    });
+    const result = await fetchHubGames(BASE);
+    expect(result).toEqual({ ok: false, reason: "nope" });
+  });
+
+  it("returns the games on a good response", async () => {
+    stubFetch({
+      ok: true,
+      status: 200,
+      json: async () => gamesBody([A_GAME]),
+    });
+    const result = await fetchHubGames(BASE);
+    expect(result).toEqual({ ok: true, value: [A_GAME] });
   });
 });
 

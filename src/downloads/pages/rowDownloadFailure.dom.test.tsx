@@ -78,8 +78,14 @@ vi.mock("../../content/rapidPoolWarm", () => ({
   warmAllRoots: vi.fn(async () => {}),
 }));
 
+// A stable empty array, not a fresh `[]` per call: the real hook is a plain
+// `useState` that only ever changes identity once its catalog load resolves.
+// A mock handing back a new array every render churns GamesPage's
+// `repos`/`load` memoization (now also keyed on the hub URL, issue #2951)
+// into a render loop no real caller of the hook would trigger.
+const NO_REPOS = vi.hoisted(() => [] as never[]);
 vi.mock("@/content/branding", () => ({
-  useGithubGameRepos: () => [],
+  useGithubGameRepos: () => NO_REPOS,
   useSuggestedMapLists: () => [],
   useCachedImage: () => ({ src: undefined, loading: false }),
 }));
@@ -106,7 +112,10 @@ vi.mock("@picoframe/frame", () => ({
     </button>
   ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
-  useSetting: () => [false, vi.fn()],
+  // A generic default-passthrough rather than a fixed `false`: GamesPage now
+  // also reads `hub.url` (a string setting) through `useHubUrl` (issue
+  // #2951), and the fixed value broke that read's type expectations.
+  useSetting: (_key: string, initial: unknown) => [initial, vi.fn()],
   useDrawer: () => ({ open: vi.fn(), close: vi.fn() }),
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
 }));
