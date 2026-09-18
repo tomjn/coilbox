@@ -19,10 +19,12 @@
  * A project can also carry Lua that is read only for a different reason
  * (issue #1280): recovered from a decoded tweak set that turned out to be a
  * program rather than data, so there was never a safe way to turn it into
- * one of the five editable stores. That Lua is shown here too, in its own
- * section, and never inside "generated": nothing here compiled it and
- * nothing here runs it. `compiled.notes` already says how many blocks there
- * are and why. This is where the actual Lua behind that count is.
+ * one of the five editable stores. That Lua is shown here in its own section
+ * rather than inside "generated", because the compiler did not write it and
+ * cannot change it. It does compile it: a block that parsed goes into the
+ * output as it stands, which is the only way an imported set means anything.
+ * `compiled.notes` says how many went in and how many were left behind.
+ * This is where the Lua behind those counts is.
  */
 import { Drawer } from "@picoframe/frame";
 import { CodeBlock } from "@/components/CodeBlock";
@@ -138,12 +140,14 @@ export function CompiledLuaDrawer({
         {project.readOnlyLua && project.readOnlyLua.length > 0 && (
           <section className="flex flex-col gap-3 border-border/60 border-t pt-4">
             <h3 className="font-medium text-sm">
-              Read only ({project.readOnlyLua.length})
+              Carried as written ({project.readOnlyLua.length})
             </h3>
             <p className="text-muted-foreground text-xs">
               Recovered from a decoded import that turned out to be a program
-              rather than data. Shown for reference only: nothing above compiles
-              or runs it.
+              rather than data. Coilbox cannot edit it, so it is compiled into
+              the output exactly as it arrived, ahead of this project's own
+              changes. A block that never parsed as Lua is left out, and says so
+              below.
             </p>
             {project.readOnlyLua.map((block, index) => (
               <div

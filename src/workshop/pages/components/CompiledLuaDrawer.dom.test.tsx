@@ -139,7 +139,7 @@ describe("the generated Lua drawer", () => {
         state={compiled()}
       />,
     );
-    expect(screen.getByText("Read only (1)")).toBeTruthy();
+    expect(screen.getByText("Carried as written (1)")).toBeTruthy();
     expect(screen.getByText("tweakdefs3")).toBeTruthy();
     expect(screen.getByText("Decoded as a program, not data.")).toBeTruthy();
   });

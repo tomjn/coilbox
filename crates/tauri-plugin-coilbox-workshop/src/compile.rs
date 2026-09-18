@@ -153,6 +153,28 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     let mut chunks = Vec::new();
     let mut notes = Vec::new();
 
+    // Lua the project carries but cannot edit (issue #1280), compiled first
+    // so everything the user did in coilbox lands on top of it. An imported
+    // set is the baseline they started from: a program that scales every
+    // unit's health has to run before the one unit they then typed a number
+    // into, or their number gets scaled too.
+    //
+    // Only a block the decoder proved is a Lua chunk. The other kind never
+    // parsed, and writing it into a file would break the whole file rather
+    // than just itself.
+    let (carried_lua, unparsed_lua): (Vec<_>, Vec<_>) = project
+        .read_only_lua
+        .iter()
+        .partition(|block| block.compiles_verbatim());
+    for block in &carried_lua {
+        chunks.push(Chunk {
+            form: LuaForm::Block,
+            title: block.title.clone(),
+            reason: "Carried from a decoded import as it stands. Coilbox never runs it, and cannot edit it either, so it is written out the way it arrived.".to_string(),
+            lua: block.lua.clone(),
+        });
+    }
+
     // A copy's key becomes a file name under the generated archive, so it is
     // checked again here rather than trusted. The editor already refuses
     // anything else (`checkCloneName`), but a project arrives as JSON that
@@ -312,18 +334,33 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         ));
     }
 
-    // Lua the project carries read-only (issue #1280). It was already refused
-    // as too risky to run automatically at decode time, and nothing about
-    // compiling makes that safer, so the compiler does the same thing it does
-    // with a text edit it cannot carry: says so rather than silently dropping
-    // it or silently running it.
-    if !project.read_only_lua.is_empty() {
-        let count = project.read_only_lua.len();
+    // The two things that can be true of carried Lua, said separately. A
+    // block that compiled is in the output, and the user should know whose
+    // code they are about to run. One that never parsed is not in the output,
+    // and saying so is the difference between a note and a silent drop.
+    if !carried_lua.is_empty() {
+        let count = carried_lua.len();
         notes.push(format!(
-            "{count} block{} of read-only Lua {} carried on this project but not compiled. {} came from a decoded import that turned out to be a program rather than data, and this compiler does not run a stranger's program automatically. Read it in the project and hand-port anything you want the game to run.",
+            "{count} block{} of Lua from a decoded import {} compiled into the output as {} arrived, ahead of this project's own changes. Coilbox cannot edit or check that Lua, so read it in the project if you are unsure what it does.",
             if count == 1 { "" } else { "s" },
             if count == 1 { "is" } else { "are" },
-            if count == 1 { "It" } else { "They" },
+            if count == 1 { "it" } else { "they" },
+        ));
+    }
+    if !unparsed_lua.is_empty() {
+        let count = unparsed_lua.len();
+        notes.push(format!(
+            "{count} block{} of decoded Lua {} left out of the output, because {} never parsed as Lua and writing {} into a file would break the file. {} still carried on the project to read: {}.",
+            if count == 1 { "" } else { "s" },
+            if count == 1 { "is" } else { "are" },
+            if count == 1 { "it" } else { "they" },
+            if count == 1 { "it" } else { "them" },
+            if count == 1 { "It is" } else { "They are" },
+            unparsed_lua
+                .iter()
+                .map(|block| block.title.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
         ));
     }
 
@@ -1280,23 +1317,86 @@ mod tests {
         assert!(out.notes[0].contains("left out"));
     }
 
-    /// Read-only Lua carried on the project (issue #1280) is noted, never
-    /// compiled and never silently dropped.
-    #[test]
-    fn read_only_lua_is_noted_rather_than_compiled_or_dropped() {
-        let mut project = project(json!({ "disabled": ["armflash"] }));
-        project.read_only_lua = vec![crate::model::ReadOnlyLuaBlock {
-            title: "tweakdefs3".to_string(),
-            lua: "do while true do end end".to_string(),
+    fn carried(title: &str, lua: &str, form: &str) -> crate::model::ReadOnlyLuaBlock {
+        crate::model::ReadOnlyLuaBlock {
+            title: title.to_string(),
+            lua: lua.to_string(),
             note: "Decoded as a program, not data.".to_string(),
-        }];
+            form: Some(form.to_string()),
+        }
+    }
+
+    /// The whole point of importing somebody's tweak set (issue #1280): most
+    /// of a real one is program, so a project that carried it without
+    /// compiling it would keep the small editable part and lose the rest.
+    #[test]
+    fn carried_lua_is_compiled_verbatim_and_noted() {
+        let mut project = project(json!({ "disabled": ["armflash"] }));
+        project.read_only_lua = vec![carried(
+            "tweakdefs3",
+            "do for _, d in pairs(UnitDefs) do d.health = 2 end end",
+            "block",
+        )];
+        let out = compile(&project);
+        assert!(out.notes.iter().any(|n| n.contains("1 block of Lua")));
+        let post = out
+            .files
+            .iter()
+            .find(|f| f.path == POST_FILE)
+            .expect("post file");
+        assert!(post.contents.contains("d.health = 2"));
+    }
+
+    /// Run order is the reason it is compiled first. A program that scales
+    /// every unit has to run before the one unit the user then typed a number
+    /// into, or their number gets scaled too.
+    #[test]
+    fn carried_lua_runs_before_the_projects_own_blocks() {
+        let mut project = project(json!({ "disabled": ["armflash"] }));
+        project.read_only_lua = vec![carried("tweakdefs", "do local imported = 1 end", "block")];
+        let out = compile(&project);
+        assert_eq!(out.chunks[0].title, "tweakdefs");
+        assert_eq!(out.chunks[0].form, LuaForm::Block);
+        let post = out
+            .files
+            .iter()
+            .find(|f| f.path == POST_FILE)
+            .expect("post file");
+        let imported = post.contents.find("local imported").expect("imported");
+        let disabled = post.contents.find("armflash").expect("disabled");
+        assert!(imported < disabled);
+    }
+
+    /// A block that never parsed cannot be written into a file, because it
+    /// would break the whole file rather than only itself.
+    #[test]
+    fn lua_that_never_parsed_is_left_out_and_said_so() {
+        let mut project = project(json!({ "disabled": ["armflash"] }));
+        project.read_only_lua = vec![carried("tweakdefs9", "not lua at all {{{", "unrecognised")];
         let out = compile(&project);
         assert!(out
             .notes
             .iter()
-            .any(|n| n.contains("1 block of read-only Lua")));
+            .any(|n| n.contains("left out of the output") && n.contains("tweakdefs9")));
         for compiled in &out.files {
-            assert!(!compiled.contents.contains("while true do end"));
+            assert!(!compiled.contents.contains("not lua at all"));
+        }
+    }
+
+    /// A project saved before the decoder recorded its verdict says nothing
+    /// about whether its Lua parses, so it is not written out.
+    #[test]
+    fn carried_lua_with_no_recorded_form_is_not_compiled() {
+        let mut project = project(json!({ "disabled": ["armflash"] }));
+        project.read_only_lua = vec![crate::model::ReadOnlyLuaBlock {
+            title: "tweakdefs".to_string(),
+            lua: "do local old = 1 end".to_string(),
+            note: "From an older project.".to_string(),
+            form: None,
+        }];
+        let out = compile(&project);
+        for compiled in &out.files {
+            assert!(!compiled.contents.contains("local old"));
         }
     }
 

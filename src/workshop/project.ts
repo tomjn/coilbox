@@ -731,7 +731,17 @@ function parseReadOnlyLua(value: unknown): ReadOnlyLuaBlock[] {
       typeof record.note !== "string"
     )
       continue;
-    out.push({ title: record.title, lua: record.lua, note: record.note });
+    out.push({
+      title: record.title,
+      lua: record.lua,
+      note: record.note,
+      // Only the decoder's own two words. A project written by hand, or by a
+      // later version of coilbox, does not get to invent a third and have the
+      // compiler read it as permission to emit the Lua.
+      ...(record.form === "block" || record.form === "unrecognised"
+        ? { form: record.form }
+        : {}),
+    });
   }
   return out;
 }
