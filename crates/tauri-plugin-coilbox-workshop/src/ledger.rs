@@ -197,7 +197,10 @@ fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
         .iter()
         .any(|(key, clone)| !clone.replaces_game_unit && valid_unit_key(key));
     if added_nonempty {
-        positions.push((PositionKey::Added, LuaForm::Table));
+        // Block since issue #2962: an added unit has to be assigned, because
+        // BAR's tweakunits merge only ever writes onto a unit the game
+        // already has and drops the rest without saying so.
+        positions.push((PositionKey::Added, LuaForm::Block));
     }
 
     for (key, clone) in &edits.clones {
