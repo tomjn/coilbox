@@ -227,6 +227,41 @@ fn include_value_errors_on_a_missing_file() {
     assert!(lua.include_value("missions/nope/mission.lua").is_err());
 }
 
+/// A patch against one weapon of several, which is the shape that sent
+/// coilbox's own preflight into a parse error (issue #2964). JSON has no
+/// integer keys, so a table with `[2]` and no `[1]` only crosses once they
+/// are numbered as strings.
+#[test]
+fn a_numbered_table_with_a_gap_crosses_as_string_keys() {
+    let dir = fixture("selfcontained");
+    let lua = SpringLua::new(&dir).unwrap();
+    let value = lua
+        .eval_expr_value(
+            "{ armcom = { weapons = { [2] = { name = 'CANNON' } } } }",
+            "patch",
+        )
+        .expect("eval");
+    assert_eq!(
+        value["armcom"]["weapons"]["2"]["name"],
+        serde_json::json!("CANNON")
+    );
+}
+
+/// A real sequence keeps its shape, so nothing that already read a decoded
+/// array has to change.
+#[test]
+fn a_real_sequence_still_crosses_as_an_array() {
+    let dir = fixture("selfcontained");
+    let lua = SpringLua::new(&dir).unwrap();
+    let value = lua
+        .eval_expr_value("{ buildoptions = { 'armsolar', 'armlab' } }", "seq")
+        .expect("eval");
+    assert_eq!(
+        value["buildoptions"],
+        serde_json::json!(["armsolar", "armlab"])
+    );
+}
+
 #[test]
 fn non_returning_chunk_errors() {
     let dir = fixture("selfcontained");
