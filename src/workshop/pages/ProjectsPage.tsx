@@ -38,6 +38,7 @@ import { EmptyState } from "@/content/pages/components/states";
 import { importContainerFile } from "@/deeplink/bindings";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { useRecordHubImport } from "@/hub/imports";
 import { forgetEditHistory } from "../history";
 import {
   describeEdits,
@@ -147,22 +148,30 @@ export default function ProjectsPage() {
    * A shared project link lands here with its code in the query string. It is
    * saved and opened, because a project is a document rather than a setting:
    * nothing about the game changes until it is compiled, so there is nothing to
-   * ask permission for beyond the deep-link confirmation it already passed.
+   * ask permission for beyond the deep-link confirmation it already passed. It
+   * names the hub item it came from when the hub browse screen started it
+   * (issue #1368), recorded once the project is actually saved rather than
+   * before: an import that failed to save is not one the hub should count.
    */
-  const { code: importCode } = useImportParam();
-  const importRef = useRef<(code: string) => void>(() => {});
-  importRef.current = (code: string) => {
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
+  const importRef = useRef<(code: string, hubItemId?: string) => void>(
+    () => {},
+  );
+  importRef.current = (code: string, hubItemId?: string) => {
     const imported = parseModProjectJson(code);
     if (!imported) {
       setError("That link is not a coilbox tweak project.");
       return;
     }
     setError(null);
-    navigate(projectPath(createProject(imported).id));
+    const project = createProject(imported);
+    recordHubImport(hubItemId, [project.id], projectPath(project.id));
+    navigate(projectPath(project.id));
   };
   useEffect(() => {
-    if (importCode) importRef.current(importCode);
-  }, [importCode]);
+    if (importCode) importRef.current(importCode, hubItemId);
+  }, [importCode, hubItemId]);
 
   /**
    * Share: a code, a link, a file or a publish to the Coilbox hub (issue

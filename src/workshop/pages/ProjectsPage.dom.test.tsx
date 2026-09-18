@@ -101,11 +101,22 @@ vi.mock("@/components/OptionSelect", () => ({
   ),
 }));
 
+// The hub import record is its own store behind its own hook, the same way
+// `ScenariosPage` and `BlueprintsPage` keep it out of this page's own tests:
+// what belongs here is only that a save that came from the hub calls it with
+// the item id, the project it made, and where to find it (issue #2728).
+const recordHubImport = vi.fn();
+vi.mock("@/hub/imports", () => ({
+  useRecordHubImport: () => recordHubImport,
+}));
+
 const { default: ProjectsPage } = await import("./ProjectsPage");
 const { PersistentStoreProvider } = await import("@picoframe/frame");
 const { installSettingsStorage, memorySettingsStorage, readStoredSetting } =
   await import("@/lib/storedSetting");
-const { EMPTY_EDITS, PROJECTS_KEY } = await import("../project");
+const { EMPTY_EDITS, PROJECTS_KEY, modProjectCode } = await import(
+  "../project"
+);
 type ModProject = import("../project").ModProject;
 
 let storage = memorySettingsStorage();
@@ -172,6 +183,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   opened.length = 0;
+  recordHubImport.mockClear();
 });
 
 describe("ProjectsPage", () => {
@@ -298,6 +310,49 @@ describe("ProjectsPage", () => {
     await vi.waitFor(() =>
       expect(opened.map((o) => o.title)).toEqual(["Share Slower tanks"]),
     );
+  });
+
+  /**
+   * A `coilbox://import` link carrying a project's code lands here the same
+   * way `ScenariosPage` and `BlueprintsPage` do, with `&hub=<id>` beside the
+   * code when the hub browse screen started it (issue #2728). The record is
+   * what lets the hub count the import and later tell someone where a project
+   * came from, so it has to name the project this save actually made, not the
+   * shared code's own id.
+   */
+  describe("importing a project from a shared link", () => {
+    it("records the hub item behind a shared project once it is saved", () => {
+      const code = modProjectCode(
+        project({ id: "shared", name: "Borrowed tanks", gameName: GAME.name }),
+      );
+      if (!code.ok) throw new Error("test project code did not fit");
+      show(
+        [],
+        `/workshop?import=${encodeURIComponent(code.code)}&hub=hub-item-1`,
+      );
+
+      const [made] = stored();
+      expect(made).toMatchObject({
+        name: "Borrowed tanks",
+        gameName: GAME.name,
+      });
+      expect(screen.getByText(`editor ${made.id}`)).toBeTruthy();
+      expect(recordHubImport).toHaveBeenCalledWith(
+        "hub-item-1",
+        [made.id],
+        `/workshop/${made.id}`,
+      );
+    });
+
+    it("saves nothing and records nothing for a link that is not a project", () => {
+      show([], "/workshop?import=not-a-real-code&hub=hub-item-1");
+
+      expect(
+        screen.getByText(/That link is not a coilbox tweak project\./),
+      ).toBeTruthy();
+      expect(stored()).toEqual([]);
+      expect(recordHubImport).not.toHaveBeenCalled();
+    });
   });
 
   /**
