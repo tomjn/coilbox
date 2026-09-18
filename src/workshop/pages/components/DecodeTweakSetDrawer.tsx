@@ -133,7 +133,10 @@ export function DecodeTweakSetDrawer({
               aria-label="Tweak payload to decode"
               value={text}
               placeholder="!bset tweakdefs3 eyJ..."
-              className="min-h-24 font-mono text-xs"
+              // `field-sizing-content` grows the box to fit, and a whole
+              // battle's mod options is tens of lines, so it has to be
+              // capped or the Decode button lands far below the fold.
+              className="max-h-48 min-h-24 overflow-auto font-mono text-xs"
               onChange={(event) => setText(event.target.value)}
             />
           </Field>

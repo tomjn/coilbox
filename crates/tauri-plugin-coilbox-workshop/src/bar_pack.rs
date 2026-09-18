@@ -110,16 +110,33 @@ impl BarSlotPack {
 }
 
 /// Strip comments and collapse whitespace to single spaces, without touching
-/// a string literal's own bytes. See this module's doc comment for why only
-/// `"` is tracked, and why a run of removed whitespace or comment becomes
-/// exactly one space rather than nothing: two tokens that were separated in
-/// the source must stay separated, or `end` and `if` written on their own
-/// lines could merge into one identifier.
+/// a string literal's own bytes. A run of removed whitespace or comment
+/// becomes exactly one space rather than nothing: two tokens that were
+/// separated in the source must stay separated, or `end` and `if` written on
+/// their own lines could merge into one identifier.
+///
+/// All three of Lua's string forms are tracked, not just `"`. Coilbox's own
+/// `lua.rs` only ever writes double-quoted strings, but a project can now
+/// carry Lua somebody else wrote (`ReadOnlyLuaBlock`), and the tools BAR
+/// players use quote with `'` throughout. Missing that would let a `--`
+/// inside a single-quoted string read as the start of a comment and swallow
+/// the rest of the line, turning working Lua into a syntax error in the
+/// exported slot, where nothing would notice until a game failed to start.
 pub fn minify_lua(source: &str) -> String {
+    /// Which string literal the scanner is inside, if any.
+    enum Quote {
+        /// `"` or `'`, ended by the same character, honouring `\` escapes.
+        Short(char),
+        /// `[[ ... ]]`, or `[=[ ... ]=]`, ended by a closing bracket with
+        /// the same number of `=` signs. No escapes inside one.
+        Long(usize),
+    }
+
+    let chars: Vec<char> = source.chars().collect();
     let mut out = String::with_capacity(source.len());
-    let mut chars = source.chars().peekable();
-    let mut in_string = false;
+    let mut in_string: Option<Quote> = None;
     let mut pending_space = false;
+    let mut i = 0;
 
     macro_rules! mark_space {
         () => {
@@ -137,42 +154,106 @@ pub fn minify_lua(source: &str) -> String {
         };
     }
 
-    while let Some(c) = chars.next() {
-        if in_string {
-            out.push(c);
-            if c == '\\' {
-                if let Some(escaped) = chars.next() {
-                    out.push(escaped);
+    while i < chars.len() {
+        let c = chars[i];
+        match in_string {
+            Some(Quote::Short(quote)) => {
+                out.push(c);
+                i += 1;
+                if c == '\\' {
+                    if let Some(escaped) = chars.get(i) {
+                        out.push(*escaped);
+                        i += 1;
+                    }
+                } else if c == quote {
+                    in_string = None;
                 }
-            } else if c == '"' {
-                in_string = false;
+                continue;
             }
-            continue;
+            Some(Quote::Long(level)) => {
+                if let Some(end) = long_bracket_close(&chars, i, level) {
+                    out.extend(&chars[i..end]);
+                    i = end;
+                    in_string = None;
+                } else {
+                    out.push(c);
+                    i += 1;
+                }
+                continue;
+            }
+            None => {}
         }
-        if c == '"' {
+        if c == '"' || c == '\'' {
             flush_space!();
-            in_string = true;
+            in_string = Some(Quote::Short(c));
             out.push(c);
+            i += 1;
             continue;
         }
-        if c == '-' && chars.peek() == Some(&'-') {
-            chars.next();
-            for next in chars.by_ref() {
-                if next == '\n' {
-                    break;
+        if c == '-' && chars.get(i + 1) == Some(&'-') {
+            // A long comment runs to its matching bracket, across as many
+            // lines as it likes. A plain one ends at the first newline.
+            if let Some(level) = long_bracket_level(&chars, i + 2) {
+                let body = i + 2 + level + 2;
+                i = long_bracket_close(&chars, body, level).unwrap_or(chars.len());
+            } else {
+                i += 2;
+                while i < chars.len() && chars[i] != '\n' {
+                    i += 1;
                 }
             }
             mark_space!();
+            continue;
+        }
+        if let Some(level) = long_bracket_level(&chars, i) {
+            flush_space!();
+            let body = i + level + 2;
+            out.extend(&chars[i..body.min(chars.len())]);
+            i = body;
+            in_string = Some(Quote::Long(level));
             continue;
         }
         if c.is_whitespace() {
             mark_space!();
+            i += 1;
             continue;
         }
         flush_space!();
         out.push(c);
+        i += 1;
     }
     out
+}
+
+/// The level of a long bracket opening at `start`, counting the `=` signs
+/// between its two `[`. `Some(0)` for `[[`, `Some(2)` for `[==[`, and `None`
+/// when this is an ordinary `[`, which is how an index is told from a string.
+fn long_bracket_level(chars: &[char], start: usize) -> Option<usize> {
+    if chars.get(start) != Some(&'[') {
+        return None;
+    }
+    let mut level = 0;
+    while chars.get(start + 1 + level) == Some(&'=') {
+        level += 1;
+    }
+    (chars.get(start + 1 + level) == Some(&'[')).then_some(level)
+}
+
+/// Where the long bracket opened at `level` closes, as the index one past its
+/// final `]`. `None` when it never does, which is a source that would not
+/// compile either.
+fn long_bracket_close(chars: &[char], from: usize, level: usize) -> Option<usize> {
+    let mut i = from;
+    while i < chars.len() {
+        if chars[i] == ']'
+            && (0..level).all(|n| chars.get(i + 1 + n) == Some(&'='))
+            && chars.get(i + 1 + level) == Some(&']')
+        {
+            return Some(i + level + 2);
+        }
+        i += 1;
+    }
+    None
 }
 
 /// The URL-safe, unpadded base64 every route in this project uses.
@@ -345,6 +426,42 @@ mod tests {
     fn minify_keeps_an_escaped_quote_inside_the_string() {
         let source = "x = \"she said \\\"hi\\\"\"";
         assert_eq!(minify_lua(source), source);
+    }
+
+    /// The case carried Lua brings in. Coilbox's own generator never writes a
+    /// single-quoted string, but the tools BAR players use quote with `'`
+    /// throughout, and a `--` inside one of those is text, not a comment.
+    #[test]
+    fn minify_tracks_a_single_quoted_string() {
+        let source = "do x = 'contains -- not a comment' y = 1 end";
+        assert_eq!(minify_lua(source), source);
+    }
+
+    #[test]
+    fn minify_keeps_a_quote_inside_a_single_quoted_string() {
+        let source = "x = 'she said \"hi\"' y = 2";
+        assert_eq!(minify_lua(source), source);
+    }
+
+    #[test]
+    fn minify_leaves_a_long_bracket_string_alone() {
+        let source = "x = [[ two  spaces and -- a fake comment ]] y = 3";
+        assert_eq!(minify_lua(source), source);
+        let levelled = "x = [==[ ]] still inside ]==] y = 4";
+        assert_eq!(minify_lua(levelled), levelled);
+    }
+
+    #[test]
+    fn minify_drops_a_long_comment_whole() {
+        let minified = minify_lua("do --[[ a comment\nacross lines ]] x = 1 end");
+        assert_eq!(minified, "do x = 1 end");
+    }
+
+    /// An index is not a string. `a[b[1]]` must survive as itself, while
+    /// `a[[b]]` is Lua's own long-string call syntax and is left intact.
+    #[test]
+    fn minify_tells_an_index_from_a_long_string() {
+        assert_eq!(minify_lua("x = a[b[1]]"), "x = a[b[1]]");
     }
 
     // -- boundary arithmetic ---------------------------------------------

@@ -149,6 +149,12 @@ pub struct ChangeLedger {
 /// project.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum PositionKey {
+    /// One block of Lua carried verbatim from a decoded import, by its
+    /// position in the project's own list. No edit ever traces to one, so
+    /// nothing looks it up: it is here because it occupies a chunk, and a
+    /// reconstruction that skipped it would be off by one from the first
+    /// carried block onward.
+    Carried(usize),
     /// Every added unit, folded into one table chunk.
     Added,
     /// One unit standing in for a game unit the project replaces.
@@ -170,13 +176,21 @@ enum SlotResolution {
 }
 
 /// The same category boundaries `compile::compile` uses, in the same order it
-/// pushes chunks in: added, then each replaced clone (alphabetically, the
-/// order a `BTreeMap`'s own iteration already gives), then field changes,
-/// then each builder's menu (alphabetically), then disabled units. Read this
-/// module's own doc comment for why re-deriving this rather than reading it
-/// off `compile.rs` is the whole design.
-fn categorize(edits: &GameEdits) -> Vec<(PositionKey, LuaForm)> {
+/// pushes chunks in: each block of carried Lua, then added, then each
+/// replaced clone (alphabetically, the order a `BTreeMap`'s own iteration
+/// already gives), then field changes, then each builder's menu
+/// (alphabetically), then disabled units. Read this module's own doc comment
+/// for why re-deriving this rather than reading it off `compile.rs` is the
+/// whole design.
+fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
+    let edits = &project.edits;
     let mut positions = Vec::new();
+
+    for (index, block) in project.read_only_lua.iter().enumerate() {
+        if block.compiles_verbatim() {
+            positions.push((PositionKey::Carried(index), LuaForm::Block));
+        }
+    }
 
     let added_nonempty = edits
         .clones
@@ -343,7 +357,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
     let edits = &project.edits;
     let compiled = compile(project);
     let pack = bar_pack::pack(&compiled.chunks);
-    let positions = categorize(edits);
+    let positions = categorize(project);
     let resolutions = resolve_slots(&positions, &compiled.chunks, &pack);
     let verified = resolutions.is_some();
 

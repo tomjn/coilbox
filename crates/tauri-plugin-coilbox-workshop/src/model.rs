@@ -115,13 +115,36 @@ impl GameEdits {
 /// `ModProject` rather than inside `GameEdits`, on purpose: `GameEdits` is the
 /// five stores an edit can land in, and this is not an edit at all, only Lua
 /// kept for the record. Nothing in this crate ever mutates it after a project
-/// is created, and `compile.rs` never compiles it, only notes that it exists.
+/// is created.
+///
+/// Read-only is about editing, not about compiling. Importing somebody's
+/// tweak set is asking to run their program, and most of a real set is
+/// program: a project that kept only the part it could turn into fields
+/// would throw away nearly all of it. So `compile.rs` emits a block verbatim
+/// when [`form`](Self::form) says the decoder proved it is a Lua chunk.
+/// Nothing in coilbox ever runs it, exactly as before: the game does, the
+/// same way it would have run the `!bset` lines it was decoded from.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadOnlyLuaBlock {
     pub title: String,
     pub lua: String,
     pub note: String,
+    /// What the decoder made of it, mirroring `DecodedSlot::form`. Only
+    /// `"block"` is compiled: that is the one value that means the text
+    /// already compiled as a Lua chunk. `None` on a project saved before
+    /// this was recorded, which is read as not known to parse.
+    #[serde(default)]
+    pub form: Option<String>,
+}
+
+impl ReadOnlyLuaBlock {
+    /// Whether this block can be emitted into the compiled output. Emitting
+    /// one that never parsed would break every file it landed in, so an
+    /// unrecognised block stays where it is and the compiler says so.
+    pub fn compiles_verbatim(&self) -> bool {
+        self.form.as_deref() == Some("block")
+    }
 }
 
 /// A project as the compiler is handed one.

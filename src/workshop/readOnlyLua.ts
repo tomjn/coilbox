@@ -8,6 +8,14 @@
  * answer is to keep the Lua and say plainly that this part of the project
  * cannot be edited here.
  *
+ * Not editable is not the same as not compiled. A decoded set is mostly
+ * program: the whole point of importing somebody's tweak set is to run it,
+ * and a project that dropped it would keep the small editable part and lose
+ * the rest. So a block the decoder proved is a valid Lua chunk is compiled
+ * verbatim into the output, ahead of the project's own edits, and coilbox
+ * still never runs it itself. A block that never parsed cannot be, because
+ * emitting it would break every file it landed in.
+ *
  * This is why it is not a sixth store beside the five in {@link GameEdits}.
  * Those five are all edits: a patch, a copy, a menu operation, a word, a
  * mark. A read-only block is none of those, so it lives on {@link ModProject}
@@ -27,6 +35,17 @@ export interface ReadOnlyLuaBlock {
   /** Why it could not be read into an editable store, in the user's own
    *  terms rather than a flag. */
   note: string;
+  /** What the decoder made of it, mirroring `DecodedSlot.form`. `"block"`
+   *  means it compiled as a Lua chunk, which is what lets the compiler emit
+   *  it verbatim. Absent on a project saved before this was recorded, which
+   *  is read as "not known to parse" and so not compiled. */
+  form?: "block" | "unrecognised";
+}
+
+/** Whether a block can be compiled into the output: only one the decoder
+ *  proved is a valid Lua chunk. */
+export function compilesVerbatim(block: ReadOnlyLuaBlock): boolean {
+  return block.form === "block";
 }
 
 /** How many read-only blocks a project carries, for a header that says so. */
