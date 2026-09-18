@@ -25,28 +25,23 @@
  * game yet and the list must not wait 23 seconds to offer a button. The editor
  * fills it in the first time it opens the project against a game it can read.
  */
-import { Button } from "@picoframe/frame";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { Button, useDrawer } from "@picoframe/frame";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Plus, SlidersHorizontal, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { gameIdentityForName } from "@/container/gameIdentity";
-import { contentWriteFile } from "@/content/bindings";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { EmptyState } from "@/content/pages/components/states";
 import { importContainerFile } from "@/deeplink/bindings";
-import { buildImportCodeLink } from "@/deeplink/build";
-import { copyDeepLink } from "@/deeplink/copyLink";
 import { useImportParam } from "@/deeplink/useImportParam";
+import { nextDrawerKey } from "@/general/drawerKey";
 import { forgetEditHistory } from "../history";
 import {
   describeEdits,
   type ModProject,
-  modProjectCode,
-  modProjectFileName,
-  modProjectJson,
   type NewProject,
   parseModProjectJson,
   useModProjects,
@@ -169,39 +164,29 @@ export default function ProjectsPage() {
     if (importCode) importRef.current(importCode);
   }, [importCode]);
 
-  async function onExport(project: ModProject) {
-    setError(null);
-    try {
-      const dest = await save({
-        title: "Export tweak project",
-        defaultPath: modProjectFileName(project),
-        filters: [{ name: "Coilbox tweak project", extensions: ["json"] }],
-      });
-      if (!dest) return;
-      await contentWriteFile({
-        dest,
-        text: modProjectJson(project, games),
-      });
-      setStatus(`Exported "${project.name}".`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  function onCopyLink(project: ModProject) {
-    setError(null);
-    const result = modProjectCode(project, games);
-    if (!result.ok) {
-      // Said here rather than on the far end, where it arrives as a corrupt
-      // code. Exporting the file still works at any size.
-      setError(
-        `"${project.name}" is ${Math.round(result.length / 1024)} KB as a link, over the ${Math.round(result.limit / 1024)} KB a link can carry. Export it as a file instead.`,
-      );
-      return;
-    }
-    void copyDeepLink(buildImportCodeLink(result.code));
-    setStatus(`Copied a link to "${project.name}".`);
-  }
+  /**
+   * Share: a code, a link, a file or a publish to the Coilbox hub (issue
+   * #2727). The drawer owns all four, through `ShareProjectForm`, and says so
+   * when the project's copied units make it too big for a code. The scanned
+   * games go with it only so the export can name the project's game by its
+   * modinfo shortname as well as its archive name (issue #1335), the same
+   * reason `ShareScenarioForm` takes them.
+   */
+  const drawer = useDrawer();
+  const openShare = async (project: ModProject) => {
+    const { ShareProjectForm } = await import("./components/ShareProjectForm");
+    drawer.open({
+      title: `Share ${project.name}`,
+      width: "28rem",
+      content: (
+        <ShareProjectForm
+          key={nextDrawerKey()}
+          project={project}
+          installed={games}
+        />
+      ),
+    });
+  };
 
   async function onImport() {
     setError(null);
@@ -333,8 +318,7 @@ export default function ProjectsPage() {
                       const copy = duplicateProject(project.id);
                       if (copy) setStatus(`Copied to "${copy.name}".`);
                     }}
-                    onExport={() => void onExport(project)}
-                    onCopyLink={() => onCopyLink(project)}
+                    onShare={() => void openShare(project)}
                     onDelete={() => {
                       removeProject(project.id);
                       forgetEditHistory(project.id);

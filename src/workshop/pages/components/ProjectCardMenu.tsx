@@ -19,14 +19,7 @@
  */
 
 import { Button, Drawer } from "@picoframe/frame";
-import {
-  CopyPlus,
-  Download,
-  Link2,
-  MoreVertical,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { CopyPlus, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -45,15 +38,13 @@ export function ProjectCardMenu({
   project,
   onRename,
   onDuplicate,
-  onExport,
-  onCopyLink,
+  onShare,
   onDelete,
 }: {
   project: ModProject;
   onRename: () => void;
   onDuplicate: () => void;
-  onExport: () => void;
-  onCopyLink: () => void;
+  onShare: () => void;
   onDelete: () => void;
 }) {
   /**
@@ -93,15 +84,12 @@ export function ProjectCardMenu({
           </DropdownMenuItem>
           {/* Not the two-rectangles clipboard glyph, which means copy to
               clipboard everywhere else in the app and would read as the same
-              job as Copy a share link two rows down (issue #2706). */}
+              job as Share two rows down (issue #2706). */}
           <DropdownMenuItem onSelect={onDuplicate}>
             <CopyPlus className="size-4" aria-hidden="true" /> Duplicate
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onExport}>
-            <Download className="size-4" aria-hidden="true" /> Export as a file
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onCopyLink}>
-            <Link2 className="size-4" aria-hidden="true" /> Copy a share link
+          <DropdownMenuItem onSelect={onShare}>
+            <Share2 className="size-4" aria-hidden="true" /> Share
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"

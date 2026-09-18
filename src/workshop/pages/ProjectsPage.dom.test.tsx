@@ -17,7 +17,28 @@ import {
   useLocation,
   useParams,
 } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+
+// The drawer is the app shell's, so it is stubbed down to what opened in it.
+// Share loads its form on demand and lands here, the same way
+// `ScenarioBuilderPage.dom.test.tsx` stubs it for `ShareScenarioForm`.
+const opened: { title: string; content: unknown }[] = [];
+vi.mock("@picoframe/frame", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
+  useDrawer: () => ({
+    open: (o: { title: string; content: unknown }) => opened.push(o),
+    close: () => {},
+    isOpen: false,
+  }),
+}));
 
 const SELECTED = {
   enginePath: "/engines/105",
@@ -136,12 +157,22 @@ function openCardMenu(name: string) {
   fireEvent.keyDown(trigger, { key: "Enter" });
 }
 
+// Share loads its form with a dynamic import. Paying the transform here,
+// rather than inside the share test's own wait, is the fix issue #2215
+// recorded for `ShareScenarioForm`'s equivalent flake under a parallel run.
+beforeAll(async () => {
+  await import("./components/ShareProjectForm");
+});
+
 beforeEach(() => {
   storage = memorySettingsStorage();
   installSettingsStorage(storage);
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  opened.length = 0;
+});
 
 describe("ProjectsPage", () => {
   it("says there is nothing yet before anything is started", () => {
@@ -248,10 +279,25 @@ describe("ProjectsPage", () => {
     ).toEqual([
       expect.stringContaining("Rename"),
       expect.stringContaining("Duplicate"),
-      expect.stringContaining("Export as a file"),
-      expect.stringContaining("Copy a share link"),
+      expect.stringContaining("Share"),
       expect.stringContaining("Delete"),
     ]);
+  });
+
+  /**
+   * Share is a code, a link, a file and a publish to the Coilbox hub, all
+   * behind `ShareProjectForm` (issue #2727). What belongs to this page is
+   * only that the menu opens it with the right project and title. The form's
+   * own routes are its own business.
+   */
+  it("shares a project from the card's menu", async () => {
+    show([project({ id: "abc", name: "Slower tanks", gameName: GAME.name })]);
+    openCardMenu("Slower tanks");
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Share/ }));
+
+    await vi.waitFor(() =>
+      expect(opened.map((o) => o.title)).toEqual(["Share Slower tanks"]),
+    );
   });
 
   /**
