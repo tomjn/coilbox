@@ -209,17 +209,29 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         .iter()
         .map(|clone| (clone.key.clone(), resolved_clone_def(clone, edits)))
         .collect();
+    // Assigned rather than left as a plain table (issue #2962). BAR's
+    // `tweakunits` route walks the units the game already has and merges a
+    // tweak into each one it finds a key for, so a key naming a unit the game
+    // does not have matches nothing and the whole added unit is dropped with
+    // no error. Only an assignment creates one, which is what
+    // `bar_tweakdefs_body` has always done for the single-slot route and what
+    // the numbered-slot packer gets by carrying this as a block.
+    //
+    // The archive route is unaffected: it loads these out of `units/` beside
+    // the game's own, so [`added_block`] is deliberately left out of the post
+    // file below rather than restating every definition a second time.
     let mut unit_files = Vec::new();
+    let added_chunk = (!added_entries.is_empty()).then_some(chunks.len());
     if !added_entries.is_empty() {
         chunks.push(Chunk {
-            form: LuaForm::Table,
+            form: LuaForm::Block,
             title: format!(
                 "{} unit{} added",
                 added_entries.len(),
                 if added_entries.len() == 1 { "" } else { "s" }
             ),
-            reason: "A copy owns its whole definition, so nothing about it depends on what the game says.".to_string(),
-            lua: unit_table(&added_entries, ""),
+            reason: "A copy owns its whole definition, and the game has no unit of that name to merge onto, so it has to be assigned rather than merged.".to_string(),
+            lua: added_block(&added_entries),
         });
         for (key, def) in &added_entries {
             unit_files.push(CompiledFile {
@@ -381,8 +393,9 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // the file and the Lua the user reads cannot say different things.
     let post_blocks: Vec<&str> = chunks
         .iter()
-        .filter(|chunk| chunk.form == LuaForm::Block)
-        .map(|chunk| chunk.lua.as_str())
+        .enumerate()
+        .filter(|(i, chunk)| chunk.form == LuaForm::Block && Some(*i) != added_chunk)
+        .map(|(_, chunk)| chunk.lua.as_str())
         .collect();
     if !patches.is_empty() || !post_blocks.is_empty() {
         files.push(CompiledFile {
@@ -581,6 +594,26 @@ fn unit_table(entries: &[(String, Value)], indent: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n");
     format!("{{\n{body}\n{indent}}}")
+}
+
+/// Every unit a project adds, as assignments (issue #2962).
+///
+/// The same thing [`bar_tweakdefs_body`] writes for the single-slot route,
+/// wrapped in `do ... end` so a numbered slot can carry it alongside another
+/// mod's. Assignment rather than a merge because there is nothing to merge
+/// onto: the game has no unit of this name, which is the whole point of a
+/// copy, and BAR's merge would find no key and drop it.
+///
+/// One table and one loop rather than a line per unit, so a project adding
+/// sixty units does not write `UnitDefs[...] =` sixty times into a slot with
+/// a size cap on it.
+fn added_block(entries: &[(String, Value)]) -> String {
+    format!(
+        "-- Units added. Assigned directly: none of these existed before, so there is\n\
+         -- nothing to merge onto.\n\
+         do\n  local added = {}\n  for name, def in pairs(added) do\n    UnitDefs[name] = def\n  end\nend",
+        unit_table(entries, "  "),
+    )
 }
 
 /// The table form again, for patches rather than whole definitions.
@@ -1072,8 +1105,11 @@ mod tests {
         assert!(!out.chunks[0].lua.contains("[1]"));
     }
 
+    /// The archive loads an added unit out of `units/`, so that file stays a
+    /// plain table. The chunk is a block because the other route, a BAR slot,
+    /// has to assign it: see [`added_block`] and issue #2962.
     #[test]
-    fn a_new_unit_is_a_table_and_gets_its_own_file() {
+    fn a_new_unit_is_assigned_in_its_chunk_and_plain_in_its_own_file() {
         let out = compile(&project(json!({
             "clones": { "supercom": {
                 "key": "supercom", "source": "armcom",
@@ -1081,13 +1117,47 @@ mod tests {
                 "def": { "maxDamage": 9000, "objectName": "arm_com.s3o" }
             } }
         })));
-        assert_eq!(out.chunks[0].form, LuaForm::Table);
+        assert_eq!(out.chunks[0].form, LuaForm::Block);
+        assert!(out.chunks[0].lua.contains("UnitDefs[name] = def"));
+        assert!(out.chunks[0].lua.starts_with("-- Units added."));
         let unit = file(&out, "units/supercom.lua");
         assert!(unit.contains("return {"));
         assert!(unit.contains("[\"supercom\"] = {"));
         assert!(unit.contains("maxDamage = 9000"));
         // Nothing executable in a file that only adds a unit.
         assert!(!unit.contains("UnitDefs"));
+    }
+
+    /// The archive already loads these out of `units/`, so restating every
+    /// definition in the post file would double the archive for nothing.
+    #[test]
+    fn added_units_are_not_restated_in_the_post_file() {
+        let out = compile(&project(json!({
+            "clones": { "supercom": {
+                "key": "supercom", "source": "armcom",
+                "replacesGameUnit": false,
+                "def": { "maxDamage": 9000 }
+            } }
+        })));
+        assert!(!out.files.iter().any(|f| f.path == POST_FILE));
+    }
+
+    /// The bug itself (issue #2962): exported as `!bset` lines, an added unit
+    /// used to land in a `tweakunits` slot, where BAR's merge finds no unit of
+    /// that name and drops it without an error.
+    #[test]
+    fn an_added_unit_packs_into_a_tweakdefs_slot() {
+        let out = compile(&project(json!({
+            "clones": { "supercom": {
+                "key": "supercom", "source": "armcom",
+                "replacesGameUnit": false,
+                "def": { "maxDamage": 9000 }
+            } }
+        })));
+        let pack = crate::bar_pack::pack(&out.chunks);
+        assert_eq!(pack.tweakunits.len(), 0);
+        assert_eq!(pack.tweakdefs.len(), 1);
+        assert!(pack.complete());
     }
 
     /// Editing a copy after making it is an ordinary override against the
@@ -1160,8 +1230,11 @@ mod tests {
             } },
             "menus": { "mylab": [{ "op": "remove", "unit": "armflash" }] }
         })));
+        // One chunk, not two: the menu is folded in rather than replayed. It
+        // is a block because an added unit is assigned (issue #2962), which
+        // says nothing about the menu decision this test is about.
         assert_eq!(out.chunks.len(), 1);
-        assert_eq!(out.chunks[0].form, LuaForm::Table);
+        assert_eq!(out.chunks[0].form, LuaForm::Block);
         let unit = file(&out, "units/mylab.lua");
         assert!(unit.contains("[1] = \"armpw\""));
         assert!(!unit.contains("armflash"));
