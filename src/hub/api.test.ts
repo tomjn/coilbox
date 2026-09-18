@@ -196,6 +196,25 @@ describe("fetchHubItems", () => {
     if (!result.ok) expect(result.reason).toContain("waking up");
   });
 
+  // The read side appends the same advice the same way, so it had the same
+  // problem (issue #2959): a row the database refuses is permanent, however
+  // it is worded, and no amount of waiting changes it.
+  it("does not blame a cold start for a row the database refused", async () => {
+    stubFetch({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: 'duplicate key value violates unique constraint "item_pkey"',
+      }),
+    });
+    const result = await fetchHubItems(BASE, {});
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) {
+      expect(result.reason).not.toContain("waking up");
+      expect(result.reason).toContain("trying again will not help");
+    }
+  });
+
   it("survives an error response with no JSON body", async () => {
     stubFetch({
       ok: false,

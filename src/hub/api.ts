@@ -184,11 +184,37 @@ export function serverError(body: unknown): string | null {
 export const COLD_START =
   "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment.";
 
+/** What to say instead, once a refusal is known to be permanent. */
+export const WILL_NOT_ACCEPT =
+  "The hub will not accept it as it stands, so trying again will not help.";
+
+/**
+ * Whether the hub's own words describe a database refusing the row rather
+ * than a database it could not reach (issue #2959).
+ *
+ * The hub folds every write failure that is not the rate limit into one
+ * status and passes PostgreSQL's message through verbatim, so a permanent no
+ * and a transient outage arrive identically: a 5xx carrying a sentence. The
+ * difference is only in that sentence. A constraint violation is the
+ * permanent kind, and PostgreSQL words all four of them the same way, which
+ * is what this matches: a check, unique, foreign key or not-null constraint.
+ *
+ * Deliberately narrow. Anything this does not recognise keeps the cold start
+ * advice, because the hub's genuine wake-up 503 carries a body too ("The
+ * gallery could not be read just now."), so treating every explained 5xx as
+ * permanent would strip that advice from the case it was written for.
+ */
+export function isPermanentRefusal(said: string | null): boolean {
+  return said !== null && /\bviolates\b.*\bconstraint\b/i.test(said);
+}
+
 /** Turn a non-2xx response into a sentence. */
 function statusMessage(status: number, body: unknown): string {
   const said = serverError(body);
-  if (status >= 500)
+  if (status >= 500) {
+    if (isPermanentRefusal(said)) return `${said} ${WILL_NOT_ACCEPT}`;
     return `${said ?? "The hub could not answer."} ${COLD_START}`;
+  }
   if (status === 404)
     return "The hub has no such item. It may have been taken down.";
   return said ?? `The hub refused that request (HTTP ${status}).`;
