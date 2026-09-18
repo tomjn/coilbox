@@ -152,6 +152,30 @@ describe("publishFailureMessage", () => {
       }),
     ).toBe("That share code could not be read.");
   });
+
+  // A database that refuses the row answers 5xx like everything else it
+  // rejects, and it is a permanent no (issue #2959). Telling somebody to wait
+  // a few seconds sends them round a loop that cannot end.
+  it("says a refused row will not be accepted, rather than to wait and retry", () => {
+    const said = publishFailureMessage(500, {
+      error:
+        'Could not publish it: new row for relation "item" violates check constraint "item_kind_check"',
+    });
+    expect(said).not.toContain("waking up");
+    expect(said).toContain("trying again will not help");
+    expect(said).toContain("item_kind_check");
+  });
+
+  // The wake-up 503 carries a body of its own, so a fix that keyed off "the
+  // hub explained itself" would have taken the advice away from the one case
+  // it was written for.
+  it("still blames a cold start for a 5xx that is not a refusal", () => {
+    expect(
+      publishFailureMessage(503, {
+        error: "The gallery could not be read just now.",
+      }),
+    ).toContain("waking up");
+  });
 });
 
 describe("publishToHub", () => {

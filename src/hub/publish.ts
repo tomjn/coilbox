@@ -13,8 +13,10 @@ import {
   HUB_KINDS,
   type HubItemDetail,
   type HubResult,
+  isPermanentRefusal,
   readItemBody,
   serverError,
+  WILL_NOT_ACCEPT,
 } from "./api";
 
 /**
@@ -130,11 +132,18 @@ const hubPublish = defineCommand<
 /**
  * Turn a refused publish into a sentence.
  *
- * Two of these are the failures that will actually happen. A 429 is the hub's
+ * Three of these are the failures that will actually happen. A 429 is the hub's
  * rate limit, which is a database trigger and arrives as a message about a
  * failed insert, so it is named here as the hourly cap it is. A 5xx is most
  * often the free tier waking up, which is the same {@link COLD_START} the read
  * side already says rather than a second wording of it.
+ *
+ * The third is a 5xx that is not an outage at all. The hub answers every
+ * write its database refuses with the same status as one it could not reach,
+ * so a row the schema will never accept arrives looking like a hub that is
+ * asleep (issue #2959). Telling somebody to wait a few seconds for a
+ * permanent no sends them round a loop with no way out of it, so a refusal
+ * {@link isPermanentRefusal} recognises says that instead.
  */
 export function publishFailureMessage(status: number, body: unknown): string {
   const said = serverError(body);
@@ -145,6 +154,7 @@ export function publishFailureMessage(status: number, body: unknown): string {
     return "This account has published 20 things in the last hour, which is the hub's limit. Try again later.";
   }
   if (status >= 500) {
+    if (isPermanentRefusal(said)) return `${said} ${WILL_NOT_ACCEPT}`;
     return `${said ?? "The hub could not publish it."} ${COLD_START}`;
   }
   return said ?? `The hub refused that request (HTTP ${status}).`;
