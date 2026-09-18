@@ -12,6 +12,7 @@ import { clamp } from "../lib/helpers";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
 import { applyChallengeMaps, generateGalaxy } from "./generate";
 import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
+import type { FactionPreset } from "./names";
 
 /**
  * Shareable challenge settings for a generated conquest galaxy — everything
@@ -40,7 +41,35 @@ export interface ConquestChallengeSettings {
    * shared before #1393, which resolve their maps locally as they always did.
    */
   nodeMaps?: NodeMaps;
+  /**
+   * The name of each system, by node id (coilbox-hub#397). Names come from
+   * pools a distribution or a game supplies, so a recipient with different
+   * content installed rebuilds the same stars under different names, and a
+   * reader with no content installed at all can name none of them.
+   *
+   * Written the same way `nodeMaps` is, and read alongside it, because it is
+   * the same problem: the seed settles the galaxy, installed content settles
+   * what it is called.
+   */
+  nodeNames?: NodeMaps;
+  /**
+   * The factions, player first, in the order the generator builds them.
+   *
+   * By position rather than by id, because the position is the part that is
+   * stable: the player is always first and the enemies follow, on any install.
+   * A game's lore factions are named and coloured from what is installed, so
+   * without this a shared conquest is a set of coloured blobs to anyone who did
+   * not generate it.
+   *
+   * No `aggression`: that is a tuning knob the seed already reproduces, not
+   * something a reader needs to say who is who.
+   */
+  factions?: ChallengeFaction[];
 }
+
+/** A faction as a challenge records it, which is a {@link FactionPreset}
+ *  without the tuning. */
+export type ChallengeFaction = Pick<FactionPreset, "name" | "color" | "side">;
 
 const LAYOUTS: readonly (GalaxyLayout | "random" | "realstars")[] = [
   "scatter",
@@ -75,6 +104,12 @@ export function challengeSettingsFromGalaxy(
     startingSystems: g.startingSystems,
     fogOfWar: g.fogOfWar,
     nodeMaps: nodeMapsFrom(galaxy.nodes),
+    nodeNames: Object.fromEntries(galaxy.nodes.map((n) => [n.id, n.name])),
+    factions: galaxy.factions.map(({ name, color, side }) => ({
+      name,
+      color,
+      side,
+    })),
   };
 }
 
@@ -135,7 +170,37 @@ export function parseConquestChallengeSettings(
         : undefined,
     fogOfWar: v.fogOfWar === true ? true : undefined,
     nodeMaps: parseNodeMaps(v.nodeMaps),
+    nodeNames: parseNodeMaps(v.nodeNames),
+    factions: parseChallengeFactions(v.factions),
   };
+}
+
+/** `#rrggbb`, the only colour the generator's own palette ever writes. */
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Read a payload's factions, or `undefined` when it names none.
+ *
+ * Four is the most the generator ever builds, a player plus three enemies. An
+ * entry with no usable name keeps its slot rather than being dropped, because
+ * the slot is what says which faction it is: closing the gap would hand the
+ * second faction's name to the third.
+ */
+function parseChallengeFactions(
+  value: unknown,
+): ChallengeFaction[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out = value.slice(0, 4).map((entry): ChallengeFaction => {
+    if (typeof entry !== "object" || entry === null) return { name: "" };
+    const { name, color, side } = entry as Record<string, unknown>;
+    return {
+      name: typeof name === "string" ? name.trim() : "",
+      color:
+        typeof color === "string" && HEX_COLOR.test(color) ? color : undefined,
+      side: typeof side === "string" && side !== "" ? side : undefined,
+    };
+  });
+  return out.some((f) => f.name !== "") ? out : undefined;
 }
 
 /** Encode a generated galaxy as a pasteable challenge code, or `null` if the
