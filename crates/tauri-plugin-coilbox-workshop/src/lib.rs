@@ -467,6 +467,24 @@ mod tests {
             .is_some_and(|e| e.contains("blocker") && e.contains("supercom")));
     }
 
+    /// A patch against a unit's second weapon and not its first (issue
+    /// #2964). Refused at the command boundary, so the whole project could
+    /// not reach a lobby over one indexed path, although the Lua was correct
+    /// and the compiler was right to write it that way.
+    #[test]
+    fn a_project_patching_one_weapon_of_several_packs() {
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "Second weapon only",
+            "gameName": "Balanced Annihilation V15.9.8",
+            "edits": { "overrides": { "armcom": { "weapons.1.name": "CANNON" } } },
+        }))
+        .expect("parse");
+
+        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
+        let tweakunits = pack["tweakunits"].as_array().expect("tweakunits array");
+        assert_eq!(tweakunits.len(), 1);
+    }
+
     /// The saved fixture carries both a table-form edit (an override) and
     /// several block-form ones (a copy, a menu, a disabled unit), so packing
     /// it is a real check that both slot kinds come back non-empty rather

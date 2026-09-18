@@ -45,6 +45,26 @@ use serde::de::DeserializeOwned;
 pub use mlua::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A Lua helper run over a value before it crosses into JSON, numbering the
+/// keys of any table that is not a sequence as strings. See
+/// [`SpringLua::eval_expr_value`] for why. Nothing here calls into the value
+/// being walked: it only reads a table already built and calls `tostring` on
+/// a number.
+const STRING_KEYS: &str = r#"
+local function __keys(value)
+  if type(value) ~= "table" then return value end
+  local count = 0
+  for _ in pairs(value) do count = count + 1 end
+  local sequence = count > 0 and #value == count
+  local out = {}
+  for key, item in pairs(value) do
+    if not sequence and type(key) == "number" then key = tostring(key) end
+    out[key] = __keys(item)
+  end
+  return out
+end
+"#;
+
 /// A sandboxed Lua VM whose `VFS` resolves files under one root directory.
 ///
 /// Construct once per file (or per file-tree, since `VFS.Include` chases
@@ -122,6 +142,34 @@ impl SpringLua {
         if chunk.is_nil() {
             return Err(Error::RuntimeError(format!(
                 "{name}: chunk did not return a value"
+            )));
+        }
+        self.lua.from_value(chunk)
+    }
+
+    /// Evaluate a Lua *expression* and return it as [`serde_json::Value`],
+    /// numbering any integer key as a string on the way across.
+    ///
+    /// The plain [`eval_value_raw`](Self::eval_value_raw) fails outright on a
+    /// table that is neither a sequence nor string-keyed, because JSON has no
+    /// integer keys at all. Real game data is full of them: a unit's second
+    /// weapon patched without its first is `{ [2] = ... }`, and a commander's
+    /// evolution stages skip numbers. Refusing those means refusing ordinary
+    /// data over a detail of the format it is being read into.
+    ///
+    /// A table that really is a sequence keeps its integer keys and still
+    /// crosses as a JSON array, so nothing that already reads one changes
+    /// shape. Both of this project's writers turn a `"5"` key back into `[5]`,
+    /// so the round trip holds.
+    ///
+    /// Takes an expression rather than a chunk because the normaliser has to
+    /// be applied to the result: pass `{ ... }`, not `return { ... }`.
+    pub fn eval_expr_value(&self, expr: &str, name: &str) -> Result<serde_json::Value> {
+        let src = format!("{STRING_KEYS}\nreturn __keys({expr})\n");
+        let chunk: Value = self.lua.load(&src).set_name(name).eval()?;
+        if chunk.is_nil() {
+            return Err(Error::RuntimeError(format!(
+                "{name}: expression did not evaluate to a value"
             )));
         }
         self.lua.from_value(chunk)

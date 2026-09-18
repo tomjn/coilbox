@@ -214,7 +214,7 @@ pub fn decode_one(lua: &SpringLua, key_hint: &str, raw: &str) -> DecodedSlot {
     let trimmed = body.trim();
     let is_block = parses_as_block(lua, trimmed);
     let (form, table) = if !is_block && looks_like_a_plain_table(trimmed) {
-        match lua.eval_value_raw(&format!("{STRING_KEYS}\nreturn __keys({trimmed})\n"), &key) {
+        match lua.eval_expr_value(trimmed, &key) {
             Ok(value) if value.is_object() => ("table", Some(value)),
             _ => ("unrecognised", None),
         }
@@ -235,35 +235,6 @@ pub fn decode_one(lua: &SpringLua, key_hint: &str, raw: &str) -> DecodedSlot {
         error: None,
     }
 }
-
-/// A Lua helper run over an evaluated table before it crosses into JSON.
-///
-/// A unit def routinely numbers its own sub-tables (`weapons = { [1] = ...,
-/// [3] = ... }`, a commander's evolution stages), and a numbered table with a
-/// gap in it is not a Lua sequence. JSON has no integer keys at all, so that
-/// table fails to convert and a whole `tweakunits` slot that is perfectly
-/// ordinary data ends up shown as read-only Lua. Numbering it as strings
-/// instead loses nothing: `lua::table_key` writes `"5"` back out as `[5]`,
-/// which is where a decoded def is headed.
-///
-/// A table that really is a sequence is left with its integer keys, so it
-/// still crosses as a JSON array rather than changing shape for every
-/// existing reader. Nothing here calls into the payload: it walks a table
-/// that has already been built and only ever calls `tostring` on a number.
-const STRING_KEYS: &str = r#"
-local function __keys(value)
-  if type(value) ~= "table" then return value end
-  local count = 0
-  for _ in pairs(value) do count = count + 1 end
-  local sequence = count > 0 and #value == count
-  local out = {}
-  for key, item in pairs(value) do
-    if not sequence and type(key) == "number" then key = tostring(key) end
-    out[key] = __keys(item)
-  end
-  return out
-end
-"#;
 
 /// Strip a `!bset tweak<defs|units><n> ` prefix if the pasted text still has
 /// it (a real-world paste, issue #1280's own requirement), and read off the

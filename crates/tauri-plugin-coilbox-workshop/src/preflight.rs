@@ -197,8 +197,11 @@ fn check_table_chunks_are_tables(compiled: &CompiledMod, report: &mut PreflightR
     };
     let mut ok = true;
     for chunk in &table_chunks {
-        let source = format!("return {}\n", chunk.lua);
-        match lua.eval_value_raw(&source, &chunk.title) {
+        // `eval_expr_value` rather than a plain eval, because a patch against
+        // one weapon of several is `{ [2] = ... }` (issue #2964). That is
+        // correct Lua and a correct patch, and only JSON has a problem with
+        // it, so it must not read as a chunk that failed to parse.
+        match lua.eval_expr_value(&chunk.lua, &chunk.title) {
             Ok(value) if value.is_object() => {}
             Ok(_) => {
                 ok = false;
@@ -396,6 +399,27 @@ mod tests {
         // A field change still writes modinfo.lua and the post file, so the
         // file-syntax check has something to report on too.
         assert!(report.passes.iter().any(|p| p.contains("generated file")));
+    }
+
+    /// A patch against one weapon of several (issue #2964). The compiler
+    /// writes it as `weapons = { [2] = { name = "CANNON" } }` on purpose,
+    /// because naming the first weapon would blank it on merge. That table is
+    /// neither a Lua sequence nor string-keyed, and the check used to fail on
+    /// reading it back rather than on anything wrong with the Lua.
+    #[test]
+    fn an_override_on_the_second_weapon_alone_still_passes() {
+        let (_, _, report) = run(json!({
+            "overrides": { "armcom": { "weapons.1.name": "CANNON" } }
+        }));
+        assert!(
+            report.blockers.is_empty(),
+            "blockers: {:?}",
+            report.blockers
+        );
+        assert!(report
+            .passes
+            .iter()
+            .any(|p| p.contains("table chunk") && p.contains("compile")));
     }
 
     #[test]
