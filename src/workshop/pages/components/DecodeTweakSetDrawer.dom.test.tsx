@@ -191,6 +191,9 @@ describe("DecodeTweakSetDrawer", () => {
         title: "tweakdefs",
         lua: "do while true do end end",
         note: expect.stringContaining("program"),
+        // Recorded so the compiler knows it is safe to write out as it
+        // stands. Without it the import keeps the Lua and never runs it.
+        form: "block",
       },
     ]);
   });

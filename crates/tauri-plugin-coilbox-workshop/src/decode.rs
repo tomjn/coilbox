@@ -101,19 +101,33 @@ pub struct DecodedTweakSet {
     pub unrecognised: Vec<DecodedSlot>,
 }
 
+/// Whether a key is the frontend's sentinel for an ad hoc paste with no key
+/// of its own: `pasted` for a single one, and `pasted-0`, `pasted-1`, ... for
+/// the lines of a multi-line paste, which `decodeTweakSet.ts` numbers so two
+/// of them never collide as the same entry.
+fn is_pasted_key(key: &str) -> bool {
+    match key.strip_prefix("pasted") {
+        None => false,
+        Some("") => true,
+        Some(rest) => rest
+            .strip_prefix('-')
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())),
+    }
+}
+
 /// Decode every recognised key in a mod-options-shaped map: `tweakdefs`,
 /// `tweakdefs1`..`tweakdefs29`, `tweakunits`, `tweakunits1`..`tweakunits29`,
-/// and `pasted` for a single ad hoc paste. Anything else in the map (a
-/// battle's other mod options) is ignored rather than reported on, since a
-/// caller handing over a whole options set should not get back a complaint
-/// about every key that was never a tweak slot.
+/// and `pasted` (or `pasted-<n>`) for an ad hoc paste. Anything else in the
+/// map (a battle's other mod options) is ignored rather than reported on,
+/// since a caller handing over a whole options set should not get back a
+/// complaint about every key that was never a tweak slot.
 pub fn decode_many(entries: &BTreeMap<String, String>) -> Result<DecodedTweakSet, String> {
     let lua = SpringLua::new(std::env::temp_dir())
         .map_err(|e| format!("Could not start the Lua syntax check: {e}"))?;
 
     let mut out = DecodedTweakSet::default();
     for (key, raw) in entries {
-        if key != "pasted" && slot_kind_and_index(key).0 == SlotKind::Unknown {
+        if !is_pasted_key(key) && slot_kind_and_index(key).0 == SlotKind::Unknown {
             continue; // Not a tweak slot at all, and not this function's to report on.
         }
         let slot = decode_one(&lua, key, raw);
@@ -196,11 +210,11 @@ pub fn decode_one(lua: &SpringLua, key_hint: &str, raw: &str) -> DecodedSlot {
         }
     };
 
-    let manifest = leading_comment(&text);
-    let trimmed = text.trim();
+    let (manifest, body) = split_leading_comment(&text);
+    let trimmed = body.trim();
     let is_block = parses_as_block(lua, trimmed);
     let (form, table) = if !is_block && looks_like_a_plain_table(trimmed) {
-        match lua.eval_value_raw(&format!("return {trimmed}\n"), &key) {
+        match lua.eval_value_raw(&format!("{STRING_KEYS}\nreturn __keys({trimmed})\n"), &key) {
             Ok(value) if value.is_object() => ("table", Some(value)),
             _ => ("unrecognised", None),
         }
@@ -222,15 +236,48 @@ pub fn decode_one(lua: &SpringLua, key_hint: &str, raw: &str) -> DecodedSlot {
     }
 }
 
+/// A Lua helper run over an evaluated table before it crosses into JSON.
+///
+/// A unit def routinely numbers its own sub-tables (`weapons = { [1] = ...,
+/// [3] = ... }`, a commander's evolution stages), and a numbered table with a
+/// gap in it is not a Lua sequence. JSON has no integer keys at all, so that
+/// table fails to convert and a whole `tweakunits` slot that is perfectly
+/// ordinary data ends up shown as read-only Lua. Numbering it as strings
+/// instead loses nothing: `lua::table_key` writes `"5"` back out as `[5]`,
+/// which is where a decoded def is headed.
+///
+/// A table that really is a sequence is left with its integer keys, so it
+/// still crosses as a JSON array rather than changing shape for every
+/// existing reader. Nothing here calls into the payload: it walks a table
+/// that has already been built and only ever calls `tostring` on a number.
+const STRING_KEYS: &str = r#"
+local function __keys(value)
+  if type(value) ~= "table" then return value end
+  local count = 0
+  for _ in pairs(value) do count = count + 1 end
+  local sequence = count > 0 and #value == count
+  local out = {}
+  for key, item in pairs(value) do
+    if not sequence and type(key) == "number" then key = tostring(key) end
+    out[key] = __keys(item)
+  end
+  return out
+end
+"#;
+
 /// Strip a `!bset tweak<defs|units><n> ` prefix if the pasted text still has
 /// it (a real-world paste, issue #1280's own requirement), and read off the
-/// key it names. `bar_pack::bset_prefix` writes exactly this shape.
+/// key it names. `bar_pack::bset_prefix` writes exactly this shape, and other
+/// tools write `!bSet`, so the command itself is matched case-insensitively.
 fn strip_bset_prefix(text: &str) -> (Option<String>, &str) {
     let trimmed = text.trim();
-    let Some(after) = trimmed.strip_prefix("!bset") else {
+    let Some(head) = trimmed.get(..5) else {
         return (None, trimmed);
     };
-    let after = after.trim_start();
+    if !head.eq_ignore_ascii_case("!bset") {
+        return (None, trimmed);
+    }
+    let after = trimmed[5..].trim_start();
     let mut parts = after.splitn(2, char::is_whitespace);
     let key = parts.next().unwrap_or("").trim();
     let rest = parts.next().unwrap_or("").trim_start();
@@ -279,29 +326,47 @@ fn slot_kind_and_index(key: &str) -> (SlotKind, Option<usize>) {
 }
 
 /// A leading `--[[ ... ]]` block comment, or a leading run of `--` line
-/// comments, whichever the text opens with. This is where NuttyB's packer
-/// leaves the manifest naming its source files, and it is read off the raw
-/// text before classification so it is captured whether the payload turns
-/// out to be data or a program.
-fn leading_comment(lua: &str) -> Option<String> {
+/// comments, whichever the text opens with, and everything after it. This is
+/// where NuttyB's packer leaves the manifest naming its source files, and it
+/// is read off the raw text before classification so it is captured whether
+/// the payload turns out to be data or a program.
+///
+/// The remainder matters as much as the comment: a table literal behind a
+/// manifest is still a table literal, and classifying the text with the
+/// comment still attached would see it start with `--` and refuse it. The
+/// safety guards then run against that remainder, so nothing inside a
+/// comment can talk its way past them.
+fn split_leading_comment(lua: &str) -> (Option<String>, &str) {
     let trimmed = lua.trim_start();
     if let Some(rest) = trimmed.strip_prefix("--[[") {
-        let end = rest.find("]]")?;
+        let Some(end) = rest.find("]]") else {
+            return (None, trimmed);
+        };
         let body = rest[..end].trim();
-        return (!body.is_empty()).then(|| body.to_string());
+        let after = rest[end + 2..].trim_start();
+        return ((!body.is_empty()).then(|| body.to_string()), after);
     }
     let mut lines = Vec::new();
-    for line in trimmed.lines() {
-        let text = line.trim();
+    let mut consumed = 0;
+    for chunk in trimmed.split_inclusive('\n') {
+        let text = chunk.trim();
         if text.is_empty() {
+            consumed += chunk.len();
             continue;
         }
         match text.strip_prefix("--") {
-            Some(comment) => lines.push(comment.trim().to_string()),
+            Some(comment) => {
+                lines.push(comment.trim().to_string());
+                consumed += chunk.len();
+            }
             None => break,
         }
     }
-    (!lines.is_empty()).then(|| lines.join("\n"))
+    let rest = trimmed[consumed..].trim_start();
+    if lines.is_empty() {
+        return (None, trimmed);
+    }
+    (Some(lines.join("\n")), rest)
 }
 
 /// Whether `src` compiles as a sequence of Lua statements, without ever
@@ -437,29 +502,93 @@ mod tests {
         assert_eq!(slot_kind_and_index("pasted"), (SlotKind::Unknown, None));
     }
 
-    // -- leading_comment ------------------------------------------------
+    // -- split_leading_comment ---------------------------------------------
 
     #[test]
     fn a_block_comment_manifest_is_read_off_the_head() {
         let text = "--[[ Source: alpha.lua, beta.lua ]]\ndo x = 1 end";
-        assert_eq!(
-            leading_comment(text).as_deref(),
-            Some("Source: alpha.lua, beta.lua")
-        );
+        let (manifest, rest) = split_leading_comment(text);
+        assert_eq!(manifest.as_deref(), Some("Source: alpha.lua, beta.lua"));
+        assert_eq!(rest, "do x = 1 end");
     }
 
     #[test]
     fn a_run_of_line_comments_is_joined() {
         let text = "-- Source: alpha.lua\n-- Source: beta.lua\ndo x = 1 end";
+        let (manifest, rest) = split_leading_comment(text);
         assert_eq!(
-            leading_comment(text).as_deref(),
+            manifest.as_deref(),
             Some("Source: alpha.lua\nSource: beta.lua")
         );
+        assert_eq!(rest, "do x = 1 end");
     }
 
     #[test]
-    fn no_leading_comment_is_none() {
-        assert_eq!(leading_comment("do x = 1 end"), None);
+    fn no_leading_comment_is_none_and_leaves_the_text_alone() {
+        assert_eq!(
+            split_leading_comment("do x = 1 end"),
+            (None, "do x = 1 end")
+        );
+    }
+
+    /// NuttyB's own shape: a manifest comment, then the data table. The
+    /// comment must not stop it being read as data, or a whole set of unit
+    /// tweaks imports as read-only Lua with nothing editable in it.
+    #[test]
+    fn a_table_behind_a_manifest_comment_is_still_data() {
+        let payload = URL_SAFE_NO_PAD.encode(
+            "-- MainUnits\n-- Source: [\"lua/main-units.lua\"]\n{cortron={energycost=42000}}",
+        );
+        let slot = decode_one(&lua(), "tweakunits", &payload);
+        assert_eq!(slot.form.as_deref(), Some("table"));
+        assert_eq!(
+            slot.table.expect("table")["cortron"]["energycost"],
+            serde_json::json!(42000)
+        );
+        // The Lua shown back is still the payload verbatim, manifest included.
+        assert!(slot.lua.expect("lua").starts_with("-- MainUnits"));
+    }
+
+    /// A commander's weapon list with a gap in it: ordinary unit-def data,
+    /// and not a Lua sequence, so it only crosses into JSON once its keys are
+    /// numbered as strings. `lua::table_key` writes those back out as `[1]`.
+    #[test]
+    fn a_numbered_table_with_a_gap_still_decodes_as_data() {
+        let payload = URL_SAFE_NO_PAD
+            .encode("{corcom={weapons={[1]={def='disintegrator'},[3]={def='shield'}}}}");
+        let slot = decode_one(&lua(), "tweakunits", &payload);
+        assert_eq!(slot.form.as_deref(), Some("table"));
+        let table = slot.table.expect("table");
+        assert_eq!(
+            table["corcom"]["weapons"]["1"]["def"],
+            serde_json::json!("disintegrator")
+        );
+        assert_eq!(
+            table["corcom"]["weapons"]["3"]["def"],
+            serde_json::json!("shield")
+        );
+    }
+
+    /// A table that really is a sequence keeps its shape, so nothing that
+    /// already read a decoded array has to change.
+    #[test]
+    fn a_real_sequence_still_crosses_as_an_array() {
+        let payload = URL_SAFE_NO_PAD.encode("{armcom={buildoptions={'armsolar','armlab'}}}");
+        let slot = decode_one(&lua(), "tweakunits", &payload);
+        assert_eq!(
+            slot.table.expect("table")["armcom"]["buildoptions"],
+            serde_json::json!(["armsolar", "armlab"])
+        );
+    }
+
+    /// The `(` guard has to run against the body, not the comment: a call
+    /// hidden after a manifest must still be refused a real evaluation.
+    #[test]
+    fn a_manifest_cannot_smuggle_a_call_past_the_guard() {
+        let payload = URL_SAFE_NO_PAD.encode("-- harmless\n{ x = string.rep(\"a\", 9) }");
+        let slot = decode_one(&lua(), "tweakunits", &payload);
+        assert_eq!(slot.form.as_deref(), Some("unrecognised"));
+        assert!(slot.table.is_none());
     }
 
     // -- looks_like_a_plain_table ------------------------------------------
@@ -572,6 +701,29 @@ mod tests {
         assert_eq!(set.tweakdefs[0].key, "tweakdefs");
         assert_eq!(set.tweakdefs[1].key, "tweakdefs2");
         assert!(set.unrecognised.is_empty());
+    }
+
+    /// A multi-line paste numbers its bare entries `pasted-0`, `pasted-1`,
+    /// ... so two of them never collide. Those are still ad hoc pastes and
+    /// must decode, rather than being read as somebody's other mod option.
+    #[test]
+    fn a_numbered_pasted_key_is_decoded_like_the_bare_one() {
+        let payload = URL_SAFE_NO_PAD.encode("{ x = 1 }");
+        let set = decode_many(&entries(&[
+            ("pasted-0", &payload),
+            ("pasted-1", &format!("!bset tweakdefs2 {payload}")),
+        ]))
+        .expect("decode");
+        assert_eq!(set.unrecognised.len(), 1);
+        assert_eq!(set.tweakdefs.len(), 1);
+        assert_eq!(set.tweakdefs[0].key, "tweakdefs2");
+    }
+
+    #[test]
+    fn a_bset_prefix_is_stripped_however_it_is_capitalised() {
+        let (key, rest) = strip_bset_prefix("!bSet tweakdefs3 abc123");
+        assert_eq!(key.as_deref(), Some("tweakdefs3"));
+        assert_eq!(rest, "abc123");
     }
 
     #[test]

@@ -59,12 +59,20 @@ export function pastedEntry(text: string): Record<string, string> {
  * out of a lobby's mod options at once (issue #1280).
  *
  * Each line is read on its own, in whichever of the three shapes it arrives
- * in: a whole `!bset tweakdefs3 <payload>` line (the key comes off its own
- * prefix, so the map key here does not have to be right), a `key=value`
- * pair copied out of an options list, or a bare payload with nothing naming
- * it. A bare line gets a key of its own (`pasted-0`, `pasted-1`, ...), so
- * two bare lines never collide as the same entry. The decoder still
- * recovers a real key from an embedded `!bset` prefix when one is there.
+ * in: a whole `!bset tweakdefs3 <payload>` line, a `key=value` pair copied
+ * out of an options list, or a bare payload with nothing naming it. A bare
+ * line gets a key of its own (`pasted-0`, `pasted-1`, ...), so two bare
+ * lines never collide as the same entry.
+ *
+ * A `!bset` line is filed under the key it names rather than a bare one,
+ * because that key is what the decoder filters on: a whole set copied out of
+ * a lobby arrives with every other `!` command in it too (`!preset coop`,
+ * `!maxunits 10000`), and only a real slot name gets those told apart from
+ * the payloads. The line is kept intact as the value, so the decoder still
+ * reads the key off the prefix itself rather than trusting this one.
+ * Capitalisation is ignored because tools write both `!bset` and `!bSet`.
+ * Any other `!` or `$` command is a lobby instruction, not a payload, so it
+ * is dropped here instead of arriving as a slot that failed to decode.
  */
 export function multiLineEntries(text: string): Record<string, string> {
   const entries: Record<string, string> = {};
@@ -72,8 +80,9 @@ export function multiLineEntries(text: string): Record<string, string> {
   for (const raw of text.split("\n")) {
     const line = raw.trim();
     if (!line) continue;
-    if (line.startsWith("!bset ")) {
-      entries[`pasted-${bare++}`] = line;
+    if (line.startsWith("!") || line.startsWith("$")) {
+      const match = /^!bset\s+(\S+)\s/i.exec(line);
+      if (match) entries[match[1]] = line;
       continue;
     }
     const eq = line.indexOf("=");
@@ -145,11 +154,16 @@ export function planProjectFromDecoded(set: DecodedTweakSet): {
     if (!slot.lua) continue; // `slot.error` already says why nothing decoded.
     const note =
       slot.form === "block"
-        ? "Decoded as a program (loops or conditionals), not a data table, so it is shown as Lua rather than turned into edits."
+        ? "Decoded as a program (loops or conditionals), not a data table, so it is carried as Lua rather than turned into edits. It is compiled into the output as it stands, ahead of this project's own changes."
         : slot.error
           ? slot.error
-          : "This slot did not decode to a shape coilbox could read into a project, so it is shown as Lua rather than turned into edits.";
-    readOnlyLua.push({ title: slotTitle(slot), lua: slot.lua, note });
+          : "This slot did not decode to a shape coilbox could read into a project, and it did not parse as Lua either, so it is kept for reference and left out of the compiled output.";
+    readOnlyLua.push({
+      title: slotTitle(slot),
+      lua: slot.lua,
+      note,
+      form: slot.form === "block" ? "block" : "unrecognised",
+    });
   }
 
   return { clones, readOnlyLua, skippedKeys };

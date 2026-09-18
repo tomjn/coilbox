@@ -34,14 +34,14 @@ describe("pastedEntry", () => {
 });
 
 describe("multiLineEntries", () => {
-  it("keeps a whole !bset line under a bare key of its own", () => {
+  it("keeps a whole !bset line intact as its own entry", () => {
     const entries = multiLineEntries(
       "!bset tweakdefs3 abc\n!bset tweakunits xyz",
     );
-    expect(Object.values(entries)).toEqual([
-      "!bset tweakdefs3 abc",
-      "!bset tweakunits xyz",
-    ]);
+    expect(entries).toEqual({
+      tweakdefs3: "!bset tweakdefs3 abc",
+      tweakunits: "!bset tweakunits xyz",
+    });
   });
 
   it("reads a key=value pair copied out of an options list", () => {
@@ -57,6 +57,32 @@ describe("multiLineEntries", () => {
 
   it("skips blank lines", () => {
     expect(multiLineEntries("\n  \nabc\n")).toEqual({ "pasted-0": "abc" });
+  });
+
+  it("files a !bset line under the key it names, so the decoder keeps it", () => {
+    expect(multiLineEntries("!bset tweakdefs3 abc")).toEqual({
+      tweakdefs3: "!bset tweakdefs3 abc",
+    });
+  });
+
+  it("reads the key off a !bSet line however it is capitalised", () => {
+    expect(multiLineEntries("!bSet tweakunits1 xyz")).toEqual({
+      tweakunits1: "!bSet tweakunits1 xyz",
+    });
+  });
+
+  /// A whole set copied out of a lobby carries every other `!` command with
+  /// it. None of those are payloads, so none may arrive as a bare entry the
+  /// decoder would then try to read as base64. A `!bSet` of some other mod
+  /// option keeps its own key, which the decoder ignores as not a tweak slot.
+  it("drops a lobby's other commands rather than decoding them as payloads", () => {
+    const entries = multiLineEntries(
+      "!preset coop\n!maxunits 10000\n$welcome-message Made with https://example.test/\n!bSet multiplier_buildpower 1.5\n!bset tweakdefs abc",
+    );
+    expect(entries).toEqual({
+      multiplier_buildpower: "!bSet multiplier_buildpower 1.5",
+      tweakdefs: "!bset tweakdefs abc",
+    });
   });
 });
 
