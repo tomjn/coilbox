@@ -212,6 +212,9 @@ pub fn render_variant(angle: &str) -> String {
 /// does not hold footprints, so a mis-framed render is caught here or nowhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderFraming {
+    /// The bleed this frame was taken with, in whole build squares each side.
+    /// At least the vocabulary's floor and as much more as the model needed.
+    pub bleed_squares: u32,
     /// The framed extent, footprint plus the bleed on both sides.
     pub squares_x: u32,
     pub squares_z: u32,
@@ -239,20 +242,33 @@ pub struct RenderFraming {
 /// the framed aspect rather than a rounding of it, and the longest edge lands at
 /// or under the class cap without a separate check.
 pub fn render_frame(footprint_x: u32, footprint_z: u32) -> RenderFraming {
-    let vocab = vocabulary();
-    let bleed = 2 * vocab.render_frame.bleed_squares;
-    let squares_x = footprint_x.max(1) + bleed;
-    let squares_z = footprint_z.max(1) + bleed;
+    render_frame_bled(
+        footprint_x,
+        footprint_z,
+        vocabulary().render_frame.bleed_squares,
+    )
+}
 
-    let cap = vocab
-        .classes
-        .get(RENDER_CLASS)
-        .and_then(|c| c.max_edge_px)
-        .unwrap_or(0);
+/// The frame for a top down render taken with `bleed_squares` of bleed each side
+/// (issue #2952).
+///
+/// The renderer widens the bleed past the vocabulary's floor when the model
+/// reaches further than the footprint, which is `fittingBleed` in
+/// `src/hub/assets/vocabulary.ts`. That side owns the choice, since it is the
+/// side holding the model. This side reproduces a frame from a bleed, so
+/// [`bleed_from_pixels`] can work out which one a picture was taken with.
+pub fn render_frame_bled(footprint_x: u32, footprint_z: u32, bleed_squares: u32) -> RenderFraming {
+    let vocab = vocabulary();
+    let bleed = bleed_squares.max(vocab.render_frame.bleed_squares);
+    let squares_x = footprint_x.max(1) + 2 * bleed;
+    let squares_z = footprint_z.max(1) + 2 * bleed;
+
+    let cap = render_cap_px();
     let pixels_per_square = (cap / squares_x.max(squares_z)).max(1);
     let per = vocab.render_frame.elmos_per_build_square;
 
     RenderFraming {
+        bleed_squares: bleed,
         squares_x,
         squares_z,
         width_elmos: squares_x * per,
@@ -261,6 +277,47 @@ pub fn render_frame(footprint_x: u32, footprint_z: u32) -> RenderFraming {
         height_px: squares_z * pixels_per_square,
         pixels_per_square,
     }
+}
+
+/// The render class's edge cap in pixels, which is also the widest frame that can
+/// be drawn at a whole pixel per build square, so it bounds the search below.
+fn render_cap_px() -> u32 {
+    vocabulary()
+        .classes
+        .get(RENDER_CLASS)
+        .and_then(|c| c.max_edge_px)
+        .unwrap_or(0)
+}
+
+/// Which bleed a top down render was taken with, from its own pixel size (issue
+/// #2952).
+///
+/// The Rust twin of `bleedFromPixels` in `src/hub/assets/vocabulary.ts`, and the
+/// reason the framing check below still means something now that the frame varies
+/// per unit. A footprint no longer names one pixel size, it names a short list of
+/// them, and a render has to be one of that list rather than any shape at all.
+///
+/// The narrowest match, which is the one the renderer guarantees it used: it
+/// steps past a bleed whose frame encodes to the same pixel size a narrower one
+/// would, so the picture and the footprint together name exactly one bleed.
+pub fn bleed_from_pixels(
+    footprint_x: u32,
+    footprint_z: u32,
+    width_px: u32,
+    height_px: u32,
+) -> Option<u32> {
+    let floor = vocabulary().render_frame.bleed_squares;
+    let cap = render_cap_px();
+    let longest = footprint_x.max(1).max(footprint_z.max(1));
+    let mut bleed = floor;
+    while longest + 2 * bleed <= cap {
+        let frame = render_frame_bled(footprint_x, footprint_z, bleed);
+        if (frame.width_px, frame.height_px) == (width_px, height_px) {
+            return Some(bleed);
+        }
+        bleed += 1;
+    }
+    None
 }
 
 /// The angle a plan is drawn from, and the only one framed on a footprint.
@@ -289,12 +346,33 @@ pub fn render_pixels(angle: &str, footprint_x: u32, footprint_z: u32) -> (u32, u
         let frame = render_frame(footprint_x, footprint_z);
         return (frame.width_px, frame.height_px);
     }
-    let cap = vocabulary()
-        .classes
-        .get(RENDER_CLASS)
-        .and_then(|c| c.max_edge_px)
-        .unwrap_or(0);
-    (cap, cap)
+    (render_cap_px(), render_cap_px())
+}
+
+/// Whether a render of this shape is one the framing rule can produce (issue
+/// #2952).
+///
+/// The check `--unit-render` refuses a mis-framed render on, and what a plain
+/// equality against [`render_pixels`] became once the plan's bleed started
+/// varying per unit. A picture angle is still one size and is compared to it. A
+/// plan is any of the sizes some bleed frames its footprint to, and
+/// [`bleed_from_pixels`] is what says which.
+///
+/// Still worth having, and not much weaker than the equality it replaced. A 3 by
+/// 2 footprint frames to 255 by 204 at a bleed of one square, 252 by 216 at two
+/// and 252 by 224 at three. Every other shape is refused, including the 256 by
+/// 256 a picture angle would be.
+pub fn render_pixels_hold(
+    angle: &str,
+    footprint_x: u32,
+    footprint_z: u32,
+    width_px: u32,
+    height_px: u32,
+) -> bool {
+    if angle == PLAN_ANGLE {
+        return bleed_from_pixels(footprint_x, footprint_z, width_px, height_px).is_some();
+    }
+    (width_px, height_px) == render_pixels(angle, footprint_x, footprint_z)
 }
 
 /// A map's size in elmos, from the metal infomap's sample counts (issue #1629).
@@ -718,5 +796,77 @@ mod tests {
         let frame = render_frame(3, 2);
         assert_eq!((frame.width_elmos, frame.height_elmos), (80, 64));
         assert_eq!(frame.width_elmos, frame.squares_x * 16);
+    }
+
+    /// A widened frame keeps every property the narrow one has, since the only
+    /// thing issue #2952 changed is how many squares of bleed go round the
+    /// footprint.
+    #[test]
+    fn a_widened_frame_keeps_the_footprints_aspect_and_whole_pixels() {
+        // 3 by 2 at three squares of bleed is 9 by 8 squares, floor(256 / 9) =
+        // 28 pixels a square, so 252 by 224.
+        let frame = render_frame_bled(3, 2, 3);
+        assert_eq!((frame.squares_x, frame.squares_z), (9, 8));
+        assert_eq!((frame.width_px, frame.height_px), (252, 224));
+        assert_eq!(frame.bleed_squares, 3);
+        assert_eq!(frame.width_px % frame.squares_x, 0);
+        assert_eq!(frame.height_px % frame.squares_z, 0);
+    }
+
+    #[test]
+    fn a_frame_never_narrows_past_the_vocabularys_floor() {
+        assert_eq!(render_frame_bled(3, 2, 0), render_frame(3, 2));
+        assert_eq!(render_frame(3, 2).bleed_squares, 1);
+    }
+
+    /// The consumer's half of the rule, and the reason the renderer may only
+    /// pick a bleed that reads back. Both sides walk the same list, so this
+    /// asserts the walk finds exactly one answer for every frame in it.
+    #[test]
+    fn a_frames_pixels_name_the_bleed_it_was_taken_with() {
+        for fx in 1..=12u32 {
+            for fz in 1..=12u32 {
+                let mut seen: Vec<(u32, u32)> = Vec::new();
+                for bleed in 1..=8u32 {
+                    let frame = render_frame_bled(fx, fz, bleed);
+                    let read = bleed_from_pixels(fx, fz, frame.width_px, frame.height_px);
+                    // A bleed whose pixels a narrower one already owns reads
+                    // back as that narrower one, which is why the renderer skips
+                    // it. Anything else has to read back as itself.
+                    if seen.contains(&(frame.width_px, frame.height_px)) {
+                        assert!(read.unwrap() < bleed, "{fx}x{fz} at {bleed}");
+                    } else {
+                        assert_eq!(read, Some(bleed), "{fx}x{fz} at {bleed}");
+                    }
+                    seen.push((frame.width_px, frame.height_px));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn pixels_no_frame_produces_name_no_bleed() {
+        // The 256 square a picture angle is, against a footprint that is not.
+        assert_eq!(bleed_from_pixels(3, 2, 256, 256), None);
+        assert_eq!(bleed_from_pixels(3, 2, 0, 0), None);
+    }
+
+    /// The check `--unit-render` refuses a mis-framed render on. A plan may be
+    /// any of the sizes some bleed frames it to and nothing else, and a picture
+    /// angle is still one size.
+    #[test]
+    fn the_framing_check_takes_a_widened_plan_and_refuses_a_shape_no_frame_makes() {
+        for bleed in 1..=4u32 {
+            let frame = render_frame_bled(3, 2, bleed);
+            assert!(
+                render_pixels_hold("top", 3, 2, frame.width_px, frame.height_px),
+                "bleed {bleed}"
+            );
+        }
+        assert!(!render_pixels_hold("top", 3, 2, 254, 204));
+        assert!(!render_pixels_hold("top", 3, 2, 256, 256));
+
+        assert!(render_pixels_hold("angled", 3, 2, 256, 256));
+        assert!(!render_pixels_hold("angled", 3, 2, 255, 204));
     }
 }

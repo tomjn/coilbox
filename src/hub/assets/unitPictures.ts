@@ -40,6 +40,13 @@ export interface PlanPicture {
    * `../preview.ts`.
    */
   framed: boolean;
+  /**
+   * The encoded picture's own pixels, which is how `pictureBox` works out the
+   * bleed a render was framed with (issue #2952). Nothing carries the bleed
+   * beside the bytes, and the footprint and the pixel size name it between them.
+   */
+  widthPx: number;
+  heightPx: number;
 }
 
 /** The variant a plan asks for: the view from above. */
@@ -74,5 +81,7 @@ export function planPicture(
     // of a render is a three quarter icon, and drawing it in a render's box would
     // scale somebody's icon up by the bleed.
     framed: picture.served_variant.startsWith(RENDER_VARIANT_PREFIX),
+    widthPx: picture.width,
+    heightPx: picture.height,
   };
 }

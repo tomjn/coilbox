@@ -3,9 +3,11 @@ import {
   ASSET_CLASSES,
   ASSET_ORIGINS,
   BUILDPIC_VARIANT,
+  bleedFromPixels,
   classForVariant,
   ELMOS_PER_BUILD_SQUARE,
   ELMOS_PER_METAL_SAMPLE,
+  fittingBleed,
   MAP_VARIANTS,
   MINIMAP_VARIANT,
   mapExtentElmos,
@@ -284,5 +286,94 @@ describe("renderFrame", () => {
 
   it("floors a footprint at one square the way the engine does", () => {
     expect(renderFrame(0, 0)).toEqual(renderFrame(1, 1));
+  });
+
+  it("widens by whole squares and keeps the footprint's aspect", () => {
+    const frame = renderFrame(3, 2, 3);
+    expect(frame.bleedSquares).toBe(3);
+    expect(frame.squaresX).toBe(9);
+    expect(frame.squaresZ).toBe(8);
+    expect(frame.widthPx / frame.heightPx).toBe(9 / 8);
+    expect(Math.max(frame.widthPx, frame.heightPx)).toBeLessThanOrEqual(256);
+  });
+
+  it("never narrows past the vocabulary's floor", () => {
+    expect(renderFrame(3, 2, 0)).toEqual(renderFrame(3, 2));
+    expect(renderFrame(3, 2, -4)).toEqual(renderFrame(3, 2));
+  });
+});
+
+/**
+ * The frame growing with the model, which is issue #2952. The complaint was a
+ * top down render filling its own picture with no room to see the unit in, and
+ * the cause was a bleed of one square against models that reach further.
+ */
+describe("fittingBleed", () => {
+  it("leaves a model inside its footprint on the floor", () => {
+    // A 3 by 2 footprint reaches 24 by 16 elmos from the origin, so a model
+    // inside it needs nothing added.
+    expect(fittingBleed(3, 2, 20, 12)).toBe(RENDER_BLEED_SQUARES);
+    expect(fittingBleed(3, 2, 0, 0)).toBe(RENDER_BLEED_SQUARES);
+  });
+
+  it("covers a model that reaches past the footprint and the floor", () => {
+    // Balanced Annihilation's Vulcan, the widest overhang measured in that
+    // game: an 8 by 8 footprint reaching 137 elmos from the origin, which is 73
+    // past the footprint's own edge at 64. That is 4.56 build squares, so it
+    // takes 5, and then 6: an 8 by 8 at five squares of bleed is 18 squares at
+    // 14 pixels each, which is the same 252 as three squares at 18, so the
+    // narrower one owns that pixel size and this steps past it.
+    const bleed = fittingBleed(8, 8, 137, 137);
+    expect(bleed).toBe(6);
+    const frame = renderFrame(8, 8, bleed);
+    expect(frame.widthElmos / 2).toBeGreaterThanOrEqual(137);
+  });
+
+  it("takes the worse side of each axis, since the camera is on the origin", () => {
+    // A model reaching 60 elmos one way and nothing the other still needs the
+    // frame 60 elmos wide on both sides of the origin.
+    expect(fittingBleed(1, 1, 60, 0)).toBe(fittingBleed(1, 1, 60, 60));
+  });
+
+  it("frames every reach it is given, however far", () => {
+    for (const reach of [0, 16, 40, 100, 240, 600]) {
+      for (const footprint of [1, 2, 5, 11]) {
+        const bleed = fittingBleed(footprint, footprint, reach, reach);
+        const frame = renderFrame(footprint, footprint, bleed);
+        expect(frame.widthElmos / 2).toBeGreaterThanOrEqual(reach);
+      }
+    }
+  });
+});
+
+describe("bleedFromPixels", () => {
+  /**
+   * The whole of what makes a widened frame usable. Nothing travels beside the
+   * bytes to say how much bleed a render carries, so a consumer reads it back
+   * off the picture, and `fittingBleed` only ever picks one that reads back.
+   */
+  it("reads back every bleed the renderer can pick", () => {
+    for (let footprintX = 1; footprintX <= 12; footprintX++) {
+      for (let footprintZ = 1; footprintZ <= 12; footprintZ++) {
+        for (const reach of [0, 24, 60, 120, 240]) {
+          const bleed = fittingBleed(footprintX, footprintZ, reach, reach);
+          const frame = renderFrame(footprintX, footprintZ, bleed);
+          expect(
+            bleedFromPixels(
+              footprintX,
+              footprintZ,
+              frame.widthPx,
+              frame.heightPx,
+            ),
+          ).toBe(bleed);
+        }
+      }
+    }
+  });
+
+  it("says nothing about a picture no frame produces", () => {
+    // A build pic standing in for a render: square, at the cap, and nothing a
+    // 3 by 2 footprint frames to.
+    expect(bleedFromPixels(3, 2, 256, 256)).toBeNull();
   });
 });

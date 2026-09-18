@@ -24,6 +24,7 @@ import { buildModel } from "@/content/unitModel";
 import { frameBox } from "@/lego/framing";
 import { readyToCapture } from "@/lego/thumbnail";
 import {
+  fittingBleed,
   PLAN_ANGLE,
   type RenderFrame,
   renderFrame,
@@ -46,8 +47,17 @@ import {
  * render's identity through its variant, so a new one is a picture the hub has
  * never held rather than a change to one it has. Bumping for it would report
  * every top down render in the corpus as changed and redraw the lot.
+ *
+ * 4: the plan's frame grows to cover the model rather than stopping at one build
+ * square (issue #2952). The pixel size is in the hash already, so on the hub the
+ * units whose frame grew would have moved on their own and the 87% that did not
+ * change would have been left alone. This machine's own render index is the
+ * reason that was not enough: `look_up` in `renderindex.rs` matches a record on
+ * the renderer version and nothing about the frame, so without a bump every unit
+ * somebody had already drawn would keep serving its old clipped picture and the
+ * fix would reach nobody who had used the feature.
  */
-export const RENDER_VERSION = 3;
+export const RENDER_VERSION = 4;
 
 /** How far above and below the model the camera's clip range reaches, in elmos,
  *  so a model sitting exactly on a clip plane is not shaved. */
@@ -64,11 +74,11 @@ export interface UnitRender {
    */
   rgba: Uint8Array;
   /**
-   * The footprint's frame, so the caller can tell the worker the same numbers it
-   * was drawn to.
+   * The plan's frame, so the caller can tell the worker the same numbers it was
+   * drawn to, including the bleed this unit's model needed.
    *
-   * The footprint's rather than this render's: only the plan is framed on it, and
-   * the three picture angles frame on the model's bounds instead. `width` and
+   * The plan's rather than this render's: only the plan is framed on a footprint,
+   * and the three picture angles frame on the model's bounds instead. `width` and
    * `height` above are what this render actually is, for every angle.
    */
   frame: RenderFrame;
@@ -91,9 +101,9 @@ export interface UnitRender {
  * three builds the camera's right as `up × (eye - target)`, which is
  * `(0,0,1) × (0,1,0) = (-1,0,0)`.
  *
- * `box` is the model's own bounds, and only decides the clip range. A unit is
- * tens of elmos tall and the ortho extent is the footprint's, so the two are
- * independent.
+ * `box` is the model's own bounds, and only decides the clip range. The ground
+ * extent is `frame`'s, which the caller has already widened to cover the same
+ * model, so the height is the only thing left for the bounds to say here.
  */
 export function topDownCamera(
   frame: RenderFrame,
@@ -118,6 +128,25 @@ export function topDownCamera(
   camera.lookAt(0, 0, 0);
   camera.updateMatrixWorld(true);
   return camera;
+}
+
+/**
+ * How far the model reaches from the unit's own origin on each ground axis, in
+ * elmos (issue #2952).
+ *
+ * The worse side of each axis rather than the extent, because the plan camera is
+ * centred on the origin: a model that reaches 60 elmos one way and 10 the other
+ * needs a frame 60 elmos wide on both sides, not 35.
+ *
+ * A model with no bounds reaches nowhere, which leaves {@link fittingBleed} on
+ * its floor.
+ */
+export function modelReach(box: THREE.Box3): [number, number] {
+  if (box.isEmpty()) return [0, 0];
+  return [
+    Math.max(Math.abs(box.min.x), Math.abs(box.max.x)),
+    Math.max(Math.abs(box.min.z), Math.abs(box.max.z)),
+  ];
 }
 
 /**
@@ -269,11 +298,11 @@ export function unpremultiply(rgba: Uint8Array): Uint8Array {
  * Draw `model` at one `angle`, at the size {@link renderPixels} says that angle
  * has to be.
  *
- * The plan is framed on the `footprintX` by `footprintZ` footprint and every
- * other angle is framed on the model's own bounds, which is the whole of what
- * the angle changes here. The lights do not change with it: all four are lit the
- * same way, so a unit is the same colour whichever picture of it you are looking
- * at.
+ * The plan is framed on the `footprintX` by `footprintZ` footprint, widened by
+ * whatever bleed the model reaches into, and every other angle is framed on the
+ * model's own bounds, which is the whole of what the angle changes here. The
+ * lights do not change with it: all four are lit the same way, so a unit is the
+ * same colour whichever picture of it you are looking at.
  *
  * Waits for the model's textures first: three's loaders do not report back to
  * whoever holds a texture, and one that has not arrived samples as a single black
@@ -291,9 +320,18 @@ export async function renderUnit(
   footprintZ: number,
   { timeoutMs = 10_000 }: { timeoutMs?: number } = {},
 ): Promise<UnitRender> {
-  const frame = renderFrame(footprintX, footprintZ);
-  const { widthPx, heightPx } = renderPixels(angle, footprintX, footprintZ);
   const built = buildModel(model);
+  const frame = renderFrame(
+    footprintX,
+    footprintZ,
+    fittingBleed(footprintX, footprintZ, ...modelReach(built.box)),
+  );
+  const { widthPx, heightPx } = renderPixels(
+    angle,
+    footprintX,
+    footprintZ,
+    frame.bleedSquares,
+  );
 
   const scene = new THREE.Scene();
   scene.background = null;

@@ -196,12 +196,18 @@ export function classForVariant(variant: string): AssetClass | null {
 }
 
 /**
- * The bleed a render carries on each side, in whole build squares.
+ * The least bleed a render carries on each side, in whole build squares.
  *
  * Models overhang their footprints, so a render framed exactly on the footprint
  * clips them. A clipped radar dish reads as broken and a centred one does not, so
- * the frame is widened by a whole square on every side and the consumer adds it
- * back, which it can because it knows the footprint too.
+ * the frame is widened by whole squares on every side.
+ *
+ * A floor rather than the whole rule since issue #2952. One square covers most
+ * units and not all: measured over Balanced Annihilation's 379 units, 331 fit
+ * inside a square of bleed and the widest, the 8 by 8 Vulcan, reaches 73 elmos
+ * past its footprint, which is 4.56 squares. So {@link fittingBleed} widens the
+ * frame per unit from the model's own reach, and {@link bleedFromPixels} is how a
+ * consumer reads back the one that was used.
  */
 export const RENDER_BLEED_SQUARES = vocabulary.renderFrame.bleedSquares;
 
@@ -212,6 +218,9 @@ export const ELMOS_PER_BUILD_SQUARE =
 
 /** The frame one unit's top down render is taken in. */
 export interface RenderFrame {
+  /** The bleed this frame was taken with, in whole build squares each side. At
+   *  least {@link RENDER_BLEED_SQUARES} and as much more as the model needed. */
+  bleedSquares: number;
   /** The framed extent, footprint plus the bleed on both sides. */
   squaresX: number;
   squaresZ: number;
@@ -235,7 +244,8 @@ export interface RenderFrame {
  *
  * `footprintX` and `footprintZ` are the unitdef's `footprintx` and `footprintz`
  * in build squares, as `--unit-dataset` reports them, and the engine floors both
- * at 1.
+ * at 1. `bleedSquares` is what {@link fittingBleed} worked out this unit's model
+ * needs, and defaults to the floor for a caller that has no model to measure.
  *
  * Pixels come out as a whole number per square so the encoded aspect is exactly
  * the framed aspect rather than a rounding of it. A footprint wide enough that a
@@ -252,11 +262,11 @@ export interface RenderFrame {
 export function renderFrame(
   footprintX: number,
   footprintZ: number,
+  bleedSquares: number = RENDER_BLEED_SQUARES,
 ): RenderFrame {
-  const squaresX =
-    Math.max(1, Math.trunc(footprintX)) + 2 * RENDER_BLEED_SQUARES;
-  const squaresZ =
-    Math.max(1, Math.trunc(footprintZ)) + 2 * RENDER_BLEED_SQUARES;
+  const bleed = Math.max(RENDER_BLEED_SQUARES, Math.trunc(bleedSquares));
+  const squaresX = Math.max(1, Math.trunc(footprintX)) + 2 * bleed;
+  const squaresZ = Math.max(1, Math.trunc(footprintZ)) + 2 * bleed;
 
   const cap = ASSET_CLASSES[RENDER_CLASS].maxEdgePx ?? 0;
   const pixelsPerSquare = Math.max(
@@ -265,6 +275,7 @@ export function renderFrame(
   );
 
   return {
+    bleedSquares: bleed,
     squaresX,
     squaresZ,
     widthElmos: squaresX * ELMOS_PER_BUILD_SQUARE,
@@ -273,6 +284,105 @@ export function renderFrame(
     heightPx: squaresZ * pixelsPerSquare,
     pixelsPerSquare,
   };
+}
+
+/**
+ * The widest frame that can still be drawn at a whole pixel per build square.
+ *
+ * Past this the frame has more squares than the class cap has pixels, so
+ * `pixelsPerSquare` floors at 1 and two different bleeds start producing the same
+ * picture. Both searches below stop here for that reason, and it is derived from
+ * the cap rather than picked.
+ */
+const MAX_FRAME_SQUARES = ASSET_CLASSES[RENDER_CLASS].maxEdgePx ?? 0;
+
+/**
+ * The bleed this unit's frame needs, from how far its model reaches (issue
+ * #2952).
+ *
+ * `reachX` and `reachZ` are how far the model's bounds reach from the unit's own
+ * origin in elmos, on each axis, taking whichever side reaches further. The
+ * origin rather than the model's centre because that is where
+ * `topDownCamera` points: the engine stands a unit's model at the unit's
+ * position and the footprint is centred there, so an asymmetric model overhangs
+ * unevenly and the frame has to cover the worse side.
+ *
+ * **The result is one a consumer can read back.** {@link bleedFromPixels}
+ * recovers the bleed from the picture's pixel size and the footprint, because
+ * nothing carries it alongside the bytes. A handful of frames encode to the same
+ * pixel size as a narrower one would, all of them square footprints: a 1 by 1 at
+ * a bleed of 1 and at a bleed of 2 are both 255 pixels square, since 3 squares of
+ * 85 and 5 squares of 51 are the same number. Those cannot be told apart
+ * afterwards, so this steps past them to the next bleed that can, which costs one
+ * more square of empty ground and nothing else.
+ */
+export function fittingBleed(
+  footprintX: number,
+  footprintZ: number,
+  reachX: number,
+  reachZ: number,
+): number {
+  const fx = Math.max(1, Math.trunc(footprintX));
+  const fz = Math.max(1, Math.trunc(footprintZ));
+  // Half the framed extent is (footprint / 2 + bleed) squares, so the bleed a
+  // reach asks for is that much past half the footprint.
+  const needed = Math.max(
+    reachX / ELMOS_PER_BUILD_SQUARE - fx / 2,
+    reachZ / ELMOS_PER_BUILD_SQUARE - fz / 2,
+  );
+  let bleed = Math.max(RENDER_BLEED_SQUARES, Math.ceil(needed));
+  while (
+    Math.max(fx, fz) + 2 * bleed <= MAX_FRAME_SQUARES &&
+    bleedFromPixels(fx, fz, ...frameSize(fx, fz, bleed)) !== bleed
+  ) {
+    bleed += 1;
+  }
+  return bleed;
+}
+
+/** The pixel size of one candidate frame, as the pair {@link bleedFromPixels}
+ *  matches on. */
+function frameSize(
+  footprintX: number,
+  footprintZ: number,
+  bleed: number,
+): [number, number] {
+  const frame = renderFrame(footprintX, footprintZ, bleed);
+  return [frame.widthPx, frame.heightPx];
+}
+
+/**
+ * Which bleed a top down render was taken with, from its own pixel size (issue
+ * #2952).
+ *
+ * The consumer's half of {@link fittingBleed}. A plan is drawn over the ground
+ * its building stands on plus the bleed round it, so a consumer that assumed the
+ * floor of one square would draw a widened render at the wrong scale. Nothing
+ * travels with the bytes to say, so the bleed is read back out of the picture: it
+ * is the only unknown left once the footprint is known, since the footprint and
+ * the bleed decide the pixel size between them.
+ *
+ * The narrowest match, which is what {@link fittingBleed} guarantees is the one
+ * that was used. Null for a picture no frame produces, which is a render from
+ * some other rule rather than a widened one.
+ */
+export function bleedFromPixels(
+  footprintX: number,
+  footprintZ: number,
+  widthPx: number,
+  heightPx: number,
+): number | null {
+  const fx = Math.max(1, Math.trunc(footprintX));
+  const fz = Math.max(1, Math.trunc(footprintZ));
+  for (
+    let bleed = RENDER_BLEED_SQUARES;
+    Math.max(fx, fz) + 2 * bleed <= MAX_FRAME_SQUARES;
+    bleed += 1
+  ) {
+    const [width, height] = frameSize(fx, fz, bleed);
+    if (width === widthPx && height === heightPx) return bleed;
+  }
+  return null;
 }
 
 /**
@@ -290,9 +400,14 @@ export function renderPixels(
   angle: string,
   footprintX: number,
   footprintZ: number,
+  bleedSquares: number = RENDER_BLEED_SQUARES,
 ): { widthPx: number; heightPx: number } {
   if (angle === PLAN_ANGLE) {
-    const { widthPx, heightPx } = renderFrame(footprintX, footprintZ);
+    const { widthPx, heightPx } = renderFrame(
+      footprintX,
+      footprintZ,
+      bleedSquares,
+    );
     return { widthPx, heightPx };
   }
   const cap = ASSET_CLASSES[RENDER_CLASS].maxEdgePx ?? 0;

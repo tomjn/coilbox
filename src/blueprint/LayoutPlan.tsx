@@ -245,13 +245,17 @@ function Sheet({
         />
       )}
       {/* Every picture before any outline, rather than a picture and its outline
-          per building. A render's box reaches a build square past the footprint
-          on each side, so interleaved the next building's transparent bleed would
-          be drawn over the last one's outline. */}
+          per building. A render's box reaches at least a build square past the
+          footprint on each side, so interleaved the next building's transparent
+          bleed would be drawn over the last one's outline. */}
       {shape.squares.map((square) => {
         const picture = pictures.get(square.def.toLowerCase());
         if (!picture) return null;
-        const box = pictureBox(square, { framed: picture.framed });
+        const box = pictureBox(square, {
+          framed: picture.framed,
+          widthPx: picture.widthPx,
+          heightPx: picture.heightPx,
+        });
         return (
           <image
             key={`p${square.def}@${square.x},${square.y}`}

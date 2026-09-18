@@ -1631,13 +1631,34 @@ Being wrong here is caught nowhere downstream. Implemented at `renderFrame` in
 square. A build pic is a three quarter icon at a fixed size and does not tile
 into a base layout, which is the whole reason a render exists.
 
-**The frame carries a bleed of one whole build square on each side.** Models
-overhang their footprints, so a frame taken exactly on the footprint clips
-them, and a clipped radar dish reads as broken where a centred one does not.
-The bleed is a whole square rather than a fraction so the consumer can add it
-back exactly: it knows the footprint, so the footprint is the central
-`footprintX` by `footprintZ` squares of a `footprintX + 2` by `footprintZ + 2`
-frame, inset by one square on every side.
+**The frame carries a bleed of whole build squares on each side, at least one.**
+Models overhang their footprints, so a frame taken exactly on the footprint
+clips them, and a clipped radar dish reads as broken where a centred one does
+not. The bleed is whole squares rather than a fraction so the consumer can add
+it back exactly: the footprint is the central `footprintX` by `footprintZ`
+squares of a `footprintX + 2b` by `footprintZ + 2b` frame, inset by `b` squares
+on every side.
+
+**`b` grows with the model, which is tomjn/coilbox#2952.** One square was the
+whole rule and it was not enough. Measured over Balanced Annihilation's 379
+units, 331 fit inside a square of bleed and 48 did not, and the widest, the 8 by
+8 Vulcan, reaches 73 elmos past its own footprint, which is 4.56 build squares.
+Those 48 rendered as a unit filling its picture with its edges cut off. A single
+larger constant is the wrong answer because the overhang grows with the unit: a
+bleed of 5 would frame a 1 by 1 solar collector across 11 squares and leave the
+collector itself 23 pixels wide. So the renderer takes `b` from the model's own
+reach, at `fittingBleed` in `src/hub/assets/vocabulary.ts`.
+
+**The consumer reads `b` back off the picture.** Nothing travels beside the bytes
+to say what bleed a render carries, and the hub holds no footprints to work it
+out with. The consumer does hold the footprint, and the footprint and `b` decide
+the pixel size between them, so `b` is the only unknown left: walk the bleeds
+from one upward and take the first whose frame is this picture's size, which is
+`bleedFromPixels` on both sides. A handful of frames encode to the same pixels a
+narrower one does, all of them square footprints, since 3 squares of 85 pixels
+and 5 squares of 51 are both 255. Those cannot be told apart afterwards, so the
+renderer steps past them to the next bleed that can be, which costs one more
+square of empty ground and nothing else.
 
 `footprintX` and `footprintZ` are the unitdef's `footprintx` and `footprintz`
 in build squares, as `--unit-dataset` reports them, and the engine floors both
@@ -1647,13 +1668,20 @@ conversion `src/lego/unitDef.ts` uses.
 So for a footprint of `fx` by `fz`:
 
 ```
-squaresX        = fx + 2
-squaresZ        = fz + 2
+b               = max(1, ceil(reachX / 16 - fx / 2), ceil(reachZ / 16 - fz / 2)),
+                  stepped up past any bleed a narrower one's pixels already name
+squaresX        = fx + 2b
+squaresZ        = fz + 2b
 camera extent   = squaresX * 16 by squaresZ * 16 elmos, orthographic,
                   centred on the footprint's centre
 pixelsPerSquare = max(1, floor(256 / max(squaresX, squaresZ)))
 image           = squaresX * pixelsPerSquare by squaresZ * pixelsPerSquare
 ```
+
+`reachX` and `reachZ` are how far the model's bounds reach from the unit's own
+origin on each ground axis, taking whichever side reaches further. The origin
+rather than the model's centre, because that is where the camera points and
+where the engine stands the unit.
 
 Pixels come out as a whole number per square so the encoded aspect is exactly
 the framed aspect rather than a rounding of it, and the longest edge lands at

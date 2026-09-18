@@ -8,9 +8,10 @@
 //!
 //! - **The framing.** A plan's aspect has to be its footprint's and a picture of
 //!   a unit has to be square, and the hub can check neither because it does not
-//!   hold footprints. So the shape is recomputed here from the angle and the
-//!   footprint through `coilbox_assets::render_pixels`, and the pixels are
-//!   refused if they are not it. A mis-framed render is caught here or nowhere.
+//!   hold footprints. So the shapes the angle and the footprint allow are worked
+//!   out here through `coilbox_assets::render_pixels_hold`, and the pixels are
+//!   refused if they are not one of them. A mis-framed render is caught here or
+//!   nowhere.
 //! - **The encoding.** `assetencode::encode_variant` is the corpus's one
 //!   encoder. A canvas can write WebP itself, and the easy path would be to let
 //!   it. Measured on one real render, the Armada Vehicle Plant at 250x200:
@@ -99,23 +100,22 @@ pub fn render(lib: &str, req: &RenderRequest<'_>) -> UnitRenderOutput {
         Some(v) => v,
         None => return skipped(RenderSkip::UnknownAngle, Vec::new()),
     };
-    let (width_px, height_px) =
-        coilbox_assets::render_pixels(req.angle, req.footprint_x, req.footprint_z);
-    if (req.width, req.height) != (width_px, height_px) {
+    if !coilbox_assets::render_pixels_hold(
+        req.angle,
+        req.footprint_x,
+        req.footprint_z,
+        req.width,
+        req.height,
+    ) {
         return skipped(
             RenderSkip::MisFramed,
             vec![format!(
-                "a {}x{} footprint frames a {:?} render to {}x{} pixels, and the render is {}x{}",
-                req.footprint_x,
-                req.footprint_z,
-                req.angle,
-                width_px,
-                height_px,
-                req.width,
-                req.height
+                "no frame of a {}x{} footprint takes a {:?} render to {}x{} pixels",
+                req.footprint_x, req.footprint_z, req.angle, req.width, req.height
             )],
         );
     }
+    let (width_px, height_px) = (req.width, req.height);
     let pixels = match read_pixels(req.pixels, req.width, req.height) {
         Ok(p) => p,
         Err(why) => return skipped(RenderSkip::NoPixels, vec![why]),
@@ -383,11 +383,11 @@ mod tests {
         source_archive: ARCHIVE,
     };
 
-    /// The framing check, which is the whole reason this mode recomputes the
-    /// frame rather than trusting the caller. A 3 by 2 footprint frames to
-    /// 255x204 and nothing else is that unit's render.
+    /// The framing check, which is the whole reason this mode works the frame
+    /// out rather than trusting the caller. A 3 by 2 footprint frames to a short
+    /// list of shapes, one per bleed, and nothing else is that unit's render.
     #[test]
-    fn refuses_a_render_that_is_not_the_shape_its_footprint_frames_to() {
+    fn refuses_a_render_that_is_not_a_shape_its_footprint_frames_to() {
         let dir = temp_dir("misframed");
         let file = dir.join("pixels.bin");
         std::fs::write(&file, pixels(256, 256)).unwrap();
@@ -395,11 +395,34 @@ mod tests {
         // Square, which is exactly the mistake the rule exists to catch.
         let out = render("nolib", &request(&dir, &file, 3, 2, 256, 256));
         assert_eq!(out.asset_skipped, Some(RenderSkip::MisFramed));
-        assert!(out.errors[0].contains("255x204"), "{:?}", out.errors);
+        assert!(out.errors[0].contains("256x256"), "{:?}", out.errors);
 
         // Transposed, which reads as a plausible picture and is the other unit's.
         let out = render("nolib", &request(&dir, &file, 3, 2, 204, 255));
         assert_eq!(out.asset_skipped, Some(RenderSkip::MisFramed));
+
+        // A pixel off the narrowest frame, so the check is a list rather than a
+        // range that anything near enough falls into.
+        let out = render("nolib", &request(&dir, &file, 3, 2, 254, 204));
+        assert_eq!(out.asset_skipped, Some(RenderSkip::MisFramed));
+    }
+
+    /// A model reaching past its footprint is framed wider (issue #2952), and
+    /// the check has to take that without being told which bleed was used.
+    #[test]
+    fn takes_a_plan_framed_wider_than_the_narrowest_frame() {
+        let dir = temp_dir("widened");
+        let file = dir.join("pixels.bin");
+        // 3 by 2 at three squares of bleed: 9 by 8 squares at 28 pixels each.
+        let frame = coilbox_assets::render_frame_bled(3, 2, 3);
+        assert_eq!((frame.width_px, frame.height_px), (252, 224));
+        std::fs::write(&file, pixels(frame.width_px, frame.height_px)).unwrap();
+
+        let out = render(
+            "nolib",
+            &request(&dir, &file, 3, 2, frame.width_px, frame.height_px),
+        );
+        assert_ne!(out.asset_skipped, Some(RenderSkip::MisFramed));
     }
 
     #[test]

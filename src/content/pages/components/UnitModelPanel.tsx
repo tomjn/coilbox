@@ -228,7 +228,10 @@ function HubRender({
 }) {
   const [result, setResult] = useState<UnitRenderResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const frame = renderFrame(footprintX, footprintZ);
+  // The narrowest frame this footprint can have, which is what it gets unless
+  // the model reaches further. Replaced by the frame actually drawn, since only
+  // a render knows how far this model reaches.
+  const [frame, setFrame] = useState(renderFrame(footprintX, footprintZ));
 
   const run = async () => {
     setBusy(true);
@@ -240,6 +243,7 @@ function HubRender({
         footprintX,
         footprintZ,
       );
+      setFrame(drawn.frame);
       setResult(
         await unitsyncUnitRender({
           enginePath,
@@ -271,8 +275,11 @@ function HubRender({
         </Button>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        {footprintX} by {footprintZ} squares, framed with a square of bleed on
-        each side, so {frame.widthPx} by {frame.heightPx} pixels.
+        {footprintX} by {footprintZ} squares, framed with{" "}
+        {frame.bleedSquares === 1
+          ? "a square"
+          : `${frame.bleedSquares} squares`}{" "}
+        of bleed on each side, so {frame.widthPx} by {frame.heightPx} pixels.
       </p>
 
       {result?.dataUrl && (
