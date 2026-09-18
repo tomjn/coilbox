@@ -1,9 +1,10 @@
 /**
  * The read half of the Coilbox Hub API (issue #1347), as the browse screen uses
- * it. Two routes, both anonymous: `/api/v1/items` lists and searches, and
- * `/api/v1/items/{id}` adds the `container_url` an import needs. The base
- * address always comes from `useHubUrl()` (see `./config`), never from a
- * literal here.
+ * it. Three routes, all anonymous: `/api/v1/items` lists and searches,
+ * `/api/v1/items/{id}` adds the `container_url` an import needs, and
+ * `/api/v1/games` lists every game the hub holds, with its ordered download
+ * sources (issue #2951). The base address always comes from `useHubUrl()`
+ * (see `./config`), never from a literal here.
  *
  * Two things the hub does deliberately, which this module has to honour:
  *
@@ -27,6 +28,8 @@ import { containerKindName, containerKindPlural } from "@/container/names";
 /** Response envelopes, from `lib/api/items.ts` in tomjn/coilbox-hub. */
 const ITEMS_FORMAT = "coilbox-hub-items";
 const ITEM_FORMAT = "coilbox-hub-item";
+/** From `lib/api/gameList.ts` in tomjn/coilbox-hub. */
+const GAMES_FORMAT = "coilbox-hub-games";
 
 /** The API version this build was written against. A higher one is refused. */
 export const HUB_API_VERSION = 1;
@@ -315,6 +318,80 @@ export function fetchHubItem(
   signal?: AbortSignal,
 ): Promise<HubResult<HubItemDetail>> {
   return getJson(hubItemUrl(base, id), readItemBody, signal);
+}
+
+/**
+ * One way to fetch a game, as the hub's `GameDownload` holds it. `value` is a
+ * rapid tag, a direct address, or an `owner/repo` GitHub path depending on
+ * `kind`. `asset` (github only) is a fragment of the release archive's
+ * filename to pick. `filename` (url only) is what to save the download as.
+ * See `hubGameDownloadRequest` in `./games/download` for how these turn into
+ * an actual download.
+ */
+export interface HubGameDownload {
+  kind: "rapid" | "url" | "github";
+  value: string;
+  asset?: string;
+  filename?: string;
+}
+
+/**
+ * A game as `GET /api/v1/games` lists it (issue #2951). `downloads` is best
+ * source first - the caller is expected to try the next one when a source
+ * comes up empty, never to stop at the first entry.
+ *
+ * `logo`/`card` can be a root-relative path (e.g. `/assets/games/...`) rather
+ * than a full address, since the hub does not know its own public origin for a
+ * picture still waiting for promotion. A caller that wants to show one has to
+ * resolve it against the hub host it just called.
+ */
+export interface HubGame {
+  shortname: string;
+  title: string;
+  description: string | null;
+  featured: boolean;
+  downloads: HubGameDownload[];
+  logo: string | null;
+  card: string | null;
+  faction_count: number;
+  unit_count: number;
+  item_count: number;
+}
+
+/** Build the games listing URL. */
+export function hubGamesUrl(base: string): string {
+  return hubUrl(base, "/api/v1/games").toString();
+}
+
+/** Read a games-listing response that already came back 2xx. */
+export function readGamesBody(body: unknown): HubResult<HubGame[]> {
+  const envelope = readEnvelope(body, GAMES_FORMAT);
+  if (!envelope.ok) return { ok: false, reason: envelope.reason };
+  const { games } = envelope.body;
+  if (!Array.isArray(games)) {
+    return {
+      ok: false,
+      reason: "The hub sent a games list with no games in it.",
+    };
+  }
+  return { ok: true, value: games as HubGame[] };
+}
+
+/**
+ * Fetch every game the hub holds. Never throws.
+ *
+ * The hub deliberately answers 503 rather than an empty list when its own
+ * catalog read fails, because an empty list is a claim ("the hub holds no
+ * games") the hub could not actually make. `getJson` already turns a 5xx into
+ * the same cold-start sentence `fetchHubItems` gives, so that distinction
+ * reaches the caller unchanged. A 503 becomes a reason to show, never an
+ * empty `HubGame[]`.
+ */
+export function fetchHubGames(
+  base: string,
+  signal?: AbortSignal,
+): Promise<HubResult<HubGame[]>> {
+  return getJson(hubGamesUrl(base), readGamesBody, signal);
 }
 
 /**

@@ -13,6 +13,9 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { useGithubGameRepos } from "@/content/branding";
+import { fetchHubGames, type HubGameDownload } from "@/hub/api";
+import { useHubUrl } from "@/hub/config";
+import { hubGameDownloadRequest } from "@/hub/games/download";
 import {
   dlGithubReleaseArchives,
   dlInstalledContent,
@@ -29,6 +32,10 @@ import { QueueProgress } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
 
+/** The coilbox hub games route (issue #2951), alongside springfiles and the
+ * curated GitHub repos in the source select below. */
+const HUB_SOURCE = "hub";
+
 type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
 
 const SORT_OPTIONS = [
@@ -42,25 +49,40 @@ const SORT_OPTIONS = [
  * registry (issue #512, resolved at render time so it can't be a literal union). */
 type Source = string;
 
-/** Normalised game row rendered by the list, regardless of source. Every source
- * resolves to a direct archive download into `<root>/games/`. */
+/** Normalised game row rendered by the list, regardless of source. Every
+ * springfiles/GitHub-repo source resolves to a direct archive download into
+ * `<root>/games/`. A hub row is different (issue #2951): the hub gives a game
+ * and its ordered download sources, not one file, so it carries `downloads`
+ * instead of `url`/`size` and is resolved at click time by
+ * `hubGameDownloadRequest`. */
 interface GameItem {
-  /** Unique identity + React key: springname for springfiles, filename for GitHub. */
+  /** Unique identity + React key: springname for springfiles, filename for
+   * GitHub, shortname for the hub. */
   id: string;
   name: string;
-  /** On-disk archive name, lowercased for installed-detection matching. */
+  /** On-disk archive name, lowercased for installed-detection matching. Blank
+   * for a hub row: which file it becomes depends on which of its several
+   * sources ends up used, so there is nothing to match against ahead of a
+   * download. */
   filename: string;
-  size: number;
-  /** Direct download URL (springfiles mirror or GitHub asset); missing = not downloadable. */
+  /** Missing for a hub row - the hub names sources, not a file, and this is
+   * left unset rather than faked as 0. */
+  size?: number;
+  /** Direct download URL (springfiles mirror or GitHub asset). Missing means
+   * not downloadable. */
   url?: string;
+  /** Hub rows only: the ordered sources to try (best first). */
+  downloads?: HubGameDownload[];
 }
 
 /**
- * Games: download games from springfiles into the configured content root.
- * Rapid games live under Browse Rapid (which also carries AIs and other rapid
- * content), so this screen covers only the non-rapid springfiles catalog —
- * plain mod archives fetched by a direct mirror download into `<root>/games/`.
- * Requires a configured write root since there's no default destination.
+ * Games: download games from springfiles, the coilbox hub or a curated GitHub
+ * release repo into the configured content root. Rapid games live under
+ * Browse Rapid (which also carries AIs and other rapid content), so this
+ * screen covers non-rapid sources - plain mod archives fetched by a direct
+ * mirror download into `<root>/games/`, or the hub's own ordered download
+ * sources for a game (issue #2951). Requires a configured write root since
+ * there's no default destination.
  */
 export default function GamesPage() {
   const { path: writePath, loading: writeRootLoading } = useWriteRoot();
@@ -76,6 +98,7 @@ export default function GamesPage() {
     () => mergeGameRepos(catalogRepos, GAME_REPOS),
     [catalogRepos],
   );
+  const hubUrl = useHubUrl();
   const [source, setSource] = useState<Source>("springfiles");
   const [games, setGames] = useState<GameItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,6 +116,22 @@ export default function GamesPage() {
       setError(null);
       setGames(null);
       try {
+        if (src === HUB_SOURCE) {
+          const result = await fetchHubGames(hubUrl);
+          if (!result.ok) {
+            setError(result.reason);
+            return;
+          }
+          setGames(
+            result.value.map((g) => ({
+              id: g.shortname,
+              name: g.title,
+              filename: "",
+              downloads: g.downloads,
+            })),
+          );
+          return;
+        }
         const repo = src === "springfiles" ? undefined : repoForKey(repos, src);
         if (repo) {
           const { archives } = await dlGithubReleaseArchives({ repo });
@@ -123,7 +162,7 @@ export default function GamesPage() {
         setLoading(false);
       }
     },
-    [repos],
+    [repos, hubUrl],
   );
 
   useEffect(() => {
@@ -157,10 +196,56 @@ export default function GamesPage() {
     refreshInstalled();
   });
 
-  // Add a game to the app-wide download queue. Every source resolves to a direct
-  // archive download into `<root>/games/`.
-  function enqueueGame(game: GameItem) {
-    if (!writePath || !game.url) return;
+  // A hub row has no fixed identity until one of its sources resolves (issue
+  // #2951): unlike every other source here, resolving it may itself involve a
+  // network call (a github source's release list). These track that in-flight
+  // resolution and its outcome per row, by game id, so the bulk queue read
+  // below (`itemFor`/`failureFor`) can pick the row up once it has an
+  // identity, the same way it already does for every other source.
+  const [hubResolving, setHubResolving] = useState<Set<string>>(new Set());
+  const [hubIdentities, setHubIdentities] = useState<Record<string, string>>(
+    {},
+  );
+  const [hubErrors, setHubErrors] = useState<Record<string, string>>({});
+
+  // Add a game to the app-wide download queue. Springfiles and GitHub-repo
+  // rows resolve to a direct archive download into `<root>/games/`. A hub row
+  // carries no single URL - its ordered `downloads` are tried in turn by
+  // `hubGameDownloadRequest`, skipping a source that comes up empty, and the
+  // first usable one is what gets queued.
+  async function enqueueGame(game: GameItem) {
+    if (!writePath) return;
+    if (game.downloads) {
+      setHubResolving((prev) => new Set(prev).add(game.id));
+      setHubErrors((prev) => {
+        if (!(game.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[game.id];
+        return next;
+      });
+      try {
+        const request = await hubGameDownloadRequest(
+          game.downloads,
+          `${writePath}/games`,
+          game.name,
+        );
+        setHubIdentities((prev) => ({
+          ...prev,
+          [game.id]: identityOf(request),
+        }));
+        enqueue(request);
+      } catch (e) {
+        setHubErrors((prev) => ({ ...prev, [game.id]: errMessage(e) }));
+      } finally {
+        setHubResolving((prev) => {
+          const next = new Set(prev);
+          next.delete(game.id);
+          return next;
+        });
+      }
+      return;
+    }
+    if (!game.url) return;
     enqueue({
       kind: "file",
       label: game.name,
@@ -205,9 +290,9 @@ export default function GamesPage() {
         <div className="space-y-1">
           <h1 className="text-lg font-semibold leading-none">Games</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Download games from springfiles or a curated GitHub release repo
-            into the configured content folder. For rapid games (and AIs) use
-            Browse Rapid.
+            Download games from springfiles, the coilbox hub or a curated GitHub
+            release repo into the configured content folder. For rapid games
+            (and AIs) use Browse Rapid.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -217,6 +302,7 @@ export default function GamesPage() {
             className="w-48"
             options={[
               { value: "springfiles", label: "springfiles" },
+              { value: HUB_SOURCE, label: "coilbox hub" },
               ...repos.map((g) => ({ value: g.key, label: g.label })),
             ]}
           />
@@ -299,30 +385,39 @@ export default function GamesPage() {
           <ul className="divide-y divide-border">
             {sorted.map((g) => {
               const isInstalled = installed.has(g.filename.toLowerCase());
-              const identity = g.url
-                ? identityOf({
-                    kind: "file",
-                    label: g.name,
-                    args: {
-                      url: g.url,
-                      destDir: `${writePath}/games`,
-                      filename: g.filename,
-                    },
-                  })
-                : null;
+              // A hub row has no identity until `enqueueGame` resolves one of
+              // its `downloads` (issue #2951). Every other source's identity
+              // is known up front from its single URL.
+              const identity = g.downloads
+                ? (hubIdentities[g.id] ?? null)
+                : g.url
+                  ? identityOf({
+                      kind: "file",
+                      label: g.name,
+                      args: {
+                        url: g.url,
+                        destDir: `${writePath}/games`,
+                        filename: g.filename,
+                      },
+                    })
+                  : null;
               const item = identity ? itemFor(identity) : null;
               const status = item?.status ?? null;
+              const isResolving = hubResolving.has(g.id);
               // Read here rather than per row through `useQueuedDownload`: the
               // springfiles catalogue is hundreds of rows, and the queue is
               // already being read once for the whole page (issue #1863).
-              const failure = identity ? failureFor(identity) : null;
+              const failure =
+                hubErrors[g.id] ?? (identity ? failureFor(identity) : null);
               return (
                 <li key={g.id} className="flex flex-col gap-2 px-6 py-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{g.name}</p>
                       <p className="truncate font-mono text-xs text-muted-foreground">
-                        {g.filename}
+                        {g.downloads
+                          ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
+                          : g.filename}
                       </p>
                     </div>
                     <Button
@@ -331,8 +426,9 @@ export default function GamesPage() {
                       onClick={() => enqueueGame(g)}
                       disabled={
                         !writePath ||
-                        !g.url ||
+                        (!g.url && !g.downloads) ||
                         isInstalled ||
+                        isResolving ||
                         status === "queued" ||
                         status === "active" ||
                         status === "done"
@@ -343,7 +439,7 @@ export default function GamesPage() {
                           : `Download ${g.name}`
                       }
                     >
-                      {status === "active" ? (
+                      {isResolving || status === "active" ? (
                         <Loader2 className="animate-spin" />
                       ) : isInstalled || status === "done" ? (
                         <CheckCircle2 className="text-emerald-500" />
@@ -352,15 +448,17 @@ export default function GamesPage() {
                       )}
                       {isInstalled
                         ? "Already downloaded"
-                        : status === "active"
-                          ? "Downloading…"
-                          : status === "queued"
-                            ? "Queued"
-                            : status === "done"
-                              ? "Done"
-                              : active
-                                ? "Add to queue"
-                                : "Download"}
+                        : isResolving
+                          ? "Resolving…"
+                          : status === "active"
+                            ? "Downloading…"
+                            : status === "queued"
+                              ? "Queued"
+                              : status === "done"
+                                ? "Done"
+                                : active
+                                  ? "Add to queue"
+                                  : "Download"}
                     </Button>
                   </div>
                   <QueueProgress item={item} />
