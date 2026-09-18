@@ -4,13 +4,14 @@ import { describe, expect, it } from "vitest";
 import { toBase64 } from "@/lib/base64";
 import {
   flipRows,
+  modelReach,
   PICTURE_VIEWS,
   pictureCamera,
   RENDER_VERSION,
   topDownCamera,
   unpremultiply,
 } from "./renderTop";
-import { PICTURE_ANGLES, renderFrame } from "./vocabulary";
+import { fittingBleed, PICTURE_ANGLES, renderFrame } from "./vocabulary";
 
 /**
  * The render itself needs a GL context, which this runner does not have. What it
@@ -117,6 +118,59 @@ describe("where the camera puts the model", () => {
       expect(Math.abs(at.x)).toBeLessThan(1);
       expect(Math.abs(at.y)).toBeLessThan(1);
     }
+  });
+
+  /**
+   * The complaint in issue #2952: a model reaching past the frame filled the
+   * whole picture and was cut off at every edge, which is the one way a plan
+   * differs from the three picture angles.
+   */
+  it("keeps a model that overhangs its footprint inside the picture", () => {
+    const wide = new THREE.Box3(
+      new THREE.Vector3(-100, 0, -30),
+      new THREE.Vector3(100, 20, 30),
+    );
+    const footprint = [3, 2] as const;
+
+    const tight = topDownCamera(renderFrame(...footprint), wide);
+    expect(Math.abs(ndc(tight, 100, 0, 0).x)).toBeGreaterThan(1);
+
+    const bleed = fittingBleed(...footprint, ...modelReach(wide));
+    const camera = topDownCamera(renderFrame(...footprint, bleed), wide);
+    for (const [x, z] of [
+      [100, 30],
+      [-100, -30],
+      [100, -30],
+      [-100, 30],
+    ]) {
+      const at = ndc(camera, x, 0, z);
+      expect(Math.abs(at.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(at.y)).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("how far a model reaches", () => {
+  it("takes the worse side of each ground axis", () => {
+    // Leaning 60 elmos one way and 10 the other, which the plan camera has to
+    // cover 60 of on both sides because it sits on the origin.
+    const leaning = new THREE.Box3(
+      new THREE.Vector3(-10, 0, -8),
+      new THREE.Vector3(60, 30, 44),
+    );
+    expect(modelReach(leaning)).toEqual([60, 44]);
+  });
+
+  it("reaches nowhere for a model with no bounds", () => {
+    expect(modelReach(new THREE.Box3())).toEqual([0, 0]);
+  });
+
+  it("says nothing about how tall the model is", () => {
+    const tall = new THREE.Box3(
+      new THREE.Vector3(-8, -50, -8),
+      new THREE.Vector3(8, 300, 8),
+    );
+    expect(modelReach(tall)).toEqual([8, 8]);
   });
 });
 

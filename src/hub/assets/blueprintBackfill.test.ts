@@ -279,6 +279,7 @@ function spy(
         height: 4,
         rgba: new Uint8Array(4 * 4 * 4),
         frame: {
+          bleedSquares: 1,
           squaresX: 4,
           squaresZ: 5,
           widthElmos: 64,
