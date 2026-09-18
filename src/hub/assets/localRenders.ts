@@ -110,5 +110,10 @@ export async function localRenders(
  * footprint's aspect, and a build pic standing in for one does not.
  */
 export function localPlanPicture(render: LocalRender): PlanPicture {
-  return { url: hubAssetUrl(render.file), framed: true };
+  return {
+    url: hubAssetUrl(render.file),
+    framed: true,
+    widthPx: render.width,
+    heightPx: render.height,
+  };
 }

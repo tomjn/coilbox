@@ -153,6 +153,9 @@ describe("useHeldUnitPictures", () => {
       url: "coilbox://localhost/hubasset/armlab-render.webp",
       // A render, so it is drawn in a render's box with its bleed.
       framed: true,
+      // And its own pixels, which is what says how much bleed that is.
+      widthPx: 255,
+      heightPx: 204,
     });
   });
 

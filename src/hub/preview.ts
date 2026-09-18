@@ -43,7 +43,7 @@ import {
 } from "@/runlite/challenge";
 import { type GenRunMap, generateRun } from "@/runlite/generate";
 import type { RogueliteRun, RunNodeType } from "@/runlite/model";
-import { RENDER_BLEED_SQUARES } from "./assets/vocabulary";
+import { bleedFromPixels, RENDER_BLEED_SQUARES } from "./assets/vocabulary";
 
 /** A labelled fact, ready to draw. Values are strings because a layout name is
  * as much a fact about a challenge as its system count. */
@@ -641,12 +641,18 @@ export interface PictureBox {
 /**
  * Where a unit's picture goes on the plan (issue #1721).
  *
- * A top down render is framed on the footprint plus {@link RENDER_BLEED_SQUARES}
- * whole build squares on every side, because models overhang their footprints and
- * a render framed exactly on the footprint clips them. The bleed is the consumer's
- * to add back, which is what this does: the picture covers the ground the building
- * stands on and the bleed round it, so the model lands at the size the footprint
- * says it is.
+ * A top down render is framed on the footprint plus whole build squares of bleed
+ * on every side, because models overhang their footprints and a render framed
+ * exactly on the footprint clips them. The bleed is the consumer's to add back,
+ * which is what this does: the picture covers the ground the building stands on
+ * and the bleed round it, so the model lands at the size the footprint says it is.
+ *
+ * **The bleed is the render's own rather than {@link RENDER_BLEED_SQUARES}**
+ * since issue #2952, because a model reaching further than one square gets a
+ * wider frame. Nothing travels with the bytes to say which, so it is read back
+ * out of the picture's own pixel size against the footprint, which is
+ * {@link bleedFromPixels}. A picture no frame explains falls back to the floor,
+ * since the floor is the rule such a picture was taken under.
  *
  * The gap {@link BUILDING_GAP} takes off each side of a square is added back
  * first. That gap is drawing room between neighbours, not ground the building does
@@ -660,15 +666,42 @@ export interface PictureBox {
  */
 export function pictureBox(
   square: BlueprintSquare,
-  { framed }: { framed: boolean },
+  {
+    framed,
+    widthPx,
+    heightPx,
+  }: { framed: boolean; widthPx?: number; heightPx?: number },
 ): PictureBox {
-  const grow = framed ? BUILDING_GAP + RENDER_BLEED_SQUARES : 0;
+  const grow = framed
+    ? BUILDING_GAP + squareBleed(square, widthPx, heightPx)
+    : 0;
   return {
     x: square.x - grow,
     y: square.y - grow,
     width: square.width + grow * 2,
     height: square.height + grow * 2,
   };
+}
+
+/**
+ * The bleed the render drawn on this square was taken with.
+ *
+ * The square carries the footprint, shrunk by {@link BUILDING_GAP} on each side
+ * for drawing room, so the gap goes back on before the footprint is the one the
+ * renderer framed against. Rounded because the gap leaves it fractional.
+ */
+function squareBleed(
+  square: BlueprintSquare,
+  widthPx: number | undefined,
+  heightPx: number | undefined,
+): number {
+  if (!widthPx || !heightPx) return RENDER_BLEED_SQUARES;
+  const footprintX = Math.round(square.width + BUILDING_GAP * 2);
+  const footprintZ = Math.round(square.height + BUILDING_GAP * 2);
+  return (
+    bleedFromPixels(footprintX, footprintZ, widthPx, heightPx) ??
+    RENDER_BLEED_SQUARES
+  );
 }
 
 /**

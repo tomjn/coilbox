@@ -10,7 +10,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { PlanPicture } from "@/hub/assets/unitPictures";
-import { RENDER_BLEED_SQUARES } from "@/hub/assets/vocabulary";
+import { RENDER_BLEED_SQUARES, renderFrame } from "@/hub/assets/vocabulary";
 import { BUILDING_GAP, blueprintShape } from "@/hub/preview";
 import { LayoutPlan } from "./LayoutPlan";
 import type { BlueprintPayload } from "./payload";
@@ -44,7 +44,24 @@ function drawn(html: string, tag: string): Record<string, number>[] {
   });
 }
 
-const render = (url: string): PlanPicture => ({ url, framed: true });
+/** The lab's own footprint, which is what a render of it is framed against. */
+const LAB_FOOTPRINT = [3, 2] as const;
+
+/** A render of the lab, drawn with `bleed` squares round its footprint. The
+ *  pixel size is the whole of what says so, since nothing else travels with a
+ *  picture. */
+const render = (
+  url: string,
+  bleed: number = RENDER_BLEED_SQUARES,
+): PlanPicture => {
+  const frame = renderFrame(...LAB_FOOTPRINT, bleed);
+  return {
+    url,
+    framed: true,
+    widthPx: frame.widthPx,
+    heightPx: frame.heightPx,
+  };
+};
 
 describe("LayoutPlan", () => {
   it("draws nothing but squares when it has no pictures", () => {
@@ -83,7 +100,17 @@ describe("LayoutPlan", () => {
 
   it("draws a build pic standing in for a render inside the building's ground", () => {
     const html = markup(
-      new Map([["armlab", { url: "https://cdn/lab.webp", framed: false }]]),
+      new Map([
+        [
+          "armlab",
+          {
+            url: "https://cdn/lab.webp",
+            framed: false,
+            widthPx: 256,
+            heightPx: 256,
+          },
+        ],
+      ]),
     );
     const [picture] = drawn(html, "image");
     const lab = drawn(html, "rect").find((rect) => rect.width > 1);
@@ -93,6 +120,21 @@ describe("LayoutPlan", () => {
     expect(picture.width).toBeCloseTo(lab.width);
     expect(picture.height).toBeCloseTo(lab.height);
     expect(html).toContain('preserveAspectRatio="xMidYMid meet"');
+  });
+
+  it("draws a render that was framed wider in the wider box it needs", () => {
+    // A model reaching past one square is framed with more, and the plan has to
+    // draw the wider picture over more ground or the unit lands small (#2952).
+    const html = markup(
+      new Map([["armlab", render("https://cdn/lab.webp", 3)]]),
+    );
+    const [picture] = drawn(html, "image");
+    const lab = drawn(html, "rect").find((rect) => rect.width > 1);
+    if (!lab) throw new Error("expected the lab's square");
+
+    const grow = BUILDING_GAP + 3;
+    expect(picture.x).toBeCloseTo(lab.x - grow);
+    expect(picture.width).toBeCloseTo(lab.width + grow * 2);
   });
 
   it("matches a def however the author's game spelled it", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Container, ContainerKind } from "@/container/container";
-import { RENDER_BLEED_SQUARES } from "./assets/vocabulary";
+import { RENDER_BLEED_SQUARES, renderFrame } from "./assets/vocabulary";
 import {
   type BlueprintShape,
   BUILDING_GAP,
@@ -635,6 +635,34 @@ describe("pictureBox", () => {
       width: square.width,
       height: square.height,
     });
+  });
+
+  /**
+   * A model reaching past one build square is framed with more, and the plan
+   * has to draw it over the extra ground or the unit lands small (#2952). The
+   * picture's own pixel size is the only thing that says how much.
+   */
+  it("reads the bleed a widened render was framed with out of its pixels", () => {
+    const frame = renderFrame(3, 2, 3);
+    const box = pictureBox(square, {
+      framed: true,
+      widthPx: frame.widthPx,
+      heightPx: frame.heightPx,
+    });
+    expect(box.x).toBeCloseTo(2 - 3);
+    expect(box.width).toBeCloseTo(3 + 3 * 2);
+    expect(box.height).toBeCloseTo(2 + 3 * 2);
+  });
+
+  it("falls back to the floor for a picture no frame explains", () => {
+    // A render from some rule this build does not have, so the rule it was
+    // taken under is the one that was always there.
+    const box = pictureBox(square, {
+      framed: true,
+      widthPx: 200,
+      heightPx: 200,
+    });
+    expect(box.width).toBeCloseTo(3 + RENDER_BLEED_SQUARES * 2);
   });
 });
 
