@@ -58,6 +58,7 @@ function renderDrawer(over: Partial<Parameters<typeof PresetsDrawer>[0]> = {}) {
       onSave={vi.fn()}
       onImport={vi.fn()}
       onSaveFromReplay={vi.fn()}
+      onBrowseHub={vi.fn()}
       {...handlers}
       {...over}
     />,
@@ -105,6 +106,13 @@ describe("the preset list", () => {
     expect(
       screen.getByRole("button", { name: "Create from replay" }),
     ).toBeTruthy();
+  });
+
+  it("sends you to the hub for presets you have not made yourself", () => {
+    const onBrowseHub = vi.fn();
+    renderDrawer({ onBrowseHub });
+    fireEvent.click(screen.getByRole("button", { name: "Browse the hub" }));
+    expect(onBrowseHub).toHaveBeenCalled();
   });
 });
 

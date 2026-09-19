@@ -926,6 +926,10 @@ export default function SkirmishPage() {
         onCopyPresetLink={onCopyPresetLink}
         onImport={onImportPreset}
         onSaveFromReplay={saveFromReplay}
+        onBrowseHub={() => {
+          setPresetsOpen(false);
+          navigate("/hub?kind=preset");
+        }}
         onHostAsBattle={
           hostingPossible ? (p) => hostAsBattle(p, p.name) : undefined
         }

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
+import { CoilboxGlyph } from "@/components/CoilboxGlyph";
 import type { MapThumbData } from "@/content/config";
 import type { SkirmishDraft } from "../../drafts";
 import type { PresetSelection } from "../../presetParts";
@@ -50,6 +51,7 @@ export function PresetsDrawer({
   onCopyPresetLink,
   onImport,
   onSaveFromReplay,
+  onBrowseHub,
   onHostAsBattle,
   disabled,
 }: {
@@ -71,6 +73,8 @@ export function PresetsDrawer({
    * setup (every seated player becomes an AI opponent) without touching the
    * current Skirmish setup. */
   onSaveFromReplay: (name: string, draft: SkirmishDraft) => void;
+  /** Open the hub, narrowed to presets. */
+  onBrowseHub: () => void;
   /** "Host as battle" (#373): take this preset online without loading it into
    * the page first. Absent where hosting is impossible, which is what hides the
    * action on a Tachyon connection (see `docs/tachyon-protocol.md`). */
@@ -213,11 +217,22 @@ export function PresetsDrawer({
 
               {/* Seed a preset from a decoded replay's setup, the other end of the
                * refight pipeline from the replay detail page's "Refight this setup". */}
-              <div className="flex items-center border-b border-border/60 px-5 py-3">
+              <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
                 <NewPresetFromReplayButton
                   onSave={onSaveFromReplay}
                   disabled={disabled}
                 />
+                {/* Where presets come from when you have not made one. Lands on
+                 * the hub already narrowed to presets rather than on everything
+                 * shared. */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onBrowseHub}
+                  disabled={disabled}
+                >
+                  <CoilboxGlyph size={16} /> Browse the hub
+                </Button>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
