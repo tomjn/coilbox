@@ -7,7 +7,7 @@ import { lookupTag } from "./battleOptions";
  * there is no per-unit count. Tags: `game/restrict/unit<N>`, `.../limit<N>` and
  * `.../numrestrictions`, with N a 0-based index into the sorted unit set.
  */
-const RESTRICT_PREFIX = "game/restrict/";
+export const RESTRICT_PREFIX = "game/restrict/";
 const NUMRESTRICTIONS_KEY = "game/restrict/numrestrictions";
 
 /** True if `key` is any engine-native unit-restriction tag (case-insensitive). */

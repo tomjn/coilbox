@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
+import type { PresetSelection } from "@/play/presetParts";
 import {
   changedCount,
   displayedValue,
+  filterOptionTags,
   missingOptionTags,
   optionValue,
   rawOptionEntries,
@@ -274,5 +276,79 @@ describe("map options across a map change", () => {
     expect(
       staleMapOptionTags(airport, { "GAME/MAPOPTIONS/ExtractorRadius": "100" }),
     ).toEqual(["GAME/MAPOPTIONS/ExtractorRadius"]);
+  });
+});
+
+describe("filterOptionTags", () => {
+  // Every tag a host seed can carry: the start-pos type, mod options (some of
+  // which are tweak slots) and the restrict block. `draftToHostSeed` builds
+  // exactly these three kinds, so there are no map options here to cover.
+  const seedTags = {
+    "game/startpostype": "2",
+    "game/modoptions/maxunits": "8000",
+    "game/modoptions/tweakunits3": "PRESET",
+    "game/restrict/numrestrictions": "1",
+    "game/restrict/unit0": "armcom",
+    "game/restrict/limit0": "0",
+  };
+
+  const sel = (over: Partial<PresetSelection> = {}): PresetSelection => ({
+    parts: [],
+    modOptions: "replace",
+    tweakSlots: "replace",
+    ...over,
+  });
+
+  it("keeps every tag when every part is taken", () => {
+    expect(
+      filterOptionTags(
+        seedTags,
+        sel({
+          parts: ["startPositions", "modOptions", "tweakSlots", "restrictions"],
+        }),
+      ),
+    ).toEqual(seedTags);
+  });
+
+  it("drops every tag when no part is taken", () => {
+    expect(filterOptionTags(seedTags, sel())).toEqual({});
+  });
+
+  it("keeps the start-pos type only with the start positions part", () => {
+    expect(filterOptionTags(seedTags, sel({ parts: ["startPositions"] }))).toEqual(
+      { "game/startpostype": "2" },
+    );
+  });
+
+  it("separates the tweak slots from the plain mod options", () => {
+    expect(filterOptionTags(seedTags, sel({ parts: ["modOptions"] }))).toEqual({
+      "game/modoptions/maxunits": "8000",
+    });
+    expect(filterOptionTags(seedTags, sel({ parts: ["tweakSlots"] }))).toEqual({
+      "game/modoptions/tweakunits3": "PRESET",
+    });
+  });
+
+  it("keeps the whole restrict block together", () => {
+    expect(filterOptionTags(seedTags, sel({ parts: ["restrictions"] }))).toEqual({
+      "game/restrict/numrestrictions": "1",
+      "game/restrict/unit0": "armcom",
+      "game/restrict/limit0": "0",
+    });
+  });
+
+  it("reads the tag prefix however it is capitalised", () => {
+    expect(
+      filterOptionTags(
+        { "Game/ModOptions/MaxUnits": "8000" },
+        sel({ parts: ["modOptions"] }),
+      ),
+    ).toEqual({ "Game/ModOptions/MaxUnits": "8000" });
+  });
+
+  it("keeps a tag that belongs to no part, having no claim to drop it", () => {
+    expect(
+      filterOptionTags({ "game/hostip": "1.2.3.4" }, sel()),
+    ).toEqual({ "game/hostip": "1.2.3.4" });
   });
 });
