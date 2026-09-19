@@ -71,6 +71,36 @@
   {
     "chunks": [
       {
+        "form": "table",
+        "lua": "{\n  [\"corak\"] = { name = \"Танк?\" },\n}",
+        "reason": "Each one is a value the user typed, so none of them has to read the game's own first.",
+        "title": "1 field change"
+      }
+    ],
+    "name": "A tweakunits payload BAR would damage",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [],
+      "tweakunits": [
+        "!bset tweakunits eyBbImNvcmFrIl0gPSB7IG5hbWUgPSAi0KLQsNC90Lo/IiB9LCB9"
+      ],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "overrides": {
+          "corak": {
+            "name": "Танк?"
+          }
+        }
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "A tweakunits payload BAR would damage"
+    }
+  },
+  {
+    "chunks": [
+      {
         "form": "block",
         "lua": "-- Units added. Assigned directly: none of these existed before, so there is\n-- nothing to merge onto.\ndo\n  local added = {\n    [\"supercom\"] = {\n      buildoptions = { [1] = \"armsolar\", [2] = \"armlab\" },\n      collisionVolumeScales = { [1] = 10, [2] = 20, [3] = 30 },\n      customParams = {},\n      maxDamage = 9500,\n      sfx = {\n        explosion = { [1] = \"boom\" },\n      },\n    },\n  }\n  for name, def in pairs(added) do\n    UnitDefs[name] = def\n  end\nend",
         "reason": "A copy owns its whole definition, and the game has no unit of that name to merge onto, so it has to be assigned rather than merged.",

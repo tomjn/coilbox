@@ -49,7 +49,6 @@
 
 use crate::compile::{Chunk, CompiledMod, LuaForm};
 use crate::model::ModProject;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use coilbox_springlua::SpringLua;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -326,8 +325,19 @@ fn check_base64_round_trip(compiled: &CompiledMod, report: &mut PreflightReport)
     }
     let mut ok = true;
     for chunk in &compiled.chunks {
-        let encoded = URL_SAFE_NO_PAD.encode(chunk.lua.as_bytes());
-        match URL_SAFE_NO_PAD.decode(&encoded) {
+        let encoded = crate::bar_pack::encode_for(chunk.form, &chunk.lua);
+        // A `tweakunits` payload reaches BAR through a step that rewrites
+        // every `_` to `=` before decoding, so a `_` in one is a byte the
+        // game will silently lose (issue #2963). Checked rather than assumed,
+        // because nothing downstream of here would notice.
+        if chunk.form == LuaForm::Table && encoded.contains('_') {
+            ok = false;
+            report.blockers.push(format!(
+                "{}'s tweakunits payload holds a character BAR rewrites before decoding, so the game would read it short.",
+                chunk.title
+            ));
+        }
+        match crate::bar_pack::decode_for(chunk.form, &encoded) {
             Ok(bytes) if bytes == chunk.lua.as_bytes() => {}
             Ok(_) => {
                 ok = false;
