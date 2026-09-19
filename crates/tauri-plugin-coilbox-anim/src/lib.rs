@@ -207,6 +207,7 @@ async fn anim_bos2lua(
                 pieces: pieces.as_deref(),
                 linear_scale,
                 precedence,
+                prune: false,
             },
         )
         .map(|conversion| (conversion, linear_scale))

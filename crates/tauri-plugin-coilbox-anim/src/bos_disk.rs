@@ -125,6 +125,7 @@ mod tests {
                 pieces: None,
                 linear_scale: coilbox_bos2lua::MODERN_LINEAR,
                 precedence: coilbox_bos2lua::Precedence::Modern,
+                prune: false,
             },
         )
         .unwrap()

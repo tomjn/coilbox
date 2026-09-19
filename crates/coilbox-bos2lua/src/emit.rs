@@ -538,6 +538,10 @@ struct Program<'a> {
     /// Whether the script has a SetMaxReloadTime, whose call-in shares
     /// `script.Create` with Create itself.
     has_reload: bool,
+    /// The functions left out because nothing can reach them, lower-cased.
+    dropped: HashSet<String>,
+    /// The constants something that is written uses, when leaving out the rest.
+    live_consts: Option<HashSet<String>>,
 }
 
 fn sanitise(want: &str, taken: &HashSet<String>) -> String {
@@ -648,6 +652,123 @@ fn walk<'s>(stmts: &'s [Stmt], f: &mut impl FnMut(&'s StmtKind)) {
     }
 }
 
+/// Every name an expression reads, lower-cased, and every constant, as written.
+fn names_in(e: &Expr, names: &mut HashSet<String>, consts: &mut HashSet<String>) {
+    match e {
+        Expr::Name(n) => {
+            names.insert(n.to_lowercase());
+        }
+        Expr::Const(n) => {
+            consts.insert(n.clone());
+        }
+        Expr::Get(a, args) => {
+            names_in(a, names, consts);
+            for x in args {
+                names_in(x, names, consts);
+            }
+        }
+        Expr::Rand(a, b) | Expr::Bin(_, a, b) => {
+            names_in(a, names, consts);
+            names_in(b, names, consts);
+        }
+        Expr::Not(a) | Expr::Neg(a) => names_in(a, names, consts),
+        Expr::Num(_) | Expr::Angle(..) | Expr::Linear(..) => {}
+    }
+}
+
+/// The name a statement itself writes to or moves, if it has one.
+fn target_of(k: &StmtKind) -> Option<&str> {
+    match k {
+        StmtKind::Assign(n, _)
+        | StmtKind::Inc(n)
+        | StmtKind::Dec(n)
+        | StmtKind::Spin { piece: n, .. }
+        | StmtKind::StopSpin { piece: n, .. }
+        | StmtKind::Turn { piece: n, .. }
+        | StmtKind::Move { piece: n, .. }
+        | StmtKind::Scale { piece: n, .. }
+        | StmtKind::WaitTurn(n, _)
+        | StmtKind::WaitMove(n, _)
+        | StmtKind::WaitScale(n)
+        | StmtKind::EmitSfx(_, n)
+        | StmtKind::Hide(n)
+        | StmtKind::Show(n)
+        | StmtKind::Explode(n, _) => Some(n),
+        _ => None,
+    }
+}
+
+/// Whether working an expression out changes nothing. A `get` may be one of
+/// the setters, and `rand` moves the synced generator every unit shares.
+fn pure(e: &Expr) -> bool {
+    match e {
+        Expr::Get(..) | Expr::Rand(..) => false,
+        Expr::Bin(_, a, b) => pure(a) && pure(b),
+        Expr::Not(a) | Expr::Neg(a) => pure(a),
+        _ => true,
+    }
+}
+
+/// The functions nothing can reach, lower-cased. What can be reached starts
+/// from the call-ins and from every function in the script's own file, since
+/// a gadget may call one of those by name. A `lua_` function is never one of
+/// them: `call-script` on it goes to LuaRules and never runs its body.
+fn unreachable(funcs: &[(&Func, usize)], infos: &HashMap<String, FuncInfo>) -> HashSet<String> {
+    let mut edges: HashMap<String, Vec<String>> = HashMap::new();
+    let mut reached: Vec<String> = Vec::new();
+    for (f, file) in funcs {
+        let lower = f.name.to_lowercase();
+        let callees = edges.entry(lower.clone()).or_default();
+        walk(&f.body, &mut |k| match k {
+            StmtKind::Call(name, _) if name.starts_with("lua_") => {}
+            StmtKind::Call(name, _) | StmtKind::Start(name, _) => callees.push(name.to_lowercase()),
+            _ => {}
+        });
+        let called_in = infos.get(&lower).is_some_and(|info| info.role.is_some());
+        if called_in || (*file == 0 && !f.name.starts_with("lua_")) {
+            reached.push(lower);
+        }
+    }
+    let mut live: HashSet<String> = HashSet::new();
+    while let Some(name) = reached.pop() {
+        if live.insert(name.clone()) {
+            reached.extend(edges.get(&name).into_iter().flatten().cloned());
+        }
+    }
+    edges
+        .into_keys()
+        .filter(|name| !live.contains(name))
+        .collect()
+}
+
+/// The `var`s of a function that are set and never read, lower-cased, when
+/// leaving out every line that sets them changes nothing.
+fn dead_locals(f: &Func) -> HashSet<String> {
+    let mut declared: HashSet<String> = HashSet::new();
+    let mut read: HashSet<String> = HashSet::new();
+    let mut kept: HashSet<String> = HashSet::new();
+    walk(&f.body, &mut |k| {
+        if let StmtKind::Var(names) = k {
+            declared.extend(names.iter().map(|n| n.to_lowercase()));
+        }
+        for e in exprs_in(k) {
+            names_in(e, &mut read, &mut HashSet::new());
+        }
+        match k {
+            StmtKind::Assign(_, e) if pure(e) => {}
+            StmtKind::Inc(_) | StmtKind::Dec(_) => {}
+            _ => kept.extend(target_of(k).map(str::to_lowercase)),
+        }
+    });
+    for p in &f.params {
+        declared.remove(&p.to_lowercase());
+    }
+    declared
+        .into_iter()
+        .filter(|n| !read.contains(n) && !kept.contains(n))
+        .collect()
+}
+
 impl<'a> Program<'a> {
     fn new(items: &'a [Item], pre: &'a Pre, options: &'a Options<'a>) -> Self {
         let mut p = Program {
@@ -665,9 +786,12 @@ impl<'a> Program<'a> {
             taken: HashSet::new(),
             warnings: pre.warnings.clone(),
             has_reload: false,
+            dropped: HashSet::new(),
+            live_consts: None,
         };
         let mut seen: HashSet<String> = HashSet::new();
-        let mut funcs: Vec<&Func> = Vec::new();
+        let mut funcs: Vec<(&Func, usize)> = Vec::new();
+        let mut piece_warnings: HashMap<String, String> = HashMap::new();
         for item in items {
             match &item.kind {
                 ItemKind::Pieces(names) => {
@@ -683,9 +807,11 @@ impl<'a> Program<'a> {
                                 match model.iter().find(|m| m.eq_ignore_ascii_case(name)) {
                                     Some(found) => found.clone(),
                                     None => {
-                                        p.warnings.push(format!(
+                                        let warning = format!(
                                         "The script names a piece called {name} that the model does not have, so the engine will refuse to load it."
-                                    ));
+                                    );
+                                        piece_warnings.insert(name.to_lowercase(), warning.clone());
+                                        p.warnings.push(warning);
                                         name.clone()
                                     }
                                 }
@@ -708,7 +834,7 @@ impl<'a> Program<'a> {
                 }
                 ItemKind::Func(f) => {
                     p.code_files.insert(item.file);
-                    funcs.push(f);
+                    funcs.push((f, item.file));
                 }
                 _ => {}
             }
@@ -721,9 +847,9 @@ impl<'a> Program<'a> {
 
         // Roles, with the engine's own tie-breaks: the numbered weapon name
         // wins over the old one, and HitByWeaponId over HitByWeapon.
-        let names: HashSet<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        let names: HashSet<&str> = funcs.iter().map(|(f, _)| f.name.as_str()).collect();
         let mut claimed: HashMap<String, String> = HashMap::new();
-        for f in &funcs {
+        for (f, _) in &funcs {
             let lower = f.name.to_lowercase();
             if p.funcs.contains_key(&lower) {
                 continue;
@@ -781,11 +907,18 @@ impl<'a> Program<'a> {
             );
         }
 
+        if options.prune {
+            p.prune(&funcs, &piece_warnings);
+        }
+
         // Who calls whom, and with how many arguments.
         let mut blocks_directly: HashMap<String, bool> = HashMap::new();
         let mut calls: HashMap<String, Vec<String>> = HashMap::new();
-        for f in &funcs {
+        for (f, _) in &funcs {
             let lower = f.name.to_lowercase();
+            if p.dropped.contains(&lower) {
+                continue;
+            }
             let mut blocks = false;
             let mut callees = Vec::new();
             walk(&f.body, &mut |k| match k {
@@ -858,6 +991,56 @@ impl<'a> Program<'a> {
         p
     }
 
+    /// Leaves out the functions nothing can reach, then the pieces, variables
+    /// and constants that only they named.
+    fn prune(&mut self, funcs: &[(&Func, usize)], piece_warnings: &HashMap<String, String>) {
+        self.dropped = unreachable(funcs, &self.funcs);
+        let mut names: HashSet<String> = HashSet::new();
+        let mut consts: HashSet<String> = HashSet::new();
+        let mut said: HashSet<String> = HashSet::new();
+        for (f, file) in funcs {
+            let lower = f.name.to_lowercase();
+            if self.dropped.contains(&lower) {
+                if !f.name.starts_with("lua_") && said.insert(lower) {
+                    self.warnings.push(format!(
+                        "{} in {} is never called, so the Lua leaves it out. If a gadget calls it by name, convert with unused code kept.",
+                        f.name, self.pre.files[*file]
+                    ));
+                }
+                continue;
+            }
+            walk(&f.body, &mut |k| {
+                names.extend(target_of(k).map(str::to_lowercase));
+                for e in exprs_in(k) {
+                    names_in(e, &mut names, &mut consts);
+                }
+            });
+        }
+        // A constant may be made of others.
+        let mut pending: Vec<String> = consts.iter().cloned().collect();
+        while let Some(name) = pending.pop() {
+            let Some(c) = self.pre.constants.get(&name) else {
+                continue;
+            };
+            for t in &c.body {
+                if self.pre.constants.contains_key(&t.text) && consts.insert(t.text.clone()) {
+                    pending.push(t.text.clone());
+                }
+            }
+        }
+        self.live_consts = Some(consts);
+
+        let gone: HashSet<&String> = self
+            .pieces
+            .iter()
+            .filter(|(bos, _, _)| !names.contains(bos))
+            .filter_map(|(bos, _, _)| piece_warnings.get(bos))
+            .collect();
+        self.warnings.retain(|w| !gone.contains(w));
+        self.pieces.retain(|(bos, _, _)| names.contains(bos));
+        self.statics.retain(|(bos, _)| names.contains(bos));
+    }
+
     fn visible(&self, file: usize) -> bool {
         file == 0 || self.code_files.contains(&file)
     }
@@ -877,6 +1060,9 @@ struct Writer<'p, 'a> {
     const_locals: usize,
     /// Names of the current function's locals, lower-cased BOS to Lua.
     locals: HashMap<String, String>,
+    /// The current function's `var`s that are set and never read, lower-cased,
+    /// which are left out along with the lines that set them.
+    dead: HashSet<String>,
     /// File-level locals the current function reads, which Lua counts.
     refs: BTreeSet<String>,
     worst_refs: usize,
@@ -920,6 +1106,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             declared: HashMap::new(),
             const_locals: 0,
             locals: HashMap::new(),
+            dead: HashSet::new(),
             refs: BTreeSet::new(),
             worst_refs: 0,
             ret: None,
@@ -1616,7 +1803,8 @@ impl<'p, 'a> Writer<'p, 'a> {
                 ItemKind::Pieces(names) => {
                     self.gap();
                     self.comments(&item.leading);
-                    for (i, name) in names.iter().enumerate() {
+                    let mut first = true;
+                    for name in names {
                         let lower = name.to_lowercase();
                         let Some((_, lua, model)) = self
                             .p
@@ -1632,14 +1820,16 @@ impl<'p, 'a> Writer<'p, 'a> {
                         } else {
                             "local "
                         };
-                        let trailing = if i == 0 { &item.trailing } else { &None };
+                        let trailing = if first { &item.trailing } else { &None };
+                        first = false;
                         self.code(&format!("{decl}{lua} = piece(\"{model}\")"), trailing);
                     }
                 }
                 ItemKind::Statics(names) => {
                     self.gap();
                     self.comments(&item.leading);
-                    for (i, name) in names.iter().enumerate() {
+                    let mut first = true;
+                    for name in names {
                         let lower = name.to_lowercase();
                         let Some((_, lua)) = self
                             .p
@@ -1655,7 +1845,8 @@ impl<'p, 'a> Writer<'p, 'a> {
                         } else {
                             "local "
                         };
-                        let trailing = if i == 0 { &item.trailing } else { &None };
+                        let trailing = if first { &item.trailing } else { &None };
+                        first = false;
                         self.code(&format!("{decl}{lua} = 0"), trailing);
                     }
                 }
@@ -1668,6 +1859,9 @@ impl<'p, 'a> Writer<'p, 'a> {
                     });
                     for name in hoisted {
                         self.define(&name, item.file, &None);
+                    }
+                    if self.p.dropped.contains(&f.name.to_lowercase()) {
+                        continue;
                     }
                     self.gap();
                     self.comments(&item.leading);
@@ -1685,7 +1879,10 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
             return;
         };
-        let wanted = self.p.visible(file) || self.p.pre.used.contains(name);
+        let wanted = match &self.p.live_consts {
+            Some(live) if file != 0 => live.contains(name),
+            _ => self.p.visible(file) || self.p.pre.used.contains(name),
+        };
         let engine = self.p.cob_names.get(name) == Some(&c.value);
         if self.declared.contains_key(name) || engine || !wanted {
             if self.p.visible(file) {
@@ -1786,9 +1983,15 @@ impl<'p, 'a> Writer<'p, 'a> {
                 vars.extend(names.iter().cloned());
             }
         });
+        self.dead = if self.p.options.prune {
+            dead_locals(f)
+        } else {
+            HashSet::new()
+        };
         let mut declared = Vec::new();
         for n in &vars {
-            if !self.locals.contains_key(&n.to_lowercase()) {
+            let lower = n.to_lowercase();
+            if !self.locals.contains_key(&lower) && !self.dead.contains(&lower) {
                 declared.push(local(n, &mut self.locals));
             }
         }
@@ -1847,7 +2050,32 @@ impl<'p, 'a> Writer<'p, 'a> {
                         lua
                     });
                 }
+                // A parameter the body never names, and the answer does not
+                // come from, needs no working out.
+                let mut named: HashSet<String> = HashSet::new();
+                if self.p.options.prune {
+                    walk(&f.body, &mut |k| {
+                        named.extend(target_of(k).map(str::to_lowercase));
+                        for e in exprs_in(k) {
+                            names_in(e, &mut named, &mut HashSet::new());
+                        }
+                    });
+                }
                 for (i, param) in params.iter().enumerate() {
+                    let answers = match spec.ret {
+                        Ret::Param(j)
+                        | Ret::Piece(j)
+                        | Ret::ParamTruthy(j)
+                        | Ret::ParamWeight(j) => i == j,
+                        Ret::Pieces => true,
+                        Ret::Truthy | Ret::Nothing | Ret::Damage(_) => false,
+                    };
+                    if self.p.options.prune
+                        && !answers
+                        && !named.contains(&f.params[i].to_lowercase())
+                    {
+                        continue;
+                    }
                     let line = match spec.inits.get(i) {
                         Some(Init::Arg(k, template)) if args[*k] == *param => {
                             if template.is_empty() {
@@ -2146,6 +2374,13 @@ impl<'p, 'a> Writer<'p, 'a> {
         self.comments(&s.leading);
         let t = &s.trailing;
         match &s.kind {
+            StmtKind::Assign(name, _) | StmtKind::Inc(name) | StmtKind::Dec(name)
+                if self.dead.contains(&name.to_lowercase()) =>
+            {
+                if let Some(c) = t {
+                    self.comments(std::slice::from_ref(c));
+                }
+            }
             StmtKind::Assign(name, e) => {
                 let target = self.variable(name).text;
                 let v = match e {

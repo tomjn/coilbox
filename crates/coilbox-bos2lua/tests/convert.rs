@@ -34,6 +34,7 @@ fn convert_with(source: &str, includes: &HashMap<String, String>, linear_scale: 
             pieces: None,
             linear_scale,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap()
@@ -252,6 +253,7 @@ fn asks_for_pieces_by_the_model_s_spelling() {
             pieces: Some(&model),
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap();
@@ -307,6 +309,7 @@ fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap();
@@ -362,6 +365,7 @@ fn a_failed_conversion_names_the_includes_it_was_not_given() {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .err()

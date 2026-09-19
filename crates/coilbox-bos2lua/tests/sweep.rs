@@ -3,8 +3,10 @@
 //! Set `COILBOX_BOS_SWEEP` to a folder holding a game's `scripts` directory,
 //! unpacked, and this converts every `.bos` in it, with every other file there
 //! available to `#include`, and runs the Lua through the preview runtime for a
-//! few hundred frames of the call-ins a unit gets. Any script that fails to
-//! convert, fails to load or stops with an error fails the test, by name.
+//! few hundred frames of the call-ins a unit gets. Each is converted twice,
+//! with everything written and with what nothing uses left out. Any script
+//! that fails to convert, fails to load or stops with an error fails the test,
+//! by name.
 //!
 //! Skipped when the variable is unset, because no game ships in this repo.
 
@@ -92,42 +94,46 @@ fn every_script_in_the_folder_converts_and_runs() {
             .as_deref()
             .and_then(|cob| coilbox_bos2lua::precedence(&source, cob))
             .unwrap_or_default();
-        let conversion = match convert(
-            &source,
-            &Options {
-                name: &name,
-                includes: &includes,
-                pieces: None,
-                linear_scale,
-                precedence,
-            },
-        ) {
-            Ok(c) => c,
-            Err(e) => {
-                failures.push(format!("{name}: did not convert: {e}"));
-                continue;
+        for prune in [false, true] {
+            let how = if prune { " pruned" } else { "" };
+            let conversion = match convert(
+                &source,
+                &Options {
+                    name: &name,
+                    includes: &includes,
+                    pieces: None,
+                    linear_scale,
+                    precedence,
+                    prune,
+                },
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    failures.push(format!("{name}{how}: did not convert: {e}"));
+                    continue;
+                }
+            };
+            if let (true, Ok(out)) = (prune, std::env::var("COILBOX_BOS_SWEEP_OUT")) {
+                let target = Path::new(&out).join(&name).with_extension("lua");
+                std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+                let mut text = conversion.lua.clone();
+                for w in &conversion.warnings {
+                    text.push_str(&format!("\n-- WARNING: {w}"));
+                }
+                std::fs::write(target, text).unwrap();
             }
-        };
-        if let Ok(out) = std::env::var("COILBOX_BOS_SWEEP_OUT") {
-            let target = Path::new(&out).join(&name).with_extension("lua");
-            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-            let mut text = conversion.lua.clone();
-            for w in &conversion.warnings {
-                text.push_str(&format!("\n-- WARNING: {w}"));
+            let pieces = piece(&conversion.lua);
+            let timeline = run(&conversion.lua, &name, &Unit::new(&pieces), &events, 300);
+            if let Some(error) = timeline.error {
+                failures.push(format!("{name}{how}: {error}"));
             }
-            std::fs::write(target, text).unwrap();
-        }
-        let pieces = piece(&conversion.lua);
-        let timeline = run(&conversion.lua, &name, &Unit::new(&pieces), &events, 300);
-        if let Some(error) = timeline.error {
-            failures.push(format!("{name}: {error}"));
-        }
-        for w in timeline
-            .warnings
-            .iter()
-            .filter(|w| w.contains("That thread stopped"))
-        {
-            failures.push(format!("{name}: {w}"));
+            for w in timeline
+                .warnings
+                .iter()
+                .filter(|w| w.contains("That thread stopped"))
+            {
+                failures.push(format!("{name}{how}: {w}"));
+            }
         }
     }
     eprintln!("{count} scripts swept, {} failed", failures.len());
