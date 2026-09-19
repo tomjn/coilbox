@@ -59,6 +59,21 @@ describe("the BOS to Lua page", () => {
     expect(path.tagName).toBe("CODE");
   });
 
+  it("leaves out unused code until the box is unticked, then converts again", async () => {
+    await loadCarrier();
+    expect(animBos2lua).toHaveBeenLastCalledWith(
+      expect.objectContaining({ prune: true }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /Leave out unused code/ }),
+    );
+    await waitFor(() =>
+      expect(animBos2lua).toHaveBeenLastCalledWith(
+        expect.objectContaining({ prune: false }),
+      ),
+    );
+  });
+
   it("shows the Lua as a read-only view, not a text box", async () => {
     await loadCarrier();
     // The BOS, and nothing for the Lua.

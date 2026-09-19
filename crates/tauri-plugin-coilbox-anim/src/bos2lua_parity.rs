@@ -154,6 +154,7 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
                 pieces: None,
                 linear_scale,
                 precedence: coilbox_bos2lua::precedence(&source, &bytes).unwrap_or_default(),
+                prune: false,
             },
         ) {
             Ok(c) => c,
@@ -304,6 +305,7 @@ fn the_converter_s_fixture_moves_as_its_compiled_cob_does() {
             pieces: None,
             linear_scale: coilbox_bos2lua::MODERN_LINEAR,
             precedence: coilbox_bos2lua::Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap()

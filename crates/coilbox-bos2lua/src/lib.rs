@@ -50,6 +50,11 @@ pub struct Options<'a> {
     /// How tightly each operator binds, which also depends on the compiler.
     /// The `.cob` can say: see [`precedence`].
     pub precedence: Precedence,
+    /// Whether to leave out what nothing uses: a header's functions that are
+    /// never called, and the constants, variables and pieces nothing names.
+    /// A function in the script's own file always stays, because a gadget may
+    /// call it by name. Off writes everything, to compare against.
+    pub prune: bool,
 }
 
 /// Which compiler's operator precedence a script was written for.

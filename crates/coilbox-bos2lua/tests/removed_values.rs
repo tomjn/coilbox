@@ -20,6 +20,7 @@ fn convert_bos(source: &str) -> Conversion {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap()

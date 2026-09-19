@@ -15,6 +15,7 @@ fn lua(source: &str, precedence: Precedence) -> String {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence,
+            prune: false,
         },
     )
     .unwrap()
@@ -84,6 +85,7 @@ fn break_outside_a_loop_is_refused() {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .err()
@@ -192,6 +194,7 @@ fn mission_command_stops_the_thread() {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap();
@@ -271,6 +274,7 @@ fn an_explode_flag_nothing_defines_takes_its_standard_value() {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap();

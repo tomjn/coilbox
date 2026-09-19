@@ -34,6 +34,7 @@ fn convert_with(source: &str, includes: &HashMap<String, String>, linear_scale: 
             pieces: None,
             linear_scale,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap()
@@ -139,9 +140,8 @@ fn hands_call_ins_to_the_engine_under_its_names() {
     );
     assert!(lua.contains("\theading = toCobAngle(heading)"), "{lua}");
     assert!(lua.contains("\treturn true\nend"), "{lua}");
-    assert!(lua.contains("function script.QueryWeapon1()"), "{lua}");
     assert!(
-        lua.contains("\tpiecenum = flare\n\treturn piecenum"),
+        lua.contains("function script.QueryWeapon1()\n\treturn flare\nend"),
         "{lua}"
     );
     assert!(
@@ -180,7 +180,7 @@ fn converts_units_and_the_axes_cob_mirrors() {
         lua.contains("Turn(pad, y_axis, math.rad(179.9561))"),
         "{lua}"
     );
-    assert!(lua.contains("BosSleep(150)"), "{lua}");
+    assert!(lua.contains("Sleep(150 + 33)"), "{lua}");
 }
 
 #[test]
@@ -252,6 +252,7 @@ fn asks_for_pieces_by_the_model_s_spelling() {
             pieces: Some(&model),
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap();
@@ -307,6 +308,7 @@ fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .unwrap();
@@ -362,6 +364,7 @@ fn a_failed_conversion_names_the_includes_it_was_not_given() {
             pieces: None,
             linear_scale: MODERN_LINEAR,
             precedence: Precedence::Modern,
+            prune: false,
         },
     )
     .err()

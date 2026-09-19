@@ -118,6 +118,9 @@ const RESERVED: &[&str] = &[
 
 /// Lua 5.1's limits, as the engine builds it (`luaconf.h`).
 const MAX_UPVALUES: usize = 60;
+/// One frame at the engine's 30 a second, in milliseconds, which is how much
+/// sooner Lua's `Sleep` wakes than COB's.
+const SLEEP_FRAME: u32 = 33;
 const MAX_LOCALS: usize = 200;
 
 // Lua's precedence, loosest first.
@@ -538,6 +541,12 @@ struct Program<'a> {
     /// Whether the script has a SetMaxReloadTime, whose call-in shares
     /// `script.Create` with Create itself.
     has_reload: bool,
+    /// The functions left out because nothing can reach them, lower-cased.
+    dropped: HashSet<String>,
+    /// The constants something that is written uses, when leaving out the rest.
+    live_consts: Option<HashSet<String>>,
+    /// The constants declared in radians or elmos.
+    units: HashMap<String, Unit>,
 }
 
 fn sanitise(want: &str, taken: &HashSet<String>) -> String {
@@ -648,6 +657,161 @@ fn walk<'s>(stmts: &'s [Stmt], f: &mut impl FnMut(&'s StmtKind)) {
     }
 }
 
+/// Every name an expression reads, lower-cased, and every constant, as written.
+fn names_in(e: &Expr, names: &mut HashSet<String>, consts: &mut HashSet<String>) {
+    match e {
+        Expr::Name(n) => {
+            names.insert(n.to_lowercase());
+        }
+        Expr::Const(n) => {
+            consts.insert(n.clone());
+        }
+        Expr::Get(a, args) => {
+            names_in(a, names, consts);
+            for x in args {
+                names_in(x, names, consts);
+            }
+        }
+        Expr::Rand(a, b) | Expr::Bin(_, a, b) => {
+            names_in(a, names, consts);
+            names_in(b, names, consts);
+        }
+        Expr::Not(a) | Expr::Neg(a) => names_in(a, names, consts),
+        Expr::Num(_) | Expr::Angle(..) | Expr::Linear(..) => {}
+    }
+}
+
+/// The name a statement itself writes to or moves, if it has one.
+fn target_of(k: &StmtKind) -> Option<&str> {
+    match k {
+        StmtKind::Assign(n, _)
+        | StmtKind::Inc(n)
+        | StmtKind::Dec(n)
+        | StmtKind::Spin { piece: n, .. }
+        | StmtKind::StopSpin { piece: n, .. }
+        | StmtKind::Turn { piece: n, .. }
+        | StmtKind::Move { piece: n, .. }
+        | StmtKind::Scale { piece: n, .. }
+        | StmtKind::WaitTurn(n, _)
+        | StmtKind::WaitMove(n, _)
+        | StmtKind::WaitScale(n)
+        | StmtKind::EmitSfx(_, n)
+        | StmtKind::Hide(n)
+        | StmtKind::Show(n)
+        | StmtKind::Explode(n, _) => Some(n),
+        _ => None,
+    }
+}
+
+/// Whether working an expression out changes nothing. A `get` may be one of
+/// the setters, and `rand` moves the synced generator every unit shares.
+fn pure(e: &Expr) -> bool {
+    match e {
+        Expr::Get(..) | Expr::Rand(..) => false,
+        Expr::Bin(_, a, b) => pure(a) && pure(b),
+        Expr::Not(a) | Expr::Neg(a) => pure(a),
+        _ => true,
+    }
+}
+
+/// A constant kept in Lua's own units, because every use of it is one.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Unit {
+    /// The degrees as written.
+    Angle(f64),
+    /// The brackets as written, which [`Writer::elmos_per_bracket`] sizes.
+    Linear(f64),
+}
+
+impl Unit {
+    /// The unit a constant's whole value is written in, if it is one. A half
+    /// turn is left out, since that one keeps the BOS's value: see `turn_to`.
+    fn of(e: &Expr) -> Option<Unit> {
+        match e {
+            Expr::Angle(deg, _) if deg.rem_euclid(360.0) != 180.0 => Some(Unit::Angle(*deg)),
+            Expr::Linear(v, _) => Some(Unit::Linear(*v)),
+            Expr::Neg(inner) => match Unit::of(inner)? {
+                Unit::Angle(deg) => Some(Unit::Angle(-deg)),
+                Unit::Linear(v) => Some(Unit::Linear(-v)),
+            },
+            _ => None,
+        }
+    }
+}
+
+/// The constant an operand is, alone or with a minus in front, and whether it
+/// has the minus.
+fn bare_const(e: &Expr) -> Option<(&str, bool)> {
+    match e {
+        Expr::Const(n) => Some((n, false)),
+        Expr::Neg(inner) => match &**inner {
+            Expr::Const(n) => Some((n, true)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The functions nothing can reach, lower-cased. What can be reached starts
+/// from the call-ins and from every function in the script's own file, since
+/// a gadget may call one of those by name. A `lua_` function is never one of
+/// them: `call-script` on it goes to LuaRules and never runs its body.
+fn unreachable(funcs: &[(&Func, usize)], infos: &HashMap<String, FuncInfo>) -> HashSet<String> {
+    let mut edges: HashMap<String, Vec<String>> = HashMap::new();
+    let mut reached: Vec<String> = Vec::new();
+    for (f, file) in funcs {
+        let lower = f.name.to_lowercase();
+        let callees = edges.entry(lower.clone()).or_default();
+        walk(&f.body, &mut |k| match k {
+            StmtKind::Call(name, _) if name.starts_with("lua_") => {}
+            StmtKind::Call(name, _) | StmtKind::Start(name, _) => callees.push(name.to_lowercase()),
+            _ => {}
+        });
+        let called_in = infos.get(&lower).is_some_and(|info| info.role.is_some());
+        if called_in || (*file == 0 && !f.name.starts_with("lua_")) {
+            reached.push(lower);
+        }
+    }
+    let mut live: HashSet<String> = HashSet::new();
+    while let Some(name) = reached.pop() {
+        if live.insert(name.clone()) {
+            reached.extend(edges.get(&name).into_iter().flatten().cloned());
+        }
+    }
+    edges
+        .into_keys()
+        .filter(|name| !live.contains(name))
+        .collect()
+}
+
+/// The `var`s of a function that are set and never read, lower-cased, when
+/// leaving out every line that sets them changes nothing.
+fn dead_locals(f: &Func) -> HashSet<String> {
+    let mut declared: HashSet<String> = HashSet::new();
+    let mut read: HashSet<String> = HashSet::new();
+    let mut kept: HashSet<String> = HashSet::new();
+    walk(&f.body, &mut |k| {
+        if let StmtKind::Var(names) = k {
+            declared.extend(names.iter().map(|n| n.to_lowercase()));
+        }
+        for e in exprs_in(k) {
+            names_in(e, &mut read, &mut HashSet::new());
+        }
+        match k {
+            StmtKind::Assign(_, e) if pure(e) => {}
+            StmtKind::Inc(_) | StmtKind::Dec(_) => {}
+            _ => kept.extend(target_of(k).map(str::to_lowercase)),
+        }
+    });
+    for p in &f.params {
+        declared.remove(&p.to_lowercase());
+    }
+    declared
+        .into_iter()
+        .filter(|n| !read.contains(n) && !kept.contains(n))
+        .collect()
+}
+
 impl<'a> Program<'a> {
     fn new(items: &'a [Item], pre: &'a Pre, options: &'a Options<'a>) -> Self {
         let mut p = Program {
@@ -665,9 +829,13 @@ impl<'a> Program<'a> {
             taken: HashSet::new(),
             warnings: pre.warnings.clone(),
             has_reload: false,
+            dropped: HashSet::new(),
+            live_consts: None,
+            units: HashMap::new(),
         };
         let mut seen: HashSet<String> = HashSet::new();
-        let mut funcs: Vec<&Func> = Vec::new();
+        let mut funcs: Vec<(&Func, usize)> = Vec::new();
+        let mut piece_warnings: HashMap<String, String> = HashMap::new();
         for item in items {
             match &item.kind {
                 ItemKind::Pieces(names) => {
@@ -683,9 +851,11 @@ impl<'a> Program<'a> {
                                 match model.iter().find(|m| m.eq_ignore_ascii_case(name)) {
                                     Some(found) => found.clone(),
                                     None => {
-                                        p.warnings.push(format!(
+                                        let warning = format!(
                                         "The script names a piece called {name} that the model does not have, so the engine will refuse to load it."
-                                    ));
+                                    );
+                                        piece_warnings.insert(name.to_lowercase(), warning.clone());
+                                        p.warnings.push(warning);
                                         name.clone()
                                     }
                                 }
@@ -708,7 +878,7 @@ impl<'a> Program<'a> {
                 }
                 ItemKind::Func(f) => {
                     p.code_files.insert(item.file);
-                    funcs.push(f);
+                    funcs.push((f, item.file));
                 }
                 _ => {}
             }
@@ -721,9 +891,9 @@ impl<'a> Program<'a> {
 
         // Roles, with the engine's own tie-breaks: the numbered weapon name
         // wins over the old one, and HitByWeaponId over HitByWeapon.
-        let names: HashSet<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        let names: HashSet<&str> = funcs.iter().map(|(f, _)| f.name.as_str()).collect();
         let mut claimed: HashMap<String, String> = HashMap::new();
-        for f in &funcs {
+        for (f, _) in &funcs {
             let lower = f.name.to_lowercase();
             if p.funcs.contains_key(&lower) {
                 continue;
@@ -781,11 +951,19 @@ impl<'a> Program<'a> {
             );
         }
 
+        if options.prune {
+            p.prune(&funcs, &piece_warnings);
+        }
+        p.units = p.unit_constants(&funcs);
+
         // Who calls whom, and with how many arguments.
         let mut blocks_directly: HashMap<String, bool> = HashMap::new();
         let mut calls: HashMap<String, Vec<String>> = HashMap::new();
-        for f in &funcs {
+        for (f, _) in &funcs {
             let lower = f.name.to_lowercase();
+            if p.dropped.contains(&lower) {
+                continue;
+            }
             let mut blocks = false;
             let mut callees = Vec::new();
             walk(&f.body, &mut |k| match k {
@@ -858,6 +1036,105 @@ impl<'a> Program<'a> {
         p
     }
 
+    /// Leaves out the functions nothing can reach, then the pieces, variables
+    /// and constants that only they named.
+    fn prune(&mut self, funcs: &[(&Func, usize)], piece_warnings: &HashMap<String, String>) {
+        self.dropped = unreachable(funcs, &self.funcs);
+        let mut names: HashSet<String> = HashSet::new();
+        let mut consts: HashSet<String> = HashSet::new();
+        let mut said: HashSet<String> = HashSet::new();
+        for (f, file) in funcs {
+            let lower = f.name.to_lowercase();
+            if self.dropped.contains(&lower) {
+                if !f.name.starts_with("lua_") && said.insert(lower) {
+                    self.warnings.push(format!(
+                        "{} in {} is never called, so the Lua leaves it out. If a gadget calls it by name, convert with unused code kept.",
+                        f.name, self.pre.files[*file]
+                    ));
+                }
+                continue;
+            }
+            walk(&f.body, &mut |k| {
+                names.extend(target_of(k).map(str::to_lowercase));
+                for e in exprs_in(k) {
+                    names_in(e, &mut names, &mut consts);
+                }
+            });
+        }
+        // A constant may be made of others.
+        let mut pending: Vec<String> = consts.iter().cloned().collect();
+        while let Some(name) = pending.pop() {
+            let Some(c) = self.pre.constants.get(&name) else {
+                continue;
+            };
+            for t in &c.body {
+                if self.pre.constants.contains_key(&t.text) && consts.insert(t.text.clone()) {
+                    pending.push(t.text.clone());
+                }
+            }
+        }
+        self.live_consts = Some(consts);
+
+        let gone: HashSet<&String> = self
+            .pieces
+            .iter()
+            .filter(|(bos, _, _)| !names.contains(bos))
+            .filter_map(|(bos, _, _)| piece_warnings.get(bos))
+            .collect();
+        self.warnings.retain(|w| !gone.contains(w));
+        self.pieces.retain(|(bos, _, _)| names.contains(bos));
+        self.statics.retain(|(bos, _)| names.contains(bos));
+    }
+
+    /// The constants that are an angle or a distance and nothing else: written
+    /// as one `<x>` or `[x]`, and only ever the whole of a turn, spin or move's
+    /// angle, distance or speed. One that is also compared, summed, handed to
+    /// the engine or built into another constant stays in the BOS's units.
+    fn unit_constants(&self, funcs: &[(&Func, usize)]) -> HashMap<String, Unit> {
+        let mut units: HashMap<String, Unit> = HashMap::new();
+        let mut other: HashSet<String> = HashSet::new();
+        for (name, c) in &self.pre.constants {
+            let whole =
+                parse::expression(&c.body, self.options.linear_scale, self.options.precedence);
+            if let Some(unit) = whole.ok().as_ref().and_then(Unit::of) {
+                units.insert(name.clone(), unit);
+            }
+            other.extend(
+                c.body
+                    .iter()
+                    .filter(|t| self.pre.constants.contains_key(&t.text))
+                    .map(|t| t.text.clone()),
+            );
+        }
+        for (f, _) in funcs {
+            if self.dropped.contains(&f.name.to_lowercase()) {
+                continue;
+            }
+            walk(&f.body, &mut |k| {
+                let angles = match k {
+                    StmtKind::Spin { .. } | StmtKind::StopSpin { .. } | StmtKind::Turn { .. } => {
+                        Some(true)
+                    }
+                    StmtKind::Move { .. } | StmtKind::Scale { .. } => Some(false),
+                    _ => None,
+                };
+                for e in exprs_in(k) {
+                    let fits = bare_const(e)
+                        .and_then(|(n, _)| units.get(n))
+                        .is_some_and(|unit| match unit {
+                            Unit::Angle(_) => angles == Some(true),
+                            Unit::Linear(_) => angles == Some(false),
+                        });
+                    if !fits {
+                        names_in(e, &mut HashSet::new(), &mut other);
+                    }
+                }
+            });
+        }
+        units.retain(|name, _| !other.contains(name));
+        units
+    }
+
     fn visible(&self, file: usize) -> bool {
         file == 0 || self.code_files.contains(&file)
     }
@@ -877,6 +1154,11 @@ struct Writer<'p, 'a> {
     const_locals: usize,
     /// Names of the current function's locals, lower-cased BOS to Lua.
     locals: HashMap<String, String>,
+    /// The current function's `var`s that are set and never read, lower-cased,
+    /// which are left out along with the lines that set them.
+    dead: HashSet<String>,
+    /// Whether anything sleeps, which the top of the file explains once.
+    sleeps: bool,
     /// File-level locals the current function reads, which Lua counts.
     refs: BTreeSet<String>,
     worst_refs: usize,
@@ -898,13 +1180,12 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 9] = [
+    const HELPER_NAMES: [&'static str; 8] = [
         "COB_ANGLE",
         "COB_LINEAR",
         "trunc",
         "toCobAngle",
         "div",
-        "BosSleep",
         "cobAllied",
         "cobGet",
         "cobSet",
@@ -920,6 +1201,8 @@ impl<'p, 'a> Writer<'p, 'a> {
             declared: HashMap::new(),
             const_locals: 0,
             locals: HashMap::new(),
+            dead: HashSet::new(),
+            sleeps: false,
             refs: BTreeSet::new(),
             worst_refs: 0,
             ret: None,
@@ -962,6 +1245,9 @@ impl<'p, 'a> Writer<'p, 'a> {
             "-- {} converted from BOS by coilbox.\n",
             self.p.options.name
         );
+        if self.sleeps {
+            lua.push_str(&format!("\n-- A COB thread wakes once its sleep has passed, a frame later than Lua's\n-- Sleep wakes, so every Sleep here is {SLEEP_FRAME} milliseconds longer than the BOS's.\n"));
+        }
         let helpers = &self.helpers;
         if helpers.contains("COB_ANGLE") || helpers.contains("COB_LINEAR") {
             lua.push_str("\n-- BOS measures angles in 65536ths of a full turn and distances in 65536ths\n-- of an elmo. These turn its numbers into the radians and elmos Lua takes.\n");
@@ -978,16 +1264,13 @@ impl<'p, 'a> Writer<'p, 'a> {
         if helpers.contains("toCobAngle") {
             lua.push_str("\n-- An angle a call-in was handed in radians, in the BOS's units.\nlocal function toCobAngle(radians)\n\treturn (trunc(radians / COB_ANGLE) + 32768) % 65536 - 32768\nend\n");
         }
-        if helpers.contains("BosSleep") {
-            lua.push_str("\n-- A COB thread wakes once its sleep has passed, a frame later than Lua's\n-- Sleep wakes, so this adds the frame back and keeps the BOS's timing.\nlocal function BosSleep(ms)\n\tSleep(ms + 33)\nend\n");
-        }
         if helpers.contains("div") {
             lua.push_str("\n-- BOS division keeps only the whole part, and the engine answers 1000 for a\n-- division by zero.\nlocal function div(a, b)\n\tif b == 0 then return 1000 end\n\treturn trunc(a / b)\nend\n");
         }
         if helpers.contains("cobAllied") {
             lua.push_str(SHARED_VALUES);
         }
-        if !helpers.is_empty() && !self.out.starts_with('\n') {
+        if (!helpers.is_empty() || self.sleeps) && !self.out.starts_with('\n') {
             lua.push('\n');
         }
         lua.push_str(&self.out);
@@ -1469,8 +1752,27 @@ impl<'p, 'a> Writer<'p, 'a> {
         }
     }
 
+    /// A constant already in the unit the operand wants, by name. One used
+    /// above where it is defined has no name yet, and is written as a number.
+    fn unit_constant(&mut self, e: &Expr, negate: bool) -> Option<String> {
+        let (name, minus) = bare_const(e)?;
+        self.p.units.get(name)?;
+        let lua = self.declared.get(name)?.clone();
+        if !self.mode.consts_global {
+            self.refs.insert(lua.clone());
+        }
+        Some(if negate != minus {
+            format!("-{lua}")
+        } else {
+            lua
+        })
+    }
+
     /// An angle for `Turn` or `Spin`, in radians.
     fn angle(&mut self, e: &Expr, negate: bool) -> String {
+        if let Some(named) = self.unit_constant(e, negate) {
+            return named;
+        }
         let sign = if negate { -1.0 } else { 1.0 };
         match e {
             Expr::Angle(deg, _) => return radians(sign * deg),
@@ -1541,6 +1843,9 @@ impl<'p, 'a> Writer<'p, 'a> {
 
     /// A distance for `Move`, in elmos.
     fn distance(&mut self, e: &Expr, negate: bool) -> String {
+        if let Some(named) = self.unit_constant(e, negate) {
+            return named;
+        }
         let sign = if negate { -1.0 } else { 1.0 };
         match e {
             Expr::Linear(v, _) => return decimal(sign * v * self.elmos_per_bracket()),
@@ -1616,7 +1921,8 @@ impl<'p, 'a> Writer<'p, 'a> {
                 ItemKind::Pieces(names) => {
                     self.gap();
                     self.comments(&item.leading);
-                    for (i, name) in names.iter().enumerate() {
+                    let mut first = true;
+                    for name in names {
                         let lower = name.to_lowercase();
                         let Some((_, lua, model)) = self
                             .p
@@ -1632,14 +1938,16 @@ impl<'p, 'a> Writer<'p, 'a> {
                         } else {
                             "local "
                         };
-                        let trailing = if i == 0 { &item.trailing } else { &None };
+                        let trailing = if first { &item.trailing } else { &None };
+                        first = false;
                         self.code(&format!("{decl}{lua} = piece(\"{model}\")"), trailing);
                     }
                 }
                 ItemKind::Statics(names) => {
                     self.gap();
                     self.comments(&item.leading);
-                    for (i, name) in names.iter().enumerate() {
+                    let mut first = true;
+                    for name in names {
                         let lower = name.to_lowercase();
                         let Some((_, lua)) = self
                             .p
@@ -1655,7 +1963,8 @@ impl<'p, 'a> Writer<'p, 'a> {
                         } else {
                             "local "
                         };
-                        let trailing = if i == 0 { &item.trailing } else { &None };
+                        let trailing = if first { &item.trailing } else { &None };
+                        first = false;
                         self.code(&format!("{decl}{lua} = 0"), trailing);
                     }
                 }
@@ -1668,6 +1977,9 @@ impl<'p, 'a> Writer<'p, 'a> {
                     });
                     for name in hoisted {
                         self.define(&name, item.file, &None);
+                    }
+                    if self.p.dropped.contains(&f.name.to_lowercase()) {
+                        continue;
                     }
                     self.gap();
                     self.comments(&item.leading);
@@ -1685,7 +1997,10 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
             return;
         };
-        let wanted = self.p.visible(file) || self.p.pre.used.contains(name);
+        let wanted = match &self.p.live_consts {
+            Some(live) if file != 0 => live.contains(name),
+            _ => self.p.visible(file) || self.p.pre.used.contains(name),
+        };
         let engine = self.p.cob_names.get(name) == Some(&c.value);
         if self.declared.contains_key(name) || engine || !wanted {
             if self.p.visible(file) {
@@ -1706,18 +2021,23 @@ impl<'p, 'a> Writer<'p, 'a> {
                 t
             })
             .collect();
-        let value = match parse::expression(
-            &body,
-            self.p.options.linear_scale,
-            self.p.options.precedence,
+        let value = match (
+            self.p.units.get(name),
+            parse::expression(
+                &body,
+                self.p.options.linear_scale,
+                self.p.options.precedence,
+            ),
         ) {
-            Ok(e) => {
+            (Some(Unit::Angle(deg)), _) => radians(*deg),
+            (Some(Unit::Linear(v)), _) => decimal(v * self.elmos_per_bracket()),
+            (None, Ok(e)) => {
                 let saved = std::mem::take(&mut self.refs);
                 let l = self.num(&e);
                 self.refs = saved;
                 l.text
             }
-            Err(_) => c.value.to_string(),
+            (None, Err(_)) => c.value.to_string(),
         };
         let lua = sanitise(name, &HashSet::new());
         let decl = if self.mode.consts_global {
@@ -1786,9 +2106,15 @@ impl<'p, 'a> Writer<'p, 'a> {
                 vars.extend(names.iter().cloned());
             }
         });
+        self.dead = if self.p.options.prune {
+            dead_locals(f)
+        } else {
+            HashSet::new()
+        };
         let mut declared = Vec::new();
         for n in &vars {
-            if !self.locals.contains_key(&n.to_lowercase()) {
+            let lower = n.to_lowercase();
+            if !self.locals.contains_key(&lower) && !self.dead.contains(&lower) {
                 declared.push(local(n, &mut self.locals));
             }
         }
@@ -1819,6 +2145,19 @@ impl<'p, 'a> Writer<'p, 'a> {
                 }
             }
         }
+        // A call-in whose whole body names its piece hands it straight back.
+        let handed_back: Option<(usize, &Stmt, &str)> = match (&role, &f.body[..]) {
+            (Some(Role::Callin(spec)), [only]) if direct => match (&spec.ret, &only.kind) {
+                (Ret::Piece(i), StmtKind::Assign(n, Expr::Name(piece)))
+                    if f.params.get(*i).is_some_and(|p| p.eq_ignore_ascii_case(n))
+                        && self.piece_out.contains(&n.to_lowercase()) =>
+                {
+                    Some((*i, only, piece.as_str()))
+                }
+                _ => None,
+            },
+            _ => None,
+        };
         match (&role, direct) {
             (Some(Role::Callin(spec)), true) => {
                 // Name each Lua argument after the BOS parameter it fills, when
@@ -1847,7 +2186,35 @@ impl<'p, 'a> Writer<'p, 'a> {
                         lua
                     });
                 }
+                // A parameter the body never names, and the answer does not
+                // come from, needs no working out.
+                let mut named: HashSet<String> = HashSet::new();
+                if self.p.options.prune {
+                    walk(&f.body, &mut |k| {
+                        named.extend(target_of(k).map(str::to_lowercase));
+                        for e in exprs_in(k) {
+                            names_in(e, &mut named, &mut HashSet::new());
+                        }
+                    });
+                }
                 for (i, param) in params.iter().enumerate() {
+                    let answers = match spec.ret {
+                        Ret::Param(j)
+                        | Ret::Piece(j)
+                        | Ret::ParamTruthy(j)
+                        | Ret::ParamWeight(j) => i == j,
+                        Ret::Pieces => true,
+                        Ret::Truthy | Ret::Nothing | Ret::Damage(_) => false,
+                    };
+                    if self.p.options.prune
+                        && !answers
+                        && !named.contains(&f.params[i].to_lowercase())
+                    {
+                        continue;
+                    }
+                    if handed_back.is_some_and(|(j, _, _)| i == j) {
+                        continue;
+                    }
                     let line = match spec.inits.get(i) {
                         Some(Init::Arg(k, template)) if args[*k] == *param => {
                             if template.is_empty() {
@@ -1908,9 +2275,16 @@ impl<'p, 'a> Writer<'p, 'a> {
         for l in prologue {
             self.line(&l);
         }
-        self.block(&f.body);
+        if let Some((_, only, piece)) = handed_back {
+            self.comments(&only.leading);
+            let p = self.piece(piece);
+            self.code(&format!("return {p}"), &only.trailing);
+        } else {
+            self.block(&f.body);
+        }
         self.comments(&f.tail);
-        let ends_in_return = matches!(f.body.last().map(|s| &s.kind), Some(StmtKind::Return(_)));
+        let ends_in_return = handed_back.is_some()
+            || matches!(f.body.last().map(|s| &s.kind), Some(StmtKind::Return(_)));
         if !ends_in_return {
             if let Some(fallthrough) = self.fallthrough() {
                 self.line(&fallthrough);
@@ -2146,6 +2520,13 @@ impl<'p, 'a> Writer<'p, 'a> {
         self.comments(&s.leading);
         let t = &s.trailing;
         match &s.kind {
+            StmtKind::Assign(name, _) | StmtKind::Inc(name) | StmtKind::Dec(name)
+                if self.dead.contains(&name.to_lowercase()) =>
+            {
+                if let Some(c) = t {
+                    self.comments(std::slice::from_ref(c));
+                }
+            }
             StmtKind::Assign(name, e) => {
                 let target = self.variable(name).text;
                 let v = match e {
@@ -2355,10 +2736,10 @@ impl<'p, 'a> Writer<'p, 'a> {
                 self.code(&format!("{f}({p}, {k})"), t);
             }
             StmtKind::Sleep(e) => {
-                self.helpers.insert("BosSleep");
-                let f = self.helper("BosSleep");
-                let v = self.num(e).text;
-                self.code(&format!("{f}({v})"), t);
+                self.sleeps = true;
+                let f = self.header("Sleep");
+                let v = self.num(e).wrap(P_ADD);
+                self.code(&format!("{f}({v} + {SLEEP_FRAME})"), t);
             }
             StmtKind::Hide(piece) | StmtKind::Show(piece) => {
                 let f = self.header(if matches!(s.kind, StmtKind::Hide(_)) {

@@ -1,7 +1,8 @@
-//! `cargo run -p coilbox-bos2lua --example convert -- <script.bos> <scripts dir>`
+//! `cargo run -p coilbox-bos2lua --example convert -- <script.bos> <scripts dir> [--keep-unused]`
 //!
 //! Converts one script and prints the Lua, then any warnings. Every file under
-//! the scripts folder is available to `#include`.
+//! the scripts folder is available to `#include`. What nothing uses is left out
+//! unless `--keep-unused` is given.
 
 use coilbox_bos2lua::{convert, Options};
 use std::collections::HashMap;
@@ -10,7 +11,7 @@ use std::path::Path;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (Some(script), Some(dir)) = (args.get(1), args.get(2)) else {
-        eprintln!("usage: convert <script.bos> <scripts dir>");
+        eprintln!("usage: convert <script.bos> <scripts dir> [--keep-unused]");
         std::process::exit(2);
     };
     let dir = Path::new(dir);
@@ -53,6 +54,7 @@ fn main() {
             pieces: None,
             linear_scale,
             precedence,
+            prune: args.get(3).map(String::as_str) != Some("--keep-unused"),
         },
     ) {
         Ok(c) => {
