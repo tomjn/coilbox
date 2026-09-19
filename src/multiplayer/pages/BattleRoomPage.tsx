@@ -14,6 +14,7 @@ import { useSkirmishAis } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { mergeGameAi } from "@/play/gameAi";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
+import type { PresetPart, PresetSelection } from "@/play/presetParts";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
 import { startPosNote } from "@/startbox/mode";
@@ -32,7 +33,7 @@ import { BattleMovedPanel } from "../battle/BattleMovedPanel";
 import { BattleOptionsDrawer } from "../battle/BattleOptionsDrawer";
 import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
-import { battleOptionTags } from "../battle/battleOptions";
+import { battleOptionTags, filterOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
 import { alliesFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
@@ -232,43 +233,59 @@ function BattleRoomPage() {
   // Apply a saved skirmish preset to the current room in place (issue #373).
   // Only ever reachable while self-hosting (see the button below), so this
   // never runs against a battle we merely joined.
-  function applySkirmishPresetInPlace(preset: SkirmishPreset, maphash: number) {
+  function applySkirmishPresetInPlace(
+    preset: SkirmishPreset,
+    maphash: number,
+    selection: PresetSelection,
+  ) {
     if (!room.battle) return;
+    const take = (part: PresetPart) => selection.parts.includes(part);
     // Don't reconcile the preset's bot AIs until the game's real addable-AI list
     // has loaded (issue #531), so an early click can't remap against the
-    // engine-natives fallback.
-    if (!room.addableAisReady) {
+    // engine-natives fallback. Only the roster needs that list, so taking the
+    // options alone is not made to wait on it.
+    if (take("teams") && !room.addableAisReady) {
       setHostSeedError("Still loading this game's AI list. Try again.");
       return;
     }
     setHostSeedError(null);
-    if (preset.mapName !== room.battle.map)
+    if (take("map") && preset.mapName !== room.battle.map)
       room.setMap(preset.mapName, maphash);
     const seed = draftToHostSeed({
       draft: preset,
       sides: room.sides,
       ais: room.addableAis,
     });
-    const applyNotice = hostSeedAiNotice(seed);
-    if (applyNotice) {
-      notify({ title: "Preset AI adjusted", body: applyNotice, level: "info" });
+    if (take("teams")) {
+      const applyNotice = hostSeedAiNotice(seed);
+      if (applyNotice) {
+        notify({
+          title: "Preset AI adjusted",
+          body: applyNotice,
+          level: "info",
+        });
+      }
+      room.setBattleStatusBatch({
+        side: seed.self.side,
+        ally: seed.self.ally,
+        teamId: seed.self.teamId,
+        colorHex: seed.self.colorHex,
+        spectator: seed.self.spectator,
+      });
     }
-    room.setBattleStatusBatch({
-      side: seed.self.side,
-      ally: seed.self.ally,
-      teamId: seed.self.teamId,
-      colorHex: seed.self.colorHex,
-      spectator: seed.self.spectator,
-    });
-    room.applyOptionTags(seed.scriptTags);
+    room.applyOptionTags(filterOptionTags(seed.scriptTags, selection));
     // The preset's own boxes, the ones saved with it, rather than whatever was
     // last saved against the map.
-    if (preset.startPosType === 2 && preset.startRects) {
+    if (
+      take("startPositions") &&
+      preset.startPosType === 2 &&
+      preset.startRects
+    ) {
       for (const [ally, rect] of Object.entries(preset.startRects))
         room.setStartBox(Number(ally), rect);
     }
     skirmishPresets.touchPreset(preset.id);
-    if (seed.bots.length === 0 || !room.serverKey) return;
+    if (!take("teams") || seed.bots.length === 0 || !room.serverKey) return;
     const serverKey = room.serverKey;
     addHostSeedBots(serverKey, seed.bots, Object.keys(room.battle.bots)).then(
       (failures) => {
@@ -618,6 +635,7 @@ function BattleRoomPage() {
               )}
               enginePath={room.enginePath}
               dataDir={room.dataDir}
+              canEditRestrictions={room.canEditRestrictions}
               onApply={applySkirmishPresetInPlace}
             />
           )}
