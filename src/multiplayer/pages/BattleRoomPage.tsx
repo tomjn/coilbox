@@ -623,7 +623,7 @@ function BattleRoomPage() {
                 className="w-full"
                 onClick={() => setApplyPresetOpen(true)}
               >
-                <Bookmark className="size-4" /> Skirmish presets
+                <Bookmark className="size-4" /> Presets
               </Button>
               <ApplySkirmishPresetDrawer
                 open={applyPresetOpen}

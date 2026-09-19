@@ -102,7 +102,7 @@ export function ApplySkirmishPresetDrawer({
               </Button>
             )}
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-              {viewing ? viewing.name : "Apply a skirmish preset"}
+              {viewing ? viewing.name : "Presets"}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label="Close">
