@@ -30,6 +30,7 @@ const current: SkirmishDraft = {
   startPosType: 0,
   startRects: { "0": { left: 0, top: 0, right: 50, bottom: 200 } },
   modOptionValues: { maxunits: "1000", onlykept: "yes", tweakdefs: "CURRENT" },
+  mapOptionValues: { fog: "0" },
   restrictions: { disabledUnits: ["armcom"] },
 };
 
@@ -45,6 +46,7 @@ const preset: SkirmishDraft = {
   startPosType: 2,
   startRects: { "0": { left: 0, top: 0, right: 100, bottom: 100 } },
   modOptionValues: { maxunits: "8000", tweakunits3: "PRESET" },
+  mapOptionValues: { fog: "1", waterlevel: "20" },
   restrictions: { advantage: 0.2 },
 };
 
@@ -218,6 +220,40 @@ describe("applySelection", () => {
     expect(out.modOptionValues).toEqual(preset.modOptionValues);
   });
 
+  it("takes the map options alone, leaving the mod options", () => {
+    const out = applySelection(
+      current,
+      preset,
+      select({ parts: ["mapOptions"] }),
+    );
+    expect(out.mapOptionValues).toEqual({ fog: "1", waterlevel: "20" });
+    expect(out.modOptionValues).toEqual(current.modOptionValues);
+  });
+
+  it("clears the map options when the map changes under them", () => {
+    // Map option keys are declared by the map, and two maps sharing a key want
+    // opposite things by it, so carrying the old map's values is worse than
+    // dropping them.
+    const out = applySelection(current, preset, select({ parts: ["map"] }));
+    expect(out.mapName).toBe("Preset Map");
+    expect(out.mapOptionValues).toEqual({});
+  });
+
+  it("keeps the map options when the map stays put", () => {
+    const sameMap: SkirmishDraft = { ...preset, mapName: current.mapName };
+    const out = applySelection(current, sameMap, select({ parts: ["map"] }));
+    expect(out.mapOptionValues).toEqual(current.mapOptionValues);
+  });
+
+  it("still takes the map options it was asked for across a map change", () => {
+    const out = applySelection(
+      current,
+      preset,
+      select({ parts: ["map", "mapOptions"] }),
+    );
+    expect(out.mapOptionValues).toEqual(preset.mapOptionValues);
+  });
+
   it("drops the boxes when the preset has none and start positions are taken", () => {
     const boxless: SkirmishDraft = { ...preset, startRects: undefined };
     const out = applySelection(
@@ -230,13 +266,14 @@ describe("applySelection", () => {
 });
 
 describe("PRESET_PARTS", () => {
-  it("lists the seven parts in picker order", () => {
+  it("lists the eight parts in picker order", () => {
     expect(PRESET_PARTS).toEqual([
       "game",
       "map",
       "startPositions",
       "modOptions",
       "tweakSlots",
+      "mapOptions",
       "teams",
       "restrictions",
     ]);
@@ -259,6 +296,7 @@ describe("partSummary", () => {
     expect(partSummary(preset, "map")).toBe("Preset Map");
     expect(partSummary(preset, "game")).toBe("Preset Game 2.0");
     expect(partSummary(preset, "modOptions")).toBe("1 option");
+    expect(partSummary(preset, "mapOptions")).toBe("2 map options");
     expect(partSummary(preset, "tweakSlots")).toBe("1 tweak slot");
   });
 
@@ -282,6 +320,7 @@ describe("partSummary", () => {
       modOptionValues: {},
     };
     expect(partSummary(bare, "modOptions")).toBeNull();
+    expect(partSummary(bare, "mapOptions")).toBeNull();
     expect(partSummary(bare, "tweakSlots")).toBeNull();
     expect(partSummary(bare, "restrictions")).toBeNull();
     expect(partSummary(bare, "teams")).toBeNull();

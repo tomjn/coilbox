@@ -68,8 +68,9 @@ function renderDrawer(over: Partial<Parameters<typeof PresetsDrawer>[0]> = {}) {
 
 const openPanel = () => fireEvent.click(screen.getByText("8v8 ruleset"));
 
+// Exact, because "Map" and "Map options" are both rows.
 const checkbox = (label: string) =>
-  screen.getByRole("checkbox", { name: new RegExp(`^${label}`) });
+  screen.getByRole("checkbox", { name: label });
 
 describe("the preset list", () => {
   it("carries no per-preset actions at all, just the row", () => {
@@ -98,7 +99,7 @@ describe("the preset list", () => {
     openPanel();
     fireEvent.click(screen.getByRole("button", { name: "Back to presets" }));
     expect(screen.getByText("8v8 ruleset")).toBeTruthy();
-    expect(screen.queryByRole("checkbox", { name: /^Map/ })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Map" })).toBeNull();
   });
 
   it("offers creating a preset from a replay", () => {

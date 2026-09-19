@@ -41,6 +41,17 @@ export interface SkirmishDraft {
    */
   startRects?: Record<string, StartRect>;
   modOptionValues: Record<string, string>;
+  /**
+   * Map options the setup chose, keyed by the map's own bare option names.
+   *
+   * Optional, and absent on every draft written before presets could carry
+   * them. Singleplayer offers no editor for these, so the only thing that fills
+   * them is capturing a battle whose host had set some. They still have to
+   * travel: without them, saving a room as a preset and applying it back lost
+   * the map's settings silently, which is the one job the room's own option
+   * presets did that a preset could not.
+   */
+  mapOptionValues?: Record<string, string>;
   /** Faithful-replay restrictions from a captured conquest/warpath/MP battle. */
   restrictions?: BattleRestrictions;
 }

@@ -104,14 +104,14 @@ export function battleOptionTags(
  * Which preset part a host seed's script tag belongs to, or null when it
  * belongs to none.
  *
- * `draftToHostSeed` builds exactly three kinds of tag: the start-pos type, the
- * draft's mod options, and the restrict block for its disabled units. A skirmish
- * draft holds no map options at all, so there are none to place here.
+ * `draftToHostSeed` builds four kinds of tag: the start-pos type, the draft's
+ * mod options, its map options, and the restrict block for its disabled units.
  */
 function partForTag(key: string): PresetPart | null {
   const low = key.toLowerCase();
   if (low === STARTPOSTYPE_KEY) return "startPositions";
   if (low.startsWith(RESTRICT_PREFIX)) return "restrictions";
+  if (low.startsWith(MAPOPT_PREFIX)) return "mapOptions";
   if (low.startsWith(MODOPT_PREFIX))
     return isTweakSlotKey(low.slice(MODOPT_PREFIX.length))
       ? "tweakSlots"

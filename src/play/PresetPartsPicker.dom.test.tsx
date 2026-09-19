@@ -51,8 +51,8 @@ function renderPicker(
 }
 
 /** The checkbox in the row whose label starts with `label`. */
-const row = (label: string) =>
-  screen.getByRole("checkbox", { name: new RegExp(`^${label}`) });
+// Exact, because "Map" and "Map options" are both rows.
+const row = (label: string) => screen.getByRole("checkbox", { name: label });
 
 describe("PresetPartsPicker", () => {
   it("shows a row per part with what the preset holds for it", () => {
@@ -68,12 +68,12 @@ describe("PresetPartsPicker", () => {
     expect(
       row("Unit restrictions").getAttribute("data-disabled"),
     ).not.toBeNull();
-    expect(screen.getByText("Not in this preset")).toBeTruthy();
+    expect(screen.getAllByText("Not in this preset").length).toBe(2);
   });
 
   it("leaves out a part this surface never offers", () => {
     renderPicker({ omit: ["game"] });
-    expect(screen.queryByRole("checkbox", { name: /^Game/ })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Game" })).toBeNull();
   });
 
   it("disables a part with the reason the caller gave", () => {

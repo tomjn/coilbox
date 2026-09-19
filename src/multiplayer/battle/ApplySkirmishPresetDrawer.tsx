@@ -165,9 +165,6 @@ export function ApplySkirmishPresetDrawer({
                 onBrowseHub={onBrowseHub}
                 disabled={disabled}
               />
-              <p className="border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
-                Seated players are left alone whatever you pick.
-              </p>
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <PresetList
                   presets={presets}

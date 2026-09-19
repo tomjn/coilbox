@@ -183,6 +183,12 @@ export default function SkirmishPage() {
   const [modOptionValues, setModOptionValues] = useState<
     Record<string, string>
   >(() => draft.modOptionValues);
+  // Map options a captured battle brought with it. Singleplayer has no editor
+  // for these, so nothing here changes them: they are carried so a preset saved
+  // off a room replays with the map set up the way the host had it.
+  const [mapOptionValues, setMapOptionValues] = useState<
+    Record<string, string> | undefined
+  >(() => draft.mapOptionValues);
   // Faithful-replay restrictions carried by a loaded conquest/warpath/MP preset
   // (disabled units + team-0 perks). Undefined for a hand-built skirmish. Held here
   // so `buildConfig` re-applies them on launch and the banner can show/clear them.
@@ -531,6 +537,7 @@ export default function SkirmishPage() {
         // render behind the picker, and starting in that gap would write the
         // previous map's block.
         mapOptionSchema: await mapOptionSchema(target, selectedMap.name),
+        mapOptions: mapOptionValues,
         disabledUnits: restrictions?.disabledUnits,
       }),
       restrictions,
@@ -547,6 +554,7 @@ export default function SkirmishPage() {
     startPosType,
     startRects,
     modOptionValues,
+    mapOptionValues,
     restrictions,
   });
 
@@ -711,6 +719,7 @@ export default function SkirmishPage() {
         startPosType,
         startRects,
         modOptionValues,
+        mapOptionValues,
         restrictions,
       },
       p,
@@ -731,6 +740,7 @@ export default function SkirmishPage() {
     setStartPosType(next.startPosType);
     setStartRects(next.startRects ?? {});
     setModOptionValues(next.modOptionValues);
+    setMapOptionValues(next.mapOptionValues);
     setRestrictions(next.restrictions);
     touchPreset(p.id);
   };

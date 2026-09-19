@@ -22,6 +22,7 @@ export type PresetPart =
   | "startPositions"
   | "modOptions"
   | "tweakSlots"
+  | "mapOptions"
   | "teams"
   | "restrictions";
 
@@ -32,6 +33,7 @@ export const PRESET_PARTS: readonly PresetPart[] = [
   "startPositions",
   "modOptions",
   "tweakSlots",
+  "mapOptions",
   "teams",
   "restrictions",
 ];
@@ -43,6 +45,7 @@ export const PART_LABELS: Record<PresetPart, string> = {
   startPositions: "Start positions",
   modOptions: "Mod options",
   tweakSlots: "Unit tweaks",
+  mapOptions: "Map options",
   teams: "Teams and bots",
   restrictions: "Unit restrictions",
 };
@@ -132,10 +135,15 @@ export function applySelection(
   const presetOptions = splitOptions(preset.modOptionValues);
   const gameName = take("game") ? preset.gameName : current.gameName;
   const gameChanged = gameName !== current.gameName;
+  const mapName = take("map") ? preset.mapName : current.mapName;
+  // Map option keys are as generic as they are common: two maps both declare
+  // `fog` and want opposite things by it, so a key that survives a map change
+  // is the old map's answer to the new map's question.
+  const mapChanged = mapName !== current.mapName;
 
   return {
     gameName,
-    mapName: take("map") ? preset.mapName : current.mapName,
+    mapName,
     startPosType: from.startPosType,
     startRects: from.startRects,
     participants: take("teams") ? preset.participants : current.participants,
@@ -146,6 +154,11 @@ export function applySelection(
       : gameChanged
         ? undefined
         : current.restrictions,
+    mapOptionValues: take("mapOptions")
+      ? (preset.mapOptionValues ?? {})
+      : mapChanged
+        ? {}
+        : current.mapOptionValues,
     modOptionValues: {
       ...mergeGroup(
         currentOptions.plain,
@@ -201,6 +214,10 @@ export function partSummary(
     }
     case "modOptions":
       return counts.plain > 0 ? plural(counts.plain, "option") : null;
+    case "mapOptions": {
+      const n = Object.keys(draft.mapOptionValues ?? {}).length;
+      return n > 0 ? plural(n, "map option") : null;
+    }
     case "tweakSlots":
       return counts.tweak > 0 ? plural(counts.tweak, "tweak slot") : null;
     case "teams": {

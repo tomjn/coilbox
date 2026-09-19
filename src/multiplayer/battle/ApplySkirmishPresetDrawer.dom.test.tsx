@@ -83,8 +83,9 @@ function renderDrawer(
 
 const openPanel = (name = "Ruleset") => fireEvent.click(screen.getByText(name));
 
+// Exact, because "Map" and "Map options" are both rows.
 const checkbox = (label: string) =>
-  screen.getByRole("checkbox", { name: new RegExp(`^${label}`) });
+  screen.getByRole("checkbox", { name: label });
 
 const selectionOf = (onApply: ReturnType<typeof vi.fn>) =>
   (onApply.mock.calls[0][2] as PresetSelection).parts;
@@ -132,7 +133,7 @@ describe("the room's preset panel", () => {
   it("never offers the game, because the room cannot change it", () => {
     renderDrawer();
     openPanel();
-    expect(screen.queryByRole("checkbox", { name: /^Game/ })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Game" })).toBeNull();
   });
 
   it("applies every part it offers", () => {
