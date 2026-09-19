@@ -100,6 +100,11 @@ import { mergeGameAi } from "../gameAi";
 import { withOption } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
+  ALL_PARTS,
+  applySelection,
+  type PresetSelection,
+} from "../presetParts";
+import {
   PRESET_KIND_VERSION,
   parsePresetJson,
   presetPayload,
@@ -664,21 +669,39 @@ export default function SkirmishPage() {
     });
   };
 
-  const loadPreset = (p: SkirmishPreset) => {
+  const loadPreset = (
+    p: SkirmishPreset,
+    selection: PresetSelection = ALL_PARTS,
+  ) => {
+    const next = applySelection(
+      {
+        participants,
+        gameName,
+        mapName,
+        startPosType,
+        startRects,
+        modOptionValues,
+        restrictions,
+      },
+      p,
+      selection,
+    );
     // The mod-option reset effect wipes values whenever the game archive changes
     // to a different defined value. Pre-seed `prevArchive` to the incoming game's
     // archive so restoring a preset for a different game doesn't discard the
-    // preset's own mod options (mirrors the initial draft-hydration escape).
+    // options we just worked out (mirrors the initial draft-hydration escape).
+    // `applySelection` has already cleared the ones a game change invalidates,
+    // so the effect has nothing left to do that would be right.
     prevArchive.current = games.find(
-      (g) => g.name === p.gameName,
+      (g) => g.name === next.gameName,
     )?.primaryArchive.name;
-    setParticipants(p.participants);
-    setGameName(p.gameName);
-    setMapName(p.mapName);
-    setStartPosType(p.startPosType);
-    setStartRects(p.startRects ?? {});
-    setModOptionValues(p.modOptionValues);
-    setRestrictions(p.restrictions);
+    setParticipants(next.participants);
+    setGameName(next.gameName);
+    setMapName(next.mapName);
+    setStartPosType(next.startPosType);
+    setStartRects(next.startRects ?? {});
+    setModOptionValues(next.modOptionValues);
+    setRestrictions(next.restrictions);
     touchPreset(p.id);
   };
 
@@ -895,6 +918,7 @@ export default function SkirmishPage() {
         onOpenChange={setPresetsOpen}
         presets={presets}
         thumbs={thumbs}
+        currentGameName={gameName}
         onLoad={loadPreset}
         onSave={saveCurrentPreset}
         onDelete={removePreset}

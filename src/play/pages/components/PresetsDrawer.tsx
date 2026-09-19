@@ -14,7 +14,9 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 import type { MapThumbData } from "@/content/config";
 import type { SkirmishDraft } from "../../drafts";
+import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
+import { LoadPartsPopover } from "./LoadPartsPopover";
 import { NewPresetFromReplayButton } from "./NewPresetFromReplayButton";
 
 /** A short, derived summary of a preset — its map, game and opponent count. No
@@ -36,6 +38,7 @@ export function PresetsDrawer({
   onOpenChange,
   presets,
   thumbs,
+  currentGameName,
   onLoad,
   onSave,
   onDelete,
@@ -50,7 +53,9 @@ export function PresetsDrawer({
   onOpenChange: (open: boolean) => void;
   presets: SkirmishPreset[];
   thumbs: Map<string, MapThumbData>;
-  onLoad: (preset: SkirmishPreset) => void;
+  /** The game the setup is on now, for the parts picker's cross-game check. */
+  currentGameName: string;
+  onLoad: (preset: SkirmishPreset, selection?: PresetSelection) => void;
   onSave: (name: string) => SkirmishPreset;
   onDelete: (id: string) => void;
   onExportPreset: (preset: SkirmishPreset) => void;
@@ -230,6 +235,15 @@ export function PresetsDrawer({
                           </div>
                         </button>
                         <div className="flex items-center gap-1 pr-2">
+                          <LoadPartsPopover
+                            preset={p}
+                            currentGameName={currentGameName}
+                            disabled={disabled}
+                            onLoad={(preset, selection) => {
+                              onLoad(preset, selection);
+                              onOpenChange(false);
+                            }}
+                          />
                           {onHostAsBattle && (
                             <Button
                               variant="ghost"

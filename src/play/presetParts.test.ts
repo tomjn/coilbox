@@ -81,7 +81,8 @@ describe("applySelection", () => {
     expect(out.gameName).toBe("Preset Game 2.0");
     expect(out.mapName).toBe("Current Map");
     expect(out.participants).toEqual(current.participants);
-    expect(out.modOptionValues).toEqual(current.modOptionValues);
+    // The options do not survive, because the game changed under them. Covered
+    // in its own right below.
   });
 
   it("takes the map alone", () => {
@@ -190,6 +191,31 @@ describe("applySelection", () => {
       onlykept: "yes",
       tweakunits3: "PRESET",
     });
+  });
+
+  it("clears an untaken option group when the game changes under it", () => {
+    // Option keys are declared by the game, so keeping the old game's values
+    // would carry keys the new game never declared.
+    const out = applySelection(current, preset, select({ parts: ["game"] }));
+    expect(out.gameName).toBe("Preset Game 2.0");
+    expect(out.modOptionValues).toEqual({});
+    expect(out.restrictions).toBeUndefined();
+  });
+
+  it("keeps an untaken option group when the game stays put", () => {
+    const sameGame: SkirmishDraft = { ...preset, gameName: current.gameName };
+    const out = applySelection(current, sameGame, select({ parts: ["game"] }));
+    expect(out.modOptionValues).toEqual(current.modOptionValues);
+    expect(out.restrictions).toEqual(current.restrictions);
+  });
+
+  it("still takes the options it was asked for across a game change", () => {
+    const out = applySelection(
+      current,
+      preset,
+      select({ parts: ["game", "modOptions", "tweakSlots"] }),
+    );
+    expect(out.modOptionValues).toEqual(preset.modOptionValues);
   });
 
   it("drops the boxes when the preset has none and start positions are taken", () => {

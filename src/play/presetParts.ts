@@ -93,14 +93,24 @@ function splitOptions(values: Record<string, string>): {
   return { plain, tweak };
 }
 
-/** One option group's result: untouched, replaced wholesale, or overlaid. */
+/**
+ * One option group's result: untouched, replaced wholesale, or overlaid.
+ *
+ * `gameChanged` empties an untaken group rather than carrying it. Option keys
+ * are declared by the game, so the ones you had mean nothing under a different
+ * one. The Singleplayer page has always done this through an effect that wipes
+ * the values on a game switch, which a full load then has to work around. Doing
+ * it here instead makes the rule the same on both surfaces and removes the
+ * workaround.
+ */
 function mergeGroup(
   currentGroup: Record<string, string>,
   presetGroup: Record<string, string>,
   taken: boolean,
   mode: MergeMode,
+  gameChanged: boolean,
 ): Record<string, string> {
-  if (!taken) return currentGroup;
+  if (!taken) return gameChanged ? {} : currentGroup;
   if (mode === "replace") return presetGroup;
   return { ...currentGroup, ...presetGroup };
 }
@@ -120,28 +130,36 @@ export function applySelection(
   const from = take("startPositions") ? preset : current;
   const currentOptions = splitOptions(current.modOptionValues);
   const presetOptions = splitOptions(preset.modOptionValues);
+  const gameName = take("game") ? preset.gameName : current.gameName;
+  const gameChanged = gameName !== current.gameName;
 
   return {
-    gameName: take("game") ? preset.gameName : current.gameName,
+    gameName,
     mapName: take("map") ? preset.mapName : current.mapName,
     startPosType: from.startPosType,
     startRects: from.startRects,
     participants: take("teams") ? preset.participants : current.participants,
+    // Restrictions name units, so they go the same way as the options when the
+    // game changes under them.
     restrictions: take("restrictions")
       ? preset.restrictions
-      : current.restrictions,
+      : gameChanged
+        ? undefined
+        : current.restrictions,
     modOptionValues: {
       ...mergeGroup(
         currentOptions.plain,
         presetOptions.plain,
         take("modOptions"),
         selection.modOptions,
+        gameChanged,
       ),
       ...mergeGroup(
         currentOptions.tweak,
         presetOptions.tweak,
         take("tweakSlots"),
         selection.tweakSlots,
+        gameChanged,
       ),
     },
   };
