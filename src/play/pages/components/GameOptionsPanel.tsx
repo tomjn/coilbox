@@ -88,27 +88,12 @@ export function GameOptionsPanel({
               <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 Mod options
               </div>
-              <div className="space-y-2">
-                {groups.map((g) =>
-                  g.name === undefined ? (
-                    <OptionGrid
-                      key={g.key}
-                      group={g}
-                      optionValues={optionValues}
-                      disabled={disabled}
-                      onOptionChange={onOptionChange}
-                    />
-                  ) : (
-                    <OptionSection
-                      key={g.key}
-                      group={g}
-                      optionValues={optionValues}
-                      disabled={disabled}
-                      onOptionChange={onOptionChange}
-                    />
-                  ),
-                )}
-              </div>
+              <ModOptionGroups
+                options={options}
+                readValue={(o) => optionValues[o.key]}
+                disabled={disabled}
+                onChange={(o, v) => onOptionChange(o.key, v)}
+              />
             </>
           )}
         </div>
@@ -120,27 +105,73 @@ export function GameOptionsPanel({
 /** Shared props for the two ways a group renders. */
 interface GroupProps {
   group: OptionGroup;
-  optionValues: Record<string, string>;
+  readValue: (o: ConfigOption) => string | undefined;
   disabled?: boolean;
-  onOptionChange: (key: string, value: string | undefined) => void;
+  onChange: (o: ConfigOption, value: string | undefined) => void;
+}
+
+/**
+ * A game's mod options, grouped the way the game itself groups them.
+ *
+ * Shared by the Singleplayer setup and the battle room's options drawer. The
+ * room used to render one flat column, which for Beyond All Reason's ~180
+ * options meant a screen and a half of scrolling past multipliers to reach
+ * anything else, while Singleplayer had already solved it: two columns, and a
+ * collapsible section per `section` option the game declares, opened when it
+ * holds a change so a non-default can never hide behind a shut header.
+ *
+ * The two surfaces read and write an option differently, one from a plain
+ * record and one from the battle's script tags with edits in flight, so the
+ * lookup and the write are passed in rather than assumed.
+ */
+export function ModOptionGroups({
+  options,
+  readValue,
+  disabled,
+  onChange,
+}: {
+  options: ConfigOption[];
+  readValue: (o: ConfigOption) => string | undefined;
+  disabled?: boolean;
+  onChange: (o: ConfigOption, value: string | undefined) => void;
+}) {
+  const groups = groupOptions(options);
+  return (
+    <div className="space-y-2">
+      {groups.map((g) =>
+        g.name === undefined ? (
+          <OptionGrid
+            key={g.key}
+            group={g}
+            readValue={readValue}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        ) : (
+          <OptionSection
+            key={g.key}
+            group={g}
+            readValue={readValue}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        ),
+      )}
+    </div>
+  );
 }
 
 /** A group's options in the two-column grid, with no header of their own. */
-function OptionGrid({
-  group,
-  optionValues,
-  disabled,
-  onOptionChange,
-}: GroupProps) {
+function OptionGrid({ group, readValue, disabled, onChange }: GroupProps) {
   return (
     <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
       {group.options.map((o) => (
         <ModOptionField
           key={o.key}
           option={o}
-          value={optionValues[o.key]}
+          value={readValue(o)}
           disabled={disabled}
-          onChange={(v) => onOptionChange(o.key, v)}
+          onChange={(v) => onChange(o, v)}
         />
       ))}
     </div>
@@ -153,9 +184,9 @@ function OptionGrid({
  * so a non-default setting can never hide behind a collapsed header.
  */
 function OptionSection(props: GroupProps) {
-  const { group, optionValues } = props;
+  const { group, readValue } = props;
   const changed = group.options.filter((o) =>
-    isChanged(o, optionValues[o.key]),
+    isChanged(o, readValue(o)),
   ).length;
 
   return (
@@ -185,8 +216,36 @@ function OptionSection(props: GroupProps) {
 }
 
 /**
+ * An option's own description, as a dimmed line under its control.
+ *
+ * It used to be a `title`, so it took a hover and a wait to read and never
+ * appeared at all for anybody not using a mouse. The text is written to be read
+ * while deciding, which is a poor fit for something you have to go looking for.
+ */
+function OptionHelp({
+  option,
+  className,
+}: {
+  option: ConfigOption;
+  className?: string;
+}) {
+  if (!option.description || option.description === option.name) return null;
+  // `text-muted-foreground` undimmed, because there is no tier below it: #1034
+  // measured that the ramp has no room for one that still clears AA. The help
+  // reads as secondary from where it sits and how small it is, not from a
+  // quieter ink.
+  return (
+    <span
+      className={`block text-xs leading-snug text-muted-foreground ${className ?? ""}`}
+    >
+      {option.description}
+    </span>
+  );
+}
+
+/**
  * Render one mod option as the control its type calls for. A section is a group
- * header rather than a setting, so it renders nothing here — callers that group
+ * header rather than a setting, so it renders nothing here: callers that group
  * (see `groupOptions`) never pass one, and those that don't would otherwise show
  * it as an empty text box.
  */
@@ -209,16 +268,19 @@ export function ModOptionField({
     return (
       <label
         htmlFor={id}
-        className="flex cursor-pointer items-center gap-2 py-1 text-sm"
-        title={o.description ?? o.name}
+        className="flex cursor-pointer items-start gap-2 py-1 text-sm"
       >
         <Checkbox
           id={id}
           checked={effective(o, value) === "1"}
           disabled={disabled}
           onCheckedChange={(v) => onChange(v === true ? "1" : "0")}
+          className="mt-0.5"
         />
-        <span className="truncate">{o.name}</span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span>{o.name}</span>
+          <OptionHelp option={o} />
+        </span>
       </label>
     );
   }
@@ -226,12 +288,10 @@ export function ModOptionField({
   if (o.type === "list" && o.listItems && o.listItems.length > 0) {
     return (
       <div>
-        <span
-          className="mb-1.5 block truncate text-xs text-muted-foreground"
-          title={o.description ?? o.name}
-        >
+        <span className="mb-1.5 block text-xs text-muted-foreground">
           {o.name}
         </span>
+        <OptionHelp option={o} className="mb-1.5" />
         <OptionSelect
           value={effective(o, value)}
           disabled={disabled}
@@ -284,12 +344,10 @@ function TypedOptionField({
 
   return (
     <Label htmlFor={id} className="block font-normal">
-      <span
-        className="mb-1.5 block truncate text-xs text-muted-foreground"
-        title={o.description ?? o.name}
-      >
+      <span className="mb-1.5 block text-xs text-muted-foreground">
         {o.name}
       </span>
+      <OptionHelp option={o} className="mb-1.5" />
       <Input
         id={id}
         type={isNumber ? "number" : "text"}

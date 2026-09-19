@@ -230,7 +230,7 @@ export function partSummary(
       if (!r) return null;
       const bits: string[] = [];
       if (r.disabledUnits?.length)
-        bits.push(plural(r.disabledUnits.length, "unit") + " disabled");
+        bits.push(`${plural(r.disabledUnits.length, "unit")} disabled`);
       if (r.advantage !== undefined)
         bits.push(`${Math.round(r.advantage * 100)}% advantage`);
       if (r.incomeMultiplier !== undefined)

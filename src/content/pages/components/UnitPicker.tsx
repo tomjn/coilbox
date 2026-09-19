@@ -144,6 +144,7 @@ export interface UnitPickerFaction {
  */
 export function UnitPicker({
   units,
+  listClassName,
   factions = [],
   gameName,
   selected,
@@ -156,6 +157,15 @@ export function UnitPicker({
 }: {
   /** The game's units, as `useUnitsyncUnitDataset` reports them. */
   units: UnitDatasetEntry[];
+  /**
+   * Passed to the scrolling list, for a caller giving the picker a pane to
+   * fill rather than a column that scrolls as a whole.
+   *
+   * Setting it also makes the picker and the list themselves flex down the
+   * page, because `flex-1` on the scroller sizes against nothing unless every
+   * box above it is a flex column that may shrink.
+   */
+  listClassName?: string;
   /** Faction blocks, in the order they should appear. Resolved from the game's
    * own sides when absent. */
   factions?: UnitPickerFaction[];
@@ -220,8 +230,11 @@ export function UnitPicker({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className={`flex flex-col gap-2 ${listClassName ? "min-h-0 flex-1" : ""}`}
+    >
       <UnitList
+        listClassName={listClassName}
         forest={forest}
         labels={labels}
         icons={icons}
@@ -513,7 +526,12 @@ function UnitList({
   isOn,
   onPick,
   autoFocusSearch = false,
+  listClassName,
 }: {
+  /** How tall the scrolling list may be. Defaults to a fixed cap, because the
+   *  picker usually sits in a column that scrolls as a whole. A caller giving
+   *  it a pane of its own passes `min-h-0 flex-1` to fill the pane instead. */
+  listClassName?: string;
   forest: ReturnType<typeof buildTechForest>;
   labels: Map<string, string>;
   icons: UnitBuildpicsResult | null;
@@ -717,7 +735,9 @@ function UnitList({
         : start + firstInWindow;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className={`flex flex-col gap-2 ${listClassName ? "min-h-0 flex-1" : ""}`}
+    >
       <div className="flex items-center gap-2">
         <Input
           value={query}
@@ -744,7 +764,7 @@ function UnitList({
         <div
           ref={setScroller}
           onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-          className="max-h-80 overflow-auto rounded-md border border-border/50 p-1"
+          className={`overflow-auto rounded-md border border-border/50 p-1 ${listClassName ?? "max-h-80"}`}
         >
           {/* The full length of the list, whether or not its rows are mounted,
             so the scrollbar is the size of the game rather than the size of

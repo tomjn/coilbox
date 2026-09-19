@@ -38,10 +38,14 @@ const HELPER =
  * removable tags in every fallback state.
  */
 export function UnitRestrictions({
+  listClassName,
   gameName,
   disabledUnits,
   onChange,
 }: {
+  /** Passed through to the picker's scrolling list, for a caller giving it a
+   *  pane of its own to fill. */
+  listClassName?: string;
   gameName: string;
   disabledUnits: string[];
   onChange: (next: string[]) => void;
@@ -170,12 +174,13 @@ export function UnitRestrictions({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <p className="text-xs text-muted-foreground">{HELPER}</p>
       {resolving ? (
         <p className="text-xs text-muted-foreground">Loading units…</p>
       ) : (
         <UnitPicker
+          listClassName={listClassName}
           units={units}
           factions={factions}
           selected={allowed}
