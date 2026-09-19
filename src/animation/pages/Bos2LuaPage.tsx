@@ -269,11 +269,6 @@ export default function Bos2LuaPage() {
                 Needs cob_vars.lua
               </Button>
             )}
-            <CheckField
-              label="Leave out unused code"
-              checked={prune}
-              onChange={setPrune}
-            />
             <Button variant="outline" size="sm" onClick={() => void browse()}>
               <Upload /> Load .bos…
             </Button>
@@ -394,6 +389,13 @@ export default function Bos2LuaPage() {
         <div className="flex min-h-0 flex-col gap-2">
           <div className="flex h-8 items-center gap-2">
             <h2 className="text-sm font-medium text-muted-foreground">Lua</h2>
+            <div className="ml-auto">
+              <CheckField
+                label="Leave out unused code"
+                checked={prune}
+                onChange={setPrune}
+              />
+            </div>
           </div>
           <div className="min-h-0 flex-1">
             {converted.lua ? (
