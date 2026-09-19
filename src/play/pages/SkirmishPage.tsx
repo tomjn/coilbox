@@ -102,6 +102,7 @@ import { usePlay } from "../PlayProvider";
 import {
   ALL_PARTS,
   applySelection,
+  type PresetPart,
   type PresetSelection,
 } from "../presetParts";
 import {
@@ -673,6 +674,35 @@ export default function SkirmishPage() {
     p: SkirmishPreset,
     selection: PresetSelection = ALL_PARTS,
   ) => {
+    // A preset naming a game this machine does not have cannot bring its game,
+    // and must not pretend to. Setting the name anyway hands it to the
+    // defaulting effect below, which replaces it with whatever sorts first, so
+    // the setup silently ends up on a third game that is neither the preset's
+    // nor the one you were on, with the map and roster loaded against it. The
+    // game-keyed parts go with it, because their keys belong to the game that
+    // is not here.
+    let taken = selection;
+    if (
+      selection.parts.includes("game") &&
+      p.gameName !== gameName &&
+      !games.some((g) => g.name === p.gameName)
+    ) {
+      const stranded: PresetPart[] = [
+        "game",
+        "modOptions",
+        "tweakSlots",
+        "restrictions",
+      ];
+      taken = {
+        ...selection,
+        parts: selection.parts.filter((part) => !stranded.includes(part)),
+      };
+      void notify({
+        title: `You do not have ${p.gameName}`,
+        body: `The rest of "${p.name}" was loaded onto ${gameName}. Install the game to load it whole.`,
+        level: "warning",
+      });
+    }
     const next = applySelection(
       {
         participants,
@@ -684,7 +714,7 @@ export default function SkirmishPage() {
         restrictions,
       },
       p,
-      selection,
+      taken,
     );
     // The mod-option reset effect wipes values whenever the game archive changes
     // to a different defined value. Pre-seed `prevArchive` to the incoming game's
