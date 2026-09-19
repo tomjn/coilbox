@@ -140,9 +140,8 @@ fn hands_call_ins_to_the_engine_under_its_names() {
     );
     assert!(lua.contains("\theading = toCobAngle(heading)"), "{lua}");
     assert!(lua.contains("\treturn true\nend"), "{lua}");
-    assert!(lua.contains("function script.QueryWeapon1()"), "{lua}");
     assert!(
-        lua.contains("\tpiecenum = flare\n\treturn piecenum"),
+        lua.contains("function script.QueryWeapon1()\n\treturn flare\nend"),
         "{lua}"
     );
     assert!(
@@ -181,7 +180,7 @@ fn converts_units_and_the_axes_cob_mirrors() {
         lua.contains("Turn(pad, y_axis, math.rad(179.9561))"),
         "{lua}"
     );
-    assert!(lua.contains("BosSleep(150)"), "{lua}");
+    assert!(lua.contains("Sleep(150 + 33)"), "{lua}");
 }
 
 #[test]
