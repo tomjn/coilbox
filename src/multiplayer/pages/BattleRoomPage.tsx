@@ -730,8 +730,6 @@ function BattleRoomPage() {
             restrictionsUnavailable={room.restrictionsUnavailable}
             startPositionsUnavailable={room.startPositionsUnavailable}
             onRestrictChange={room.setRestrictions}
-            isFounder={room.isFounder}
-            serverKey={room.serverKey}
           />
           {room.gameMissing && (
             <MissingContentCard

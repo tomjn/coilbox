@@ -1,4 +1,5 @@
 import { ChevronRight, Loader2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ConfigOption } from "@/content/bindings";
@@ -61,6 +62,7 @@ export function PresetTweaksView({
   disabled,
   onApply,
   onApplyMutator,
+  progress,
 }: {
   /** The game the setup or room is on. A project is written against one game. */
   gameName: string;
@@ -78,6 +80,9 @@ export function PresetTweaksView({
    * only one a battle offers. Absent on the surfaces that cannot take it.
    */
   onApplyMutator?: (project: ModProject) => Promise<void>;
+  /** How a slow apply is going, where applying starts a run rather than
+   *  finishing one. */
+  progress?: ReactNode;
 }) {
   const [packing, setPacking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +133,10 @@ export function PresetTweaksView({
         Applied over whatever the options already say, so a preset first and a
         project after gives you both.
       </p>
+
+      {progress && (
+        <div className="border-b border-border/60 px-5 py-3">{progress}</div>
+      )}
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
         {error && (

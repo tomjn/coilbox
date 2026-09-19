@@ -165,8 +165,18 @@ export function ApplySkirmishPresetDrawer({
               disabled={disabled}
               onApply={(slots) => {
                 onApplyTweaks(slots);
-                close();
+                // Same reason the preset panel stays put: a bot-hosted room
+                // takes these one `!bSet` at a time over real seconds.
+                if (selfHost) close();
               }}
+              progress={
+                !selfHost && delivery?.progress ? (
+                  <DeliveryProgressPanel
+                    progress={delivery.progress}
+                    retryHint="Applying again sends only the slots that did not land."
+                  />
+                ) : null
+              }
             />
           ) : viewing ? (
             <PresetPartsView

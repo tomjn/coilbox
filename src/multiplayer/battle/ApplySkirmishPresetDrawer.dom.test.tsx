@@ -41,7 +41,7 @@ afterEach(() => {
   mapStatus.value = "ready";
 });
 
-const idleDelivery = (): TweakDelivery => ({
+const _idleDelivery = (): TweakDelivery => ({
   progress: null,
   running: false,
   start: vi.fn(async () => {}),
