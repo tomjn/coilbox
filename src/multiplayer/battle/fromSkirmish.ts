@@ -10,7 +10,11 @@ import {
   resolveRandomSides,
   rgbToHex,
 } from "@/play/participants";
-import { MODOPT_PREFIX, STARTPOSTYPE_KEY } from "./battleOptions";
+import {
+  MAPOPT_PREFIX,
+  MODOPT_PREFIX,
+  STARTPOSTYPE_KEY,
+} from "./battleOptions";
 import { restrictTagsFor } from "./restrictTags";
 
 /**
@@ -169,6 +173,9 @@ export function draftToHostSeed(opts: {
   };
   for (const [k, v] of Object.entries(draft.modOptionValues)) {
     scriptTags[`${MODOPT_PREFIX}${k}`] = v;
+  }
+  for (const [k, v] of Object.entries(draft.mapOptionValues ?? {})) {
+    scriptTags[`${MAPOPT_PREFIX}${k}`] = v;
   }
   const disabledUnits = draft.restrictions?.disabledUnits;
   if (disabledUnits && disabledUnits.length > 0) {

@@ -359,11 +359,17 @@ export function toBattleConfig(opts: {
    * substitutes nothing at all here: `CGameSetup::Init` copies the
    * `[mapoptions]` section verbatim, so `Spring.GetMapOptions()` returns `nil`
    * for a key the script left out and the map's Lua takes whatever branch that
-   * leads to (issue #1868). Singleplayer offers no way to change one, so there
-   * is no matching values argument. Required for the same reason `optionSchema`
-   * is: a new launch path should not be able to quietly skip it.
+   * leads to (issue #1868). Required for the same reason `optionSchema` is: a
+   * new launch path should not be able to quietly skip it.
    */
   mapOptionSchema: ConfigOption[];
+  /**
+   * Map options the setup chose, over the map's own defaults. Singleplayer has
+   * no editor for these, so they only ever arrive from a preset captured off a
+   * battle whose host had set some. Defaults fill the rest, exactly as they do
+   * for the mod options.
+   */
+  mapOptions?: Record<string, string>;
   /**
    * Ally start boxes on the 0..200 grid, keyed by the ally number the
    * participants carry. Written only under `startPosType` 2, the mode that draws
@@ -385,7 +391,7 @@ export function toBattleConfig(opts: {
     disabledUnits,
   } = opts;
   const modOptions = effectiveOptions(optionSchema, opts.modOptions);
-  const mapOptions = effectiveOptions(mapOptionSchema, {});
+  const mapOptions = effectiveOptions(mapOptionSchema, opts.mapOptions ?? {});
   const you = participants[0];
   const active = participants.filter((p) => !(p.kind === "you" && p.spectator));
 

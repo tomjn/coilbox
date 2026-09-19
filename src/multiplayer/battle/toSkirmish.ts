@@ -3,7 +3,7 @@ import type { BattleRestrictions, SkirmishDraft } from "@/play/drafts";
 import { standardAi } from "@/play/gameAi";
 import { hexToRgb, PALETTE, type Participant } from "@/play/participants";
 import type { Battle, User } from "../bindings";
-import { MODOPT_PREFIX } from "./battleOptions";
+import { MAPOPT_PREFIX, MODOPT_PREFIX } from "./battleOptions";
 import { colorIntToHex, startPosTypeOf } from "./config";
 import { disabledFromTags } from "./restrictTags";
 
@@ -120,9 +120,13 @@ export function battleToSkirmishDraft(opts: {
   }
 
   const modOptionValues: Record<string, string> = {};
+  const mapOptionValues: Record<string, string> = {};
   for (const [k, v] of Object.entries(battle.scriptTags)) {
-    if (k.toLowerCase().startsWith(MODOPT_PREFIX)) {
+    const low = k.toLowerCase();
+    if (low.startsWith(MODOPT_PREFIX)) {
       modOptionValues[k.slice(MODOPT_PREFIX.length)] = v;
+    } else if (low.startsWith(MAPOPT_PREFIX)) {
+      mapOptionValues[k.slice(MAPOPT_PREFIX.length)] = v;
     }
   }
 
@@ -134,6 +138,9 @@ export function battleToSkirmishDraft(opts: {
     participants: [you, ...opponents],
     gameName: battle.modname,
     mapName: battle.map,
+    // Only when the host actually set some, so a room that left the map alone
+    // saves a preset with no map options rather than one holding an empty set.
+    ...(Object.keys(mapOptionValues).length > 0 ? { mapOptionValues } : {}),
     startPosType: startPosTypeOf(battle),
     // The battle's boxes are already on the grid a skirmish draws on, so a room
     // played locally keeps the layout the host set rather than starting blank.

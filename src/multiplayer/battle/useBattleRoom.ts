@@ -141,7 +141,14 @@ export interface BattleRoomView {
   /** Apply a whole preset's option tags at once. Founder: batch-set and prune
    * omitted. Autohost: `!bSet` per value, paced the same way as a workshop
    * project's tweak slots. */
-  applyOptionTags: (tags: Record<string, string>) => void;
+  /**
+   * Write a set of option script tags, settling once they are actually set.
+   *
+   * Awaitable because order matters after it: `!addbox` is refused until the
+   * room is in choose-in-game mode, and the tag that puts it there is in this
+   * run. A caller sending boxes has to let this finish first.
+   */
+  applyOptionTags: (tags: Record<string, string>) => Promise<void>;
   /**
    * Progress of the paced autohost delivery `applyOptionTags` starts on a
    * SPADS battle (issue #2761). Stays empty on a battle we founded, where
@@ -975,7 +982,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // `setRestrictions`). Autohost battle: `!bSet` each value (removal isn't possible
   // there — an omitted option simply keeps its current value).
   const applyOptionTags = useCallback(
-    (tags: Record<string, string>) => {
+    async (tags: Record<string, string>): Promise<void> => {
       if (!activeKey || !battle) return;
       if (isFounder) {
         // A preset stores only what its author changed, so top the founder's set
@@ -990,10 +997,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
           ...missingOptionTags("mod", modOptionsSchema, tags),
           ...missingOptionTags("map", mapOptionsSchema, tags),
         };
+        const writes: Promise<unknown>[] = [];
         if (Object.keys(filled).length > 0) {
-          mpSetScriptTags({ serverKey: activeKey, tags: filled }).then(
-            clearErr,
-            setErr,
+          writes.push(
+            mpSetScriptTags({ serverKey: activeKey, tags: filled }).then(
+              clearErr,
+              setErr,
+            ),
           );
         }
         const current = battleOptionTags(battle.scriptTags);
@@ -1002,17 +1012,20 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
           (k) => !wanted.has(k.toLowerCase()),
         );
         if (remove.length > 0) {
-          mpRemoveScriptTags({ serverKey: activeKey, tags: remove }).then(
-            clearErr,
-            setErr,
+          writes.push(
+            mpRemoveScriptTags({ serverKey: activeKey, tags: remove }).then(
+              clearErr,
+              setErr,
+            ),
           );
         }
+        await Promise.all(writes);
       } else {
         // Firing every `!bSet` at once trips SPADS' flood ban after the third
         // one, leaving the room holding part of a preset (issue #2761). Route
         // through the same paced, confirmed run #1279 built for tweak slots
         // instead of a second copy of that mistake.
-        void presetDelivery.start(optionTagSlots(tags));
+        await presetDelivery.start(optionTagSlots(tags));
       }
     },
     [

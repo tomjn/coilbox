@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
+import { useOneShotParam } from "@/deeplink/useOneShotParam";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
@@ -174,6 +175,15 @@ export default function BrowsePage() {
   const [error, setError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
+
+  // `?kind=preset` lands here already narrowed, for a screen that sends you to
+  // the hub looking for one kind of thing rather than for the hub at large. The
+  // param is stripped once read, so clearing the chips afterwards sticks.
+  const seedKind = useOneShotParam("kind");
+  useEffect(() => {
+    if (!seedKind || !HUB_KINDS.includes(seedKind as HubKind)) return;
+    setFilters((f) => ({ ...f, kind: [seedKind as HubKind], page: 1 }));
+  }, [seedKind]);
 
   // Typing is separate from the filter it eventually sets, so the list is not
   // refetched on every keystroke.

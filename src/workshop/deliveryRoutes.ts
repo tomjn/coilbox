@@ -45,6 +45,20 @@ export interface TweakSlotCounts {
  */
 const TWEAK_KEY = /^tweak(defs|units)(\d+)?$/;
 
+/**
+ * Whether a bare mod option key is a tweak slot, by key shape alone.
+ *
+ * `tweakSlotOptions` below answers the same question from a game's declared
+ * options, which is what a caller wanting each slot's default needs. A caller
+ * holding only the values, such as a saved preset's `modOptionValues`, has no
+ * schema to consult and would otherwise match the key shape in a second place.
+ * Splitting a preset's options this way therefore works for a game that is not
+ * installed, which is the normal case when browsing shared presets.
+ */
+export function isTweakSlotKey(key: string): boolean {
+  return TWEAK_KEY.test(key);
+}
+
 /** Count a game's declared tweak slots, split by which kind of Lua they carry. */
 export function tweakSlotCounts(options: ConfigOption[]): TweakSlotCounts {
   let defs = 0;

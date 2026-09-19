@@ -1,6 +1,8 @@
 import type { ConfigOption } from "@/content/bindings";
 import { effectiveOptions } from "@/play/modOptions";
-import { tweakSlotOptions } from "@/workshop/deliveryRoutes";
+import type { PresetPart, PresetSelection } from "@/play/presetParts";
+import { isTweakSlotKey, tweakSlotOptions } from "@/workshop/deliveryRoutes";
+import { RESTRICT_PREFIX } from "./restrictTags";
 
 /** Engine script-tag prefixes for the two option scopes + the start-pos tag. */
 export const MODOPT_PREFIX = "game/modoptions/";
@@ -94,6 +96,44 @@ export function battleOptionTags(
     ) {
       out[k] = v;
     }
+  }
+  return out;
+}
+
+/**
+ * Which preset part a host seed's script tag belongs to, or null when it
+ * belongs to none.
+ *
+ * `draftToHostSeed` builds four kinds of tag: the start-pos type, the draft's
+ * mod options, its map options, and the restrict block for its disabled units.
+ */
+function partForTag(key: string): PresetPart | null {
+  const low = key.toLowerCase();
+  if (low === STARTPOSTYPE_KEY) return "startPositions";
+  if (low.startsWith(RESTRICT_PREFIX)) return "restrictions";
+  if (low.startsWith(MAPOPT_PREFIX)) return "mapOptions";
+  if (low.startsWith(MODOPT_PREFIX))
+    return isTweakSlotKey(low.slice(MODOPT_PREFIX.length))
+      ? "tweakSlots"
+      : "modOptions";
+  return null;
+}
+
+/**
+ * Narrow a host seed's script tags to the parts a selection takes, for applying
+ * only some of a preset to a battle room.
+ *
+ * A tag belonging to no part is kept rather than dropped. Filtering is about the
+ * parts this knows, and an unrecognised tag is somebody else's to decide on.
+ */
+export function filterOptionTags(
+  tags: Record<string, string>,
+  selection: PresetSelection,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(tags)) {
+    const part = partForTag(key);
+    if (part === null || selection.parts.includes(part)) out[key] = value;
   }
   return out;
 }
