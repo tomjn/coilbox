@@ -22,7 +22,7 @@ import {
   StartBoxControls,
   useStartBoxAllies,
 } from "@/startbox/StartBoxControls";
-import { ApplySkirmishPresetPopover } from "../battle/ApplySkirmishPresetPopover";
+import { ApplySkirmishPresetDrawer } from "../battle/ApplySkirmishPresetDrawer";
 import { AutohostControls } from "../battle/AutohostControls";
 import { addHostSeedBots } from "../battle/applyHostSeed";
 import { BattleChatCard } from "../battle/BattleChatCard";
@@ -138,6 +138,7 @@ function BattleRoomPage() {
   // self-hosted room apply one in place.
   const skirmishPresets = useSkirmishPresets();
   const [hostSeedError, setHostSeedError] = useState<string | null>(null);
+  const [applyPresetOpen, setApplyPresetOpen] = useState(false);
 
   // "Host as battle" (from a skirmish preset or the current Singleplayer setup)
   // navigates here with the draft to seed once the room we just opened is ready.
@@ -629,15 +630,29 @@ function BattleRoomPage() {
               its map, options, start boxes and bots, without touching any real
               seated player. Self-host only, mirroring the host-seed apply above. */}
           {room.selfHost && (
-            <ApplySkirmishPresetPopover
-              presets={skirmishPresets.presets.filter(
-                (p) => p.gameName === battle.modname,
-              )}
-              enginePath={room.enginePath}
-              dataDir={room.dataDir}
-              canEditRestrictions={room.canEditRestrictions}
-              onApply={applySkirmishPresetInPlace}
-            />
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setApplyPresetOpen(true)}
+              >
+                Apply skirmish preset
+              </Button>
+              <ApplySkirmishPresetDrawer
+                open={applyPresetOpen}
+                onOpenChange={setApplyPresetOpen}
+                // Every preset, not just this game's. The panel blocks the
+                // game-keyed parts itself, and an exact game-name match (version
+                // and all) showed an empty list far more often than it helped.
+                presets={skirmishPresets.presets}
+                gameName={battle.modname}
+                enginePath={room.enginePath}
+                dataDir={room.dataDir}
+                canEditRestrictions={room.canEditRestrictions}
+                onApply={applySkirmishPresetInPlace}
+              />
+            </>
           )}
           <StartPosOptions
             battle={battle}

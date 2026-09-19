@@ -2,9 +2,11 @@ import { Button, Input } from "@picoframe/frame";
 import {
   ArrowLeft,
   Check,
-  ChevronRight,
-  ImageOff,
+  Link as LinkIcon,
   Save,
+  Share2,
+  Swords,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -13,17 +15,11 @@ import { useState } from "react";
 import { CoilboxGlyph } from "@/components/CoilboxGlyph";
 import type { MapThumbData } from "@/content/config";
 import type { SkirmishDraft } from "../../drafts";
+import { PresetList } from "../../PresetList";
+import { PresetPartsView } from "../../PresetPartsView";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
 import { NewPresetFromReplayButton } from "./NewPresetFromReplayButton";
-import { PresetPartsView } from "./PresetPartsView";
-
-/** A short, derived summary of a preset — its map, game and opponent count. No
- * description is stored on a preset, so this is computed at render time. */
-function describePreset(p: SkirmishPreset): string {
-  const ai = p.participants.filter((x) => x.kind === "ai").length;
-  return `${p.mapName} · ${p.gameName} · ${ai} AI opponent${ai === 1 ? "" : "s"}`;
-}
 
 /**
  * Right-hand slide-in sheet for managing singleplayer presets: browse saved
@@ -145,17 +141,63 @@ export function PresetsDrawer({
               key={viewing.id}
               preset={viewing}
               currentGameName={currentGameName}
+              verb="Load"
               disabled={disabled}
-              onLoad={load}
-              onExport={onExportPreset}
-              onCopyLink={onCopyPresetLink}
-              onHostAsBattle={onHostAsBattle}
-              onDelete={(id) => {
-                // Back to the list, since the preset this panel is about has
-                // just stopped existing.
-                onDelete(id);
-                setViewing(null);
-              }}
+              onConfirm={(selection) => load(viewing, selection)}
+              actions={
+                <>
+                  {/* The whole-preset actions, which moved off the list row:
+                   * they act on this one preset and the row had five icons with
+                   * no room to say which was which. */}
+                  <div className="flex items-center gap-2">
+                    {onHostAsBattle && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        disabled={disabled}
+                        onClick={() => onHostAsBattle(viewing)}
+                      >
+                        <Swords className="size-4" /> Host as battle
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      disabled={disabled}
+                      onClick={() => onExportPreset(viewing)}
+                    >
+                      <Share2 className="size-4" /> Export
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      disabled={disabled}
+                      onClick={() => onCopyPresetLink(viewing)}
+                    >
+                      <LinkIcon className="size-4" /> Copy link
+                    </Button>
+                  </div>
+                  {/* Set apart, because it is the one action here that cannot
+                   * be undone. */}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                    disabled={disabled}
+                    onClick={() => {
+                      // Back to the list, since the preset this panel is about
+                      // has just stopped existing.
+                      onDelete(viewing.id);
+                      setViewing(null);
+                    }}
+                  >
+                    <Trash2 className="size-4" /> Delete preset
+                  </Button>
+                </>
+              }
             />
           ) : (
             <>
@@ -236,72 +278,13 @@ export function PresetsDrawer({
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                {presets.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No presets yet. Save your current setup above, or import a
-                    shared one.
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {presets.map((p) => {
-                      const thumb = thumbs.get(p.mapName);
-                      return (
-                        <li key={p.id}>
-                          <div className="group flex items-stretch rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40">
-                            <button
-                              type="button"
-                              onClick={() => setViewing(p)}
-                              disabled={disabled}
-                              className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-2 pr-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/40">
-                                {thumb ? (
-                                  <img
-                                    src={thumb.url}
-                                    alt={`Minimap of ${p.mapName}`}
-                                    style={{
-                                      // unitsync thumbnails are square; stretch back
-                                      // to the map's real proportions, letterboxed by
-                                      // fixing the longer axis to 100%.
-                                      aspectRatio:
-                                        thumb.width && thumb.height
-                                          ? `${thumb.width} / ${thumb.height}`
-                                          : "1 / 1",
-                                      width:
-                                        !thumb.width ||
-                                        !thumb.height ||
-                                        thumb.width >= thumb.height
-                                          ? "100%"
-                                          : "auto",
-                                      height:
-                                        !thumb.width ||
-                                        !thumb.height ||
-                                        thumb.width >= thumb.height
-                                          ? "auto"
-                                          : "100%",
-                                    }}
-                                    className="object-fill"
-                                  />
-                                ) : (
-                                  <ImageOff className="size-5 text-muted-foreground" />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">
-                                  {p.name}
-                                </span>
-                                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                                  {describePreset(p)}
-                                </span>
-                              </div>
-                              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                <PresetList
+                  presets={presets}
+                  thumbs={thumbs}
+                  disabled={disabled}
+                  onOpen={setViewing}
+                  empty="No presets yet. Save your current setup above, or import a shared one."
+                />
               </div>
             </>
           )}
