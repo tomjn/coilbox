@@ -53,16 +53,23 @@
 //! single-quoted or long-bracket Lua string (`lua.rs`'s `lua_string` always
 //! double-quotes), so neither is tracked.
 //!
-//! Encoding reuses the exact alphabet `preflight.rs`'s round-trip check
-//! already proves every chunk survives, and `localBar.ts` already uses for
-//! the local single-slot route: URL-safe base64, padding stripped. That is
-//! one encoding implemented in the language each caller already runs in, not
-//! a second one invented for this module. This crate's own `Cargo.toml`
-//! already names its `base64` dependency as "the codec issue #1277's BAR
-//! export will encode a slot's payload with".
+//! Encoding is unpadded base64 both ways, and the alphabet differs by slot
+//! kind because BAR reads the two kinds differently (issue #2963).
+//! `tweakdefs` goes straight to BAR's decoder and carries the URL-safe
+//! alphabet `localBar.ts` already uses for the local single-slot route.
+//! `tweakunits` goes through one step more, `CustomKeyToUsefulTable`, which
+//! rewrites every `_` to `=` before decoding and so destroys the URL-safe
+//! spelling of 63. That slot carries the standard alphabet instead, which
+//! passes through untouched and which BAR's decoder reads just as happily:
+//! its table holds `['+'] = 62, ['/'] = 63` beside the URL-safe pair.
+//! Neither is padded, because that decoder walks its input four characters
+//! at a time and a short final group simply yields fewer bytes.
 
 use crate::compile::{Chunk, LuaForm};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{
+    engine::general_purpose::{STANDARD_NO_PAD, URL_SAFE_NO_PAD},
+    Engine as _,
+};
 use serde::Serialize;
 
 /// The base64 payload cap, per slot. Tom's decision on issue #1277.
@@ -256,9 +263,51 @@ fn long_bracket_close(chars: &[char], from: usize, level: usize) -> Option<usize
     None
 }
 
-/// The URL-safe, unpadded base64 every route in this project uses.
+/// The URL-safe, unpadded base64 a `tweakdefs` slot carries. BAR hands that
+/// slot straight to its own decoder, which reads this alphabet.
 fn encode(text: &str) -> String {
     URL_SAFE_NO_PAD.encode(text.as_bytes())
+}
+
+/// The same bytes for a `tweakunits` slot, which BAR reads through one step
+/// more and that step destroys the URL-safe alphabet (issue #2963).
+///
+/// `CustomKeyToUsefulTable` runs `string.gsub(dataRaw, "_", "=")` before it
+/// decodes, so every `_` becomes padding, which its table maps to nil, and
+/// the byte is dropped. The line still packs, still encodes and still
+/// decodes here. It fails only when a game loads it, and the only trace is a
+/// line in the infolog.
+///
+/// The standard alphabet goes through that `gsub` untouched, because it
+/// spells 62 and 63 as `+` and `/`. BAR's decoder reads both alphabets, with
+/// `['+'] = 62, ['/'] = 63` beside the URL-safe pair, so the bytes arrive as
+/// written. Padding stays off: the decoder walks the input four characters
+/// at a time and a short final group simply yields fewer bytes, which is why
+/// the unpadded form this project already sends has always worked.
+///
+/// `_` only encodes to 63 on the third byte of a group, so plain English
+/// rarely produces one and this went unnoticed. Any text outside ASCII makes
+/// it likely, since UTF-8 sets the high bits of every byte it uses.
+fn encode_tweakunits(text: &str) -> String {
+    STANDARD_NO_PAD.encode(text.as_bytes())
+}
+
+/// The payload for a chunk, in whichever alphabet its own slot kind needs.
+/// Shared with `preflight.rs` so the round trip it checks is the encoding
+/// that actually ships, rather than a second opinion about it.
+pub(crate) fn encode_for(form: LuaForm, text: &str) -> String {
+    match form {
+        LuaForm::Table => encode_tweakunits(text),
+        LuaForm::Block => encode(text),
+    }
+}
+
+/// The other half of [`encode_for`], for a caller checking the round trip.
+pub(crate) fn decode_for(form: LuaForm, payload: &str) -> Result<Vec<u8>, base64::DecodeError> {
+    match form {
+        LuaForm::Table => STANDARD_NO_PAD.decode(payload),
+        LuaForm::Block => URL_SAFE_NO_PAD.decode(payload),
+    }
 }
 
 /// The `!bset` prefix for one slot: bare for index 0, numbered from 1.
@@ -304,7 +353,7 @@ fn pack_tables(chunks: &[Chunk], result: &mut BarSlotPack) {
             continue;
         }
         let minified = minify_lua(&chunk.lua);
-        let payload = encode(&minified);
+        let payload = encode_tweakunits(&minified);
         let prefix = bset_prefix("tweakunits", slot_index);
         if !fits_payload(payload.len()) || !fits_line(prefix.len(), payload.len()) {
             result.oversized.push(chunk.title.clone());
@@ -393,6 +442,94 @@ mod tests {
             reason: "test".to_string(),
             lua: lua.to_string(),
         }
+    }
+
+    /// Beyond All Reason reading a `tweakunits` payload, in its own two
+    /// steps: `CustomKeyToUsefulTable`'s `string.gsub(dataRaw, "_", "=")`,
+    /// then `base64Decode` from `common/luaUtilities/base64.lua`. That
+    /// decoder's table maps both alphabets (`-` and `+` to 62, `_` and `/`
+    /// to 63) and drops `=`, and it reads four characters at a time so a
+    /// short final group just yields fewer bytes.
+    ///
+    /// Written out rather than reached for from the `base64` crate on
+    /// purpose: no engine here does the `gsub`, and that step is the bug.
+    fn as_bar_reads_tweakunits(payload: &str) -> Vec<u8> {
+        let mut bits = Vec::new();
+        for c in payload.replace('_', "=").chars() {
+            let value = match c {
+                'A'..='Z' => c as u8 - b'A',
+                'a'..='z' => c as u8 - b'a' + 26,
+                '0'..='9' => c as u8 - b'0' + 52,
+                '-' | '+' => 62,
+                '/' => 63,
+                _ => continue, // `=`, which the table maps to nil.
+            };
+            bits.push(value);
+        }
+        let mut out = Vec::new();
+        for group in bits.chunks(4) {
+            out.push((group[0] << 2) | (group.get(1).copied().unwrap_or(0) >> 4));
+            if group.len() > 2 {
+                out.push((group[1] << 4) | (group[2] >> 2));
+            }
+            if group.len() > 3 {
+                out.push((group[2] << 6) | group[3]);
+            }
+        }
+        out
+    }
+
+    /// The bug (issue #2963). A unit renamed in Russian inside a copied
+    /// definition is ordinary data, and its URL-safe payload holds a `_`
+    /// that BAR turns into padding before decoding, so the table arrives
+    /// truncated and the whole slot fails to load.
+    #[test]
+    fn a_tweakunits_payload_survives_bars_own_underscore_rewrite() {
+        let lua = "{ [\"armcom\"] = { name = \"привет\" } }";
+        let pack = pack(&[table_chunk("Field changes", lua)]);
+        let payload = pack.tweakunits[0]
+            .rsplit_once(' ')
+            .expect("a payload")
+            .1
+            .to_string();
+
+        assert!(!payload.contains('_'), "payload: {payload}");
+        assert_eq!(
+            String::from_utf8(as_bar_reads_tweakunits(&payload)).expect("utf8"),
+            minify_lua(lua),
+        );
+    }
+
+    /// The same bytes under the alphabet this project used before, to show
+    /// the test above is testing something. BAR would read this one short.
+    #[test]
+    fn the_url_safe_spelling_of_the_same_payload_is_what_bar_damages() {
+        let lua = "{ [\"armcom\"] = { name = \"привет\" } }";
+        let url_safe = encode(&minify_lua(lua));
+        assert!(url_safe.contains('_'));
+        assert_ne!(
+            String::from_utf8_lossy(&as_bar_reads_tweakunits(&url_safe)),
+            minify_lua(lua),
+        );
+    }
+
+    /// `tweakdefs` reaches BAR's decoder with no rewrite in the way, so it
+    /// keeps the alphabet every other route in this project speaks.
+    #[test]
+    fn a_tweakdefs_payload_keeps_the_url_safe_alphabet() {
+        // Chosen because the two alphabets spell this one differently: it
+        // encodes a 63, so the standard form holds a `/` where the URL-safe
+        // form holds a `_`.
+        let lua = "do x = \"?\" end";
+        assert_ne!(encode(lua), STANDARD_NO_PAD.encode(lua.as_bytes()));
+
+        let pack = pack(&[block_chunk("Block", lua)]);
+        let payload = pack.tweakdefs[0].rsplit_once(' ').expect("a payload").1;
+        assert_eq!(payload, encode(&minify_lua(lua)));
+        assert_eq!(
+            URL_SAFE_NO_PAD.decode(payload).expect("decodes"),
+            minify_lua(lua).as_bytes(),
+        );
     }
 
     // -- minify_lua -----------------------------------------------------
