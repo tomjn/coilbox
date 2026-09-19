@@ -315,9 +315,9 @@ describe("filterOptionTags", () => {
   });
 
   it("keeps the start-pos type only with the start positions part", () => {
-    expect(filterOptionTags(seedTags, sel({ parts: ["startPositions"] }))).toEqual(
-      { "game/startpostype": "2" },
-    );
+    expect(
+      filterOptionTags(seedTags, sel({ parts: ["startPositions"] })),
+    ).toEqual({ "game/startpostype": "2" });
   });
 
   it("separates the tweak slots from the plain mod options", () => {
@@ -330,7 +330,9 @@ describe("filterOptionTags", () => {
   });
 
   it("keeps the whole restrict block together", () => {
-    expect(filterOptionTags(seedTags, sel({ parts: ["restrictions"] }))).toEqual({
+    expect(
+      filterOptionTags(seedTags, sel({ parts: ["restrictions"] })),
+    ).toEqual({
       "game/restrict/numrestrictions": "1",
       "game/restrict/unit0": "armcom",
       "game/restrict/limit0": "0",
@@ -347,8 +349,8 @@ describe("filterOptionTags", () => {
   });
 
   it("keeps a tag that belongs to no part, having no claim to drop it", () => {
-    expect(
-      filterOptionTags({ "game/hostip": "1.2.3.4" }, sel()),
-    ).toEqual({ "game/hostip": "1.2.3.4" });
+    expect(filterOptionTags({ "game/hostip": "1.2.3.4" }, sel())).toEqual({
+      "game/hostip": "1.2.3.4",
+    });
   });
 });

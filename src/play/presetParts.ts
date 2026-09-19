@@ -156,8 +156,7 @@ export function optionCounts(draft: SkirmishDraft): {
   return { plain: Object.keys(plain).length, tweak: Object.keys(tweak).length };
 }
 
-const plural = (n: number, word: string) =>
-  `${n} ${word}${n === 1 ? "" : "s"}`;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
  * A line describing what this preset holds for one part, or null when it holds

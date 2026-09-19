@@ -4,8 +4,8 @@ import type { Participant } from "./participants";
 import {
   ALL_PARTS,
   applySelection,
-  type PresetSelection,
   PRESET_PARTS,
+  type PresetSelection,
   partSummary,
 } from "./presetParts";
 
@@ -71,9 +71,9 @@ describe("applySelection", () => {
     // Guards against a field being added to SkirmishDraft without being
     // assigned to a part, which would silently never transfer.
     const keys = Object.keys(preset).sort();
-    expect(Object.keys(applySelection(current, preset, ALL_PARTS)).sort()).toEqual(
-      keys,
-    );
+    expect(
+      Object.keys(applySelection(current, preset, ALL_PARTS)).sort(),
+    ).toEqual(keys);
   });
 
   it("takes the game alone", () => {
