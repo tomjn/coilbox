@@ -31,10 +31,8 @@ import { BattleMapCard } from "../battle/BattleMapCard";
 import { BattleMembersTable } from "../battle/BattleMembersTable";
 import { BattleMovedPanel } from "../battle/BattleMovedPanel";
 import { BattleOptionsDrawer } from "../battle/BattleOptionsDrawer";
-import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
-import { battleOptionTags, filterOptionTags } from "../battle/battleOptions";
-import { useBattlePresets } from "../battle/battlePresets";
+import { filterOptionTags } from "../battle/battleOptions";
 import { alliesFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
@@ -116,8 +114,6 @@ function BattleRoomPage() {
   // replay-stats database (#375) — purely a read, no server involvement.
   const relationFor = useStatsRelations(room.me);
   const navigate = useNavigate();
-  const presets = useBattlePresets();
-  const [presetsOpen, setPresetsOpen] = useState(false);
   // The game's skirmish AIs, so saving this battle as a skirmish preset can resolve
   // each bot's `aiDll` to a real AI reference (and convert human opponents to one).
   const { ais: skirmishAis } = useSkirmishAis(
@@ -132,10 +128,8 @@ function BattleRoomPage() {
     room.battle?.startRects ?? {},
   );
 
-  // Skirmish presets (issue #373): the singleplayer preset store, distinct
-  // from `useBattlePresets` above (options-only snapshots). Used both to host
-  // a preset's own bots once a room WE opened from it comes up, and to let a
-  // self-hosted room apply one in place.
+  // The preset library (issue #373). Used both to host a preset's own bots
+  // once a room we opened from it comes up, and to apply one to this room.
   const skirmishPresets = useSkirmishPresets();
   const [hostSeedError, setHostSeedError] = useState<string | null>(null);
   const [applyPresetOpen, setApplyPresetOpen] = useState(false);
@@ -147,24 +141,6 @@ function BattleRoomPage() {
   const location = useLocation();
   const hostDraft = (location.state as { hostDraft?: SkirmishDraft } | null)
     ?.hostDraft;
-
-  // Per-game default preset: when we host a game that has a default preset set,
-  // apply its options once. Guarded by a ref keyed on the battle + game so it seeds
-  // the room a single time and never re-clobbers options the host then tweaks.
-  const appliedDefaultRef = useRef<string | null>(null);
-  useEffect(() => {
-    const b = room.battle;
-    if (!b || !room.selfHost || !room.canEditOptions) return;
-    const key = `${room.serverKey}::${b.modname}`;
-    if (appliedDefaultRef.current === key) return;
-    const defId = presets.defaultForGame(b.modname);
-    if (!defId) return;
-    const preset = presets.presets.find((p) => p.id === defId);
-    if (!preset) return;
-    appliedDefaultRef.current = key;
-    room.applyOptionTags(preset.scriptTags);
-    presets.touchPreset(preset.id);
-  }, [room, presets]);
 
   // Apply a "Host as battle" seed once, the first time this battle is ready:
   // the draft's own seat, its mod/map options, start-pos type and unit
@@ -659,9 +635,8 @@ function BattleRoomPage() {
                     tags[`game/modoptions/${key}`] = value;
                   void room.applyOptionTags(tags);
                 }}
-                // Only a room we run ourselves needs the map's checksum, so
-                // only that one waits on unitsync to read it.
-                mapNeedsChecksum={room.selfHost}
+                selfHost={room.selfHost}
+                delivery={room.presetDelivery}
                 onApply={applySkirmishPresetInPlace}
                 saveLabel="Save this battle"
                 onSave={(name) => {
@@ -758,42 +733,6 @@ function BattleRoomPage() {
             isFounder={room.isFounder}
             serverKey={room.serverKey}
           />
-          {room.canEditOptions && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setPresetsOpen(true)}
-              >
-                <Bookmark className="size-4" /> Option presets
-              </Button>
-              <BattlePresetsDrawer
-                open={presetsOpen}
-                onOpenChange={setPresetsOpen}
-                gameName={battle.modname}
-                presets={presets.presetsForGame(battle.modname)}
-                defaultId={presets.defaultForGame(battle.modname)}
-                optionCount={
-                  Object.keys(battleOptionTags(battle.scriptTags)).length
-                }
-                onSave={(name) =>
-                  presets.savePreset(name, battle.modname, battle.scriptTags)
-                }
-                onLoad={(p) => {
-                  room.applyOptionTags(p.scriptTags);
-                  presets.touchPreset(p.id);
-                }}
-                onDelete={(id) => presets.removePreset(id)}
-                onSetDefault={(id) =>
-                  presets.setDefaultForGame(battle.modname, id)
-                }
-                disabled={!room.canEditOptions}
-                isFounder={room.isFounder}
-                delivery={room.presetDelivery}
-              />
-            </>
-          )}
           {room.gameMissing && (
             <MissingContentCard
               battleId={battle.id}

@@ -40,7 +40,7 @@ A singleplayer skirmish has one human (you) and AIs, so a multiplayer battle is 
 - **Spectators** are dropped — they weren't fighting.
 - **Host unit restrictions** carry over as the disabled-unit set.
 
-This is separate from the host-only **Option presets** in the battle room, which save only mod/map options for re-hosting — not the whole battle.
+The battle room used to keep a second, host-only store called Option presets, holding mod and map options and nothing else. It is gone: a preset carries map options now, so there was nothing left it could do that this cannot.
 
 ## Sharing presets
 

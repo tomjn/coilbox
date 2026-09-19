@@ -18,6 +18,7 @@ import type { Participant } from "@/play/participants";
 import type { PresetSelection } from "@/play/presetParts";
 import type { SkirmishPreset } from "@/play/presets";
 import { ApplySkirmishPresetDrawer } from "./ApplySkirmishPresetDrawer";
+import type { TweakDelivery } from "./useTweakDelivery";
 
 const mapStatus = vi.hoisted(() => ({ value: "ready" as string }));
 
@@ -38,6 +39,14 @@ vi.mock("@/workshop/project", () => ({
 afterEach(() => {
   cleanup();
   mapStatus.value = "ready";
+});
+
+const idleDelivery = (): TweakDelivery => ({
+  progress: null,
+  running: false,
+  start: vi.fn(async () => {}),
+  cancel: vi.fn(),
+  clear: vi.fn(),
 });
 
 const you: Participant = {
@@ -174,7 +183,7 @@ describe("the room's preset panel", () => {
 
   it("waits on the map checksum when we run the game ourselves", () => {
     mapStatus.value = "loading";
-    renderDrawer({ mapNeedsChecksum: true });
+    renderDrawer({ selfHost: true });
     openPanel();
     expect(
       screen
@@ -187,7 +196,7 @@ describe("the room's preset panel", () => {
     // The map goes out as `!map <name>` there, which names the map rather than
     // hashing it, so waiting on unitsync would block an apply for nothing.
     mapStatus.value = "loading";
-    const { onApply } = renderDrawer({ mapNeedsChecksum: false });
+    const { onApply } = renderDrawer({ selfHost: false });
     openPanel();
     fireEvent.click(screen.getByRole("button", { name: "Apply all 6 parts" }));
     expect(onApply).toHaveBeenCalled();

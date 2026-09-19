@@ -32,6 +32,7 @@ export function PresetPartsView({
   blockedLabel,
   disabled,
   onConfirm,
+  progress,
   actions,
 }: {
   preset: SkirmishDraft;
@@ -50,6 +51,9 @@ export function PresetPartsView({
   blockedLabel?: string | null;
   disabled?: boolean;
   onConfirm: (selection: PresetSelection) => void;
+  /** How a slow apply is going, for a surface where confirming starts a run
+   *  rather than finishing one. */
+  progress?: ReactNode;
   /** Whatever else this surface offers for the whole preset, under the primary
    *  button. Singleplayer puts hosting, sharing and deleting here. */
   actions?: ReactNode;
@@ -155,6 +159,7 @@ export function PresetPartsView({
       </div>
 
       <div className="space-y-2 border-t border-border/60 px-5 py-3">
+        {progress}
         <Button
           className="w-full"
           disabled={disabled || count === 0 || !!blockedLabel}

@@ -13,6 +13,8 @@ import { PresetTweaksView, usePresetTweaks } from "@/play/PresetTweaksView";
 import type { PresetSelection } from "@/play/presetParts";
 import type { SkirmishPreset } from "@/play/presets";
 import { hexToI32 } from "./config";
+import { DeliveryProgressPanel } from "./DeliveryProgressPanel";
+import type { TweakDelivery } from "./useTweakDelivery";
 
 /**
  * Applying parts of a saved skirmish preset to the CURRENT battle room
@@ -49,7 +51,8 @@ export function ApplySkirmishPresetDrawer({
   canEditRestrictions,
   modOptionsSchema,
   onApplyTweaks,
-  mapNeedsChecksum = true,
+  selfHost = true,
+  delivery,
   onApply,
   saveLabel,
   onSave,
@@ -73,10 +76,19 @@ export function ApplySkirmishPresetDrawer({
   modOptionsSchema: ConfigOption[];
   /** Send a packed project's slots over whatever the room's options say. */
   onApplyTweaks: (slots: Record<string, string>) => void;
-  /** Whether changing the map here needs the map's own checksum. True when we
-   *  run the game and send `UPDATEBATTLEINFO`, false when a bot does and the
-   *  map goes out as `!map <name>`, which names it rather than hashing it. */
-  mapNeedsChecksum?: boolean;
+  /**
+   * Whether we run the game ourselves rather than a bot doing it.
+   *
+   * Decides two things. The map goes out as `UPDATEBATTLEINFO` with a checksum
+   * when we host and as `!map <name>` when a bot does, so only the first waits
+   * on unitsync to read one. And a bot-hosted apply is a paced run over real
+   * seconds, so the sheet stays open to show it rather than closing on a run
+   * that has barely started.
+   */
+  selfHost?: boolean;
+  /** Progress of that paced run, for the sheet to show. Absent where there is
+   *  no paced run to watch. */
+  delivery?: TweakDelivery;
   onApply: (
     preset: SkirmishPreset,
     maphash: number,
@@ -98,7 +110,7 @@ export function ApplySkirmishPresetDrawer({
   const mapInfo = useUnitsyncMapInfo(
     enginePath,
     dataDir,
-    mapNeedsChecksum ? viewing?.mapName : undefined,
+    selfHost ? viewing?.mapName : undefined,
   );
   const maphash = hexToI32(mapInfo.info?.checksum);
 
@@ -175,15 +187,23 @@ export function ApplySkirmishPresetDrawer({
               // Only the map needs unitsync to read a checksum, so the wait is
               // announced rather than the button just sitting dead.
               blockedLabel={
-                mapNeedsChecksum && mapInfo.status === "loading"
-                  ? "Reading map…"
-                  : null
+                selfHost && mapInfo.status === "loading" ? "Reading map…" : null
               }
               disabled={disabled}
               onConfirm={(selection) => {
                 onApply(viewing, maphash, selection);
-                close();
+                // A bot-hosted apply is one `!bSet` at a time over real
+                // seconds, so closing here would hide the whole of it.
+                if (selfHost) close();
               }}
+              progress={
+                !selfHost && delivery?.progress ? (
+                  <DeliveryProgressPanel
+                    progress={delivery.progress}
+                    retryHint="Applying again sends only the options that did not land."
+                  />
+                ) : null
+              }
             />
           ) : (
             <>
