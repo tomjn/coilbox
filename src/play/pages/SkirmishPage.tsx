@@ -959,6 +959,12 @@ export default function SkirmishPage() {
         presets={presets}
         thumbs={thumbs}
         currentGameName={gameName}
+        modOptionsSchema={modOptions}
+        // Over the top of whatever the options already say, which is the point
+        // of applying a project after a preset rather than instead of one.
+        onApplyTweaks={(slots) =>
+          setModOptionValues((current) => ({ ...current, ...slots }))
+        }
         onLoad={loadPreset}
         onSave={saveCurrentPreset}
         onDelete={removePreset}

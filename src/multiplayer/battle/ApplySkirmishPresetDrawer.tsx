@@ -2,11 +2,14 @@ import { Button } from "@picoframe/frame";
 import { ArrowLeft, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
+import type { ConfigOption } from "@/content/bindings";
 import { useUnitsyncMapInfo, useUnitsyncThumbnails } from "@/content/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { PresetLibraryToolbar } from "@/play/PresetLibraryToolbar";
 import { PresetList } from "@/play/PresetList";
 import { PresetPartsView } from "@/play/PresetPartsView";
+import { PresetTweaksRow } from "@/play/PresetTweaksRow";
+import { PresetTweaksView } from "@/play/PresetTweaksView";
 import type { PresetSelection } from "@/play/presetParts";
 import type { SkirmishPreset } from "@/play/presets";
 import { hexToI32 } from "./config";
@@ -44,6 +47,8 @@ export function ApplySkirmishPresetDrawer({
   dataDir,
   disabled,
   canEditRestrictions,
+  modOptionsSchema,
+  onApplyTweaks,
   mapNeedsChecksum = true,
   onApply,
   saveLabel,
@@ -64,6 +69,10 @@ export function ApplySkirmishPresetDrawer({
    *  `game/restrict/*` script tags with no autohost path, so on a bot-hosted
    *  room the row says so rather than silently doing nothing. */
   canEditRestrictions?: boolean;
+  /** The game's declared options, for deciding whether it has tweak slots. */
+  modOptionsSchema: ConfigOption[];
+  /** Send a packed project's slots over whatever the room's options say. */
+  onApplyTweaks: (slots: Record<string, string>) => void;
   /** Whether changing the map here needs the map's own checksum. True when we
    *  run the game and send `UPDATEBATTLEINFO`, false when a bot does and the
    *  map goes out as `!map <name>`, which names it rather than hashing it. */
@@ -81,6 +90,7 @@ export function ApplySkirmishPresetDrawer({
   onBrowseHub: () => void;
 }) {
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
+  const [tweaksOpen, setTweaksOpen] = useState(false);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
   const mapInfo = useUnitsyncMapInfo(
     enginePath,
@@ -91,6 +101,7 @@ export function ApplySkirmishPresetDrawer({
 
   const close = () => {
     setViewing(null);
+    setTweaksOpen(false);
     onOpenChange(false);
   };
 
@@ -98,7 +109,10 @@ export function ApplySkirmishPresetDrawer({
     <DialogPrimitive.Root
       open={open}
       onOpenChange={(next) => {
-        if (!next) setViewing(null);
+        if (!next) {
+          setViewing(null);
+          setTweaksOpen(false);
+        }
         onOpenChange(next);
       }}
     >
@@ -106,18 +120,21 @@ export function ApplySkirmishPresetDrawer({
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center gap-2 border-b border-border/60 px-5 py-4">
-            {viewing && (
+            {(viewing || tweaksOpen) && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setViewing(null)}
+                onClick={() => {
+                  setViewing(null);
+                  setTweaksOpen(false);
+                }}
                 aria-label="Back to presets"
               >
                 <ArrowLeft className="size-4" />
               </Button>
             )}
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-              {viewing ? viewing.name : "Presets"}
+              {tweaksOpen ? "Unit tweaks" : (viewing?.name ?? "Presets")}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label="Close">
@@ -126,7 +143,17 @@ export function ApplySkirmishPresetDrawer({
             </DialogPrimitive.Close>
           </div>
 
-          {viewing ? (
+          {tweaksOpen ? (
+            <PresetTweaksView
+              gameName={gameName}
+              modOptionsSchema={modOptionsSchema}
+              disabled={disabled}
+              onApply={(slots) => {
+                onApplyTweaks(slots);
+                close();
+              }}
+            />
+          ) : viewing ? (
             <PresetPartsView
               key={viewing.id}
               preset={viewing}
@@ -166,6 +193,10 @@ export function ApplySkirmishPresetDrawer({
                 disabled={disabled}
               />
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <PresetTweaksRow
+                  disabled={disabled}
+                  onOpen={() => setTweaksOpen(true)}
+                />
                 <PresetList
                   presets={presets}
                   thumbs={thumbs}

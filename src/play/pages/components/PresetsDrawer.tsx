@@ -9,11 +9,14 @@ import {
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
+import type { ConfigOption } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
 import type { SkirmishDraft } from "../../drafts";
 import { PresetLibraryToolbar } from "../../PresetLibraryToolbar";
 import { PresetList } from "../../PresetList";
 import { PresetPartsView } from "../../PresetPartsView";
+import { PresetTweaksRow } from "../../PresetTweaksRow";
+import { PresetTweaksView } from "../../PresetTweaksView";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
 
@@ -36,6 +39,8 @@ export function PresetsDrawer({
   presets,
   thumbs,
   currentGameName,
+  modOptionsSchema,
+  onApplyTweaks,
   onLoad,
   onSave,
   onDelete,
@@ -53,6 +58,10 @@ export function PresetsDrawer({
   thumbs: Map<string, MapThumbData>;
   /** The game the setup is on now, for the parts picker's cross-game check. */
   currentGameName: string;
+  /** The game's declared options, for deciding whether it has tweak slots. */
+  modOptionsSchema: ConfigOption[];
+  /** Write a packed project's slots over whatever the options already say. */
+  onApplyTweaks: (slots: Record<string, string>) => void;
   onLoad: (preset: SkirmishPreset, selection?: PresetSelection) => void;
   onSave: (name: string) => SkirmishPreset;
   onDelete: (id: string) => void;
@@ -76,6 +85,9 @@ export function PresetsDrawer({
   // Which preset's parts are on screen, if any. The drawer switches to them in
   // place rather than stacking a popover over itself.
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
+  // The unit tweak list, the sheet's third face alongside the list and a
+  // preset's own panel.
+  const [tweaksOpen, setTweaksOpen] = useState(false);
 
   const load = (preset: SkirmishPreset, selection?: PresetSelection) => {
     onLoad(preset, selection);
@@ -88,7 +100,10 @@ export function PresetsDrawer({
       open={open}
       onOpenChange={(next) => {
         // Reopening lands on the list, not on whichever preset was last open.
-        if (!next) setViewing(null);
+        if (!next) {
+          setViewing(null);
+          setTweaksOpen(false);
+        }
         onOpenChange(next);
       }}
     >
@@ -96,18 +111,21 @@ export function PresetsDrawer({
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center gap-2 border-b border-border/60 px-5 py-4">
-            {viewing && (
+            {(viewing || tweaksOpen) && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setViewing(null)}
+                onClick={() => {
+                  setViewing(null);
+                  setTweaksOpen(false);
+                }}
                 aria-label="Back to presets"
               >
                 <ArrowLeft className="size-4" />
               </Button>
             )}
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-              {viewing ? viewing.name : "Presets"}
+              {tweaksOpen ? "Unit tweaks" : (viewing?.name ?? "Presets")}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label="Close">
@@ -116,7 +134,18 @@ export function PresetsDrawer({
             </DialogPrimitive.Close>
           </div>
 
-          {viewing ? (
+          {tweaksOpen ? (
+            <PresetTweaksView
+              gameName={currentGameName}
+              modOptionsSchema={modOptionsSchema}
+              disabled={disabled}
+              onApply={(slots) => {
+                onApplyTweaks(slots);
+                setTweaksOpen(false);
+                onOpenChange(false);
+              }}
+            />
+          ) : viewing ? (
             <PresetPartsView
               // Fresh ticks per preset rather than the last one's.
               key={viewing.id}
@@ -192,6 +221,10 @@ export function PresetsDrawer({
               />
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <PresetTweaksRow
+                  disabled={disabled}
+                  onOpen={() => setTweaksOpen(true)}
+                />
                 <PresetList
                   presets={presets}
                   thumbs={thumbs}

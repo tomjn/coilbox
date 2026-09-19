@@ -14,6 +14,12 @@ import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
 import { PresetsDrawer } from "./PresetsDrawer";
 
+// The tweaks panel reads the project library, which lives in the frame's
+// settings store and has no provider in a bare render.
+vi.mock("@/workshop/project", () => ({
+  useModProjects: () => ({ projects: [] }),
+}));
+
 afterEach(cleanup);
 
 const you: Participant = {
@@ -55,6 +61,8 @@ function renderDrawer(over: Partial<Parameters<typeof PresetsDrawer>[0]> = {}) {
       presets={[preset]}
       thumbs={new Map()}
       currentGameName="Preset Game"
+      modOptionsSchema={[]}
+      onApplyTweaks={vi.fn()}
       onSave={vi.fn()}
       onImport={vi.fn()}
       onSaveFromReplay={vi.fn()}
@@ -107,6 +115,26 @@ describe("the preset list", () => {
     expect(
       screen.getByRole("button", { name: "Create from replay" }),
     ).toBeTruthy();
+  });
+
+  it("offers unit tweaks above the presets, as its own panel", () => {
+    renderDrawer();
+    fireEvent.click(screen.getByText("Unit tweaks"));
+    expect(
+      screen.getByRole("button", { name: "Back to presets" }),
+    ).toBeTruthy();
+    // The fixture's game declares no tweak slots, which is said rather than
+    // shown as an empty list.
+    expect(
+      screen.getByText(/declares no tweakdefs or tweakunits options/),
+    ).toBeTruthy();
+  });
+
+  it("comes back from the tweaks panel to the list", () => {
+    renderDrawer();
+    fireEvent.click(screen.getByText("Unit tweaks"));
+    fireEvent.click(screen.getByRole("button", { name: "Back to presets" }));
+    expect(screen.getByText("8v8 ruleset")).toBeTruthy();
   });
 
   it("sends you to the hub for presets you have not made yourself", () => {

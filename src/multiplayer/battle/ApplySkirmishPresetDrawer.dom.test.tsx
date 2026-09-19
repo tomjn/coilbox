@@ -69,6 +69,8 @@ function renderDrawer(
       onOpenChange={vi.fn()}
       presets={[preset()]}
       gameName="A Game"
+      modOptionsSchema={[]}
+      onApplyTweaks={vi.fn()}
       onApply={onApply}
       saveLabel="Save this battle"
       onSave={vi.fn()}

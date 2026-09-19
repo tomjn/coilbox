@@ -649,6 +649,16 @@ function BattleRoomPage() {
                 enginePath={room.enginePath}
                 dataDir={room.dataDir}
                 canEditRestrictions={room.canEditRestrictions}
+                modOptionsSchema={room.modOptionsSchema}
+                // Through the same route every other option takes, so a
+                // bot-hosted room gets the paced !bSet run rather than a
+                // second copy of it.
+                onApplyTweaks={(slots) => {
+                  const tags: Record<string, string> = {};
+                  for (const [key, value] of Object.entries(slots))
+                    tags[`game/modoptions/${key}`] = value;
+                  void room.applyOptionTags(tags);
+                }}
                 // Only a room we run ourselves needs the map's checksum, so
                 // only that one waits on unitsync to read it.
                 mapNeedsChecksum={room.selfHost}
