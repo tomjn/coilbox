@@ -1,11 +1,9 @@
 import { Button, Input } from "@picoframe/frame";
 import {
+  ArrowLeft,
   Check,
   ImageOff,
-  Link as LinkIcon,
   Save,
-  Share2,
-  Swords,
   Trash2,
   Upload,
   X,
@@ -16,8 +14,8 @@ import type { MapThumbData } from "@/content/config";
 import type { SkirmishDraft } from "../../drafts";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
-import { LoadPartsPopover } from "./LoadPartsPopover";
 import { NewPresetFromReplayButton } from "./NewPresetFromReplayButton";
+import { PresetPartsView } from "./PresetPartsView";
 
 /** A short, derived summary of a preset — its map, game and opponent count. No
  * description is stored on a preset, so this is computed at render time. */
@@ -28,10 +26,16 @@ function describePreset(p: SkirmishPreset): string {
 
 /**
  * Right-hand slide-in sheet for managing singleplayer presets: browse saved
- * setups (minimap + auto-summary), load one by clicking it, delete or share
- * (export to file) individual presets, save the current setup, and import a
- * shared preset. Built on the radix `Dialog` primitive styled as a side panel,
+ * setups (minimap + auto-summary), save the current setup, and import a shared
+ * preset. Built on the radix `Dialog` primitive styled as a side panel,
  * matching `MapPickerDrawer`.
+ *
+ * Clicking a preset switches the sheet to that preset's own panel rather than
+ * loading it outright. Loading used to be a one-click overwrite of the whole
+ * setup with no preview, and the panel is where choosing parts of it lives, so
+ * the two problems have one answer. Hosting, exporting and copying a link moved
+ * there too: they act on one preset, and the row had five icons competing for
+ * the same few pixels with nothing to say which was which.
  */
 export function PresetsDrawer({
   open,
@@ -88,19 +92,41 @@ export function PresetsDrawer({
     setNaming(false);
   };
 
-  const load = (preset: SkirmishPreset) => {
-    onLoad(preset);
+  // Which preset's parts are on screen, if any. The drawer switches to them in
+  // place rather than stacking a popover over itself.
+  const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
+
+  const load = (preset: SkirmishPreset, selection?: PresetSelection) => {
+    onLoad(preset, selection);
+    setViewing(null);
     onOpenChange(false);
   };
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        // Reopening lands on the list, not on whichever preset was last open.
+        if (!next) setViewing(null);
+        onOpenChange(next);
+      }}
+    >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
-          <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-            <DialogPrimitive.Title className="text-base font-semibold">
-              Presets
+          <div className="flex items-center gap-2 border-b border-border/60 px-5 py-4">
+            {viewing && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setViewing(null)}
+                aria-label="Back to presets"
+              >
+                <ArrowLeft className="size-4" />
+              </Button>
+            )}
+            <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
+              {viewing ? viewing.name : "Presets"}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label="Close">
@@ -109,190 +135,170 @@ export function PresetsDrawer({
             </DialogPrimitive.Close>
           </div>
 
-          {/* Save the current setup / import a shared one. */}
-          <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
-            {naming ? (
-              <>
-                <Input
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitSave();
-                    if (e.key === "Escape") cancelSave();
-                  }}
-                  placeholder="Preset name"
-                  className="h-8 flex-1"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={commitSave}
-                  disabled={!name.trim()}
-                  aria-label="Save preset"
-                >
-                  <Check className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={cancelSave}
-                  aria-label="Cancel"
-                >
-                  <X className="size-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setNaming(true)}
-                  disabled={disabled}
-                  className="flex-1"
-                >
-                  <Save className="size-4" /> Save current setup
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onImport}
-                  disabled={disabled}
-                >
-                  <Upload className="size-4" /> Import
-                </Button>
-              </>
-            )}
-          </div>
-
-          {/* Seed a preset from a decoded replay's setup, the other end of the
-           * refight pipeline from the replay detail page's "Refight this setup". */}
-          <div className="flex items-center border-b border-border/60 px-5 py-3">
-            <NewPresetFromReplayButton
-              onSave={onSaveFromReplay}
+          {viewing ? (
+            <PresetPartsView
+              // Fresh ticks per preset rather than the last one's.
+              key={viewing.id}
+              preset={viewing}
+              currentGameName={currentGameName}
               disabled={disabled}
+              onLoad={load}
+              onExport={onExportPreset}
+              onCopyLink={onCopyPresetLink}
+              onHostAsBattle={onHostAsBattle}
             />
-          </div>
+          ) : (
+            <>
+              {/* Save the current setup / import a shared one. */}
+              <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
+                {naming ? (
+                  <>
+                    <Input
+                      autoFocus
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitSave();
+                        if (e.key === "Escape") cancelSave();
+                      }}
+                      placeholder="Preset name"
+                      className="h-8 flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={commitSave}
+                      disabled={!name.trim()}
+                      aria-label="Save preset"
+                    >
+                      <Check className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={cancelSave}
+                      aria-label="Cancel"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNaming(true)}
+                      disabled={disabled}
+                      className="flex-1"
+                    >
+                      <Save className="size-4" /> Save current setup
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onImport}
+                      disabled={disabled}
+                    >
+                      <Upload className="size-4" /> Import
+                    </Button>
+                  </>
+                )}
+              </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {presets.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No presets yet. Save your current setup above, or import a
-                shared one.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {presets.map((p) => {
-                  const thumb = thumbs.get(p.mapName);
-                  return (
-                    <li key={p.id}>
-                      <div className="group flex items-stretch gap-3 rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40">
-                        <button
-                          type="button"
-                          onClick={() => load(p)}
-                          disabled={disabled}
-                          className="flex min-w-0 flex-1 items-center gap-3 rounded-l-lg p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/40">
-                            {thumb ? (
-                              <img
-                                src={thumb.url}
-                                alt={`Minimap of ${p.mapName}`}
-                                style={{
-                                  // unitsync thumbnails are square; stretch back
-                                  // to the map's real proportions, letterboxed by
-                                  // fixing the longer axis to 100%.
-                                  aspectRatio:
-                                    thumb.width && thumb.height
-                                      ? `${thumb.width} / ${thumb.height}`
-                                      : "1 / 1",
-                                  width:
-                                    !thumb.width ||
-                                    !thumb.height ||
-                                    thumb.width >= thumb.height
-                                      ? "100%"
-                                      : "auto",
-                                  height:
-                                    !thumb.width ||
-                                    !thumb.height ||
-                                    thumb.width >= thumb.height
-                                      ? "auto"
-                                      : "100%",
-                                }}
-                                className="object-fill"
-                              />
-                            ) : (
-                              <ImageOff className="size-5 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="block truncate text-sm font-medium">
-                              {p.name}
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {describePreset(p)}
-                            </span>
-                          </div>
-                        </button>
-                        <div className="flex items-center gap-1 pr-2">
-                          <LoadPartsPopover
-                            preset={p}
-                            currentGameName={currentGameName}
-                            disabled={disabled}
-                            onLoad={(preset, selection) => {
-                              onLoad(preset, selection);
-                              onOpenChange(false);
-                            }}
-                          />
-                          {onHostAsBattle && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => onHostAsBattle(p)}
+              {/* Seed a preset from a decoded replay's setup, the other end of the
+               * refight pipeline from the replay detail page's "Refight this setup". */}
+              <div className="flex items-center border-b border-border/60 px-5 py-3">
+                <NewPresetFromReplayButton
+                  onSave={onSaveFromReplay}
+                  disabled={disabled}
+                />
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                {presets.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No presets yet. Save your current setup above, or import a
+                    shared one.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {presets.map((p) => {
+                      const thumb = thumbs.get(p.mapName);
+                      return (
+                        <li key={p.id}>
+                          <div className="group flex items-stretch gap-3 rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40">
+                            <button
+                              type="button"
+                              onClick={() => setViewing(p)}
                               disabled={disabled}
-                              aria-label={`Host ${p.name} as a battle`}
-                              title="Host as battle"
+                              className="flex min-w-0 flex-1 items-center gap-3 rounded-l-lg p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              <Swords className="size-4" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onExportPreset(p)}
-                            disabled={disabled}
-                            aria-label={`Export preset ${p.name} to a file`}
-                            title="Export to file"
-                          >
-                            <Share2 className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onCopyPresetLink(p)}
-                            disabled={disabled}
-                            aria-label={`Copy a link for preset ${p.name}`}
-                            title="Copy link"
-                          >
-                            <LinkIcon className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onDelete(p.id)}
-                            disabled={disabled}
-                            aria-label={`Delete preset ${p.name}`}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+                              <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/40">
+                                {thumb ? (
+                                  <img
+                                    src={thumb.url}
+                                    alt={`Minimap of ${p.mapName}`}
+                                    style={{
+                                      // unitsync thumbnails are square; stretch back
+                                      // to the map's real proportions, letterboxed by
+                                      // fixing the longer axis to 100%.
+                                      aspectRatio:
+                                        thumb.width && thumb.height
+                                          ? `${thumb.width} / ${thumb.height}`
+                                          : "1 / 1",
+                                      width:
+                                        !thumb.width ||
+                                        !thumb.height ||
+                                        thumb.width >= thumb.height
+                                          ? "100%"
+                                          : "auto",
+                                      height:
+                                        !thumb.width ||
+                                        !thumb.height ||
+                                        thumb.width >= thumb.height
+                                          ? "auto"
+                                          : "100%",
+                                    }}
+                                    className="object-fill"
+                                  />
+                                ) : (
+                                  <ImageOff className="size-5 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="block truncate text-sm font-medium">
+                                  {p.name}
+                                </span>
+                                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                  {describePreset(p)}
+                                </span>
+                              </div>
+                            </button>
+                            {/* Only delete stays on the row. Hosting, exporting and
+                             * copying a link all belong to one preset and now live
+                             * on its own panel, but clearing out duplicates is a
+                             * sweep down the list and wants to stay one click. */}
+                            <div className="flex items-center pr-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onDelete(p.id)}
+                                disabled={disabled}
+                                aria-label={`Delete preset ${p.name}`}
+                                title="Delete"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
