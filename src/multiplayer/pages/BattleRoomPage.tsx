@@ -282,30 +282,23 @@ function BattleRoomPage() {
         spectator: seed.self.spectator,
       });
     }
-    room.applyOptionTags(filterOptionTags(seed.scriptTags, selection));
+    // The boxes wait for the options, because `!addbox` is refused until the
+    // room is in choose-in-game mode and the tag that sets it is in this run.
+    // Sending both at once had every box rejected on a bot-hosted room.
+    const options = room.applyOptionTags(
+      filterOptionTags(seed.scriptTags, selection),
+    );
     // The preset's own boxes, the ones saved with it, rather than whatever was
     // last saved against the map.
-    //
-    // On a bot-hosted room the boxes go out as `!addbox`, which SPADS only
-    // accepts once the room is already in choose-in-game mode. The tag that
-    // puts it there is in the paced option run just above and has not landed
-    // yet, so sending now would have every box refused. Say so instead, and the
-    // second apply lands them.
     if (
       take("startPositions") &&
       preset.startPosType === 2 &&
       preset.startRects
     ) {
-      if (room.selfHost || room.canEditBoxes) {
-        for (const [ally, rect] of Object.entries(preset.startRects))
-          room.setStartBox(Number(ally), rect);
-      } else {
-        notify({
-          title: "Start boxes not sent",
-          body: "The host has to be in choose-in-game mode first. Apply this preset again once it is.",
-          level: "warning",
-        });
-      }
+      const rects = Object.entries(preset.startRects);
+      void options.then(() => {
+        for (const [ally, rect] of rects) room.setStartBox(Number(ally), rect);
+      });
     }
     skirmishPresets.touchPreset(preset.id);
     if (!take("teams") || seed.bots.length === 0 || !room.serverKey) return;
