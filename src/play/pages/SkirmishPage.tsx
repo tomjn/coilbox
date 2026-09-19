@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Bookmark, History, Play, Swords } from "lucide-react";
+import { Bookmark, Play, Swords } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -10,11 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
@@ -30,6 +25,7 @@ import {
 } from "@/container/container";
 import { rememberCarriedShortname } from "@/container/shortnames";
 import {
+  primeScan,
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
   useUnitsyncMapMeta,
@@ -44,8 +40,10 @@ import {
   exactMapRequirement,
 } from "@/content/resolveContent";
 import { useFactionLogos } from "@/factions/logos";
-import { withoutGeneratedGames } from "@/lib/generatedGames";
-import { mostRecentOpen } from "@/lib/recency";
+import {
+  isWorkshopMutatorArchive,
+  withoutGeneratedGames,
+} from "@/lib/generatedGames";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { AccountPicker } from "@/multiplayer/AccountPicker";
 import { liveHostableKeys } from "@/multiplayer/protocol";
@@ -69,6 +67,8 @@ import { useImportParam } from "../../deeplink/useImportParam";
 import { useOneShotParam } from "../../deeplink/useOneShotParam";
 import { useRecordHubImport } from "../../hub/imports";
 import { getProfile } from "../../profile/profile";
+import { workshopTestMutator } from "../../workshop/mutator";
+import type { ModProject } from "../../workshop/project";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
 import {
@@ -227,24 +227,6 @@ export default function SkirmishPage() {
   // showing the way it does today. Only being live on nothing but Tachyon
   // connections removes it.
   const hostingPossible = liveKeys.length === 0 || hostableKeys.length > 0;
-
-  // Header overflow fix (issue #514): the Continue affordance goes icon-only,
-  // with its full "Continue: <preset name>" text moved into this popover so a
-  // long preset name never widens the header.
-  const [continueOpen, setContinueOpen] = useState(false);
-
-  // The single most recently used preset (issue #374's "continue playing"
-  // affordance): a compact header button, mirroring the login panel's
-  // "Reconnect as ..." shortcut, that loads it back into the working setup.
-  const mostRecentPreset = useMemo(
-    () =>
-      mostRecentOpen(
-        presets,
-        () => true,
-        (p) => Date.parse(p.lastUsedAt),
-      ),
-    [presets],
-  );
 
   // The team colour remembered across surfaces (shared with the MP lobby via the
   // same setting key). Empty = never picked.
@@ -745,6 +727,40 @@ export default function SkirmishPage() {
     touchPreset(p.id);
   };
 
+  /**
+   * Apply a project to a game with no tweak slots, by writing the mutator
+   * archive and playing that instead.
+   *
+   * The mutator depends on the open game and supplies only what the project
+   * changes, so the map, roster and options all still mean what they meant: the
+   * only thing that moves is which game the setup names. `prevArchive` is
+   * pre-seeded for the same reason loading a preset does it, because the game
+   * archive changing is what the option-reset effect watches for and the
+   * options here are still the ones the setup chose.
+   */
+  async function applyTweakMutator(project: ModProject) {
+    if (!target) throw new Error("No engine selected.");
+    const written = await workshopTestMutator({
+      dataDir: target.dataDir,
+      project,
+    });
+    const rescanned = await primeScan(target.enginePath, target.dataDir, true);
+    const found = rescanned.games.find((g) =>
+      isWorkshopMutatorArchive(g.primaryArchive.name),
+    );
+    if (!found)
+      throw new Error(
+        `Wrote the archive to ${written.dir} but the rescan did not find it.`,
+      );
+    prevArchive.current = found.primaryArchive.name;
+    setGameName(found.name);
+    notify({
+      title: `Playing with "${project.name}"`,
+      body: `${gameName} has no tweak slots, so the project is carried by a generated game that depends on it.`,
+      level: "success",
+    });
+  }
+
   // Share a preset: serialize it and write to a file the user picks. The write
   // goes through the plugin (no frontend fs plugin), mirroring the start-script
   // export above.
@@ -881,42 +897,6 @@ export default function SkirmishPage() {
                 Spectate
               </label>
             )}
-            {mostRecentPreset && (
-              <Popover open={continueOpen} onOpenChange={setContinueOpen}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label={`Continue: ${mostRecentPreset.name}`}
-                        disabled={running}
-                      >
-                        <History className="size-4" />
-                      </Button>
-                    </PopoverTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Continue: {mostRecentPreset.name}
-                  </TooltipContent>
-                </Tooltip>
-                <PopoverContent align="end" className="w-64 p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      loadPreset(mostRecentPreset);
-                      setContinueOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <History className="size-4 shrink-0" />
-                    <span className="truncate">
-                      Continue: {mostRecentPreset.name}
-                    </span>
-                  </button>
-                </PopoverContent>
-              </Popover>
-            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -965,6 +945,7 @@ export default function SkirmishPage() {
         onApplyTweaks={(slots) =>
           setModOptionValues((current) => ({ ...current, ...slots }))
         }
+        onApplyMutator={applyTweakMutator}
         onLoad={loadPreset}
         onSave={saveCurrentPreset}
         onDelete={removePreset}

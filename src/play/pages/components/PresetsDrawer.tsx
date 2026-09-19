@@ -11,12 +11,13 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 import type { ConfigOption } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
+import type { ModProject } from "../../../workshop/project";
 import type { SkirmishDraft } from "../../drafts";
 import { PresetLibraryToolbar } from "../../PresetLibraryToolbar";
 import { PresetList } from "../../PresetList";
 import { PresetPartsView } from "../../PresetPartsView";
 import { PresetTweaksRow } from "../../PresetTweaksRow";
-import { PresetTweaksView } from "../../PresetTweaksView";
+import { PresetTweaksView, usePresetTweaks } from "../../PresetTweaksView";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
 
@@ -41,6 +42,7 @@ export function PresetsDrawer({
   currentGameName,
   modOptionsSchema,
   onApplyTweaks,
+  onApplyMutator,
   onLoad,
   onSave,
   onDelete,
@@ -62,6 +64,8 @@ export function PresetsDrawer({
   modOptionsSchema: ConfigOption[];
   /** Write a packed project's slots over whatever the options already say. */
   onApplyTweaks: (slots: Record<string, string>) => void;
+  /** Carry a project by mutator archive instead, for a game with no slots. */
+  onApplyMutator?: (project: ModProject) => Promise<void>;
   onLoad: (preset: SkirmishPreset, selection?: PresetSelection) => void;
   onSave: (name: string) => SkirmishPreset;
   onDelete: (id: string) => void;
@@ -88,6 +92,13 @@ export function PresetsDrawer({
   // The unit tweak list, the sheet's third face alongside the list and a
   // preset's own panel.
   const [tweaksOpen, setTweaksOpen] = useState(false);
+  // Read here as well as in the panel, so the row says up front when there is
+  // nothing behind it rather than opening onto an explanation.
+  const tweaks = usePresetTweaks(
+    currentGameName,
+    modOptionsSchema,
+    !!onApplyMutator,
+  );
 
   const load = (preset: SkirmishPreset, selection?: PresetSelection) => {
     onLoad(preset, selection);
@@ -144,6 +155,14 @@ export function PresetsDrawer({
                 setTweaksOpen(false);
                 onOpenChange(false);
               }}
+              onApplyMutator={
+                onApplyMutator &&
+                (async (project) => {
+                  await onApplyMutator(project);
+                  setTweaksOpen(false);
+                  onOpenChange(false);
+                })
+              }
             />
           ) : viewing ? (
             <PresetPartsView
@@ -223,6 +242,7 @@ export function PresetsDrawer({
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <PresetTweaksRow
                   disabled={disabled}
+                  unavailable={tweaks.unavailable}
                   onOpen={() => setTweaksOpen(true)}
                 />
                 <PresetList

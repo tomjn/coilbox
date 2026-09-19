@@ -63,6 +63,9 @@ function renderDrawer(over: Partial<Parameters<typeof PresetsDrawer>[0]> = {}) {
       currentGameName="Preset Game"
       modOptionsSchema={[]}
       onApplyTweaks={vi.fn()}
+      // Singleplayer always has the archive route, so "no slots" is never the
+      // reason there: no projects for the game is.
+      onApplyMutator={vi.fn()}
       onSave={vi.fn()}
       onImport={vi.fn()}
       onSaveFromReplay={vi.fn()}
@@ -117,24 +120,15 @@ describe("the preset list", () => {
     ).toBeTruthy();
   });
 
-  it("offers unit tweaks above the presets, as its own panel", () => {
+  it("will not open unit tweaks when there is nothing behind it", () => {
+    // The mocked library holds no projects for this game, so the row says so
+    // rather than opening onto an empty list.
     renderDrawer();
+    expect(screen.getByText("No projects for Preset Game yet")).toBeTruthy();
     fireEvent.click(screen.getByText("Unit tweaks"));
     expect(
-      screen.getByRole("button", { name: "Back to presets" }),
-    ).toBeTruthy();
-    // The fixture's game declares no tweak slots, which is said rather than
-    // shown as an empty list.
-    expect(
-      screen.getByText(/declares no tweakdefs or tweakunits options/),
-    ).toBeTruthy();
-  });
-
-  it("comes back from the tweaks panel to the list", () => {
-    renderDrawer();
-    fireEvent.click(screen.getByText("Unit tweaks"));
-    fireEvent.click(screen.getByRole("button", { name: "Back to presets" }));
-    expect(screen.getByText("8v8 ruleset")).toBeTruthy();
+      screen.queryByRole("button", { name: "Back to presets" }),
+    ).toBeNull();
   });
 
   it("sends you to the hub for presets you have not made yourself", () => {

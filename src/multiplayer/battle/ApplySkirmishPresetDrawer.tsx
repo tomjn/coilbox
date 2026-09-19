@@ -9,7 +9,7 @@ import { PresetLibraryToolbar } from "@/play/PresetLibraryToolbar";
 import { PresetList } from "@/play/PresetList";
 import { PresetPartsView } from "@/play/PresetPartsView";
 import { PresetTweaksRow } from "@/play/PresetTweaksRow";
-import { PresetTweaksView } from "@/play/PresetTweaksView";
+import { PresetTweaksView, usePresetTweaks } from "@/play/PresetTweaksView";
 import type { PresetSelection } from "@/play/presetParts";
 import type { SkirmishPreset } from "@/play/presets";
 import { hexToI32 } from "./config";
@@ -91,6 +91,9 @@ export function ApplySkirmishPresetDrawer({
 }) {
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
   const [tweaksOpen, setTweaksOpen] = useState(false);
+  // Read here as well as in the panel, so the row says up front when there is
+  // nothing behind it rather than opening onto an explanation.
+  const tweaks = usePresetTweaks(gameName, modOptionsSchema, false);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
   const mapInfo = useUnitsyncMapInfo(
     enginePath,
@@ -195,6 +198,7 @@ export function ApplySkirmishPresetDrawer({
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <PresetTweaksRow
                   disabled={disabled}
+                  unavailable={tweaks.unavailable}
                   onOpen={() => setTweaksOpen(true)}
                 />
                 <PresetList

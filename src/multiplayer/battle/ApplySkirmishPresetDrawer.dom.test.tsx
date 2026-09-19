@@ -29,6 +29,12 @@ vi.mock("@/content/config", () => ({
   }),
 }));
 
+// The tweaks row reads the project library, which lives in the frame's
+// settings store and has no provider in a bare render.
+vi.mock("@/workshop/project", () => ({
+  useModProjects: () => ({ projects: [] }),
+}));
+
 afterEach(() => {
   cleanup();
   mapStatus.value = "ready";
