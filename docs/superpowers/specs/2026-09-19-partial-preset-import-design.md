@@ -44,7 +44,9 @@ Splitting the tweak slots out of the mod options costs almost nothing. `TWEAK_KE
 
 Replace and overlay only mean anything for the two parts that are maps of keys to values. The other five hold a single value each, so taking them is replacement by definition and offering a choice would be a control that does nothing.
 
-So `modOptions` and `tweakSlots` each carry their own replace-or-overlay control in the picker, defaulting to overlay. Overlay is the less destructive reading and matches what "take this part and leave the rest" sounds like it should do. Replace exists because a preset meant to define a match needs to be reproducible, and overlaying it onto somebody's leftover settings is not.
+So `modOptions` and `tweakSlots` each carry their own replace-or-overlay control in the picker, defaulting to replace. Overlay was the first choice here, on the grounds that it is less destructive and reads the way "take this part and leave the rest" sounds. It cannot be the default, and the reason is the partition property above. A key the current draft sets and the preset does not survives an overlay and is dropped by a full load, so an overlay default would make every part ticked mean something other than what Load has always meant. Replace is what a wholesale load does, so replace is what taking a whole part does.
+
+Overlay stays as the opt-in for the case it is actually good at: a preset that deliberately sets three options and means to leave everything else alone. That is a fragment of a ruleset rather than a ruleset, and the person applying it knows which they have.
 
 The two modes mean different things on the two surfaces, and the difference is not cosmetic.
 
