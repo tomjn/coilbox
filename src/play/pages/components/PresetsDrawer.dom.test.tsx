@@ -71,14 +71,14 @@ const checkbox = (label: string) =>
   screen.getByRole("checkbox", { name: new RegExp(`^${label}`) });
 
 describe("the preset list", () => {
-  it("leaves only delete on the row", () => {
+  it("carries no per-preset actions at all, just the row", () => {
     renderDrawer();
-    expect(screen.getByRole("button", { name: /^Delete preset/ })).toBeTruthy();
     for (const gone of [
       /^Host /,
-      /^Export preset/,
+      /^Export/,
       /^Copy a link/,
-      /^Load parts/,
+      /^Copy link/,
+      /^Delete/,
     ])
       expect(screen.queryByRole("button", { name: gone })).toBeNull();
   });
@@ -96,8 +96,15 @@ describe("the preset list", () => {
     renderDrawer();
     openPanel();
     fireEvent.click(screen.getByRole("button", { name: "Back to presets" }));
-    expect(screen.getByRole("button", { name: /^Delete preset/ })).toBeTruthy();
+    expect(screen.getByText("8v8 ruleset")).toBeTruthy();
     expect(screen.queryByRole("checkbox", { name: /^Map/ })).toBeNull();
+  });
+
+  it("offers creating a preset from a replay", () => {
+    renderDrawer();
+    expect(
+      screen.getByRole("button", { name: "Create from replay" }),
+    ).toBeTruthy();
   });
 });
 
@@ -182,5 +189,16 @@ describe("a preset's panel", () => {
     renderDrawer({ onHostAsBattle: undefined });
     openPanel();
     expect(screen.queryByRole("button", { name: "Host as battle" })).toBeNull();
+  });
+
+  it("deletes the preset and returns to the list", () => {
+    const { onDelete } = renderDrawer();
+    openPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Delete preset" }));
+    expect(onDelete).toHaveBeenCalledWith("preset-1");
+    // The panel was about a preset that no longer exists, so it cannot stay.
+    expect(
+      screen.queryByRole("button", { name: "Back to presets" }),
+    ).toBeNull();
   });
 });

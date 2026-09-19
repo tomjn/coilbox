@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Link as LinkIcon, Share2, Swords } from "lucide-react";
+import { Link as LinkIcon, Share2, Swords, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PresetPartsPicker } from "../../PresetPartsPicker";
 import {
@@ -32,6 +32,7 @@ export function PresetPartsView({
   onExport,
   onCopyLink,
   onHostAsBattle,
+  onDelete,
 }: {
   preset: SkirmishPreset;
   /** The game the setup is on now, for deciding whether the game-keyed parts
@@ -44,6 +45,7 @@ export function PresetPartsView({
   /** Absent where hosting is impossible, which is what hides the action on a
    *  Tachyon connection. */
   onHostAsBattle?: (preset: SkirmishPreset) => void;
+  onDelete: (id: string) => void;
 }) {
   const [selection, setSelection] = useState<PresetSelection>(ALL_PARTS);
 
@@ -162,6 +164,17 @@ export function PresetPartsView({
             <LinkIcon className="size-4" /> Copy link
           </Button>
         </div>
+        {/* Set apart from the three above, because it is the one action here
+         * that cannot be undone. */}
+        <Button
+          variant="destructive"
+          size="sm"
+          className="w-full"
+          disabled={disabled}
+          onClick={() => onDelete(preset.id)}
+        >
+          <Trash2 className="size-4" /> Delete preset
+        </Button>
       </div>
     </div>
   );

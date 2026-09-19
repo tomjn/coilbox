@@ -37,7 +37,7 @@ export function NewPresetFromReplayButton({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" disabled={disabled}>
-          <FilePlus2 className="size-4" /> New from replay…
+          <FilePlus2 className="size-4" /> Create from replay
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-80 flex-col gap-3">

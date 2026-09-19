@@ -2,9 +2,9 @@ import { Button, Input } from "@picoframe/frame";
 import {
   ArrowLeft,
   Check,
+  ChevronRight,
   ImageOff,
   Save,
-  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -146,6 +146,12 @@ export function PresetsDrawer({
               onExport={onExportPreset}
               onCopyLink={onCopyPresetLink}
               onHostAsBattle={onHostAsBattle}
+              onDelete={(id) => {
+                // Back to the list, since the preset this panel is about has
+                // just stopped existing.
+                onDelete(id);
+                setViewing(null);
+              }}
             />
           ) : (
             <>
@@ -226,12 +232,12 @@ export function PresetsDrawer({
                       const thumb = thumbs.get(p.mapName);
                       return (
                         <li key={p.id}>
-                          <div className="group flex items-stretch gap-3 rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40">
+                          <div className="group flex items-stretch rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40">
                             <button
                               type="button"
                               onClick={() => setViewing(p)}
                               disabled={disabled}
-                              className="flex min-w-0 flex-1 items-center gap-3 rounded-l-lg p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                              className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-2 pr-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/40">
                                 {thumb ? (
@@ -265,7 +271,7 @@ export function PresetsDrawer({
                                   <ImageOff className="size-5 text-muted-foreground" />
                                 )}
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <span className="block truncate text-sm font-medium">
                                   {p.name}
                                 </span>
@@ -273,23 +279,8 @@ export function PresetsDrawer({
                                   {describePreset(p)}
                                 </span>
                               </div>
+                              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                             </button>
-                            {/* Only delete stays on the row. Hosting, exporting and
-                             * copying a link all belong to one preset and now live
-                             * on its own panel, but clearing out duplicates is a
-                             * sweep down the list and wants to stay one click. */}
-                            <div className="flex items-center pr-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onDelete(p.id)}
-                                disabled={disabled}
-                                aria-label={`Delete preset ${p.name}`}
-                                title="Delete"
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            </div>
                           </div>
                         </li>
                       );
