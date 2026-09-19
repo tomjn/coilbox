@@ -168,6 +168,9 @@ async fn anim_cob_run(
 /// import reads them from the archive, the script is named by its path in that
 /// folder rather than `name`, and the `.cob` beside it is read when `cob` is not
 /// given. Otherwise nothing is read, and nothing is ever written.
+///
+/// What nothing uses is left out unless `prune` is false, which the converter
+/// page sends to compare the two.
 #[tauri::command]
 async fn anim_bos2lua(
     source: String,
@@ -176,6 +179,7 @@ async fn anim_bos2lua(
     pieces: Option<Vec<String>>,
     cob: Option<Vec<u8>>,
     path: Option<String>,
+    prune: Option<bool>,
 ) -> CliResult {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut includes = includes.unwrap_or_default();
@@ -207,7 +211,7 @@ async fn anim_bos2lua(
                 pieces: pieces.as_deref(),
                 linear_scale,
                 precedence,
-                prune: false,
+                prune: prune.unwrap_or(true),
             },
         )
         .map(|conversion| (conversion, linear_scale))

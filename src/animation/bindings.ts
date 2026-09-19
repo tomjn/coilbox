@@ -81,6 +81,8 @@ export const animBos2lua = defineCommand<
     pieces?: string[];
     cob?: number[];
     path?: string;
+    /** Leave out what nothing uses. On unless this is false. */
+    prune?: boolean;
   },
   {
     lua: string;

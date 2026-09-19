@@ -19,6 +19,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { CheckField } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
 import { errorText } from "@/lib/helpers";
@@ -72,6 +73,9 @@ export default function Bos2LuaPage() {
   // Where the script was loaded from, so its includes are read from beside it.
   const [path, setPath] = useState<string | null>(null);
   const [converted, setConverted] = useState<Converted>(EMPTY);
+  // Not remembered between visits, so a box unticked once to compare cannot
+  // go on writing the unused code weeks later.
+  const [prune, setPrune] = useState(true);
   const [copied, setCopied] = useState<"lua" | "cobVars" | null>(null);
   const [warningsOpen, setWarningsOpen] = useState(false);
   const [cobVarsOpen, setCobVarsOpen] = useState(false);
@@ -88,7 +92,12 @@ export default function Bos2LuaPage() {
       setConverted(EMPTY);
       return;
     }
-    animBos2lua({ source: bos, name: fileName, ...(path ? { path } : {}) })
+    animBos2lua({
+      source: bos,
+      name: fileName,
+      prune,
+      ...(path ? { path } : {}),
+    })
       .then(({ lua, warnings, cobVars, missingIncludes }) => {
         if (ticket !== latest.current) return;
         if (missingIncludes.length > 0) {
@@ -110,7 +119,7 @@ export default function Bos2LuaPage() {
           });
         }
       });
-  }, [bos, fileName, path]);
+  }, [bos, fileName, path, prune]);
 
   async function loadPath(picked: string) {
     try {
@@ -260,6 +269,11 @@ export default function Bos2LuaPage() {
                 Needs cob_vars.lua
               </Button>
             )}
+            <CheckField
+              label="Leave out unused code"
+              checked={prune}
+              onChange={setPrune}
+            />
             <Button variant="outline" size="sm" onClick={() => void browse()}>
               <Upload /> Load .bos…
             </Button>
