@@ -1,25 +1,21 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import {
   ArrowLeft,
-  Check,
   Link as LinkIcon,
-  Save,
   Share2,
   Swords,
   Trash2,
-  Upload,
   X,
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
-import { CoilboxGlyph } from "@/components/CoilboxGlyph";
 import type { MapThumbData } from "@/content/config";
 import type { SkirmishDraft } from "../../drafts";
+import { PresetLibraryToolbar } from "../../PresetLibraryToolbar";
 import { PresetList } from "../../PresetList";
 import { PresetPartsView } from "../../PresetPartsView";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
-import { NewPresetFromReplayButton } from "./NewPresetFromReplayButton";
 
 /**
  * Right-hand slide-in sheet for managing singleplayer presets: browse saved
@@ -77,21 +73,6 @@ export function PresetsDrawer({
   onHostAsBattle?: (preset: SkirmishPreset) => void;
   disabled?: boolean;
 }) {
-  const [naming, setNaming] = useState(false);
-  const [name, setName] = useState("");
-
-  const commitSave = () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    onSave(trimmed);
-    setName("");
-    setNaming(false);
-  };
-  const cancelSave = () => {
-    setName("");
-    setNaming(false);
-  };
-
   // Which preset's parts are on screen, if any. The drawer switches to them in
   // place rather than stacking a popover over itself.
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
@@ -201,81 +182,14 @@ export function PresetsDrawer({
             />
           ) : (
             <>
-              {/* Save the current setup / import a shared one. */}
-              <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
-                {naming ? (
-                  <>
-                    <Input
-                      autoFocus
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitSave();
-                        if (e.key === "Escape") cancelSave();
-                      }}
-                      placeholder="Preset name"
-                      className="h-8 flex-1"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={commitSave}
-                      disabled={!name.trim()}
-                      aria-label="Save preset"
-                    >
-                      <Check className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={cancelSave}
-                      aria-label="Cancel"
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setNaming(true)}
-                      disabled={disabled}
-                      className="flex-1"
-                    >
-                      <Save className="size-4" /> Save current setup
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={onImport}
-                      disabled={disabled}
-                    >
-                      <Upload className="size-4" /> Import
-                    </Button>
-                  </>
-                )}
-              </div>
-
-              {/* Seed a preset from a decoded replay's setup, the other end of the
-               * refight pipeline from the replay detail page's "Refight this setup". */}
-              <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
-                <NewPresetFromReplayButton
-                  onSave={onSaveFromReplay}
-                  disabled={disabled}
-                />
-                {/* Where presets come from when you have not made one. Lands on
-                 * the hub already narrowed to presets rather than on everything
-                 * shared. */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onBrowseHub}
-                  disabled={disabled}
-                >
-                  <CoilboxGlyph size={16} /> Browse the hub
-                </Button>
-              </div>
+              <PresetLibraryToolbar
+                saveLabel="Save current setup"
+                onSave={onSave}
+                onImport={onImport}
+                onSaveFromReplay={onSaveFromReplay}
+                onBrowseHub={onBrowseHub}
+                disabled={disabled}
+              />
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 <PresetList

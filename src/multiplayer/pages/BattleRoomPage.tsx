@@ -13,7 +13,7 @@ import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { mergeGameAi } from "@/play/gameAi";
-import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
+import { PresetImportGate, usePresetImport } from "@/play/presetImport";
 import type { PresetPart, PresetSelection } from "@/play/presetParts";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
@@ -139,6 +139,8 @@ function BattleRoomPage() {
   const skirmishPresets = useSkirmishPresets();
   const [hostSeedError, setHostSeedError] = useState<string | null>(null);
   const [applyPresetOpen, setApplyPresetOpen] = useState(false);
+  // Importing a shared preset file, the same flow the Singleplayer sheet runs.
+  const presetImport = usePresetImport(setHostSeedError);
 
   // "Host as battle" (from a skirmish preset or the current Singleplayer setup)
   // navigates here with the draft to seed once the room we just opened is ready.
@@ -608,27 +610,11 @@ function BattleRoomPage() {
             onChangeMap={room.setMap}
             onRescan={room.rescan}
           />
-          {/* Save the whole battle as a replayable singleplayer skirmish (other
-              humans become AIs). Distinct from the host-only "Option presets" below,
-              which stores only mod/map options. */}
-          <SaveAsPresetButton
-            getDraft={() =>
-              battleToSkirmishDraft({
-                battle,
-                me: room.me,
-                sides: room.sides,
-                ais: skirmishAis,
-              })
-            }
-            defaultName={battle.title || `Battle ${battle.id}`}
-            variant="outline"
-            size="sm"
-            className="w-full"
-            label="Save as skirmish preset"
-          />
-          {/* Apply a saved skirmish preset to this room in place (issue #373):
-              its map, options, start boxes and bots, without touching any real
-              seated player. Self-host only, mirroring the host-seed apply above. */}
+          {/* One door to the preset library, the same sheet Singleplayer opens.
+              Saving this battle as a replayable skirmish (other humans become
+              AIs) lives inside it, along with importing and the hub, rather than
+              as separate buttons out here. Distinct from the host-only "Option
+              presets" below, which stores only mod/map options. */}
           {room.selfHost && (
             <>
               <Button
@@ -637,7 +623,7 @@ function BattleRoomPage() {
                 className="w-full"
                 onClick={() => setApplyPresetOpen(true)}
               >
-                Apply skirmish preset
+                <Bookmark className="size-4" /> Skirmish presets
               </Button>
               <ApplySkirmishPresetDrawer
                 open={applyPresetOpen}
@@ -651,6 +637,58 @@ function BattleRoomPage() {
                 dataDir={room.dataDir}
                 canEditRestrictions={room.canEditRestrictions}
                 onApply={applySkirmishPresetInPlace}
+                saveLabel="Save this battle"
+                onSave={(name) => {
+                  const draft = battleToSkirmishDraft({
+                    battle,
+                    me: room.me,
+                    sides: room.sides,
+                    ais: skirmishAis,
+                  });
+                  if (!draft) {
+                    notify({
+                      title: "Couldn't save preset",
+                      body: "This battle can't be captured yet.",
+                      level: "error",
+                    });
+                    return;
+                  }
+                  skirmishPresets.savePreset(name, draft);
+                  notify({
+                    title: "Saved to Singleplayer presets",
+                    body: `"${name}" — replay it from Singleplayer → Presets.`,
+                    level: "success",
+                  });
+                }}
+                onImport={presetImport.importFromFile}
+                onSaveFromReplay={(name, draft) => {
+                  skirmishPresets.savePreset(name, draft);
+                  notify({
+                    title: "Saved to Singleplayer presets",
+                    body: `"${name}" — replay it from Singleplayer → Presets.`,
+                    level: "success",
+                  });
+                }}
+                onBrowseHub={() => {
+                  setApplyPresetOpen(false);
+                  navigate("/hub?kind=preset");
+                }}
+              />
+              {/* An imported preset names a game and a map this machine may not
+                  have, so it waits behind the same content check Singleplayer
+                  puts it behind. */}
+              <PresetImportGate
+                pending={presetImport.pending}
+                target={room.target ?? undefined}
+                targetLoading={room.targetLoading}
+                onCancel={() => presetImport.setPending(null)}
+                onContinue={(p) => {
+                  skirmishPresets.savePreset(
+                    p.name?.trim() || "Imported preset",
+                    p,
+                  );
+                  presetImport.setPending(null);
+                }}
               />
             </>
           )}

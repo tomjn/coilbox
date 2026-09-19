@@ -3,6 +3,8 @@ import { ArrowLeft, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 import { useUnitsyncMapInfo, useUnitsyncThumbnails } from "@/content/config";
+import type { SkirmishDraft } from "@/play/drafts";
+import { PresetLibraryToolbar } from "@/play/PresetLibraryToolbar";
 import { PresetList } from "@/play/PresetList";
 import { PresetPartsView } from "@/play/PresetPartsView";
 import type { PresetSelection } from "@/play/presetParts";
@@ -37,6 +39,11 @@ export function ApplySkirmishPresetDrawer({
   disabled,
   canEditRestrictions,
   onApply,
+  saveLabel,
+  onSave,
+  onImport,
+  onSaveFromReplay,
+  onBrowseHub,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -55,6 +62,12 @@ export function ApplySkirmishPresetDrawer({
     maphash: number,
     selection: PresetSelection,
   ) => void;
+  /** What the save button says, e.g. "Save this battle". */
+  saveLabel: string;
+  onSave: (name: string) => void;
+  onImport: () => void;
+  onSaveFromReplay: (name: string, draft: SkirmishDraft) => void;
+  onBrowseHub: () => void;
 }) {
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
@@ -127,6 +140,14 @@ export function ApplySkirmishPresetDrawer({
             />
           ) : (
             <>
+              <PresetLibraryToolbar
+                saveLabel={saveLabel}
+                onSave={onSave}
+                onImport={onImport}
+                onSaveFromReplay={onSaveFromReplay}
+                onBrowseHub={onBrowseHub}
+                disabled={disabled}
+              />
               <p className="border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
                 Seated players are left alone whatever you pick.
               </p>

@@ -70,6 +70,11 @@ function renderDrawer(
       presets={[preset()]}
       gameName="A Game"
       onApply={onApply}
+      saveLabel="Save this battle"
+      onSave={vi.fn()}
+      onImport={vi.fn()}
+      onSaveFromReplay={vi.fn()}
+      onBrowseHub={vi.fn()}
       {...over}
     />,
   );
@@ -83,6 +88,29 @@ const checkbox = (label: string) =>
 
 const selectionOf = (onApply: ReturnType<typeof vi.fn>) =>
   (onApply.mock.calls[0][2] as PresetSelection).parts;
+
+describe("the room's preset library", () => {
+  it("offers the same four ways in that Singleplayer does", () => {
+    renderDrawer();
+    for (const label of [
+      "Save this battle",
+      "Import",
+      "Create from replay",
+      "Browse the hub",
+    ])
+      expect(screen.getByRole("button", { name: label })).toBeTruthy();
+  });
+
+  it("names the preset before saving, the way the sheet always has", () => {
+    const onSave = vi.fn();
+    renderDrawer({ onSave });
+    fireEvent.click(screen.getByRole("button", { name: "Save this battle" }));
+    const field = screen.getByPlaceholderText("Preset name");
+    fireEvent.change(field, { target: { value: "Simian Simmers" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save preset" }));
+    expect(onSave).toHaveBeenCalledWith("Simian Simmers");
+  });
+});
 
 describe("the room's preset list", () => {
   it("reads the same as Singleplayer's, a row that opens a panel", () => {
