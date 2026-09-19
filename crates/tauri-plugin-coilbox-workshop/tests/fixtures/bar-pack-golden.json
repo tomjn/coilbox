@@ -1020,6 +1020,59 @@
     }
   },
   {
+    "chunks": [
+      {
+        "form": "block",
+        "lua": "do for _, d in pairs(UnitDefs) do d.health = d.health * 2 end end",
+        "reason": "Carried from a decoded import as it stands. Coilbox never runs it, and cannot edit it either, so it is written out the way it arrived.",
+        "title": "tweakdefs"
+      },
+      {
+        "form": "block",
+        "lua": "-- Units switched off, taken out of every build menu in the game.\ndo\n  local off = {\n    [\"armfav\"] = true,\n  }\n  for _, def in pairs(UnitDefs) do\n    for key, list in pairs(def) do\n      if string.lower(key) == \"buildoptions\" and type(list) == \"table\" then\n        local keys = {}\n        for i in pairs(list) do\n          if type(i) == \"number\" then\n            keys[#keys + 1] = i\n          end\n        end\n        table.sort(keys)\n        local kept = {}\n        for _, i in ipairs(keys) do\n          if not off[string.lower(tostring(list[i]))] then\n            kept[#kept + 1] = list[i]\n          end\n        end\n        def[key] = kept\n      end\n    end\n  end\nend",
+        "reason": "It reads every builder in the game before it writes to any of them.",
+        "title": "1 unit switched off"
+      }
+    ],
+    "name": "Lua carried from a decoded import",
+    "pack": {
+      "oversized": [],
+      "tweakdefs": [
+        "!bset tweakdefs ZG8gZm9yIF8sIGQgaW4gcGFpcnMoVW5pdERlZnMpIGRvIGQuaGVhbHRoID0gZC5oZWFsdGggKiAyIGVuZCBlbmQgZG8gbG9jYWwgb2ZmID0geyBbImFybWZhdiJdID0gdHJ1ZSwgfSBmb3IgXywgZGVmIGluIHBhaXJzKFVuaXREZWZzKSBkbyBmb3Iga2V5LCBsaXN0IGluIHBhaXJzKGRlZikgZG8gaWYgc3RyaW5nLmxvd2VyKGtleSkgPT0gImJ1aWxkb3B0aW9ucyIgYW5kIHR5cGUobGlzdCkgPT0gInRhYmxlIiB0aGVuIGxvY2FsIGtleXMgPSB7fSBmb3IgaSBpbiBwYWlycyhsaXN0KSBkbyBpZiB0eXBlKGkpID09ICJudW1iZXIiIHRoZW4ga2V5c1sja2V5cyArIDFdID0gaSBlbmQgZW5kIHRhYmxlLnNvcnQoa2V5cykgbG9jYWwga2VwdCA9IHt9IGZvciBfLCBpIGluIGlwYWlycyhrZXlzKSBkbyBpZiBub3Qgb2ZmW3N0cmluZy5sb3dlcih0b3N0cmluZyhsaXN0W2ldKSldIHRoZW4ga2VwdFsja2VwdCArIDFdID0gbGlzdFtpXSBlbmQgZW5kIGRlZltrZXldID0ga2VwdCBlbmQgZW5kIGVuZCBlbmQ"
+      ],
+      "tweakunits": [],
+      "unplaced": []
+    },
+    "project": {
+      "edits": {
+        "disabled": [
+          "armfav"
+        ]
+      },
+      "gameName": "Beyond All Reason test-1",
+      "name": "Lua carried from a decoded import",
+      "readOnlyLua": [
+        {
+          "form": "block",
+          "lua": "do for _, d in pairs(UnitDefs) do d.health = d.health * 2 end end",
+          "note": "Decoded as a program, not data.",
+          "title": "tweakdefs"
+        },
+        {
+          "form": "unrecognised",
+          "lua": "not lua at all {{{",
+          "note": "Did not parse.",
+          "title": "tweakdefs1"
+        },
+        {
+          "lua": "do local old = 1 end",
+          "note": "From an older project.",
+          "title": "tweakdefs2"
+        }
+      ]
+    }
+  },
+  {
     "chunks": [],
     "name": "Nothing at all",
     "pack": {
