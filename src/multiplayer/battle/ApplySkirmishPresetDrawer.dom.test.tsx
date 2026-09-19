@@ -163,15 +163,25 @@ describe("the room's preset panel", () => {
     expect(selectionOf(onApply)).toEqual(["map", "startPositions", "teams"]);
   });
 
-  it("waits on the map checksum only when the map is being taken", () => {
+  it("waits on the map checksum when we run the game ourselves", () => {
     mapStatus.value = "loading";
-    renderDrawer();
+    renderDrawer({ mapNeedsChecksum: true });
     openPanel();
     expect(
       screen
         .getByRole("button", { name: "Reading map…" })
         .hasAttribute("disabled"),
     ).toBe(true);
+  });
+
+  it("does not wait on a checksum a bot-hosted room never needs", () => {
+    // The map goes out as `!map <name>` there, which names the map rather than
+    // hashing it, so waiting on unitsync would block an apply for nothing.
+    mapStatus.value = "loading";
+    const { onApply } = renderDrawer({ mapNeedsChecksum: false });
+    openPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Apply all 6 parts" }));
+    expect(onApply).toHaveBeenCalled();
   });
 
   it("says who owns the restrictions when they cannot be sent here", () => {

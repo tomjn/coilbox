@@ -234,8 +234,9 @@ function BattleRoomPage() {
   }, [hostDraft, room]);
 
   // Apply a saved skirmish preset to the current room in place (issue #373).
-  // Only ever reachable while self-hosting (see the button below), so this
-  // never runs against a battle we merely joined.
+  // Reachable on any room whose options we may write: one we host ourselves,
+  // and one an autohost bot runs, where each step goes out as a command and the
+  // bot decides whether we were allowed to ask.
   function applySkirmishPresetInPlace(
     preset: SkirmishPreset,
     maphash: number,
@@ -252,8 +253,13 @@ function BattleRoomPage() {
       return;
     }
     setHostSeedError(null);
-    if (take("map") && preset.mapName !== room.battle.map)
-      room.setMap(preset.mapName, maphash);
+    // Changing the map is `UPDATEBATTLEINFO` when we run the game ourselves and
+    // `!map` when a bot does. The second needs no checksum, which is why the
+    // panel only waits on unitsync for the first.
+    if (take("map") && preset.mapName !== room.battle.map) {
+      if (room.selfHost) room.setMap(preset.mapName, maphash);
+      else room.suggestMap(preset.mapName);
+    }
     const seed = draftToHostSeed({
       draft: preset,
       sides: room.sides,
@@ -279,13 +285,27 @@ function BattleRoomPage() {
     room.applyOptionTags(filterOptionTags(seed.scriptTags, selection));
     // The preset's own boxes, the ones saved with it, rather than whatever was
     // last saved against the map.
+    //
+    // On a bot-hosted room the boxes go out as `!addbox`, which SPADS only
+    // accepts once the room is already in choose-in-game mode. The tag that
+    // puts it there is in the paced option run just above and has not landed
+    // yet, so sending now would have every box refused. Say so instead, and the
+    // second apply lands them.
     if (
       take("startPositions") &&
       preset.startPosType === 2 &&
       preset.startRects
     ) {
-      for (const [ally, rect] of Object.entries(preset.startRects))
-        room.setStartBox(Number(ally), rect);
+      if (room.selfHost || room.canEditBoxes) {
+        for (const [ally, rect] of Object.entries(preset.startRects))
+          room.setStartBox(Number(ally), rect);
+      } else {
+        notify({
+          title: "Start boxes not sent",
+          body: "The host has to be in choose-in-game mode first. Apply this preset again once it is.",
+          level: "warning",
+        });
+      }
     }
     skirmishPresets.touchPreset(preset.id);
     if (!take("teams") || seed.bots.length === 0 || !room.serverKey) return;
@@ -615,7 +635,7 @@ function BattleRoomPage() {
               AIs) lives inside it, along with importing and the hub, rather than
               as separate buttons out here. Distinct from the host-only "Option
               presets" below, which stores only mod/map options. */}
-          {room.selfHost && (
+          {room.canEditOptions && (
             <>
               <Button
                 variant="outline"
@@ -636,6 +656,9 @@ function BattleRoomPage() {
                 enginePath={room.enginePath}
                 dataDir={room.dataDir}
                 canEditRestrictions={room.canEditRestrictions}
+                // Only a room we run ourselves needs the map's checksum, so
+                // only that one waits on unitsync to read it.
+                mapNeedsChecksum={room.selfHost}
                 onApply={applySkirmishPresetInPlace}
                 saveLabel="Save this battle"
                 onSave={(name) => {

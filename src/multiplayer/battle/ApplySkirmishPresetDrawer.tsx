@@ -12,16 +12,22 @@ import type { SkirmishPreset } from "@/play/presets";
 import { hexToI32 } from "./config";
 
 /**
- * Applying parts of a saved skirmish preset to the CURRENT battle room, host
- * only (issue #373).
+ * Applying parts of a saved skirmish preset to the CURRENT battle room
+ * (issue #373).
  *
  * The same sheet as Singleplayer's, deliberately: a list of presets, and a
  * panel per preset with the parts to take. This was a 288px popover that showed
  * the parts in place with no way back, which read as a different feature rather
  * than the same one in another room.
  *
- * Applying never touches another seated human. It moves the host's own seat,
- * the map, options, start boxes and bots, and that is all.
+ * Applying never touches another seated human. It moves your own seat, the
+ * map, options, start boxes and bots, and that is all.
+ *
+ * It is not for a room we run ourselves only. Every step has an autohost route
+ * as well, so on a bot-hosted room each one goes out as a command and the bot
+ * decides whether we were allowed to ask. Restricting it to self-hosted rooms
+ * left the common case, somebody in a SPADS room, with no way to apply a preset
+ * at all.
  *
  * Presets for other games are listed rather than filtered out. The room cannot
  * change game, so `game` is not on offer and the game-keyed parts block
@@ -38,6 +44,7 @@ export function ApplySkirmishPresetDrawer({
   dataDir,
   disabled,
   canEditRestrictions,
+  mapNeedsChecksum = true,
   onApply,
   saveLabel,
   onSave,
@@ -57,6 +64,10 @@ export function ApplySkirmishPresetDrawer({
    *  `game/restrict/*` script tags with no autohost path, so on a bot-hosted
    *  room the row says so rather than silently doing nothing. */
   canEditRestrictions?: boolean;
+  /** Whether changing the map here needs the map's own checksum. True when we
+   *  run the game and send `UPDATEBATTLEINFO`, false when a bot does and the
+   *  map goes out as `!map <name>`, which names it rather than hashing it. */
+  mapNeedsChecksum?: boolean;
   onApply: (
     preset: SkirmishPreset,
     maphash: number,
@@ -71,7 +82,11 @@ export function ApplySkirmishPresetDrawer({
 }) {
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
-  const mapInfo = useUnitsyncMapInfo(enginePath, dataDir, viewing?.mapName);
+  const mapInfo = useUnitsyncMapInfo(
+    enginePath,
+    dataDir,
+    mapNeedsChecksum ? viewing?.mapName : undefined,
+  );
   const maphash = hexToI32(mapInfo.info?.checksum);
 
   const close = () => {
@@ -130,7 +145,9 @@ export function ApplySkirmishPresetDrawer({
               // Only the map needs unitsync to read a checksum, so the wait is
               // announced rather than the button just sitting dead.
               blockedLabel={
-                mapInfo.status === "loading" ? "Reading map…" : null
+                mapNeedsChecksum && mapInfo.status === "loading"
+                  ? "Reading map…"
+                  : null
               }
               disabled={disabled}
               onConfirm={(selection) => {
