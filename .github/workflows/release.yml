@@ -127,20 +127,24 @@ jobs:
           fi
 
           if [ "$COUNT" -eq 0 ]; then
-            # The tag exists by now, so GitHub takes the commit from it and
-            # --target would be ignored.
-            gh release create "$VER" --draft --title "$VER" --generate-notes
-            FOUND="$(releases)"
-            COUNT="$(printf '%s\n' "$FOUND" | grep -c . || true)"
-            test "$COUNT" -eq 1 || { echo "created the release but found $COUNT"; exit 1; }
+            # Taking the id from the response rather than looking the release up
+            # again afterwards. The list endpoint is eventually consistent and did
+            # not have the new release a second after creating it, while the
+            # response carries the id already. The tag exists by now, so GitHub
+            # takes the commit from it.
+            ID="$(gh api --method POST "repos/$GH_REPO/releases" \
+              -f "tag_name=$VER" -f "name=$VER" \
+              -F draft=true -F generate_release_notes=true --jq .id)"
           elif [ "${FOUND##* }" != "true" ]; then
             echo "a published release already exists for $VER (id ${FOUND%% *})"
             echo "delete it and run this workflow again"
             exit 1
+          else
+            ID="${FOUND%% *}"
           fi
 
-          echo "release_id=${FOUND%% *}" >> "$GITHUB_OUTPUT"
-          echo "Draft release ${FOUND%% *} ready for $VER"
+          echo "release_id=$ID" >> "$GITHUB_OUTPUT"
+          echo "Draft release $ID ready for $VER"
 
   build:
     needs: prepare-release
