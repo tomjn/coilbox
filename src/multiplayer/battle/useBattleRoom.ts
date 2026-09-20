@@ -343,8 +343,17 @@ export interface BattleRoomView {
   setMap: (name: string, maphash: number) => void;
   /** Host: lock/unlock the battle directly (UPDATEBATTLEINFO), preserving the map. */
   setLocked: (locked: boolean) => void;
-  /** Force a unitsync rescan and drop cached previews for the battle's map. */
-  rescan: () => Promise<void>;
+  /**
+   * Force a unitsync rescan and drop cached previews for the battle's map.
+   * Resolves with what the fresh scan says about this battle's content.
+   */
+  rescan: () => Promise<ContentPresence>;
+}
+
+/** Whether the battle's game and map are installed, as one scan saw it. */
+export interface ContentPresence {
+  game: boolean;
+  map: boolean;
 }
 
 /**
@@ -1198,9 +1207,26 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     if (enginePath && dataDir && battle?.map) {
       invalidateMapPreview(enginePath, dataDir, battle.map);
     }
-    await scan.run(true).then(clearErr, setErr);
+    const found = await scan.run(true).catch((e) => {
+      setErr(e);
+      return null;
+    });
+    if (found) clearErr();
     setContentNonce((n) => n + 1);
-  }, [enginePath, dataDir, battle?.map, scan.run, setErr, clearErr]);
+    // The same exact-name match `contentVerdict` makes above.
+    return {
+      game: !!found?.games.some((g) => g.name === battle?.modname),
+      map: !!found?.maps.some((m) => m.name === battle?.map),
+    };
+  }, [
+    enginePath,
+    dataDir,
+    battle?.map,
+    battle?.modname,
+    scan.run,
+    setErr,
+    clearErr,
+  ]);
 
   return {
     battle,

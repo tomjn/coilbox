@@ -328,6 +328,8 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     recordVictory,
     recordDefeat,
     /** Force a rescan so a just-installed game/map clears `missing`. */
-    recheck: () => scan.run(true),
+    recheck: async () => {
+      await scan.run(true);
+    },
   };
 }

@@ -282,9 +282,12 @@ fn run() -> i32 {
     absolutize(&mut args);
 
     // unitsync reads SPRING_DATADIR via getenv inside Init, so setting it now
-    // points the scan at the chosen content root. The loader-path var helps the
-    // dynamic loader find libunitsync's own sibling libraries in the engine dir.
-    std::env::set_var("SPRING_DATADIR", &args.datadir);
+    // points the scan at the chosen content root. COILBOX_EXTRA_DATADIRS is the
+    // caller's list of other content folders, read after that one. The
+    // loader-path var helps the dynamic loader find libunitsync's own sibling
+    // libraries in the engine dir.
+    let extras = std::env::var("COILBOX_EXTRA_DATADIRS").unwrap_or_default();
+    std::env::set_var("SPRING_DATADIR", spring_datadir(&args.datadir, &extras));
     if let Some(dir) = Path::new(&args.lib).parent() {
         prepend_loader_path(dir);
         // Best-effort: lets dependents that resolve relative to CWD load too.
@@ -1308,6 +1311,16 @@ fn parse_args() -> Result<Args, String> {
     })
 }
 
+/// The `SPRING_DATADIR` list for a scan: the chosen content root first, which
+/// the engine reads as the highest priority, then the caller's other folders.
+fn spring_datadir(datadir: &str, extras: &str) -> String {
+    if extras.is_empty() {
+        return datadir.to_string();
+    }
+    let sep = if cfg!(windows) { ';' } else { ':' };
+    format!("{datadir}{sep}{extras}")
+}
+
 /// Resolve every caller-supplied path against the current directory, which at
 /// this point is still the one the worker was started in.
 ///
@@ -1941,6 +1954,13 @@ fn print_json(out: &ScanOutput) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_chosen_root_leads_the_datadir_list() {
+        let sep = if cfg!(windows) { ';' } else { ':' };
+        assert_eq!(spring_datadir("/a", ""), "/a");
+        assert_eq!(spring_datadir("/a", "/b"), format!("/a{sep}/b"));
+    }
 
     fn args_with(cache_dir: Option<&str>, asset_dir: Option<&str>) -> Args {
         Args {

@@ -382,23 +382,29 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   const [cancelled, setCancelled] = useState(false);
 
   const run = useCallback(
-    async (force = false) => {
-      if (!enginePath || !dataDir) return;
+    // Resolves with what the scan found, or null when it found nothing to
+    // report, so a caller that has to act on the answer need not wait a render.
+    async (force = false): Promise<ScanResult | null> => {
+      if (!enginePath || !dataDir) return null;
       const key = `${dataDir}::${enginePath}`;
       if (!force && scanCache.has(key)) {
-        setData(scanCache.get(key) ?? null);
-        return;
+        const cached = scanCache.get(key) ?? null;
+        setData(cached);
+        return cached;
       }
       setLoading(true);
       setError(null);
       setCancelled(false);
       try {
-        setData(await primeScan(enginePath, dataDir, force));
+        const found = await primeScan(enginePath, dataDir, force);
+        setData(found);
+        return found;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         // A cancel lands in a stable "cancelled" state rather than an error.
         if (/cancelled/i.test(msg)) setCancelled(true);
         else setError(msg);
+        return null;
       } finally {
         setLoading(false);
       }

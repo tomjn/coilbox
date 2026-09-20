@@ -411,6 +411,8 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     recordDefeat,
     reset,
     /** Force a rescan so a just-installed game/map clears `missing` (install gate). */
-    recheck: () => scan.run(true),
+    recheck: async () => {
+      await scan.run(true);
+    },
   };
 }

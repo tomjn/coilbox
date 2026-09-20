@@ -3,11 +3,15 @@ import { Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useWriteRootPath } from "@/downloads/config";
 import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
-import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
+import {
+  QueueProgress,
+  StartingBar,
+} from "@/downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "@/downloads/useQueuedDownload";
 import type { MapPicture } from "@/hub/assets/picture";
 import { useMapPictureRung } from "@/hub/assets/useMapPicture";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
+import type { ContentPresence } from "./useBattleRoom";
 
 /**
  * The map-not-installed state, rendered inside the minimap box (where the user is
@@ -24,7 +28,7 @@ export function MissingMapBox({
   /** The joined battle's id, to key the auto-download once per (battle, map). */
   battleId: number;
   mapName: string;
-  onRescan: () => Promise<void>;
+  onRescan: () => Promise<ContentPresence>;
   /**
    * Remote pictures of the map, best first, from `@/hub/assets/picture`. Shown
    * behind the controls while the map isn't installed.
@@ -50,20 +54,33 @@ export function MissingMapBox({
 
   const downloading = mapDl.busy;
   const progress = mapDl.progress;
+  // This box only renders while the map is missing, so a finished download with
+  // no rescan running means the engine cannot see what was downloaded. Read
+  // from the queue rather than held here, because a rescan remounts this box.
+  const downloadedButMissing = mapDl.completed && !downloading && !rescanning;
 
   async function downloadMap() {
     const settled = await mapDl.start();
     if (settled?.status !== "done") return;
-    await onRescan();
+    await rescan();
   }
 
   async function rescan() {
     setRescanning(true);
     try {
-      await onRescan();
+      return await onRescan();
     } finally {
       setRescanning(false);
     }
+  }
+
+  // What joining a battle starts. The scan this box was drawn from can be as
+  // old as the session, so look again before fetching a map that may already
+  // be on disk, and never repeat a download that has already finished once.
+  async function downloadIfStillMissing() {
+    const found = await rescan();
+    if (found.map || mapDl.completed) return;
+    await downloadMap();
   }
 
   // On join, start the same download the button fires (issue #439) — this box only
@@ -75,7 +92,7 @@ export function MissingMapBox({
     writeRootReady: !!writePath,
     queueIdle: active == null && queued.length === 0,
     inFlight: downloading,
-    start: downloadMap,
+    start: downloadIfStillMissing,
   });
 
   return (
@@ -104,16 +121,32 @@ export function MissingMapBox({
         <span className="text-xs font-medium text-muted-foreground">
           Map not installed
         </span>
-        {downloading && progress ? (
-          <QueueProgress item={mapDl} className="w-full" />
+        {downloadedButMissing && (
+          <span className="text-xs">
+            Downloaded to {writePath}, but the engine still does not list this
+            map. The file may be a different version, or one the engine cannot
+            read.
+          </span>
+        )}
+        {mapDl.status === "active" ? (
+          progress ? (
+            <QueueProgress item={mapDl} className="w-full" />
+          ) : (
+            <StartingBar className="w-full" />
+          )
         ) : (
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button size="sm" disabled={downloading} onClick={downloadMap}>
+            <Button
+              size="sm"
+              variant={downloadedButMissing ? "secondary" : undefined}
+              disabled={downloading}
+              onClick={downloadMap}
+            >
               <Download className="size-4" />
               {mapDl.status === "queued"
                 ? "Queued…"
-                : downloading
-                  ? "Downloading…"
+                : downloadedButMissing
+                  ? "Download again"
                   : "Download"}
             </Button>
             <Button
