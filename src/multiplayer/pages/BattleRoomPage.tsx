@@ -26,6 +26,7 @@ import { ApplySkirmishPresetDrawer } from "../battle/ApplySkirmishPresetDrawer";
 import { AutohostControls } from "../battle/AutohostControls";
 import { addHostSeedBots } from "../battle/applyHostSeed";
 import { BattleChatCard } from "../battle/BattleChatCard";
+import { BattleEngineCard } from "../battle/BattleEngineCard";
 import { BattleGameCard } from "../battle/BattleGameCard";
 import { BattleMapCard } from "../battle/BattleMapCard";
 import { BattleMembersTable } from "../battle/BattleMembersTable";
@@ -771,6 +772,11 @@ function BattleRoomPage() {
             dataDir={room.dataDir}
             game={room.localGame}
             gameName={battle.modname}
+          />
+          <BattleEngineCard
+            engine={battle.engine}
+            version={battle.version}
+            target={room.target}
           />
         </aside>
       </div>
