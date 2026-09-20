@@ -3,10 +3,10 @@ name: release cache
 # Prime the release-profile Rust dependency cache that release.yml restores on
 # Windows.
 #
-# Releases run on tag pushes, and a run can only restore a cache saved on its
-# own ref or on the default branch. A cache saved by one tag is therefore
-# unreadable by the next, so the only ref a release build can read is main and
-# the cache has to be saved from here.
+# A run can only restore a cache saved on its own ref or on the default branch.
+# A release dispatched from a tag, or triggered by pushing one, therefore cannot
+# read a cache saved by the release before it, so the only ref a release build
+# can rely on is main and the cache has to be saved from here.
 #
 # Windows only, matching release.yml's restore step. The reasoning for that,
 # and for the key, is written out there.
