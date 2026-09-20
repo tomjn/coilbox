@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useUnitsyncThumbnails } from "@/content/config";
-import { engineLabel } from "@/content/engineVersion";
 import type { PlayTarget } from "@/play/config";
 import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
 import {
@@ -33,6 +32,7 @@ import {
   directClosePorts,
 } from "../../direct/reachability";
 import { VpnWarning } from "../../direct/VpnWarning";
+import { useEngineVersionCheck } from "../battle/useEngineVersionCheck";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { relayPingLabel, useRelayPing } from "../relayPing";
 import { hostBattleFailure } from "./hostBattle";
@@ -62,19 +62,16 @@ const LAST_MAX_PLAYERS_KEY = "multiplayer.hostBattle.lastMaxPlayers";
 const LAST_PORT_KEY = "multiplayer.hostBattle.lastPort";
 const LAST_ENGINE_KEY = "multiplayer.hostBattle.lastEngine";
 
-/** One option per installed engine version, named the way Settings names it. */
+/**
+ * One option per version an installed engine reported. An engine that has not
+ * said its version is left out until it does: its folder name is not a version,
+ * and the battle would advertise whatever was picked to every joiner.
+ */
 function engineOptions(targets: PlayTarget[]) {
-  const seen = new Set<string>();
-  return targets
-    .filter((t) => !seen.has(t.engineVersion) && seen.add(t.engineVersion))
-    .map((t) => ({
-      value: t.engineVersion,
-      label: engineLabel({
-        version: t.engineVersion,
-        syncVersion: t.syncVersion,
-        path: t.enginePath,
-      }),
-    }));
+  const versions = new Set(
+    targets.flatMap((t) => (t.syncVersion ? [t.syncVersion] : [])),
+  );
+  return [...versions].map((v) => ({ value: v, label: v }));
 }
 
 /**
@@ -152,6 +149,7 @@ export function HostBattleForm({
   const {
     target,
     targets,
+    refreshTargets,
     games,
     maps,
     gameName,
@@ -166,6 +164,16 @@ export function HostBattleForm({
     gameFailed,
     mapFailed,
   } = content;
+  // Every engine is asked for its version as the form opens, so the picker
+  // offers versions and never folder names.
+  const unverified = targets.filter((t) => !t.syncVersion);
+  const unreadableEngines = useEngineVersionCheck(
+    unverified.map((t) => t.executable),
+    refreshTargets,
+  );
+  const checkingEngines = unverified.some(
+    (t) => !unreadableEngines.has(t.executable),
+  );
   const { thumbs } = useUnitsyncThumbnails(target?.enginePath, target?.dataDir);
   // Swaps the drawer's whole content for the map picker grid, with a back
   // button, rather than stacking a second drawer on top of the one this form
@@ -383,10 +391,14 @@ export function HostBattleForm({
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium">Engine</span>
             <OptionSelect
-              value={target?.engineVersion ?? ""}
+              value={target?.syncVersion ?? ""}
               onValueChange={setEngineVersion}
               options={engineOptions(targets)}
-              placeholder="Select an engine"
+              placeholder={
+                checkingEngines
+                  ? "Reading engine versions…"
+                  : "Select an engine"
+              }
               size="sm"
             />
             <span className="text-xs text-muted-foreground">

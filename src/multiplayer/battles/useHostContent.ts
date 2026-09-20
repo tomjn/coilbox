@@ -24,7 +24,11 @@ export function useHostContent(
   initialMap?: string,
   engineVersion?: string,
 ) {
-  const { target, targets } = usePreferredTarget(engineVersion);
+  const {
+    target,
+    targets,
+    refresh: refreshTargets,
+  } = usePreferredTarget(engineVersion);
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
 
@@ -114,6 +118,7 @@ export function useHostContent(
   return {
     target,
     targets,
+    refreshTargets,
     games,
     maps,
     scanning: scan.loading,
