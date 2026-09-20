@@ -183,8 +183,9 @@ fn loader_var() -> &'static str {
     }
 }
 
-/// Env to set on the worker child: point unitsync at the content root, and put
-/// the engine dir on the loader path so libunitsync's sibling libraries resolve.
+/// Env to set on the worker child: point unitsync at the content root, name the
+/// other content folders for it to read after that one, and put the engine dir
+/// on the loader path so libunitsync's sibling libraries resolve.
 fn loader_envs(engine_dir: &Path, datadir: &str) -> Vec<(String, String)> {
     let var = loader_var();
     let sep = if cfg!(windows) { ';' } else { ':' };
@@ -197,6 +198,10 @@ fn loader_envs(engine_dir: &Path, datadir: &str) -> Vec<(String, String)> {
     };
     vec![
         ("SPRING_DATADIR".into(), datadir.to_string()),
+        (
+            "COILBOX_EXTRA_DATADIRS".into(),
+            coilbox_proc::extra_datadirs(datadir),
+        ),
         (var.to_string(), value),
     ]
 }

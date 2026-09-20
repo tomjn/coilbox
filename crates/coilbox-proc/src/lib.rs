@@ -188,6 +188,79 @@ fn spawned_file(program: &OsStr) -> Option<&std::path::Path> {
     named_a_directory.then_some(path)
 }
 
+/// What the engine splits a `SPRING_DATADIR` list on (`cPD` in its
+/// `DataDirLocater.cpp`).
+pub const DATADIR_SEP: char = if cfg!(windows) { ';' } else { ':' };
+
+/// Every content folder the content plugin knows, published by it each time it
+/// hands a state to the frontend. The unitsync and play plugins read it back so
+/// an engine sees all of them, where it used to see only the folder it lives in
+/// and called a game sitting in the next folder along "not installed".
+static CONTENT_ROOTS: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
+
+/// Replace the published content folders.
+pub fn set_content_roots(roots: Vec<String>) {
+    *CONTENT_ROOTS.write().unwrap() = roots;
+}
+
+/// The published content folders other than `primary`, as a `SPRING_DATADIR`
+/// style list. Empty when there are none.
+pub fn extra_datadirs(primary: &str) -> String {
+    join_extras(primary, &CONTENT_ROOTS.read().unwrap())
+}
+
+/// The `SPRING_DATADIR` for an engine whose own folder is `primary`. That folder
+/// comes first, which the engine reads as the highest priority.
+pub fn spring_datadir(primary: &str) -> String {
+    let extras = extra_datadirs(primary);
+    if extras.is_empty() {
+        primary.to_string()
+    } else {
+        format!("{primary}{DATADIR_SEP}{extras}")
+    }
+}
+
+fn join_extras(primary: &str, roots: &[String]) -> String {
+    roots
+        .iter()
+        // A folder with the separator in its name cannot go in the list: the
+        // engine would split it into two folders that do not exist.
+        .filter(|r| r.as_str() != primary && !r.is_empty() && !r.contains(DATADIR_SEP))
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(&DATADIR_SEP.to_string())
+}
+
+#[cfg(test)]
+mod datadirs {
+    use super::*;
+
+    fn roots(paths: &[&str]) -> Vec<String> {
+        paths.iter().map(|p| p.to_string()).collect()
+    }
+
+    #[test]
+    fn the_engines_own_folder_is_left_out_of_the_extras() {
+        let sep = DATADIR_SEP;
+        assert_eq!(
+            join_extras("/a", &roots(&["/a", "/b", "/c"])),
+            format!("/b{sep}/c")
+        );
+    }
+
+    #[test]
+    fn no_other_folders_means_no_extras() {
+        assert_eq!(join_extras("/a", &roots(&["/a"])), "");
+        assert_eq!(join_extras("/a", &[]), "");
+    }
+
+    #[test]
+    fn a_folder_the_engine_would_split_is_dropped() {
+        let split = format!("/b{DATADIR_SEP}c");
+        assert_eq!(join_extras("/a", &roots(&[&split, "/d"])), "/d");
+    }
+}
+
 #[cfg(test)]
 mod liveness {
     //! Real processes rather than a mock of the OS, because the thing under

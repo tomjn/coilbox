@@ -172,7 +172,9 @@ fn launch_blocking(
 ) -> Result<Option<ExitOutcome>, String> {
     let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
-        .env("SPRING_DATADIR", &data_dir)
+        // Every content folder, so the engine finds a game the scan found in a
+        // folder other than its own.
+        .env("SPRING_DATADIR", coilbox_proc::spring_datadir(&data_dir))
         // The engine writes its own infolog file; detach its stdio so we don't
         // hold pipes open or pop a console.
         .stdout(Stdio::null())
@@ -399,7 +401,15 @@ async fn play_infolog<R: Runtime>(
 ) -> CliResult {
     let documents = app.path().document_dir().ok();
     let base = infolog::LogBaseDirs::from_env(documents);
-    let dirs = infolog::candidate_dirs(infolog::current_os(), &base, &data_dir);
+    let mut dirs = infolog::candidate_dirs(infolog::current_os(), &base, &data_dir);
+    // The other content folders the engine was launched with. It writes to the
+    // first folder it can, which is one of these when `data_dir` is read-only.
+    for extra in coilbox_proc::extra_datadirs(&data_dir).split(coilbox_proc::DATADIR_SEP) {
+        let extra = std::path::PathBuf::from(extra);
+        if !extra.as_os_str().is_empty() && !dirs.contains(&extra) {
+            dirs.push(extra);
+        }
+    }
     let Some(path) = infolog::newest_log(&dirs) else {
         return CliResult::err("no engine log was found");
     };

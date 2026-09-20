@@ -333,8 +333,23 @@ fn compute_state<R: Runtime>(
     }
 }
 
+/// Tell the plugins that start an engine or a unitsync worker which content
+/// folders exist, so either one sees them all. Runs wherever a state is about to
+/// reach the frontend, which is before the frontend can ask for a scan of it.
+fn publish_roots(state: &ContentState) {
+    coilbox_proc::set_content_roots(
+        state
+            .roots
+            .iter()
+            .filter(|r| r.exists && r.valid)
+            .map(|r| r.path.clone())
+            .collect(),
+    );
+}
+
 /// Persist `state` as the snapshot in `store` and write it out.
 fn persist(path: &Path, mut store: StoreFile, state: &ContentState) -> Result<(), String> {
+    publish_roots(state);
     store.schema_version = SCHEMA_VERSION;
     store.snapshot = Some(state.clone());
     save_store(path, &store)
@@ -495,6 +510,7 @@ async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
     };
     let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
     state.roots = ensure_portable_seed(state.roots);
+    publish_roots(&state);
     CliResult::ok(json!({ "state": state }))
 }
 
