@@ -62,6 +62,7 @@ describe("settings declarations", () => {
       "general",
       "engine-settings",
       "notifications",
+      "sound",
       "hub",
       "updates",
       "game-updates",
