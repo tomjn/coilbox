@@ -10,56 +10,60 @@ import { useEngineVersionCheck } from "./useEngineVersionCheck";
 afterEach(() => contentVerifyEngine.mockReset());
 
 describe("useEngineVersionCheck", () => {
-  it("leaves a verified engine alone", () => {
-    const onVerified = vi.fn();
-    const { result } = renderHook(() =>
-      useEngineVersionCheck(undefined, onVerified),
-    );
+  it("runs nothing when every engine has reported its version", () => {
+    const { result } = renderHook(() => useEngineVersionCheck([], vi.fn()));
     expect(contentVerifyEngine).not.toHaveBeenCalled();
-    expect(result.current).toBe(false);
+    expect(result.current.size).toBe(0);
   });
 
-  it("asks the engine for its version, then has the caller look again", async () => {
+  it("asks every engine without a version, then has the caller look again", async () => {
     contentVerifyEngine.mockResolvedValue({
       engine: { syncVersion: "2026.07.01-102-g6e5c5a0" },
     });
     const onVerified = vi.fn();
     const { result } = renderHook(() =>
-      useEngineVersionCheck("/engine/spring", onVerified),
+      useEngineVersionCheck(["/a/spring", "/b/spring"], onVerified),
     );
     await waitFor(() => expect(onVerified).toHaveBeenCalledTimes(1));
-    expect(contentVerifyEngine).toHaveBeenCalledWith({
-      path: "/engine/spring",
-    });
-    expect(result.current).toBe(false);
+    expect(contentVerifyEngine.mock.calls).toEqual([
+      [{ path: "/a/spring" }],
+      [{ path: "/b/spring" }],
+    ]);
+    expect(result.current.size).toBe(0);
   });
 
-  it("reports an engine that answers without a version", async () => {
+  it("names an engine that answers without a version", async () => {
     contentVerifyEngine.mockResolvedValue({ engine: {} });
     const onVerified = vi.fn();
     const { result } = renderHook(() =>
-      useEngineVersionCheck("/engine/spring", onVerified),
+      useEngineVersionCheck(["/a/spring"], onVerified),
     );
-    await waitFor(() => expect(result.current).toBe(true));
+    await waitFor(() => expect(result.current.has("/a/spring")).toBe(true));
     expect(onVerified).not.toHaveBeenCalled();
   });
 
-  it("reports an engine that will not run", async () => {
-    contentVerifyEngine.mockRejectedValue(new Error("timed out"));
+  it("names an engine that will not run, and still reads the others", async () => {
+    contentVerifyEngine
+      .mockRejectedValueOnce(new Error("not an engine"))
+      .mockResolvedValueOnce({ engine: { syncVersion: "2026.09.01" } });
+    const onVerified = vi.fn();
     const { result } = renderHook(() =>
-      useEngineVersionCheck("/engine/spring", vi.fn()),
+      useEngineVersionCheck(["/bad/spring", "/good/spring"], onVerified),
     );
-    await waitFor(() => expect(result.current).toBe(true));
+    await waitFor(() => expect(onVerified).toHaveBeenCalledTimes(1));
+    expect([...result.current]).toEqual(["/bad/spring"]);
   });
 
-  it("asks once per engine, not once per render", async () => {
+  it("asks each engine once, however often the list comes back", async () => {
     contentVerifyEngine.mockResolvedValue({ engine: {} });
-    const onVerified = vi.fn();
-    const { rerender, result } = renderHook(() =>
-      useEngineVersionCheck("/engine/spring", onVerified),
+    const { rerender, result } = renderHook(
+      ({ list }) => useEngineVersionCheck(list, vi.fn()),
+      { initialProps: { list: ["/a/spring"] } },
     );
-    await waitFor(() => expect(result.current).toBe(true));
-    rerender();
-    expect(contentVerifyEngine).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.size).toBe(1));
+    rerender({ list: ["/a/spring"] });
+    rerender({ list: ["/a/spring", "/b/spring"] });
+    await waitFor(() => expect(result.current.size).toBe(2));
+    expect(contentVerifyEngine).toHaveBeenCalledTimes(2);
   });
 });

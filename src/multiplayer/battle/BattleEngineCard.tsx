@@ -106,7 +106,14 @@ export function BattleEngineCard({
         <dt className="text-muted-foreground">Host</dt>
         <dd className="break-words">{hostLabel ?? "Not given by the lobby"}</dd>
         <dt className="text-muted-foreground">Yours</dt>
-        <dd className="break-words">{mineLabel ?? "None"}</dd>
+        <dd className="break-words">
+          {mineLabel ??
+            (verdict !== "unverified"
+              ? "None"
+              : unreadable
+                ? "Unknown"
+                : "Checking…")}
+        </dd>
       </dl>
       {verdict === "mismatch" && (
         <MissingEngine
@@ -115,11 +122,10 @@ export function BattleEngineCard({
           onInstalled={onInstalled}
         />
       )}
-      {verdict === "unverified" && (
-        <p className="text-muted-foreground">
-          {unreadable
-            ? "Your engine would not report its version, so this is its folder name. It may still be the host's version."
-            : "Checking your engine's version…"}
+      {verdict === "unverified" && unreadable && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-400">
+          Your engine would not report its version, so it cannot be checked
+          against the host's. Pick another in Settings, Engines.
         </p>
       )}
     </div>

@@ -432,6 +432,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // refuses every other version, so an installed match has to win.
   const {
     target,
+    targets: engineTargets,
     loading: targetLoading,
     refresh: refreshTarget,
   } = usePreferredTarget(battle?.version);
@@ -574,10 +575,16 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     target,
   );
   const engineMissing = engine.verdict === "mismatch";
-  const engineUnreadable = useEngineVersionCheck(
-    engine.verdict === "unverified" ? target?.executable : undefined,
+  // On joining, every engine that has not said its version is asked, not only
+  // the one about to launch: the host's engine may be one of the others.
+  const unreadableEngines = useEngineVersionCheck(
+    battle
+      ? engineTargets.filter((t) => !t.syncVersion).map((t) => t.executable)
+      : [],
     refreshTarget,
   );
+  const engineUnreadable =
+    !!target && !target.syncVersion && unreadableEngines.has(target.executable);
   const sync: SyncState = battle
     ? deriveSync(battle, { mapMissing, gameMissing, engineMissing })
     : "pending";

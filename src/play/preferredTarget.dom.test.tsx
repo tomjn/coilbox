@@ -54,11 +54,9 @@ describe("usePreferredTarget", () => {
     expect(result.current.target?.executable).toBe("/root/engine/old/spring");
   });
 
-  it("matches an engine that only has its folder name", () => {
+  it("never matches an engine on its folder name", () => {
     const { result } = renderHook(() => usePreferredTarget("2024.11.02"));
-    expect(result.current.target?.executable).toBe(
-      "/root/engine/folder/spring",
-    );
+    expect(result.current.target?.executable).toBe("/root/engine/new/spring");
   });
 
   it("falls back to the preferred engine when the version is not installed", () => {

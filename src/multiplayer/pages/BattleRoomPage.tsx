@@ -93,6 +93,7 @@ function BattleRoomPage() {
     hasTarget: !!room.target,
     targetLoading: room.targetLoading,
     engineMissing: engine.verdict === "mismatch" ? engine.hostLabel : null,
+    engineUnreadable: room.engineUnreadable,
     unreadable: room.contentUnreadable,
     contentKnown: room.contentKnown,
     mapMissing: room.mapMissing,

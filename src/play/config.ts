@@ -67,8 +67,9 @@ export interface PlayTarget {
  * override; the singleplayer screen always uses the preferred engine.
  *
  * A multiplayer battle passes the host's engine version as `wantVersion`, and
- * an installed engine of exactly that version wins over the preferred one. The
- * host's engine refuses every other version, so the preference cannot apply.
+ * an installed engine that reported exactly that version wins over the
+ * preferred one. The host's engine refuses every other version, so the
+ * preference cannot apply. A folder name is never read as a version here.
  */
 export function usePreferredTarget(wantVersion?: string): {
   target: PlayTarget | null;
@@ -111,7 +112,7 @@ export function usePreferredTarget(wantVersion?: string): {
   const want = wantVersion?.trim();
   let target =
     (want
-      ? first((e) => (e.syncVersion ?? e.version).trim() === want)
+      ? first((e) => e.syncVersion?.trim() === want)
       : null) ?? first((e) => e.id === resolvedId);
   if (!target) {
     const r = roots.find((r) => r.engines.length > 0);

@@ -10,6 +10,7 @@ function content(p: Partial<LaunchContent> = {}): LaunchContent {
     hasTarget: true,
     targetLoading: false,
     engineMissing: null,
+    engineUnreadable: false,
     unreadable: false,
     contentKnown: true,
     mapMissing: false,
@@ -25,6 +26,11 @@ describe("launchBlock", () => {
     const block = launchBlock(content({ engineMissing: "Recoil 2026.03.01" }));
     expect(block?.short).toBe("Engine missing");
     expect(block?.reason).toContain("Recoil 2026.03.01");
+  });
+
+  it("blocks an engine that would not report its version", () => {
+    const block = launchBlock(content({ engineUnreadable: true }));
+    expect(block?.short).toBe("Engine unknown");
   });
 
   it("names the engine before content it cannot be trusted to have read", () => {

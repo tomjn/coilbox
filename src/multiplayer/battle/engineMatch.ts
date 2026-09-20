@@ -9,8 +9,9 @@ import type { PlayTarget } from "../../play/config";
  *
  * - `match` and `mismatch` compare the host's version with the one our engine
  *   binary reported.
- * - `unverified` is an engine nobody has run yet, which only has its folder
- *   name. A folder name that differs proves nothing, so it is not a mismatch.
+ * - `unverified` is an engine that has not reported its version. Its folder
+ *   name is never read as one: the folder can hold any build, or another
+ *   program entirely. The room asks the binary and the verdict follows.
  * - `unknown` is a lobby that never gave the host's version.
  * - `none` is no engine on this machine at all.
  */
@@ -25,23 +26,23 @@ export interface EngineMatch {
   verdict: EngineVerdict;
   /** The host's engine as the lobby gave it, e.g. `Recoil 2026.03.01`. */
   hostLabel: string | null;
-  /** The engine this machine would launch. */
+  /** The version our engine reported, or null when it has not reported one. */
   mineLabel: string | null;
 }
 
 export function engineMatch(
   host: { engine: string; version: string },
-  target: Pick<PlayTarget, "engineVersion" | "syncVersion"> | null | undefined,
+  target: Pick<PlayTarget, "syncVersion"> | null | undefined,
 ): EngineMatch {
   const hostVersion = host.version.trim();
   const hostLabel =
     hostVersion === "" ? null : `${host.engine.trim()} ${hostVersion}`.trim();
   if (!target) return { verdict: "none", hostLabel, mineLabel: null };
 
-  const mine = (target.syncVersion ?? target.engineVersion).trim();
+  const mine = target.syncVersion?.trim() || null;
   let verdict: EngineVerdict;
-  if (hostVersion === "") verdict = "unknown";
-  else if (mine === hostVersion) verdict = "match";
-  else verdict = target.syncVersion ? "mismatch" : "unverified";
+  if (!mine) verdict = "unverified";
+  else if (hostVersion === "") verdict = "unknown";
+  else verdict = mine === hostVersion ? "match" : "mismatch";
   return { verdict, hostLabel, mineLabel: mine };
 }

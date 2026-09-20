@@ -104,12 +104,13 @@ describe("BattleEngineCard", () => {
   });
 
   it("says it is checking an engine that has not reported its version", () => {
-    card(match({ verdict: "unverified", mineLabel: "some-folder" }));
-    expect(screen.getByText(/Checking your engine/)).toBeTruthy();
+    card(match({ verdict: "unverified", mineLabel: null }));
+    expect(screen.getByText("Checking…")).toBeTruthy();
   });
 
   it("says when the engine would not report its version", () => {
-    card(match({ verdict: "unverified", mineLabel: "some-folder" }), true);
+    card(match({ verdict: "unverified", mineLabel: null }), true);
+    expect(screen.getByText("Unknown")).toBeTruthy();
     expect(screen.getByText(/would not report its version/)).toBeTruthy();
   });
 });
