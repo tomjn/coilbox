@@ -37,6 +37,7 @@ vi.mock("./useHostContent", () => ({
 
 function stubContent(gameName: string, mapName: string) {
   useHostContent.mockReturnValue({
+    targets: [],
     target: {
       engineVersion: "105.1.1",
       syncVersion: "105.1.1",

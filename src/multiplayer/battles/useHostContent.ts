@@ -19,8 +19,12 @@ import { hexToI32 } from "../battle/config";
  * Selection lives here too, seeded to the first scanned entry, so a caller holds a
  * name and a setter rather than a scan, a memo and a defaulting effect.
  */
-export function useHostContent(initialGame?: string, initialMap?: string) {
-  const { target } = usePreferredTarget();
+export function useHostContent(
+  initialGame?: string,
+  initialMap?: string,
+  engineVersion?: string,
+) {
+  const { target, targets } = usePreferredTarget(engineVersion);
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
 
@@ -109,6 +113,7 @@ export function useHostContent(initialGame?: string, initialMap?: string) {
 
   return {
     target,
+    targets,
     games,
     maps,
     scanning: scan.loading,

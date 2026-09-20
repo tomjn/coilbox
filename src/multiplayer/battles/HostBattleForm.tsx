@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useUnitsyncThumbnails } from "@/content/config";
+import { engineLabel } from "@/content/engineVersion";
+import type { PlayTarget } from "@/play/config";
 import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
 import {
   advertisedGamePort,
@@ -58,13 +60,30 @@ const LAST_MAP_KEY = "multiplayer.hostBattle.lastMap";
 const LAST_TITLE_KEY = "multiplayer.hostBattle.lastTitle";
 const LAST_MAX_PLAYERS_KEY = "multiplayer.hostBattle.lastMaxPlayers";
 const LAST_PORT_KEY = "multiplayer.hostBattle.lastPort";
+const LAST_ENGINE_KEY = "multiplayer.hostBattle.lastEngine";
+
+/** One option per installed engine version, named the way Settings names it. */
+function engineOptions(targets: PlayTarget[]) {
+  const seen = new Set<string>();
+  return targets
+    .filter((t) => !seen.has(t.engineVersion) && seen.add(t.engineVersion))
+    .map((t) => ({
+      value: t.engineVersion,
+      label: engineLabel({
+        version: t.engineVersion,
+        syncVersion: t.syncVersion,
+        path: t.enginePath,
+      }),
+    }));
+}
 
 /**
  * The "Host a battle" form, as shown in the frame's drawer by `HostBattleButton`.
  * It collects the game, map, title, size and optional password, then fires
- * OPENBATTLE through the parent's `onHost`. The engine is the preferred one (no
- * picker), and the mod and map hashes come from unitsync so joining clients can
- * sync.
+ * OPENBATTLE through the parent's `onHost`. The engine starts as the preferred
+ * one and the host can pick another, because every joiner has to run exactly the
+ * version the battle advertises. The mod and map hashes come from unitsync so
+ * joining clients can sync.
  *
  * How the battle is reachable is worked out rather than asked about. There used
  * to be a "Hole punching for NAT players" checkbox here, which advertised
@@ -73,7 +92,7 @@ const LAST_PORT_KEY = "multiplayer.hostBattle.lastPort";
  * is {@link hostingRoute} reading the answer {@link ReachablePorts} already had
  * (issue #2020).
  *
- * The game, map, title, player limit and port default to whatever the host
+ * The engine, game, map, title, player limit and port default to whatever the host
  * hosted last time, the same way `relayMode` below remembers the relay choice
  * (issue #2794). `initialMap`/`initialGame`/`initialTitle` win over that,
  * since those come from a jump the host asked for. The password does not get
@@ -121,12 +140,18 @@ export function HostBattleForm({
     8,
   );
   const [lastPort, setLastPort] = useSetting(LAST_PORT_KEY, DEFAULT_HOST_PORT);
+  const [lastEngine, setLastEngine] = useSetting(LAST_ENGINE_KEY, "");
+  // Empty means the preferred engine. A remembered version that has since been
+  // uninstalled falls back the same way.
+  const [engineVersion, setEngineVersion] = useState(lastEngine);
   const content = useHostContent(
     initialGame ?? lastGame,
     initialMap ?? lastMap,
+    engineVersion,
   );
   const {
     target,
+    targets,
     games,
     maps,
     gameName,
@@ -268,6 +293,7 @@ export function HostBattleForm({
       if (serverKey) recordHostingRoute(serverKey, route);
       // Remembered for the next battle (issue #2794), except the password,
       // per the keys above.
+      setLastEngine(engineVersion);
       setLastGame(gameName);
       setLastMap(mapName);
       setLastTitle(title);
@@ -351,6 +377,21 @@ export function HostBattleForm({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={`${gameName || "Game"} — hosted`}
             />
+          </label>
+
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Engine</span>
+            <OptionSelect
+              value={target?.engineVersion ?? ""}
+              onValueChange={setEngineVersion}
+              options={engineOptions(targets)}
+              placeholder="Select an engine"
+              size="sm"
+            />
+            <span className="text-xs text-muted-foreground">
+              Everybody who joins has to have exactly this version.
+            </span>
           </label>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}

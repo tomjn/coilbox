@@ -72,6 +72,8 @@ export interface PlayTarget {
  */
 export function usePreferredTarget(wantVersion?: string): {
   target: PlayTarget | null;
+  /** Every installed engine, for a screen that lets the player pick one. */
+  targets: PlayTarget[];
   loading: boolean;
   error: string | null;
 } {
@@ -113,7 +115,8 @@ export function usePreferredTarget(wantVersion?: string): {
     const r = roots.find((r) => r.engines.length > 0);
     if (r) target = build(r.path, r.engines[0]);
   }
-  return { target, loading, error };
+  const targets = roots.flatMap((r) => r.engines.map((e) => build(r.path, e)));
+  return { target, targets, loading, error };
 }
 
 /**
