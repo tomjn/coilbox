@@ -1,6 +1,6 @@
 name: release
 
-# Build Coilbox for macOS, Linux, and Windows on a version tag (or manually).
+# Build and publish Coilbox for macOS, Linux, and Windows at a given version.
 # Sidecars come from committed prebuilts under src-tauri/binaries/ per target
 # triple. uberstress is an externalBin (tauri-build bundles it automatically);
 # pr-downloader is assembled into the `prdownloader/` resource folder per runner
@@ -12,34 +12,135 @@ name: release
 # dylibs into the .app) — a future hardening step, not done here.
 
 on:
+  # The normal way to cut a release. The workflow creates the tag and the draft
+  # release itself, so a release only ever exists once CI owns it and is a draft
+  # from creation until the last step publishes it. Nothing has to be made in the
+  # UI first, and nothing flips between published and draft on the way.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.15.6 (no leading v)"
+        required: true
+        type: string
+  # Pushing a bare version tag still works, for cutting a release from a checkout
+  # instead of the Actions tab. It takes the same path from prepare-release on.
   push:
-    # Plain version tags, e.g. 0.1 or 1.0.1 (no leading "v").
     tags:
       - "[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+"
-  workflow_dispatch:
 
-# tauri-action creates the draft release and uploads the build artifacts.
+# Two runs on one version would race each other for the same release and the same
+# asset names.
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+# prepare-release creates the tag and the draft release, the build jobs upload
+# artifacts to it, and publish-release makes it public.
 permissions:
   contents: write
 
 jobs:
-  # If a release already exists for this tag (drafted or published from the
-  # GitHub UI), demote it to a draft so tauri-action reuses it instead of
-  # forking its own orphan draft - tauri-action only ever reuses DRAFT releases.
-  # Without this, publishing the release before the build finishes leaves it
-  # empty while the artifacts land on a hidden duplicate draft (the 1.1.6
-  # failure). No-op when no release exists yet (a plain `git push` of the tag);
-  # tauri-action then creates the draft itself.
+  # Settle the version, the commit and the one release every other job writes to,
+  # before anything is built. Both triggers meet here, so the rest of the workflow
+  # has a single shape and never reads github.ref_name again.
   prepare-release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      sha: ${{ steps.resolve.outputs.sha }}
+      release_id: ${{ steps.draft.outputs.release_id }}
     steps:
-      - name: Demote any existing release for this tag to draft
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Resolve the version and commit
+        id: resolve
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VER="${INPUT_VERSION:-$GITHUB_REF_NAME}"
+          if ! [[ "$VER" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "version must look like 1.2 or 1.2.3 with no leading v, got '$VER'"
+            exit 1
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "Releasing $VER from $GITHUB_SHA"
+
+      # Creating the tag through the API rather than pushing it is deliberate:
+      # a ref created with GITHUB_TOKEN raises no push event, so this cannot set
+      # off a second release run of itself.
+      #
+      # An existing tag is fine as long as it names the commit being built, which
+      # covers both a tag push and a re-run after a failure. A tag pointing
+      # somewhere else means the artifacts would not match what the tag says, so
+      # that stops here.
+      - name: Create the tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VER: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Resolves an annotated tag to its commit, unlike the git ref endpoint.
+          # Branching on the exit status rather than on the output, because gh
+          # prints the API's error body on stdout and a missing tag would
+          # otherwise read as a tag pointing at something unexpected.
+          if ! TAGGED="$(gh api "repos/$GITHUB_REPOSITORY/commits/$VER" --jq .sha 2>/dev/null)"; then
+            TAGGED=""
+          fi
+          if [ -z "$TAGGED" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$VER" -f "sha=$GITHUB_SHA" --jq .ref
+          elif [ "$TAGGED" != "$GITHUB_SHA" ]; then
+            echo "tag $VER already points at $TAGGED, not $GITHUB_SHA"
+            echo "delete the tag or dispatch from the commit it names"
+            exit 1
+          else
+            echo "tag $VER already points at this commit"
+          fi
+
+      # GitHub will happily hold two releases on one tag, and `gh release` then
+      # resolves the tag to whichever one is published while tauri-action resolves
+      # it to the draft. That split is what broke 1.15.5: the portable zip and
+      # latest.json landed on different releases. So the count is checked here, and
+      # the id is passed down for every later step to verify it is still writing to
+      # the release this job settled on.
+      - name: Create or claim the draft release
+        id: draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=true || true
+          VER: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          releases() {
+            gh api --paginate "repos/$GH_REPO/releases" \
+              --jq '.[] | select(.tag_name == env.VER) | "\(.id) \(.draft)"'
+          }
+
+          FOUND="$(releases)"
+          COUNT="$(printf '%s\n' "$FOUND" | grep -c . || true)"
+
+          if [ "$COUNT" -gt 1 ]; then
+            echo "$COUNT releases already exist for tag $VER, delete all but one:"
+            echo "$FOUND"
+            exit 1
+          fi
+
+          if [ "$COUNT" -eq 0 ]; then
+            # The tag exists by now, so GitHub takes the commit from it and
+            # --target would be ignored.
+            gh release create "$VER" --draft --title "$VER" --generate-notes
+            FOUND="$(releases)"
+            COUNT="$(printf '%s\n' "$FOUND" | grep -c . || true)"
+            test "$COUNT" -eq 1 || { echo "created the release but found $COUNT"; exit 1; }
+          elif [ "${FOUND##* }" != "true" ]; then
+            echo "a published release already exists for $VER (id ${FOUND%% *})"
+            echo "delete it and run this workflow again"
+            exit 1
+          fi
+
+          echo "release_id=${FOUND%% *}" >> "$GITHUB_OUTPUT"
+          echo "Draft release ${FOUND%% *} ready for $VER"
 
   build:
     needs: prepare-release
@@ -65,7 +166,11 @@ jobs:
             cache_rust: true
     runs-on: ${{ matrix.platform }}
     steps:
+      # The exact commit prepare-release tagged, not the branch head, so the three
+      # platforms cannot build different code if main moves during the run.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-release.outputs.sha }}
 
       # Pin an exact semver: setup-bun only resolves a tag through
       # api.github.com when the version isn't strict semver, and that API
@@ -114,17 +219,18 @@ jobs:
           shared-key: profile-release
           save-if: false
 
-      # The release version comes from the git tag, not hand-maintained in source.
-      # In source the bundle version is a 0.0.0 placeholder; on a tag build we
-      # write the tag (e.g. 0.1.1) into tauri.conf.json so the artifacts are
-      # versioned correctly. (jq is preinstalled on all GitHub runners.)
-      - name: Set version from tag
-        if: startsWith(github.ref, 'refs/tags/')
+      # The release version is the one prepare-release settled on, not a number
+      # hand-maintained in source. In source the bundle version is a 0.0.0
+      # placeholder, and it is written here so the artifacts are versioned
+      # correctly. (jq is preinstalled on all GitHub runners.)
+      - name: Set the version
         shell: bash
+        env:
+          VER: ${{ needs.prepare-release.outputs.version }}
         run: |
-          jq --arg v "$GITHUB_REF_NAME" '.version = $v' src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp
+          jq --arg v "$VER" '.version = $v' src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp
           mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
-          echo "App version set to $GITHUB_REF_NAME"
+          echo "App version set to $VER"
 
       - name: Install dependencies
         run: bun install
@@ -185,10 +291,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          # Tags stay bare (1.2.2) to match the trigger filter above; the "v"
-          # is display-only.
-          releaseName: "v${{ github.ref_name }}"
+          # prepare-release has already made the draft, so tauri-action finds it
+          # by tag and uploads into it. These two only matter if it ever has to
+          # create one, and they match the draft's own name so a release made that
+          # way is indistinguishable from the usual one.
+          tagName: ${{ needs.prepare-release.outputs.version }}
+          releaseName: ${{ needs.prepare-release.outputs.version }}
           releaseDraft: true
           prerelease: false
           args: -- --timings
@@ -209,16 +317,17 @@ jobs:
       # after the files are copied. Assembling the zip by hand would mean keeping a
       # second copy of that hook in step with the first.
       - name: Build and sign the Windows portable zip
-        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        if: matrix.platform == 'windows-latest'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          VER: ${{ needs.prepare-release.outputs.version }}
+          RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          VER="$GITHUB_REF_NAME"
           SETUP="target/release/bundle/nsis/Coilbox_${VER}_x64-setup.exe"
           test -f "$SETUP" || { echo "no installer at $SETUP"; exit 1; }
 
@@ -253,6 +362,13 @@ jobs:
           rm -f "$ZIP" "$ZIP.sig"
           (cd "$STAGING" && 7z a -tzip -mx=9 "$(cygpath -w "$GITHUB_WORKSPACE/$ZIP")" . > /dev/null)
           bunx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$ZIP"
+
+          # `gh release upload` looks the release up by tag, which is the lookup
+          # that sent 1.15.5's zip to a duplicate release. Checking the id it
+          # resolves to costs one API call and turns that into a failed build.
+          FOUND="$(gh release view "$VER" --json databaseId --jq .databaseId)"
+          test "$FOUND" = "$RELEASE_ID" \
+            || { echo "tag $VER now resolves to release $FOUND, not $RELEASE_ID"; exit 1; }
           gh release upload "$VER" "$ZIP" "$ZIP.sig" --clobber
 
       # The sidecar build above and tauri-action's app build both run cargo
@@ -267,14 +383,49 @@ jobs:
           path: target/cargo-timings/*.html
           if-no-files-found: warn
 
-  # Every platform has now uploaded to the same draft; publish it in one step so
-  # the release only ever goes live with all artifacts attached. This is the
-  # single publish point - CI owns going public, so it no longer matters whether
-  # the UI-created release was left a draft or published too early.
+  # Every platform has now uploaded to the same draft, so publish it in one step
+  # and the release only ever goes live with all its artifacts attached. This is
+  # the single publish point, and the draft it publishes is the one prepare-release
+  # created, so a release is never public before CI is finished with it.
   publish-release:
-    needs: build
+    needs: [prepare-release, build]
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      VER: ${{ needs.prepare-release.outputs.version }}
+      RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
     steps:
+      # Everything below addresses the release by tag, so confirm the tag still
+      # names the release prepare-release settled on, and that all three platforms
+      # plus the portable zip actually landed on it. 1.15.5 failed one step later
+      # than this, on jq reading a file that had silently never downloaded.
+      - name: Check the release is whole
+        run: |
+          set -euo pipefail
+          FOUND="$(gh release view "$VER" --json databaseId --jq .databaseId)"
+          test "$FOUND" = "$RELEASE_ID" \
+            || { echo "tag $VER now resolves to release $FOUND, not $RELEASE_ID"; exit 1; }
+
+          HAVE="$(gh api "repos/$GH_REPO/releases/$RELEASE_ID/assets" --jq '.[].name')"
+          MISSING=""
+          for want in \
+            "latest.json" \
+            "Coilbox_${VER}_x64-setup.exe" \
+            "Coilbox_${VER}_x64-portable.zip" \
+            "Coilbox_${VER}_x64-portable.zip.sig" \
+            "Coilbox_${VER}_amd64.AppImage" \
+            "Coilbox_${VER}_aarch64.dmg" \
+            "Coilbox_aarch64.app.tar.gz"; do
+            printf '%s\n' "$HAVE" | grep -qxF "$want" || MISSING="$MISSING $want"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "release $RELEASE_ID is missing:$MISSING"
+            echo "it has:"
+            printf '%s\n' "$HAVE"
+            exit 1
+          fi
+
       # Tell the app about the portable zip, before anyone can see the release.
       #
       # tauri-action writes latest.json with only the target keys its own updater
@@ -288,13 +439,8 @@ jobs:
       # upload to the same latest.json, and a patch applied before the others
       # finish would be overwritten by them.
       - name: Add the portable zip to latest.json
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          VER="$GITHUB_REF_NAME"
           ZIP="Coilbox_${VER}_x64-portable.zip"
           rm -rf manifest && mkdir manifest
           gh release download "$VER" --pattern latest.json --pattern "$ZIP.sig" --dir manifest
@@ -307,8 +453,4 @@ jobs:
           gh release upload "$VER" manifest/latest.json --clobber
 
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+        run: gh release edit "$VER" --draft=false

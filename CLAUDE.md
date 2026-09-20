@@ -64,7 +64,9 @@ So: import `Button`/`Input` from `@picoframe/frame`; add anything else from the 
 
 ## Releases
 
-The release version comes from the git tag, not from source. CI (`.github/workflows/release.yml`) writes the pushed tag (e.g. `0.2.0`) into `tauri.conf.json` at build time via `jq`; in source the version stays a `0.0.0` placeholder. To cut a release, push a `N.N` or `N.N.N` tag at the release commit — no manual version bump is needed. (`package.json` / Cargo versions are not used for the artifact version.)
+To cut a release, run the `release` workflow from the Actions tab and give it the version (`N.N` or `N.N.N`, no leading `v`). It creates the tag and the draft release itself, builds all three platforms into that one draft, and publishes it as the last step. Pushing a bare version tag still works and joins the same path at `prepare-release`. No manual version bump is needed: CI writes the version into `tauri.conf.json` at build time via `jq`, and in source it stays a `0.0.0` placeholder. (`package.json` and Cargo versions are not used for the artifact version.)
+
+**Do not create the release in the GitHub UI.** GitHub allows two releases on one tag, and when that happens `gh release upload` writes to the published one while tauri-action writes to the draft. That split is what broke 1.15.5: the portable zip and `latest.json` ended up on different releases and the publish job failed on the missing file. A release that already exists and is published now stops the run in `prepare-release` rather than being quietly demoted to a draft.
 
 ## Reports
 
