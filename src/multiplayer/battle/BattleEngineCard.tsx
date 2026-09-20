@@ -1,24 +1,12 @@
-import type { PlayTarget } from "@/play/config";
-import { engineMatch } from "./engineMatch";
+import type { EngineMatch } from "./engineMatch";
 
 /**
  * The engine the host asked for beside the one this machine would launch. The
- * engine turns away any other version without telling the player why, so a
- * difference is called out here before the game starts.
+ * host's engine turns away any other version and says why only in its own log,
+ * so both are named here before the game starts.
  */
-export function BattleEngineCard({
-  engine,
-  version,
-  target,
-}: {
-  engine: string;
-  version: string;
-  target: PlayTarget | null;
-}) {
-  const { verdict, hostLabel, mineLabel } = engineMatch(
-    { engine, version },
-    target,
-  );
+export function BattleEngineCard({ match }: { match: EngineMatch }) {
+  const { verdict, hostLabel, mineLabel } = match;
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-sm">
@@ -31,9 +19,8 @@ export function BattleEngineCard({
       </dl>
       {verdict === "mismatch" && (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-400">
-          Your engine is not the version the host asked for, so the host will
-          refuse your connection. Install {hostLabel} and pick it in Settings,
-          Engines.
+          You do not have the host's engine, so the host will refuse your
+          connection. Install {hostLabel} in Settings, Engines.
         </p>
       )}
       {verdict === "unverified" && (

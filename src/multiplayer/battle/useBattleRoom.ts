@@ -420,7 +420,11 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     isFounder,
   });
 
-  const { target, loading: targetLoading } = usePreferredTarget();
+  // The host's engine version, not the player's preferred engine. The host
+  // refuses every other version, so an installed match has to win.
+  const { target, loading: targetLoading } = usePreferredTarget(
+    battle?.version,
+  );
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
 

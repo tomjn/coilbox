@@ -65,8 +65,12 @@ export interface PlayTarget {
  * default), resolved from content state — including its executable, which the
  * scan-target shape omits. Unlike the content browser there's no per-page
  * override; the singleplayer screen always uses the preferred engine.
+ *
+ * A multiplayer battle passes the host's engine version as `wantVersion`, and
+ * an installed engine of exactly that version wins over the preferred one. The
+ * host's engine refuses every other version, so the preference cannot apply.
  */
-export function usePreferredTarget(): {
+export function usePreferredTarget(wantVersion?: string): {
   target: PlayTarget | null;
   loading: boolean;
   error: string | null;
@@ -89,15 +93,22 @@ export function usePreferredTarget(): {
     syncVersion: e.syncVersion,
   });
 
-  // Preferred engine, else the first engine in any root.
-  let target: PlayTarget | null = null;
-  for (const r of roots) {
-    const e = r.engines.find((en) => en.id === resolvedId);
-    if (e) {
-      target = build(r.path, e);
-      break;
+  // The wanted version, else the preferred engine, else the first engine in
+  // any root.
+  const first = (
+    wanted: (e: (typeof roots)[number]["engines"][number]) => boolean,
+  ): PlayTarget | null => {
+    for (const r of roots) {
+      const e = r.engines.find(wanted);
+      if (e) return build(r.path, e);
     }
-  }
+    return null;
+  };
+  const want = wantVersion?.trim();
+  let target =
+    (want
+      ? first((e) => (e.syncVersion ?? e.version).trim() === want)
+      : null) ?? first((e) => e.id === resolvedId);
   if (!target) {
     const r = roots.find((r) => r.engines.length > 0);
     if (r) target = build(r.path, r.engines[0]);
