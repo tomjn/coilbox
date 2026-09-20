@@ -775,7 +775,13 @@ function BattleRoomPage() {
             game={room.localGame}
             gameName={battle.modname}
           />
-          <BattleEngineCard match={engine} />
+          <BattleEngineCard
+            match={engine}
+            version={battle.version}
+            target={room.target}
+            onInstalled={room.refreshTarget}
+            unreadable={room.engineUnreadable}
+          />
         </aside>
       </div>
     </main>

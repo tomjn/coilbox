@@ -79,6 +79,7 @@ import { type EngineMatch, engineMatch } from "./engineMatch";
 import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";
 import { optionTagSlots } from "./tweakDelivery";
+import { useEngineVersionCheck } from "./useEngineVersionCheck";
 import { type TweakDelivery, useTweakDelivery } from "./useTweakDelivery";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
@@ -193,6 +194,10 @@ export interface BattleRoomView {
   startPosType: number;
   /** The host's engine beside the one this machine would launch. */
   engine: EngineMatch;
+  /** Read the installed engines again, after the host's one has been installed. */
+  refreshTarget: () => Promise<void>;
+  /** The engine would not say its version, so the verdict stays unverified. */
+  engineUnreadable: boolean;
   mapMissing: boolean;
   gameMissing: boolean;
   /** True once local content presence is known (scan settled). */
@@ -425,9 +430,11 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
 
   // The host's engine version, not the player's preferred engine. The host
   // refuses every other version, so an installed match has to win.
-  const { target, loading: targetLoading } = usePreferredTarget(
-    battle?.version,
-  );
+  const {
+    target,
+    loading: targetLoading,
+    refresh: refreshTarget,
+  } = usePreferredTarget(battle?.version);
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
 
@@ -567,6 +574,10 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     target,
   );
   const engineMissing = engine.verdict === "mismatch";
+  const engineUnreadable = useEngineVersionCheck(
+    engine.verdict === "unverified" ? target?.executable : undefined,
+    refreshTarget,
+  );
   const sync: SyncState = battle
     ? deriveSync(battle, { mapMissing, gameMissing, engineMissing })
     : "pending";
@@ -1293,6 +1304,8 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     clearStartBox,
     startPosType,
     engine,
+    refreshTarget,
+    engineUnreadable,
     mapMissing,
     gameMissing,
     contentKnown,

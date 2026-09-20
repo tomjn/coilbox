@@ -76,8 +76,10 @@ export function usePreferredTarget(wantVersion?: string): {
   targets: PlayTarget[];
   loading: boolean;
   error: string | null;
+  /** Read the installed engines again, after one has been installed. */
+  refresh: () => Promise<void>;
 } {
-  const { state, loading, error } = useContentState();
+  const { state, loading, error, refresh } = useContentState();
   const roots = state?.roots ?? [];
   const engines = roots.flatMap((r) =>
     r.engines.map((e) => ({ id: e.id, version: e.syncVersion ?? e.version })),
@@ -116,7 +118,7 @@ export function usePreferredTarget(wantVersion?: string): {
     if (r) target = build(r.path, r.engines[0]);
   }
   const targets = roots.flatMap((r) => r.engines.map((e) => build(r.path, e)));
-  return { target, targets, loading, error };
+  return { target, targets, loading, error, refresh };
 }
 
 /**
