@@ -777,6 +777,7 @@ function BattleRoomPage() {
             gameName={battle.modname}
           />
           <BattleEngineCard
+            battleId={battle.id}
             match={engine}
             version={battle.version}
             target={room.target}

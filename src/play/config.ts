@@ -111,9 +111,8 @@ export function usePreferredTarget(wantVersion?: string): {
   };
   const want = wantVersion?.trim();
   let target =
-    (want
-      ? first((e) => e.syncVersion?.trim() === want)
-      : null) ?? first((e) => e.id === resolvedId);
+    (want ? first((e) => e.syncVersion?.trim() === want) : null) ??
+    first((e) => e.id === resolvedId);
   if (!target) {
     const r = roots.find((r) => r.engines.length > 0);
     if (r) target = build(r.path, r.engines[0]);

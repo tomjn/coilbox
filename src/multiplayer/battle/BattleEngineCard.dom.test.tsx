@@ -14,6 +14,7 @@ const resolve = vi.hoisted(() => ({
   loading: false,
   download: vi.fn(),
 }));
+const auto = vi.hoisted(() => ({ enabled: false }));
 const completed = vi.hoisted(() => ({
   fire: (_item: { kind: string }) => {},
 }));
@@ -29,7 +30,12 @@ vi.mock("@/content/useResolveContent", () => ({
     errorFor: () => null,
   }),
 }));
+vi.mock("@picoframe/frame", async (original) => ({
+  ...(await original<typeof import("@picoframe/frame")>()),
+  useSetting: () => [auto.enabled, () => {}],
+}));
 vi.mock("@/downloads/DownloadQueueProvider", () => ({
+  useDownloadQueue: () => ({ active: null, queued: [] }),
   useDownloadComplete: (cb: (item: { kind: string }) => void) => {
     completed.fire = cb;
   },
@@ -47,10 +53,14 @@ const match = (p: Partial<EngineMatch>): EngineMatch => ({
   ...p,
 });
 
+// A fresh battle per test, because the auto download fires once per battle.
+let battleId = 0;
+
 function card(m: EngineMatch, unreadable = false) {
   const onInstalled = vi.fn();
   render(
     <BattleEngineCard
+      battleId={++battleId}
       match={m}
       version="2026.09.01"
       target={null}
@@ -65,6 +75,7 @@ afterEach(() => {
   cleanup();
   resolve.canDownload = true;
   resolve.noWriteRoot = false;
+  auto.enabled = false;
   resolve.download.mockClear();
 });
 
@@ -79,6 +90,19 @@ describe("BattleEngineCard", () => {
     card(match({ verdict: "mismatch", mineLabel: "2025.06.20" }));
     fireEvent.click(screen.getByRole("button", { name: /2026\.09\.01/ }));
     expect(resolve.download).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches the host's engine on joining, without a click", () => {
+    auto.enabled = true;
+    card(match({ verdict: "mismatch", mineLabel: "2025.06.20" }));
+    expect(resolve.download).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches nothing on joining when no build exists to fetch", () => {
+    auto.enabled = true;
+    resolve.canDownload = false;
+    card(match({ verdict: "mismatch", mineLabel: "2025.06.20" }));
+    expect(resolve.download).not.toHaveBeenCalled();
   });
 
   it("says so when no download exists for this platform", () => {

@@ -1,11 +1,15 @@
-import { Button } from "@picoframe/frame";
+import { Button, useSetting } from "@picoframe/frame";
 import { Download, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { engineVersionRequirement } from "@/content/resolveContent";
 import { useResolveContent } from "@/content/useResolveContent";
-import { useDownloadComplete } from "@/downloads/DownloadQueueProvider";
+import {
+  useDownloadComplete,
+  useDownloadQueue,
+} from "@/downloads/DownloadQueueProvider";
 import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
 import type { PlayTarget } from "@/play/config";
+import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
 import type { EngineMatch } from "./engineMatch";
 
 /**
@@ -14,10 +18,12 @@ import type { EngineMatch } from "./engineMatch";
  * platforms, so "no download" is an ordinary answer and not an error.
  */
 function MissingEngine({
+  battleId,
   version,
   target,
   onInstalled,
 }: {
+  battleId: number;
   version: string;
   target: PlayTarget | null;
   onInstalled: () => void;
@@ -29,6 +35,19 @@ function MissingEngine({
   const item = resolve.itemFor(req);
   const error = resolve.errorFor(req);
   const busy = status === "active" || status === "queued";
+
+  // Joining a battle is asking to play it, so the engine is fetched the same
+  // way the game is, under the same setting, once a build is known to exist.
+  const { active, queued } = useDownloadQueue();
+  const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
+  useAutoDownload({
+    key: `${battleId}:engine:${version}`,
+    enabled: autoEnabled,
+    writeRootReady: resolve.canDownload(req),
+    queueIdle: active == null && queued.length === 0,
+    inFlight: busy,
+    start: () => resolve.download(req),
+  });
 
   // The room holds its own read of the installed engines, so it has to be told
   // to look again before it can resolve the one that just arrived.
@@ -83,12 +102,15 @@ function MissingEngine({
  * so both are named here before the game starts.
  */
 export function BattleEngineCard({
+  battleId,
   match,
   version,
   target,
   onInstalled,
   unreadable,
 }: {
+  /** The joined battle's id, so the engine is fetched once per battle. */
+  battleId: number;
   match: EngineMatch;
   /** The host's version as the lobby gave it, which a download is matched on. */
   version: string;
@@ -117,6 +139,7 @@ export function BattleEngineCard({
       </dl>
       {verdict === "mismatch" && (
         <MissingEngine
+          battleId={battleId}
           version={version.trim()}
           target={target}
           onInstalled={onInstalled}
