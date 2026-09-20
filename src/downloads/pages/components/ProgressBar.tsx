@@ -141,6 +141,30 @@ export function ProgressBar({
   );
 }
 
+/**
+ * The bar for a download that is running and has not reported any progress yet,
+ * which is the seconds a source takes to resolve a name or open a connection.
+ * Without it a screen shows a disabled button and nothing moving.
+ */
+export function StartingBar({ className }: { className?: string }) {
+  const captionId = useId();
+  return (
+    <div className={cn("flex flex-col gap-1", className)}>
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-label="Download progress"
+        aria-describedby={captionId}
+      >
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+      </div>
+      <span id={captionId} className="text-xs text-muted-foreground">
+        Starting…
+      </span>
+    </div>
+  );
+}
+
 /** The three things a download bar needs, as the queue hands them out. */
 export interface ProgressSource {
   progress: DownloadProgress | null;

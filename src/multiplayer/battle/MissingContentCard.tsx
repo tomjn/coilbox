@@ -7,9 +7,13 @@ import {
   identityOf,
   useDownloadQueue,
 } from "@/downloads/DownloadQueueProvider";
-import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
+import {
+  QueueProgress,
+  StartingBar,
+} from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
+import type { ContentPresence } from "./useBattleRoom";
 
 /**
  * Shown when the battle's game isn't installed locally. Downloads the game
@@ -27,11 +31,18 @@ export function MissingContentCard({
   /** The joined battle's id, to key the auto-download once per (battle, game). */
   battleId: number;
   gameName: string;
-  onRescan: () => Promise<void>;
+  onRescan: () => Promise<ContentPresence>;
 }) {
   const writePath = useWriteRootPath();
-  const { active, queued, items, enqueue, onComplete, failureFor } =
-    useDownloadQueue();
+  const {
+    active,
+    queued,
+    items,
+    enqueue,
+    onComplete,
+    failureFor,
+    completedFor,
+  } = useDownloadQueue();
   const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
   const [rescanning, setRescanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,10 +63,23 @@ export function MissingContentCard({
   // The row wins while it is still there, then the queue's longer-lived record
   // of the failure takes over once it has been pruned (issue #2504).
   const downloadError = item?.error ?? failureFor(identity);
+  // This card only renders while the game is missing, so a finished download
+  // with no rescan running means the engine cannot see what was downloaded.
+  const downloadedButMissing =
+    completedFor(identity) && !downloading && !rescanning;
 
   async function downloadGame() {
     setError(null);
     enqueue(input);
+  }
+
+  // What joining a battle starts. The scan this card was drawn from can be as
+  // old as the session, so look again before fetching a game that may already
+  // be on disk, and never repeat a download that has already finished once.
+  async function downloadIfStillMissing() {
+    const found = await rescan();
+    if (found?.game || completedFor(identity)) return;
+    downloadGame();
   }
 
   // The queue owns the download, so the card learns it finished by subscribing
@@ -65,7 +89,10 @@ export function MissingContentCard({
     () =>
       onComplete((done) => {
         if (done.identity !== identity) return;
-        onRescan().catch((e) => setError(errMessage(e)));
+        setRescanning(true);
+        onRescan()
+          .catch((e) => setError(errMessage(e)))
+          .finally(() => setRescanning(false));
       }),
     [onComplete, identity, onRescan],
   );
@@ -74,7 +101,10 @@ export function MissingContentCard({
     setRescanning(true);
     setError(null);
     try {
-      await onRescan();
+      return await onRescan();
+    } catch (e) {
+      setError(errMessage(e));
+      return null;
     } finally {
       setRescanning(false);
     }
@@ -89,7 +119,7 @@ export function MissingContentCard({
     writeRootReady: !!writePath,
     queueIdle: active == null && queued.length === 0,
     inFlight: downloading,
-    start: downloadGame,
+    start: downloadIfStillMissing,
   });
 
   return (
@@ -102,18 +132,34 @@ export function MissingContentCard({
         <span className="font-medium">{gameName}</span> isn't installed —
         download it to join, or rescan if it's already on disk.
       </p>
-      {downloading && progress ? (
-        <QueueProgress item={item} />
+      {downloadedButMissing && (
+        <p className="text-sm">
+          Downloaded to {writePath}, but the engine still does not list this
+          game. The archive may be a different version, or one the engine cannot
+          read.
+        </p>
+      )}
+      {item?.status === "active" ? (
+        progress ? (
+          <QueueProgress item={item} />
+        ) : (
+          <StartingBar />
+        )
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" disabled={downloading} onClick={downloadGame}>
+          <Button
+            size="sm"
+            variant={downloadedButMissing ? "secondary" : undefined}
+            disabled={downloading}
+            onClick={downloadGame}
+          >
             <Download className="size-4" />
             {/* Queued is worth saying: the queue runs one download at a time, so
                 waiting behind another is not the same as making no progress. */}
             {item?.status === "queued"
               ? "Queued…"
-              : downloading
-                ? "Downloading…"
+              : downloadedButMissing
+                ? "Download again"
                 : "Download"}
           </Button>
           <Button
