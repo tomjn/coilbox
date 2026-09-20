@@ -89,25 +89,28 @@ beforeEach(() => {
 });
 
 /**
- * The level a tone plays at, read off the graph: walk back from the master gain,
- * stepping past the gong's limiter, to the gain the tone set for itself.
+ * The base level a tone was built at, read off the graph. The chain runs
+ * master <- group <- event <- (the gong's limiter) <- the tone's own gain, so
+ * this walks back through the two nodes the player controls to reach the one
+ * the tone set for itself.
  */
-function levelInto(master: FakeNode): number {
-  let node = master.inbound.at(-1);
-  if (node instanceof FakeCompressor) node = node.inbound.at(-1);
-  if (!(node instanceof FakeGain))
-    throw new Error("no gain feeding the master");
-  return node.gain.value;
+function toneLevelInto(master: FakeNode): number {
+  const group = master.inbound.at(-1);
+  const event = group?.inbound.at(-1);
+  let tone = event?.inbound.at(-1);
+  if (tone instanceof FakeCompressor) tone = tone.inbound.at(-1);
+  if (!(tone instanceof FakeGain)) throw new Error("no tone gain on the chain");
+  return tone.gain.value;
 }
 
 describe("the master gain", () => {
   it("is the only thing connected to the speakers", async () => {
     const { getAudioContext, getMasterGain } = await import("./context");
-    const { playGong, playChime, playPing } = await import("./library");
+    const { playEvent } = await import("./play");
 
-    playGong();
-    playChime();
-    playPing();
+    playEvent("ring");
+    playEvent("hostIngame");
+    playEvent("mention");
 
     const ctx = getAudioContext() as unknown as FakeAudioContext;
     const master = getMasterGain() as unknown as FakeNode;
@@ -119,15 +122,17 @@ describe("the master gain", () => {
 
   it("keeps the gong, chime and ping at the levels they were tuned to", async () => {
     const { getMasterGain } = await import("./context");
-    const { playGong, playChime, playPing } = await import("./library");
+    const { playEvent } = await import("./play");
     const master = getMasterGain() as unknown as FakeNode;
 
-    playGong();
-    expect(levelInto(master)).toBe(1.4);
-    playChime();
-    expect(levelInto(master)).toBe(0.3);
-    playPing();
-    expect(levelInto(master)).toBe(0.28);
+    // Each event's default sound, at the level that sound is built at. These
+    // are what a player hears before touching anything.
+    playEvent("ring");
+    expect(toneLevelInto(master)).toBe(1.4);
+    playEvent("hostIngame");
+    expect(toneLevelInto(master)).toBe(0.3);
+    playEvent("mention");
+    expect(toneLevelInto(master)).toBe(0.28);
   });
 
   it("starts at full volume, so nothing sounds different until the player asks", async () => {
