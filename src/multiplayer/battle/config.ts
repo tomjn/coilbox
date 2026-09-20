@@ -277,7 +277,8 @@ export type SyncState = "synced" | "pending" | "error";
 
 /**
  * Roll the battle's per-player sync flags plus local content presence into a
- * single pill state. Missing map/game/engine or any unsynced player (sync=2) is an
+ * single pill state. Missing map/game, an engine not confirmed to match the
+ * host's, or any unsynced player (sync=2) is an
  * error; an unknown player (sync=0) is pending; otherwise synced. Spectators are
  * ignored — their sync doesn't gate the match starting.
  */

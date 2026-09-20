@@ -574,7 +574,11 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     { engine: battle?.engine ?? "", version: battle?.version ?? "" },
     target,
   );
-  const engineMissing = engine.verdict === "mismatch";
+  // Unsynced until the engine is known to match, not only once it is known to
+  // differ: an engine that has not said its version has confirmed nothing. A
+  // lobby that never gave the host's version leaves nothing to confirm against.
+  const engineMissing =
+    engine.verdict !== "match" && engine.verdict !== "unknown";
   // On joining, every engine that has not said its version is asked, not only
   // the one about to launch: the host's engine may be one of the others.
   const unreadableEngines = useEngineVersionCheck(
