@@ -194,6 +194,13 @@ interface DownloadQueueValue {
    * download is asked for again.
    */
   failureFor: (identity: string) => string | null;
+  /**
+   * Whether the last attempt at this identity finished. Outlives the row like
+   * {@link failureFor} does, so a screen still showing "not installed" after its
+   * own download succeeded can say so rather than offer the download again.
+   * Cleared when the same download is asked for again.
+   */
+  completedFor: (identity: string) => boolean;
   /** The tracked item with this identity, or null. For pages that enqueue
    * directly and want to draw the download's progress themselves. */
   itemFor: (identity: string) => QueueItem | null;
@@ -249,6 +256,9 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
    * span of time after which "this failed" stops being the truth.
    */
   const [failures, setFailures] = useState<Record<string, string>>({});
+
+  /** The identities whose last attempt finished, kept the same way. */
+  const [completions, setCompletions] = useState<Record<string, true>>({});
 
   // Set synchronously in startNext so the pump can't launch a second item before
   // the "active" status commits to state.
@@ -404,6 +414,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       try {
         await start(item, onProgress);
         patch(item.id, { status: "done", progress: null, rate: IDLE_RATE });
+        setCompletions((c) => ({ ...c, [item.identity]: true }));
         for (const fn of completeListeners.current) fn(settled);
       } catch (e) {
         const msg = errMessage(e);
@@ -455,6 +466,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     setFailures((f) => {
       if (!(identity in f)) return f;
       const { [identity]: _gone, ...rest } = f;
+      return rest;
+    });
+    setCompletions((c) => {
+      if (!(identity in c)) return c;
+      const { [identity]: _gone, ...rest } = c;
       return rest;
     });
     const already = itemsRef.current.find(
@@ -567,6 +583,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     [failures],
   );
 
+  const completedFor = useCallback(
+    (identity: string) => identity in completions,
+    [completions],
+  );
+
   const itemByIdentity = useMemo(() => {
     const m = new Map<string, QueueItem>();
     for (const i of items) m.set(i.identity, i);
@@ -629,6 +650,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       cancel,
       statusFor,
       failureFor,
+      completedFor,
       itemFor,
       onComplete,
     }),
@@ -643,6 +665,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       cancel,
       statusFor,
       failureFor,
+      completedFor,
       itemFor,
       onComplete,
     ],

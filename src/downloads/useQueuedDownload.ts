@@ -35,6 +35,11 @@ export interface QueuedDownload {
    * the download is started again.
    */
   error: string | null;
+  /**
+   * The last attempt finished. Outlives the queue row the same way `error`
+   * does, and goes when the download is started again.
+   */
+  completed: boolean;
   /** Waiting for a slot, or downloading right now. */
   busy: boolean;
 }
@@ -54,7 +59,8 @@ export interface QueuedDownload {
  * started anywhere in the app, shows here as busy too.
  */
 export function useQueuedDownload(input?: EnqueueInput | null): QueuedDownload {
-  const { enqueue, waitFor, items, failureFor } = useDownloadQueue();
+  const { enqueue, waitFor, items, failureFor, completedFor } =
+    useDownloadQueue();
   const [started, setStarted] = useState<{
     id: string;
     identity: string;
@@ -91,6 +97,7 @@ export function useQueuedDownload(input?: EnqueueInput | null): QueuedDownload {
     // The row wins while it is still there, then the queue's longer-lived
     // record of the failure takes over once it has been pruned.
     error: item?.error ?? (identity ? failureFor(identity) : null),
+    completed: identity ? completedFor(identity) : false,
     busy: item?.status === "queued" || item?.status === "active",
   };
 }

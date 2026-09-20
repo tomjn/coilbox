@@ -20,6 +20,7 @@ import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
 import type { Battle } from "../bindings";
 import type { MemberRow } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
+import type { ContentPresence } from "./useBattleRoom";
 import { useMapChangeQueue } from "./useMapChangeQueue";
 
 /**
@@ -72,7 +73,7 @@ export function BattleMapCard({
   onClearBox: (ally: number) => void;
   onSuggestMap: (name: string) => void;
   onChangeMap: (name: string, maphash: number) => void;
-  onRescan: () => Promise<void>;
+  onRescan: () => Promise<ContentPresence>;
 }) {
   const minimap = useUnitsyncMinimap(enginePath, dataDir, battle.map);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
