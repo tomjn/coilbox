@@ -5,8 +5,9 @@
 //! read API: other plugins can call `content_state_load` / `content_list_engines`
 //! to find where content lives without re-implementing detection.
 //!
-//! Engine *version* identity is folder-derived; the binary is only executed on an
-//! explicit `content_verify_engine` (bounded by a timeout), never during listing.
+//! An engine's folder name is only a label. Its *version* is what the binary
+//! reports, read once at startup and on `content_verify_engine` (bounded by a
+//! timeout), recorded against that binary, and never read during listing.
 //! Results use the [`CliResult`] envelope, matching every other picoframe plugin.
 
 mod archives;
@@ -34,8 +35,8 @@ mod storage;
 mod widget;
 
 use model::{
-    load_store, save_store, ContentRoot, ContentState, RootCounts, RootKind, RootSource, StoreFile,
-    UserRoot, SCHEMA_VERSION,
+    load_store, save_store, ContentRoot, ContentState, Engine, RootCounts, RootKind, RootSource,
+    StoreFile, UserRoot, SCHEMA_VERSION,
 };
 use paths::{candidate_roots, current_os, BaseDirs, Candidate};
 use picoframe_core::CliResult;
@@ -48,6 +49,54 @@ use tauri::{
 };
 
 const VERIFY_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Held across each read, change and write of the store that records a verified
+/// engine, so two verifications finishing together cannot lose one another's
+/// answer.
+static VERIFY_STORE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// The size and modified time of an engine binary, as the identity a verified
+/// version belongs to. None when the file cannot be read.
+fn binary_fingerprint(executable: &Path) -> Option<String> {
+    let meta = std::fs::metadata(executable).ok()?;
+    let modified = meta
+        .modified()
+        .ok()?
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_millis();
+    Some(format!("{}:{modified}", meta.len()))
+}
+
+/// Give freshly discovered engines the versions their binaries already
+/// reported. Discovery only knows a folder name, which is not a version, so
+/// without this every load forgot what had been verified and every screen that
+/// needs a version had to run the engine again.
+///
+/// A version follows its binary, not its folder. It is carried over only when
+/// the file at that path is still the one that was asked.
+fn carry_verified(previous: &[Engine], fresh: &mut [Engine]) {
+    for e in fresh.iter_mut().filter(|e| e.sync_version.is_none()) {
+        let Some(p) = previous
+            .iter()
+            .find(|p| p.executable == e.executable && p.sync_version.is_some())
+        else {
+            continue;
+        };
+        if p.verified_binary.is_none()
+            || p.verified_binary != binary_fingerprint(Path::new(&e.executable))
+        {
+            continue;
+        }
+        e.sync_version = p.sync_version.clone();
+        e.verified_at = p.verified_at;
+        e.verified_binary = p.verified_binary.clone();
+    }
+}
+
+fn all_engines(state: &ContentState) -> Vec<Engine> {
+    state.roots.iter().flat_map(|r| r.engines.clone()).collect()
+}
 
 // ---- small shared helpers (used by scan.rs too) ----------------------------
 
@@ -348,7 +397,15 @@ fn publish_roots(state: &ContentState) {
 }
 
 /// Persist `state` as the snapshot in `store` and write it out.
-fn persist(path: &Path, mut store: StoreFile, state: &ContentState) -> Result<(), String> {
+///
+/// Whatever rebuilt `state` found its engines by folder, so the versions the
+/// outgoing snapshot held are carried into it first.
+fn persist(path: &Path, mut store: StoreFile, state: &mut ContentState) -> Result<(), String> {
+    if let Some(previous) = store.snapshot.as_ref().map(all_engines) {
+        for r in state.roots.iter_mut() {
+            carry_verified(&previous, &mut r.engines);
+        }
+    }
     publish_roots(state);
     store.schema_version = SCHEMA_VERSION;
     store.snapshot = Some(state.clone());
@@ -381,11 +438,12 @@ fn refresh_against_disk(state: ContentState) -> ContentState {
             let exists = canon.is_dir();
             let forced = r.forced == Some(true);
             let kind = if exists { scan::classify(&canon) } else { None };
-            let engines = if exists {
+            let mut engines = if exists {
                 scan::discover_engines(&canon)
             } else {
                 Vec::new()
             };
+            carry_verified(&r.engines, &mut engines);
             r.exists = exists;
             // `forced` means valid even with no recognizable Spring layout, not
             // valid even though the folder is gone. A forced root whose directory
@@ -544,11 +602,11 @@ async fn content_rescan<R: Runtime>(
         )
     })
     .await;
-    let state = match result {
+    let mut state = match result {
         Ok(s) => s,
         Err(e) => return CliResult::err(format!("rescan task failed: {e}")),
     };
-    if let Err(e) = persist(&path, store, &state) {
+    if let Err(e) = persist(&path, store, &mut state) {
         return CliResult::err(e);
     }
     CliResult::ok(json!({ "state": state }))
@@ -606,18 +664,23 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliRe
 
     let result =
         tauri::async_runtime::spawn_blocking(move || build_root(acc, true, now_ms())).await;
-    let root = match result {
+    let mut root = match result {
         Ok(r) => r,
         Err(e) => return CliResult::err(format!("scan task failed: {e}")),
     };
+    // Before the entry is replaced below, which is the only copy of what its
+    // engines had reported.
+    if let Some(snap) = store.snapshot.as_ref() {
+        carry_verified(&all_engines(snap), &mut root.engines);
+    }
 
     if let Some(snap) = store.snapshot.as_mut() {
         match snap.roots.iter_mut().find(|r| r.id == root.id) {
             Some(r) => *r = root.clone(),
             None => snap.roots.push(root.clone()),
         }
-        let snapshot = snap.clone();
-        if let Err(e) = persist(&sp, store, &snapshot) {
+        let mut snapshot = snap.clone();
+        if let Err(e) = persist(&sp, store, &mut snapshot) {
             return CliResult::err(e);
         }
     }
@@ -657,8 +720,8 @@ fn add_root_inner<R: Runtime>(
             forced: force && !valid,
         });
     }
-    let state = compute_state(app, &store, true, false);
-    persist(&sp, store, &state)?;
+    let mut state = compute_state(app, &store, true, false);
+    persist(&sp, store, &mut state)?;
     Ok(state)
 }
 
@@ -719,8 +782,8 @@ async fn content_remove_root<R: Runtime>(app: AppHandle<R>, path: String) -> Cli
     store
         .user_roots
         .retain(|u| canonical(&resolve_stored(&u.path)) != canon);
-    let state = compute_state(&app, &store, true, false);
-    if let Err(e) = persist(&sp, store, &state) {
+    let mut state = compute_state(&app, &store, true, false);
+    if let Err(e) = persist(&sp, store, &mut state) {
         return CliResult::err(e);
     }
     CliResult::ok(json!({ "state": state }))
@@ -765,8 +828,8 @@ async fn content_recreate_root<R: Runtime>(app: AppHandle<R>, path: String) -> C
             });
         }
     }
-    let state = compute_state(&app, &store, true, false);
-    if let Err(e) = persist(&sp, store, &state) {
+    let mut state = compute_state(&app, &store, true, false);
+    if let Err(e) = persist(&sp, store, &mut state) {
         return CliResult::err(e);
     }
     CliResult::ok(json!({ "state": state }))
@@ -794,6 +857,81 @@ async fn content_list_engines<R: Runtime>(app: AppHandle<R>) -> CliResult {
     CliResult::ok(json!({ "engines": engines }))
 }
 
+/// Where `path` is tracked in `snap`, as (root, engine) indexes. `path` may be the
+/// engine's executable or its directory.
+fn find_engine(snap: &ContentState, path: &str) -> Option<(usize, usize)> {
+    let target = canonical(Path::new(path));
+    for (ri, r) in snap.roots.iter().enumerate() {
+        for (ei, e) in r.engines.iter().enumerate() {
+            if canonical(Path::new(&e.executable)) == target
+                || canonical(Path::new(&e.path)) == target
+            {
+                return Some((ri, ei));
+            }
+        }
+    }
+    None
+}
+
+/// Run one tracked engine to read its version, and record the answer against the
+/// binary that gave it. Blocking. The engine must be tracked in the snapshot and
+/// its executable must live within its content root, or it is not run.
+fn verify_engine(sp: &Path, path: &str) -> Result<Engine, String> {
+    let store = load_store(sp)?;
+    let snap = store
+        .snapshot
+        .as_ref()
+        .ok_or("no scan yet — run a rescan first")?;
+    let (ri, ei) =
+        find_engine(snap, path).ok_or("engine not found in tracked roots — rescan first")?;
+
+    // Security: the executable must be inside its content root.
+    let root_canon = canonical(Path::new(&snap.roots[ri].path));
+    let exe = PathBuf::from(&snap.roots[ri].engines[ei].executable);
+    if !canonical(&exe).starts_with(&root_canon) {
+        return Err("engine executable is outside its content root — refusing to run".into());
+    }
+
+    // Taken before the run, so a binary replaced while it ran is asked again.
+    let binary = binary_fingerprint(&exe);
+    let version = engine::read_version(&exe, VERIFY_TIMEOUT)?;
+
+    // The store is read again under the lock. The run above took long enough
+    // for another verification to have saved its own answer.
+    let _held = VERIFY_STORE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut store = load_store(sp)?;
+    let snap = store
+        .snapshot
+        .as_mut()
+        .ok_or("no scan yet — run a rescan first")?;
+    let (ri, ei) =
+        find_engine(snap, path).ok_or("engine not found in tracked roots — rescan first")?;
+    let e = &mut snap.roots[ri].engines[ei];
+    e.sync_version = Some(version);
+    e.verified_at = Some(now_ms());
+    e.verified_binary = binary;
+    let engine = e.clone();
+    let mut snapshot = snap.clone();
+    persist(sp, store, &mut snapshot)?;
+    Ok(engine)
+}
+
+/// Ask every tracked engine that has not reported a version for it. Run once at
+/// startup, off the main thread, so a screen that needs an engine's version
+/// finds it already known. An engine's folder name is never its version: the
+/// folder can hold any build, or something that is not an engine at all.
+fn verify_unverified_engines(sp: &Path) {
+    let Ok(store) = load_store(sp) else { return };
+    let state = refresh_against_disk(store.snapshot.unwrap_or_default());
+    for e in all_engines(&state) {
+        if e.sync_version.is_none() {
+            // An engine that will not answer stays unverified, and the screens
+            // that need its version say so.
+            let _ = verify_engine(sp, &e.executable);
+        }
+    }
+}
+
 /// `content_verify_engine` — execute the engine binary to read its sync-version.
 /// The engine must be one tracked in the snapshot and its executable must live
 /// within its content root (refuses to run anything else).
@@ -803,56 +941,11 @@ async fn content_verify_engine<R: Runtime>(app: AppHandle<R>, path: String) -> C
         Ok(p) => p,
         Err(e) => return CliResult::err(e),
     };
-    let mut store = match load_store(&sp) {
-        Ok(s) => s,
-        Err(e) => return CliResult::err(e),
-    };
-    let Some(snap) = store.snapshot.as_mut() else {
-        return CliResult::err("no scan yet — run a rescan first");
-    };
-
-    let target = canonical(Path::new(&path));
-    let mut found: Option<(usize, usize)> = None;
-    'outer: for (ri, r) in snap.roots.iter().enumerate() {
-        for (ei, e) in r.engines.iter().enumerate() {
-            if canonical(Path::new(&e.executable)) == target
-                || canonical(Path::new(&e.path)) == target
-            {
-                found = Some((ri, ei));
-                break 'outer;
-            }
-        }
+    match tauri::async_runtime::spawn_blocking(move || verify_engine(&sp, &path)).await {
+        Ok(Ok(engine)) => CliResult::ok(json!({ "engine": engine })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("verify task failed: {e}")),
     }
-    let Some((ri, ei)) = found else {
-        return CliResult::err("engine not found in tracked roots — rescan first");
-    };
-
-    // Security: the executable must be inside its content root.
-    let root_canon = canonical(Path::new(&snap.roots[ri].path));
-    let exe = PathBuf::from(snap.roots[ri].engines[ei].executable.clone());
-    if !canonical(&exe).starts_with(&root_canon) {
-        return CliResult::err("engine executable is outside its content root — refusing to run");
-    }
-
-    let exe2 = exe.clone();
-    let result =
-        tauri::async_runtime::spawn_blocking(move || engine::read_version(&exe2, VERIFY_TIMEOUT))
-            .await;
-    let version = match result {
-        Ok(Ok(v)) => v,
-        Ok(Err(e)) => return CliResult::err(e),
-        Err(e) => return CliResult::err(format!("verify task failed: {e}")),
-    };
-
-    let now = now_ms();
-    snap.roots[ri].engines[ei].sync_version = Some(version);
-    snap.roots[ri].engines[ei].verified_at = Some(now);
-    let engine = snap.roots[ri].engines[ei].clone();
-    let snapshot = snap.clone();
-    if let Err(e) = persist(&sp, store, &snapshot) {
-        return CliResult::err(e);
-    }
-    CliResult::ok(json!({ "engine": engine }))
 }
 
 /// `content_open_path` — reveal a content folder (or an engine's directory) in
@@ -984,6 +1077,15 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             branding::branding_catalog,
             branding::branding_image
         ])
+        // Engine versions are read here, before any screen asks for one. Each
+        // is a process start, so it runs on its own thread and the app does not
+        // wait for it.
+        .setup(|app, _api| {
+            if let Ok(sp) = store_path(app) {
+                std::thread::spawn(move || verify_unverified_engines(&sp));
+            }
+            Ok(())
+        })
         // Stop the replay watcher (#462) cleanly when the app is shutting
         // down, rather than leaving its background thread to be torn down by
         // process exit.
@@ -1163,6 +1265,104 @@ mod tests {
         assert!(!gone_r.valid, "gone, unforced root is invalid");
         assert_eq!(gone_r.counts.games, 0, "stale counts zeroed when gone");
 
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    fn engine_at(executable: &Path, sync_version: Option<&str>) -> Engine {
+        Engine {
+            id: "e".into(),
+            root_path: String::new(),
+            path: String::new(),
+            executable: display_path(executable),
+            platform: None,
+            version: "folder name".into(),
+            sync_version: sync_version.map(str::to_string),
+            verified_at: sync_version.map(|_| 1),
+            verified_binary: sync_version.and_then(|_| binary_fingerprint(executable)),
+        }
+    }
+
+    fn binary_in(dir: &str, contents: &str) -> PathBuf {
+        let base = std::env::temp_dir().join(dir);
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let bin = base.join("spring");
+        std::fs::write(&bin, contents).unwrap();
+        bin
+    }
+
+    #[test]
+    fn a_verified_version_survives_rediscovery() {
+        let bin = binary_in("coilbox_carry_same", "engine");
+        let previous = vec![engine_at(&bin, Some("2026.09.01"))];
+        let mut fresh = vec![engine_at(&bin, None)];
+        carry_verified(&previous, &mut fresh);
+        assert_eq!(fresh[0].sync_version.as_deref(), Some("2026.09.01"));
+        assert_eq!(fresh[0].verified_at, Some(1));
+        assert!(fresh[0].verified_binary.is_some());
+    }
+
+    #[test]
+    fn a_swapped_binary_is_not_given_the_old_version() {
+        let bin = binary_in("coilbox_carry_swapped", "engine");
+        let previous = vec![engine_at(&bin, Some("2026.09.01"))];
+        // Same folder, same file name, a different program.
+        std::fs::write(&bin, "something else entirely").unwrap();
+        let mut fresh = vec![engine_at(&bin, None)];
+        carry_verified(&previous, &mut fresh);
+        assert_eq!(fresh[0].sync_version, None);
+    }
+
+    #[test]
+    fn a_version_recorded_without_its_binary_is_not_trusted() {
+        let bin = binary_in("coilbox_carry_legacy", "engine");
+        let mut legacy = engine_at(&bin, Some("2026.09.01"));
+        legacy.verified_binary = None;
+        let mut fresh = vec![engine_at(&bin, None)];
+        carry_verified(&[legacy], &mut fresh);
+        assert_eq!(fresh[0].sync_version, None);
+    }
+
+    #[test]
+    fn a_version_is_not_carried_to_another_engine() {
+        let a = binary_in("coilbox_carry_a", "engine");
+        let b = binary_in("coilbox_carry_b", "engine");
+        let mut fresh = vec![engine_at(&b, None)];
+        carry_verified(&[engine_at(&a, Some("2026.09.01"))], &mut fresh);
+        assert_eq!(fresh[0].sync_version, None);
+    }
+
+    #[test]
+    fn loading_the_snapshot_keeps_what_its_engines_reported() {
+        let base = std::env::temp_dir().join("coilbox_refresh_keeps_versions");
+        let _ = std::fs::remove_dir_all(&base);
+        let dir = base.join("engine").join("some folder name");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(base.join("games")).unwrap();
+        let bin_name = if cfg!(windows) {
+            "spring.exe"
+        } else {
+            "spring"
+        };
+        std::fs::write(dir.join(bin_name), "engine").unwrap();
+
+        // What discovery finds, then what verification recorded against it.
+        let mut engines = scan::discover_engines(&canonical(&base));
+        assert_eq!(engines.len(), 1, "the fixture is a discoverable engine");
+        engines[0].sync_version = Some("2026.09.01".into());
+        engines[0].verified_binary = binary_fingerprint(Path::new(&engines[0].executable));
+        let mut root = stale_root(&display_path(&base), RootSource::Manual, false);
+        root.engines = engines;
+
+        let out = refresh_against_disk(ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: vec![root],
+            last_scan_at: Some(0),
+        });
+        assert_eq!(
+            out.roots[0].engines[0].sync_version.as_deref(),
+            Some("2026.09.01")
+        );
         let _ = std::fs::remove_dir_all(&base);
     }
 
