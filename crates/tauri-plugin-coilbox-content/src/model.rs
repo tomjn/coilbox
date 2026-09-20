@@ -46,6 +46,11 @@ pub struct Engine {
     pub sync_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verified_at: Option<u64>,
+    /// The size and modified time of the binary that reported `sync_version`.
+    /// A version is only carried over to a binary that still matches, so a
+    /// folder whose engine was swapped for another build is asked again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verified_binary: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

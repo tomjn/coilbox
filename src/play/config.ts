@@ -65,13 +65,22 @@ export interface PlayTarget {
  * default), resolved from content state — including its executable, which the
  * scan-target shape omits. Unlike the content browser there's no per-page
  * override; the singleplayer screen always uses the preferred engine.
+ *
+ * A multiplayer battle passes the host's engine version as `wantVersion`, and
+ * an installed engine that reported exactly that version wins over the
+ * preferred one. The host's engine refuses every other version, so the
+ * preference cannot apply. A folder name is never read as a version here.
  */
-export function usePreferredTarget(): {
+export function usePreferredTarget(wantVersion?: string): {
   target: PlayTarget | null;
+  /** Every installed engine, for a screen that lets the player pick one. */
+  targets: PlayTarget[];
   loading: boolean;
   error: string | null;
+  /** Read the installed engines again, after one has been installed. */
+  refresh: () => Promise<void>;
 } {
-  const { state, loading, error } = useContentState();
+  const { state, loading, error, refresh } = useContentState();
   const roots = state?.roots ?? [];
   const engines = roots.flatMap((r) =>
     r.engines.map((e) => ({ id: e.id, version: e.syncVersion ?? e.version })),
@@ -89,20 +98,27 @@ export function usePreferredTarget(): {
     syncVersion: e.syncVersion,
   });
 
-  // Preferred engine, else the first engine in any root.
-  let target: PlayTarget | null = null;
-  for (const r of roots) {
-    const e = r.engines.find((en) => en.id === resolvedId);
-    if (e) {
-      target = build(r.path, e);
-      break;
+  // The wanted version, else the preferred engine, else the first engine in
+  // any root.
+  const first = (
+    wanted: (e: (typeof roots)[number]["engines"][number]) => boolean,
+  ): PlayTarget | null => {
+    for (const r of roots) {
+      const e = r.engines.find(wanted);
+      if (e) return build(r.path, e);
     }
-  }
+    return null;
+  };
+  const want = wantVersion?.trim();
+  let target =
+    (want ? first((e) => e.syncVersion?.trim() === want) : null) ??
+    first((e) => e.id === resolvedId);
   if (!target) {
     const r = roots.find((r) => r.engines.length > 0);
     if (r) target = build(r.path, r.engines[0]);
   }
-  return { target, loading, error };
+  const targets = roots.flatMap((r) => r.engines.map((e) => build(r.path, e)));
+  return { target, targets, loading, error, refresh };
 }
 
 /**

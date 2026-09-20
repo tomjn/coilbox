@@ -44,6 +44,7 @@ vi.mock("../../direct/reachability", async (importOriginal) => ({
 
 vi.mock("./useHostContent", () => ({
   useHostContent: () => ({
+    targets: [],
     target: {
       engineVersion: "recoil_2025.06.20_amd64-linux.7z",
       executable: "/engine/recoil_2025.06.20_amd64-linux.7z/spring",

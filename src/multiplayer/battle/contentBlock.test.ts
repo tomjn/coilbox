@@ -9,6 +9,8 @@ function content(p: Partial<LaunchContent> = {}): LaunchContent {
   return {
     hasTarget: true,
     targetLoading: false,
+    engineMissing: null,
+    engineUnreadable: false,
     unreadable: false,
     contentKnown: true,
     mapMissing: false,
@@ -20,6 +22,24 @@ function content(p: Partial<LaunchContent> = {}): LaunchContent {
 }
 
 describe("launchBlock", () => {
+  it("blocks a player without the host's engine, naming the version", () => {
+    const block = launchBlock(content({ engineMissing: "Recoil 2026.03.01" }));
+    expect(block?.short).toBe("Engine missing");
+    expect(block?.reason).toContain("Recoil 2026.03.01");
+  });
+
+  it("blocks an engine that would not report its version", () => {
+    const block = launchBlock(content({ engineUnreadable: true }));
+    expect(block?.short).toBe("Engine unknown");
+  });
+
+  it("names the engine before content it cannot be trusted to have read", () => {
+    const block = launchBlock(
+      content({ engineMissing: "Recoil 2026.03.01", gameMissing: true }),
+    );
+    expect(block?.short).toBe("Engine missing");
+  });
+
   it("lets a player with the map and the game launch", () => {
     expect(launchBlock(content())).toBeNull();
   });

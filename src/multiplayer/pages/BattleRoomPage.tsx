@@ -26,6 +26,7 @@ import { ApplySkirmishPresetDrawer } from "../battle/ApplySkirmishPresetDrawer";
 import { AutohostControls } from "../battle/AutohostControls";
 import { addHostSeedBots } from "../battle/applyHostSeed";
 import { BattleChatCard } from "../battle/BattleChatCard";
+import { BattleEngineCard } from "../battle/BattleEngineCard";
 import { BattleGameCard } from "../battle/BattleGameCard";
 import { BattleMapCard } from "../battle/BattleMapCard";
 import { BattleMembersTable } from "../battle/BattleMembersTable";
@@ -87,9 +88,12 @@ function BattleRoomPage() {
   // minutes, and a direct room has no server to fetch the content from and no
   // hashes in the LAN beacon to warn before the join (issue #1572). The battle
   // itself carries the map and game names, so the room can say it straight away.
+  const engine = room.engine;
   const block = launchBlock({
     hasTarget: !!room.target,
     targetLoading: room.targetLoading,
+    engineMissing: engine.verdict === "mismatch" ? engine.hostLabel : null,
+    engineUnreadable: room.engineUnreadable,
     unreadable: room.contentUnreadable,
     contentKnown: room.contentKnown,
     mapMissing: room.mapMissing,
@@ -771,6 +775,14 @@ function BattleRoomPage() {
             dataDir={room.dataDir}
             game={room.localGame}
             gameName={battle.modname}
+          />
+          <BattleEngineCard
+            battleId={battle.id}
+            match={engine}
+            version={battle.version}
+            target={room.target}
+            onInstalled={room.refreshTarget}
+            unreadable={room.engineUnreadable}
           />
         </aside>
       </div>

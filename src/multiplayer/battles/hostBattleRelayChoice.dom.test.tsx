@@ -113,6 +113,7 @@ vi.mock("../../direct/reachability", async (importOriginal) => ({
 
 vi.mock("./useHostContent", () => ({
   useHostContent: () => ({
+    targets: [],
     target: {
       engineVersion: "105.1.1",
       syncVersion: "105.1.1",

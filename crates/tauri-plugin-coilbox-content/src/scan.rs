@@ -133,6 +133,7 @@ fn make_engine(
         version,
         sync_version: None,
         verified_at: None,
+        verified_binary: None,
     }
 }
 

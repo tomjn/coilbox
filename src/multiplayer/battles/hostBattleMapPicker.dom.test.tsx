@@ -39,6 +39,7 @@ const MAPS = [
 
 function stubContent() {
   useHostContent.mockReturnValue({
+    targets: [],
     target: {
       engineVersion: "105.1.1",
       syncVersion: "105.1.1",

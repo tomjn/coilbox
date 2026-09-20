@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useUnitsyncThumbnails } from "@/content/config";
+import type { PlayTarget } from "@/play/config";
 import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
 import {
   advertisedGamePort,
@@ -31,6 +32,7 @@ import {
   directClosePorts,
 } from "../../direct/reachability";
 import { VpnWarning } from "../../direct/VpnWarning";
+import { useEngineVersionCheck } from "../battle/useEngineVersionCheck";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { relayPingLabel, useRelayPing } from "../relayPing";
 import { hostBattleFailure } from "./hostBattle";
@@ -58,13 +60,27 @@ const LAST_MAP_KEY = "multiplayer.hostBattle.lastMap";
 const LAST_TITLE_KEY = "multiplayer.hostBattle.lastTitle";
 const LAST_MAX_PLAYERS_KEY = "multiplayer.hostBattle.lastMaxPlayers";
 const LAST_PORT_KEY = "multiplayer.hostBattle.lastPort";
+const LAST_ENGINE_KEY = "multiplayer.hostBattle.lastEngine";
+
+/**
+ * One option per version an installed engine reported. An engine that has not
+ * said its version is left out until it does: its folder name is not a version,
+ * and the battle would advertise whatever was picked to every joiner.
+ */
+function engineOptions(targets: PlayTarget[]) {
+  const versions = new Set(
+    targets.flatMap((t) => (t.syncVersion ? [t.syncVersion] : [])),
+  );
+  return [...versions].map((v) => ({ value: v, label: v }));
+}
 
 /**
  * The "Host a battle" form, as shown in the frame's drawer by `HostBattleButton`.
  * It collects the game, map, title, size and optional password, then fires
- * OPENBATTLE through the parent's `onHost`. The engine is the preferred one (no
- * picker), and the mod and map hashes come from unitsync so joining clients can
- * sync.
+ * OPENBATTLE through the parent's `onHost`. The engine starts as the preferred
+ * one and the host can pick another, because every joiner has to run exactly the
+ * version the battle advertises. The mod and map hashes come from unitsync so
+ * joining clients can sync.
  *
  * How the battle is reachable is worked out rather than asked about. There used
  * to be a "Hole punching for NAT players" checkbox here, which advertised
@@ -73,7 +89,7 @@ const LAST_PORT_KEY = "multiplayer.hostBattle.lastPort";
  * is {@link hostingRoute} reading the answer {@link ReachablePorts} already had
  * (issue #2020).
  *
- * The game, map, title, player limit and port default to whatever the host
+ * The engine, game, map, title, player limit and port default to whatever the host
  * hosted last time, the same way `relayMode` below remembers the relay choice
  * (issue #2794). `initialMap`/`initialGame`/`initialTitle` win over that,
  * since those come from a jump the host asked for. The password does not get
@@ -121,12 +137,19 @@ export function HostBattleForm({
     8,
   );
   const [lastPort, setLastPort] = useSetting(LAST_PORT_KEY, DEFAULT_HOST_PORT);
+  const [lastEngine, setLastEngine] = useSetting(LAST_ENGINE_KEY, "");
+  // Empty means the preferred engine. A remembered version that has since been
+  // uninstalled falls back the same way.
+  const [engineVersion, setEngineVersion] = useState(lastEngine);
   const content = useHostContent(
     initialGame ?? lastGame,
     initialMap ?? lastMap,
+    engineVersion,
   );
   const {
     target,
+    targets,
+    refreshTargets,
     games,
     maps,
     gameName,
@@ -141,6 +164,16 @@ export function HostBattleForm({
     gameFailed,
     mapFailed,
   } = content;
+  // Every engine is asked for its version as the form opens, so the picker
+  // offers versions and never folder names.
+  const unverified = targets.filter((t) => !t.syncVersion);
+  const unreadableEngines = useEngineVersionCheck(
+    unverified.map((t) => t.executable),
+    refreshTargets,
+  );
+  const checkingEngines = unverified.some(
+    (t) => !unreadableEngines.has(t.executable),
+  );
   const { thumbs } = useUnitsyncThumbnails(target?.enginePath, target?.dataDir);
   // Swaps the drawer's whole content for the map picker grid, with a back
   // button, rather than stacking a second drawer on top of the one this form
@@ -268,6 +301,7 @@ export function HostBattleForm({
       if (serverKey) recordHostingRoute(serverKey, route);
       // Remembered for the next battle (issue #2794), except the password,
       // per the keys above.
+      setLastEngine(engineVersion);
       setLastGame(gameName);
       setLastMap(mapName);
       setLastTitle(title);
@@ -351,6 +385,25 @@ export function HostBattleForm({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={`${gameName || "Game"} — hosted`}
             />
+          </label>
+
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Engine</span>
+            <OptionSelect
+              value={target?.syncVersion ?? ""}
+              onValueChange={setEngineVersion}
+              options={engineOptions(targets)}
+              placeholder={
+                checkingEngines
+                  ? "Reading engine versions…"
+                  : "Select an engine"
+              }
+              size="sm"
+            />
+            <span className="text-xs text-muted-foreground">
+              Everybody who joins has to have exactly this version.
+            </span>
           </label>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}

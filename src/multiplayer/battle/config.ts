@@ -277,15 +277,21 @@ export type SyncState = "synced" | "pending" | "error";
 
 /**
  * Roll the battle's per-player sync flags plus local content presence into a
- * single pill state. Missing map/game or any unsynced player (sync=2) is an
+ * single pill state. Missing map/game, an engine not confirmed to match the
+ * host's, or any unsynced player (sync=2) is an
  * error; an unknown player (sync=0) is pending; otherwise synced. Spectators are
  * ignored — their sync doesn't gate the match starting.
  */
 export function deriveSync(
   battle: Battle,
-  content: { mapMissing: boolean; gameMissing: boolean },
+  content: {
+    mapMissing: boolean;
+    gameMissing: boolean;
+    engineMissing?: boolean;
+  },
 ): SyncState {
-  if (content.mapMissing || content.gameMissing) return "error";
+  if (content.mapMissing || content.gameMissing || content.engineMissing)
+    return "error";
   const players = Object.values(battle.members)
     .filter((m) => m.battleStatus.mode)
     .map((m) => m.battleStatus.sync);

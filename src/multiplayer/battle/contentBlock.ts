@@ -17,6 +17,19 @@ export interface LaunchContent {
   hasTarget: boolean;
   targetLoading: boolean;
   /**
+   * The host's engine, named, when the engine this machine would launch has
+   * reported a different version. Null when they match or when it cannot be
+   * told. The host's engine refuses every other version, so this is a block
+   * and not a warning.
+   */
+  engineMissing: string | null;
+  /**
+   * The engine was asked for its version and would not give one. Hosting
+   * refuses such an engine too: with no version there is nothing to compare,
+   * and the folder it sits in says nothing about what is inside.
+   */
+  engineUnreadable: boolean;
+  /**
    * The content scan stopped without saying what is installed and will not try
    * again on its own, e.g. a preferred engine with no libunitsync in it (mirrors
    * `resolveContent.ts`'s `unreadable`, issue #1386). Whether the map or game is
@@ -59,6 +72,19 @@ export function launchBlock(c: LaunchContent): LaunchBlock | null {
       short: "No engine",
       reason:
         "No engine is selected, so this battle cannot start. Add a content folder with an engine in Settings, Content folders.",
+    };
+  }
+  if (c.engineMissing) {
+    return {
+      short: "Engine missing",
+      reason: `You do not have the engine this battle uses (${c.engineMissing}), so the host will refuse your connection. Install it in Settings, Engines to play.`,
+    };
+  }
+  if (c.engineUnreadable) {
+    return {
+      short: "Engine unknown",
+      reason:
+        "Your engine would not report its version, so it cannot be checked against the host's. Pick another engine in Settings, Engines to play.",
     };
   }
   if (c.unreadable) {
