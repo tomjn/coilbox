@@ -36,7 +36,6 @@ import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { filterOptionTags } from "../battle/battleOptions";
 import { alliesFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
-import { engineMatch } from "../battle/engineMatch";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { GameTypePresetsControls } from "../battle/GameTypePresetsControls";
 import { MissingContentCard } from "../battle/MissingContentCard";
@@ -89,10 +88,7 @@ function BattleRoomPage() {
   // minutes, and a direct room has no server to fetch the content from and no
   // hashes in the LAN beacon to warn before the join (issue #1572). The battle
   // itself carries the map and game names, so the room can say it straight away.
-  const engine = engineMatch(
-    { engine: room.battle?.engine ?? "", version: room.battle?.version ?? "" },
-    room.target,
-  );
+  const engine = room.engine;
   const block = launchBlock({
     hasTarget: !!room.target,
     targetLoading: room.targetLoading,

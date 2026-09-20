@@ -319,6 +319,13 @@ describe("deriveSync", () => {
     expect(deriveSync(battle, { mapMissing: true, gameMissing: false })).toBe(
       "error",
     );
+    expect(
+      deriveSync(battle, {
+        mapMissing: false,
+        gameMissing: false,
+        engineMissing: true,
+      }),
+    ).toBe("error");
     expect(deriveSync(battle, { mapMissing: false, gameMissing: true })).toBe(
       "error",
     );

@@ -107,6 +107,7 @@ vi.mock("@/play/config", () => ({
       enginePath: "/engine",
       executable: "/engine/spring",
       dataDir: "/data",
+      engineVersion: "2026.03.01",
     },
     loading: false,
   }),

@@ -75,6 +75,7 @@ import {
   startPosTypeOf,
   usedColorsFromBattle,
 } from "./config";
+import { type EngineMatch, engineMatch } from "./engineMatch";
 import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";
 import { optionTagSlots } from "./tweakDelivery";
@@ -190,6 +191,8 @@ export interface BattleRoomView {
   /** Clear one ally's start box (0-based). Founder → REMOVESTARTRECT; autohost → `!clearbox <ally+1>`. */
   clearStartBox: (ally: number) => void;
   startPosType: number;
+  /** The host's engine beside the one this machine would launch. */
+  engine: EngineMatch;
   mapMissing: boolean;
   gameMissing: boolean;
   /** True once local content presence is known (scan settled). */
@@ -557,8 +560,15 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     () => (battle ? membersToRows(battle, me, state?.users) : []),
     [battle, me, state?.users],
   );
+  // No lobby carries a player's engine version, so the sync flag is the only
+  // way to tell the room we cannot play. The host refuses any other version.
+  const engine = engineMatch(
+    { engine: battle?.engine ?? "", version: battle?.version ?? "" },
+    target,
+  );
+  const engineMissing = engine.verdict === "mismatch";
   const sync: SyncState = battle
-    ? deriveSync(battle, { mapMissing, gameMissing })
+    ? deriveSync(battle, { mapMissing, gameMissing, engineMissing })
     : "pending";
 
   // Match state + start gating. The match has "started" once the host (autohost)
@@ -662,10 +672,20 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // Tachyon connection the same push becomes the asset status matchmaking will
   // later read, so it matters just as much there.
   useEffect(() => {
-    if (!activeKey || !myStatus || !contentKnown) return;
-    const desired = mapMissing || gameMissing ? 2 : 1;
+    // A wrong engine is known without the content scan, which that engine may
+    // never finish.
+    if (!activeKey || !myStatus || (!contentKnown && !engineMissing)) return;
+    const desired = engineMissing || mapMissing || gameMissing ? 2 : 1;
     if (myStatus.battleStatus.sync !== desired) pushStatus({ sync: desired });
-  }, [activeKey, myStatus, contentKnown, mapMissing, gameMissing, pushStatus]);
+  }, [
+    activeKey,
+    myStatus,
+    contentKnown,
+    engineMissing,
+    mapMissing,
+    gameMissing,
+    pushStatus,
+  ]);
 
   // Assign our team colour on join. The seat opens at teamColor 0 (the protocol's
   // "unset", rendered black) both when we join someone else's battle and when the
@@ -1272,6 +1292,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     setStartBox,
     clearStartBox,
     startPosType,
+    engine,
     mapMissing,
     gameMissing,
     contentKnown,
