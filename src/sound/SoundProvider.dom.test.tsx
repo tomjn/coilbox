@@ -20,7 +20,9 @@ vi.mock("@picoframe/frame", () => ({
 }));
 
 const setMasterLevel = vi.fn();
-vi.mock("./context", () => ({ setMasterLevel: (...a: unknown[]) => setMasterLevel(...a) }));
+vi.mock("./context", () => ({
+  setMasterLevel: (...a: unknown[]) => setMasterLevel(...a),
+}));
 
 beforeEach(() => {
   settings.clear();
