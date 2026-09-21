@@ -120,18 +120,27 @@ function effectiveLevel(id: EventId): number {
  * makes a sound, so there is one place the player's settings have to be obeyed.
  */
 export function playEvent(id: EventId) {
-  const sound = SOUNDS[soundForEvent(id)];
-  if (sound.kind === "cuelume") {
-    // cuelume's volume is global and read when the sound starts, so it has to
-    // be set immediately before each play. Unlike our own sounds, one already
-    // playing cannot be turned down.
-    setCuelumeVolume(effectiveLevel(id));
-    cuelumePlay(sound.name);
-    return;
+  try {
+    const sound = SOUNDS[soundForEvent(id)];
+    if (sound.kind === "cuelume") {
+      // cuelume's volume is global and read when the sound starts, so it has to
+      // be set immediately before each play. Unlike our own sounds, one already
+      // playing cannot be turned down.
+      setCuelumeVolume(effectiveLevel(id));
+      cuelumePlay(sound.name);
+      return;
+    }
+    const out = getEventGain(id);
+    if (!out) return;
+    sound.play(out);
+  } catch (e) {
+    // A cue is a decoration on something else that is actually happening. It is
+    // called from the lobby event loop and from `notify()`, which promises its
+    // callers it never throws, so a refused or closed AudioContext must not
+    // take the thing it was announcing down with it. cuelume owns a context of
+    // its own, so it is the likelier of the two to fail out from under us.
+    console.warn(`sound: ${id} failed to play`, e);
   }
-  const out = getEventGain(id);
-  if (!out) return;
-  sound.play(out);
 }
 
 // Dev-only hook for reading the whole chain back from devtools / tauri-mcp
