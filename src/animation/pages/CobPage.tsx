@@ -45,6 +45,7 @@ export default function CobPage() {
   const [revealTarget, setRevealTarget] = useState("");
   const [listing, setListing] = useState("");
   const [banner, setBanner] = useState<Banner | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
 
@@ -57,6 +58,7 @@ export default function CobPage() {
   // Asks before overwriting an existing .cob.
   async function compile(p: string, overwrite = false) {
     setBanner(null);
+    setWarnings([]);
     setBusy(true);
     setPath(p);
     setKind("bos");
@@ -80,6 +82,7 @@ export default function CobPage() {
         kind: "success",
         text: `Compiled to ${res.output} (${res.bytes} bytes).`,
       });
+      setWarnings(res.warnings);
       await disassemble(res.output);
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
@@ -90,6 +93,7 @@ export default function CobPage() {
 
   async function loadCob(p: string) {
     setBanner(null);
+    setWarnings([]);
     setBusy(true);
     setPath(p);
     setKind("cob");
@@ -241,6 +245,15 @@ export default function CobPage() {
             <BannerIcon size={15} className="mt-px shrink-0" />
             <span className="break-all">{banner.text}</span>
           </p>
+        )}
+        {warnings.length > 0 && (
+          <ul className="shrink-0 list-disc space-y-0.5 rounded-md border border-border bg-muted/50 px-3 py-2 pl-8 text-xs text-muted-foreground">
+            {warnings.map((w) => (
+              <li key={w} className="break-all">
+                {w}
+              </li>
+            ))}
+          </ul>
         )}
         {listing ? (
           <Textarea

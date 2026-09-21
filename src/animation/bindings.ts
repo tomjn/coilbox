@@ -54,10 +54,17 @@ export const animCobRun = defineCommand<
  * Compile a `.bos` to `.cob`. Writes `<basename>.cob` next to the source unless
  * `output` is given. If the output exists and `overwrite` isn't set, it returns
  * `needsOverwrite: true` without writing, so the UI can confirm first.
+ * `warnings` covers anything that compiled but is worth a second look, such as
+ * a bare assignment sitting outside any function.
  */
 export const animBos2cob = defineCommand<
   { path: string; output?: string; overwrite?: boolean },
-  { output: string; bytes: number; needsOverwrite: boolean }
+  {
+    output: string;
+    bytes: number;
+    needsOverwrite: boolean;
+    warnings: string[];
+  }
 >("coilbox-anim", "anim_bos2cob");
 
 /**
