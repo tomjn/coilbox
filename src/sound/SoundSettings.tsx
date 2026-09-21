@@ -1,10 +1,11 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, RotateCcw, Square } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { getProfileSound } from "@/profile/profile";
 import {
+  EVENT_GROUP_IDS,
   EVENTS,
   type EventId,
   eventMutedKey,
@@ -20,7 +21,7 @@ import {
 import { LevelRow } from "./LevelRow";
 import { isSoundId, SOUND_IDS, SOUNDS } from "./library";
 import { MusicSource } from "./MusicSource";
-import { playEvent } from "./play";
+import { previewEvent, stopPreview } from "./play";
 import {
   DEFAULT_SOUND_VOLUME,
   defaultMusicVolume,
@@ -29,7 +30,6 @@ import {
   SOUND_MUTED_KEY,
   SOUND_VOLUME_KEY,
 } from "./SoundProvider";
-import { useGameMusic } from "./useGameMusic";
 
 /** Settings section at /settings/sound. */
 export default function SoundSettings() {
@@ -38,10 +38,6 @@ export default function SoundSettings() {
     DEFAULT_SOUND_VOLUME,
   );
   const [muted, setMuted] = useSetting<boolean>(SOUND_MUTED_KEY, false);
-  // Derived from the hook rather than from the player's module state, so
-  // picking a game with music makes the Music group appear straight away.
-  const { tracks } = useGameMusic();
-  const anyMusic = getProfileSound() !== null || tracks.length > 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -98,7 +94,10 @@ export default function SoundSettings() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Groups
         </h2>
-        {visibleGroupIds(anyMusic).map((id) => (
+        {/* Music is always on the list now that coilbox bundles a track of its
+            own, so the group always controls something whatever the
+            distribution ships and whatever game is picked. */}
+        {visibleGroupIds(true).map((id) => (
           <div key={id} className="flex items-center justify-between gap-4">
             <span className="flex flex-col">
               <span className="text-sm font-medium">{GROUPS[id].label}</span>
@@ -128,7 +127,8 @@ export default function SoundSettings() {
         </h2>
         <p className="text-xs text-muted-foreground">
           Each of these plays a sound you can change. A sound's final volume is
-          the master, times its group, times its own.
+          the master, times the group it sits under, times its own. Play lets
+          you hear one whether or not it is muted.
         </p>
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -144,11 +144,26 @@ export default function SoundSettings() {
               </th>
             </tr>
           </thead>
-          <tbody>
-            {VISIBLE_EVENT_IDS.map((id) => (
-              <EventRow key={id} id={id} />
-            ))}
-          </tbody>
+          {/* One `tbody` per group rather than one for the table, so each band
+              of rows says which group's slider above controls it. */}
+          {EVENT_GROUP_IDS.map((group) => (
+            <tbody key={group}>
+              <tr>
+                <th
+                  scope="colgroup"
+                  colSpan={3}
+                  className="border-b pt-5 pb-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  {GROUPS[group].label}
+                </th>
+              </tr>
+              {VISIBLE_EVENT_IDS.filter((id) => EVENTS[id].group === group).map(
+                (id) => (
+                  <EventRow key={id} id={id} />
+                ),
+              )}
+            </tbody>
+          ))}
         </table>
       </section>
     </div>
@@ -181,6 +196,25 @@ function EventRow({ id }: { id: EventId }) {
   const event = EVENTS[id];
   const [sound, setSound] = useSetting<string | null>(eventSoundKey(id), null);
   const chosen = isSoundId(sound) ? sound : event.sound;
+  const [playing, setPlaying] = useState(false);
+  // Cleared on unmount and before each new press, so leaving the page mid-gong
+  // cannot set state on a row that is gone, and a second press cannot be
+  // stopped early by the first press's timer.
+  const endsAt = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(endsAt.current), []);
+
+  function preview() {
+    window.clearTimeout(endsAt.current);
+    if (playing) {
+      stopPreview(id);
+      setPlaying(false);
+      return;
+    }
+    const seconds = previewEvent(id);
+    if (seconds <= 0) return;
+    setPlaying(true);
+    endsAt.current = window.setTimeout(() => setPlaying(false), seconds * 1000);
+  }
 
   return (
     <tr className="border-b align-top last:border-0">
@@ -192,28 +226,52 @@ function EventRow({ id }: { id: EventId }) {
       </th>
       <td className="py-3 pr-4">
         <div className="flex items-center gap-2">
-          <div className="w-32">
+          {/* `shrink-0` so the dropdown is the same width on every row, however
+              long the name of the sound in it. */}
+          <div className="w-32 shrink-0">
             <OptionSelect
               value={chosen}
-              onValueChange={setSound}
+              // Picking the default clears the setting rather than storing
+              // the id, so "unset means the default" stays true and a later
+              // change to the default reaches a player who never chose
+              // anything else.
+              onValueChange={(v) => setSound(v === event.sound ? null : v)}
               size="sm"
               ariaLabel={`Sound for ${event.label}`}
               options={SOUND_IDS.map((soundId) => ({
                 value: soundId,
                 label: SOUNDS[soundId].label,
                 group: SOUNDS[soundId].group,
+                // Named in the list as well as offered by the reset button,
+                // because a player browsing 21 sounds should be able to see
+                // which one they started with.
+                trailing:
+                  soundId === event.sound ? (
+                    <span className="text-xs text-muted-foreground">
+                      Default
+                    </span>
+                  ) : undefined,
               }))}
             />
           </div>
-          {/* Plays through the same gain chain as the real event, so what you
-              hear here is what you will hear then. */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => playEvent(id)}
-            aria-label={`Preview ${event.label}`}
+            onClick={preview}
+            aria-label={
+              playing ? `Stop ${event.label}` : `Preview ${event.label}`
+            }
           >
-            <Play />
+            {playing ? <Square /> : <Play />}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSound(null)}
+            disabled={chosen === event.sound}
+            aria-label={`Reset ${event.label} to ${SOUNDS[event.sound].label}`}
+          >
+            <RotateCcw />
           </Button>
         </div>
       </td>

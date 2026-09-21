@@ -3,11 +3,11 @@
 /**
  * A sound's volume is the master times its group times the event's own, and a
  * mute anywhere on that path silences it. That is four separate things a player
- * can set, and the only reason the preview button can be trusted is that a
- * preview and the real event go through the same nodes.
+ * can set.
  *
  * These prove the chain is wired the way the settings screen claims, because a
- * group slider connected to nothing looks exactly like a working one.
+ * group slider connected to nothing looks exactly like a working one. The last
+ * few cover the preview button, which deliberately leaves that chain.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -211,5 +211,55 @@ describe("the event and group chain", () => {
     const { EVENTS, VISIBLE_EVENT_IDS } = await import("./events");
     expect(VISIBLE_EVENT_IDS).not.toContain("matchFound");
     expect(EVENTS.matchFound.sound).toBe("gong");
+  });
+});
+
+describe("the preview button's route to the speakers", () => {
+  it("obeys the three volumes but none of the three mutes", async () => {
+    const { getAudioContext, setMasterLevel } = await import("./context");
+    const { previewEvent, setEventLevel, setGroupLevel } = await import(
+      "./play"
+    );
+    const ctx = getAudioContext() as unknown as FakeAudioContext;
+
+    setMasterLevel(0.5, true);
+    setGroupLevel("alerts", 0.5, true);
+    setEventLevel("ring", 0.5, true);
+    previewEvent("ring");
+
+    // A slider sits beside the button, so a quiet preview explains itself. A
+    // mute does not: the group's switch is in a different section of the page.
+    const out = ctx.destination.inbound.at(-1) as FakeGain;
+    expect(out.gain.value).toBeCloseTo(0.125);
+  });
+
+  it("goes to the speakers past the chain, not through it", async () => {
+    // The mutes live on those nodes, so a preview routed through them would be
+    // silenced by them however its own gain was set.
+    const { getAudioContext, getMasterGain, setMasterLevel } = await import(
+      "./context"
+    );
+    const { previewEvent } = await import("./play");
+    const ctx = getAudioContext() as unknown as FakeAudioContext;
+    const master = getMasterGain() as unknown as FakeGain;
+
+    setMasterLevel(1, true);
+    previewEvent("ring");
+
+    expect(master.gain.value).toBe(0);
+    const out = ctx.destination.inbound.at(-1) as FakeGain;
+    expect(out).not.toBe(master);
+    expect(master.inbound).toEqual([]);
+  });
+
+  it("swallows a failure the same way the real event does", async () => {
+    const { getAudioContext } = await import("./context");
+    const { previewEvent } = await import("./play");
+    const ctx = getAudioContext() as unknown as FakeAudioContext;
+    ctx.createGain = () => {
+      throw new Error("audio context closed");
+    };
+
+    expect(() => previewEvent("ring")).not.toThrow();
   });
 });

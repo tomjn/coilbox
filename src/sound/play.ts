@@ -1,5 +1,10 @@
 import { play as cuelumePlay, setVolume as setCuelumeVolume } from "cuelume";
-import { getAudioContext, getMasterGain, getMasterLevel } from "./context";
+import {
+  getAudioContext,
+  getMasterGain,
+  getMasterLevel,
+  getMasterVolume,
+} from "./context";
 import {
   EVENT_IDS,
   EVENTS,
@@ -16,8 +21,10 @@ import { SOUNDS, type SoundId } from "./library";
  * master gain, which feeds the speakers. So the final level is the master times
  * the group times the event times whatever the sound itself is built at, and a
  * mute anywhere on that path silences it by zeroing one node. Nothing checks a
- * setting at play time, which is what keeps the preview button honest: it plays
- * through the same four nodes the real event will.
+ * setting at play time.
+ *
+ * `previewEvent` is the one exception, and it takes its own route to the
+ * speakers past those nodes. See the note there.
  *
  * Levels are held here rather than read from the settings store, because events
  * fire from plain functions in the lobby event loop that cannot reach React.
@@ -33,6 +40,8 @@ const eventLevels = new Map<EventId, Level>();
 const eventSounds = new Map<EventId, SoundId>();
 const groupGains = new Map<GroupId, GainNode>();
 const eventGains = new Map<EventId, GainNode>();
+/** The preview button's own nodes, straight to the speakers. See `previewEvent`. */
+const previewGains = new Map<EventId, GainNode>();
 
 function levelValue(level: Level): number {
   return level.muted ? 0 : level.volume;
@@ -143,6 +152,76 @@ export function playEvent(id: EventId) {
   }
 }
 
+/**
+ * What the preview button plays at: the three volumes multiplied together, with
+ * every mute on the way ignored.
+ *
+ * Volumes are obeyed because their sliders sit on the same page as the button,
+ * so a quiet preview explains itself. A mute does not: the Interface group
+ * ships muted, and its switch is in a different section from the two rows it
+ * silences, so obeying it made those buttons look broken.
+ */
+function previewLevel(id: EventId): number {
+  return (
+    getMasterVolume() *
+    (groupLevels.get(EVENTS[id].group) ?? FULL).volume *
+    (eventLevels.get(id) ?? FULL).volume
+  );
+}
+
+/**
+ * Play an event's sound because the player asked to hear it, rather than
+ * because the event happened. Returns how many seconds it will sound for, or 0
+ * if it could not play, so a button can show that it is playing.
+ *
+ * Takes its own gain node straight to the speakers instead of the event ->
+ * group -> master chain, because those nodes carry the mutes this deliberately
+ * ignores. Pressing play always makes a sound.
+ */
+export function previewEvent(id: EventId): number {
+  try {
+    const sound = SOUNDS[soundForEvent(id)];
+    if (sound.kind === "cuelume") {
+      setCuelumeVolume(previewLevel(id));
+      cuelumePlay(sound.name);
+      return sound.seconds;
+    }
+    const ctx = getAudioContext();
+    if (!ctx) return 0;
+    if (ctx.state === "suspended") void ctx.resume();
+    // Kept in a map like every other node here rather than built per press.
+    // WebKit collects an audio node nothing holds a reference to, and a
+    // collected gain takes the sound hanging off it with it.
+    let out = previewGains.get(id);
+    if (!out) {
+      out = ctx.createGain();
+      out.connect(ctx.destination);
+      previewGains.set(id, out);
+    }
+    out.gain.value = previewLevel(id);
+    sound.play(out);
+    return sound.seconds;
+  } catch (e) {
+    console.warn(`sound: preview of ${id} failed to play`, e);
+    return 0;
+  }
+}
+
+/**
+ * Cut a preview short.
+ *
+ * Only reaches coilbox's own sounds. cuelume plays on an AudioContext it owns
+ * and exposes no way to stop one, so the last of those (1.1s at the outside)
+ * finishes on its own. Ramped rather than zeroed so cutting a gong off does not
+ * click.
+ */
+export function stopPreview(id: EventId) {
+  const ctx = getAudioContext();
+  const out = previewGains.get(id);
+  if (!ctx || !out) return;
+  out.gain.setTargetAtTime(0, ctx.currentTime, 0.015);
+}
+
 // Dev-only hook for reading the whole chain back from devtools / tauri-mcp
 // `execute_js`, the way `__coilboxMasterLevel` reads the master. Guarded on
 // `window` because `notify()` reaches this module, and plenty of tests import
@@ -159,6 +238,7 @@ if (typeof window !== "undefined" && import.meta.env.DEV) {
         id,
         {
           gain: eventGains.get(id)?.gain.value ?? null,
+          preview: previewGains.get(id)?.gain.value ?? null,
           sound: soundForEvent(id),
         },
       ]),

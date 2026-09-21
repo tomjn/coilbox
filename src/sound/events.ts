@@ -24,7 +24,7 @@ export const GROUPS = {
   },
   music: {
     label: "Music",
-    description: "The soundtrack, when this build ships one.",
+    description: "The soundtrack, whichever one you pick above.",
   },
 } as const satisfies Record<
   string,
@@ -112,6 +112,11 @@ export const VISIBLE_EVENT_IDS = EVENT_IDS.filter(
   (id) => !("hidden" in EVENTS[id]),
 );
 
+/** The groups the Sounds table splits its rows under, in group order. */
+export const EVENT_GROUP_IDS = GROUP_IDS.filter((group) =>
+  VISIBLE_EVENT_IDS.some((id) => EVENTS[id].group === group),
+);
+
 /**
  * The groups worth showing a player. A group whose events are all hidden, or
  * that has none yet, would be a slider controlling nothing.
@@ -122,9 +127,7 @@ export const VISIBLE_EVENT_IDS = EVENT_IDS.filter(
  */
 export function visibleGroupIds(hasMusic: boolean): GroupId[] {
   return GROUP_IDS.filter((group) =>
-    group === "music"
-      ? hasMusic
-      : VISIBLE_EVENT_IDS.some((id) => EVENTS[id].group === group),
+    group === "music" ? hasMusic : EVENT_GROUP_IDS.includes(group),
   );
 }
 
