@@ -103,9 +103,17 @@ export function soundForEvent(id: EventId): SoundId {
  * makes a sound, so there is one place the player's settings have to be obeyed.
  */
 export function playEvent(id: EventId) {
-  const out = getEventGain(id);
-  if (!out) return;
-  SOUNDS[soundForEvent(id)].play(out);
+  try {
+    const out = getEventGain(id);
+    if (!out) return;
+    SOUNDS[soundForEvent(id)].play(out);
+  } catch (e) {
+    // A cue is a decoration on something else that is actually happening. It is
+    // called from the lobby event loop and from `notify()`, which promises its
+    // callers it never throws, so a refused or closed AudioContext must not
+    // take the thing it was announcing down with it.
+    console.warn(`sound: ${id} failed to play`, e);
+  }
 }
 
 // Dev-only hook for reading the whole chain back from devtools / tauri-mcp
