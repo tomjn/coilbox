@@ -50,10 +50,22 @@ function levelValue(level: Level): number {
 /**
  * A short ramp rather than a jumped value, so dragging a slider while a sound is
  * still decaying doesn't click. Matches the master gain's behaviour.
+ *
+ * The node is checked before the context is asked for, and that order is the
+ * whole point: `getAudioContext` builds the context if it does not exist, and
+ * SoundProvider pushes every stored level in on mount, long before the player
+ * has clicked anything. Asking first built the one AudioContext the app owns
+ * with no user activation behind it, and WebKit permanently refuses to let such
+ * a context reach the speakers. It still reports "running" and still advances
+ * its clock, so every sound was scheduled and none was ever heard.
+ *
+ * There is no node to ramp until something has played anyway, which only
+ * happens after a gesture, so nothing is lost by waiting.
  */
 function applyLevel(node: GainNode | undefined, level: Level) {
+  if (!node) return;
   const ctx = getAudioContext();
-  if (!node || !ctx) return;
+  if (!ctx) return;
   node.gain.setTargetAtTime(levelValue(level), ctx.currentTime, 0.015);
 }
 
