@@ -9,8 +9,9 @@ import { getProfileSound } from "@/profile/profile";
  * That means the music group's volume cannot be a gain node either. The element
  * has a volume of its own, which is set from the same numbers.
  *
- * Nothing here plays unless a distribution ships tracks. Coilbox bundles no
- * audio at all.
+ * Coilbox bundles one track of its own, and can otherwise play what a
+ * distribution ships or what is inside a game's archive. None of it starts
+ * until a player asks for it.
  */
 
 /**
@@ -21,7 +22,10 @@ import { getProfileSound } from "@/profile/profile";
  */
 export type Track =
   | { kind: "portable"; path: string }
-  | { kind: "archive"; path: string; label: string };
+  | { kind: "archive"; path: string; label: string }
+  // Bundled into the app by the build, so it already has a URL the element can
+  // stream and needs neither the asset protocol nor unitsync.
+  | { kind: "bundled"; url: string; label: string };
 
 let element: HTMLAudioElement | null = null;
 let queue: Track[] = [];
@@ -94,6 +98,7 @@ function releaseBlob(): void {
 let loadToken = 0;
 
 async function urlFor(track: Track, token: number): Promise<string | null> {
+  if (track.kind === "bundled") return track.url;
   if (track.kind === "portable") return assetUrl(track.path);
   if (!archiveResolver) return null;
   const url = await archiveResolver(track.path);
