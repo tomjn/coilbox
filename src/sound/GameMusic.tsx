@@ -44,7 +44,11 @@ export function GameMusic() {
     });
     // The resolver goes in before the tracks, because setting the tracks is
     // what starts playback and a track with no way to fetch it just stalls.
-    if (tracks.length > 0) setTracks(tracks);
+    //
+    // Set unconditionally, including to nothing. A game with no music has to
+    // clear the list, or the previous game's tracks keep playing against a
+    // resolver that now points somewhere else entirely.
+    setTracks(tracks);
   }, [enabled, enginePath, dataDir, archive, tracks]);
 
   return null;
