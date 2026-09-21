@@ -77,10 +77,20 @@ class FakeAudioContext {
   }
 }
 
+/** How many AudioContexts have been built since the last reset. */
+let contextsBuilt = 0;
+
 beforeEach(() => {
   vi.resetModules();
+  contextsBuilt = 0;
+  class CountingAudioContext extends FakeAudioContext {
+    constructor() {
+      super();
+      contextsBuilt += 1;
+    }
+  }
   (window as unknown as { AudioContext: unknown }).AudioContext =
-    FakeAudioContext;
+    CountingAudioContext;
 });
 
 /** The event gain and the group gain a played event routed through. */
@@ -211,6 +221,43 @@ describe("the event and group chain", () => {
     const { EVENTS, VISIBLE_EVENT_IDS } = await import("./events");
     expect(VISIBLE_EVENT_IDS).not.toContain("matchFound");
     expect(EVENTS.matchFound.sound).toBe("gong");
+  });
+});
+
+describe("when the AudioContext gets built", () => {
+  it("builds none while the stored levels are pushed in at startup", async () => {
+    // The one that matters. SoundProvider pushes every group and event level on
+    // mount, before the player has clicked anything. Building the context there
+    // means building it with no user activation behind it, and WebKit then
+    // refuses that context the speakers for the rest of the session. It still
+    // reports "running" and still advances its clock, so every later sound is
+    // scheduled, plays silently, and logs nothing.
+    const { setEventLevel, setGroupLevel } = await import("./play");
+
+    setGroupLevel("alerts", 1, false);
+    setGroupLevel("ui", 1, true);
+    setEventLevel("ring", 1, false);
+    setEventLevel("uiSuccess", 1, false);
+
+    expect(contextsBuilt).toBe(0);
+  });
+
+  it("builds one the moment something actually plays", async () => {
+    const { playEvent, setGroupLevel } = await import("./play");
+    setGroupLevel("alerts", 1, false);
+    expect(contextsBuilt).toBe(0);
+
+    playEvent("ring");
+    expect(contextsBuilt).toBe(1);
+  });
+
+  it("keeps using that one rather than building a second", async () => {
+    const { playEvent, previewEvent, setEventLevel } = await import("./play");
+    playEvent("ring");
+    previewEvent("mention");
+    setEventLevel("ring", 0.5, false);
+    playEvent("ring");
+    expect(contextsBuilt).toBe(1);
   });
 });
 
