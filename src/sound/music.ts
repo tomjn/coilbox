@@ -13,9 +13,23 @@ import { getProfileSound } from "@/profile/profile";
  * audio at all.
  */
 
+/**
+ * A track either lives beside the app, where the asset protocol can stream it,
+ * or inside a game archive, where only unitsync can reach it and hands it back
+ * whole. The second kind becomes a blob URL, which seeks like a file and can be
+ * released when the next track starts.
+ */
+export type Track =
+  | { kind: "portable"; path: string }
+  | { kind: "archive"; path: string; label: string };
+
 let element: HTMLAudioElement | null = null;
-let queue: string[] = [];
+let queue: Track[] = [];
 let index = 0;
+/** Resolves an archive track to a playable URL. Set by whoever owns unitsync. */
+let archiveResolver: ((path: string) => Promise<string | null>) | null = null;
+/** The blob URL currently playing, released when it is replaced. */
+let blobUrl: string | null = null;
 let level = 1;
 /** What the player asked for, as opposed to whether it is sounding right now. */
 let wanted = false;
@@ -30,7 +44,7 @@ const suspendedFor = new Set<SuspendReason>();
 export type SuspendReason = "game" | "unfocused";
 
 /** The track list, shuffled if the profile asked for that. */
-function buildQueue(tracks: string[], shuffle: boolean): string[] {
+function buildQueue(tracks: Track[], shuffle: boolean): Track[] {
   const list = [...tracks];
   if (!shuffle) return list;
   for (let i = list.length - 1; i > 0; i--) {
@@ -60,11 +74,36 @@ function ensureElement(): HTMLAudioElement | null {
   return element;
 }
 
+/** Free the blob the last archive track was playing from. */
+function releaseBlob(): void {
+  if (!blobUrl) return;
+  URL.revokeObjectURL(blobUrl);
+  blobUrl = null;
+}
+
+async function urlFor(track: Track): Promise<string | null> {
+  if (track.kind === "portable") return assetUrl(track.path);
+  if (!archiveResolver) return null;
+  const url = await archiveResolver(track.path);
+  if (!url) return null;
+  // Only after the new one exists, so a failed load leaves the old track
+  // playable rather than killing the music outright.
+  releaseBlob();
+  blobUrl = url;
+  return url;
+}
+
 async function playCurrent(): Promise<void> {
   const el = ensureElement();
   const track = queue[index];
   if (!el || !track) return;
-  el.src = assetUrl(track);
+  const url = await urlFor(track);
+  // Fetching an archive track takes long enough for the player to have changed
+  // their mind, or to have launched a game. Without this re-check, a pause that
+  // lands mid-fetch is undone the moment the bytes arrive, and the music starts
+  // playing with the button saying it is stopped.
+  if (!url || !shouldPlay()) return;
+  el.src = url;
   el.volume = level;
   try {
     await el.play();
@@ -72,20 +111,55 @@ async function playCurrent(): Promise<void> {
     // Autoplay can be refused before the player has interacted with the window.
     // The next call after a click succeeds, so there is nothing to recover here.
   }
+  if (!shouldPlay()) el.pause();
 }
 
 /** Load the profile's tracks. Safe to call when it ships none. */
 export function initMusic(): void {
   const config = getProfileSound();
   if (!config?.tracks?.length) return;
-  queue = buildQueue(config.tracks, config.shuffle === true);
-  index = 0;
+  setTracks(
+    config.tracks.map((path) => ({ kind: "portable", path }) as const),
+    config.shuffle === true,
+  );
   if (config.enabled) setMusicWanted(true);
 }
 
-/** Whether this build has any music at all, which is what shows the controls. */
+/**
+ * Replace the track list. Used by the profile at startup and by the game music
+ * source when the player picks a different game.
+ */
+export function setTracks(tracks: Track[], shuffle = false): void {
+  queue = buildQueue(tracks, shuffle);
+  index = 0;
+  releaseBlob();
+  element?.pause();
+  apply();
+}
+
+/**
+ * How an archive track's bytes are fetched. Null puts archive music out of
+ * reach.
+ *
+ * Re-applies afterwards, because a track list can arrive before the resolver
+ * does. Without this, that ordering leaves the music wanted, unsuspended, and
+ * silent, with nothing scheduled to try again.
+ */
+export function setArchiveResolver(
+  resolver: ((path: string) => Promise<string | null>) | null,
+): void {
+  archiveResolver = resolver;
+  if (resolver) apply();
+}
+
+/** The tracks currently queued, for a settings screen to list. */
+export function getTracks(): Track[] {
+  return queue;
+}
+
+/** Whether there is anything to play, which is what shows the music controls. */
 export function hasMusic(): boolean {
-  return getProfileSound() !== null;
+  return getProfileSound() !== null || queue.length > 0;
 }
 
 /**
@@ -118,13 +192,33 @@ export function setMusicSuspended(reason: SuspendReason, value: boolean): void {
   apply();
 }
 
+/** Whether the music should be sounding right now, on everything known. */
+function shouldPlay(): boolean {
+  return wanted && suspendedFor.size === 0 && level > 0 && queue.length > 0;
+}
+
 function apply(): void {
-  const shouldPlay =
-    wanted && suspendedFor.size === 0 && level > 0 && queue.length > 0;
   const el = element;
-  if (shouldPlay) {
+  if (shouldPlay()) {
     if (!el || el.paused) void playCurrent();
     return;
   }
   el?.pause();
+}
+
+// Dev-only hook for reading the player's state from devtools / tauri-mcp
+// `execute_js`. The audio element is never in the DOM, so there is otherwise
+// nothing to inspect. Matches `__coilboxMasterLevel` and `__coilboxSoundGraph`.
+if (typeof window !== "undefined" && import.meta.env.DEV) {
+  (window as unknown as { __coilboxMusic?: () => unknown }).__coilboxMusic =
+    () => ({
+      wanted,
+      suspendedFor: [...suspendedFor],
+      level,
+      tracks: queue.length,
+      index,
+      playing: element ? !element.paused : false,
+      src: element?.src ?? null,
+      seconds: element?.currentTime ?? null,
+    });
 }

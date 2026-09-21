@@ -15,13 +15,16 @@ import {
   groupMutedKey,
   groupVolumeKey,
 } from "./events";
+import { GameMusic } from "./GameMusic";
 import { isSoundId } from "./library";
 import {
   initMusic,
   setMusicLevel,
   setMusicSuspended,
   setMusicWanted,
+  setTracks,
 } from "./music";
+import { defaultMusicSource, MUSIC_SOURCE_KEY } from "./musicSourceKeys";
 import { setEventLevel, setEventSound, setGroupLevel } from "./play";
 
 /** Persisted settings keys (frame settings store). Volume is 0..100. */
@@ -68,6 +71,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     <>
       <MentionKeyMigration />
       <Music />
+      <GameMusic />
       {GROUP_IDS.map((id) => (
         <GroupLevel key={id} id={id} />
       ))}
@@ -89,10 +93,17 @@ export function SoundProvider({ children }: { children: ReactNode }) {
  */
 function Music() {
   const [wanted] = useSetting<boolean>(MUSIC_PLAYING_KEY, musicOnByDefault());
+  const [source] = useSetting<string>(
+    MUSIC_SOURCE_KEY,
+    defaultMusicSource(getProfileSound() !== null),
+  );
 
   useEffect(() => {
-    initMusic();
-  }, []);
+    // "off" has to clear the list as well as stop playing, or the Music group
+    // stays in settings controlling a soundtrack the player turned off.
+    if (source === "profile") initMusic();
+    else if (source === "off") setTracks([]);
+  }, [source]);
 
   useEffect(() => {
     setMusicWanted(wanted);
