@@ -19,6 +19,7 @@ import playPlugin from "./play";
 import profilePlugin from "./profile";
 import runlitePlugin from "./runlite";
 import scenarioPlugin from "./scenario";
+import soundPlugin from "./sound";
 import uberstressPlugin from "./uberstress";
 import updaterPlugin from "./updater";
 import workshopPlugin from "./workshop";
@@ -51,4 +52,5 @@ export const plugins: FramePlugin[] = [
   updaterPlugin,
   gameUpdatesPlugin,
   notifyPlugin,
+  soundPlugin,
 ];

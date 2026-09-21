@@ -168,8 +168,9 @@ export default function GeneralSettings() {
           <span className="space-y-1">
             <span className="block text-sm font-medium">Ambient effects</span>
             <span className="block text-xs text-muted-foreground">
-              Star twinkle, nebulae, ambience audio and other decorative
-              touches. Turn off for a plainer, quieter interface.
+              Star twinkle, nebulae and other decorative touches. Turn off for a
+              plainer interface. Sound is controlled separately, in Sound
+              settings.
             </span>
           </span>
         </Label>

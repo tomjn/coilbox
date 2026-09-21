@@ -25,9 +25,9 @@ beforeEach(() => {
     FakeAudioContext;
 });
 
-describe("soundCue", () => {
+describe("sound context", () => {
   it("unlocks a single shared AudioContext on the first gesture, for every caller", async () => {
-    const { getAudioContext } = await import("./soundCue");
+    const { getAudioContext } = await import("./context");
 
     // Stand in for two different cues each asking for a context before any
     // gesture has happened, the way mentionCue/ingameCue/ringEffect each
