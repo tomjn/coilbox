@@ -85,7 +85,10 @@ function Panel({ serverKey }: { serverKey: string }) {
     const id = `${found.queueId}:${found.readyBy}`;
     if (rungFor.current === id) return;
     rungFor.current = id;
-    triggerAttention("A match has been found. Accept it to play.");
+    triggerAttention(
+      "matchFound",
+      "A match has been found. Accept it to play.",
+    );
     void notify({
       title: "Match found",
       body: "Accept it before the countdown runs out.",

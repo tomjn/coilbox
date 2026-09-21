@@ -70,7 +70,6 @@ import {
 } from "./channels";
 import {
   HIGHLIGHT_OWN_KEY,
-  HIGHLIGHT_SOUND_KEY,
   HIGHLIGHT_WORDS_KEY,
   matchesHighlight,
 } from "./chat/highlight";
@@ -702,11 +701,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // values when an incoming message arrives, without re-creating the handler.
   const [hlWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
   const [hlOwn] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
-  const [hlSound] = useSetting<boolean>(HIGHLIGHT_SOUND_KEY, true);
-  const highlightRef = useRef({ words: hlWords, own: hlOwn, sound: hlSound });
+  const highlightRef = useRef({ words: hlWords, own: hlOwn });
   useEffect(() => {
-    highlightRef.current = { words: hlWords, own: hlOwn, sound: hlSound };
-  }, [hlWords, hlOwn, hlSound]);
+    highlightRef.current = { words: hlWords, own: hlOwn };
+  }, [hlWords, hlOwn]);
 
   // One-way "has ever connected this session" latch driving Chat/Battles sidebar
   // visibility. Set on any transition to connected (fresh connect or reload
@@ -1063,13 +1061,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             if (live) live.state = r.state;
             dispatchMirror(serverKey, { type: "snapshot", state: r.state });
             // A chat/private message that mentions a highlight word or our own
-            // username fires the mention cue (a soft ping + taskbar flash), gated
-            // behind the sound setting. Skip our own messages and non-chat lines
-            // (join/leave/system). The text lives in the snapshot, not the delta.
-            // Skip replayed channel history too (`id != null`): joining a channel
-            // would otherwise ping once per past mention in its backlog.
+            // username fires the mention cue (a sound + taskbar flash). Whether
+            // it makes a noise is Sound settings' business, not this loop's.
+            // Skip our own messages and non-chat lines (join/leave/system). The
+            // text lives in the snapshot, not the delta. Skip replayed channel
+            // history too (`id != null`): joining a channel would otherwise ping
+            // once per past mention in its backlog.
             const hl = highlightRef.current;
-            if (!hl.sound) return;
             for (const d of batch) {
               const msg = incomingChatMsg(d, r.state);
               if (

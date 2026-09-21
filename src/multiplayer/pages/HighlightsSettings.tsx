@@ -1,17 +1,18 @@
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router";
 import { Switch } from "@/components/ui/switch";
-import {
-  HIGHLIGHT_OWN_KEY,
-  HIGHLIGHT_SOUND_KEY,
-  HIGHLIGHT_WORDS_KEY,
-} from "../chat/highlight";
+import { HIGHLIGHT_OWN_KEY, HIGHLIGHT_WORDS_KEY } from "../chat/highlight";
 
 /**
  * Settings section at /settings/chat-highlights (issue #193). Manages the list of
- * words that flag a chat message, whether your own username also flags one, and
- * whether a matched incoming message plays a sound + flashes the window. Highlight
- * matching itself lives in `chat/highlight.ts`; this only edits its inputs.
+ * words that flag a chat message, and whether your own username also flags one.
+ * Highlight matching itself lives in `chat/highlight.ts`, and this only edits its
+ * inputs.
+ *
+ * The sound a mention makes used to be a toggle here as well. It is now one row
+ * of the events table in Sound settings, alongside every other sound, rather
+ * than two screens owning one behaviour between them.
  */
 export default function HighlightsSettings() {
   const [words, setWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
@@ -19,7 +20,6 @@ export default function HighlightsSettings() {
     HIGHLIGHT_OWN_KEY,
     true,
   );
-  const [sound, setSound] = useSetting<boolean>(HIGHLIGHT_SOUND_KEY, true);
 
   // Rows are edited by index (words may be blank while typing); empty entries are
   // ignored by the matcher, so there's no need to prune them on every keystroke.
@@ -48,22 +48,14 @@ export default function HighlightsSettings() {
         />
       </label>
 
-      <label
-        htmlFor="highlight-sound"
-        className="flex items-center justify-between gap-4"
-      >
-        <span className="flex flex-col">
-          <span className="text-sm font-medium">Play a sound on mention</span>
-          <span className="text-xs text-muted-foreground">
-            Play a chime and flash the window when an incoming message matches.
-          </span>
-        </span>
-        <Switch
-          id="highlight-sound"
-          checked={sound}
-          onCheckedChange={setSound}
-        />
-      </label>
+      <p className="text-xs text-muted-foreground">
+        A matching message flashes the window and plays a sound. Choose which
+        sound, and how loud, under{" "}
+        <Link to="/settings/sound" className="underline underline-offset-2">
+          Sound
+        </Link>
+        .
+      </p>
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">Highlight words</span>

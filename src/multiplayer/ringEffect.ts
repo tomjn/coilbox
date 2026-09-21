@@ -1,16 +1,18 @@
 import { announce, flashTaskbar } from "@/sound/context";
-import { playGong } from "@/sound/library";
+import type { EventId } from "@/sound/events";
+import { playEvent } from "@/sound/play";
 
 /**
  * Reaction to an autohost `!ring` (a `Delta::Ring` from the lobby). Autohosts ring
  * a battle room to poke AFK players, so the point is to grab attention even when the
  * player has wandered off: the whole app "reverberates" (a slight vibration + a touch
- * of blur that decays like a struck object settling), a synthesized gong plays, and
+ * of blur that decays like a struck object settling), a sound plays, and
  * the OS taskbar/dock flashes so a player behind other windows still notices.
  *
  * All three affordances are best-effort and independent - a failure in one (blocked
  * audio, missing window permission) must never break the others or throw into the
- * event loop that calls this.
+ * event loop that calls this. Muting the sound in Sound settings leaves the reverb
+ * and the flash alone, which is the point of them.
  */
 
 const REVERB_CLASS = "ring-reverb";
@@ -32,12 +34,14 @@ function playReverb() {
 }
 
 /**
- * Fire every ring affordance, saying what for. Anything that has to reach a
- * player who may have wandered off uses this: an autohost ring, and a
- * matchmaking match found, which runs on a countdown nobody can afford to miss.
+ * Fire every ring affordance, saying which event it is for and what to announce.
+ * Anything that has to reach a player who may have wandered off uses this: an
+ * autohost ring, and a matchmaking match found, which runs on a countdown nobody
+ * can afford to miss. They are separate events so a player can silence one
+ * without the other.
  */
-export function triggerAttention(announcement: string) {
-  playGong();
+export function triggerAttention(event: EventId, announcement: string) {
+  playEvent(event);
   playReverb();
   flashTaskbar("ring", true);
   announce(announcement, true);
@@ -48,7 +52,7 @@ export function triggerAttention(announcement: string) {
  * `from` is the ringing user (usually the autohost).
  */
 export function triggerRing(from?: string) {
-  triggerAttention(from ? `Rung by ${from}` : "Rung by the host");
+  triggerAttention("ring", from ? `Rung by ${from}` : "Rung by the host");
 }
 
 // Dev-only hook so the effect can be exercised from devtools / tauri-mcp `execute_js`

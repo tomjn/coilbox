@@ -1,14 +1,19 @@
-import { getAudioContext, getMasterGain } from "./context";
+import { getAudioContext } from "./context";
 
 /**
- * The tones coilbox can play. Each is synthesized rather than loaded from a file,
- * so the app bundles no audio at all.
+ * The sounds coilbox can play, and nothing about when to play them. An event
+ * picks a sound from here by id (see events.ts), so the same ping can serve a
+ * mention today and something else tomorrow without either knowing about the
+ * other.
  *
- * Their gains were tuned against each other, not picked independently: the gong
- * is driven hard because a ring has to carry across a room, and the chime and
- * ping sit far below it because they are nudges. Those relative levels are the
- * point, so they stay hardcoded here and the player's master volume scales all of
- * them together through `getMasterGain()`.
+ * Each is synthesized rather than loaded from a file, so the app bundles no
+ * audio at all.
+ *
+ * The base levels below were tuned against each other, not picked
+ * independently: the gong is driven hard because a ring has to carry across a
+ * room, and the chime and ping sit far below it because they are nudges. Those
+ * relative levels are the point, so they stay hardcoded here. Everything a
+ * player controls is applied by the gain node each `play` is handed.
  */
 
 const GONG_DURATION_S = 1.8;
@@ -20,10 +25,9 @@ const GONG_DURATION_S = 1.8;
  * gentle lowpass, matching the ~1.8s decay of the ring's visual reverb so sound and motion
  * settle together.
  */
-export function playGong() {
+function playGong(out: AudioNode) {
   const ctx = getAudioContext();
-  const out = getMasterGain();
-  if (!ctx || !out) return;
+  if (!ctx) return;
   if (ctx.state === "suspended") void ctx.resume();
 
   const now = ctx.currentTime;
@@ -83,10 +87,9 @@ export function playGong() {
  * through a gentle lowpass with a quick attack and short decay, played at a low
  * gain. Reads as an upbeat "ready" ping rather than an alarm.
  */
-export function playChime() {
+function playChime(out: AudioNode) {
   const ctx = getAudioContext();
-  const out = getMasterGain();
-  if (!ctx || !out) return;
+  if (!ctx) return;
   if (ctx.state === "suspended") void ctx.resume();
 
   const now = ctx.currentTime;
@@ -124,10 +127,9 @@ export function playChime() {
  * through a gentle lowpass with a quick attack and short decay at a modest gain.
  * Reads as a light "someone's talking to you" alert rather than an alarm.
  */
-export function playPing() {
+function playPing(out: AudioNode) {
   const ctx = getAudioContext();
-  const out = getMasterGain();
-  if (!ctx || !out) return;
+  if (!ctx) return;
   if (ctx.state === "suspended") void ctx.resume();
 
   const now = ctx.currentTime;
@@ -158,4 +160,23 @@ export function playPing() {
     osc.start(start);
     osc.stop(start + 0.28);
   }
+}
+
+/** Every sound in the library, by id. Persisted in settings, so ids are stable. */
+export const SOUNDS = {
+  gong: { label: "Gong", play: playGong },
+  chime: { label: "Chime", play: playChime },
+  ping: { label: "Ping", play: playPing },
+} as const satisfies Record<
+  string,
+  { label: string; play: (out: AudioNode) => void }
+>;
+
+export type SoundId = keyof typeof SOUNDS;
+
+export const SOUND_IDS = Object.keys(SOUNDS) as SoundId[];
+
+/** Whether a stored sound choice still names a sound we have. */
+export function isSoundId(v: unknown): v is SoundId {
+  return typeof v === "string" && v in SOUNDS;
 }

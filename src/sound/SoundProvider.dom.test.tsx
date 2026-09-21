@@ -23,6 +23,13 @@ const setMasterLevel = vi.fn();
 vi.mock("./context", () => ({
   setMasterLevel: (...a: unknown[]) => setMasterLevel(...a),
 }));
+// The Provider also pushes every group and event level. Those have their own
+// tests, and this file is only about the master.
+vi.mock("./play", () => ({
+  setEventLevel: () => {},
+  setEventSound: () => {},
+  setGroupLevel: () => {},
+}));
 
 beforeEach(() => {
   settings.clear();

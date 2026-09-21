@@ -1,13 +1,14 @@
 import { announce, flashTaskbar } from "@/sound/context";
-import { playPing } from "@/sound/library";
+import { playEvent } from "@/sound/play";
 
 /**
  * Reaction to an incoming chat / private message that mentions one of your
- * highlight words or your own username (issue #193). A short, distinct two-note
- * "ping" plus the OS taskbar/dock flash so a mention still lands when you've tabbed
- * away. Deliberately lighter than the ring gong and different from the "host is
- * launching" chime so the three cues are tellable apart, and asset-free
- * (synthesized) to match their no-bundled-audio approach.
+ * highlight words or your own username (issue #193). A sound plus the OS
+ * taskbar/dock flash, so a mention still lands when you've tabbed away.
+ *
+ * Which sound, and how loud, is the player's to choose in Sound settings - this
+ * only says that a mention happened. The flash and the screen reader
+ * announcement are not sound and are not affected by muting the event.
  */
 
 /**
@@ -15,7 +16,7 @@ import { playPing } from "@/sound/library";
  * message matches the highlight predicate. `from` names the sender (for a11y).
  */
 export function triggerMentionCue(from: string) {
-  playPing();
+  playEvent("mention");
   flashTaskbar("mentionCue");
   announce(`${from} mentioned you`);
 }
