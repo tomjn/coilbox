@@ -29,8 +29,14 @@ import {
   stepMatch,
 } from "@/scenario/pages/components/missionLuaSearch";
 import { useLuaTokens } from "@/scenario/pages/components/missionLuaTokens";
-import { animBos2lua, animBosRead } from "../bindings";
+import {
+  animBos2lua,
+  animBosLint,
+  animBosRead,
+  type LintDiagnostic,
+} from "../bindings";
 import { BosSource } from "./BosSource";
+import { LintProblems } from "./LintProblems";
 
 /** `Input` forwards `ref` at runtime but its type has none, and the find box
  *  needs its node to take focus on Cmd/Ctrl+F. See `MissionLuaView`. */
@@ -85,6 +91,12 @@ export default function Bos2LuaPage() {
   // Only the newest conversion is shown, so a slow one for an older version
   // of the text cannot land on top of the current one.
   const latest = useRef(0);
+  const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([]);
+  const [lintError, setLintError] = useState<string | null>(null);
+  // The line of the problem last clicked, 1-indexed as the lint pass reports
+  // it. Cleared whenever the source changes underneath it.
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const latestLint = useRef(0);
 
   useEffect(() => {
     const ticket = ++latest.current;
@@ -120,6 +132,48 @@ export default function Bos2LuaPage() {
         }
       });
   }, [bos, fileName, path, prune]);
+
+  // Linted separately from the conversion above, on a short debounce: a lint
+  // pass is not needed on every keystroke the way the live Lua view is.
+  useEffect(() => {
+    if (bos.trim() === "") {
+      setDiagnostics([]);
+      setLintError(null);
+      return;
+    }
+    const ticket = ++latestLint.current;
+    const timer = setTimeout(() => {
+      animBosLint({ source: bos, name: fileName })
+        .then(({ diagnostics, error }) => {
+          if (ticket !== latestLint.current) return;
+          setDiagnostics(diagnostics);
+          setLintError(error ?? null);
+        })
+        .catch((error: unknown) => {
+          if (ticket === latestLint.current) {
+            setDiagnostics([]);
+            setLintError(errorText(error));
+          }
+        });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [bos, fileName]);
+
+  // A picked problem stops pointing anywhere once the text it was about has
+  // moved.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: bos is the reset trigger, not read in the body
+  useEffect(() => {
+    setSelectedLine(null);
+  }, [bos]);
+
+  const problemLines = useMemo(() => {
+    const map = new Map<number, "error" | "warning">();
+    for (const d of diagnostics) {
+      if (d.severity === "info") continue;
+      if (map.get(d.line - 1) !== "error") map.set(d.line - 1, d.severity);
+    }
+    return map;
+  }, [diagnostics]);
 
   async function loadPath(picked: string) {
     try {
@@ -384,7 +438,17 @@ export default function Bos2LuaPage() {
             lines={bosLines}
             matches={matches}
             activeMatch={activeMatch}
+            highlightLine={selectedLine === null ? null : selectedLine - 1}
+            problemLines={problemLines}
           />
+          <div className="max-h-40 shrink-0 overflow-y-auto">
+            <LintProblems
+              diagnostics={diagnostics}
+              error={lintError}
+              selectedLine={selectedLine}
+              onSelect={setSelectedLine}
+            />
+          </div>
         </div>
         <div className="flex min-h-0 flex-col gap-2">
           <div className="flex h-8 items-center gap-2">

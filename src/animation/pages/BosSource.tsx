@@ -25,6 +25,15 @@ const TEXT =
   "font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:break-word]";
 const LAYOUT = `absolute inset-0 py-2 pr-3 [scrollbar-gutter:stable] ${TEXT}`;
 
+/** How a line's own number reads in the gutter, for the worst lint severity
+ *  on it. Info is left unmarked, since it is not worth the eye. */
+function gutterClass(severity: "error" | "warning" | undefined) {
+  if (severity === "error") return "text-destructive font-semibold";
+  if (severity === "warning")
+    return "text-amber-600 dark:text-amber-400 font-semibold";
+  return undefined;
+}
+
 export function BosSource({
   id,
   value,
@@ -33,6 +42,8 @@ export function BosSource({
   lines,
   matches,
   activeMatch,
+  highlightLine,
+  problemLines,
 }: {
   id: string;
   value: string;
@@ -41,11 +52,18 @@ export function BosSource({
   lines: string[];
   matches: LuaMatch[];
   activeMatch: LuaMatch | null;
+  /** A 0-indexed line to scroll to and mark, such as a lint problem picked
+   *  from the list beside this box. Independent of find's `activeMatch`. */
+  highlightLine?: number | null;
+  /** The worst severity a lint pass found on each 0-indexed line, for a mark
+   *  in the gutter. Info is left unmarked, since it is not worth the eye. */
+  problemLines?: Map<number, "error" | "warning">;
 }) {
   const boxRef = useRef<HTMLTextAreaElement | null>(null);
   const backRef = useRef<HTMLDivElement | null>(null);
   const gutterRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef<HTMLElement | null>(null);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
   const [heights, setHeights] = useState<number[]>([]);
   const [width, setWidth] = useState(0);
 
@@ -92,6 +110,16 @@ export function BosSource({
     follow();
   }, [activeMatch, follow]);
 
+  // A picked lint problem is brought to the middle of the box too, on its own
+  // trigger so it works whether or not anything is being found.
+  useEffect(() => {
+    const box = boxRef.current;
+    const line = highlightRef.current;
+    if (highlightLine == null || !box || !line) return;
+    box.scrollTop = line.offsetTop - box.clientHeight / 2;
+    follow();
+  }, [highlightLine, follow]);
+
   const byLine = new Map<number, LuaMatch[]>();
   for (const match of matches) {
     const list = byLine.get(match.line);
@@ -112,8 +140,12 @@ export function BosSource({
         >
           <div ref={gutterRef} className={`py-2 pr-3 ${TEXT}`}>
             {lines.map((_, n) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
-              <div key={n} style={{ height: heights[n] }}>
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
+                key={n}
+                style={{ height: heights[n] }}
+                className={gutterClass(problemLines?.get(n))}
+              >
                 {n + 1}
               </div>
             ))}
@@ -127,8 +159,12 @@ export function BosSource({
           className={`${LAYOUT} pointer-events-none overflow-hidden text-transparent ${numbered ? "" : "pl-3"}`}
         >
           {lines.map((line, n) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
-            <div key={n}>
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
+              key={n}
+              ref={n === highlightLine ? highlightRef : undefined}
+              className={n === highlightLine ? "bg-amber-500/10" : undefined}
+            >
               {segments(line, byLine.get(n) ?? []).map((part) =>
                 part.match ? (
                   <mark

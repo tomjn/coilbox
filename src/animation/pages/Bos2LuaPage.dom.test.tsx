@@ -15,7 +15,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { animBos2lua, animBosRead, open } = vi.hoisted(() => ({
+const { animBos2lua, animBosLint, animBosRead, open } = vi.hoisted(() => ({
   animBos2lua: vi.fn(async () => ({
     lua: 'local base = piece("base")\nfunction script.Create()\nend',
     warnings: ["first difference", "second difference"],
@@ -23,11 +23,12 @@ const { animBos2lua, animBosRead, open } = vi.hoisted(() => ({
     cobVars: "-- cob_vars" as string | null,
     missingIncludes: [] as string[],
   })),
+  animBosLint: vi.fn(async () => ({ diagnostics: [], error: undefined })),
   animBosRead: vi.fn(async () => ({ source: "piece base;\nCreate() { }\n" })),
   open: vi.fn(async () => "/games/THIS.sdd/scripts/carrier.bos"),
 }));
 
-vi.mock("../bindings", () => ({ animBos2lua, animBosRead }));
+vi.mock("../bindings", () => ({ animBos2lua, animBosLint, animBosRead }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }),

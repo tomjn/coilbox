@@ -16,7 +16,14 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
 import { errorText } from "@/lib/helpers";
-import { animBos2cob, animCobDisasm } from "../bindings";
+import {
+  animBos2cob,
+  animBosLint,
+  animBosRead,
+  animCobDisasm,
+  type LintDiagnostic,
+} from "../bindings";
+import { LintProblems } from "./LintProblems";
 
 const COB = /\.cob$/i;
 const BOS = /\.bos$/i;
@@ -47,6 +54,26 @@ export default function CobPage() {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([]);
+  const [lintError, setLintError] = useState<string | null>(null);
+
+  // Lints a .bos once it has compiled, so the same source that just produced
+  // the listing is what the problems below it are about. Never for a .cob
+  // loaded straight from disk, since there is no source to lint.
+  async function lintBos(p: string) {
+    try {
+      const { source } = await animBosRead({ path: p });
+      const { diagnostics, error } = await animBosLint({
+        source,
+        name: p,
+      });
+      setDiagnostics(diagnostics);
+      setLintError(error ?? null);
+    } catch (e) {
+      setDiagnostics([]);
+      setLintError(errorText(e));
+    }
+  }
 
   async function disassemble(p: string) {
     const res = await animCobDisasm({ path: p });
@@ -60,6 +87,8 @@ export default function CobPage() {
     setBusy(true);
     setPath(p);
     setKind("bos");
+    setDiagnostics([]);
+    setLintError(null);
     try {
       const res = await animBos2cob({ path: p, overwrite });
       if (res.needsOverwrite) {
@@ -81,6 +110,7 @@ export default function CobPage() {
         text: `Compiled to ${res.output} (${res.bytes} bytes).`,
       });
       await disassemble(res.output);
+      await lintBos(p);
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
     } finally {
@@ -95,6 +125,8 @@ export default function CobPage() {
     setKind("cob");
     setRevealTarget(p);
     setListing("");
+    setDiagnostics([]);
+    setLintError(null);
     try {
       await disassemble(p);
     } catch (e) {
@@ -243,12 +275,19 @@ export default function CobPage() {
           </p>
         )}
         {listing ? (
-          <Textarea
-            value={listing}
-            readOnly
-            spellCheck={false}
-            className="min-h-0 flex-1 resize-none bg-card/30 font-mono text-xs leading-relaxed"
-          />
+          <>
+            <Textarea
+              value={listing}
+              readOnly
+              spellCheck={false}
+              className="min-h-0 flex-1 resize-none bg-card/30 font-mono text-xs leading-relaxed"
+            />
+            {kind === "bos" && (diagnostics.length > 0 || lintError) && (
+              <div className="max-h-40 shrink-0 overflow-y-auto">
+                <LintProblems diagnostics={diagnostics} error={lintError} />
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <Binary size={26} className="opacity-30" />
