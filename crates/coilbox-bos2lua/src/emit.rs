@@ -563,7 +563,7 @@ fn sanitise(want: &str, taken: &HashSet<String>) -> String {
 }
 
 /// Every expression a statement reads, not counting the statements inside it.
-fn exprs_in(k: &StmtKind) -> Vec<&Expr> {
+pub(crate) fn exprs_in(k: &StmtKind) -> Vec<&Expr> {
     match k {
         StmtKind::Assign(_, e)
         | StmtKind::Sleep(e)
@@ -658,7 +658,7 @@ fn walk<'s>(stmts: &'s [Stmt], f: &mut impl FnMut(&'s StmtKind)) {
 }
 
 /// Every name an expression reads, lower-cased, and every constant, as written.
-fn names_in(e: &Expr, names: &mut HashSet<String>, consts: &mut HashSet<String>) {
+pub(crate) fn names_in(e: &Expr, names: &mut HashSet<String>, consts: &mut HashSet<String>) {
     match e {
         Expr::Name(n) => {
             names.insert(n.to_lowercase());

@@ -12,10 +12,13 @@
 
 mod emit;
 mod lex;
+mod lint;
 mod parse;
 mod pp;
 
 use std::collections::{HashMap, HashSet, VecDeque};
+
+pub use lint::{lint, Diagnostic, LintOptions, Severity};
 
 pub struct Conversion {
     pub lua: String,
@@ -220,9 +223,24 @@ fn opcode(op: &str) -> Option<u32> {
     })
 }
 
-pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
-    let includes: HashMap<String, (String, String)> = options
-        .includes
+/// A script preprocessed and parsed, the common step [`convert`] and
+/// [`lint::lint`] both start from.
+struct Parsed {
+    items: Vec<parse::Item>,
+    pre: pp::Output,
+}
+
+/// Preprocesses and parses a script exactly as [`convert`] does: the same
+/// include resolution, the same linear scale and precedence, and the same
+/// wording when parsing fails.
+fn preprocess_and_parse(
+    source: &str,
+    name: &str,
+    includes: &HashMap<String, String>,
+    linear_scale: i64,
+    precedence: Precedence,
+) -> Result<Parsed, String> {
+    let includes: HashMap<String, (String, String)> = includes
         .iter()
         .map(|(path, text)| (normalise(path), (path.clone(), text.clone())))
         .collect();
@@ -231,24 +249,28 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
             .iter()
             .find_map(|candidate| includes.get(candidate).cloned())
     };
-    let pre = pp::preprocess(
-        source,
-        options.name,
-        &resolve,
-        options.linear_scale,
-        options.precedence,
-    );
-    let items = parse::parse(&pre.tokens, options.linear_scale, options.precedence).map_err(|e| {
+    let pre = pp::preprocess(source, name, &resolve, linear_scale, precedence);
+    let items = parse::parse(&pre.tokens, linear_scale, precedence).map_err(|e| {
         // Often the reason: a macro defined in a header nobody supplied.
         match pre.missing.as_slice() {
-            [] => format!("{}: {e}", options.name),
+            [] => format!("{name}: {e}"),
             missing => format!(
-                "{}: {e}. It includes {}, which could not be found, so anything defined there is missing.",
-                options.name,
+                "{name}: {e}. It includes {}, which could not be found, so anything defined there is missing.",
                 missing.join(", ")
             ),
         }
     })?;
+    Ok(Parsed { items, pre })
+}
+
+pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
+    let Parsed { items, pre } = preprocess_and_parse(
+        source,
+        options.name,
+        options.includes,
+        options.linear_scale,
+        options.precedence,
+    )?;
     emit::emit(&items, &pre, options)
 }
 
