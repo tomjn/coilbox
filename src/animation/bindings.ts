@@ -104,10 +104,10 @@ export interface LintDiagnostic {
 /**
  * Lint BOS source and report what it finds, without converting it.
  *
- * Same inputs as {@link animBos2lua} minus `path` and `prune`: nothing is
- * read from or written to disk, and every rule runs regardless of pruning.
- * `cob`, when given, still settles the linear scale and precedence a rule
- * needs to fold a `<x>` or `[x]` constant.
+ * Same inputs as {@link animBos2lua} minus `prune`, which no rule cares
+ * about. `path`, when given, reads the script's includes from disk exactly as
+ * `animBos2lua` does. `cob`, when given, still settles the linear scale and
+ * precedence a rule needs to fold a `<x>` or `[x]` constant.
  *
  * A script that fails to parse comes back with an empty `diagnostics` array
  * and `error` set, rather than throwing, so the UI can show the parse
@@ -120,6 +120,7 @@ export const animBosLint = defineCommand<
     includes?: Record<string, string>;
     pieces?: string[];
     cob?: number[];
+    path?: string;
   },
   { diagnostics: LintDiagnostic[]; error?: string }
 >("coilbox-anim", "anim_bos_lint");

@@ -143,7 +143,7 @@ export default function Bos2LuaPage() {
     }
     const ticket = ++latestLint.current;
     const timer = setTimeout(() => {
-      animBosLint({ source: bos, name: fileName })
+      animBosLint({ source: bos, name: fileName, ...(path ? { path } : {}) })
         .then(({ diagnostics, error }) => {
           if (ticket !== latestLint.current) return;
           setDiagnostics(diagnostics);
@@ -157,7 +157,7 @@ export default function Bos2LuaPage() {
         });
     }, 300);
     return () => clearTimeout(timer);
-  }, [bos, fileName]);
+  }, [bos, fileName, path]);
 
   // A picked problem stops pointing anywhere once the text it was about has
   // moved.

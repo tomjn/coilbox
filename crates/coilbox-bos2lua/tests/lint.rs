@@ -82,6 +82,39 @@ fn invalid_call_is_an_error() {
 }
 
 #[test]
+fn a_missing_include_replaces_invalid_call_with_one_info_diagnostic() {
+    // "missing.h" is never supplied, so the preprocessor cannot find it, and
+    // a call that might be defined there must not be guessed at either way.
+    let source = "#include \"missing.h\"\nF() { call-script Ghost(); }";
+    let diags = lint_src(source);
+    assert!(!diags.iter().any(|d| d.rule == "invalid-call"), "{diags:?}");
+    let missing: Vec<&Diagnostic> = diags
+        .iter()
+        .filter(|d| d.rule == "missing-include")
+        .collect();
+    assert_eq!(missing.len(), 1, "{diags:?}");
+    assert_eq!(missing[0].severity, Severity::Info);
+    assert_eq!(missing[0].line, 1);
+    assert!(missing[0].message.contains("missing.h"), "{diags:?}");
+}
+
+#[test]
+fn a_found_include_does_not_flag_missing_include() {
+    let mut includes = HashMap::new();
+    includes.insert("found.h".to_string(), "G() { }".to_string());
+    let diags = lint_with(
+        "#include \"found.h\"\nF() { call-script G(); }",
+        &includes,
+        None,
+    );
+    assert!(
+        !diags.iter().any(|d| d.rule == "missing-include"),
+        "{diags:?}"
+    );
+    assert!(!diags.iter().any(|d| d.rule == "invalid-call"), "{diags:?}");
+}
+
+#[test]
 fn recursive_call_flags_a_cycle_of_call_script() {
     assert!(fires(
         "A() { call-script B(); }\nB() { call-script A(); }",

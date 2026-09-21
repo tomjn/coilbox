@@ -97,7 +97,14 @@ pub fn lint(source: &str, options: &LintOptions) -> Result<Vec<Diagnostic>, Stri
         empty_function_rule(f, &mut out);
         callin_name_rule(f, &mut out);
     }
-    invalid_call_rule(&funcs, &mut out);
+    // A missing header means the linter cannot see what it defines, so a
+    // call into it would misread as a call to nothing. Say that once per
+    // missing name instead, rather than every call it happens to cover.
+    if pre.missing.is_empty() {
+        invalid_call_rule(&funcs, &mut out);
+    } else {
+        missing_include_rule(&pre.missing, &mut out);
+    }
     recursive_call_rule(&funcs, &mut out);
     signal_never_signalled_rule(&funcs, &pre.constants, &mut out);
     weapon_without_aim_rule(&funcs, &mut out);
@@ -344,6 +351,25 @@ fn invalid_call_rule(funcs: &[&Func], out: &mut Vec<Diagnostic>) {
                 });
             }
         });
+    }
+}
+
+/// One `missing-include` per name the preprocessor could not find, in place
+/// of `invalid-call`: with a header missing, a call into it cannot be told
+/// from a genuine typo, so guessing which is worse than saying neither.
+fn missing_include_rule(missing: &[String], out: &mut Vec<Diagnostic>) {
+    let mut seen = HashSet::new();
+    for name in missing {
+        if seen.insert(name.clone()) {
+            out.push(Diagnostic {
+                rule: "missing-include",
+                severity: Severity::Info,
+                line: 1,
+                message: format!(
+                    "`{name}` could not be found, so the linter cannot see what it defines, and calls into it are not checked."
+                ),
+            });
+        }
     }
 }
 

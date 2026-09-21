@@ -234,10 +234,10 @@ async fn anim_bos2lua(
 
 /// `anim_bos_lint`: the diagnostics a BOS lint pass finds in `source`.
 ///
-/// Same inputs as `anim_bos2lua`, minus `path` and `prune`: this never reads
-/// or writes a file, and every rule runs whether or not anything is pruned.
-/// `cob`, when given, still settles the linear scale and precedence the
-/// linter needs to fold a `<x>` or `[x]` constant.
+/// Same inputs as `anim_bos2lua`, minus `prune`, which no rule cares about.
+/// `path`, when given, reads the script's includes from disk exactly as
+/// `anim_bos2lua` does, and still settles the linear scale and precedence
+/// from the `.cob` beside it when `cob` is not given.
 ///
 /// A script that fails to parse comes back `{ diagnostics: [], error }`
 /// rather than a thrown error, so the UI can show the parse failure next to
@@ -249,9 +249,22 @@ async fn anim_bos_lint(
     includes: Option<HashMap<String, String>>,
     pieces: Option<Vec<String>>,
     cob: Option<Vec<u8>>,
+    path: Option<String>,
 ) -> CliResult {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let includes = includes.unwrap_or_default();
+        let mut includes = includes.unwrap_or_default();
+        let mut name = name;
+        let mut cob = cob;
+        if let Some(path) = path.as_deref().map(Path::new) {
+            let (root, in_game) = bos_disk::locate(path);
+            for (key, text) in bos_disk::includes(&source, &root, &in_game) {
+                includes.entry(key).or_insert(text);
+            }
+            name = in_game;
+            if cob.is_none() {
+                cob = bos_disk::cob_beside(path);
+            }
+        }
         let linear_scale = cob
             .as_deref()
             .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))

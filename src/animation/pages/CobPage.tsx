@@ -66,6 +66,7 @@ export default function CobPage() {
       const { diagnostics, error } = await animBosLint({
         source,
         name: p,
+        path: p,
       });
       setDiagnostics(diagnostics);
       setLintError(error ?? null);
