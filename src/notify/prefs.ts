@@ -10,6 +10,9 @@ const prefs = {
   osEnabled: true,
   /** Cached OS permission grant. Assume not-granted until the Provider checks. */
   permGranted: false,
+  /** Whether an OS banner makes a sound. Default on, since it only ever fires
+   * when the window is not focused, where a silent banner is easy to miss. */
+  osSound: true,
 };
 
 export function setOsEnabled(v: boolean): void {
@@ -26,4 +29,12 @@ export function getOsEnabled(): boolean {
 
 export function getPermGranted(): boolean {
   return prefs.permGranted;
+}
+
+export function setOsSound(v: boolean): void {
+  prefs.osSound = v;
+}
+
+export function getOsSound(): boolean {
+  return prefs.osSound;
 }

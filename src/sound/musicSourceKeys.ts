@@ -3,7 +3,10 @@
  * and the two components that use it do not have to import each other.
  */
 
-/** One of "off", "profile" (tracks this build ships) or "game". */
+/**
+ * One of "off", "nostalgia" (the track coilbox bundles), "profile" (tracks the
+ * distribution ships) or "game".
+ */
 export const MUSIC_SOURCE_KEY = "sound.music.source";
 
 /** The game whose archive music is read from, when the source is a game. */

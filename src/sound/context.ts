@@ -71,6 +71,17 @@ export function getMasterLevel(): number {
 }
 
 /**
+ * The master volume with its mute ignored, 0..1.
+ *
+ * Only the preview button wants this. Pressing play is an explicit ask to hear
+ * a sound, so it has to be louder than a switch the player set days ago and
+ * forgot, in a section further up the page.
+ */
+export function getMasterVolume(): number {
+  return masterVolume;
+}
+
+/**
  * Point the master gain at a new level. Called by SoundProvider as the player
  * drags the slider, so it has to be safe to call before any cue has ever played.
  * The node does not exist yet in that case, and picks the level up when it is

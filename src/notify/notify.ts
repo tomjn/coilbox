@@ -3,7 +3,8 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
 import { playEvent } from "@/sound/play";
 import { recordNotification } from "./history";
-import { getOsEnabled, getPermGranted } from "./prefs";
+import { notificationSound } from "./notificationSound";
+import { getOsEnabled, getOsSound, getPermGranted } from "./prefs";
 import { route } from "./route";
 
 /** Severity of a notification, mapped to a sonner toast style. */
@@ -77,7 +78,11 @@ export async function notify(input: NotifyInput): Promise<void> {
   }
 
   try {
-    sendNotification({ title: input.title, body: input.body });
+    sendNotification({
+      title: input.title,
+      body: input.body,
+      sound: notificationSound(getOsSound()),
+    });
     await getCurrentWindow()
       .requestUserAttention(UserAttentionType.Informational)
       .catch(() => {});

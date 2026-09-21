@@ -2,6 +2,7 @@ import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useEffect } from "react";
 import { HIGHLIGHT_SOUND_KEY } from "@/multiplayer/chat/highlight";
 import { getProfileSound } from "@/profile/profile";
+import { BUNDLED_TRACKS } from "./bundledMusic";
 import { setMasterLevel } from "./context";
 import {
   EVENT_IDS,
@@ -102,6 +103,7 @@ function Music() {
     // "off" has to clear the list as well as stop playing, or the Music group
     // stays in settings controlling a soundtrack the player turned off.
     if (source === "profile") initMusic();
+    else if (source === "nostalgia") setTracks(BUNDLED_TRACKS);
     else if (source === "off") setTracks([]);
   }, [source]);
 

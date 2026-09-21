@@ -132,6 +132,24 @@ describe("a cuelume sound", () => {
     expect(order).toEqual(["volume", "play"]);
   });
 
+  it("is still audible from the preview button with all three muted", async () => {
+    // The two Interface events are cuelume's, and the Interface group ships
+    // muted, so this is the pair a player finds on a fresh install. Obeying the
+    // mute here is what made the button look broken.
+    const { setMasterLevel } = await import("./context");
+    const { previewEvent, setEventLevel, setGroupLevel } = await import(
+      "./play"
+    );
+
+    setMasterLevel(0.5, true);
+    setGroupLevel("ui", 0.5, true);
+    setEventLevel("uiSuccess", 0.5, true);
+    previewEvent("uiSuccess");
+
+    expect(setCuelumeVolume).toHaveBeenLastCalledWith(0.125);
+    expect(cuelumePlay).toHaveBeenCalledWith("success");
+  });
+
   it("leaves coilbox's own sounds on the gain chain, not on cuelume", async () => {
     const { playEvent } = await import("./play");
     playEvent("ring");

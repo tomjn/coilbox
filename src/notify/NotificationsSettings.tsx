@@ -5,7 +5,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
-import { NOTIFY_OS_ENABLED_KEY } from "./NotifyProvider";
+import { NOTIFY_OS_ENABLED_KEY, NOTIFY_OS_SOUND_KEY } from "./NotifyProvider";
 import { notify } from "./notify";
 import { setPermGranted } from "./prefs";
 
@@ -15,6 +15,7 @@ export default function NotificationsSettings() {
     NOTIFY_OS_ENABLED_KEY,
     true,
   );
+  const [osSound, setOsSound] = useSetting<boolean>(NOTIFY_OS_SOUND_KEY, true);
   const [granted, setGranted] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -46,6 +47,26 @@ export default function NotificationsSettings() {
           id="notifications-os-enabled"
           checked={osEnabled}
           onCheckedChange={setOsEnabled}
+        />
+      </label>
+
+      <label
+        htmlFor="notifications-os-sound"
+        className="flex items-center justify-between gap-4"
+      >
+        <span className="flex flex-col">
+          <span className="text-sm font-medium">Notification sound</span>
+          <span className="text-xs text-muted-foreground">
+            Let the banner make your system's notification sound. Your operating
+            system owns that sound and its volume, so Coilbox's own volume does
+            not apply, though muting all sound does.
+          </span>
+        </span>
+        <Switch
+          id="notifications-os-sound"
+          checked={osSound}
+          onCheckedChange={setOsSound}
+          disabled={!osEnabled}
         />
       </label>
 

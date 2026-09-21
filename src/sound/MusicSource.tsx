@@ -37,6 +37,7 @@ export function MusicSource() {
             ariaLabel="Music source"
             options={[
               { value: "off", label: "No music" },
+              { value: "nostalgia", label: "Nostalgia" },
               // Only offered by a build that ships tracks, but always listed,
               // so it is clear the option exists and why it is unavailable.
               {

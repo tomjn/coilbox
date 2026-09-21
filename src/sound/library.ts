@@ -174,9 +174,46 @@ type SoundDef =
       label: string;
       group: string;
       kind: "synth";
+      /** How long it sounds for. Only the preview button's icon reads this. */
+      seconds: number;
       play: (out: AudioNode) => void;
     }
-  | { label: string; group: string; kind: "cuelume"; name: CuelumeName };
+  | {
+      label: string;
+      group: string;
+      kind: "cuelume";
+      seconds: number;
+      name: CuelumeName;
+    };
+
+/**
+ * How long each of cuelume's sounds lasts, in seconds.
+ *
+ * Measured from its recipes: the longest layer's offset plus attack plus decay,
+ * plus a shimmer tail where there is one. cuelume publishes the names but not
+ * the recipes, so these are read off rather than derived, and the fallback is
+ * today's longest. Nothing but the preview icon depends on them, so drift shows
+ * up as an icon that reverts slightly early or late.
+ */
+const CUELUME_SECONDS: Record<string, number> = {
+  arrival: 1.055,
+  bloom: 0.85,
+  chime: 0.716,
+  ready: 0.654,
+  success: 0.604,
+  loading: 0.535,
+  droplet: 0.474,
+  sparkle: 0.468,
+  scan: 0.357,
+  error: 0.244,
+  whisper: 0.162,
+  page: 0.122,
+  pulse: 0.087,
+  release: 0.057,
+  toggle: 0.045,
+  press: 0.021,
+  tick: 0.019,
+};
 
 /** The bands the sound picker splits its list into. */
 const COILBOX = "Coilbox";
@@ -194,6 +231,7 @@ const CUELUME_SOUNDS = Object.fromEntries(
       label: `${name[0].toUpperCase()}${name.slice(1)}`,
       group: INTERFACE,
       kind: "cuelume",
+      seconds: CUELUME_SECONDS[name] ?? 1.055,
       name,
     },
   ]),
@@ -202,15 +240,36 @@ const CUELUME_SOUNDS = Object.fromEntries(
     label: string;
     group: string;
     kind: "cuelume";
+    seconds: number;
     name: K;
   };
 };
 
 /** Every sound in the library, by id. Persisted in settings, so ids are stable. */
 export const SOUNDS = {
-  gong: { label: "Gong", group: COILBOX, kind: "synth", play: playGong },
-  chime: { label: "Chime", group: COILBOX, kind: "synth", play: playChime },
-  ping: { label: "Ping", group: COILBOX, kind: "synth", play: playPing },
+  // Each `seconds` is the last moment an oscillator is still running in the
+  // routine beside it, so the three stay together when one is retuned.
+  gong: {
+    label: "Gong",
+    group: COILBOX,
+    kind: "synth",
+    seconds: GONG_DURATION_S + 0.05,
+    play: playGong,
+  },
+  chime: {
+    label: "Chime",
+    group: COILBOX,
+    kind: "synth",
+    seconds: 0.13 + 0.36,
+    play: playChime,
+  },
+  ping: {
+    label: "Ping",
+    group: COILBOX,
+    kind: "synth",
+    seconds: 0.1 + 0.28,
+    play: playPing,
+  },
   ...CUELUME_SOUNDS,
 } as const satisfies Record<string, SoundDef>;
 
