@@ -10,6 +10,7 @@ import {
   eventVolumeKey,
   GROUP_IDS,
   type GroupId,
+  groupMutedByDefault,
   groupMutedKey,
   groupVolumeKey,
 } from "./events";
@@ -57,7 +58,10 @@ export function SoundProvider({ children }: { children: ReactNode }) {
 
 function GroupLevel({ id }: { id: GroupId }) {
   const [volume] = useSetting<number>(groupVolumeKey(id), 100);
-  const [muted] = useSetting<boolean>(groupMutedKey(id), false);
+  const [muted] = useSetting<boolean>(
+    groupMutedKey(id),
+    groupMutedByDefault(id),
+  );
   useEffect(() => {
     setGroupLevel(id, volume / 100, muted);
   }, [id, volume, muted]);

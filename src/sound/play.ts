@@ -1,4 +1,5 @@
-import { getAudioContext, getMasterGain } from "./context";
+import { play as cuelumePlay, setVolume as setCuelumeVolume } from "cuelume";
+import { getAudioContext, getMasterGain, getMasterLevel } from "./context";
 import {
   EVENT_IDS,
   EVENTS,
@@ -99,18 +100,45 @@ export function soundForEvent(id: EventId): SoundId {
 }
 
 /**
+ * The volume an event should come out at, as a single number.
+ *
+ * Only needed for cuelume, which plays on an AudioContext of its own and takes
+ * a multiplier rather than a node to connect to. Read from the same levels the
+ * gain nodes are built from, so the two kinds of sound cannot disagree about
+ * how loud the player asked for.
+ */
+function effectiveLevel(id: EventId): number {
+  return (
+    getMasterLevel() *
+    levelValue(groupLevels.get(EVENTS[id].group) ?? FULL) *
+    levelValue(eventLevels.get(id) ?? FULL)
+  );
+}
+
+/**
  * Play what this event sounds like right now. The only way anything in the app
  * makes a sound, so there is one place the player's settings have to be obeyed.
  */
 export function playEvent(id: EventId) {
+  const sound = SOUNDS[soundForEvent(id)];
+  if (sound.kind === "cuelume") {
+    // cuelume's volume is global and read when the sound starts, so it has to
+    // be set immediately before each play. Unlike our own sounds, one already
+    // playing cannot be turned down.
+    setCuelumeVolume(effectiveLevel(id));
+    cuelumePlay(sound.name);
+    return;
+  }
   const out = getEventGain(id);
   if (!out) return;
-  SOUNDS[soundForEvent(id)].play(out);
+  sound.play(out);
 }
 
 // Dev-only hook for reading the whole chain back from devtools / tauri-mcp
-// `execute_js`, the way `__coilboxMasterLevel` reads the master.
-if (import.meta.env.DEV) {
+// `execute_js`, the way `__coilboxMasterLevel` reads the master. Guarded on
+// `window` because `notify()` reaches this module, and plenty of tests import
+// that in a plain node environment.
+if (typeof window !== "undefined" && import.meta.env.DEV) {
   (
     window as unknown as { __coilboxSoundGraph?: () => unknown }
   ).__coilboxSoundGraph = () => ({

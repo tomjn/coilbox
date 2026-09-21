@@ -10,6 +10,7 @@ import {
   eventSoundKey,
   eventVolumeKey,
   GROUPS,
+  groupMutedByDefault,
   groupMutedKey,
   groupVolumeKey,
   VISIBLE_EVENT_IDS,
@@ -93,6 +94,7 @@ export default function SoundSettings() {
               label={GROUPS[id].label}
               volumeKey={groupVolumeKey(id)}
               mutedKey={groupMutedKey(id)}
+              defaultMuted={groupMutedByDefault(id)}
               compact
             />
           </div>
@@ -156,6 +158,7 @@ function EventRow({ id }: { id: EventId }) {
               options={SOUND_IDS.map((soundId) => ({
                 value: soundId,
                 label: SOUNDS[soundId].label,
+                group: SOUNDS[soundId].group,
               }))}
             />
           </div>

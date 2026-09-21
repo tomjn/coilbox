@@ -1,3 +1,4 @@
+import { type SoundName as CuelumeName, sounds as cuelumeNames } from "cuelume";
 import { getAudioContext } from "./context";
 
 /**
@@ -162,15 +163,56 @@ function playPing(out: AudioNode) {
   }
 }
 
+/**
+ * A sound is either one coilbox synthesizes into a node we hand it, or one of
+ * cuelume's, which owns its own AudioContext and can only be given a number.
+ * The two are kept apart here rather than papered over, because only the first
+ * kind can be turned down while it is already playing.
+ */
+type SoundDef =
+  | {
+      label: string;
+      group: string;
+      kind: "synth";
+      play: (out: AudioNode) => void;
+    }
+  | { label: string; group: string; kind: "cuelume"; name: CuelumeName };
+
+/** The bands the sound picker splits its list into. */
+const COILBOX = "Coilbox";
+const INTERFACE = "Interface";
+
+/**
+ * Cuelume's catalogue, offered for any event. Ids carry a `cue-` prefix because
+ * cuelume ships a `chime` of its own and ours came first, and because a stored
+ * id should say where the sound comes from.
+ */
+const CUELUME_SOUNDS = Object.fromEntries(
+  cuelumeNames.map((name) => [
+    `cue-${name}`,
+    {
+      label: `${name[0].toUpperCase()}${name.slice(1)}`,
+      group: INTERFACE,
+      kind: "cuelume",
+      name,
+    },
+  ]),
+) as {
+  [K in CuelumeName as `cue-${K}`]: {
+    label: string;
+    group: string;
+    kind: "cuelume";
+    name: K;
+  };
+};
+
 /** Every sound in the library, by id. Persisted in settings, so ids are stable. */
 export const SOUNDS = {
-  gong: { label: "Gong", play: playGong },
-  chime: { label: "Chime", play: playChime },
-  ping: { label: "Ping", play: playPing },
-} as const satisfies Record<
-  string,
-  { label: string; play: (out: AudioNode) => void }
->;
+  gong: { label: "Gong", group: COILBOX, kind: "synth", play: playGong },
+  chime: { label: "Chime", group: COILBOX, kind: "synth", play: playChime },
+  ping: { label: "Ping", group: COILBOX, kind: "synth", play: playPing },
+  ...CUELUME_SOUNDS,
+} as const satisfies Record<string, SoundDef>;
 
 export type SoundId = keyof typeof SOUNDS;
 
