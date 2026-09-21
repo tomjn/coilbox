@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { playEvent } from "@/sound/play";
 import {
   type BattleConfig,
   type LaunchEvent,
@@ -183,6 +184,12 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       onEvent.onmessage = (event) => {
         if (event.kind === "started") onEngineStarted?.(runId);
       };
+      // Every launch comes through here - skirmish, battle, campaign, conquest,
+      // a saved game and a replay - so one sound covers the lot. Deliberately
+      // not the same event as the host starting a battle you are in: that one
+      // is somebody else acting and has to reach you across the room, this one
+      // is you pressing the button and already looking at the screen.
+      playEvent("launch");
       // Recorded before the engine starts, so crash triage can tell this run's
       // log from the one an earlier session left behind (#379).
       const startedAtMs = Date.now();

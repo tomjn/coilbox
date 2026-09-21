@@ -70,6 +70,13 @@ export const EVENTS = {
     group: "alerts",
     sound: "chime",
   },
+  launch: {
+    label: "You launch a game",
+    description:
+      "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay.",
+    group: "alerts",
+    sound: "cue-ready",
+  },
   matchFound: {
     label: "A match is found",
     description: "Matchmaking pairs you up and starts the accept countdown.",
