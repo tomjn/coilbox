@@ -23,6 +23,7 @@ type WebkitWindow = { webkitAudioContext?: typeof AudioContext };
 
 export function getAudioContext(): AudioContext | null {
   if (audioCtx) return audioCtx;
+  if (typeof window === "undefined") return null;
   const Ctor =
     window.AudioContext ??
     (window as unknown as WebkitWindow).webkitAudioContext;
@@ -60,6 +61,16 @@ export function getMasterGain(): GainNode | null {
 }
 
 /**
+ * The master level as a plain number, 0 when muted.
+ *
+ * For cuelume, which plays on its own AudioContext and so cannot be fed through
+ * the master gain node. It takes a multiplier instead.
+ */
+export function getMasterLevel(): number {
+  return masterMuted ? 0 : masterVolume;
+}
+
+/**
  * Point the master gain at a new level. Called by SoundProvider as the player
  * drags the slider, so it has to be safe to call before any cue has ever played.
  * The node does not exist yet in that case, and picks the level up when it is
@@ -77,11 +88,18 @@ export function setMasterLevel(volume: number, muted: boolean): void {
   masterGain.gain.setTargetAtTime(target, ctx.currentTime, 0.015);
 }
 
+/**
+ * Whether there is a browser to talk to. This module is reached from `notify()`,
+ * which plenty of tests import in a plain node environment, and touching
+ * `window` as the module loads would take all of them down.
+ */
+const hasWindow = typeof window !== "undefined";
+
 // Dev-only hook so the master level can be read from devtools / tauri-mcp
 // `execute_js` (`window.__coilboxMasterLevel()`), matching the `__coilboxRing`
 // and `__coilboxMentionCue` hooks the cues expose. Reads the live gain node
 // rather than the variables above, so it can catch the two drifting apart.
-if (import.meta.env.DEV) {
+if (hasWindow && import.meta.env.DEV) {
   (
     window as unknown as { __coilboxMasterLevel?: () => unknown }
   ).__coilboxMasterLevel = () => ({
@@ -101,8 +119,10 @@ function unlockAudioOnce() {
   window.removeEventListener("pointerdown", unlockAudioOnce);
   window.removeEventListener("keydown", unlockAudioOnce);
 }
-window.addEventListener("pointerdown", unlockAudioOnce, { once: true });
-window.addEventListener("keydown", unlockAudioOnce, { once: true });
+if (hasWindow) {
+  window.addEventListener("pointerdown", unlockAudioOnce, { once: true });
+  window.addEventListener("keydown", unlockAudioOnce, { once: true });
+}
 
 // The cues are non-verbal, so each is also announced to assistive tech via a
 // single reused visually-hidden live region shared by all of them.

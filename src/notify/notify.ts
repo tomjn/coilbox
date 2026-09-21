@@ -1,6 +1,7 @@
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
+import { playEvent } from "@/sound/play";
 import { recordNotification } from "./history";
 import { getOsEnabled, getPermGranted } from "./prefs";
 import { route } from "./route";
@@ -55,6 +56,13 @@ export async function notify(input: NotifyInput): Promise<void> {
   // Single interception point: every notification, whatever channel it takes,
   // is recorded so the topbar bell can surface it after the toast has gone.
   recordNotification(input);
+
+  // The same point is the one place in the app that already knows something
+  // notable happened and how it went, so it is where the interface sounds
+  // hang rather than on individual buttons. Silent unless a player turns the
+  // Interface group on.
+  if (input.level === "success") playEvent("uiSuccess");
+  else if (input.level === "error") playEvent("uiError");
 
   let focused = true;
   try {

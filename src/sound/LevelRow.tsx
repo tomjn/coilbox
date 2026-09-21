@@ -12,6 +12,7 @@ export function LevelRow({
   label,
   volumeKey,
   mutedKey,
+  defaultMuted = false,
   compact = false,
 }: {
   /** Used for the control ids, so the labels point at the right thing. */
@@ -20,11 +21,13 @@ export function LevelRow({
   label: string;
   volumeKey: string;
   mutedKey: string;
+  /** Must match what SoundProvider pushes, or the switch lies about the sound. */
+  defaultMuted?: boolean;
   /** Tighter layout for a table cell, rather than a settings row. */
   compact?: boolean;
 }) {
   const [volume, setVolume] = useSetting<number>(volumeKey, 100);
-  const [muted, setMuted] = useSetting<boolean>(mutedKey, false);
+  const [muted, setMuted] = useSetting<boolean>(mutedKey, defaultMuted);
 
   return (
     <div className="flex items-center gap-3">

@@ -17,9 +17,20 @@ export const GROUPS = {
   },
   ui: {
     label: "Interface",
-    description: "Small sounds as you use Coilbox itself.",
+    description: "Small sounds as Coilbox gets on with things.",
+    // Off until asked for. Interface sounds divide people, and a desktop app
+    // that starts chirping after an update irritates before it delights.
+    mutedByDefault: true,
   },
-} as const satisfies Record<string, { label: string; description: string }>;
+} as const satisfies Record<
+  string,
+  { label: string; description: string; mutedByDefault?: true }
+>;
+
+/** Whether a group is silent for a player who has never opened Sound settings. */
+export function groupMutedByDefault(id: GroupId): boolean {
+  return "mutedByDefault" in GROUPS[id];
+}
 
 export type GroupId = keyof typeof GROUPS;
 
@@ -65,6 +76,19 @@ export const EVENTS = {
     group: "alerts",
     sound: "gong",
     hidden: true,
+  },
+  uiSuccess: {
+    label: "Something finished",
+    description:
+      "A download completes, or anything else Coilbox tells you went well.",
+    group: "ui",
+    sound: "cue-success",
+  },
+  uiError: {
+    label: "Something failed",
+    description: "Coilbox reports that something went wrong.",
+    group: "ui",
+    sound: "cue-error",
   },
 } as const satisfies Record<string, EventDef>;
 
