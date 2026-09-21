@@ -22,6 +22,10 @@ export const GROUPS = {
     // that starts chirping after an update irritates before it delights.
     mutedByDefault: true,
   },
+  music: {
+    label: "Music",
+    description: "The soundtrack, when this build ships one.",
+  },
 } as const satisfies Record<
   string,
   { label: string; description: string; mutedByDefault?: true }
@@ -109,12 +113,20 @@ export const VISIBLE_EVENT_IDS = EVENT_IDS.filter(
 );
 
 /**
- * The groups with at least one event a player can see. A group whose events are
- * all hidden, or that has none yet, would be a slider controlling nothing.
+ * The groups worth showing a player. A group whose events are all hidden, or
+ * that has none yet, would be a slider controlling nothing.
+ *
+ * Music is the exception: it has no events, and whether it controls anything
+ * depends on whether this build ships tracks, which only the profile knows.
+ * Passed in rather than imported so this file stays a plain registry.
  */
-export const VISIBLE_GROUP_IDS = GROUP_IDS.filter((group) =>
-  VISIBLE_EVENT_IDS.some((id) => EVENTS[id].group === group),
-);
+export function visibleGroupIds(hasMusic: boolean): GroupId[] {
+  return GROUP_IDS.filter((group) =>
+    group === "music"
+      ? hasMusic
+      : VISIBLE_EVENT_IDS.some((id) => EVENTS[id].group === group),
+  );
+}
 
 /** Settings keys. Unset means "the default", which is why none are written eagerly. */
 export const eventVolumeKey = (id: EventId) => `sound.events.${id}.volume`;

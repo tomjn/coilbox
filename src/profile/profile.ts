@@ -69,6 +69,28 @@ export interface SplashConfig {
   duration?: number;
 }
 
+/**
+ * Background music for a distribution that ships its own soundtrack.
+ *
+ * Coilbox bundles no audio, so with no `tracks` there is nothing to play and the
+ * music controls stay hidden. A player who has tracks gets the Music group in
+ * Sound settings to turn them down or off.
+ */
+export interface SoundConfig {
+  /**
+   * Paths relative to the portable `.coilbox/` folder, e.g. `sounds/theme.ogg`.
+   * Streamed through the asset protocol rather than inlined, because a track is
+   * minutes long and a data URI would hold all of it in memory.
+   */
+  tracks?: string[];
+  /** Start playing on launch. Defaults to false, so music is opt-in. */
+  enabled?: boolean;
+  /** Starting volume for the music group, 0 to 100. Defaults to 50. */
+  volume?: number;
+  /** Play the list in a random order rather than as written. */
+  shuffle?: boolean;
+}
+
 /** Text and/or logo image for a top-bar slot; `href` makes it a link. */
 export interface ProfileLogo {
   /** Text shown when no image resolves. */
@@ -243,6 +265,8 @@ export interface Profile {
   lobby?: ProfileLobby;
   /** Brand splash shown over the whole window at startup. */
   splash?: SplashConfig;
+  /** Background music, off unless a distribution ships tracks to play. */
+  sound?: SoundConfig;
   /**
    * Solid CSS colour painted behind everything from the first frame until the app
    * has rendered — kills the white flash a dark distribution otherwise shows while
@@ -783,6 +807,13 @@ export function isProfileAuthoringEnabled(): boolean {
 /** Curated map packs this profile ships (empty when it defines none). */
 export function getProfileMapLists(): SuggestedMapList[] {
   return loaded.mapLists ?? [];
+}
+
+/** Background music this profile ships, or null when it ships none. */
+export function getProfileSound(): SoundConfig | null {
+  const sound = loaded.sound;
+  if (!sound?.tracks?.length) return null;
+  return sound;
 }
 
 /** Map-exclusion rules this profile adds on top of the catalog's (empty when it
