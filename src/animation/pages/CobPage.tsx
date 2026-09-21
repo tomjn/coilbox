@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, Drawer } from "@picoframe/frame";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ask, open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -11,6 +11,7 @@ import {
   Hammer,
   Info,
   RefreshCw,
+  TriangleAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
@@ -23,7 +24,7 @@ import {
   animCobDisasm,
   type LintDiagnostic,
 } from "../bindings";
-import { LintProblems } from "./LintProblems";
+import { LintProblems, SEVERITY_COLOR, worstSeverity } from "./LintProblems";
 
 const COB = /\.cob$/i;
 const BOS = /\.bos$/i;
@@ -56,6 +57,7 @@ export default function CobPage() {
   const [dragging, setDragging] = useState(false);
   const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([]);
   const [lintError, setLintError] = useState<string | null>(null);
+  const [checksOpen, setChecksOpen] = useState(false);
 
   // Lints a .bos once it has compiled, so the same source that just produced
   // the listing is what the problems below it are about. Never for a .cob
@@ -205,6 +207,10 @@ export default function CobPage() {
   }, []);
 
   const BannerIcon = banner ? BANNER_ICONS[banner.kind] : null;
+  const showChecks = kind === "bos" && (diagnostics.length > 0 || !!lintError);
+  const checksSeverity = lintError
+    ? "error"
+    : worstSeverity(diagnostics.map((d) => d.severity));
 
   return (
     <div className="flex h-full flex-col">
@@ -256,6 +262,19 @@ export default function CobPage() {
             >
               <FolderOpen /> Open .cob…
             </Button>
+            {showChecks && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={checksSeverity ? SEVERITY_COLOR[checksSeverity] : ""}
+                onClick={() => setChecksOpen(true)}
+              >
+                <TriangleAlert className="size-4" />
+                {diagnostics.length > 0
+                  ? `${diagnostics.length} ${diagnostics.length === 1 ? "check" : "checks"}`
+                  : "Parse error"}
+              </Button>
+            )}
           </>
         }
       />
@@ -276,19 +295,12 @@ export default function CobPage() {
           </p>
         )}
         {listing ? (
-          <>
-            <Textarea
-              value={listing}
-              readOnly
-              spellCheck={false}
-              className="min-h-0 flex-1 resize-none bg-card/30 font-mono text-xs leading-relaxed"
-            />
-            {kind === "bos" && (diagnostics.length > 0 || lintError) && (
-              <div className="max-h-40 shrink-0 overflow-y-auto">
-                <LintProblems diagnostics={diagnostics} error={lintError} />
-              </div>
-            )}
-          </>
+          <Textarea
+            value={listing}
+            readOnly
+            spellCheck={false}
+            className="min-h-0 flex-1 resize-none bg-card/30 font-mono text-xs leading-relaxed"
+          />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <Binary size={26} className="opacity-30" />
@@ -297,6 +309,15 @@ export default function CobPage() {
           </div>
         )}
       </div>
+      <Drawer
+        open={checksOpen && showChecks}
+        onOpenChange={setChecksOpen}
+        title="Checks"
+        description="What the lint pass found in this .bos."
+        width="34rem"
+      >
+        <LintProblems diagnostics={diagnostics} error={lintError} />
+      </Drawer>
     </div>
   );
 }

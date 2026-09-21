@@ -11,17 +11,33 @@ import { Button } from "@picoframe/frame";
 import { AlertCircle, Info, TriangleAlert } from "lucide-react";
 import type { LintDiagnostic } from "../bindings";
 
-const ICONS: Record<LintDiagnostic["severity"], typeof AlertCircle> = {
+/** Which icon reads a severity, wherever one is shown. */
+export const SEVERITY_ICON: Record<
+  LintDiagnostic["severity"],
+  typeof AlertCircle
+> = {
   error: AlertCircle,
   warning: TriangleAlert,
   info: Info,
 };
 
-const COLORS: Record<LintDiagnostic["severity"], string> = {
+/** How a severity reads, wherever one is shown: a row's icon, a gutter mark,
+ *  or a count button covering a whole page's worth of them. */
+export const SEVERITY_COLOR: Record<LintDiagnostic["severity"], string> = {
   error: "text-destructive",
   warning: "text-amber-700 dark:text-amber-400",
   info: "text-muted-foreground",
 };
+
+/** The most urgent of a set of severities, error first, then warning, then
+ *  info. `null` for an empty set, so a caller does not need its own guard. */
+export function worstSeverity(
+  severities: LintDiagnostic["severity"][],
+): LintDiagnostic["severity"] | null {
+  if (severities.includes("error")) return "error";
+  if (severities.includes("warning")) return "warning";
+  return severities.length > 0 ? "info" : null;
+}
 
 export function LintProblems({
   diagnostics,
@@ -47,7 +63,7 @@ export function LintProblems({
   return (
     <ul aria-label="Lint problems" className="flex flex-col gap-1 text-xs">
       {diagnostics.map((d) => {
-        const Icon = ICONS[d.severity];
+        const Icon = SEVERITY_ICON[d.severity];
         return (
           <li key={`${d.rule}:${d.line}:${d.message}`}>
             <Button
@@ -59,7 +75,7 @@ export function LintProblems({
               onClick={() => onSelect?.(d.line)}
             >
               <Icon
-                className={`mt-0.5 size-3.5 shrink-0 ${COLORS[d.severity]}`}
+                className={`mt-0.5 size-3.5 shrink-0 ${SEVERITY_COLOR[d.severity]}`}
                 aria-hidden
               />
               <span className="min-w-0 flex-1">

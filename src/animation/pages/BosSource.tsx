@@ -19,18 +19,42 @@ import {
   useState,
 } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { LuaMatch } from "@/scenario/pages/components/missionLuaSearch";
+import type { LintDiagnostic } from "../bindings";
+import { SEVERITY_COLOR, SEVERITY_ICON, worstSeverity } from "./LintProblems";
 
 const TEXT =
   "font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:break-word]";
 const LAYOUT = `absolute inset-0 py-2 pr-3 [scrollbar-gutter:stable] ${TEXT}`;
 
-/** How a line's own number reads in the gutter, for the worst lint severity
- *  on it. Info is left unmarked, since it is not worth the eye. */
-function gutterClass(severity: "error" | "warning" | undefined) {
+/** The worst severity lint found on a line, `error` or `warning` only: info
+ *  is left unmarked everywhere here, since it is not worth the eye. */
+function lineSeverity(diagnostics: LintDiagnostic[] | undefined) {
+  if (!diagnostics) return null;
+  const severity = worstSeverity(diagnostics.map((d) => d.severity));
+  return severity === "info" ? null : severity;
+}
+
+/** How a line's own number reads in the gutter, for the worst severity on it. */
+function gutterClass(severity: "error" | "warning" | null) {
   if (severity === "error") return "text-destructive font-semibold";
   if (severity === "warning")
     return "text-amber-600 dark:text-amber-400 font-semibold";
+  return undefined;
+}
+
+/** The tint behind a line with a lint problem on it, subtle enough to read
+ *  as a hint rather than a highlight, so several such lines in a row do not
+ *  fight the amber a picked problem or a find match already use. */
+function rowTint(severity: "error" | "warning" | null) {
+  if (severity === "error") return "bg-destructive/10";
+  if (severity === "warning") return "bg-amber-500/10";
   return undefined;
 }
 
@@ -43,7 +67,7 @@ export function BosSource({
   matches,
   activeMatch,
   highlightLine,
-  problemLines,
+  problems,
 }: {
   id: string;
   value: string;
@@ -55,9 +79,10 @@ export function BosSource({
   /** A 0-indexed line to scroll to and mark, such as a lint problem picked
    *  from the list beside this box. Independent of find's `activeMatch`. */
   highlightLine?: number | null;
-  /** The worst severity a lint pass found on each 0-indexed line, for a mark
-   *  in the gutter. Info is left unmarked, since it is not worth the eye. */
-  problemLines?: Map<number, "error" | "warning">;
+  /** Every error or warning diagnostic on each 0-indexed line, for a mark in
+   *  the gutter and a tint behind the line, each with the message(s) on
+   *  hover. */
+  problems?: Map<number, LintDiagnostic[]>;
 }) {
   const boxRef = useRef<HTMLTextAreaElement | null>(null);
   const backRef = useRef<HTMLDivElement | null>(null);
@@ -135,20 +160,40 @@ export function BosSource({
           aria-hidden="true"
           className="shrink-0 select-none overflow-hidden text-right text-muted-foreground"
           style={{
-            width: `calc(${Math.max(2, String(lines.length).length)}ch + 1.5rem)`,
+            width: `calc(${Math.max(2, String(lines.length).length)}ch + ${problems && problems.size > 0 ? "2.5rem" : "1.5rem"})`,
           }}
         >
           <div ref={gutterRef} className={`py-2 pr-3 ${TEXT}`}>
-            {lines.map((_, n) => (
-              <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
-                key={n}
-                style={{ height: heights[n] }}
-                className={gutterClass(problemLines?.get(n))}
-              >
-                {n + 1}
-              </div>
-            ))}
+            <TooltipProvider>
+              {lines.map((_, n) => {
+                const onLine = problems?.get(n);
+                const severity = lineSeverity(onLine);
+                const Icon = severity ? SEVERITY_ICON[severity] : null;
+                return (
+                  <div
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
+                    key={n}
+                    style={{ height: heights[n] }}
+                    className="flex items-center justify-end gap-1"
+                  >
+                    {severity && Icon && onLine && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Icon
+                            className={`size-3 shrink-0 ${SEVERITY_COLOR[severity]}`}
+                            aria-hidden
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          {onLine.map((d) => d.message).join(" ")}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    <span className={gutterClass(severity)}>{n + 1}</span>
+                  </div>
+                );
+              })}
+            </TooltipProvider>
           </div>
         </div>
       )}
@@ -163,7 +208,11 @@ export function BosSource({
               // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
               key={n}
               ref={n === highlightLine ? highlightRef : undefined}
-              className={n === highlightLine ? "bg-amber-500/10" : undefined}
+              className={
+                n === highlightLine
+                  ? "bg-amber-400/25"
+                  : rowTint(lineSeverity(problems?.get(n)))
+              }
             >
               {segments(line, byLine.get(n) ?? []).map((part) =>
                 part.match ? (

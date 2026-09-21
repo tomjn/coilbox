@@ -36,7 +36,7 @@ import {
   type LintDiagnostic,
 } from "../bindings";
 import { BosSource } from "./BosSource";
-import { LintProblems } from "./LintProblems";
+import { LintProblems, SEVERITY_COLOR, worstSeverity } from "./LintProblems";
 
 /** `Input` forwards `ref` at runtime but its type has none, and the find box
  *  needs its node to take focus on Cmd/Ctrl+F. See `MissionLuaView`. */
@@ -83,7 +83,7 @@ export default function Bos2LuaPage() {
   // go on writing the unused code weeks later.
   const [prune, setPrune] = useState(true);
   const [copied, setCopied] = useState<"lua" | "cobVars" | null>(null);
-  const [warningsOpen, setWarningsOpen] = useState(false);
+  const [checksOpen, setChecksOpen] = useState(false);
   const [cobVarsOpen, setCobVarsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [rawMatch, setRawMatch] = useState(0);
@@ -166,11 +166,15 @@ export default function Bos2LuaPage() {
     setSelectedLine(null);
   }, [bos]);
 
-  const problemLines = useMemo(() => {
-    const map = new Map<number, "error" | "warning">();
+  // 0-indexed line -> its error/warning diagnostics, for BosSource's gutter
+  // mark and row tint. Info is left out: it is not worth the eye inline.
+  const lineProblems = useMemo(() => {
+    const map = new Map<number, LintDiagnostic[]>();
     for (const d of diagnostics) {
       if (d.severity === "info") continue;
-      if (map.get(d.line - 1) !== "error") map.set(d.line - 1, d.severity);
+      const list = map.get(d.line - 1);
+      if (list) list.push(d);
+      else map.set(d.line - 1, [d]);
     }
     return map;
   }, [diagnostics]);
@@ -271,6 +275,15 @@ export default function Bos2LuaPage() {
 
   const searching = query.trim() !== "";
   const warningCount = converted.warnings.length;
+  const problemCount = diagnostics.length;
+  const totalChecks = problemCount + warningCount;
+  const checksSeverity = lintError
+    ? "error"
+    : worstSeverity([
+        ...diagnostics.map((d) => d.severity),
+        ...(warningCount > 0 ? (["warning"] as const) : []),
+      ]);
+  const showChecks = totalChecks > 0 || !!lintError;
 
   async function copy(text: string, which: "lua" | "cobVars") {
     if (!text) return;
@@ -302,15 +315,17 @@ export default function Bos2LuaPage() {
         }
         actions={
           <>
-            {warningCount > 0 && (
+            {showChecks && (
               <Button
                 size="sm"
                 variant="outline"
-                className="text-amber-700 dark:text-amber-400"
-                onClick={() => setWarningsOpen(true)}
+                className={checksSeverity ? SEVERITY_COLOR[checksSeverity] : ""}
+                onClick={() => setChecksOpen(true)}
               >
                 <TriangleAlert className="size-4" />
-                {warningCount} {warningCount === 1 ? "warning" : "warnings"}
+                {totalChecks > 0
+                  ? `${totalChecks} ${totalChecks === 1 ? "check" : "checks"}`
+                  : "Parse error"}
               </Button>
             )}
             {converted.cobVars && (
@@ -439,16 +454,8 @@ export default function Bos2LuaPage() {
             matches={matches}
             activeMatch={activeMatch}
             highlightLine={selectedLine === null ? null : selectedLine - 1}
-            problemLines={problemLines}
+            problems={lineProblems}
           />
-          <div className="max-h-40 shrink-0 overflow-y-auto">
-            <LintProblems
-              diagnostics={diagnostics}
-              error={lintError}
-              selectedLine={selectedLine}
-              onSelect={setSelectedLine}
-            />
-          </div>
         </div>
         <div className="flex min-h-0 flex-col gap-2">
           <div className="flex h-8 items-center gap-2">
@@ -484,17 +491,38 @@ export default function Bos2LuaPage() {
         </div>
       </div>
       <Drawer
-        open={warningsOpen && warningCount > 0}
-        onOpenChange={setWarningsOpen}
-        title="Conversion warnings"
-        description="Where the Lua may do something different from the BOS."
+        open={checksOpen && showChecks}
+        onOpenChange={setChecksOpen}
+        title="Checks"
+        description="Problems the lint pass found in the BOS, and where the Lua may do something different from it."
         width="34rem"
       >
-        <ul className="flex list-disc flex-col gap-2 pl-4 text-sm">
-          {converted.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-5 text-sm">
+          {(problemCount > 0 || lintError) && (
+            <section className="flex flex-col gap-2">
+              <h3 className="font-medium text-sm">Problems in the BOS</h3>
+              <LintProblems
+                diagnostics={diagnostics}
+                error={lintError}
+                selectedLine={selectedLine}
+                onSelect={(line) => {
+                  setSelectedLine(line);
+                  setChecksOpen(false);
+                }}
+              />
+            </section>
+          )}
+          {warningCount > 0 && (
+            <section className="flex flex-col gap-2">
+              <h3 className="font-medium text-sm">Conversion warnings</h3>
+              <ul className="flex list-disc flex-col gap-2 pl-4">
+                {converted.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       </Drawer>
       <Drawer
         open={cobVarsOpen && converted.cobVars !== null}
