@@ -93,6 +93,37 @@ export const animBos2lua = defineCommand<
   }
 >("coilbox-anim", "anim_bos2lua");
 
+/** One thing a lint pass found wrong with a BOS script. */
+export interface LintDiagnostic {
+  rule: string;
+  severity: "error" | "warning" | "info";
+  line: number;
+  message: string;
+}
+
+/**
+ * Lint BOS source and report what it finds, without converting it.
+ *
+ * Same inputs as {@link animBos2lua} minus `path` and `prune`: nothing is
+ * read from or written to disk, and every rule runs regardless of pruning.
+ * `cob`, when given, still settles the linear scale and precedence a rule
+ * needs to fold a `<x>` or `[x]` constant.
+ *
+ * A script that fails to parse comes back with an empty `diagnostics` array
+ * and `error` set, rather than throwing, so the UI can show the parse
+ * failure next to whatever source is on screen.
+ */
+export const animBosLint = defineCommand<
+  {
+    source: string;
+    name: string;
+    includes?: Record<string, string>;
+    pieces?: string[];
+    cob?: number[];
+  },
+  { diagnostics: LintDiagnostic[]; error?: string }
+>("coilbox-anim", "anim_bos_lint");
+
 /** The text of a `.bos` on disk, for the converter page to show and edit. */
 export const animBosRead = defineCommand<{ path: string }, { source: string }>(
   "coilbox-anim",
