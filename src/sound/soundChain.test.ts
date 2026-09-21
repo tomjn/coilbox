@@ -186,6 +186,24 @@ describe("the event and group chain", () => {
     expect(soundForEvent("mention")).toBe("ping");
   });
 
+  it("swallows a failure rather than taking down whatever it was announcing", async () => {
+    // `notify()` promises its callers it never throws, and plays a cue before
+    // its own try block. A cue is a decoration on something real happening, so
+    // a refused or closed AudioContext must not break the download that
+    // finished or the message that arrived.
+    const { getAudioContext, getMasterGain } = await import("./context");
+    const { playEvent } = await import("./play");
+    getMasterGain();
+    const ctx = getAudioContext() as unknown as FakeAudioContext;
+    // What a closed or refused context looks like from the inside: the very
+    // first node the cue tries to build throws.
+    ctx.createGain = () => {
+      throw new Error("audio context closed");
+    };
+
+    expect(() => playEvent("ring")).not.toThrow();
+  });
+
   it("keeps matchmaking off the table but still on the chain", async () => {
     // The matchmaking page has no way in from the navigation yet, so a row for
     // it would be a setting for something a player cannot open. The event
