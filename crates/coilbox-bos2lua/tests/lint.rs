@@ -360,3 +360,193 @@ fn corpus_noise_report() {
         scripts.len()
     );
 }
+
+/// Every `.bos` under `dir`, at any depth.
+fn collect_bos(dir: &Path, out: &mut Vec<PathBuf>) {
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_bos(&path, out);
+        } else if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("bos"))
+        {
+            out.push(path);
+        }
+    }
+}
+
+/// A file, read the way `.bos` predates UTF-8: whatever is not valid is
+/// replaced rather than the read refused, matching `bos_disk::read_text` in
+/// the Tauri plugin.
+fn read_lossy(path: &Path) -> Option<String> {
+    std::fs::read(path)
+        .ok()
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// The game root a script belongs to, and its own path inside that root,
+/// exactly as `bos_disk::locate` in the Tauri plugin works it out: the folder
+/// above the nearest `scripts` directory (matched regardless of case) stands
+/// in for the archive root. A script in no `scripts` folder is taken as
+/// sitting at the root, named by its bare file name. Reimplemented here
+/// rather than reused, since `coilbox-bos2lua` cannot depend on the plugin
+/// crate that already depends on it.
+fn locate(bos: &Path) -> (PathBuf, String) {
+    let file = bos
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let dir = bos.parent().unwrap_or_else(|| Path::new("."));
+    let root = dir
+        .ancestors()
+        .find(|d| {
+            d.file_name()
+                .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case("scripts"))
+        })
+        .and_then(Path::parent);
+    match root.and_then(|root| Some((root, bos.strip_prefix(root).ok()?))) {
+        Some((root, rel)) => (root.to_path_buf(), slashed(rel)),
+        None => (dir.to_path_buf(), file),
+    }
+}
+
+fn slashed(rel: &Path) -> String {
+    rel.components()
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// `rel`, a normalised path, under `base` as a file, matching each name
+/// regardless of case, the way a real game archive is looked up.
+fn find_ci(base: &Path, rel: &str) -> Option<PathBuf> {
+    let mut at = base.to_path_buf();
+    for name in rel.split('/') {
+        let exact = at.join(name);
+        at = if exact.exists() {
+            exact
+        } else {
+            std::fs::read_dir(&at)
+                .ok()?
+                .flatten()
+                .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))?
+                .path()
+        };
+    }
+    at.is_file().then_some(at)
+}
+
+/// The files `source`, the script at `name` under `root`, includes, found the
+/// same way `find_includes` finds them for the game import: beside the
+/// including file, at the root, then under `scripts/` (see `candidates` in
+/// `lib.rs`).
+fn corpus_includes(source: &str, root: &Path, name: &str) -> HashMap<String, String> {
+    coilbox_bos2lua::find_includes(source, name, |candidate| {
+        let path = find_ci(root, candidate)?;
+        let text = read_lossy(&path)?;
+        Some((slashed(path.strip_prefix(root).ok()?), text))
+    })
+    .into_iter()
+    .map(|found| (found.path, found.text))
+    .collect()
+}
+
+/// Lints every `.bos` under `BOS_LINT_CORPUS` (a folder holding one or more
+/// games, unpacked) and reports, per rule, how many times it fired and in how
+/// many distinct scripts, how many scripts failed to parse (with the first 5
+/// reasons), and three concrete examples for every rule that fired in more
+/// than 20 scripts, so a reviewer can judge false positives from real data.
+/// Skipped, and no rule is tuned from what it finds here: `docs/reports` or a
+/// terminal is where that judgement belongs, not this file.
+///
+/// Run with:
+/// `BOS_LINT_CORPUS=~/dev/spring-testdata/games cargo test -p coilbox-bos2lua --test lint -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn real_corpus_noise_report() {
+    let Ok(root) = std::env::var("BOS_LINT_CORPUS") else {
+        eprintln!("BOS_LINT_CORPUS is not set, so there is nothing to sweep.");
+        return;
+    };
+    let root = PathBuf::from(root);
+    let mut scripts = Vec::new();
+    collect_bos(&root, &mut scripts);
+
+    let mut counts: HashMap<&'static str, usize> = HashMap::new();
+    let mut scripts_with_rule: HashMap<&'static str, std::collections::HashSet<PathBuf>> =
+        HashMap::new();
+    let mut examples: HashMap<&'static str, Vec<(PathBuf, u32, String, String)>> = HashMap::new();
+    let mut parse_failures: Vec<(PathBuf, String)> = Vec::new();
+
+    for path in &scripts {
+        let Some(source) = read_lossy(path) else {
+            continue;
+        };
+        let (game_root, name) = locate(path);
+        let includes = corpus_includes(&source, &game_root, &name);
+        let result = lint(
+            &source,
+            &LintOptions {
+                name: &name,
+                includes: &includes,
+                pieces: None,
+                linear_scale: MODERN_LINEAR,
+                precedence: Precedence::Modern,
+            },
+        );
+        match result {
+            Ok(diags) => {
+                let lines: Vec<&str> = source.lines().collect();
+                let mut seen_here = std::collections::HashSet::new();
+                for d in diags {
+                    *counts.entry(d.rule).or_default() += 1;
+                    if seen_here.insert(d.rule) {
+                        scripts_with_rule
+                            .entry(d.rule)
+                            .or_default()
+                            .insert(path.clone());
+                    }
+                    let bucket = examples.entry(d.rule).or_default();
+                    if bucket.len() < 3 {
+                        let src_line = lines
+                            .get(d.line.saturating_sub(1) as usize)
+                            .unwrap_or(&"")
+                            .trim()
+                            .to_string();
+                        bucket.push((path.clone(), d.line, src_line, d.message.clone()));
+                    }
+                }
+            }
+            Err(e) => parse_failures.push((path.clone(), e)),
+        }
+    }
+
+    eprintln!(
+        "\nlinted {} script(s) under {}\n",
+        scripts.len(),
+        root.display()
+    );
+    let mut rules: Vec<&&'static str> = counts.keys().collect();
+    rules.sort();
+    for rule in &rules {
+        let total = counts[*rule];
+        let distinct = scripts_with_rule.get(*rule).map_or(0, |s| s.len());
+        eprintln!("{rule}: {total} occurrence(s) across {distinct} script(s)");
+    }
+
+    eprintln!("\n{} script(s) failed to parse", parse_failures.len());
+    for (path, err) in parse_failures.iter().take(5) {
+        eprintln!("  {}: {err}", path.display());
+    }
+
+    for rule in &rules {
+        let distinct = scripts_with_rule.get(*rule).map_or(0, |s| s.len());
+        if distinct > 20 {
+            eprintln!("\n--- {rule} fires in {distinct} scripts, examples ---");
+            for (path, line, src, message) in examples.get(*rule).into_iter().flatten() {
+                eprintln!("{}:{line}: {src}\n    {message}", path.display());
+            }
+        }
+    }
+}
