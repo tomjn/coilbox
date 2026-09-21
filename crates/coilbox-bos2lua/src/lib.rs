@@ -24,7 +24,7 @@ pub struct Conversion {
     pub lua: String,
     /// Anything the Lua may do differently from the BOS, and any include that
     /// could not be found. Empty for a script that converted exactly.
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
     /// Whether the Lua keeps shared unit values as rules params. A game running
     /// it also wants [`COB_VARS_POLYFILL`] if its gadgets or widgets set or
     /// read them.
@@ -33,6 +33,58 @@ pub struct Conversion {
     /// is also a warning. A caller with no way to supply them, such as a
     /// pasted script, can treat any as a failure.
     pub missing_includes: Vec<String>,
+}
+
+/// Something a converted script may do differently from the BOS, or an
+/// include the preprocessor could not find.
+///
+/// Some name where in the source they come from, such as a macro used with
+/// the wrong number of arguments. Others name nowhere in particular, such as
+/// a script that will not fit inside Lua's own limits, and leave `file` and
+/// `line` `None`.
+#[derive(Clone, Debug)]
+pub struct Warning {
+    /// The file the warning is about, when it names one.
+    pub file: Option<String>,
+    /// The line inside that file, when the warning is about one.
+    pub line: Option<u32>,
+    /// Whether `file` is the script's own file rather than one it includes.
+    /// Always `false` when `file` is `None`.
+    pub main: bool,
+    pub message: String,
+}
+
+impl Warning {
+    /// A warning about nowhere in particular.
+    fn unlocated(message: String) -> Self {
+        Warning {
+            file: None,
+            line: None,
+            main: false,
+            message,
+        }
+    }
+
+    /// A warning that names the file and line it comes from.
+    fn at(file: String, line: u32, main: bool, message: String) -> Self {
+        Warning {
+            file: Some(file),
+            line: Some(line),
+            main,
+            message,
+        }
+    }
+}
+
+impl std::fmt::Display for Warning {
+    /// Exactly the wording a located warning used to carry in its own message,
+    /// before its file and line moved out into their own fields.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (&self.file, self.line) {
+            (Some(file), Some(line)) => write!(f, "{file} line {line}: {}", self.message),
+            _ => write!(f, "{}", self.message),
+        }
+    }
 }
 
 pub struct Options<'a> {

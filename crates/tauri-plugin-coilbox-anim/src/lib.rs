@@ -220,7 +220,12 @@ async fn anim_bos2lua(
     match result {
         Ok(Ok((conversion, linear_scale))) => CliResult::ok(json!({
             "lua": conversion.lua,
-            "warnings": conversion.warnings,
+            "warnings": conversion.warnings.iter().map(|w| json!({
+                "file": w.file,
+                "line": w.line,
+                "message": w.message,
+                "main": w.main,
+            })).collect::<Vec<_>>(),
             "linearScale": linear_scale,
             "cobVars": conversion
                 .shared_values
