@@ -190,6 +190,67 @@ describe("background music", () => {
     expect(FakeAudio.last?.paused ?? true).toBe(true);
   });
 
+  it("throws away a track that arrives after the player switched game", async () => {
+    // Reading a track out of a .sdz is slow enough that switching game twice
+    // leaves two loads in flight. Whichever finishes last used to win, so the
+    // loser revoked the winner's blob URL out from under the audio element and
+    // the music stopped dead with no error anywhere.
+    profileSound.mockReturnValue(null);
+    const revoked: string[] = [];
+    URL.revokeObjectURL = (u: string) => revoked.push(u);
+
+    const music = await import("./music");
+    let releaseFirst: (url: string) => void = () => {};
+    music.setArchiveResolver(
+      () =>
+        new Promise<string | null>((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+    music.setMusicLevel(1, false);
+    music.setMusicWanted(true);
+    music.setTracks([{ kind: "archive", path: "GameA/a.ogg", label: "a" }]);
+    await flush();
+
+    // The player picks a different game before the first track arrives. Each
+    // call hands back a distinct URL, the way createObjectURL really does, so
+    // the discarded load can be told from the one that wins.
+    let nth = 0;
+    music.setArchiveResolver(async () => `blob:from-game-b-${++nth}`);
+    music.setTracks([{ kind: "archive", path: "GameB/b.ogg", label: "b" }]);
+    await flush();
+    const playing = FakeAudio.last?.src;
+    expect(playing).toMatch(/^blob:from-game-b-/);
+
+    // The abandoned one now turns up. It must not take the speaker.
+    releaseFirst("blob:from-game-a");
+    await flush();
+    expect(FakeAudio.last?.src).toBe(playing);
+    // And it must be freed rather than leaked, since nothing else holds it.
+    expect(revoked).toContain("blob:from-game-a");
+    // Whatever is actually playing is still owned by the element.
+    expect(revoked).not.toContain(playing);
+  });
+
+  it("stops playing when handed an empty track list", async () => {
+    // The contract `GameMusic` leans on. Picking a game with no music has to
+    // clear the list rather than skip the call, or the previous game's tracks
+    // keep looping against a resolver now pointed at a different archive. That
+    // caller-side half is not covered here, only the guarantee it relies on.
+    profileSound.mockReturnValue(null);
+    const music = await import("./music");
+    music.setArchiveResolver(async () => "blob:a");
+    music.setMusicLevel(1, false);
+    music.setMusicWanted(true);
+    music.setTracks([{ kind: "archive", path: "GameA/a.ogg", label: "a" }]);
+    await flush();
+    expect(FakeAudio.last?.paused).toBe(false);
+
+    music.setTracks([]);
+    await flush();
+    expect(FakeAudio.last?.paused).toBe(true);
+  });
+
   it("skips past a track that will not load", async () => {
     // One missing file in a distribution's list should cost that track, not
     // the whole soundtrack.

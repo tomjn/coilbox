@@ -81,11 +81,29 @@ function releaseBlob(): void {
   blobUrl = null;
 }
 
-async function urlFor(track: Track): Promise<string | null> {
+/**
+ * Bumped by anything that makes an in-flight load irrelevant: a new track list,
+ * or starting a different track. A load that finishes holding a stale number
+ * throws its result away instead of stamping it over whatever is playing now.
+ *
+ * Reading a track out of a `.sdz` is slow enough for two loads to overlap
+ * easily. Switching game twice in a few seconds is all it takes, and without
+ * this the loser of the race revokes the winner's blob URL out from under the
+ * element, which stops the music dead with no error anywhere.
+ */
+let loadToken = 0;
+
+async function urlFor(track: Track, token: number): Promise<string | null> {
   if (track.kind === "portable") return assetUrl(track.path);
   if (!archiveResolver) return null;
   const url = await archiveResolver(track.path);
   if (!url) return null;
+  if (token !== loadToken) {
+    // Someone else's track is playing now. This one was fetched for nothing,
+    // so free it rather than leaking it.
+    URL.revokeObjectURL(url);
+    return null;
+  }
   // Only after the new one exists, so a failed load leaves the old track
   // playable rather than killing the music outright.
   releaseBlob();
@@ -97,12 +115,14 @@ async function playCurrent(): Promise<void> {
   const el = ensureElement();
   const track = queue[index];
   if (!el || !track) return;
-  const url = await urlFor(track);
+  loadToken += 1;
+  const token = loadToken;
+  const url = await urlFor(track, token);
   // Fetching an archive track takes long enough for the player to have changed
   // their mind, or to have launched a game. Without this re-check, a pause that
   // lands mid-fetch is undone the moment the bytes arrive, and the music starts
   // playing with the button saying it is stopped.
-  if (!url || !shouldPlay()) return;
+  if (!url || token !== loadToken || !shouldPlay()) return;
   el.src = url;
   el.volume = level;
   try {
@@ -111,7 +131,7 @@ async function playCurrent(): Promise<void> {
     // Autoplay can be refused before the player has interacted with the window.
     // The next call after a click succeeds, so there is nothing to recover here.
   }
-  if (!shouldPlay()) el.pause();
+  if (token !== loadToken || !shouldPlay()) el.pause();
 }
 
 /** Load the profile's tracks. Safe to call when it ships none. */
@@ -132,6 +152,10 @@ export function initMusic(): void {
 export function setTracks(tracks: Track[], shuffle = false): void {
   queue = buildQueue(tracks, shuffle);
   index = 0;
+  // Anything still loading belongs to the list being replaced. Retiring the
+  // token here is what stops the previous game's track arriving late and
+  // playing over the one the player just chose.
+  loadToken += 1;
   releaseBlob();
   element?.pause();
   apply();

@@ -14,8 +14,12 @@ import { AUDIO_EXTS } from "@/lib/assetUrl";
  *
  * The rest ship a `music.lua` and no audio, or nothing at all. So the rule here
  * is a path with a `music` directory segment in it, which covers both layouts
- * without either being hardcoded, and would pick up a third game that invents
- * its own.
+ * without hardcoding either.
+ *
+ * It is a guess beyond those two, not a standard. A game filing its soundtrack
+ * under `bgm/`, `ost/` or `audio/tracks/` would find nothing here, and the
+ * symptom is silence rather than an error. Widen the rule when a real game
+ * turns up that needs it, rather than in anticipation.
  */
 
 /**
