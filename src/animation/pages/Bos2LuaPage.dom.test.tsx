@@ -20,7 +20,10 @@ import type { LintDiagnostic } from "../bindings";
 const { animBos2lua, animBosLint, animBosRead, open } = vi.hoisted(() => ({
   animBos2lua: vi.fn(async () => ({
     lua: 'local base = piece("base")\nfunction script.Create()\nend',
-    warnings: ["first difference", "second difference"],
+    warnings: [
+      { file: null, line: null, message: "first difference" },
+      { file: null, line: null, message: "second difference" },
+    ],
     linearScale: 65536,
     cobVars: "-- cob_vars" as string | null,
     missingIncludes: [] as string[],
@@ -95,7 +98,7 @@ describe("the BOS to Lua page", () => {
       expect(screen.getByText("first difference")).toBeTruthy(),
     );
     expect(screen.getByText("second difference")).toBeTruthy();
-    expect(screen.getByText("Conversion warnings")).toBeTruthy();
+    expect(screen.getByText(/Conversion warnings/)).toBeTruthy();
   });
 
   it("puts lint problems in the same Checks drawer, above conversion warnings", async () => {
@@ -115,7 +118,7 @@ describe("the BOS to Lua page", () => {
     // it has run.
     fireEvent.click(await screen.findByRole("button", { name: /3 checks/ }));
     await waitFor(() =>
-      expect(screen.getByText("Problems in the BOS")).toBeTruthy(),
+      expect(screen.getByText(/Problems in the BOS/)).toBeTruthy(),
     );
     expect(screen.getByText(/never finishes/)).toBeTruthy();
   });
@@ -186,7 +189,7 @@ describe("the BOS to Lua page", () => {
     });
     fireEvent.click(problem);
     await waitFor(() =>
-      expect(screen.queryByText("Problems in the BOS")).toBeNull(),
+      expect(screen.queryByText(/Problems in the BOS/)).toBeNull(),
     );
   });
 

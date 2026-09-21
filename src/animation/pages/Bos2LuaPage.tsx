@@ -20,6 +20,12 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  CheckItem,
+  CheckSection,
+  SEVERITY_COLOR,
+  worstSeverity,
+} from "@/components/CheckItem";
 import { CheckField } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
@@ -34,10 +40,11 @@ import {
   animBos2lua,
   animBosLint,
   animBosRead,
+  type ConversionWarning,
   type LintDiagnostic,
 } from "../bindings";
 import { BosSource } from "./BosSource";
-import { LintProblems, SEVERITY_COLOR, worstSeverity } from "./LintProblems";
+import { LintProblems } from "./LintProblems";
 
 /** `Input` forwards `ref` at runtime but its type has none, and the find box
  *  needs its node to take focus on Cmd/Ctrl+F. See `MissionLuaView`. */
@@ -58,7 +65,7 @@ Create()
 
 interface Converted {
   lua: string;
-  warnings: string[];
+  warnings: ConversionWarning[];
   cobVars: string | null;
   error: string | null;
 }
@@ -66,6 +73,16 @@ interface Converted {
 const BOS = /\.bos$/i;
 
 const EMPTY: Converted = { lua: "", warnings: [], cobVars: null, error: null };
+
+/** Where a conversion warning is shown as pointing: a bare line in the main
+ *  script, the included file's own name and line for one that came from
+ *  elsewhere, or nothing for a warning that names no location at all. */
+function warningLocation(warning: ConversionWarning): string | undefined {
+  if (warning.file === null || warning.line === null) return undefined;
+  if (warning.main) return `line ${warning.line}`;
+  const name = warning.file.split(/[\\/]/).pop() ?? warning.file;
+  return `${name}:${warning.line}`;
+}
 
 /**
  * BOS → Lua unit-script converter. Converts as you type through the Rust
@@ -168,17 +185,31 @@ export default function Bos2LuaPage() {
   }, [bos]);
 
   // 0-indexed line -> its error/warning diagnostics, for BosSource's gutter
-  // mark and row tint. Info is left out: it is not worth the eye inline.
+  // mark and row tint. Info is left out: it is not worth the eye inline. A
+  // conversion warning located in the main file gets the same mark, so the
+  // gutter does not draw a line between the two kinds of problem.
   const lineProblems = useMemo(() => {
     const map = new Map<number, LintDiagnostic[]>();
-    for (const d of diagnostics) {
-      if (d.severity === "info") continue;
+    const add = (d: LintDiagnostic) => {
       const list = map.get(d.line - 1);
       if (list) list.push(d);
       else map.set(d.line - 1, [d]);
+    };
+    for (const d of diagnostics) {
+      if (d.severity === "info") continue;
+      add(d);
+    }
+    for (const w of converted.warnings) {
+      if (!w.main || w.line === null) continue;
+      add({
+        rule: "conversion",
+        severity: "warning",
+        line: w.line,
+        message: w.message,
+      });
     }
     return map;
-  }, [diagnostics]);
+  }, [diagnostics, converted.warnings]);
 
   async function loadPath(picked: string) {
     try {
@@ -514,28 +545,39 @@ export default function Bos2LuaPage() {
       >
         <div className="flex flex-col gap-5 text-sm">
           {(problemCount > 0 || lintError) && (
-            <section className="flex flex-col gap-2">
-              <h3 className="font-medium text-sm">Problems in the BOS</h3>
-              <LintProblems
-                diagnostics={diagnostics}
-                error={lintError}
-                selectedLine={selectedLine}
-                onSelect={(line) => {
-                  setSelectedLine(line);
-                  setChecksOpen(false);
-                }}
-              />
-            </section>
+            <LintProblems
+              diagnostics={diagnostics}
+              error={lintError}
+              onSelect={(line) => {
+                setSelectedLine(line);
+                setChecksOpen(false);
+              }}
+            />
           )}
           {warningCount > 0 && (
-            <section className="flex flex-col gap-2">
-              <h3 className="font-medium text-sm">Conversion warnings</h3>
-              <ul className="flex list-disc flex-col gap-2 pl-4">
-                {converted.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
-              </ul>
-            </section>
+            <CheckSection title="Conversion warnings" count={warningCount}>
+              {converted.warnings.map((warning, i) => {
+                const jumpTo = warning.main ? warning.line : null;
+                return (
+                  <CheckItem
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a warning carries no id of its own, and two can share a file, line and message
+                    key={i}
+                    severity="warning"
+                    location={warningLocation(warning)}
+                    message={warning.message}
+                    tag="conversion"
+                    onSelect={
+                      jumpTo === null
+                        ? undefined
+                        : () => {
+                            setSelectedLine(jumpTo);
+                            setChecksOpen(false);
+                          }
+                    }
+                  />
+                );
+              })}
+            </CheckSection>
           )}
         </div>
       </Drawer>

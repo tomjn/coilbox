@@ -38,11 +38,12 @@ const DIAGNOSTICS: LintDiagnostic[] = [
 describe("the lint problems list", () => {
   it("shows each diagnostic's line, message and rule", () => {
     render(<LintProblems diagnostics={DIAGNOSTICS} />);
-    expect(screen.getByText(/line 3:/)).toBeTruthy();
+    expect(screen.getByText("line 3")).toBeTruthy();
     expect(screen.getByText(/flare.*is declared as a piece/)).toBeTruthy();
     expect(screen.getByText("unused-piece")).toBeTruthy();
     expect(screen.getByText("speed-zero")).toBeTruthy();
     expect(screen.getByText("invalid-call")).toBeTruthy();
+    expect(screen.getByText(/Problems in the BOS/)).toBeTruthy();
   });
 
   it("hands the row's line back to onSelect when clicked", () => {

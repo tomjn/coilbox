@@ -18,6 +18,11 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  SEVERITY_COLOR,
+  SEVERITY_ICON,
+  worstSeverity,
+} from "@/components/CheckItem";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -27,7 +32,6 @@ import {
 } from "@/components/ui/tooltip";
 import type { LuaMatch } from "@/scenario/pages/components/missionLuaSearch";
 import type { LintDiagnostic } from "../bindings";
-import { SEVERITY_COLOR, SEVERITY_ICON, worstSeverity } from "./LintProblems";
 
 const TEXT =
   "font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:break-word]";

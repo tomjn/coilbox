@@ -61,6 +61,23 @@ export const animBos2cob = defineCommand<
 >("coilbox-anim", "anim_bos2cob");
 
 /**
+ * One thing a conversion did differently from the BOS, or an include that
+ * could not be found.
+ *
+ * `file` and `line` name where in the source it comes from, when it names
+ * anywhere at all: some, such as a script too big for Lua's own limits, name
+ * nowhere in particular and leave both `null`. `main` says whether `file` is
+ * the script's own file rather than one it includes, so a caller can tell
+ * which warnings it can jump to in the box showing that file.
+ */
+export interface ConversionWarning {
+  file: string | null;
+  line: number | null;
+  message: string;
+  main?: boolean;
+}
+
+/**
  * Convert BOS source to a Lua unit script that runs as it is, comments and all.
  *
  * `includes` is the files it may `#include`, keyed by path. `pieces` is the
@@ -86,7 +103,7 @@ export const animBos2lua = defineCommand<
   },
   {
     lua: string;
-    warnings: string[];
+    warnings: ConversionWarning[];
     linearScale: number;
     cobVars: string | null;
     missingIncludes: string[];

@@ -14,6 +14,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SEVERITY_COLOR, worstSeverity } from "@/components/CheckItem";
 import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
 import { errorText } from "@/lib/helpers";
@@ -24,7 +25,7 @@ import {
   animCobDisasm,
   type LintDiagnostic,
 } from "../bindings";
-import { LintProblems, SEVERITY_COLOR, worstSeverity } from "./LintProblems";
+import { LintProblems } from "./LintProblems";
 
 const COB = /\.cob$/i;
 const BOS = /\.bos$/i;
