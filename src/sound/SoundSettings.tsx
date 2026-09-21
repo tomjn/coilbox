@@ -3,6 +3,7 @@ import { Pause, Play } from "lucide-react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { getProfileSound } from "@/profile/profile";
 import {
   EVENTS,
   type EventId,
@@ -18,7 +19,7 @@ import {
 } from "./events";
 import { LevelRow } from "./LevelRow";
 import { isSoundId, SOUND_IDS, SOUNDS } from "./library";
-import { hasMusic } from "./music";
+import { MusicSource } from "./MusicSource";
 import { playEvent } from "./play";
 import {
   DEFAULT_SOUND_VOLUME,
@@ -28,6 +29,7 @@ import {
   SOUND_MUTED_KEY,
   SOUND_VOLUME_KEY,
 } from "./SoundProvider";
+import { useGameMusic } from "./useGameMusic";
 
 /** Settings section at /settings/sound. */
 export default function SoundSettings() {
@@ -36,6 +38,10 @@ export default function SoundSettings() {
     DEFAULT_SOUND_VOLUME,
   );
   const [muted, setMuted] = useSetting<boolean>(SOUND_MUTED_KEY, false);
+  // Derived from the hook rather than from the player's module state, so
+  // picking a game with music makes the Music group appear straight away.
+  const { tracks } = useGameMusic();
+  const anyMusic = getProfileSound() !== null || tracks.length > 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -83,9 +89,16 @@ export default function SoundSettings() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Music
+        </h2>
+        <MusicSource />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Groups
         </h2>
-        {visibleGroupIds(hasMusic()).map((id) => (
+        {visibleGroupIds(anyMusic).map((id) => (
           <div key={id} className="flex items-center justify-between gap-4">
             <span className="flex flex-col">
               <span className="text-sm font-medium">{GROUPS[id].label}</span>
