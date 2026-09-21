@@ -32,22 +32,6 @@ fn fires(source: &str, rule: &str) -> bool {
 }
 
 #[test]
-fn unused_piece_flags_a_piece_nothing_names() {
-    assert!(fires(
-        "piece used, unused;\nF() { turn used to x-axis <90> speed <10>; }",
-        "unused-piece"
-    ));
-    assert!(!fires("piece flare;\nF() { hide flare; }", "unused-piece"));
-}
-
-#[test]
-fn unused_piece_is_info_severity() {
-    let diags = lint_src("piece unused;\nF() { }");
-    let d = diags.iter().find(|d| d.rule == "unused-piece").unwrap();
-    assert_eq!(d.severity, Severity::Info);
-}
-
-#[test]
 fn unused_static_flags_a_write_with_no_read() {
     assert!(fires(
         "static-var dead;\nF() { dead = 1; }",
@@ -57,6 +41,13 @@ fn unused_static_flags_a_write_with_no_read() {
         "static-var live;\nF() { call-script G(live); }\nG(v) { }",
         "unused-static"
     ));
+}
+
+#[test]
+fn unused_static_is_info_severity() {
+    let diags = lint_src("static-var dead;\nF() { dead = 1; }");
+    let d = diags.iter().find(|d| d.rule == "unused-static").unwrap();
+    assert_eq!(d.severity, Severity::Info);
 }
 
 #[test]
@@ -170,31 +161,15 @@ fn duplicate_animation_flags_a_repeated_command() {
 }
 
 #[test]
-fn duplicate_if_flags_a_repeated_condition() {
-    assert!(fires(
-        "F() { if (a) { sleep 1; } if (a) { sleep 2; } }",
-        "duplicate-if"
-    ));
-    assert!(!fires(
-        "F() { if (a) { sleep 1; } if (b) { sleep 2; } }",
-        "duplicate-if"
-    ));
-}
-
-#[test]
-fn sleep_only_guard_flags_an_if_with_only_a_sleep() {
-    assert!(fires("F() { if (a) { sleep 100; } }", "sleep-only-guard"));
-    assert!(!fires(
-        "F() { if (a) { sleep 100; } else { turn p to x-axis <0> speed <10>; } }",
-        "sleep-only-guard"
-    ));
-}
-
-#[test]
 fn empty_function_flags_an_empty_body_except_a_callin() {
     assert!(fires("Empty() { }", "empty-function"));
     // Create is a real call-in, and an empty one is a deliberate stub.
     assert!(!fires("Create() { }", "empty-function"));
+}
+
+#[test]
+fn empty_function_skips_a_lua_prefixed_stub() {
+    assert!(!fires("lua_setSpeed(v) { }", "empty-function"));
 }
 
 #[test]
@@ -262,18 +237,6 @@ fn fires_with_pieces(source: &str, pieces: &[String], rule: &str) -> bool {
     lint_with(source, &HashMap::new(), Some(pieces))
         .iter()
         .any(|d| d.rule == rule)
-}
-
-#[test]
-fn weapon_without_aim_flags_a_query_with_no_aim() {
-    assert!(fires(
-        "QueryWeapon1(piecenum) { piecenum = flare; }",
-        "weapon-without-aim"
-    ));
-    assert!(!fires(
-        "QueryWeapon1(piecenum) { piecenum = flare; }\nAimWeapon1(heading, pitch) { return (1); }",
-        "weapon-without-aim"
-    ));
 }
 
 #[test]

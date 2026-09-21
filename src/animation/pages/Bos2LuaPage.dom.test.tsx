@@ -102,10 +102,10 @@ describe("the BOS to Lua page", () => {
     animBosLint.mockResolvedValue({
       diagnostics: [
         {
-          rule: "unused-piece",
-          severity: "info",
+          rule: "speed-zero",
+          severity: "warning",
           line: 1,
-          message: "`base` is declared as a piece but nothing names it.",
+          message: "`turn` at speed 0 never finishes.",
         },
       ],
       error: undefined,
@@ -117,9 +117,52 @@ describe("the BOS to Lua page", () => {
     await waitFor(() =>
       expect(screen.getByText("Problems in the BOS")).toBeTruthy(),
     );
-    expect(
-      screen.getByText(/is declared as a piece but nothing names it/),
-    ).toBeTruthy();
+    expect(screen.getByText(/never finishes/)).toBeTruthy();
+  });
+
+  it("lists an info diagnostic in the drawer without counting it on the button", async () => {
+    animBosLint.mockResolvedValue({
+      diagnostics: [
+        {
+          rule: "unused-static",
+          severity: "info",
+          line: 1,
+          message: "`base` is declared with `static-var` but never read.",
+        },
+      ],
+      error: undefined,
+    });
+    await loadCarrier();
+    // Two conversion warnings, no error or warning diagnostics: the info
+    // above does not add to the count.
+    fireEvent.click(await screen.findByRole("button", { name: /2 checks/ }));
+    await waitFor(() =>
+      expect(screen.getByText(/but never read/)).toBeTruthy(),
+    );
+  });
+
+  it("shows a neutral notes button when only info diagnostics exist", async () => {
+    animBos2lua.mockResolvedValueOnce({
+      lua: 'local base = piece("base")\nfunction script.Create()\nend',
+      warnings: [],
+      linearScale: 65536,
+      cobVars: null,
+      missingIncludes: [],
+    });
+    animBosLint.mockResolvedValue({
+      diagnostics: [
+        {
+          rule: "unused-static",
+          severity: "info",
+          line: 1,
+          message: "`base` is declared with `static-var` but never read.",
+        },
+      ],
+      error: undefined,
+    });
+    await loadCarrier();
+    const button = await screen.findByRole("button", { name: /1 note/ });
+    expect(button.className).not.toMatch(/text-destructive|text-amber/);
   });
 
   it("closes the drawer and scrolls to the line when a problem is picked", async () => {

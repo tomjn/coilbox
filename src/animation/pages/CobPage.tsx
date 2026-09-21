@@ -207,6 +207,11 @@ export default function CobPage() {
   }, []);
 
   const BannerIcon = banner ? BANNER_ICONS[banner.kind] : null;
+  // The button's count is only what needs acting on: errors and warnings. An
+  // info diagnostic still lists in the drawer, but does not add to the
+  // number on the button.
+  const infoCount = diagnostics.filter((d) => d.severity === "info").length;
+  const severeCount = diagnostics.length - infoCount;
   const showChecks = kind === "bos" && (diagnostics.length > 0 || !!lintError);
   const checksSeverity = lintError
     ? "error"
@@ -266,13 +271,23 @@ export default function CobPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className={checksSeverity ? SEVERITY_COLOR[checksSeverity] : ""}
+                className={
+                  severeCount > 0 && checksSeverity
+                    ? SEVERITY_COLOR[checksSeverity]
+                    : ""
+                }
                 onClick={() => setChecksOpen(true)}
               >
-                <TriangleAlert className="size-4" />
-                {diagnostics.length > 0
-                  ? `${diagnostics.length} ${diagnostics.length === 1 ? "check" : "checks"}`
-                  : "Parse error"}
+                {severeCount > 0 || lintError ? (
+                  <TriangleAlert className="size-4" />
+                ) : (
+                  <Info className="size-4" />
+                )}
+                {lintError
+                  ? "Parse error"
+                  : severeCount > 0
+                    ? `${severeCount} ${severeCount === 1 ? "check" : "checks"}`
+                    : `${infoCount} ${infoCount === 1 ? "note" : "notes"}`}
               </Button>
             )}
           </>

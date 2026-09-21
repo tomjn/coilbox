@@ -14,6 +14,21 @@
 //! real scripts games ship. Also not implemented: an unnamed-global rule,
 //! because that only ever arises from a decompiled script, and coilbox has no
 //! decompiler.
+//!
+//! Also removed after a sweep of 891 real scripts, once each had shown itself
+//! to be noise rather than a real problem:
+//!
+//! - `weapon-without-aim`, because `AimWeapon1` is a convention of the Lua
+//!   unit script framework, not the engine's COB runtime, which calls each
+//!   weapon's call-ins directly. It stays as a conversion warning in
+//!   `emit.rs`.
+//! - `sleep-only-guard`, because guarding a `sleep delay` call with
+//!   `if (delay > 0)` is ordinary and correct.
+//! - `duplicate-if`, because it fired in 263 of the 891 scripts, on gait
+//!   phases that deliberately re-check the same flag.
+//! - `unused-piece`, because it fired in 617 of the 891 scripts, and pieces
+//!   usually exist to fill out the model hierarchy rather than to be named
+//!   anywhere.
 
 use crate::emit::{exprs_in, names_in};
 use crate::parse::{Expr, Func, ItemKind, Stmt, StmtKind};
@@ -79,20 +94,12 @@ pub fn lint(source: &str, options: &LintOptions) -> Result<Vec<Diagnostic>, Stri
     let (pieces, statics) = declared_names(&pre.tokens);
     let mut out = Vec::new();
 
-    unused_names_rule("unused-piece", Severity::Info, &pieces, &funcs, &mut out);
-    unused_names_rule(
-        "unused-static",
-        Severity::Warning,
-        &statics,
-        &funcs,
-        &mut out,
-    );
+    unused_names_rule(&statics, &funcs, &mut out);
     for f in &main_funcs {
         unused_local_rule(f, &mut out);
         speed_zero_rule(f, &pre.constants, &mut out);
         dead_code_rule(f, &pre.constants, &mut out);
         always_true_rule(f, &pre.constants, &mut out);
-        sleep_only_guard_rule(f, &mut out);
         raw_signal_rule(f, &mut out);
         empty_function_rule(f, &mut out);
         callin_name_rule(f, &mut out);
@@ -107,13 +114,11 @@ pub fn lint(source: &str, options: &LintOptions) -> Result<Vec<Diagnostic>, Stri
     }
     recursive_call_rule(&funcs, &mut out);
     signal_never_signalled_rule(&funcs, &pre.constants, &mut out);
-    weapon_without_aim_rule(&funcs, &mut out);
     let mut blocks: Vec<&[Stmt]> = Vec::new();
     for f in &funcs {
         collect_blocks(&f.body, &mut blocks);
     }
     duplicate_animation_rule(&blocks, &mut out);
-    duplicate_if_rule(&blocks, &mut out);
     if let Some(model) = options.pieces {
         missing_piece_rule(&pieces, model, &mut out);
     }
@@ -196,9 +201,7 @@ fn piece_target(k: &StmtKind) -> Option<&str> {
 /// Every name read anywhere in the tree, lower-cased: every piece-carrying
 /// statement's piece, and every `Expr::Name` any statement's expressions
 /// mention. A plain assignment's own target is not in here, since writing a
-/// name is not reading it, which is exactly what `unused-static` needs, and
-/// pieces are never assignment targets in real scripts, so the same set
-/// answers `unused-piece` too.
+/// name is not reading it, which is exactly what `unused-static` needs.
 fn mentioned_names(funcs: &[&Func]) -> HashSet<String> {
     let mut used = HashSet::new();
     let mut consts = HashSet::new();
@@ -216,40 +219,25 @@ fn mentioned_names(funcs: &[&Func]) -> HashSet<String> {
 }
 
 fn unused_names_rule(
-    rule: &'static str,
-    severity: Severity,
     declared: &[(String, u32, usize)],
     funcs: &[&Func],
     out: &mut Vec<Diagnostic>,
 ) {
     let used = mentioned_names(funcs);
     let mut seen = HashSet::new();
-    let noun = if rule == "unused-piece" {
-        "a piece"
-    } else {
-        "with `static-var`"
-    };
     for (name, line, file) in declared {
         if *file != 0 || !seen.insert(name.to_lowercase()) {
             continue;
         }
         if !used.contains(&name.to_lowercase()) {
-            let message = if rule == "unused-piece" {
-                format!(
-                    "`{name}` is declared as {noun} but nothing in the script names it. \
-                     That's fine if it exists only to fill out the model's hierarchy."
-                )
-            } else {
-                format!(
-                    "`{name}` is declared {noun} but never read, so writing to it has no \
-                     effect anywhere else in the script."
-                )
-            };
             out.push(Diagnostic {
-                rule,
-                severity,
+                rule: "unused-static",
+                severity: Severity::Info,
                 line: *line,
-                message,
+                message: format!(
+                    "`{name}` is declared with `static-var` but never read, so writing to it has no \
+                     effect anywhere else in the script."
+                ),
             });
         }
     }
@@ -509,29 +497,6 @@ fn always_true_rule(
     });
 }
 
-fn sleep_only_guard_rule(f: &Func, out: &mut Vec<Diagnostic>) {
-    each_stmt(&f.body, &mut |s| {
-        if s.file != 0 {
-            return;
-        }
-        let StmtKind::If {
-            then, els: None, ..
-        } = &s.kind
-        else {
-            return;
-        };
-        let [only] = then.as_slice() else { return };
-        if matches!(only.kind, StmtKind::Sleep(_)) {
-            out.push(Diagnostic {
-                rule: "sleep-only-guard",
-                severity: Severity::Info,
-                line: s.line,
-                message: "the only thing this `if` guards is a `sleep`, so whatever the sleep delays happens on the same schedule whether the condition is true or not.".into(),
-            });
-        }
-    });
-}
-
 fn raw_signal_rule(f: &Func, out: &mut Vec<Diagnostic>) {
     each_stmt(&f.body, &mut |s| {
         if s.file != 0 {
@@ -713,6 +678,9 @@ fn empty_function_rule(f: &Func, out: &mut Vec<Diagnostic>) {
     if is_callin(&f.name) {
         return;
     }
+    if f.name.to_lowercase().starts_with("lua_") {
+        return;
+    }
     if is_empty_body(&f.body) {
         out.push(Diagnostic {
             rule: "empty-function",
@@ -790,26 +758,6 @@ fn signal_never_signalled_rule(
     }
 }
 
-fn weapon_without_aim_rule(funcs: &[&Func], out: &mut Vec<Diagnostic>) {
-    let names: HashSet<String> = funcs.iter().map(|f| f.name.to_lowercase()).collect();
-    if names.contains("aimweapon1") {
-        return;
-    }
-    let anchor = funcs
-        .iter()
-        .filter(|f| f.file == 0)
-        .filter(|f| (1..=32).any(|n| f.name.eq_ignore_ascii_case(&format!("QueryWeapon{n}"))))
-        .min_by_key(|f| f.line);
-    if let Some(f) = anchor {
-        out.push(Diagnostic {
-            rule: "weapon-without-aim",
-            severity: Severity::Warning,
-            line: f.line,
-            message: "the unit script framework only turns weapon call-ins on when `AimWeapon1` exists, and this script has none, so its weapons never aim.".into(),
-        });
-    }
-}
-
 fn is_animation(k: &StmtKind) -> bool {
     matches!(
         k,
@@ -834,30 +782,6 @@ fn duplicate_animation_rule(blocks: &[&[Stmt]], out: &mut Vec<Diagnostic>) {
                     severity: Severity::Warning,
                     line: b.line,
                     message: "this repeats the animation right before it with nothing in between, so the first one has no visible effect.".into(),
-                });
-            }
-        }
-    }
-}
-
-fn duplicate_if_rule(blocks: &[&[Stmt]], out: &mut Vec<Diagnostic>) {
-    for block in blocks {
-        for pair in block.windows(2) {
-            let [a, b] = pair else { continue };
-            if b.file != 0 {
-                continue;
-            }
-            let (StmtKind::If { cond: ca, .. }, StmtKind::If { cond: cb, .. }) = (&a.kind, &b.kind)
-            else {
-                continue;
-            };
-            if format!("{ca:?}") == format!("{cb:?}") {
-                out.push(Diagnostic {
-                    rule: "duplicate-if",
-                    severity: Severity::Info,
-                    line: b.line,
-                    message: "this `if` tests the same condition as the one right before it."
-                        .into(),
                 });
             }
         }

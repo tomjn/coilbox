@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Copy,
   FileCode2,
+  Info,
   Search,
   TriangleAlert,
   Upload,
@@ -276,14 +277,18 @@ export default function Bos2LuaPage() {
   const searching = query.trim() !== "";
   const warningCount = converted.warnings.length;
   const problemCount = diagnostics.length;
-  const totalChecks = problemCount + warningCount;
+  // The button's count is only what needs acting on: errors, lint warnings
+  // and conversion warnings. An info diagnostic still lists in the drawer,
+  // but does not add to the number on the button.
+  const infoCount = diagnostics.filter((d) => d.severity === "info").length;
+  const severeCount = problemCount - infoCount + warningCount;
   const checksSeverity = lintError
     ? "error"
     : worstSeverity([
         ...diagnostics.map((d) => d.severity),
         ...(warningCount > 0 ? (["warning"] as const) : []),
       ]);
-  const showChecks = totalChecks > 0 || !!lintError;
+  const showChecks = severeCount > 0 || infoCount > 0 || !!lintError;
 
   async function copy(text: string, which: "lua" | "cobVars") {
     if (!text) return;
@@ -319,13 +324,23 @@ export default function Bos2LuaPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className={checksSeverity ? SEVERITY_COLOR[checksSeverity] : ""}
+                className={
+                  severeCount > 0 && checksSeverity
+                    ? SEVERITY_COLOR[checksSeverity]
+                    : ""
+                }
                 onClick={() => setChecksOpen(true)}
               >
-                <TriangleAlert className="size-4" />
-                {totalChecks > 0
-                  ? `${totalChecks} ${totalChecks === 1 ? "check" : "checks"}`
-                  : "Parse error"}
+                {severeCount > 0 || lintError ? (
+                  <TriangleAlert className="size-4" />
+                ) : (
+                  <Info className="size-4" />
+                )}
+                {lintError
+                  ? "Parse error"
+                  : severeCount > 0
+                    ? `${severeCount} ${severeCount === 1 ? "check" : "checks"}`
+                    : `${infoCount} ${infoCount === 1 ? "note" : "notes"}`}
               </Button>
             )}
             {converted.cobVars && (
