@@ -13,6 +13,7 @@ export function LevelRow({
   volumeKey,
   mutedKey,
   defaultMuted = false,
+  defaultVolume = 100,
   compact = false,
 }: {
   /** Used for the control ids, so the labels point at the right thing. */
@@ -23,10 +24,12 @@ export function LevelRow({
   mutedKey: string;
   /** Must match what SoundProvider pushes, or the switch lies about the sound. */
   defaultMuted?: boolean;
+  /** Also must match SoundProvider. Music takes its default from the profile. */
+  defaultVolume?: number;
   /** Tighter layout for a table cell, rather than a settings row. */
   compact?: boolean;
 }) {
-  const [volume, setVolume] = useSetting<number>(volumeKey, 100);
+  const [volume, setVolume] = useSetting<number>(volumeKey, defaultVolume);
   const [muted, setMuted] = useSetting<boolean>(mutedKey, defaultMuted);
 
   return (

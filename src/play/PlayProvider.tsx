@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { setMusicSuspended } from "@/sound/music";
 import { playEvent } from "@/sound/play";
 import {
   type BattleConfig,
@@ -153,6 +154,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   const clearRun = useCallback(() => {
     runningRef.current = false;
     activeRunIdRef.current = null;
+    setMusicSuspended("game", false);
     setRunning(false);
     setActiveRunId(null);
     setKind(null);
@@ -190,6 +192,10 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       // is somebody else acting and has to reach you across the room, this one
       // is you pressing the button and already looking at the screen.
       playEvent("launch");
+      // The engine is about to take the screen and make its own noise, so the
+      // lobby soundtrack stops until it exits. Cleared in `clearRun`, which
+      // every ending goes through including a crash or a cancel.
+      setMusicSuspended("game", true);
       // Recorded before the engine starts, so crash triage can tell this run's
       // log from the one an earlier session left behind (#379).
       const startedAtMs = Date.now();

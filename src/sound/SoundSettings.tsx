@@ -1,5 +1,5 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Play } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -14,13 +14,17 @@ import {
   groupMutedKey,
   groupVolumeKey,
   VISIBLE_EVENT_IDS,
-  VISIBLE_GROUP_IDS,
+  visibleGroupIds,
 } from "./events";
 import { LevelRow } from "./LevelRow";
 import { isSoundId, SOUND_IDS, SOUNDS } from "./library";
+import { hasMusic } from "./music";
 import { playEvent } from "./play";
 import {
   DEFAULT_SOUND_VOLUME,
+  defaultMusicVolume,
+  MUSIC_PLAYING_KEY,
+  musicOnByDefault,
   SOUND_MUTED_KEY,
   SOUND_VOLUME_KEY,
 } from "./SoundProvider";
@@ -81,7 +85,7 @@ export default function SoundSettings() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Groups
         </h2>
-        {VISIBLE_GROUP_IDS.map((id) => (
+        {visibleGroupIds(hasMusic()).map((id) => (
           <div key={id} className="flex items-center justify-between gap-4">
             <span className="flex flex-col">
               <span className="text-sm font-medium">{GROUPS[id].label}</span>
@@ -89,14 +93,18 @@ export default function SoundSettings() {
                 {GROUPS[id].description}
               </span>
             </span>
-            <LevelRow
-              id={`sound-group-${id}`}
-              label={GROUPS[id].label}
-              volumeKey={groupVolumeKey(id)}
-              mutedKey={groupMutedKey(id)}
-              defaultMuted={groupMutedByDefault(id)}
-              compact
-            />
+            <div className="flex items-center gap-3">
+              {id === "music" && <MusicToggle />}
+              <LevelRow
+                id={`sound-group-${id}`}
+                label={GROUPS[id].label}
+                volumeKey={groupVolumeKey(id)}
+                mutedKey={groupMutedKey(id)}
+                defaultMuted={groupMutedByDefault(id)}
+                defaultVolume={id === "music" ? defaultMusicVolume() : 100}
+                compact
+              />
+            </div>
           </div>
         ))}
       </section>
@@ -131,6 +139,28 @@ export default function SoundSettings() {
         </table>
       </section>
     </div>
+  );
+}
+
+/**
+ * Play and pause for the soundtrack. Separate from the group's mute, which is
+ * about how loud everything under it is. Pausing stops a track, muting leaves
+ * it where it was.
+ */
+function MusicToggle() {
+  const [playing, setPlaying] = useSetting<boolean>(
+    MUSIC_PLAYING_KEY,
+    musicOnByDefault(),
+  );
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setPlaying(!playing)}
+      aria-label={playing ? "Pause music" : "Play music"}
+    >
+      {playing ? <Pause /> : <Play />}
+    </Button>
   );
 }
 
