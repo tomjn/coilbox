@@ -194,15 +194,47 @@ fn alias(callin: &str) -> Option<String> {
     None
 }
 
-/// Whether a call-in is handed angles rather than plain numbers.
+/// The arguments a `.cob` expects for a call-in, from the Lua form a scenario
+/// is written in.
 ///
-/// The scenarios the builder offers are written in radians, because that is
-/// what the Lua unit script framework takes. A `.cob` counts angles in 65536ths
-/// of a circle, so the same instruction has to arrive here as a different
-/// number. Only aiming and building are handed angles at all.
-fn takes_angles(callin: &str) -> bool {
-    let callin = callin.to_ascii_lowercase();
-    callin.starts_with("aim") || callin == "startbuilding"
+/// The two runtimes are handed the same scenario and do not want the same
+/// numbers. Every difference below is the engine's, and each one is a different
+/// kind of difference:
+///
+/// - Aiming and building are handed angles. Lua takes radians, COB counts
+///   65536ths of a circle (`CobInstance.cpp:45-56`).
+/// - A transport identifies its passenger by unit id in Lua and by model height
+///   in 65536ths in COB (`LuaUnitScript.cpp:139-141` against
+///   `CobInstance.cpp:355-372`). The scenario's one number is the stand-in's
+///   height in elmos, which is the only form both can be built from.
+/// - `TransportDrop` takes x, y and z in Lua and one packed word in COB, with y
+///   dropped entirely (`CobInstance.cpp:385-395`, `PACKXZ` in
+///   `CobInstance.h:10`).
+///
+/// Everything else is handed straight through.
+///
+/// `QueryTransport` is not here. It is never fired as an event: it answers with
+/// a piece, and the preview asks it through the probe rather than driving it.
+fn cob_args(callin: &str, args: &[f64]) -> Vec<i32> {
+    let lower = callin.to_ascii_lowercase();
+
+    if lower.starts_with("aim") || lower == "startbuilding" {
+        return args.iter().map(|arg| (arg * RAD2TAANG) as i32).collect();
+    }
+
+    if lower == "begintransport" {
+        return args.iter().map(|arg| (arg * 65536.0) as i32).collect();
+    }
+
+    if lower == "transportdrop" {
+        // (unitID, x, y, z) becomes (unitID, PACKXZ(x, z)).
+        let id = args.first().copied().unwrap_or(0.0) as i32;
+        let x = args.get(1).copied().unwrap_or(0.0) as i32;
+        let z = args.get(3).copied().unwrap_or(0.0) as i32;
+        return vec![id, (x << 16) + (z & 0xffff)];
+    }
+
+    args.iter().map(|arg| *arg as i32).collect()
 }
 
 /// One frame of a script's call stack.
@@ -410,12 +442,7 @@ impl Run {
             );
             // Arguments arrive on the stack, the way a call leaves them, and
             // `CREATE_LOCAL_VAR` claims them one at a time.
-            let scale = if takes_angles(&event.callin) {
-                RAD2TAANG
-            } else {
-                1.0
-            };
-            thread.data = event.args.iter().map(|arg| (arg * scale) as i32).collect();
+            thread.data = cob_args(&event.callin, &event.args);
             thread.params = thread.data.len() as i32;
             self.add(thread)?;
 
