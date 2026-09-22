@@ -12,8 +12,9 @@
  * about it.
  */
 
-import type { StandInAttach, StandInKey, StandInTrack } from "./scriptPlayback";
+import * as THREE from "three";
 import type { UnitBounds } from "./s3oBuild";
+import type { StandInAttach, StandInKey, StandInTrack } from "./scriptPlayback";
 
 type Vec3 = [number, number, number];
 
@@ -126,4 +127,282 @@ export function attachedAt(
   if (frame < attach.frame) return null;
   if (attach.until !== null && frame >= attach.until) return null;
   return attach;
+}
+
+/**
+ * Which of the two candidate shapes is built.
+ *
+ * Both are here because the silhouette has to be judged by looking rather than
+ * specified: the case that matters is a low rear angle, where an upside-down
+ * sphere reads the same either way up. Screenshot both in the real viewport,
+ * keep the one that reads, delete the other.
+ */
+export const STAND_IN_SHAPE: "wedge" | "glacis" = "wedge";
+
+/**
+ * Neutral grey. Every other colour in this scene means something specific -
+ * violet is selection, orange is the collision volume, red is the aim point,
+ * sky blue is the reference figure - and the stand-in is a unit rather than a
+ * reading about one, so it takes none of them.
+ */
+const BODY_COLOUR = 0x9ca3af;
+/**
+ * The nose facet. Teal is the one place on the wheel nothing in this scene
+ * already occupies, and it is what says which way the thing is facing from any
+ * angle the silhouette alone does not.
+ */
+const NOSE_COLOUR = 0x14b8a6;
+
+/** How tall the shape is, in multiples of its radius. `STAND_IN_MID_Y` is half
+ *  this, which is where its middle sits. */
+const HEIGHT = STAND_IN_MID_Y * 2;
+/** How far past the radius the nose reaches, in multiples of the radius. What
+ *  makes a shape seen from behind different from one seen in front. */
+const NOSE_REACH = 1.35;
+
+/** The panel texture's own size in pixels, and how many elmos one tile covers.
+ *  Small and plain on purpose: flat shading is what makes the facets readable,
+ *  and a busy texture fights it. */
+const PANEL_PIXELS = 64;
+const PANEL_ELMOS = 4;
+
+/**
+ * The stand-in, in its own local space with its base on y = 0, as the engine
+ * stands a unit.
+ *
+ * Purely a visual aid. It never carries a piece, is never selected, hovered,
+ * baked or exported. The viewport positions and toggles it. This only builds
+ * the shape.
+ */
+export function buildStandIn(radius: number): THREE.Group {
+  const group = new THREE.Group();
+  const texture = panelTexture();
+
+  const body = new THREE.MeshStandardMaterial({
+    color: BODY_COLOUR,
+    map: texture,
+    flatShading: true,
+    roughness: 0.75,
+    metalness: 0.05,
+  });
+  const nose = new THREE.MeshStandardMaterial({
+    color: NOSE_COLOUR,
+    map: texture,
+    flatShading: true,
+    roughness: 0.55,
+    metalness: 0.05,
+  });
+
+  const geometry =
+    STAND_IN_SHAPE === "wedge" ? wedgeGeometry(radius) : glacisGeometry(radius);
+
+  const mesh = new THREE.Mesh(geometry, [body, nose]);
+  mesh.raycast = () => {};
+  group.add(mesh);
+  return group;
+}
+
+/**
+ * Candidate one: a squat eight-sided prism with its front face pulled forward
+ * into a wedge and a shallow dome on top.
+ *
+ * Facing reads from the wedge, up reads from the flat base against the dome.
+ * Convex, with no moving parts.
+ */
+function wedgeGeometry(radius: number): THREE.BufferGeometry {
+  const height = HEIGHT * radius;
+  // Eight around, with the one at the front pushed out into the wedge.
+  const base = ring(radius, 0, NOSE_REACH);
+  const deck = ring(radius * 0.78, height * 0.72, NOSE_REACH);
+  const apex: Vec3 = [0, height, 0];
+
+  const body: number[] = [];
+  const noseFaces: number[] = [];
+
+  for (let i = 0; i < base.length; i++) {
+    const j = (i + 1) % base.length;
+    // The two triangles of the skirt between base and deck. The pair carrying
+    // the front vertex is the nose facet.
+    const skirt = [
+      ...base[i],
+      ...base[j],
+      ...deck[j],
+      ...base[i],
+      ...deck[j],
+      ...deck[i],
+    ];
+    (i === 0 || j === 0 ? noseFaces : body).push(...skirt);
+    // The dome: deck up to the apex.
+    body.push(...deck[i], ...deck[j], ...apex);
+    // The flat base, wound so it faces down.
+    body.push(0, 0, 0, ...base[j], ...base[i]);
+  }
+
+  return grouped(body, noseFaces);
+}
+
+/**
+ * Candidate two: a chamfered box whose front face rakes back from the base,
+ * with a shallow roof ridge running front to back.
+ *
+ * The rake is a tank's glacis plate. Facing reads from the slope and from the
+ * ridge's direction, up reads from the ridge itself.
+ */
+function glacisGeometry(radius: number): THREE.BufferGeometry {
+  const h = HEIGHT * radius;
+  const x = radius;
+  const back = -radius;
+  const front = radius * NOSE_REACH;
+
+  // The deck, narrower and shorter than the base, with the front edge pulled
+  // well back so the nose is a long slope rather than a wall.
+  const dx = x * 0.72;
+  const deckFront = radius * 0.35;
+  const deckY = h * 0.75;
+  // The ridge, one line down the middle of the deck.
+  const ridgeY = h;
+
+  const p = {
+    baseBL: [-x, 0, back] as Vec3,
+    baseBR: [x, 0, back] as Vec3,
+    baseFL: [-x, 0, front] as Vec3,
+    baseFR: [x, 0, front] as Vec3,
+    deckBL: [-dx, deckY, back * 0.9] as Vec3,
+    deckBR: [dx, deckY, back * 0.9] as Vec3,
+    deckFL: [-dx, deckY, deckFront] as Vec3,
+    deckFR: [dx, deckY, deckFront] as Vec3,
+    ridgeB: [0, ridgeY, back * 0.75] as Vec3,
+    ridgeF: [0, ridgeY, deckFront * 0.6] as Vec3,
+  };
+
+  const body: number[] = [];
+  const noseFaces: number[] = [];
+
+  // The base, facing down.
+  body.push(...p.baseBL, ...p.baseFL, ...p.baseFR);
+  body.push(...p.baseBL, ...p.baseFR, ...p.baseBR);
+  // The glacis: base front edge up to the deck front edge. The nose facet.
+  noseFaces.push(...p.baseFL, ...p.deckFL, ...p.deckFR);
+  noseFaces.push(...p.baseFL, ...p.deckFR, ...p.baseFR);
+  // The back.
+  body.push(...p.baseBR, ...p.deckBR, ...p.deckBL);
+  body.push(...p.baseBR, ...p.deckBL, ...p.baseBL);
+  // The left and right skirts.
+  body.push(...p.baseBL, ...p.deckBL, ...p.deckFL);
+  body.push(...p.baseBL, ...p.deckFL, ...p.baseFL);
+  body.push(...p.baseFR, ...p.deckFR, ...p.deckBR);
+  body.push(...p.baseFR, ...p.deckBR, ...p.baseBR);
+  // The roof: four faces up to the ridge, plus its two ends.
+  body.push(...p.deckFL, ...p.ridgeF, ...p.ridgeB);
+  body.push(...p.deckFL, ...p.ridgeB, ...p.deckBL);
+  body.push(...p.deckFR, ...p.deckBR, ...p.ridgeB);
+  body.push(...p.deckFR, ...p.ridgeB, ...p.ridgeF);
+  body.push(...p.deckFL, ...p.deckFR, ...p.ridgeF);
+  body.push(...p.deckBL, ...p.ridgeB, ...p.deckBR);
+
+  return grouped(body, noseFaces);
+}
+
+/** A ring of eight points at one height, with the front one pushed out. */
+function ring(radius: number, y: number, noseReach: number): Vec3[] {
+  const points: Vec3[] = [];
+  for (let i = 0; i < 8; i++) {
+    // Starting at the front and going round, so index 0 is the nose.
+    const angle = (i / 8) * Math.PI * 2;
+    const reach = i === 0 ? noseReach : 1;
+    points.push([
+      Math.sin(angle) * radius,
+      y,
+      Math.cos(angle) * radius * reach,
+    ]);
+  }
+  return points;
+}
+
+/**
+ * One geometry in two material groups: the body, then the nose facet.
+ *
+ * Non-indexed and with normals computed per triangle, which is what flat
+ * shading needs. Shared vertices would average the normals across a facet and
+ * smooth away the very edges that make the shape readable.
+ */
+function grouped(body: number[], nose: number[]): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute([...body, ...nose], 3),
+  );
+  geometry.computeVertexNormals();
+  geometry.addGroup(0, body.length / 3, 0);
+  geometry.addGroup(body.length / 3, nose.length / 3, 1);
+  // Box-projected on x and z, in elmos, so the panels stay the same size on a
+  // stand-in built for a scout and one built for a factory.
+  const pos = geometry.getAttribute("position");
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uv[i * 2] = pos.getX(i) / PANEL_ELMOS;
+    uv[i * 2 + 1] = (pos.getZ(i) + pos.getY(i)) / PANEL_ELMOS;
+  }
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  return geometry;
+}
+
+/**
+ * A small tiling grey panel pattern: panel lines on a light base, with a little
+ * grain.
+ *
+ * Not a stone or metal photograph. Flat shading is what makes the facets
+ * readable and a busy texture fights it, so this is enough to say "made of
+ * something" and no more. Follows `environment.ts` for the canvas-less path,
+ * since the tests run without a DOM.
+ */
+function panelTexture(): THREE.CanvasTexture | null {
+  const canvas =
+    typeof document === "undefined" ? null : document.createElement("canvas");
+  const context = canvas?.getContext("2d");
+  if (!canvas || !context) return null;
+
+  canvas.width = PANEL_PIXELS;
+  canvas.height = PANEL_PIXELS;
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, PANEL_PIXELS, PANEL_PIXELS);
+
+  context.strokeStyle = "rgba(0, 0, 0, 0.22)";
+  context.lineWidth = 1;
+  const step = PANEL_PIXELS / 2;
+  for (let at = 0; at <= PANEL_PIXELS; at += step) {
+    context.beginPath();
+    context.moveTo(at + 0.5, 0);
+    context.lineTo(at + 0.5, PANEL_PIXELS);
+    context.moveTo(0, at + 0.5);
+    context.lineTo(PANEL_PIXELS, at + 0.5);
+    context.stroke();
+  }
+
+  const image = context.getImageData(0, 0, PANEL_PIXELS, PANEL_PIXELS);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const grain = Math.round((Math.random() - 0.5) * 18);
+    image.data[i] += grain;
+    image.data[i + 1] += grain;
+    image.data[i + 2] += grain;
+  }
+  context.putImageData(image, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+/** Frees the geometry, materials and texture `buildStandIn` allocated. */
+export function disposeStandIn(group: THREE.Group): void {
+  for (const child of group.children) {
+    if (!(child instanceof THREE.Mesh)) continue;
+    child.geometry.dispose();
+    for (const material of [child.material].flat()) {
+      (material as THREE.MeshStandardMaterial).map?.dispose();
+      material.dispose();
+    }
+  }
 }

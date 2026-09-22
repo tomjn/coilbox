@@ -1,7 +1,14 @@
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import type { StandInTrack } from "./scriptPlayback";
-import { attachedAt, standInAt, standInRadius } from "./standIn";
+import {
+  attachedAt,
+  buildStandIn,
+  disposeStandIn,
+  standInAt,
+  standInRadius,
+} from "./standIn";
 
 /** Two keys, ten frames apart, moving two radii along x and one up. */
 function track(overrides: Partial<StandInTrack> = {}): StandInTrack {
@@ -121,9 +128,9 @@ describe("standInRadius", () => {
   });
 
   it("never disappears for a unit with almost nothing in it", () => {
-    expect(standInRadius({ mid: [0, 0, 0], sizeX: 0, sizeY: 0, sizeZ: 0 })).toBe(
-      6,
-    );
+    expect(
+      standInRadius({ mid: [0, 0, 0], sizeX: 0, sizeY: 0, sizeZ: 0 }),
+    ).toBe(6);
   });
 
   it("never grows into a wall beside a very large unit", () => {
@@ -132,3 +139,63 @@ describe("standInRadius", () => {
     ).toBe(40);
   });
 });
+
+describe("buildStandIn", () => {
+  /** A view aid, never a piece. Nothing in the builder may select, hover or
+   *  seat against it, which is how `referenceObject.ts` does it too. */
+  it("is invisible to the pointer", () => {
+    const group = buildStandIn(10);
+    let meshes = 0;
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        meshes += 1;
+        expect(child.raycast({} as never, [])).toBeUndefined();
+      }
+    });
+    expect(meshes).toBeGreaterThan(0);
+    disposeStandIn(group);
+  });
+
+  /** Sized in elmos with nothing rescaled, and standing on y = 0 the way the
+   *  engine stands a unit, so a track's `y: 0` sits it on the ground. */
+  it("is built to the radius it is given, standing on the ground", () => {
+    const box = new THREE.Box3().setFromObject(buildStandIn(10));
+    expect(box.min.y).toBeCloseTo(0, 5);
+    expect(box.max.x).toBeCloseTo(10, 1);
+    expect(box.min.x).toBeCloseTo(-10, 1);
+  });
+
+  /** The front reads from the silhouette: it sticks out further forward than
+   *  it does back, so a shape seen from behind is not a shape seen in front. */
+  it("is not the same front to back", () => {
+    const box = new THREE.Box3().setFromObject(buildStandIn(10));
+    expect(box.max.z).toBeGreaterThan(Math.abs(box.min.z));
+  });
+
+  /** Up reads from the silhouette too: the top is not the base. */
+  it("is not the same upside down", () => {
+    const group = buildStandIn(10);
+    const box = new THREE.Box3().setFromObject(group);
+    // Narrower at the top than at the base, so a stand-in that has somehow
+    // been turned over is obvious rather than merely wrong.
+    expect(widthAt(group, box.max.y * 0.9)).toBeLessThan(
+      widthAt(group, box.min.y + 0.01),
+    );
+  });
+});
+
+/** How wide the shape is across x at one height, read off its vertices. */
+function widthAt(group: THREE.Group, y: number): number {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  group.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const pos = child.geometry.getAttribute("position");
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getY(i) - y) > 0.5) continue;
+      min = Math.min(min, pos.getX(i));
+      max = Math.max(max, pos.getX(i));
+    }
+  });
+  return max - min;
+}
