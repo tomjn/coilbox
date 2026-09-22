@@ -762,6 +762,48 @@ mod what_it_says_about_itself {
             .any(|note| note.contains("the world")));
     }
 
+    /// `get PIECE_Y(turret)` pushes the turret's script piece number, counted
+    /// from 0, and the engine reads exactly that piece (`SafeGetPiece(p1)` at
+    /// `rts/Sim/Units/Scripts/UnitScript.h:80-85`).
+    #[test]
+    fn asks_about_the_piece_it_names_rather_than_the_one_before() {
+        // get PIECE_Y(1, 0, 0, 0), then move the barrel along z by it.
+        let mut code = push(8);
+        code.extend(push(1));
+        code.extend(push(0));
+        code.extend(push(0));
+        code.extend(push(0));
+        code.push(op("GET"));
+        code.extend([op("MOVE_NOW"), 2, 2, op("RETURN")]);
+        // The turret seven above the base, the barrel one above that.
+        let rest = [
+            Rest {
+                parent: None,
+                position: [0.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0, 7.0, 0.0],
+            },
+            Rest {
+                parent: Some(1),
+                position: [0.0, 1.0, 0.0],
+            },
+        ];
+
+        let timeline = run(
+            &create_only(code),
+            &model_pieces(),
+            &created(),
+            2,
+            &rest,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(close(pose(&timeline, 0, "barrel")[2], 7.0));
+    }
+
     /// The engine stopped keeping shared values in Spring 102.0. The preview
     /// still keeps what a script stores, so a `.cob` and its converted Lua play
     /// the same, but says the game will not, rather than calling a shared value
