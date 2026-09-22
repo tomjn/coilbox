@@ -28,6 +28,7 @@ import {
 } from "@/components/CheckItem";
 import { CheckField } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
+import { SourceEditor } from "@/components/SourceEditor";
 import { Label } from "@/components/ui/label";
 import { errorText } from "@/lib/helpers";
 import { MissionLuaCode } from "@/scenario/pages/components/MissionLuaCode";
@@ -43,7 +44,6 @@ import {
   type ConversionWarning,
   type LintDiagnostic,
 } from "../bindings";
-import { BosSource } from "./BosSource";
 import { LintProblems } from "./LintProblems";
 
 /** `Input` forwards `ref` at runtime but its type has none, and the find box
@@ -488,7 +488,7 @@ export default function Bos2LuaPage() {
                   : `${matchAt + 1} of ${matches.length}`}
             </span>
           </div>
-          <BosSource
+          <SourceEditor
             id="bos-input"
             value={bos}
             onChange={(value) => {
