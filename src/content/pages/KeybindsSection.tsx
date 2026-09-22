@@ -1,14 +1,15 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { OptionSelect } from "@/components/OptionSelect";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { useSkirmishDraft } from "../../play/drafts";
+import { GamePickerField } from "../../play/pages/components/GamePickerButton";
 import {
   useKeybinds,
   useScanTargetSelection,
   useUnitsyncArchiveFile,
   useUnitsyncEngineConfig,
+  useUnitsyncGameHeaders,
   useUnitsyncScan,
 } from "../config";
 import { engineConfigDir } from "../enginePaths";
@@ -55,6 +56,7 @@ export default function KeybindsSection() {
 
   const scan = useUnitsyncScan(enginePath, rootPath);
   const games = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(enginePath, rootPath);
   const [draft] = useSkirmishDraft();
   const [gameName, setGameName] = useState("");
   useEffect(() => {
@@ -156,14 +158,18 @@ export default function KeybindsSection() {
         <span className="text-sm text-muted-foreground">
           Bindings a game brings with it:
         </span>
-        <OptionSelect
-          value={gameName}
-          onValueChange={setGameName}
-          options={games.map((g) => ({ value: g.name, label: g.name }))}
-          placeholder={scan.loading ? "Reading games..." : "No game selected"}
-          disabled={games.length === 0}
-          className="w-72"
-        />
+        <div className="w-72">
+          <GamePickerField
+            value={gameName}
+            onValueChange={setGameName}
+            games={games}
+            headers={gameHeaders}
+            placeholder={scan.loading ? "Reading games..." : "No game selected"}
+            ariaLabel="Game whose bindings to show"
+            disabled={games.length === 0}
+            gamesLoading={scan.loading}
+          />
+        </div>
       </div>
 
       {file.error ? <ErrorBanner message={file.error} /> : null}

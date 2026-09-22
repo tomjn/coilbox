@@ -22,43 +22,29 @@ vi.mock("../../decodeTweakSet", async () => {
   return { ...actual, workshopDecodeTweakSet };
 });
 
-// A plain <select>, the same stand-in `ProjectsPage.dom.test.tsx` uses: the
-// real picker is a Radix popover happy-dom cannot drive.
-vi.mock("@/components/OptionSelect", () => ({
-  OptionSelect: ({
-    value,
-    onValueChange,
-    options,
-    ariaLabel,
-  }: {
-    value: string;
-    onValueChange: (value: string) => void;
-    options: { value: string; label: string }[];
-    ariaLabel?: string;
-  }) => (
-    <select
-      aria-label={ariaLabel}
-      value={value}
-      onChange={(e) => onValueChange(e.target.value)}
-    >
-      <option value="">Pick a game</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  ),
-}));
-
 const { DecodeTweakSetDrawer } = await import("./DecodeTweakSetDrawer");
 
-const GAMES = [{ name: "Balanced Annihilation V15.9.8" }];
+const GAME = "Balanced Annihilation V15.9.8";
+const GAMES = [
+  {
+    name: GAME,
+    primaryArchive: { name: "ba.sdz" },
+    dependencyArchives: [],
+    info: {},
+  },
+];
+
+/** Opens the game picker from its button and chooses the one game. */
+function pickGame() {
+  fireEvent.click(screen.getByLabelText("Game for the decoded project"));
+  fireEvent.click(screen.getByRole("button", { name: GAME }));
+}
 
 function draw(onStarted = vi.fn()) {
   render(
     <DecodeTweakSetDrawer
       games={GAMES}
+      headers={new Map()}
       scanning={false}
       onStarted={onStarted}
     />,
@@ -137,14 +123,12 @@ describe("DecodeTweakSetDrawer", () => {
       .closest("button");
     expect(startButton?.hasAttribute("disabled")).toBe(true);
 
-    fireEvent.change(screen.getByLabelText("Game for the decoded project"), {
-      target: { value: "Balanced Annihilation V15.9.8" },
-    });
+    pickGame();
     fireEvent.click(screen.getByText("Start a project from this"));
 
     expect(onStarted).toHaveBeenCalledTimes(1);
     const input = onStarted.mock.calls[0][0];
-    expect(input.gameName).toBe("Balanced Annihilation V15.9.8");
+    expect(input.gameName).toBe(GAME);
     expect(input.edits.clones.armcom).toEqual({
       key: "armcom",
       replacesGameUnit: false,
@@ -179,9 +163,7 @@ describe("DecodeTweakSetDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Decode" }));
     await screen.findByText("Program, read only");
 
-    fireEvent.change(screen.getByLabelText("Game for the decoded project"), {
-      target: { value: "Balanced Annihilation V15.9.8" },
-    });
+    pickGame();
     fireEvent.click(screen.getByText("Start a project from this"));
 
     const input = onStarted.mock.calls[0][0];

@@ -33,6 +33,8 @@ import { Blocks, Download, Loader2, Repeat } from "lucide-react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import type { GameItem } from "@/content/bindings";
+import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import type { ArrivalNote } from "../../arrival";
 import {
   orderPack,
@@ -73,8 +75,9 @@ export function ArrivingPack({
   view,
   onView,
   games,
+  gameHeaders,
   game,
-  onGame,
+  onChooseGame,
   unreadable,
   changes,
   checked,
@@ -93,9 +96,12 @@ export function ArrivingPack({
   onView: (view: PackView) => void;
   /** The games on this machine, because the file names none and the choice
    *  decides both what fits and how each layout is drawn. */
-  games: string[];
+  games: readonly GameItem[];
+  /** Loading-screen art for the game button, keyed by game name. */
+  gameHeaders: Map<string, string>;
   game: string;
-  onGame: (game: string) => void;
+  /** Opens the game picker, which the form shows in place of this pack. */
+  onChooseGame: () => void;
   /** Entries in the file no reader here understands. */
   unreadable: number;
   /** What reading the file changed, said once for the file. */
@@ -126,13 +132,13 @@ export function ArrivingPack({
 
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-medium">Read them against</span>
-        <OptionSelect
-          size="sm"
+        <GamePickerButton
           value={game}
-          onValueChange={onGame}
+          games={games}
+          headers={gameHeaders}
           placeholder="Pick a game"
           disabled={games.length === 0}
-          options={games.map((name) => ({ value: name, label: name }))}
+          onClick={onChooseGame}
         />
         <p className="text-xs text-muted-foreground">
           A game's blueprint file says nothing about which game it is for, so
