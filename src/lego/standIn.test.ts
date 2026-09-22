@@ -184,6 +184,47 @@ describe("buildStandIn", () => {
   });
 });
 
+/**
+ * Every face points outwards.
+ *
+ * The shape is convex, so a triangle's own normal has to agree with the
+ * direction from the middle of the shape to that triangle. A face wound the
+ * other way is culled, and what you see through the hole is the inside of the
+ * far side, which looks like a solid shape with its colours in the wrong
+ * places rather than like a bug. The glacis plate shipped that way until
+ * somebody rotated the camera far enough round to catch it.
+ */
+describe("the stand-in's winding", () => {
+  it("turns every face outwards", () => {
+    const mesh = buildStandIn(10).children[0] as THREE.Mesh;
+    const pos = mesh.geometry.getAttribute("position");
+
+    const middle = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      middle.add(new THREE.Vector3().fromBufferAttribute(pos, i));
+    }
+    middle.divideScalar(pos.count);
+
+    const inward: string[] = [];
+    for (let t = 0; t < pos.count; t += 3) {
+      const a = new THREE.Vector3().fromBufferAttribute(pos, t);
+      const b = new THREE.Vector3().fromBufferAttribute(pos, t + 1);
+      const c = new THREE.Vector3().fromBufferAttribute(pos, t + 2);
+      const normal = new THREE.Vector3()
+        .crossVectors(b.clone().sub(a), c.clone().sub(a))
+        .normalize();
+      const outward = a.clone().add(b).add(c).divideScalar(3).sub(middle);
+      if (normal.dot(outward) <= 0) {
+        inward.push(
+          `triangle at vertex ${t}, normal (${normal.x.toFixed(2)}, ${normal.y.toFixed(2)}, ${normal.z.toFixed(2)})`,
+        );
+      }
+    }
+
+    expect(inward).toEqual([]);
+  });
+});
+
 /** How wide the shape is across x at one height, read off its vertices. */
 function widthAt(group: THREE.Group, y: number): number {
   let min = Number.POSITIVE_INFINITY;

@@ -135,16 +135,6 @@ export function attachedAt(
 }
 
 /**
- * Which of the two candidate shapes is built.
- *
- * Both are here because the silhouette has to be judged by looking rather than
- * specified: the case that matters is a low rear angle, where an upside-down
- * sphere reads the same either way up. Screenshot both in the real viewport,
- * keep the one that reads, delete the other.
- */
-export const STAND_IN_SHAPE: "wedge" | "glacis" = "wedge";
-
-/**
  * Neutral grey. Every other colour in this scene means something specific -
  * violet is selection, orange is the collision volume, red is the aim point,
  * sky blue is the reference figure - and the stand-in is a unit rather than a
@@ -198,62 +188,28 @@ export function buildStandIn(radius: number): THREE.Group {
     metalness: 0.05,
   });
 
-  const geometry =
-    STAND_IN_SHAPE === "wedge" ? wedgeGeometry(radius) : glacisGeometry(radius);
-
-  const mesh = new THREE.Mesh(geometry, [body, nose]);
+  const mesh = new THREE.Mesh(standInGeometry(radius), [body, nose]);
   mesh.raycast = () => {};
   group.add(mesh);
   return group;
 }
 
 /**
- * Candidate one: a squat eight-sided prism with its front face pulled forward
- * into a wedge and a shallow dome on top.
- *
- * Facing reads from the wedge, up reads from the flat base against the dome.
- * Convex, with no moving parts.
- */
-function wedgeGeometry(radius: number): THREE.BufferGeometry {
-  const height = HEIGHT * radius;
-  // Eight around, with the one at the front pushed out into the wedge.
-  const base = ring(radius, 0, NOSE_REACH);
-  const deck = ring(radius * 0.78, height * 0.72, NOSE_REACH);
-  const apex: Vec3 = [0, height, 0];
-
-  const body: number[] = [];
-  const noseFaces: number[] = [];
-
-  for (let i = 0; i < base.length; i++) {
-    const j = (i + 1) % base.length;
-    // The two triangles of the skirt between base and deck. The pair carrying
-    // the front vertex is the nose facet.
-    const skirt = [
-      ...base[i],
-      ...base[j],
-      ...deck[j],
-      ...base[i],
-      ...deck[j],
-      ...deck[i],
-    ];
-    (i === 0 || j === 0 ? noseFaces : body).push(...skirt);
-    // The dome: deck up to the apex.
-    body.push(...deck[i], ...deck[j], ...apex);
-    // The flat base, wound so it faces down.
-    body.push(0, 0, 0, ...base[j], ...base[i]);
-  }
-
-  return grouped(body, noseFaces);
-}
-
-/**
- * Candidate two: a chamfered box whose front face rakes back from the base,
- * with a shallow roof ridge running front to back.
+ * A chamfered box whose front face rakes back from the base, with a shallow
+ * roof ridge running front to back.
  *
  * The rake is a tank's glacis plate. Facing reads from the slope and from the
- * ridge's direction, up reads from the ridge itself.
+ * direction the ridge runs, up reads from the ridge itself.
+ *
+ * Chosen over the other candidate by looking at both in the viewport from a
+ * low rear angle, which is the case that separates them. That other one was a
+ * squat eight-sided prism with a domed top and one vertex pushed forward, and
+ * it read as a rock: the dome took away any flat deck to judge "up" against,
+ * and one pushed vertex out of eight is not a visible point, so only the
+ * coloured facet said which way it faced. A colour doing the work the
+ * silhouette is supposed to do is the thing being avoided here.
  */
-function glacisGeometry(radius: number): THREE.BufferGeometry {
+function standInGeometry(radius: number): THREE.BufferGeometry {
   const h = HEIGHT * radius;
   const x = radius;
   const back = -radius;
@@ -283,20 +239,26 @@ function glacisGeometry(radius: number): THREE.BufferGeometry {
   const body: number[] = [];
   const noseFaces: number[] = [];
 
+  // Every triangle below is wound so its own normal points out of the shape.
+  // `the stand-in's winding` in the tests holds this, because a face wound the
+  // other way is culled and what shows through the hole is the inside of the
+  // far side, which reads as a solid shape with its colours misplaced rather
+  // than as a bug.
+
   // The base, facing down.
-  body.push(...p.baseBL, ...p.baseFL, ...p.baseFR);
-  body.push(...p.baseBL, ...p.baseFR, ...p.baseBR);
+  body.push(...p.baseBL, ...p.baseFR, ...p.baseFL);
+  body.push(...p.baseBL, ...p.baseBR, ...p.baseFR);
   // The glacis: base front edge up to the deck front edge. The nose facet.
-  noseFaces.push(...p.baseFL, ...p.deckFL, ...p.deckFR);
-  noseFaces.push(...p.baseFL, ...p.deckFR, ...p.baseFR);
+  noseFaces.push(...p.baseFL, ...p.deckFR, ...p.deckFL);
+  noseFaces.push(...p.baseFL, ...p.baseFR, ...p.deckFR);
   // The back.
-  body.push(...p.baseBR, ...p.deckBR, ...p.deckBL);
-  body.push(...p.baseBR, ...p.deckBL, ...p.baseBL);
+  body.push(...p.baseBR, ...p.deckBL, ...p.deckBR);
+  body.push(...p.baseBR, ...p.baseBL, ...p.deckBL);
   // The left and right skirts.
-  body.push(...p.baseBL, ...p.deckBL, ...p.deckFL);
-  body.push(...p.baseBL, ...p.deckFL, ...p.baseFL);
-  body.push(...p.baseFR, ...p.deckFR, ...p.deckBR);
-  body.push(...p.baseFR, ...p.deckBR, ...p.baseBR);
+  body.push(...p.baseBL, ...p.deckFL, ...p.deckBL);
+  body.push(...p.baseBL, ...p.baseFL, ...p.deckFL);
+  body.push(...p.baseFR, ...p.deckBR, ...p.deckFR);
+  body.push(...p.baseFR, ...p.baseBR, ...p.deckBR);
   // The roof: four faces up to the ridge, plus its two ends.
   body.push(...p.deckFL, ...p.ridgeF, ...p.ridgeB);
   body.push(...p.deckFL, ...p.ridgeB, ...p.deckBL);
@@ -306,22 +268,6 @@ function glacisGeometry(radius: number): THREE.BufferGeometry {
   body.push(...p.deckBL, ...p.ridgeB, ...p.deckBR);
 
   return grouped(body, noseFaces);
-}
-
-/** A ring of eight points at one height, with the front one pushed out. */
-function ring(radius: number, y: number, noseReach: number): Vec3[] {
-  const points: Vec3[] = [];
-  for (let i = 0; i < 8; i++) {
-    // Starting at the front and going round, so index 0 is the nose.
-    const angle = (i / 8) * Math.PI * 2;
-    const reach = i === 0 ? noseReach : 1;
-    points.push([
-      Math.sin(angle) * radius,
-      y,
-      Math.cos(angle) * radius * reach,
-    ]);
-  }
-  return points;
 }
 
 /**
