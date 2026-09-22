@@ -743,6 +743,8 @@ describe("pieceWorldRest", () => {
   });
 
   it("has nothing for a piece the unit does not have", () => {
-    expect(pieceWorldRest(project([]), pack(), null).get("nope")).toBeUndefined();
+    expect(
+      pieceWorldRest(project([]), pack(), null).get("nope"),
+    ).toBeUndefined();
   });
 });

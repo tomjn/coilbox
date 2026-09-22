@@ -79,7 +79,9 @@ describe("startBuildingAngles", () => {
   });
 
   it("is negative for a target to the unit's right", () => {
-    expect(startBuildingAngles(ORIGIN, RIGHT).heading).toBeCloseTo(-Math.PI / 2);
+    expect(startBuildingAngles(ORIGIN, RIGHT).heading).toBeCloseTo(
+      -Math.PI / 2,
+    );
   });
 
   /** Measured from `midPos`, which is the whole reason the engine uses it: a
