@@ -94,9 +94,15 @@ fn on_large_stack<T: Send + 'static>(
 fn compile_inner(source: &str, include_dir: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
     let tokens = preprocess::preprocess(source, include_dir)?;
     let mut root = parser::parse_file(tokens)?;
-    let warnings = parser::stray_warnings(&root);
+    let mut warnings = parser::stray_warnings(&root);
     fold::fold_tree(&mut root);
-    let bytes = compiler::Compiler::compile(&root, 4)?;
+    let (bytes, codegen_warnings) = compiler::Compiler::compile(&root, 4)?;
+    // One line per warning, however many statements raised it.
+    for warning in codegen_warnings {
+        if !warnings.contains(&warning) {
+            warnings.push(warning);
+        }
+    }
     Ok((bytes, warnings))
 }
 

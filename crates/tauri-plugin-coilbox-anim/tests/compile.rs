@@ -75,27 +75,33 @@ fn anims_bos() {
 
 /// Pathological input must surface a clean error, never abort the process via a
 /// stack overflow (regression for the app-crash report).
-/// `scale` and `wait-for-scale` compile to a stream the engine cannot run: it
-/// reads a piece and no axis, so the axis BARScriptCompiler's grammar writes
-/// lands where the next instruction should be. No other compiler in the
-/// ecosystem has the statement at all, so this one refuses it rather than
-/// writing a script that dies on the line.
+/// A scale statement writes a piece and no axis, which is what the engine
+/// reads (`CobThread.cpp`). BARScriptCompiler writes the axis too, where the
+/// engine reads it as the next instruction and the script stops, so this is
+/// the one place the port deliberately differs from the reference. The axis
+/// stays in the syntax, since that is how scripts are written, and the
+/// compiler says it went unused.
 #[test]
-fn scale_is_refused_rather_than_miscompiled() {
-    let dir = fixtures();
-    for statement in [
-        "scale base to x-axis [2] speed [1];",
-        "scale base to x-axis [2] now;",
-        "wait-for-scale base along x-axis;",
-    ] {
-        let src = format!("piece base;\nCreate()\n{{\n\t{statement}\n}}\n");
-        let error = tauri_plugin_coilbox_anim::compile_bos(&src, &dir)
-            .expect_err(&format!("{statement} should not compile"));
-        assert!(
-            error.contains("cannot be compiled") && error.contains("no axis"),
-            "{statement}: {error}"
-        );
-    }
+fn scale_writes_no_axis_and_says_so() {
+    let src = "piece base;\nCreate()\n{\n\tscale base to x-axis [2] speed [1];\n}\n";
+    let (bytes, warnings) =
+        tauri_plugin_coilbox_anim::compile_bos_with_warnings(src, &fixtures()).expect("compile");
+    let words: Vec<u32> = bytes[44..]
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|w| u32::from_le_bytes(*w))
+        .collect();
+    // PUSH speed, PUSH destination, SCALE base, then the appended return.
+    assert_eq!(
+        &words[..7],
+        &[0x10021001, 65536, 0x10021001, 131072, 0x100A0000, 0, 0x10021001],
+        "{words:?}"
+    );
+    assert!(
+        warnings.iter().any(|w| w.contains("ignores the axis")),
+        "{warnings:?}"
+    );
 }
 
 #[test]

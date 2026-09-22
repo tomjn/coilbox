@@ -25,6 +25,9 @@ Create()
 Walk()
 {
 	var step;
+	scale torso to x-axis [2] speed [0.5];
+	scale gun to y-axis [1.5] now;
+	wait-for-scale torso along x-axis;
 	while (count < 10)
 	{
 		if (step == 0)

@@ -209,27 +209,34 @@ Name strings byte-packed (no alignment). Sounds list unused.
    never taken is never evaluated, so a malformed condition inside dead code
    is not an error.
 
-## Deliberate divergence: no `scale` statement
+## Deliberate divergence: `scale` writes no axis
 
-`scale`, `scale now` and `wait-for-scale` are the one place this port refuses
-what the reference accepts. Upstream added them in `0630e758` ("Add SCALE
-commands", 2025-10-17), copying `move`'s grammar including `_axis`, two days
-before the engine's own scale opcodes landed in RecoilEngine `b44193e1c7`
-("Some animation works", #2589). The engine's scaling has no axis at all:
-`CobThread.cpp` reads a piece and nothing else for `SCALE`, `SCALE_NOW` and
-`WAIT_SCALE`, and `UnitScript.h` declares `Scale(int piece, float speed, float
-destination)`. So the axis word upstream writes lands where the engine reads
-its next instruction, and the script stops there.
+The scale statements are the one place this port does not match the reference
+byte for byte, and it is deliberate.
 
-No other compiler in the ecosystem has a scale statement, and nothing in the
-1465 compiled scripts scanned from Balanced Annihilation, Metal Factions,
-Spring 1944 and Expand and Exterminate uses one. `compiler.rs` therefore errors
-on the statement, and `decompile.rs` treats the opcodes as unwritable. The BOS
-to Lua path in `coilbox-bos2lua` still converts `scale`, dropping the axis the
-same way the engine would, since `Spring.UnitScript.Scale` does work.
+Upstream added `scale`, `scale now` and `wait-for-scale` in `0630e758` ("Add
+SCALE commands", 2025-10-17) by copying `move`'s grammar, `_axis` included, two
+days before the engine's own scale opcodes landed in RecoilEngine `b44193e1c7`
+("Some animation works", #2589). The engine scales a whole piece: `CobThread.cpp`
+reads a piece and nothing else for `SCALE`, `SCALE_NOW` and `WAIT_SCALE`, and
+`CUnitScript::Scale` calls `AddAnim(AScale, piece, -1, ...)` with -1 where a
+move passes an axis. So the axis word upstream writes lands where the engine
+reads its next instruction, and the script stops there.
 
-Nothing else diverges. `anims.bos` used to carry both statements and no longer
-does, and its `.cob` was regenerated from the pinned reference.
+The stack is already right: the compiler pushes speed then destination, which
+is the order the engine pops them. Only the axis operand is wrong, so this port
+parses the axis, leaves it out of the file, and warns that it went unused. The
+statement then compiles to something Recoil runs. `coilbox-bos2lua` already
+dropped the axis the same way for `Spring.UnitScript.Scale`.
+
+`anims.bos` no longer carries the statements, since it is checked against the
+reference, and its `.cob` was regenerated. `scale_writes_no_axis_and_says_so`
+in `tests/compile.rs` pins the bytes instead, and `roundtrip.bos` covers the
+decompiler's side.
+
+Nothing in the wild depends on either shape: no scale instruction appears in
+any of the 1925 compiled scripts across the nine games scanned locally, which
+fits an opcode added in October 2025.
 
 ## Status
 
