@@ -87,11 +87,12 @@ export interface ScriptProbes {
 /**
  * How long a preview runs before it loops.
  *
- * Six seconds is two or three cycles of anything the presets generate, which is
- * enough to see a loop as a loop, and short enough that the wait before it
- * plays is not one.
+ * Six seconds was enough to see a walk cycle as a cycle, and it is not enough
+ * once there is a second object in the scene: a builder reaching one way and
+ * then the other, with something to reach at, is a sequence rather than a
+ * cycle, and it needs room to play out before it starts again.
  */
-export const PREVIEW_SECONDS = 6;
+export const PREVIEW_SECONDS = 15;
 
 /** Frames in a preview, at the sim rate the runtime works in. */
 export const PREVIEW_FRAMES = PREVIEW_SECONDS * 30;
@@ -272,22 +273,26 @@ export const SCENARIOS: Scenario[] = [
         callin: "StartBuilding",
         aimAtStandIn: { from: "midPos" },
       },
-      { frame: at(2.5), callin: "StopBuilding" },
+      { frame: at(5), callin: "StopBuilding" },
       {
-        frame: at(3.5),
+        frame: at(6.5),
         callin: "StartBuilding",
         aimAtStandIn: { from: "midPos" },
       },
-      { frame: at(5.5), callin: "StopBuilding" },
+      { frame: at(11), callin: "StopBuilding" },
     ],
     // On the ground ahead and to one side, then across to the other during the
     // gap between the two builds, so the arm is seen to follow it.
+    //
+    // It comes back to where it started, so the preview loops without the
+    // stand-in jumping across the scene on the frame it restarts.
     standIn: {
       keys: [
         { frame: 0, pos: [1.6, 0, 2.6] },
-        { frame: at(2.5), pos: [1.6, 0, 2.6] },
-        { frame: at(3.5), pos: [-1.6, 0, 2.6] },
-        { frame: at(5.5), pos: [-1.6, 0, 2.6] },
+        { frame: at(5), pos: [1.6, 0, 2.6] },
+        { frame: at(6.5), pos: [-1.6, 0, 2.6] },
+        { frame: at(11), pos: [-1.6, 0, 2.6] },
+        { frame: at(PREVIEW_SECONDS), pos: [1.6, 0, 2.6] },
       ],
     },
   },
@@ -306,14 +311,14 @@ export const SCENARIOS: Scenario[] = [
       // No arguments. `CFactory::StartBuild` calls the no-argument form, unlike
       // a construction unit, which is handed a heading and a pitch to aim its
       // nanolathe with (`CBuilder`).
-      { frame: at(1.5), callin: "StartBuilding" },
-      { frame: at(4.5), callin: "StopBuilding" },
-      { frame: at(5.5), callin: "Deactivate" },
+      { frame: at(2), callin: "StartBuilding" },
+      { frame: at(11), callin: "StopBuilding" },
+      { frame: at(13), callin: "Deactivate" },
     ],
     standIn: {
       // Nowhere until the factory starts building. A key on the same frame the
       // attach begins, so the keyed position is never what is drawn.
-      keys: [{ frame: at(1.5), pos: [0, 0, 0] }],
+      keys: [{ frame: at(2), pos: [0, 0, 0] }],
       // A factory spawns what it builds at the world position of the piece
       // `QueryBuildInfo` names, and leaves it there
       // (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`). It does not carry
@@ -321,7 +326,7 @@ export const SCENARIOS: Scenario[] = [
       // riding it through whatever the doors do.
       attach: {
         from: "QueryBuildInfo",
-        frame: at(1.5),
+        frame: at(2),
         until: null,
         follow: false,
       },
@@ -360,22 +365,26 @@ export const SCENARIOS: Scenario[] = [
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(2), callin: "Shot1" },
+      { frame: at(4), callin: "Shot1" },
       {
-        frame: at(3),
+        frame: at(6),
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(4.5), callin: "Shot1" },
+      { frame: at(9.5), callin: "Shot1" },
     ],
     // Off the ground and well out, so the second aim differs from the first in
     // pitch as well as heading and a barrel that only turns is obvious.
+    //
+    // Back where it started by the end, so the turret tracks it round rather
+    // than the stand-in jumping across the scene when the preview loops.
     standIn: {
       keys: [
         { frame: 0, pos: [2.6, 2.2, 4] },
-        { frame: at(2), pos: [2.6, 2.2, 4] },
-        { frame: at(3), pos: [-2.6, 0.6, 4] },
-        { frame: at(5.5), pos: [-2.6, 0.6, 4] },
+        { frame: at(4), pos: [2.6, 2.2, 4] },
+        { frame: at(6), pos: [-2.6, 0.6, 4] },
+        { frame: at(10), pos: [-2.6, 0.6, 4] },
+        { frame: at(PREVIEW_SECONDS), pos: [2.6, 2.2, 4] },
       ],
     },
   },
@@ -391,18 +400,24 @@ export const SCENARIOS: Scenario[] = [
       // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup`
       // is the ground and ship arm, which needs the attach piece the script
       // chooses for itself and is not previewable yet.
-      { frame: at(2), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
+      { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
     ],
     standIn: {
       keys: [
         // Approaching on the ground, from in front.
         { frame: 0, pos: [0, 0, 4.5] },
-        { frame: at(2), pos: [0, 0, 1] },
+        { frame: at(4), pos: [0, 0, 1] },
+        // The return leg, which is the preview's rather than the engine's: no
+        // unload call-in fires during it. It is here so the stand-in walks
+        // back to where it started instead of teleporting there on the frame
+        // the preview loops.
+        { frame: at(11), pos: [0, 0, 1] },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 4.5] },
       ],
       attach: {
         from: "QueryTransport",
-        frame: at(2),
-        until: null,
+        frame: at(4),
+        until: at(11),
         follow: true,
       },
     },
@@ -418,25 +433,30 @@ export const SCENARIOS: Scenario[] = [
       // (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:806-826`). The position is
       // where the passenger is going, which is the ground under the transport.
       {
-        frame: at(2.5),
+        frame: at(5),
         callin: "TransportDrop",
         args: [STAND_IN_UNIT_ID, 0, 0, 0],
       },
       // Once the last passenger is off (`MobileCAI.cpp:2094-2098`).
-      { frame: at(3), callin: "EndTransport" },
+      { frame: at(6), callin: "EndTransport" },
     ],
+    // Every key is measured from the piece it was riding, so it leaves from
+    // where the transport was holding it rather than from the unit's origin,
+    // and so the last key lands exactly where the first frame's attachment
+    // puts it. That is what closes the loop.
     standIn: {
       keys: [
-        // Measured from the piece it was riding, so it leaves from where the
-        // transport was holding it rather than from the unit's origin.
-        { frame: at(2.5), pos: [0, 0, 0], fromAttachPiece: true },
-        { frame: at(4), pos: [0, -1.6, -1.2], fromAttachPiece: true },
-        { frame: at(5.5), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        { frame: at(5), pos: [0, 0, 0], fromAttachPiece: true },
+        { frame: at(7.5), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        { frame: at(12), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        // Back up to the piece. The preview's own return leg, not a reload: no
+        // call-in fires during it.
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromAttachPiece: true },
       ],
       attach: {
         from: "QueryTransport",
         frame: 0,
-        until: at(2.5),
+        until: at(5),
         follow: true,
       },
     },

@@ -155,8 +155,36 @@ describe("scenarios", () => {
       }
       for (const key of scenario.standIn?.keys ?? []) {
         expect(key.frame).toBeGreaterThanOrEqual(0);
-        expect(key.frame).toBeLessThan(PREVIEW_FRAMES);
+        // A closing key lands on `PREVIEW_FRAMES` itself, which is the frame
+        // the preview wraps to. That is one past the last frame drawn, and it
+        // is the only key allowed there.
+        expect(key.frame).toBeLessThanOrEqual(PREVIEW_FRAMES);
       }
+    }
+  });
+
+  /**
+   * A stand-in that moves has to end where it began, or it leaps across the
+   * scene on the frame the preview loops. The unit itself snaps back to its
+   * rest pose there, which is a cut everything in the scene shares. A stand-in
+   * sliding through that boundary and then jumping is the thing that reads as
+   * a bug rather than as a restart.
+   *
+   * Checked against the first and last keys rather than against the comment on
+   * each track, since a comment cannot be wrong in a way a run notices.
+   */
+  it("brings a moving stand-in back to where it started", () => {
+    for (const scenario of SCENARIOS) {
+      const keys = scenario.standIn?.keys ?? [];
+      if (keys.length < 2) continue;
+      const first = keys[0];
+      const last = keys[keys.length - 1];
+
+      expect(last.frame).toBe(PREVIEW_FRAMES);
+      expect(last.pos).toEqual(first.pos);
+      expect(last.fromAttachPiece ?? false).toBe(
+        first.fromAttachPiece ?? false,
+      );
     }
   });
 
@@ -169,7 +197,7 @@ describe("scenarios", () => {
   it("puts a factory's stand-in on its build piece, sitting still", () => {
     expect(scenarioById("building-factory")?.standIn?.attach).toEqual({
       from: "QueryBuildInfo",
-      frame: at(1.5),
+      frame: at(2),
       until: null,
       follow: false,
     });
