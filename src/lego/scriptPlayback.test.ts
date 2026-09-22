@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  at,
   clampFrame,
   frameAt,
   hiddenAt,
@@ -124,13 +125,103 @@ describe("scenarios", () => {
     expect(killed?.args?.[0]).toBe((killed?.args?.[1] ?? 0) / 2);
   });
 
-  /** The mobile builder's form keeps its two angles, which aim the nanolathe. */
-  it("keep the mobile builder aiming where it was told to", () => {
+  /** The mobile builder aims at the stand-in rather than at two numbers
+   *  somebody picked, which is the only way a wrong aim is visible. */
+  it("aims the mobile builder at its stand-in", () => {
     const build = scenarioById("building")?.events.find(
       (e) => e.callin === "StartBuilding",
     );
 
-    expect(build?.args).toHaveLength(2);
+    expect(build?.aimAtStandIn).toEqual({ from: "midPos" });
+    expect(build?.args).toBeUndefined();
+  });
+
+  it("aims the weapon at its stand-in from the aim piece", () => {
+    const aim = scenarioById("firing")?.events.find(
+      (e) => e.callin === "AimWeapon1",
+    );
+
+    expect(aim?.aimAtStandIn).toEqual({ from: "AimFromWeapon" });
+    expect(aim?.args).toBeUndefined();
+  });
+
+  /** Every event that aims at a stand-in is in a scenario that has one, and
+   *  every track's keys are inside the preview. */
+  it("never aims at a stand-in a scenario does not place", () => {
+    for (const scenario of SCENARIOS) {
+      for (const event of scenario.events) {
+        if (!event.aimAtStandIn) continue;
+        expect(scenario.standIn?.keys.length ?? 0).toBeGreaterThan(0);
+      }
+      for (const key of scenario.standIn?.keys ?? []) {
+        expect(key.frame).toBeGreaterThanOrEqual(0);
+        expect(key.frame).toBeLessThan(PREVIEW_FRAMES);
+      }
+    }
+  });
+
+  /**
+   * A factory spawns what it builds at the piece `QueryBuildInfo` names
+   * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), and leaves it there.
+   * It does not carry it, so the stand-in sits at the piece's rest position
+   * rather than riding it.
+   */
+  it("puts a factory's stand-in on its build piece, sitting still", () => {
+    expect(scenarioById("building-factory")?.standIn?.attach).toEqual({
+      from: "QueryBuildInfo",
+      frame: at(1.5),
+      until: null,
+      follow: false,
+    });
+  });
+
+  /**
+   * Air transport, which is the only kind in scope. The engine's air arm calls
+   * `BeginTransport` then attaches with the piece `QueryTransport` names
+   * (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup` is
+   * the ground and ship arm and is deliberately absent.
+   */
+  it("loads a transport the way the engine's air arm does", () => {
+    const load = scenarioById("transport-load");
+    const callins = load?.events.map((e) => e.callin) ?? [];
+    expect(callins).toContain("BeginTransport");
+    expect(callins).not.toContain("TransportPickup");
+    expect(load?.standIn?.attach?.from).toBe("QueryTransport");
+    expect(load?.standIn?.attach?.follow).toBe(true);
+    // Attached from the frame the transport is told it has a passenger.
+    const begin = load?.events.find((e) => e.callin === "BeginTransport");
+    expect(load?.standIn?.attach?.frame).toBe(begin?.frame);
+  });
+
+  /**
+   * `StartUnload` is not here on purpose: nothing in `rts/` outside the script
+   * interface files calls it, the same reason `QueryLandingPad` has no
+   * scenario.
+   */
+  it("unloads with the two call-ins the engine actually fires", () => {
+    const unload = scenarioById("transport-unload");
+    const callins = unload?.events.map((e) => e.callin) ?? [];
+    expect(callins).toContain("TransportDrop");
+    expect(callins).toContain("EndTransport");
+    expect(callins).not.toContain("StartUnload");
+    // It comes off on the frame it is dropped, and not before.
+    const drop = unload?.events.find((e) => e.callin === "TransportDrop");
+    expect(unload?.standIn?.attach?.until).toBe(drop?.frame);
+  });
+
+  /** `TransportDrop` takes a unit id then x, y and z in Lua, which is the form
+   *  the scenarios are written in. `LuaUnitScript.cpp:806-826`. */
+  it("writes the transport call-ins in their Lua form", () => {
+    expect(
+      scenarioById("transport-unload")?.events.find(
+        (e) => e.callin === "TransportDrop",
+      )?.args,
+    ).toHaveLength(4);
+    expect(
+      scenarioById("transport-load")?.events.find(
+        (e) => e.callin === "BeginTransport",
+      )?.args,
+    ).toHaveLength(1);
   });
 });
 

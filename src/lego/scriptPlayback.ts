@@ -198,6 +198,20 @@ export const CREATED: ScriptEvent[] = [
 ];
 
 /**
+ * The stand-in that stands in for a passenger, in the Lua argument form.
+ *
+ * `BeginTransport`, `QueryTransport` and `TransportDrop` all take a unit id in
+ * Lua where COB takes the passenger's model height or a packed position
+ * (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:139-141,787-826` against
+ * `CobInstance.cpp:355-395`). The scenario writes the Lua form and the COB
+ * runtime converts, which is how radians are already handled.
+ *
+ * The preview has no unit table for a script to look this up in, so the number
+ * only has to be a plausible id: what a script does with it is open a door.
+ */
+const STAND_IN_UNIT_ID = 1;
+
+/**
  * What a preview can put a unit through.
  *
  * Every one of them starts with `Create`, because the engine does and because a
@@ -246,16 +260,36 @@ export const SCENARIOS: Scenario[] = [
     id: "building",
     label: "Building (mobile)",
     description:
-      "A construction unit reaching one way, stopping, then reaching the other. Its nanolathe is aimed, so this is the one with angles in it.",
+      "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it.",
     events: [
       ...CREATED,
-      // Heading and pitch in radians, relative to the unit's own facing, which
-      // is what the engine works out from the build target and hands over.
-      { frame: at(0.5), callin: "StartBuilding", args: [0.7, -0.2] },
+      // No literal angles. `aimResolver.ts` works them out from where the
+      // stand-in is on each of these frames, using the builder's own formula
+      // (`rts/Sim/Units/UnitTypes/Builder.cpp:942-955`), so an arm that aims
+      // at the wrong place is visibly aiming at the wrong place.
+      {
+        frame: at(0.5),
+        callin: "StartBuilding",
+        aimAtStandIn: { from: "midPos" },
+      },
       { frame: at(2.5), callin: "StopBuilding" },
-      { frame: at(3.5), callin: "StartBuilding", args: [-0.6, 0.15] },
+      {
+        frame: at(3.5),
+        callin: "StartBuilding",
+        aimAtStandIn: { from: "midPos" },
+      },
       { frame: at(5.5), callin: "StopBuilding" },
     ],
+    // On the ground ahead and to one side, then across to the other during the
+    // gap between the two builds, so the arm is seen to follow it.
+    standIn: {
+      keys: [
+        { frame: 0, pos: [1.6, 0, 2.6] },
+        { frame: at(2.5), pos: [1.6, 0, 2.6] },
+        { frame: at(3.5), pos: [-1.6, 0, 2.6] },
+        { frame: at(5.5), pos: [-1.6, 0, 2.6] },
+      ],
+    },
   },
   {
     id: "building-factory",
@@ -276,6 +310,22 @@ export const SCENARIOS: Scenario[] = [
       { frame: at(4.5), callin: "StopBuilding" },
       { frame: at(5.5), callin: "Deactivate" },
     ],
+    standIn: {
+      // Nowhere until the factory starts building. A key on the same frame the
+      // attach begins, so the keyed position is never what is drawn.
+      keys: [{ frame: at(1.5), pos: [0, 0, 0] }],
+      // A factory spawns what it builds at the world position of the piece
+      // `QueryBuildInfo` names, and leaves it there
+      // (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`). It does not carry
+      // it, so the stand-in sits at the piece's rest position rather than
+      // riding it through whatever the doors do.
+      attach: {
+        from: "QueryBuildInfo",
+        frame: at(1.5),
+        until: null,
+        follow: false,
+      },
+    },
   },
   {
     id: "destroyed",
@@ -302,12 +352,94 @@ export const SCENARIOS: Scenario[] = [
     description: "Aims one way, fires, aims the other, fires again.",
     events: [
       ...CREATED,
-      // Heading and pitch in radians, which is what the call-in is handed.
-      { frame: at(0.5), callin: "AimWeapon1", args: [0.8, 0.15] },
+      // Aimed at the stand-in rather than at two numbers, and measured from
+      // the piece `AimFromWeapon1` names, as the engine measures it
+      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`).
+      {
+        frame: at(0.5),
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon" },
+      },
       { frame: at(2), callin: "Shot1" },
-      { frame: at(3), callin: "AimWeapon1", args: [-0.8, 0.3] },
+      {
+        frame: at(3),
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon" },
+      },
       { frame: at(4.5), callin: "Shot1" },
     ],
+    // Off the ground and well out, so the second aim differs from the first in
+    // pitch as well as heading and a barrel that only turns is obvious.
+    standIn: {
+      keys: [
+        { frame: 0, pos: [2.6, 2.2, 4] },
+        { frame: at(2), pos: [2.6, 2.2, 4] },
+        { frame: at(3), pos: [-2.6, 0.6, 4] },
+        { frame: at(5.5), pos: [-2.6, 0.6, 4] },
+      ],
+    },
+  },
+  {
+    id: "transport-load",
+    label: "Loading a transport",
+    description:
+      "An air transport picking something up: it is told what it is carrying, and the stand-in rides the piece the script names for it.",
+    events: [
+      ...CREATED,
+      // The engine's air arm calls `BeginTransport` and then attaches with the
+      // piece `QueryTransport` names
+      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup`
+      // is the ground and ship arm, which needs the attach piece the script
+      // chooses for itself and is not previewable yet.
+      { frame: at(2), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
+    ],
+    standIn: {
+      keys: [
+        // Approaching on the ground, from in front.
+        { frame: 0, pos: [0, 0, 4.5] },
+        { frame: at(2), pos: [0, 0, 1] },
+      ],
+      attach: {
+        from: "QueryTransport",
+        frame: at(2),
+        until: null,
+        follow: true,
+      },
+    },
+  },
+  {
+    id: "transport-unload",
+    label: "Unloading a transport",
+    description:
+      "The same transport putting its passenger down: the stand-in comes off the piece it was riding and settles below.",
+    events: [
+      ...CREATED,
+      // `TransportDrop(unitID, x, y, z)` in the Lua form
+      // (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:806-826`). The position is
+      // where the passenger is going, which is the ground under the transport.
+      {
+        frame: at(2.5),
+        callin: "TransportDrop",
+        args: [STAND_IN_UNIT_ID, 0, 0, 0],
+      },
+      // Once the last passenger is off (`MobileCAI.cpp:2094-2098`).
+      { frame: at(3), callin: "EndTransport" },
+    ],
+    standIn: {
+      keys: [
+        // Measured from the piece it was riding, so it leaves from where the
+        // transport was holding it rather than from the unit's origin.
+        { frame: at(2.5), pos: [0, 0, 0], fromAttachPiece: true },
+        { frame: at(4), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        { frame: at(5.5), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+      ],
+      attach: {
+        from: "QueryTransport",
+        frame: 0,
+        until: at(2.5),
+        follow: true,
+      },
+    },
   },
 ];
 
