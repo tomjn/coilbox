@@ -3,8 +3,9 @@
  * The BOS → Lua page around the converter, which Rust tests on its own. What
  * is left here: a script loaded from disk is converted with its path so its
  * includes come with it, the path is shown as code, the Lua is a read-only
- * view rather than a second text box, find searches the BOS, and warnings sit
- * behind a counted button rather than under the code.
+ * view rather than a second text box, find searches the BOS, and lint
+ * problems and conversion warnings sit behind one counted "Checks" button
+ * rather than under the code.
  */
 import {
   cleanup,
@@ -14,20 +15,28 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { LintDiagnostic } from "../bindings";
 
-const { animBos2lua, animBosRead, open } = vi.hoisted(() => ({
+const { animBos2lua, animBosLint, animBosRead, open } = vi.hoisted(() => ({
   animBos2lua: vi.fn(async () => ({
     lua: 'local base = piece("base")\nfunction script.Create()\nend',
-    warnings: ["first difference", "second difference"],
+    warnings: [
+      { file: null, line: null, message: "first difference" },
+      { file: null, line: null, message: "second difference" },
+    ],
     linearScale: 65536,
     cobVars: "-- cob_vars" as string | null,
     missingIncludes: [] as string[],
+  })),
+  animBosLint: vi.fn(async () => ({
+    diagnostics: [] as LintDiagnostic[],
+    error: undefined as string | undefined,
   })),
   animBosRead: vi.fn(async () => ({ source: "piece base;\nCreate() { }\n" })),
   open: vi.fn(async () => "/games/THIS.sdd/scripts/carrier.bos"),
 }));
 
-vi.mock("../bindings", () => ({ animBos2lua, animBosRead }));
+vi.mock("../bindings", () => ({ animBos2lua, animBosLint, animBosRead }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }),
@@ -81,14 +90,107 @@ describe("the BOS to Lua page", () => {
     expect(screen.queryByPlaceholderText(/Converted Lua/)).toBeNull();
   });
 
-  it("puts warnings behind a counted button that opens a drawer", async () => {
+  it("puts warnings behind a counted Checks button that opens a drawer", async () => {
     await loadCarrier();
     expect(screen.queryByText("first difference")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /2 warnings/ }));
+    fireEvent.click(screen.getByRole("button", { name: /2 checks/ }));
     await waitFor(() =>
       expect(screen.getByText("first difference")).toBeTruthy(),
     );
     expect(screen.getByText("second difference")).toBeTruthy();
+    expect(screen.getByText(/Conversion warnings/)).toBeTruthy();
+  });
+
+  it("puts lint problems in the same Checks drawer, above conversion warnings", async () => {
+    animBosLint.mockResolvedValue({
+      diagnostics: [
+        {
+          rule: "speed-zero",
+          severity: "warning",
+          line: 1,
+          message: "`turn` at speed 0 never finishes.",
+        },
+      ],
+      error: undefined,
+    });
+    await loadCarrier();
+    // The lint pass is debounced, so the button's count only reaches 3 once
+    // it has run.
+    fireEvent.click(await screen.findByRole("button", { name: /3 checks/ }));
+    await waitFor(() =>
+      expect(screen.getByText(/Problems in the BOS/)).toBeTruthy(),
+    );
+    expect(screen.getByText(/never finishes/)).toBeTruthy();
+  });
+
+  it("lists an info diagnostic in the drawer without counting it on the button", async () => {
+    animBosLint.mockResolvedValue({
+      diagnostics: [
+        {
+          rule: "unused-static",
+          severity: "info",
+          line: 1,
+          message: "`base` is declared with `static-var` but never read.",
+        },
+      ],
+      error: undefined,
+    });
+    await loadCarrier();
+    // Two conversion warnings, no error or warning diagnostics: the info
+    // above does not add to the count.
+    fireEvent.click(await screen.findByRole("button", { name: /2 checks/ }));
+    await waitFor(() =>
+      expect(screen.getByText(/but never read/)).toBeTruthy(),
+    );
+  });
+
+  it("shows a neutral notes button when only info diagnostics exist", async () => {
+    animBos2lua.mockResolvedValueOnce({
+      lua: 'local base = piece("base")\nfunction script.Create()\nend',
+      warnings: [],
+      linearScale: 65536,
+      cobVars: null,
+      missingIncludes: [],
+    });
+    animBosLint.mockResolvedValue({
+      diagnostics: [
+        {
+          rule: "unused-static",
+          severity: "info",
+          line: 1,
+          message: "`base` is declared with `static-var` but never read.",
+        },
+      ],
+      error: undefined,
+    });
+    await loadCarrier();
+    const button = await screen.findByRole("button", { name: /1 note/ });
+    expect(button.className).not.toMatch(/text-destructive|text-amber/);
+  });
+
+  it("closes the drawer and scrolls to the line when a problem is picked", async () => {
+    animBosLint.mockResolvedValue({
+      diagnostics: [
+        {
+          rule: "speed-zero",
+          severity: "warning",
+          line: 2,
+          message: "`turn` at speed 0 never finishes.",
+        },
+      ],
+      error: undefined,
+    });
+    await loadCarrier();
+    // The lint pass is debounced, so the button's count only reaches 3 once
+    // it has run.
+    fireEvent.click(await screen.findByRole("button", { name: /3 checks/ }));
+    const problem = await screen.findByRole("button", {
+      name: /speed-zero/,
+    });
+    fireEvent.click(problem);
+    await waitFor(() =>
+      expect(screen.queryByText(/Problems in the BOS/)).toBeNull(),
+    );
   });
 
   it("finds in the BOS from Cmd+F and marks each match", async () => {

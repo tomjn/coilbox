@@ -14,7 +14,7 @@
 
 use crate::parse::{self, Axis, Comment, Expr, Func, Item, ItemKind, Stmt, StmtKind};
 use crate::pp::{self, Output as Pre};
-use crate::{Conversion, Options};
+use crate::{Conversion, Options, Warning};
 use coilbox_unitpose::unitvalue::{self, NAMES as COB_NAMES};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -516,9 +516,9 @@ pub fn emit(items: &[Item], pre: &Pre, options: &Options) -> Result<Conversion, 
         last = Some(result);
     }
     let mut result = last.expect("at least one mode");
-    result.warnings.push(format!(
+    result.warnings.push(Warning::unlocated(format!(
         "Even with its pieces, variables and constants made global, a function here uses more than Lua's {MAX_UPVALUES} outside names, so the engine will refuse to load it."
-    ));
+    )));
     Ok(result)
 }
 
@@ -537,7 +537,7 @@ struct Program<'a> {
     /// Constants the engine's own `COB` table already names, with the same value.
     cob_names: HashMap<String, i64>,
     taken: HashSet<String>,
-    warnings: Vec<String>,
+    warnings: Vec<Warning>,
     /// Whether the script has a SetMaxReloadTime, whose call-in shares
     /// `script.Create` with Create itself.
     has_reload: bool,
@@ -563,7 +563,7 @@ fn sanitise(want: &str, taken: &HashSet<String>) -> String {
 }
 
 /// Every expression a statement reads, not counting the statements inside it.
-fn exprs_in(k: &StmtKind) -> Vec<&Expr> {
+pub(crate) fn exprs_in(k: &StmtKind) -> Vec<&Expr> {
     match k {
         StmtKind::Assign(_, e)
         | StmtKind::Sleep(e)
@@ -658,7 +658,7 @@ fn walk<'s>(stmts: &'s [Stmt], f: &mut impl FnMut(&'s StmtKind)) {
 }
 
 /// Every name an expression reads, lower-cased, and every constant, as written.
-fn names_in(e: &Expr, names: &mut HashSet<String>, consts: &mut HashSet<String>) {
+pub(crate) fn names_in(e: &Expr, names: &mut HashSet<String>, consts: &mut HashSet<String>) {
     match e {
         Expr::Name(n) => {
             names.insert(n.to_lowercase());
@@ -855,7 +855,7 @@ impl<'a> Program<'a> {
                                         "The script names a piece called {name} that the model does not have, so the engine will refuse to load it."
                                     );
                                         piece_warnings.insert(name.to_lowercase(), warning.clone());
-                                        p.warnings.push(warning);
+                                        p.warnings.push(Warning::unlocated(warning));
                                         name.clone()
                                     }
                                 }
@@ -913,9 +913,9 @@ impl<'a> Program<'a> {
                     } else {
                         (f.name.clone(), other.clone())
                     };
-                    p.warnings.push(format!(
+                    p.warnings.push(Warning::unlocated(format!(
                         "{keep} and {drop} are the same call-in. The engine calls {keep} and {drop} becomes an ordinary function."
-                    ));
+                    )));
                     if keep == f.name {
                         if let Some(info) = p.funcs.get_mut(&other.to_lowercase()) {
                             info.role = None;
@@ -946,9 +946,9 @@ impl<'a> Program<'a> {
         if (1..=32).any(|n| claimed.contains_key(&format!("script.QueryWeapon{n}")))
             && !claimed.contains_key("script.AimWeapon1")
         {
-            p.warnings.push(
+            p.warnings.push(Warning::unlocated(
                 "The unit script framework only hands weapon call-ins on when AimWeapon1 exists, and this script has none, so its weapons will not aim.".into(),
-            );
+            ));
         }
 
         if options.prune {
@@ -1013,10 +1013,10 @@ impl<'a> Program<'a> {
             info.direct = match &info.role {
                 Some(Role::Callin(s)) if s.ret != Ret::Nothing => {
                     if info.called {
-                        p.warnings.push(format!(
+                        p.warnings.push(Warning::unlocated(format!(
                             "The script calls {} itself. The Lua calls the engine's {} instead, which gets the same answer.",
                             info.lua, s.lua
-                        ));
+                        )));
                     }
                     true
                 }
@@ -1026,10 +1026,10 @@ impl<'a> Program<'a> {
             };
             if let Some(Role::Callin(s)) = &info.role {
                 if s.ret != Ret::Nothing && info.blocks && !s.threaded {
-                    p.warnings.push(format!(
+                    p.warnings.push(Warning::unlocated(format!(
                         "{} waits, but the engine wants its answer at once, so it will stop with an error the first time it waits.",
                         info.lua
-                    ));
+                    )));
                 }
             }
         }
@@ -1047,10 +1047,10 @@ impl<'a> Program<'a> {
             let lower = f.name.to_lowercase();
             if self.dropped.contains(&lower) {
                 if !f.name.starts_with("lua_") && said.insert(lower) {
-                    self.warnings.push(format!(
+                    self.warnings.push(Warning::unlocated(format!(
                         "{} in {} is never called, so the Lua leaves it out. If a gadget calls it by name, convert with unused code kept.",
                         f.name, self.pre.files[*file]
-                    ));
+                    )));
                 }
                 continue;
             }
@@ -1081,7 +1081,7 @@ impl<'a> Program<'a> {
             .filter(|(bos, _, _)| !names.contains(bos))
             .filter_map(|(bos, _, _)| piece_warnings.get(bos))
             .collect();
-        self.warnings.retain(|w| !gone.contains(w));
+        self.warnings.retain(|w| !gone.contains(&w.message));
         self.pieces.retain(|(bos, _, _)| names.contains(bos));
         self.statics.retain(|(bos, _)| names.contains(bos));
     }
@@ -1169,7 +1169,7 @@ struct Writer<'p, 'a> {
     piece_out: HashSet<String>,
     /// Something to say at the end of the line being written.
     note: Option<String>,
-    warnings: Vec<String>,
+    warnings: Vec<Warning>,
     warned: HashSet<String>,
     include_stack: Vec<String>,
     last_header: Option<String>,
@@ -1219,7 +1219,7 @@ impl<'p, 'a> Writer<'p, 'a> {
 
     fn warn(&mut self, key: &str, message: String) {
         if self.warned.insert(key.to_string()) {
-            self.warnings.push(message);
+            self.warnings.push(Warning::unlocated(message));
         }
     }
 
@@ -1887,9 +1887,13 @@ impl<'p, 'a> Writer<'p, 'a> {
                 }
                 ItemKind::Stray { text, line } => {
                     self.comments(&item.leading);
-                    self.warnings.push(format!(
-                        "{} line {line}: `{text}` is outside any function, where the compiler drops it, so the Lua leaves it out too.",
-                        self.p.pre.files[item.file]
+                    self.warnings.push(Warning::at(
+                        self.p.pre.files[item.file].clone(),
+                        *line,
+                        item.file == 0,
+                        format!(
+                            "`{text}` is outside any function, where the compiler drops it, so the Lua leaves it out too."
+                        ),
                     ));
                 }
                 ItemKind::Define(name) => {

@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Copy,
   FileCode2,
+  Info,
   Search,
   TriangleAlert,
   Upload,
@@ -19,6 +20,12 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  CheckItem,
+  CheckSection,
+  SEVERITY_COLOR,
+  worstSeverity,
+} from "@/components/CheckItem";
 import { CheckField } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
@@ -29,8 +36,15 @@ import {
   stepMatch,
 } from "@/scenario/pages/components/missionLuaSearch";
 import { useLuaTokens } from "@/scenario/pages/components/missionLuaTokens";
-import { animBos2lua, animBosRead } from "../bindings";
+import {
+  animBos2lua,
+  animBosLint,
+  animBosRead,
+  type ConversionWarning,
+  type LintDiagnostic,
+} from "../bindings";
 import { BosSource } from "./BosSource";
+import { LintProblems } from "./LintProblems";
 
 /** `Input` forwards `ref` at runtime but its type has none, and the find box
  *  needs its node to take focus on Cmd/Ctrl+F. See `MissionLuaView`. */
@@ -51,7 +65,7 @@ Create()
 
 interface Converted {
   lua: string;
-  warnings: string[];
+  warnings: ConversionWarning[];
   cobVars: string | null;
   error: string | null;
 }
@@ -59,6 +73,16 @@ interface Converted {
 const BOS = /\.bos$/i;
 
 const EMPTY: Converted = { lua: "", warnings: [], cobVars: null, error: null };
+
+/** Where a conversion warning is shown as pointing: a bare line in the main
+ *  script, the included file's own name and line for one that came from
+ *  elsewhere, or nothing for a warning that names no location at all. */
+function warningLocation(warning: ConversionWarning): string | undefined {
+  if (warning.file === null || warning.line === null) return undefined;
+  if (warning.main) return `line ${warning.line}`;
+  const name = warning.file.split(/[\\/]/).pop() ?? warning.file;
+  return `${name}:${warning.line}`;
+}
 
 /**
  * BOS → Lua unit-script converter. Converts as you type through the Rust
@@ -77,7 +101,7 @@ export default function Bos2LuaPage() {
   // go on writing the unused code weeks later.
   const [prune, setPrune] = useState(true);
   const [copied, setCopied] = useState<"lua" | "cobVars" | null>(null);
-  const [warningsOpen, setWarningsOpen] = useState(false);
+  const [checksOpen, setChecksOpen] = useState(false);
   const [cobVarsOpen, setCobVarsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [rawMatch, setRawMatch] = useState(0);
@@ -85,6 +109,12 @@ export default function Bos2LuaPage() {
   // Only the newest conversion is shown, so a slow one for an older version
   // of the text cannot land on top of the current one.
   const latest = useRef(0);
+  const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([]);
+  const [lintError, setLintError] = useState<string | null>(null);
+  // The line of the problem last clicked, 1-indexed as the lint pass reports
+  // it. Cleared whenever the source changes underneath it.
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const latestLint = useRef(0);
 
   useEffect(() => {
     const ticket = ++latest.current;
@@ -120,6 +150,66 @@ export default function Bos2LuaPage() {
         }
       });
   }, [bos, fileName, path, prune]);
+
+  // Linted separately from the conversion above, on a short debounce: a lint
+  // pass is not needed on every keystroke the way the live Lua view is.
+  useEffect(() => {
+    if (bos.trim() === "") {
+      setDiagnostics([]);
+      setLintError(null);
+      return;
+    }
+    const ticket = ++latestLint.current;
+    const timer = setTimeout(() => {
+      animBosLint({ source: bos, name: fileName, ...(path ? { path } : {}) })
+        .then(({ diagnostics, error }) => {
+          if (ticket !== latestLint.current) return;
+          setDiagnostics(diagnostics);
+          setLintError(error ?? null);
+        })
+        .catch((error: unknown) => {
+          if (ticket === latestLint.current) {
+            setDiagnostics([]);
+            setLintError(errorText(error));
+          }
+        });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [bos, fileName, path]);
+
+  // A picked problem stops pointing anywhere once the text it was about has
+  // moved.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: bos is the reset trigger, not read in the body
+  useEffect(() => {
+    setSelectedLine(null);
+  }, [bos]);
+
+  // 0-indexed line -> its error/warning diagnostics, for BosSource's gutter
+  // mark and row tint. Info is left out: it is not worth the eye inline. A
+  // conversion warning located in the main file gets the same mark, so the
+  // gutter does not draw a line between the two kinds of problem.
+  const lineProblems = useMemo(() => {
+    const map = new Map<number, LintDiagnostic[]>();
+    const add = (d: LintDiagnostic) => {
+      const list = map.get(d.line - 1);
+      if (list) list.push(d);
+      else map.set(d.line - 1, [d]);
+    };
+    for (const d of diagnostics) {
+      if (d.severity === "info") continue;
+      add(d);
+    }
+    for (const w of converted.warnings) {
+      if (!w.main || w.line === null) continue;
+      add({
+        rule: "conversion",
+        severity: "warning",
+        line: w.line,
+        message: w.message,
+      });
+    }
+    return map;
+  }, [diagnostics, converted.warnings]);
 
   async function loadPath(picked: string) {
     try {
@@ -217,6 +307,19 @@ export default function Bos2LuaPage() {
 
   const searching = query.trim() !== "";
   const warningCount = converted.warnings.length;
+  const problemCount = diagnostics.length;
+  // The button's count is only what needs acting on: errors, lint warnings
+  // and conversion warnings. An info diagnostic still lists in the drawer,
+  // but does not add to the number on the button.
+  const infoCount = diagnostics.filter((d) => d.severity === "info").length;
+  const severeCount = problemCount - infoCount + warningCount;
+  const checksSeverity = lintError
+    ? "error"
+    : worstSeverity([
+        ...diagnostics.map((d) => d.severity),
+        ...(warningCount > 0 ? (["warning"] as const) : []),
+      ]);
+  const showChecks = severeCount > 0 || infoCount > 0 || !!lintError;
 
   async function copy(text: string, which: "lua" | "cobVars") {
     if (!text) return;
@@ -248,15 +351,27 @@ export default function Bos2LuaPage() {
         }
         actions={
           <>
-            {warningCount > 0 && (
+            {showChecks && (
               <Button
                 size="sm"
                 variant="outline"
-                className="text-amber-700 dark:text-amber-400"
-                onClick={() => setWarningsOpen(true)}
+                className={
+                  severeCount > 0 && checksSeverity
+                    ? SEVERITY_COLOR[checksSeverity]
+                    : ""
+                }
+                onClick={() => setChecksOpen(true)}
               >
-                <TriangleAlert className="size-4" />
-                {warningCount} {warningCount === 1 ? "warning" : "warnings"}
+                {severeCount > 0 || lintError ? (
+                  <TriangleAlert className="size-4" />
+                ) : (
+                  <Info className="size-4" />
+                )}
+                {lintError
+                  ? "Parse error"
+                  : severeCount > 0
+                    ? `${severeCount} ${severeCount === 1 ? "check" : "checks"}`
+                    : `${infoCount} ${infoCount === 1 ? "note" : "notes"}`}
               </Button>
             )}
             {converted.cobVars && (
@@ -384,6 +499,8 @@ export default function Bos2LuaPage() {
             lines={bosLines}
             matches={matches}
             activeMatch={activeMatch}
+            highlightLine={selectedLine === null ? null : selectedLine - 1}
+            problems={lineProblems}
           />
         </div>
         <div className="flex min-h-0 flex-col gap-2">
@@ -420,17 +537,49 @@ export default function Bos2LuaPage() {
         </div>
       </div>
       <Drawer
-        open={warningsOpen && warningCount > 0}
-        onOpenChange={setWarningsOpen}
-        title="Conversion warnings"
-        description="Where the Lua may do something different from the BOS."
+        open={checksOpen && showChecks}
+        onOpenChange={setChecksOpen}
+        title="Checks"
+        description="Problems the lint pass found in the BOS, and where the Lua may do something different from it."
         width="34rem"
       >
-        <ul className="flex list-disc flex-col gap-2 pl-4 text-sm">
-          {converted.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-5 text-sm">
+          {(problemCount > 0 || lintError) && (
+            <LintProblems
+              diagnostics={diagnostics}
+              error={lintError}
+              onSelect={(line) => {
+                setSelectedLine(line);
+                setChecksOpen(false);
+              }}
+            />
+          )}
+          {warningCount > 0 && (
+            <CheckSection title="Conversion warnings" count={warningCount}>
+              {converted.warnings.map((warning, i) => {
+                const jumpTo = warning.main ? warning.line : null;
+                return (
+                  <CheckItem
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a warning carries no id of its own, and two can share a file, line and message
+                    key={i}
+                    severity="warning"
+                    location={warningLocation(warning)}
+                    message={warning.message}
+                    tag="conversion"
+                    onSelect={
+                      jumpTo === null
+                        ? undefined
+                        : () => {
+                            setSelectedLine(jumpTo);
+                            setChecksOpen(false);
+                          }
+                    }
+                  />
+                );
+              })}
+            </CheckSection>
+          )}
+        </div>
       </Drawer>
       <Drawer
         open={cobVarsOpen && converted.cobVars !== null}
