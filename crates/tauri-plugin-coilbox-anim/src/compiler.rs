@@ -308,6 +308,19 @@ impl Compiler {
             i += 2;
         }
 
+        // Scale is the one statement BARScriptCompiler writes that the engine
+        // cannot run. Its `scale`/`wait-for-scale` grammar copies `move`, axis
+        // and all, but the engine's scale opcodes take a piece and nothing
+        // else (`CobThread.cpp`), so the axis word lands where the engine
+        // reads its next instruction and the script dies there. Refusing is
+        // the only honest answer, since every other compiler in the ecosystem
+        // has no scale statement at all.
+        if keyword == "scale" || keyword == "wait-for-scale" {
+            return Err(format!(
+                "{keyword} cannot be compiled. The engine's scale opcodes take a piece and no axis, so the axis this statement writes is read as an instruction and stops the script. Convert the script to Lua, where scaling works."
+            ));
+        }
+
         // Declared order for set/attach-unit; reversed otherwise.
         let children: Vec<&Node> = if keyword == "set" || keyword == "attach-unit" {
             node.children.iter().collect()

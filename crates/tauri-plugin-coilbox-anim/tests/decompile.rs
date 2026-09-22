@@ -151,6 +151,36 @@ fn compiler_signature_after_a_script_is_not_code() {
     assert_eq!(&again[44..56], &code[..12], "the code itself is unchanged");
 }
 
+/// A `.cob` holding a scale opcode cannot be written as BOS, because the
+/// statement BARScriptCompiler has for it does not compile to this.
+#[test]
+fn a_scale_opcode_has_no_bos() {
+    let mut code = Vec::new();
+    // PUSH_CONSTANT 1, PUSH_CONSTANT 2, SCALE base, PUSH_CONSTANT 0, RETURN.
+    for w in [
+        0x10021001u32,
+        1,
+        0x10021001,
+        2,
+        0x100A0000,
+        0,
+        0x10021001,
+        0,
+        0x10065000,
+    ] {
+        code.extend_from_slice(&w.to_le_bytes());
+    }
+    let cob = cob_with_one_script("Create", &code, &["base"]);
+    let decompiled = decompile_cob(&cob).expect("decompile");
+    assert_eq!(decompiled.warnings.len(), 1, "{:?}", decompiled.warnings);
+    assert!(
+        decompiled.warnings[0].contains("scale opcodes have no BOS statement"),
+        "{:?}",
+        decompiled.warnings
+    );
+    assert!(compile_bos(&decompiled.source, &fixtures()).is_err());
+}
+
 /// A COB v4 file with one script, laid out the way `cob::encode` does it.
 fn cob_with_one_script(name: &str, code: &[u8], pieces: &[&str]) -> Vec<u8> {
     let words = code.len() as u32 / 4;

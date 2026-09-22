@@ -65,8 +65,8 @@ fn folds_bos() {
     assert_golden("folds");
 }
 
-/// Remaining animation keywords: spin+accelerate, stop-spin+decelerate, scale,
-/// wait-for-move/scale, cache/dont-cache/dont-shade/dont-shadow, attach-unit
+/// Remaining animation keywords: spin+accelerate, stop-spin+decelerate,
+/// wait-for-move, cache/dont-cache/dont-shade/dont-shadow, attach-unit
 /// (with its dummy push), drop-unit, comparison/logical/unary operators.
 #[test]
 fn anims_bos() {
@@ -75,6 +75,29 @@ fn anims_bos() {
 
 /// Pathological input must surface a clean error, never abort the process via a
 /// stack overflow (regression for the app-crash report).
+/// `scale` and `wait-for-scale` compile to a stream the engine cannot run: it
+/// reads a piece and no axis, so the axis BARScriptCompiler's grammar writes
+/// lands where the next instruction should be. No other compiler in the
+/// ecosystem has the statement at all, so this one refuses it rather than
+/// writing a script that dies on the line.
+#[test]
+fn scale_is_refused_rather_than_miscompiled() {
+    let dir = fixtures();
+    for statement in [
+        "scale base to x-axis [2] speed [1];",
+        "scale base to x-axis [2] now;",
+        "wait-for-scale base along x-axis;",
+    ] {
+        let src = format!("piece base;\nCreate()\n{{\n\t{statement}\n}}\n");
+        let error = tauri_plugin_coilbox_anim::compile_bos(&src, &dir)
+            .expect_err(&format!("{statement} should not compile"));
+        assert!(
+            error.contains("cannot be compiled") && error.contains("no axis"),
+            "{statement}: {error}"
+        );
+    }
+}
+
 #[test]
 fn deeply_nested_input_errors_gracefully() {
     let src = format!(

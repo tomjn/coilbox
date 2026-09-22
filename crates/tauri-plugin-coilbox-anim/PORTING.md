@@ -209,6 +209,28 @@ Name strings byte-packed (no alignment). Sounds list unused.
    never taken is never evaluated, so a malformed condition inside dead code
    is not an error.
 
+## Deliberate divergence: no `scale` statement
+
+`scale`, `scale now` and `wait-for-scale` are the one place this port refuses
+what the reference accepts. Upstream added them in `0630e758` ("Add SCALE
+commands", 2025-10-17), copying `move`'s grammar including `_axis`, two days
+before the engine's own scale opcodes landed in RecoilEngine `b44193e1c7`
+("Some animation works", #2589). The engine's scaling has no axis at all:
+`CobThread.cpp` reads a piece and nothing else for `SCALE`, `SCALE_NOW` and
+`WAIT_SCALE`, and `UnitScript.h` declares `Scale(int piece, float speed, float
+destination)`. So the axis word upstream writes lands where the engine reads
+its next instruction, and the script stops there.
+
+No other compiler in the ecosystem has a scale statement, and nothing in the
+1465 compiled scripts scanned from Balanced Annihilation, Metal Factions,
+Spring 1944 and Expand and Exterminate uses one. `compiler.rs` therefore errors
+on the statement, and `decompile.rs` treats the opcodes as unwritable. The BOS
+to Lua path in `coilbox-bos2lua` still converts `scale`, dropping the axis the
+same way the engine would, since `Spring.UnitScript.Scale` does work.
+
+Nothing else diverges. `anims.bos` used to carry both statements and no longer
+does, and its `.cob` was regenerated from the pinned reference.
+
 ## Status
 
 Compiler (`anim_bos2cob`) implemented and byte-exact vs the reference across the

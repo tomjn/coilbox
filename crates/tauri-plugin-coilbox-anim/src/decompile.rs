@@ -106,7 +106,7 @@ enum Stmt {
     Declare(usize),
     Assign(Var, Expr),
     Step(Var, &'static str),
-    /// `turn`, `move` or `scale`. No speed means `now`.
+    /// `turn` or `move`. No speed means `now`.
     Motion {
         keyword: &'static str,
         piece: u32,
@@ -342,7 +342,7 @@ impl Body<'_> {
                     self.locals += 1;
                     Some(Stmt::Declare(self.locals - 1))
                 }
-                "TURN" | "MOVE" | "SCALE" | "TURN_NOW" | "MOVE_NOW" | "SCALE_NOW" => {
+                "TURN" | "MOVE" | "TURN_NOW" | "MOVE_NOW" => {
                     let target = pop(&mut stack, op)?;
                     let speed = if op.ends_with("_NOW") {
                         None
@@ -350,10 +350,10 @@ impl Body<'_> {
                         Some(pop(&mut stack, op)?)
                     };
                     Some(Stmt::Motion {
-                        keyword: match op {
-                            "TURN" | "TURN_NOW" => "turn",
-                            "MOVE" | "MOVE_NOW" => "move",
-                            _ => "scale",
+                        keyword: if op.starts_with("TURN") {
+                            "turn"
+                        } else {
+                            "move"
                         },
                         piece: self.piece(arg(0))?,
                         axis: self.axis(arg(1))?,
@@ -376,11 +376,11 @@ impl Body<'_> {
                     piece: self.piece(arg(0))?,
                     axis: self.axis(arg(1))?,
                 }),
-                "WAIT_FOR_TURN" | "WAIT_FOR_MOVE" | "WAIT_FOR_SCALE" => Some(Stmt::Wait {
-                    keyword: match op {
-                        "WAIT_FOR_TURN" => "turn",
-                        "WAIT_FOR_MOVE" => "move",
-                        _ => "scale",
+                "WAIT_FOR_TURN" | "WAIT_FOR_MOVE" => Some(Stmt::Wait {
+                    keyword: if op == "WAIT_FOR_TURN" {
+                        "turn"
+                    } else {
+                        "move"
                     },
                     piece: self.piece(arg(0))?,
                     axis: self.axis(arg(1))?,
@@ -476,6 +476,10 @@ impl Body<'_> {
                         let left = pop(&mut stack, op)?;
                         stack.push(Expr::Binary(sym, Box::new(left), Box::new(right)));
                         None
+                    } else if other.contains("SCALE") {
+                        // `compiler.rs` refuses the scale statements, since
+                        // the axis they write is not one the engine reads.
+                        return Err("the scale opcodes have no BOS statement that compiles".into());
                     } else if other == "PLAY_SOUND" {
                         // The operand indexes a table of sound names that only
                         // a TA Kingdoms COB carries, and `compiler.rs` writes
