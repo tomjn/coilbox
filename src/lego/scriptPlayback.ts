@@ -21,6 +21,18 @@ export interface ScriptEvent {
    *  runtime saying it does not have one would say it about nearly every
    *  unit. */
   ambient?: boolean;
+  /**
+   * Work this event's arguments out from where the stand-in is on its frame,
+   * rather than taking them as literals.
+   *
+   * A literal aim is a number somebody picked, and a script that aims at it
+   * correctly looks exactly like one that does not. `aimResolver.ts` replaces
+   * the marker with `args` before the run, using the engine's own formula:
+   * `AimFromWeapon` measures from the piece that call-in names
+   * (`rts/Sim/Weapons/Weapon.cpp:410-424`), `midPos` from the unit's mid
+   * (`rts/Sim/Units/UnitTypes/Builder.cpp:942-955`).
+   */
+  aimAtStandIn?: { from: "AimFromWeapon" | "midPos" };
 }
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
@@ -84,12 +96,60 @@ export const PREVIEW_SECONDS = 6;
 /** Frames in a preview, at the sim rate the runtime works in. */
 export const PREVIEW_FRAMES = PREVIEW_SECONDS * 30;
 
+/** Where the stand-in is on one frame, and which way it faces. */
+export interface StandInKey {
+  frame: number;
+  /** Unit-local, in multiples of the stand-in's radius. A track written this
+   *  way serves a scout and a factory alike, since the radius comes from the
+   *  edited unit's own size rather than from the track. */
+  pos: [number, number, number];
+  /**
+   * Measure `pos` from the attach piece's rest position rather than from the
+   * unit's origin.
+   *
+   * What a dropped passenger needs: it leaves the transport from where the
+   * transport was holding it, not from where the unit's origin happens to be.
+   */
+  fromAttachPiece?: boolean;
+  /** Radians about the vertical axis, relative to the unit's facing. Zero
+   *  where no key sets one. */
+  heading?: number;
+}
+
+/** The piece the stand-in sits on, and for how long. */
+export interface StandInAttach {
+  /** The call-in the probe asks for that piece. */
+  from: "QueryTransport" | "QueryBuildInfo";
+  /** The first frame the stand-in sits on it. */
+  frame: number;
+  /** The frame it comes off again, or null to stay on to the end. */
+  until: number | null;
+  /**
+   * Ride the piece as it animates, rather than sitting where the piece rests.
+   *
+   * A transport carries its passenger, so it follows. A factory spawns the
+   * unit it builds at the piece's world position once and leaves it there
+   * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), so it does not.
+   */
+  follow: boolean;
+}
+
+/** Where the stand-in goes over a scenario, as a preview aid layered over the
+ *  timeline. The runtimes know nothing about it. */
+export interface StandInTrack {
+  keys: StandInKey[];
+  attach?: StandInAttach | null;
+}
+
 export interface Scenario {
   id: string;
   label: string;
   /** Why you would pick it, in the panel under the picker. */
   description: string;
   events: ScriptEvent[];
+  /** The stand-in this scenario puts in the scene, if it puts one there at
+   *  all. A scenario with no track shows no stand-in. */
+  standIn?: StandInTrack;
 }
 
 /** Seconds to frames, for writing a scenario in the units it reads in.
