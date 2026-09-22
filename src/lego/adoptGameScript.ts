@@ -29,7 +29,11 @@
  * script and use the presets" is the way back.
  */
 
-import { animBos2lua, animCobDisasmBytes } from "../animation/bindings";
+import {
+  animBos2lua,
+  animCobDisasmBytes,
+  type ConversionWarning,
+} from "../animation/bindings";
 import { unitsyncUnitScript } from "../content/bindings";
 import { inferRoles, type RoleFindings } from "./inferRoles";
 import type { LegoProject } from "./model";
@@ -131,6 +135,14 @@ function parseUnitDef(raw: string | null): Record<string, unknown> | null {
   }
 }
 
+/** A conversion warning as the text notes carry it elsewhere in the app,
+ *  exactly what the Rust side's own `Display` for it would write. */
+function warningText(warning: ConversionWarning): string {
+  return warning.file !== null && warning.line !== null
+    ? `${warning.file} line ${warning.line}: ${warning.message}`
+    : warning.message;
+}
+
 /**
  * Read a `.cob` back as a listing, or say why it could not be.
  *
@@ -178,7 +190,7 @@ async function convert(
       pieces: project.pieces.map((piece) => piece.name),
       ...(result.bytes?.length ? { cob: result.bytes } : {}),
     });
-    notes.push(...warnings);
+    notes.push(...warnings.map(warningText));
     return lua;
   } catch (error) {
     notes.push(

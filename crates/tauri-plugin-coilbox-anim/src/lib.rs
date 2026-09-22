@@ -231,7 +231,12 @@ async fn anim_bos2lua(
     match result {
         Ok(Ok((conversion, linear_scale))) => CliResult::ok(json!({
             "lua": conversion.lua,
-            "warnings": conversion.warnings,
+            "warnings": conversion.warnings.iter().map(|w| json!({
+                "file": w.file,
+                "line": w.line,
+                "message": w.message,
+                "main": w.main,
+            })).collect::<Vec<_>>(),
             "linearScale": linear_scale,
             "cobVars": conversion
                 .shared_values
@@ -240,6 +245,73 @@ async fn anim_bos2lua(
         })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("conversion task failed: {e}")),
+    }
+}
+
+/// `anim_bos_lint`: the diagnostics a BOS lint pass finds in `source`.
+///
+/// Same inputs as `anim_bos2lua`, minus `prune`, which no rule cares about.
+/// `path`, when given, reads the script's includes from disk exactly as
+/// `anim_bos2lua` does, and still settles the linear scale and precedence
+/// from the `.cob` beside it when `cob` is not given.
+///
+/// A script that fails to parse comes back `{ diagnostics: [], error }`
+/// rather than a thrown error, so the UI can show the parse failure next to
+/// whatever partial source is on screen instead of losing it to a toast.
+#[tauri::command]
+async fn anim_bos_lint(
+    source: String,
+    name: String,
+    includes: Option<HashMap<String, String>>,
+    pieces: Option<Vec<String>>,
+    cob: Option<Vec<u8>>,
+    path: Option<String>,
+) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut includes = includes.unwrap_or_default();
+        let mut name = name;
+        let mut cob = cob;
+        if let Some(path) = path.as_deref().map(Path::new) {
+            let (root, in_game) = bos_disk::locate(path);
+            for (key, text) in bos_disk::includes(&source, &root, &in_game) {
+                includes.entry(key).or_insert(text);
+            }
+            name = in_game;
+            if cob.is_none() {
+                cob = bos_disk::cob_beside(path);
+            }
+        }
+        let linear_scale = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))
+            .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
+        let precedence = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::precedence(&source, cob))
+            .unwrap_or_default();
+        coilbox_bos2lua::lint(
+            &source,
+            &coilbox_bos2lua::LintOptions {
+                name: &name,
+                includes: &includes,
+                pieces: pieces.as_deref(),
+                linear_scale,
+                precedence,
+            },
+        )
+    })
+    .await;
+    match result {
+        Ok(Ok(diagnostics)) => CliResult::ok(json!({
+            "diagnostics": diagnostics.iter().map(|d| json!({
+                "rule": d.rule,
+                "severity": d.severity.as_str(),
+                "line": d.line,
+                "message": d.message,
+            })).collect::<Vec<_>>(),
+        })),
+        Ok(Err(e)) => CliResult::ok(json!({ "diagnostics": [], "error": e })),
+        Err(e) => CliResult::err(format!("lint task failed: {e}")),
     }
 }
 
@@ -302,6 +374,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             anim_cob_run,
             anim_bos2cob,
             anim_bos2lua,
+            anim_bos_lint,
             anim_bos_read
         ])
         .build()
