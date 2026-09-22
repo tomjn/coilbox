@@ -19,20 +19,25 @@ import type { StandInAttach, StandInKey, StandInTrack } from "./scriptPlayback";
 type Vec3 = [number, number, number];
 
 /**
- * How big the stand-in is beside the unit being edited: a third of the unit's
- * wider horizontal extent.
+ * How big the stand-in is beside the unit being edited: a fifth or so of the
+ * unit's wider horizontal extent.
  *
  * Judged by looking rather than derived. A fixed size is a speck beside a
  * factory and a wall beside a scout, and the point of the thing is that it
- * reads as another unit.
+ * reads as another unit. It was a third until it was watched on screen, where
+ * it crowded the unit it is meant to be a target for.
+ *
+ * A track's positions are multiples of this too, so a stand-in that shrinks
+ * also stands proportionally nearer. That is deliberate: the two together are
+ * what make one track serve a scout and a factory alike.
  */
-const RADIUS_FRACTION = 1 / 3;
+const RADIUS_FRACTION = 7 / 30;
 /** The smallest it goes, in elmos, so a unit with almost nothing built yet
  *  still has something visible to aim at. */
-const MIN_RADIUS = 6;
+const MIN_RADIUS = 4.2;
 /** The largest, so the biggest factory in a game gets a target rather than a
  *  second building. */
-const MAX_RADIUS = 40;
+const MAX_RADIUS = 28;
 
 /**
  * How high the stand-in's middle is above its base, in multiples of its

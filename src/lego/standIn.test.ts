@@ -113,30 +113,30 @@ describe("attachedAt", () => {
 });
 
 describe("standInRadius", () => {
-  /** A third of the unit's larger horizontal extent, so it reads as another
+  /** A fraction of the unit's larger horizontal extent, so it reads as another
    *  unit rather than a speck or a wall. */
-  it("is a third of the wider horizontal extent", () => {
+  it("is a fraction of the wider horizontal extent", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 60, sizeY: 20, sizeZ: 30 }),
-    ).toBe(20);
+    ).toBe(14);
   });
 
   it("uses z when the unit is longer than it is wide", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 30, sizeY: 20, sizeZ: 60 }),
-    ).toBe(20);
+    ).toBe(14);
   });
 
   it("never disappears for a unit with almost nothing in it", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 0, sizeY: 0, sizeZ: 0 }),
-    ).toBe(6);
+    ).toBe(4.2);
   });
 
   it("never grows into a wall beside a very large unit", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 600, sizeY: 100, sizeZ: 600 }),
-    ).toBe(40);
+    ).toBe(28);
   });
 });
 
