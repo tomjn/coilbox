@@ -361,7 +361,9 @@ describe("a compiled script whose game ships its source", () => {
     readScript.mockResolvedValue(withSource());
     convertBos.mockResolvedValue({
       lua: "-- converted\n",
-      warnings: ["could not find sfxtype.h"],
+      warnings: [
+        { file: null, line: null, message: "could not find sfxtype.h" },
+      ],
       linearScale: 65536,
     });
 

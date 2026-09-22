@@ -12,16 +12,19 @@
 
 mod emit;
 mod lex;
+mod lint;
 mod parse;
 mod pp;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+pub use lint::{lint, Diagnostic, LintOptions, Severity};
+
 pub struct Conversion {
     pub lua: String,
     /// Anything the Lua may do differently from the BOS, and any include that
     /// could not be found. Empty for a script that converted exactly.
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
     /// Whether the Lua keeps shared unit values as rules params. A game running
     /// it also wants [`COB_VARS_POLYFILL`] if its gadgets or widgets set or
     /// read them.
@@ -30,6 +33,58 @@ pub struct Conversion {
     /// is also a warning. A caller with no way to supply them, such as a
     /// pasted script, can treat any as a failure.
     pub missing_includes: Vec<String>,
+}
+
+/// Something a converted script may do differently from the BOS, or an
+/// include the preprocessor could not find.
+///
+/// Some name where in the source they come from, such as a macro used with
+/// the wrong number of arguments. Others name nowhere in particular, such as
+/// a script that will not fit inside Lua's own limits, and leave `file` and
+/// `line` `None`.
+#[derive(Clone, Debug)]
+pub struct Warning {
+    /// The file the warning is about, when it names one.
+    pub file: Option<String>,
+    /// The line inside that file, when the warning is about one.
+    pub line: Option<u32>,
+    /// Whether `file` is the script's own file rather than one it includes.
+    /// Always `false` when `file` is `None`.
+    pub main: bool,
+    pub message: String,
+}
+
+impl Warning {
+    /// A warning about nowhere in particular.
+    fn unlocated(message: String) -> Self {
+        Warning {
+            file: None,
+            line: None,
+            main: false,
+            message,
+        }
+    }
+
+    /// A warning that names the file and line it comes from.
+    fn at(file: String, line: u32, main: bool, message: String) -> Self {
+        Warning {
+            file: Some(file),
+            line: Some(line),
+            main,
+            message,
+        }
+    }
+}
+
+impl std::fmt::Display for Warning {
+    /// Exactly the wording a located warning used to carry in its own message,
+    /// before its file and line moved out into their own fields.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match (&self.file, self.line) {
+            (Some(file), Some(line)) => write!(f, "{file} line {line}: {}", self.message),
+            _ => write!(f, "{}", self.message),
+        }
+    }
 }
 
 pub struct Options<'a> {
@@ -220,9 +275,24 @@ fn opcode(op: &str) -> Option<u32> {
     })
 }
 
-pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
-    let includes: HashMap<String, (String, String)> = options
-        .includes
+/// A script preprocessed and parsed, the common step [`convert`] and
+/// [`lint::lint`] both start from.
+struct Parsed {
+    items: Vec<parse::Item>,
+    pre: pp::Output,
+}
+
+/// Preprocesses and parses a script exactly as [`convert`] does: the same
+/// include resolution, the same linear scale and precedence, and the same
+/// wording when parsing fails.
+fn preprocess_and_parse(
+    source: &str,
+    name: &str,
+    includes: &HashMap<String, String>,
+    linear_scale: i64,
+    precedence: Precedence,
+) -> Result<Parsed, String> {
+    let includes: HashMap<String, (String, String)> = includes
         .iter()
         .map(|(path, text)| (normalise(path), (path.clone(), text.clone())))
         .collect();
@@ -231,24 +301,28 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
             .iter()
             .find_map(|candidate| includes.get(candidate).cloned())
     };
-    let pre = pp::preprocess(
-        source,
-        options.name,
-        &resolve,
-        options.linear_scale,
-        options.precedence,
-    );
-    let items = parse::parse(&pre.tokens, options.linear_scale, options.precedence).map_err(|e| {
+    let pre = pp::preprocess(source, name, &resolve, linear_scale, precedence);
+    let items = parse::parse(&pre.tokens, linear_scale, precedence).map_err(|e| {
         // Often the reason: a macro defined in a header nobody supplied.
         match pre.missing.as_slice() {
-            [] => format!("{}: {e}", options.name),
+            [] => format!("{name}: {e}"),
             missing => format!(
-                "{}: {e}. It includes {}, which could not be found, so anything defined there is missing.",
-                options.name,
+                "{name}: {e}. It includes {}, which could not be found, so anything defined there is missing.",
                 missing.join(", ")
             ),
         }
     })?;
+    Ok(Parsed { items, pre })
+}
+
+pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
+    let Parsed { items, pre } = preprocess_and_parse(
+        source,
+        options.name,
+        options.includes,
+        options.linear_scale,
+        options.precedence,
+    )?;
     emit::emit(&items, &pre, options)
 }
 

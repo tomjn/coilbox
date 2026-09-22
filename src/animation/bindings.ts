@@ -68,6 +68,23 @@ export const animBos2cob = defineCommand<
 >("coilbox-anim", "anim_bos2cob");
 
 /**
+ * One thing a conversion did differently from the BOS, or an include that
+ * could not be found.
+ *
+ * `file` and `line` name where in the source it comes from, when it names
+ * anywhere at all: some, such as a script too big for Lua's own limits, name
+ * nowhere in particular and leave both `null`. `main` says whether `file` is
+ * the script's own file rather than one it includes, so a caller can tell
+ * which warnings it can jump to in the box showing that file.
+ */
+export interface ConversionWarning {
+  file: string | null;
+  line: number | null;
+  message: string;
+  main?: boolean;
+}
+
+/**
  * Convert BOS source to a Lua unit script that runs as it is, comments and all.
  *
  * `includes` is the files it may `#include`, keyed by path. `pieces` is the
@@ -93,12 +110,44 @@ export const animBos2lua = defineCommand<
   },
   {
     lua: string;
-    warnings: string[];
+    warnings: ConversionWarning[];
     linearScale: number;
     cobVars: string | null;
     missingIncludes: string[];
   }
 >("coilbox-anim", "anim_bos2lua");
+
+/** One thing a lint pass found wrong with a BOS script. */
+export interface LintDiagnostic {
+  rule: string;
+  severity: "error" | "warning" | "info";
+  line: number;
+  message: string;
+}
+
+/**
+ * Lint BOS source and report what it finds, without converting it.
+ *
+ * Same inputs as {@link animBos2lua} minus `prune`, which no rule cares
+ * about. `path`, when given, reads the script's includes from disk exactly as
+ * `animBos2lua` does. `cob`, when given, still settles the linear scale and
+ * precedence a rule needs to fold a `<x>` or `[x]` constant.
+ *
+ * A script that fails to parse comes back with an empty `diagnostics` array
+ * and `error` set, rather than throwing, so the UI can show the parse
+ * failure next to whatever source is on screen.
+ */
+export const animBosLint = defineCommand<
+  {
+    source: string;
+    name: string;
+    includes?: Record<string, string>;
+    pieces?: string[];
+    cob?: number[];
+    path?: string;
+  },
+  { diagnostics: LintDiagnostic[]; error?: string }
+>("coilbox-anim", "anim_bos_lint");
 
 /** The text of a `.bos` on disk, for the converter page to show and edit. */
 export const animBosRead = defineCommand<{ path: string }, { source: string }>(

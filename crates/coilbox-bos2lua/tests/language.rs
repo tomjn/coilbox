@@ -201,7 +201,7 @@ fn mission_command_stops_the_thread() {
     assert!(conversion
         .warnings
         .iter()
-        .any(|w| w.contains("Mission-Command")));
+        .any(|w| w.to_string().contains("Mission-Command")));
     assert!(conversion.lua.contains("do error("), "{}", conversion.lua);
 }
 
@@ -286,5 +286,5 @@ fn an_explode_flag_nothing_defines_takes_its_standard_value() {
     assert!(conversion
         .warnings
         .iter()
-        .any(|w| w.contains("NOHEATCLOUD")));
+        .any(|w| w.to_string().contains("NOHEATCLOUD")));
 }
