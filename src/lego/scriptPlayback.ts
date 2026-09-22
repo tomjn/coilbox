@@ -284,20 +284,23 @@ export const SCENARIOS: Scenario[] = [
     // On the ground ahead and to one side, then across to the other during the
     // gap between the two builds, so the arm is seen to follow it.
     //
-    // As far out as the target the `firing` scenario puts in the air, and for
-    // the same reason: at arm's length it reads as a thing being built, and up
-    // close it reads as part of the unit. A build this far out is still well
-    // inside a builder's default reach of 128 elmos.
+    // Well out in front. These are multiples of the stand-in's own radius,
+    // which is itself a fraction of the unit, so the distance works out at
+    // about 1.8 times the unit's wider horizontal extent: a unit filling the
+    // 5x5 plate gets a build target a little over 120 elmos away. Anything
+    // nearer and it sits inside the unit's own silhouette and reads as a part
+    // of it rather than as a thing being built, which is what it did at half
+    // this distance on a walker.
     //
     // It comes back to where it started, so the preview loops without the
     // stand-in jumping across the scene on the frame it restarts.
     standIn: {
       keys: [
-        { frame: 0, pos: [2.6, 0, 4.5] },
-        { frame: at(5), pos: [2.6, 0, 4.5] },
-        { frame: at(6.5), pos: [-2.6, 0, 4.5] },
-        { frame: at(11), pos: [-2.6, 0, 4.5] },
-        { frame: at(PREVIEW_SECONDS), pos: [2.6, 0, 4.5] },
+        { frame: 0, pos: [3.5, 0, 7] },
+        { frame: at(5), pos: [3.5, 0, 7] },
+        { frame: at(6.5), pos: [-3.5, 0, 7] },
+        { frame: at(11), pos: [-3.5, 0, 7] },
+        { frame: at(PREVIEW_SECONDS), pos: [3.5, 0, 7] },
       ],
     },
   },
