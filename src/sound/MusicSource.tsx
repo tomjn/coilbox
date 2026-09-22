@@ -1,6 +1,8 @@
 import { useSetting } from "@picoframe/frame";
 import { OptionSelect } from "@/components/OptionSelect";
+import { useUnitsyncGameHeaders } from "@/content/config";
 import { useHostContent } from "@/multiplayer/battles/useHostContent";
+import { GamePickerField } from "@/play/pages/components/GamePickerButton";
 import { getProfileSound } from "@/profile/profile";
 import {
   defaultMusicSource,
@@ -24,6 +26,10 @@ export function MusicSource() {
   );
   const [game, setGame] = useSetting<string>(MUSIC_GAME_KEY, "");
   const content = useHostContent();
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    content.target?.enginePath,
+    content.target?.dataDir,
+  );
   const { tracks, loading } = useGameMusic();
 
   return (
@@ -63,17 +69,15 @@ export function MusicSource() {
 
       {source === "game" && (
         <div className="flex items-start gap-3">
-          <div className="w-40 shrink-0">
-            <OptionSelect
+          <div className="w-64 shrink-0">
+            <GamePickerField
               value={game}
               onValueChange={setGame}
-              size="sm"
+              games={content.games}
+              headers={gameHeaders}
               placeholder="Pick a game"
               ariaLabel="Game to take music from"
-              options={content.games.map((g) => ({
-                value: g.name,
-                label: g.name,
-              }))}
+              gamesLoading={content.scanning}
             />
           </div>
           <span className="block text-xs text-muted-foreground">

@@ -23,8 +23,10 @@
 import { Button, Drawer, Input } from "@picoframe/frame";
 import { useState } from "react";
 import { Field } from "@/components/Field";
-import { OptionSelect } from "@/components/OptionSelect";
 import { Textarea } from "@/components/ui/textarea";
+import type { GameItem } from "@/content/bindings";
+import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
+import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { defaultProjectName, type ModProject } from "../../project";
 
 /** What the form hands back, with the name already filled in if it was left
@@ -35,11 +37,14 @@ export interface ProjectDetails {
   gameName: string;
 }
 
+const NO_ART = new Map<string, string>();
+
 export function ProjectDetailsDrawer({
   open,
   onOpenChange,
   project,
   games,
+  headers = NO_ART,
   scanning,
   existing,
   onSubmit,
@@ -48,8 +53,11 @@ export function ProjectDetailsDrawer({
   onOpenChange: (open: boolean) => void;
   /** The project being renamed. Absent when one is being started. */
   project?: ModProject;
-  /** The installed games, for the menu a new project picks from. */
-  games: readonly { name: string }[];
+  /** The installed games, for the picker a new project chooses from. */
+  games: readonly GameItem[];
+  /** Loading-screen art for the picker, keyed by game name. Only a new project
+   *  shows the picker, so a rename can leave it out. */
+  headers?: Map<string, string>;
   /** Whether the content scan is still running, so the menu says so. */
   scanning: boolean;
   /** The projects already saved, so a nameless one gets a name nothing else
@@ -72,6 +80,7 @@ export function ProjectDetailsDrawer({
       <ProjectDetailsForm
         project={project}
         games={games}
+        headers={headers}
         scanning={scanning}
         existing={existing}
         onSubmit={onSubmit}
@@ -90,12 +99,14 @@ export function ProjectDetailsDrawer({
 function ProjectDetailsForm({
   project,
   games,
+  headers,
   scanning,
   existing,
   onSubmit,
 }: {
   project?: ModProject;
-  games: readonly { name: string }[];
+  games: readonly GameItem[];
+  headers: Map<string, string>;
   scanning: boolean;
   existing: readonly { name: string }[];
   onSubmit: (details: ProjectDetails) => void;
@@ -103,6 +114,9 @@ function ProjectDetailsForm({
   const [gameName, setGameName] = useState(project?.gameName ?? "");
   const [name, setName] = useState(project?.name ?? "");
   const [description, setDescription] = useState(project?.description ?? "");
+  // Swaps the drawer's content for the game picker rather than stacking a
+  // second drawer on this one (issue #2995).
+  const [pickingGame, setPickingGame] = useState(false);
 
   // The name the project would get if the box is left empty, shown greyed in
   // the box so the default is something you can read and overtype rather than
@@ -112,6 +126,20 @@ function ProjectDetailsForm({
   const fallback = gameName ? defaultProjectName(gameName, existing) : "";
   const chosen = name.trim() || (project ? "" : fallback);
   const noGames = !scanning && games.length === 0;
+
+  if (pickingGame) {
+    return (
+      <GamePickerPanel
+        games={games}
+        headers={headers}
+        selectedName={gameName}
+        onSelect={setGameName}
+        onBack={() => setPickingGame(false)}
+        backLabel="Back to the project details"
+        gamesLoading={scanning}
+      />
+    );
+  }
 
   return (
     <form
@@ -131,13 +159,13 @@ function ProjectDetailsForm({
           label="Game"
           hint="Every edit in the project is a patch against this game's own units."
         >
-          <OptionSelect
-            size="sm"
+          <GamePickerButton
             ariaLabel="Game for the new project"
             placeholder={scanning ? "Scanning…" : "Pick a game"}
             value={gameName}
-            onValueChange={setGameName}
-            options={games.map((g) => ({ value: g.name, label: g.name }))}
+            games={games}
+            headers={headers}
+            onClick={() => setPickingGame(true)}
           />
         </Field>
       )}

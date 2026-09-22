@@ -40,6 +40,7 @@ vi.mock("@picoframe/frame", async () => ({
 }));
 vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({ data: { games: [] }, loading: false }),
+  useUnitsyncGameHeaders: () => ({ headers: new Map(), loading: false }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
 // The widget file sync reaches the play state and the engine config, which

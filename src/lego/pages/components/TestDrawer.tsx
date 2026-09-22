@@ -12,9 +12,13 @@
 import { Button, useSetting } from "@picoframe/frame";
 import { FolderOpen, Rocket, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
-import { primeScan, useUnitsyncScan } from "../../../content/config";
+import {
+  primeScan,
+  useUnitsyncGameHeaders,
+  useUnitsyncScan,
+} from "../../../content/config";
 import {
   isScratchArchive,
   SCRATCH_FOLDER,
@@ -28,6 +32,8 @@ import {
   usePreferredTarget,
 } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
+import { GamePickerButton } from "../../../play/pages/components/GamePickerButton";
+import { GamePickerPanel } from "../../../play/pages/components/GamePickerPanel";
 import { exportTextureName, unitAtlas } from "../../atlas";
 import { legoExport, legoScratchGame } from "../../bindings";
 import { unitScript } from "../../luaScript";
@@ -88,6 +94,10 @@ function uniqueByName<T extends { name: string }>(items: T[]): T[] {
 export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    target?.enginePath,
+    target?.dataDir,
+  );
   const { running, launch } = usePlay();
 
   // Remembered app-wide rather than on the unit: which game and map you test
@@ -96,6 +106,13 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const [mapName, setMapName] = useSetting<string>("lego.testMap", "");
 
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
+  // Swaps the drawer's body for the game picker rather than stacking a second
+  // drawer on this one (issue #2995).
+  const [pickingGame, setPickingGame] = useState(false);
+  // This stays mounted while closed, so reopening starts back on the settings.
+  useEffect(() => {
+    if (!open) setPickingGame(false);
+  }, [open]);
   /** Kept once written, so the reveal button survives a later failure. */
   const [scratchDir, setScratchDir] = useState<string | null>(null);
 
@@ -262,80 +279,96 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
             </DialogPrimitive.Close>
           </div>
 
-          <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
-            <p className="text-xs text-muted-foreground">
-              The unit is written into a scratch game of coilbox's own, which
-              depends on the game you pick below. Your install is not touched,
-              and deleting <code>{SCRATCH_FOLDER}</code> undoes all of it.
-            </p>
-
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Build on</span>
-              <OptionSelect
-                value={game?.name ?? ""}
-                onValueChange={setGameName}
-                options={games.map((g) => ({ value: g.name, label: g.name }))}
-                placeholder={waiting ? "Reading games" : "No game installed"}
-                disabled={busy || games.length === 0}
+          {pickingGame ? (
+            <div className="flex min-h-0 flex-1 flex-col px-2 pt-3">
+              <GamePickerPanel
+                games={games}
+                headers={gameHeaders}
+                selectedName={game?.name ?? ""}
+                onSelect={setGameName}
+                onBack={() => setPickingGame(false)}
+                backLabel="Back to the test settings"
+                gamesLoading={waiting}
               />
             </div>
-
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Map</span>
-              <OptionSelect
-                value={map?.name ?? ""}
-                onValueChange={setMapName}
-                options={maps.map((m) => ({ value: m.name, label: m.name }))}
-                placeholder={waiting ? "Reading maps" : "No map installed"}
-                disabled={busy || maps.length === 0}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2 rounded border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-              <p>
-                <code>{project.unitName}</code> is the scratch game's start
-                unit, so it is waiting at your start position a second into the
-                match. Nothing has to build it and no cheats are needed.
-              </p>
-              <p>
-                If it is not there, press Enter and type <code>/cheat</code>{" "}
-                then <code>/give {project.unitName}</code> to place one by hand.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
-              <Button
-                onClick={() => void run()}
-                disabled={busy || !!blocker || !game || !map}
-              >
-                <Rocket className="size-4" />
-                {busy ? BUSY_LABEL[phase.state] : "Launch"}
-              </Button>
-            </div>
-
-            {blocker ? (
-              <p className="text-xs text-destructive">{blocker}</p>
-            ) : null}
-
-            {phase.state === "failed" ? (
-              <p className="text-xs text-destructive">{phase.message}</p>
-            ) : null}
-
-            {phase.state === "done" ? (
+          ) : (
+            <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
               <p className="text-xs text-muted-foreground">
-                The game has closed. Launch again to test a change.
+                The unit is written into a scratch game of coilbox's own, which
+                depends on the game you pick below. Your install is not touched,
+                and deleting <code>{SCRATCH_FOLDER}</code> undoes all of it.
               </p>
-            ) : null}
 
-            {scratchDir ? (
-              <div className="flex flex-col gap-2 text-xs">
-                <code className="break-all">{scratchDir}</code>
-                <ShowMe path={scratchDir}>
-                  <FolderOpen className="size-4" /> Show me the scratch game
-                </ShowMe>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Build on</span>
+                <GamePickerButton
+                  value={game?.name ?? ""}
+                  games={games}
+                  headers={gameHeaders}
+                  placeholder={waiting ? "Reading games" : "No game installed"}
+                  disabled={busy || games.length === 0}
+                  onClick={() => setPickingGame(true)}
+                />
               </div>
-            ) : null}
-          </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Map</span>
+                <OptionSelect
+                  value={map?.name ?? ""}
+                  onValueChange={setMapName}
+                  options={maps.map((m) => ({ value: m.name, label: m.name }))}
+                  placeholder={waiting ? "Reading maps" : "No map installed"}
+                  disabled={busy || maps.length === 0}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 rounded border border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                <p>
+                  <code>{project.unitName}</code> is the scratch game's start
+                  unit, so it is waiting at your start position a second into
+                  the match. Nothing has to build it and no cheats are needed.
+                </p>
+                <p>
+                  If it is not there, press Enter and type <code>/cheat</code>{" "}
+                  then <code>/give {project.unitName}</code> to place one by
+                  hand.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
+                <Button
+                  onClick={() => void run()}
+                  disabled={busy || !!blocker || !game || !map}
+                >
+                  <Rocket className="size-4" />
+                  {busy ? BUSY_LABEL[phase.state] : "Launch"}
+                </Button>
+              </div>
+
+              {blocker ? (
+                <p className="text-xs text-destructive">{blocker}</p>
+              ) : null}
+
+              {phase.state === "failed" ? (
+                <p className="text-xs text-destructive">{phase.message}</p>
+              ) : null}
+
+              {phase.state === "done" ? (
+                <p className="text-xs text-muted-foreground">
+                  The game has closed. Launch again to test a change.
+                </p>
+              ) : null}
+
+              {scratchDir ? (
+                <div className="flex flex-col gap-2 text-xs">
+                  <code className="break-all">{scratchDir}</code>
+                  <ShowMe path={scratchDir}>
+                    <FolderOpen className="size-4" /> Show me the scratch game
+                  </ShowMe>
+                </div>
+              ) : null}
+            </div>
+          )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

@@ -9,8 +9,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useUnitsyncThumbnails } from "@/content/config";
+import {
+  useUnitsyncGameHeaders,
+  useUnitsyncThumbnails,
+} from "@/content/config";
 import type { PlayTarget } from "@/play/config";
+import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
+import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
 import {
   advertisedGamePort,
@@ -179,6 +184,12 @@ export function HostBattleForm({
   // button, rather than stacking a second drawer on top of the one this form
   // is already showing in (issue #2796).
   const [pickingMap, setPickingMap] = useState(false);
+  // The game picker takes over the drawer the same way (issue #2995).
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    target?.enginePath,
+    target?.dataDir,
+  );
+  const [pickingGame, setPickingGame] = useState(false);
 
   const [title, setTitle] = useState(initialTitle ?? lastTitle);
   // 8 is a sensible starting size for a fresh host (issue #502) and also the
@@ -333,6 +344,20 @@ export function HostBattleForm({
   // one on top of it (issue #2796). Picking a map, or the back button, drops
   // back to the form with every other field exactly as it was, since nothing
   // here unmounts the form's own state.
+  if (pickingGame) {
+    return (
+      <GamePickerPanel
+        games={games}
+        headers={gameHeaders}
+        selectedName={gameName}
+        onSelect={setGameName}
+        onBack={() => setPickingGame(false)}
+        backLabel="Back to the battle form"
+        gamesLoading={content.scanning}
+      />
+    );
+  }
+
   if (pickingMap) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3">
@@ -406,17 +431,16 @@ export function HostBattleForm({
             </span>
           </label>
 
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
-          <label className="flex flex-col gap-1 text-sm">
+          <div className="flex flex-col gap-1 text-sm">
             <span className="font-medium">Game</span>
-            <OptionSelect
+            <GamePickerButton
               value={gameName}
-              onValueChange={setGameName}
-              options={games.map((g) => ({ value: g.name, label: g.name }))}
+              games={games}
+              headers={gameHeaders}
               placeholder={content.scanning ? "Scanning…" : "Select a game"}
-              size="sm"
+              onClick={() => setPickingGame(true)}
             />
-          </label>
+          </div>
 
           <div className="flex flex-col gap-1 text-sm">
             <span className="font-medium">Map</span>

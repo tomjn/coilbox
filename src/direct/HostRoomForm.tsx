@@ -17,10 +17,14 @@ import { Button, Input, useDrawer } from "@picoframe/frame";
 import { ChevronLeft, ImageOff } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useUnitsyncThumbnails } from "@/content/config";
+import {
+  useUnitsyncGameHeaders,
+  useUnitsyncThumbnails,
+} from "@/content/config";
 import { identifierFieldProps } from "@/lib/identifierField";
+import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
+import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
 import {
   DEFAULT_HOST_PORT,
@@ -103,6 +107,12 @@ export function HostRoomForm({
   // button, rather than stacking a second drawer on top of the one this form
   // is already showing in (issue #2864, following #2796's HostBattleForm).
   const [pickingMap, setPickingMap] = useState(false);
+  // The game picker takes over the drawer the same way (issue #2995).
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    content.target?.enginePath,
+    content.target?.dataDir,
+  );
+  const [pickingGame, setPickingGame] = useState(false);
   const [name, setName] = useState(defaultName ?? "Player");
   const [title, setTitle] = useState("");
   const [password, setPassword] = useState("");
@@ -249,6 +259,20 @@ export function HostRoomForm({
   // Picking a map, or the back button, drops back to the form with every
   // other field exactly as it was, since nothing here unmounts the form's own
   // state.
+  if (pickingGame) {
+    return (
+      <GamePickerPanel
+        games={content.games}
+        headers={gameHeaders}
+        selectedName={content.gameName}
+        onSelect={content.setGameName}
+        onBack={() => setPickingGame(false)}
+        backLabel="Back to the room form"
+        gamesLoading={content.scanning}
+      />
+    );
+  }
+
   if (pickingMap) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3">
@@ -308,17 +332,16 @@ export function HostRoomForm({
         <span className="text-xs text-destructive">{nameProblem}</span>
       )}
 
-      {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
-      <label className="flex flex-col gap-1 text-sm">
+      <div className="flex flex-col gap-1 text-sm">
         <span className="font-medium">Game</span>
-        <OptionSelect
+        <GamePickerButton
           value={content.gameName}
-          onValueChange={content.setGameName}
-          options={content.games.map((g) => ({ value: g.name, label: g.name }))}
+          games={content.games}
+          headers={gameHeaders}
           placeholder={content.scanning ? "Scanning…" : "Select a game"}
-          size="sm"
+          onClick={() => setPickingGame(true)}
         />
-      </label>
+      </div>
 
       <div className="flex flex-col gap-1 text-sm">
         <span className="font-medium">Map</span>

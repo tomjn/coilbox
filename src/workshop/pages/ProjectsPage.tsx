@@ -33,7 +33,11 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { gameIdentityForName } from "@/container/gameIdentity";
-import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
+import {
+  useScanTargetSelection,
+  useUnitsyncGameHeaders,
+  useUnitsyncScan,
+} from "@/content/config";
 import { EmptyState } from "@/content/pages/components/states";
 import { importContainerFile } from "@/deeplink/bindings";
 import { useImportParam } from "@/deeplink/useImportParam";
@@ -67,6 +71,10 @@ export default function ProjectsPage() {
   const { selected } = useScanTargetSelection();
   const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
   const games = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    selected?.enginePath,
+    selected?.rootPath,
+  );
   const {
     projects,
     createProject,
@@ -245,6 +253,7 @@ export default function ProjectsPage() {
             <>
               <DecodeTweakSetDrawer
                 games={games}
+                headers={gameHeaders}
                 scanning={scan.loading}
                 onStarted={onDecodedStart}
               />
@@ -267,6 +276,7 @@ export default function ProjectsPage() {
           }}
           project={renaming ?? undefined}
           games={games}
+          headers={gameHeaders}
           scanning={scan.loading}
           existing={projects}
           onSubmit={saveDetails}

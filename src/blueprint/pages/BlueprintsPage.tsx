@@ -36,7 +36,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useUnitsyncScan } from "@/content/config";
+import type { GameItem } from "@/content/bindings";
+import { useUnitsyncGameHeaders, useUnitsyncScan } from "@/content/config";
 import {
   EmptyState,
   ErrorBanner,
@@ -47,6 +48,7 @@ import { useImportParam } from "@/deeplink/useImportParam";
 import { useRecordHubImport } from "@/hub/imports";
 import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
+import { GamePickerField } from "@/play/pages/components/GamePickerButton";
 import {
   type BlueprintSource,
   libraryGames,
@@ -76,6 +78,10 @@ export default function BlueprintsPage() {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    target?.enginePath,
+    target?.dataDir,
+  );
   const [game, setGame] = useState(ALL_GAMES);
   // A confirmed `coilbox://import` link carrying a blueprint code lands here,
   // because this is the only place a layout can be kept on its own. It names the
@@ -148,6 +154,7 @@ export default function BlueprintsPage() {
             />
             <NewBlueprintButton
               games={installed}
+              headers={gameHeaders}
               taken={names}
               scanning={scan.loading}
             />
@@ -326,10 +333,13 @@ function SourceLine({ source }: { source: BlueprintSource }) {
  */
 function NewBlueprintButton({
   games,
+  headers,
   taken,
   scanning,
 }: {
-  games: { name: string; info: Record<string, string> }[];
+  games: GameItem[];
+  /** Loading-screen art for the game picker, keyed by game name. */
+  headers: Map<string, string>;
   /** The names already in the library, so a second "Untitled layout" is
    *  offered as "Untitled layout 2" rather than as a twin. */
   taken: string[];
@@ -383,12 +393,14 @@ function NewBlueprintButton({
 
         <div className="space-y-1.5">
           <span className="text-xs font-medium">Game</span>
-          <OptionSelect
+          <GamePickerField
             value={pick}
             onValueChange={setGame}
+            games={games}
+            headers={headers}
             placeholder={scanning ? "Reading your games…" : "Pick a game"}
             disabled={games.length === 0}
-            options={games.map((g) => ({ value: g.name, label: g.name }))}
+            gamesLoading={scanning}
           />
           <p className="text-xs text-muted-foreground">
             A layout names its buildings by the game's own unit names, so it is

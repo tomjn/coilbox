@@ -49,14 +49,19 @@ const SELECTED = {
 const GAME = {
   name: "Test Game",
   primaryArchive: { name: "testgame.sdd", path: "/data/games/testgame.sdd" },
+  dependencyArchives: [],
+  info: {},
 };
 const GAME_2 = {
   name: "Test Game 2",
   primaryArchive: { name: "testgame2.sdd", path: "/data/games/testgame2.sdd" },
+  dependencyArchives: [],
+  info: {},
 };
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
+  useUnitsyncGameHeaders: () => ({ headers: new Map(), loading: false }),
   useUnitsyncScan: () => ({
     data: { games: [GAME, GAME_2], maps: [] },
     loading: false,
@@ -70,35 +75,6 @@ vi.mock("@/content/config", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: async () => null,
   save: async () => null,
-}));
-
-// A plain <select>, the stand-in `UnitPage.dom.test.tsx` uses for the same
-// reason: the real picker is a Radix popover happy-dom cannot drive.
-vi.mock("@/components/OptionSelect", () => ({
-  OptionSelect: ({
-    value,
-    onValueChange,
-    options,
-    ariaLabel,
-  }: {
-    value: string;
-    onValueChange: (value: string) => void;
-    options: { value: string; label: string }[];
-    ariaLabel?: string;
-  }) => (
-    <select
-      aria-label={ariaLabel}
-      value={value}
-      onChange={(e) => onValueChange(e.target.value)}
-    >
-      <option value="">Pick a game</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  ),
 }));
 
 // The hub import record is its own store behind its own hook, the same way
@@ -225,9 +201,8 @@ describe("ProjectsPage", () => {
   it("starts a project under the name and description it was given", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: /New project/ }));
-    fireEvent.change(screen.getByLabelText("Game for the new project"), {
-      target: { value: GAME_2.name },
-    });
+    fireEvent.click(screen.getByLabelText("Game for the new project"));
+    fireEvent.click(screen.getByRole("button", { name: GAME_2.name }));
     fireEvent.change(screen.getByLabelText("Name for the new project"), {
       target: { value: "Slower tanks" },
     });
@@ -248,9 +223,8 @@ describe("ProjectsPage", () => {
   it("takes the game's name for a project nobody named", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: /New project/ }));
-    fireEvent.change(screen.getByLabelText("Game for the new project"), {
-      target: { value: GAME_2.name },
-    });
+    fireEvent.click(screen.getByLabelText("Game for the new project"));
+    fireEvent.click(screen.getByRole("button", { name: GAME_2.name }));
     fireEvent.click(screen.getByRole("button", { name: "Start editing" }));
 
     const [made] = stored();

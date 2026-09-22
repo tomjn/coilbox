@@ -20,8 +20,10 @@ import { Button, Drawer } from "@picoframe/frame";
 import { FileCode2 } from "lucide-react";
 import { useState } from "react";
 import { Field } from "@/components/Field";
-import { OptionSelect } from "@/components/OptionSelect";
 import { Textarea } from "@/components/ui/textarea";
+import type { GameItem } from "@/content/bindings";
+import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
+import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import {
   allSlots,
   type DecodedTweakSet,
@@ -41,12 +43,15 @@ type Phase =
 
 export function DecodeTweakSetDrawer({
   games,
+  headers,
   scanning,
   onStarted,
 }: {
   /** The installed games, for the picker a decoded set of units is filed
    *  under: nothing about a payload names its own game. */
-  games: readonly { name: string }[];
+  games: readonly GameItem[];
+  /** Loading-screen art for the game picker, keyed by game name. */
+  headers: Map<string, string>;
   scanning: boolean;
   /** Called with what a decoded set turned into, so the page can create and
    *  open the project the way it does for any other import. */
@@ -56,6 +61,9 @@ export function DecodeTweakSetDrawer({
   const [text, setText] = useState("");
   const [gameName, setGameName] = useState("");
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
+  // Swaps the drawer's content for the game picker rather than stacking a
+  // second drawer on this one (issue #2995).
+  const [pickingGame, setPickingGame] = useState(false);
 
   async function run() {
     const trimmed = text.trim();
@@ -111,7 +119,11 @@ export function DecodeTweakSetDrawer({
       <Button
         size="sm"
         variant="secondary"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // Reopening starts back on the payload, not a picker left open.
+          setPickingGame(false);
+          setOpen(true);
+        }}
         title="Decode a base64 tweak payload, or a set of a battle's mod options, back to Lua"
       >
         <FileCode2 className="mr-1 size-3.5" />
@@ -124,83 +136,92 @@ export function DecodeTweakSetDrawer({
         description="Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
         width="26rem"
       >
-        <div className="flex flex-col gap-4">
-          <Field
-            label="Payload"
-            hint="One line for a single payload, or several for a whole set of slots."
-          >
-            <Textarea
-              aria-label="Tweak payload to decode"
-              value={text}
-              placeholder="!bset tweakdefs3 eyJ..."
-              // `field-sizing-content` grows the box to fit, and a whole
-              // battle's mod options is tens of lines, so it has to be
-              // capped or the Decode button lands far below the fold.
-              className="max-h-48 min-h-24 overflow-auto font-mono text-xs"
-              onChange={(event) => setText(event.target.value)}
-            />
-          </Field>
+        {pickingGame ? (
+          <GamePickerPanel
+            games={games}
+            headers={headers}
+            selectedName={gameName}
+            onSelect={setGameName}
+            onBack={() => setPickingGame(false)}
+            backLabel="Back to the decoded payload"
+            gamesLoading={scanning}
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <Field
+              label="Payload"
+              hint="One line for a single payload, or several for a whole set of slots."
+            >
+              <Textarea
+                aria-label="Tweak payload to decode"
+                value={text}
+                placeholder="!bset tweakdefs3 eyJ..."
+                // `field-sizing-content` grows the box to fit, and a whole
+                // battle's mod options is tens of lines, so it has to be
+                // capped or the Decode button lands far below the fold.
+                className="max-h-48 min-h-24 overflow-auto font-mono text-xs"
+                onChange={(event) => setText(event.target.value)}
+              />
+            </Field>
 
-          <Button
-            onClick={() => void run()}
-            disabled={!text.trim() || phase.state === "decoding"}
-          >
-            <FileCode2 className="size-4" />
-            {phase.state === "decoding" ? "Decoding" : "Decode"}
-          </Button>
+            <Button
+              onClick={() => void run()}
+              disabled={!text.trim() || phase.state === "decoding"}
+            >
+              <FileCode2 className="size-4" />
+              {phase.state === "decoding" ? "Decoding" : "Decode"}
+            </Button>
 
-          {phase.state === "failed" ? (
-            <p className="text-xs text-destructive">{phase.message}</p>
-          ) : null}
+            {phase.state === "failed" ? (
+              <p className="text-xs text-destructive">{phase.message}</p>
+            ) : null}
 
-          {phase.state === "done" ? (
-            allSlots(phase.set).length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Nothing there matched a tweakdefs or tweakunits slot.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
-                <ul className="flex flex-col gap-2">
-                  {allSlots(phase.set).map((slot, index) => (
-                    // A decode result is stable once it lands and slots do
-                    // not reorder under the user's cursor.
-                    // biome-ignore lint/suspicious/noArrayIndexKey: see above
-                    <SlotCard key={index} slot={slot} />
-                  ))}
-                </ul>
+            {phase.state === "done" ? (
+              allSlots(phase.set).length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Nothing there matched a tweakdefs or tweakunits slot.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
+                  <ul className="flex flex-col gap-2">
+                    {allSlots(phase.set).map((slot, index) => (
+                      // A decode result is stable once it lands and slots do
+                      // not reorder under the user's cursor.
+                      // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                      <SlotCard key={index} slot={slot} />
+                    ))}
+                  </ul>
 
-                {nothingToStart ? (
-                  <p className="text-xs text-muted-foreground">
-                    Nothing here decoded to a shape coilbox can carry into a
-                    project.
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <Field
-                      label="Game"
-                      hint="Nothing in a payload says which game it is for."
-                    >
-                      <OptionSelect
-                        size="sm"
-                        ariaLabel="Game for the decoded project"
-                        placeholder={scanning ? "Scanning…" : "Pick a game"}
-                        value={gameName}
-                        onValueChange={setGameName}
-                        options={games.map((g) => ({
-                          value: g.name,
-                          label: g.name,
-                        }))}
-                      />
-                    </Field>
-                    <Button onClick={startProject} disabled={!gameName}>
-                      Start a project from this
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )
-          ) : null}
-        </div>
+                  {nothingToStart ? (
+                    <p className="text-xs text-muted-foreground">
+                      Nothing here decoded to a shape coilbox can carry into a
+                      project.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <Field
+                        label="Game"
+                        hint="Nothing in a payload says which game it is for."
+                      >
+                        <GamePickerButton
+                          ariaLabel="Game for the decoded project"
+                          placeholder={scanning ? "Scanning…" : "Pick a game"}
+                          value={gameName}
+                          games={games}
+                          headers={headers}
+                          onClick={() => setPickingGame(true)}
+                        />
+                      </Field>
+                      <Button onClick={startProject} disabled={!gameName}>
+                        Start a project from this
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )
+            ) : null}
+          </div>
+        )}
       </Drawer>
     </>
   );

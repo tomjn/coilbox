@@ -25,10 +25,11 @@ import { FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { identify } from "@/container/container";
-import { useUnitsyncScan } from "@/content/config";
+import { useUnitsyncGameHeaders, useUnitsyncScan } from "@/content/config";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { usePreferredTarget } from "@/play/config";
+import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { barFormat } from "../../bar";
 import { useEquivalents } from "../../equivalentsStore";
 import { appFileIO } from "../../fileIO";
@@ -76,6 +77,13 @@ export function ImportPackForm({
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    target?.enginePath,
+    target?.dataDir,
+  );
+  // Swaps the drawer's content for the game picker rather than stacking a
+  // second drawer on this one (issue #2995).
+  const [pickingGame, setPickingGame] = useState(false);
   // The first game on the machine until somebody says otherwise, so the pack is
   // read against something rather than opening on an empty list.
   const against = game || installed[0]?.name || "";
@@ -218,6 +226,25 @@ export function ImportPackForm({
     }
   };
 
+  if (pickingGame) {
+    return (
+      <GamePickerPanel
+        games={installed}
+        headers={gameHeaders}
+        selectedName={against}
+        onSelect={(name) => {
+          // The sides one game has are not the sides the next one has, so a
+          // choice made against the old game says nothing about this one.
+          setTakingAs("");
+          setGame(name);
+        }}
+        onBack={() => setPickingGame(false)}
+        backLabel="Back to the pack"
+        gamesLoading={scan.loading}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col">
       <div className="flex flex-col gap-3 p-4">
@@ -268,14 +295,10 @@ export function ImportPackForm({
             picks={picks}
             view={view}
             onView={setView}
-            games={installed.map((one) => one.name)}
+            games={installed}
+            gameHeaders={gameHeaders}
             game={against}
-            onGame={(name) => {
-              // The sides one game has are not the sides the next one has, so a
-              // choice made against the old game says nothing about this one.
-              setTakingAs("");
-              setGame(name);
-            }}
+            onChooseGame={() => setPickingGame(true)}
             unreadable={read.pack.unreadable}
             changes={packChanges(read.pack)}
             checked={known !== undefined}
