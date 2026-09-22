@@ -5,6 +5,8 @@
 //! run said. For looking at a converted script that moves differently from its
 //! COB.
 
+use std::collections::HashMap;
+
 use coilbox_springlua::unitscript::{run, ScriptEvent, Unit};
 
 fn event(frame: u32, callin: &str, args: &[f64]) -> ScriptEvent {
@@ -45,7 +47,14 @@ fn main() {
         event(160, "Deactivate", &[]),
         event(200, "Killed", &[50.0, 100.0]),
     ];
-    let timeline = run(&lua, path, &Unit::new(&pieces), &events, frames);
+    let timeline = run(
+        &lua,
+        path,
+        &Unit::new(&pieces),
+        &events,
+        frames,
+        &HashMap::new(),
+    );
     let Some(at) = pieces.iter().position(|p| p == watch) else {
         eprintln!("no piece called {watch}; the script has {pieces:?}");
         std::process::exit(2);

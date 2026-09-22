@@ -2573,6 +2573,7 @@ fn lego_run_script(
     unit_def: Option<serde_json::Value>,
     includes: Option<HashMap<String, String>>,
     rest: Option<Vec<unitscript::Rest>>,
+    values: Option<HashMap<i32, i32>>,
 ) -> CliResult {
     let timeline = unitscript::run(
         &script,
@@ -2585,6 +2586,7 @@ fn lego_run_script(
         },
         &events,
         frames,
+        &values.unwrap_or_default(),
     );
     match serde_json::to_value(timeline) {
         Ok(value) => CliResult::ok(value),

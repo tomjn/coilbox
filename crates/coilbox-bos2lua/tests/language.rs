@@ -39,7 +39,14 @@ fn y_after_defining(defines: &str, body: &str, precedence: Precedence) -> f64 {
         args: Vec::new(),
         ambient: true,
     }];
-    let timeline = run(&lua, "unit.lua", &Unit::new(&pieces), &events, 2);
+    let timeline = run(
+        &lua,
+        "unit.lua",
+        &Unit::new(&pieces),
+        &events,
+        2,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None, "{lua}");
     timeline.frames[1][1]
 }
@@ -177,7 +184,14 @@ fn scales_a_piece() {
         args: Vec::new(),
         ambient: true,
     }];
-    let timeline = run(&lua, "unit.lua", &Unit::new(&pieces), &events, 2);
+    let timeline = run(
+        &lua,
+        "unit.lua",
+        &Unit::new(&pieces),
+        &events,
+        2,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None, "{lua}");
 }
 
@@ -222,7 +236,14 @@ fn a_lua_call_goes_to_the_game_s_lua() {
         args: Vec::new(),
         ambient: true,
     }];
-    let timeline = run(&lua, "unit.lua", &Unit::new(&pieces), &events, 2);
+    let timeline = run(
+        &lua,
+        "unit.lua",
+        &Unit::new(&pieces),
+        &events,
+        2,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None, "{lua}");
 }
 
@@ -255,7 +276,14 @@ fn a_minus_before_a_negative_value_is_not_a_comment() {
         args: Vec::new(),
         ambient: true,
     }];
-    let timeline = run(&lua, "unit.lua", &Unit::new(&pieces), &events, 2);
+    let timeline = run(
+        &lua,
+        "unit.lua",
+        &Unit::new(&pieces),
+        &events,
+        2,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None, "{lua}");
     assert_eq!(timeline.frames[1][0], 1.0, "{lua}");
     assert_eq!(y_after("x = 3; y = -(-x);", Precedence::Modern), 3.0);

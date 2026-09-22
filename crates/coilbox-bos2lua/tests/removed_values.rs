@@ -43,7 +43,14 @@ fn create() -> [ScriptEvent; 1] {
 /// script here declares `piece base, turret`, so turret is the second piece.
 fn turret_height(lua: &str) -> f64 {
     let pieces = pieces();
-    let timeline = run(lua, "shared.lua", &Unit::new(&pieces), &create(), 3);
+    let timeline = run(
+        lua,
+        "shared.lua",
+        &Unit::new(&pieces),
+        &create(),
+        3,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None, "{lua}");
     timeline.frames[1][6 + 1]
 }
@@ -142,7 +149,7 @@ fn with_polyfill(lua: &str) -> coilbox_springlua::unitscript::Timeline {
         includes: &includes,
         ..Unit::new(&pieces)
     };
-    run(lua, "polyfill.lua", &unit, &create(), 3)
+    run(lua, "polyfill.lua", &unit, &create(), 3, &HashMap::new())
 }
 
 /// Like `with_polyfill`, but for a script that needs its own events and frame
@@ -162,7 +169,7 @@ fn with_polyfill_events(
         includes: &includes,
         ..Unit::new(&pieces)
     };
-    run(lua, "polyfill.lua", &unit, events, frames)
+    run(lua, "polyfill.lua", &unit, events, frames, &HashMap::new())
 }
 
 /// The converter and the polyfill agree on a unit, an allyteam and a game

@@ -63,7 +63,14 @@ fn created() -> Vec<ScriptEvent> {
 }
 
 fn play(bytes: &[u8], frames: u32) -> Timeline {
-    run(bytes, &model_pieces(), &created(), frames, &[])
+    run(
+        bytes,
+        &model_pieces(),
+        &created(),
+        frames,
+        &[],
+        &HashMap::new(),
+    )
 }
 
 /// One piece's numbers on one frame: x, y, z offset then x, y, z rotation.
@@ -307,7 +314,7 @@ mod stack_and_arithmetic {
             },
         ];
 
-        let timeline = run(&bytes, &model_pieces(), &events, 3, &[]);
+        let timeline = run(&bytes, &model_pieces(), &events, 3, &[], &HashMap::new());
 
         assert!(close(pose(&timeline, 1, "base")[2], 2.0));
     }
@@ -469,7 +476,14 @@ mod what_it_says_about_itself {
 
     #[test]
     fn reports_a_file_that_is_not_a_cob() {
-        let timeline = run(b"not a cob", &model_pieces(), &created(), 5, &[]);
+        let timeline = run(
+            b"not a cob",
+            &model_pieces(),
+            &created(),
+            5,
+            &[],
+            &HashMap::new(),
+        );
 
         assert!(timeline.error.is_some());
         assert!(timeline.frames.is_empty());
@@ -491,6 +505,7 @@ mod what_it_says_about_itself {
             }],
             3,
             &[],
+            &HashMap::new(),
         );
 
         assert_eq!(timeline.warnings, Vec::<String>::new());
@@ -509,6 +524,7 @@ mod what_it_says_about_itself {
             }],
             3,
             &[],
+            &HashMap::new(),
         );
 
         assert!(timeline
@@ -536,6 +552,7 @@ mod what_it_says_about_itself {
             }],
             3,
             &[],
+            &HashMap::new(),
         );
 
         assert!(close(pose(&timeline, 0, "base")[2], 1.0));
@@ -564,6 +581,7 @@ mod what_it_says_about_itself {
             }],
             3,
             &[],
+            &HashMap::new(),
         );
 
         // Radians into COB units and back out through the distance scale is the

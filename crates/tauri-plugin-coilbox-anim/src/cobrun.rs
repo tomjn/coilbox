@@ -86,6 +86,11 @@ fn pack_xz(x: f64, z: f64) -> i32 {
 /// because the rest of the unit still animates and the mismatch usually means
 /// the script was written against a variant of the model.
 ///
+/// `values` seeds the unit value store before the first frame runs, so a
+/// script asking what its own health is sees what the caller put there. A
+/// script's own `SET` still overrides it, as it would in the engine: the seed
+/// only fills in what nobody has said yet.
+///
 /// Never returns an error. A file that will not decode, a thread that loops
 /// without sleeping and a word that is not an opcode all come back as a
 /// [`Timeline`] with `error` set and whatever frames it managed first.
@@ -95,8 +100,9 @@ pub fn run(
     events: &[ScriptEvent],
     frames: u32,
     rest: &[Rest],
+    values: &HashMap<i32, i32>,
 ) -> Timeline {
-    match Run::start(bytes, pieces, rest) {
+    match Run::start(bytes, pieces, rest, values) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(pieces, error),
     }
@@ -285,12 +291,20 @@ struct Run {
     rng: u64,
     /// Values the script has set on its unit, so it can read back what it
     /// stored. Scripts keep real state this way: whether the yard is open,
-    /// whether the unit is armoured, whether it is switched on.
+    /// whether the unit is armoured, whether it is switched on. Seeded from
+    /// whatever the caller supplied before the first frame runs.
     set_values: HashMap<i32, i32>,
+    /// Every unit value id a script has asked for, in the order it first asked.
+    asked: Vec<coilbox_unitpose::AskedValue>,
 }
 
 impl Run {
-    fn start(bytes: &[u8], pieces: &[String], rest: &[Rest]) -> Result<Self, String> {
+    fn start(
+        bytes: &[u8],
+        pieces: &[String],
+        rest: &[Rest],
+        values: &HashMap<i32, i32>,
+    ) -> Result<Self, String> {
         let program = Program::read(bytes, pieces)?;
         let mut model = Model::new(pieces);
         model.place(rest);
@@ -312,7 +326,8 @@ impl Run {
             budget: FRAME_INSTRUCTIONS,
             fatal: false,
             rng: 0x2545_F491_4F6C_DD1D,
-            set_values: HashMap::new(),
+            set_values: values.clone(),
+            asked: Vec::new(),
         })
     }
 
@@ -336,6 +351,8 @@ impl Run {
         }
 
         self.model.finish(&mut timeline);
+        timeline.asked = std::mem::take(&mut self.asked);
+        timeline.functions = self.program.names.clone();
         timeline
     }
 
@@ -1037,6 +1054,7 @@ impl Run {
     /// Everything after that is about the unit, and then about a world the
     /// preview has none of, which is zero and a note.
     fn unit_value(&mut self, i: usize, id: i32, p1: i32, p2: i32) -> i32 {
+        unitvalue::note_asked(&mut self.asked, id);
         if (LUA0..=LUA9).contains(&id) {
             return self.threads[i].lua[(id - LUA0) as usize];
         }

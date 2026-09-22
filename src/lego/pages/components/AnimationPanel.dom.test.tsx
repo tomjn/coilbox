@@ -39,7 +39,7 @@ vi.mock("../../../general/display", () => ({
   useReduceMotion: () => false,
 }));
 
-function timeline(): ScriptTimeline {
+function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
   return {
     fps: 30,
     pieces: ["base"],
@@ -47,6 +47,9 @@ function timeline(): ScriptTimeline {
     hidden: [],
     error: null,
     warnings: [],
+    asked: [],
+    functions: [],
+    ...over,
   };
 }
 
@@ -165,5 +168,108 @@ describe("a unit on the presets", () => {
     expect(screen.queryByText(/What happens to the unit/)).toBeNull();
     expect(runCob).not.toHaveBeenCalled();
     expect(runLua).not.toHaveBeenCalled();
+  });
+});
+
+describe("unit values", () => {
+  it("is hidden until a run has asked about the unit", () => {
+    show(project({ compiledScript: COMPILED }));
+
+    expect(screen.queryByText("Unit values")).toBeNull();
+  });
+
+  it("offers a control for everything the last run asked about", async () => {
+    runCob.mockResolvedValue(
+      timeline({ asked: [{ id: 4, name: "HEALTH", default: 100 }] }),
+    );
+    show(project({ compiledScript: COMPILED }));
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(screen.getByText("Unit values")).toBeTruthy());
+    expect(screen.getByText("Health")).toBeTruthy();
+    // The frame scrubber is the other slider a playable run shows.
+    expect(screen.getAllByRole("slider")).toHaveLength(2);
+  });
+
+  it("reruns with the changed value, and offers a reset once one has changed", async () => {
+    runCob.mockResolvedValue(
+      timeline({ asked: [{ id: 4, name: "HEALTH", default: 100 }] }),
+    );
+    show(project({ compiledScript: COMPILED }));
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(runCob).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+
+    // The frame scrubber is the other slider, so the unit value's is the last.
+    const healthSlider = screen.getAllByRole("slider").at(-1) as HTMLElement;
+    fireEvent.keyDown(healthSlider, { key: "ArrowLeft" });
+
+    await waitFor(() => expect(runCob).toHaveBeenCalledTimes(2));
+    expect(runCob.mock.calls[1][0]).toMatchObject({ values: { 4: 99 } });
+    expect(screen.getByRole("button", { name: "Reset" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+    await waitFor(() => expect(runCob).toHaveBeenCalledTimes(3));
+    expect(runCob.mock.calls[2][0]).toMatchObject({ values: {} });
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+  });
+});
+
+describe("calling a function", () => {
+  it("learns the script's functions from an idle run, then fires the chosen one", async () => {
+    runCob.mockResolvedValue(
+      timeline({ functions: ["Create", "QueryTurret"] }),
+    );
+    show(project({ compiledScript: COMPILED }));
+
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
+    fireEvent.click(await screen.findByText("Call a function"));
+
+    // Nothing was playing yet, so learning the functions took a run of its own.
+    await waitFor(() => expect(runCob).toHaveBeenCalledTimes(1));
+    expect(runCob.mock.calls[0][0]).toMatchObject({
+      events: [
+        { frame: 0, callin: "Create" },
+        { frame: 1, callin: "setSFXoccupy" },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Function to call" }));
+    fireEvent.click(await screen.findByText("QueryTurret"));
+
+    await waitFor(() => expect(runCob).toHaveBeenCalledTimes(2));
+    expect(runCob.mock.calls[1][0]).toMatchObject({
+      events: [
+        { frame: 0, callin: "Create" },
+        { frame: 1, callin: "setSFXoccupy" },
+        { frame: 15, callin: "QueryTurret", args: [] },
+      ],
+    });
+  });
+
+  it("does not run text that is not a comma separated list of numbers", async () => {
+    runCob.mockResolvedValue(timeline({ functions: ["AimWeapon1"] }));
+    show(project({ compiledScript: COMPILED }));
+
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
+    fireEvent.click(await screen.findByText("Call a function"));
+    await waitFor(() => expect(runCob).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Function to call" }));
+    fireEvent.click(await screen.findByText("AimWeapon1"));
+    await waitFor(() => expect(runCob).toHaveBeenCalledTimes(2));
+
+    fireEvent.change(screen.getByLabelText("Arguments"), {
+      target: { value: "0.8, not a number" },
+    });
+
+    expect(await screen.findByText(/Numbers, comma separated/)).toBeTruthy();
+    // The bad text is not silently retried, so no third run ever happens.
+    expect(runCob).toHaveBeenCalledTimes(2);
   });
 });

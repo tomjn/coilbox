@@ -100,7 +100,7 @@ fn every_unit_script_in_the_folder_runs() {
             failures.push(format!("{unit}: asked for its pieces: {error}"));
             continue;
         }
-        let timeline = run(script, &name, &target, &events, 300);
+        let timeline = run(script, &name, &target, &events, 300, &HashMap::new());
         if let Some(error) = timeline.error {
             failures.push(format!("{unit}: {error}"));
         }

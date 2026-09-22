@@ -192,6 +192,13 @@ fn the_pruned_script_loads_and_runs() {
         args: vec![0.5, 0.0],
         ambient: true,
     }];
-    let timeline = run(&lua, "unit.lua", &Unit::new(&pieces), &events, 20);
+    let timeline = run(
+        &lua,
+        "unit.lua",
+        &Unit::new(&pieces),
+        &events,
+        20,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None, "{lua}");
 }

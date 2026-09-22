@@ -151,10 +151,12 @@ async fn anim_cob_run(
     events: Vec<coilbox_unitpose::ScriptEvent>,
     frames: u32,
     rest: Option<Vec<coilbox_unitpose::Rest>>,
+    values: Option<HashMap<i32, i32>>,
 ) -> CliResult {
     let rest = rest.unwrap_or_default();
+    let values = values.unwrap_or_default();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        cobrun::run(&bytes, &pieces, &events, frames, &rest)
+        cobrun::run(&bytes, &pieces, &events, frames, &rest, &values)
     })
     .await;
     match result {
