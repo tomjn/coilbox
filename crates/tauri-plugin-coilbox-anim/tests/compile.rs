@@ -91,3 +91,71 @@ fn unknown_variable_is_a_clean_error() {
         tauri_plugin_coilbox_anim::compile_bos("piece p; F(){ a = 1; }", &fixtures()).unwrap_err();
     assert!(err.contains("Var not found"), "unexpected error: {err}");
 }
+
+/// A third carrier.bos-adjacent bug found while verifying the fix: THIS.h uses
+/// the lowercase word operator `not` (`if (not isMoving) ...`), which the
+/// grammar already accepts case-insensitively, but `compiler.rs`'s codegen
+/// only recognised `"NOT"`/`"!"`. Same opcode either way, so this can't be a
+/// golden-fixture regression.
+#[test]
+fn a_lowercase_not_compiles_the_same_as_uppercase() {
+    let lower =
+        tauri_plugin_coilbox_anim::compile_bos("piece p; F(){ if (not p) {} }", &fixtures())
+            .unwrap_or_else(|e| panic!("compile: {e}"));
+    let upper =
+        tauri_plugin_coilbox_anim::compile_bos("piece p; F(){ if (NOT p) {} }", &fixtures())
+            .unwrap_or_else(|e| panic!("compile: {e}"));
+    assert_eq!(lower, upper);
+}
+
+/// An object-like macro whose body is a parenthesised expression, written
+/// with a space before the `(` (carrier.bos's own `#define MUZZLE (1028 +
+/// get PERK_BETTER_KINETICS)`), must not be mistaken for a function-like
+/// macro just because a `(` follows the name.
+#[test]
+fn a_space_before_the_paren_keeps_a_define_object_like() {
+    let bytes = tauri_plugin_coilbox_anim::compile_bos(
+        "piece p; static-var v;\n#define MUZZLE (1 + 2)\nF(){ v = MUZZLE; }\n",
+        &fixtures(),
+    )
+    .unwrap_or_else(|e| panic!("compile: {e}"));
+    assert!(!bytes.is_empty());
+}
+
+/// The carrier.bos bug: THIS.h has a bare assignment at file scope (which
+/// Scriptor accepted and compiled to nothing) and a function-like macro used
+/// as a statement. Both must compile, and the stray assignment must surface a
+/// warning rather than a silent drop or a syntax error.
+#[test]
+fn compiles_a_file_scope_assignment_and_a_function_like_macro() {
+    let src = "\
+piece base;
+static-var fireStealthTime;
+static-var permaStealth;
+
+fireStealthTime = 1000;
+permaStealth = 0;
+
+#define TRAIL(p,rate) static-var EngineEnabled;\\
+MoveRate0() {\\
+call-script f(p,rate);\\
+}
+TRAIL(base,1)
+
+f(p,rate) {
+}
+
+Create() {
+}
+";
+    let (bytes, warnings) = tauri_plugin_coilbox_anim::compile_bos_with_warnings(src, &fixtures())
+        .unwrap_or_else(|e| panic!("compile: {e}"));
+    assert!(!bytes.is_empty());
+    assert_eq!(
+        warnings,
+        [
+            "`fireStealthTime = 1000;` is outside any function, where the compiler drops it.",
+            "`permaStealth = 0;` is outside any function, where the compiler drops it.",
+        ]
+    );
+}

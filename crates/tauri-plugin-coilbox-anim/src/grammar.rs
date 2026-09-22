@@ -72,7 +72,19 @@ pub const SYMBOLS: &[&str] = &[
 pub fn rule(name: &str) -> Option<&'static [&'static [&'static str]]> {
     Some(match name {
         "_file" => &[&["_declaration~"]],
-        "_declaration" => &[&["_pieceDec"], &["_staticVarDec"], &["_funcDec"]],
+        "_declaration" => &[
+            &["_pieceDec"],
+            &["_staticVarDec"],
+            &["_funcDec"],
+            &["_strayDeclaration"],
+        ],
+        // Scriptor accepted a bare assignment at file scope (outside any
+        // function), and a `.cob` only holds functions, so it emitted nothing
+        // for it. `compiler.rs` reaches the same result naturally: the bytes
+        // land in the scratch buffer the next `funcDec` resets. This rule just
+        // lets the grammar accept the statement so it can be parsed and
+        // reported, rather than being a syntax error.
+        "_strayDeclaration" => &[&["_assignStatement", ";"]],
         "_pieceDec" => &[&["piece", "_pieceName", "_commaPiece~", ";"]],
         "_commaPiece" => &[&[",", "_pieceName"]],
         "_pieceName" => &[&["_identifier"]],

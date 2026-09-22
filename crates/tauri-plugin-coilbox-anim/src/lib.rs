@@ -4,10 +4,10 @@
 //! byte-exact porting spec and golden-test harness.
 //!
 //! Implemented: `anim_cob_disasm` (disassemble a `.cob`), `anim_bos2cob`
-//! (compile a `.bos` to `.cob`, byte-exact vs the Python reference's `--nopcpp`
-//! mode), `anim_cob_run` (play a `.cob`) and `anim_bos2lua` (convert a `.bos` to
-//! a Lua unit script, through `coilbox-bos2lua`). See PORTING.md for the porting
-//! spec and golden-test harness.
+//! (compile a `.bos` to `.cob`, byte-exact vs the Python reference), `anim_cob_run`
+//! (play a `.cob`) and `anim_bos2lua` (convert a `.bos` to a Lua unit script,
+//! through `coilbox-bos2lua`). See PORTING.md for the porting spec and
+//! golden-test harness.
 
 #[cfg(test)]
 mod bos2lua_parity;
@@ -33,13 +33,22 @@ use tauri::{
 };
 
 /// Compile BOS source to COB bytes: `preprocess -> parse -> fold -> codegen`.
-/// `include_dir` resolves `#include` targets. Mirrors the reference `--nopcpp`
-/// pipeline (builtin preprocessor, constant folding on, COB version 4).
+/// `include_dir` resolves `#include` targets. Mirrors the reference pipeline
+/// (preprocess, constant folding on, COB version 4).
 ///
 /// Runs on a dedicated large-stack thread so deeply-nested input can't overflow
 /// (and abort the process), and catches any unexpected internal panic so even a
 /// malformed script surfaces as an error rather than crashing the caller.
 pub fn compile_bos(source: &str, include_dir: &Path) -> Result<Vec<u8>, String> {
+    compile_bos_with_warnings(source, include_dir).map(|(bytes, _)| bytes)
+}
+
+/// Same as [`compile_bos`], plus any warnings gathered along the way (for
+/// instance, a bare assignment sitting outside any function).
+pub fn compile_bos_with_warnings(
+    source: &str,
+    include_dir: &Path,
+) -> Result<(Vec<u8>, Vec<String>), String> {
     let source = source.to_string();
     let include_dir = include_dir.to_path_buf();
     std::thread::Builder::new()
@@ -61,11 +70,13 @@ pub fn compile_bos(source: &str, include_dir: &Path) -> Result<Vec<u8>, String> 
         .map_err(|_| "compiler thread panicked".to_string())?
 }
 
-fn compile_inner(source: &str, include_dir: &Path) -> Result<Vec<u8>, String> {
+fn compile_inner(source: &str, include_dir: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
     let tokens = preprocess::preprocess(source, include_dir)?;
     let mut root = parser::parse_file(tokens)?;
+    let warnings = parser::stray_warnings(&root);
     fold::fold_tree(&mut root);
-    compiler::Compiler::compile(&root, 4)
+    let bytes = compiler::Compiler::compile(&root, 4)?;
+    Ok((bytes, warnings))
 }
 
 /// Best-effort message from a caught panic payload.
@@ -320,14 +331,14 @@ async fn anim_bos_read(path: String) -> CliResult {
 #[tauri::command]
 async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bool>) -> CliResult {
     let overwrite = overwrite.unwrap_or(false);
-    let result =
-        tauri::async_runtime::spawn_blocking(move || -> Result<(String, usize, bool), String> {
+    let result = tauri::async_runtime::spawn_blocking(
+        move || -> Result<(String, usize, bool, Vec<String>), String> {
             let source = std::fs::read_to_string(&path)
                 .map_err(|e| format!("could not read {path}: {e}"))?;
             let src_path = Path::new(&path);
             let include_dir = src_path.parent().unwrap_or_else(|| Path::new("."));
             // Compile first so compile errors surface regardless of the output state.
-            let bytes = compile_bos(&source, include_dir)?;
+            let (bytes, warnings) = compile_bos_with_warnings(&source, include_dir)?;
             let out_path = output.unwrap_or_else(|| {
                 src_path
                     .with_extension("cob")
@@ -335,18 +346,20 @@ async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bo
                     .into_owned()
             });
             if Path::new(&out_path).exists() && !overwrite {
-                return Ok((out_path, bytes.len(), true)); // ask before overwriting
+                return Ok((out_path, bytes.len(), true, warnings)); // ask before overwriting
             }
             std::fs::write(&out_path, &bytes)
                 .map_err(|e| format!("could not write {out_path}: {e}"))?;
-            Ok((out_path, bytes.len(), false))
-        })
-        .await;
+            Ok((out_path, bytes.len(), false, warnings))
+        },
+    )
+    .await;
     match result {
-        Ok(Ok((out_path, len, needs_overwrite))) => CliResult::ok(json!({
+        Ok(Ok((out_path, len, needs_overwrite, warnings))) => CliResult::ok(json!({
             "output": out_path,
             "bytes": len,
             "needsOverwrite": needs_overwrite,
+            "warnings": warnings,
         })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("compile task failed: {e}")),

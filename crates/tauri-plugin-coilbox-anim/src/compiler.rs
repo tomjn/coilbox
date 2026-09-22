@@ -504,9 +504,11 @@ impl Compiler {
 
     fn parse_unary_op(&mut self, node: &Node) -> Result<(), String> {
         let text = node.get_text();
-        let opcode_name = match text.as_str() {
+        // Case-insensitive, matching the grammar's own terminal match for
+        // `not` (`grammar.rs::SYMBOLS`) and the reference's `index()` lookups.
+        let opcode_name = match text.to_uppercase().as_str() {
             "NOT" | "!" => "LOGICAL_NOT",
-            other => return Err(format!("Unhandled unary op: {other}")),
+            _ => return Err(format!("Unhandled unary op: {text}")),
         };
         self.emit(&op_bytes(opcode_name));
         Ok(())

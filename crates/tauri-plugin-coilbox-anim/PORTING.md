@@ -10,24 +10,48 @@ The Python reference is the oracle. To (re)generate fixtures:
 
 ```
 # in a venv with pcpp installed (pip install pcpp)
-python bos2cob_py3.py path/to/foo.bos          # -> foo.cob (default: pcpp + builtin preproc, fold on, v4)
-python bos2cob_py3.py --nopcpp foo.bos         # builtin preprocessor only (our parity target)
+python bos2cob_py3.py path/to/foo.bos          # -> foo.cob (default mode, fold on, v4)
 python bos2cob_py3.py --dontfold foo.bos       # skip constant folding
 python cob_decompiler.py foo.cob               # disassembly listing + opcode/arg stats
 ```
 
-**Parity target: `--nopcpp` (builtin preprocessor only).** Matching full pcpp
-(a complete C preprocessor) is out of scope; our preprocessor ports the builtin
-`preprocess()` only. For scripts using only simple `#define`/`#ifdef`/`#include`
-the two modes produce identical `.cob`.
+The checked-out reference has no `--nopcpp` flag any more. Its only mode runs
+pcpp, a full C preprocessor, ahead of its own `preprocess()`.
+
+**Parity target: the reference's default mode (pcpp).** The checked-out
+reference has dropped `--nopcpp` and always runs pcpp, a full C preprocessor,
+ahead of its own `preprocess()`. `preprocess.rs` now covers what pcpp adds
+over the original builtin preprocessor: function-like macros (`#define
+NAME(a,b) body`, with `\` line continuations, nested calls, and
+parenthesis-aware argument splitting) and `#if`/`#elif` over integer constant
+expressions plus `defined(X)`/`defined X`. Object-like macros, `#ifdef`,
+`#include`, and the nested-tuple token quirks below are unchanged from the
+original port and stay byte-identical, guarded by the `min`, `features`,
+`folds`, and `anims` golden tests plus `preprocess.rs`'s own unit tests
+(`handles_defines_conditionals_and_macro_expansion`,
+`passes_through_plain_source_unchanged`).
+
+The tokenizer drops whitespace, so `#define NAME(a,b)` (function-like) and
+`#define NAME (a,b)` (object-like, body `(a,b)`, as carrier.bos's own `#define
+MUZZLE (1028 + get PERK_BETTER_KINETICS)` does) are indistinguishable once
+tokenized. `defines_as_function_like` in `preprocess.rs` settles it with a
+direct scan of the raw source for that one `#define`, rather than the token
+stream.
+
+**Scriptor's file-scope allowance.** Scriptor accepted a bare assignment
+outside any function. A `.cob` only holds functions, so it emitted nothing for
+it. The grammar's `_strayDeclaration` rule (`grammar.rs`) accepts `name =
+expr;` at file scope. `compiler.rs` needs no special case, because the bytes
+land in the scratch buffer the next `funcDec` resets, so it compiles away on
+its own. `parser::stray_warnings` reports it instead of staying silent.
 
 ## Pipeline
 
-`text → [pcpp (skipped)] → builtin preprocess() → tokenizer → Pump → parse(_file)
-→ fold (fixpoint) → Compiler → COB bytes`
+`text → preprocess() (macros incl. function-like, #if/#elif, #ifdef, #include)
+→ tokenizer → Pump → parse(_file) → fold (fixpoint) → Compiler → COB bytes`
 
-- Args: `--shortopcodes` (opcode table swap, cobVersion 8 else 4), `--dontfold`,
-  `--nopcpp`. Constants: `LINEAR_SCALE=65536`, `ANGULAR_SCALE=182`.
+- Args: `--shortopcodes` (opcode table swap, cobVersion 8 else 4), `--dontfold`.
+  Constants: `LINEAR_SCALE=65536`, `ANGULAR_SCALE=182`.
 - Output file: `<basename>.cob`.
 
 ## Opcodes (§ `opcodes.rs`)
@@ -152,16 +176,21 @@ Name strings byte-packed (no alignment). Sounds list unused.
     node and never fires — so a fold's left operand can ONLY be the expression's
     first child. Net: `y + 1 * 2` folds nothing; `1 * 2 + y` folds `1*2`. The
     Rust port replicates this (only `children[i]` as a bare `term` is `term1`).
-11. **`#if` is unsupported** in `--nopcpp`: the reference's `#if` does
-    `"".join()` over `(token, idx)` tuples and crashes (`TypeError`). The port
-    errors on `#if` rather than inventing behaviour.
+11. **`#if`/`#elif`** are handled by `preprocess.rs` directly now (see
+    "Parity target" above), evaluating an integer constant expression with C
+    precedence over macros and `defined(X)`/`defined X`. A branch that is
+    never taken is never evaluated, so a malformed condition inside dead code
+    is not an error.
 
 ## Status
 
 Compiler (`anim_bos2cob`) implemented and byte-exact vs the reference across the
 golden fixtures in `tests/`: `min`, `features` (broad keyword/jump/operator
 coverage), `folds` (rounding/division-skip/bracket/bitwise hazards), and `anims`
-(remaining animation keywords). `cargo test -p tauri-plugin-coilbox-anim`.
+(remaining animation keywords). These four also guard that function-like
+macros and `#if`/`#elif` left the pre-existing object-macro/`#ifdef`/`#include`
+behaviour byte-identical, since none of them exercise the new code paths.
+`cargo test -p tauri-plugin-coilbox-anim`.
 
 ## cob_decompiler.py (disassembler, NOT a BOS regenerator)
 
