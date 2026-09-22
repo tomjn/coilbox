@@ -130,9 +130,10 @@ const TAANG2RAD: f32 = std::f32::consts::PI / 32768.0;
 /// differently would animate differently. A result that is not a number comes
 /// back as zero, which is what the engine does after it logs.
 ///
-/// `XZ_ATAN` and `XZ_HYPOT` are deliberately not here. They take a pair of map
-/// coordinates packed into one number, so a script asking either is asking
-/// about a world the preview has none of, whatever the arithmetic.
+/// `XZ_ATAN` and `XZ_HYPOT` are here too. They take a map position packed into
+/// one number, which looks like a question about the world, but the only thing
+/// either reads from outside the arguments is the unit's own heading, and that
+/// is 0 in the editor.
 pub fn arithmetic(id: i32, p1: i32, p2: i32) -> Option<i32> {
     let sane = |value: f32| Some(if value.is_finite() { value as i32 } else { 0 });
     match id {
@@ -150,6 +151,16 @@ pub fn arithmetic(id: i32, p1: i32, p2: i32) -> Option<i32> {
         KTAN => sane(1024.0 * (TAANG2RAD * p1 as f32).tan()),
         // Nothing for a negative, and it says so the same way.
         SQRT => sane((p1 as f32).sqrt()),
+        // A packed pair, from a unit at heading 0, which is the only heading
+        // the editor has.
+        XZ_ATAN => {
+            let (x, z) = unpack_xz(p1);
+            sane(RAD2TAANG * x.atan2(z) + 32768.0)
+        }
+        XZ_HYPOT => {
+            let (x, z) = unpack_xz(p1);
+            sane(x.hypot(z) * COBSCALE)
+        }
         _ => None,
     }
 }
@@ -179,10 +190,30 @@ const MY_ID: i32 = 71;
 const HEADING: i32 = 82;
 const IN_WATER: i32 = 28;
 const MAX_SPEED: i32 = 75;
-/// The packed pair of map coordinates, which is not arithmetic however it
-/// looks. Named only so the test that keeps it out can say what it is.
-#[cfg(test)]
 const XZ_ATAN: i32 = 12;
+const XZ_HYPOT: i32 = 13;
+
+/// Where one of the unit's own pieces is. Not answered here, because the
+/// answer comes from the model each runtime holds, but named here so both
+/// runtimes read it by the same name.
+pub const PIECE_XZ: i32 = 7;
+pub const PIECE_Y: i32 = 8;
+
+/// A map position as a script holds one: x in the high half and z in the low,
+/// each a whole number of elmos (`PACKXZ` in `CobInstance.h:10`).
+pub fn pack_xz(x: f64, z: f64) -> i32 {
+    ((x as i32) << 16).wrapping_add((z as i32) & 0xffff)
+}
+
+/// The two halves of a packed pair, signed, as `UNPACKX` and `UNPACKZ` read
+/// them (`CobInstance.h:11-12`).
+fn unpack_xz(xz: i32) -> (f32, f32) {
+    let bits = xz as u32;
+    (
+        f32::from((bits >> 16) as u16 as i16),
+        f32::from((bits & 0xffff) as u16 as i16),
+    )
+}
 
 /// Unit values 1024 to 8191 once held numbers BOS scripts shared: 8 per unit,
 /// 64 per team, 64 per allyteam and 4096 for the whole game. Spring 102.0
@@ -334,11 +365,32 @@ mod tests {
         assert_eq!(arithmetic(SQRT, -1, 0), Some(0));
     }
 
-    /// A question about the world is not arithmetic, whatever the sums inside
-    /// it: this one takes a pair of map coordinates packed into a number.
+    /// `XZ_ATAN` is the heading to a packed x and z, turned half a circle and
+    /// less the unit's own heading, which is 0 in the editor
+    /// (`rts/Sim/Units/Scripts/UnitScript.cpp:1094-1095`).
     #[test]
-    fn does_not_answer_the_packed_coordinate_pair() {
-        assert_eq!(arithmetic(XZ_ATAN, 1, 0), None);
+    fn heads_towards_a_packed_pair() {
+        // Straight ahead is atan2(0, 1), nothing, plus half a circle.
+        assert_eq!(arithmetic(XZ_ATAN, pack_xz(0.0, 1.0), 0), Some(32768));
+        // A quarter circle round is 16384, plus the half.
+        assert_eq!(arithmetic(XZ_ATAN, pack_xz(1.0, 0.0), 0), Some(49152));
+    }
+
+    /// `XZ_HYPOT` is how far a packed x and z is, in 65536ths
+    /// (`UnitScript.cpp:1096-1097`).
+    #[test]
+    fn measures_a_packed_pair() {
+        assert_eq!(arithmetic(XZ_HYPOT, pack_xz(3.0, 4.0), 0), Some(5 * 65536));
+    }
+
+    /// The halves are signed, so a pair to the right and behind unpacks as
+    /// negative rather than as a very large number.
+    #[test]
+    fn unpacks_a_negative_pair() {
+        assert_eq!(
+            arithmetic(XZ_HYPOT, pack_xz(-3.0, -4.0), 0),
+            Some(5 * 65536)
+        );
     }
 
     /// Two names sharing an id would be a typo in the transcription, and one of
