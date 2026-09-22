@@ -180,6 +180,13 @@ fn the_script_loads_and_runs() {
         event(41, "AimFromWeapon1", &[]),
         event(42, "AimWeapon1", &[0.5, 0.1]),
     ];
-    let timeline = run(&lua, "unit.lua", &Unit::new(&pieces), &events, 60);
+    let timeline = run(
+        &lua,
+        "unit.lua",
+        &Unit::new(&pieces),
+        &events,
+        60,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None, "{lua}");
 }

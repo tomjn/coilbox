@@ -123,7 +123,14 @@ fn every_script_in_the_folder_converts_and_runs() {
                 std::fs::write(target, text).unwrap();
             }
             let pieces = piece(&conversion.lua);
-            let timeline = run(&conversion.lua, &name, &Unit::new(&pieces), &events, 300);
+            let timeline = run(
+                &conversion.lua,
+                &name,
+                &Unit::new(&pieces),
+                &events,
+                300,
+                &HashMap::new(),
+            );
             if let Some(error) = timeline.error {
                 failures.push(format!("{name}{how}: {error}"));
             }

@@ -218,6 +218,11 @@ struct Sim {
     /// A factory does exactly that: it asks for its yard to open and then waits
     /// for the yard to be open, which never comes and never ends.
     values: HashMap<i32, i32>,
+    /// Every unit value id the script has asked for, in the order it first asked
+    /// and with the same exclusions the compiled runtime applies, so a caller
+    /// offering controls for a script's unit values gets the same list either
+    /// runtime produced it from.
+    asked: Vec<coilbox_unitpose::AskedValue>,
     /// Rules parameters the script set, which it reads back for the same reason
     /// it reads back a unit value. The engine keeps a unit's on the unit and the
     /// game's on the game, so one name used for both is two values here too.
@@ -264,12 +269,24 @@ enum State {
 /// piece the unit does not have fails here, exactly as it fails at load in the
 /// engine, and says which name.
 ///
+/// `values` seeds the unit value store before the first frame runs, so a
+/// script asking what its own health is sees what the caller put there. A
+/// script's own `SetUnitValue` still overrides it, as it would in the engine:
+/// the seed only fills in what nobody has said yet.
+///
 /// Never returns an error. A script that will not compile, names a missing
 /// piece, throws, or loops without sleeping comes back as a [`Timeline`] with
 /// `error` set and whatever frames it managed. Failing is an outcome of running
 /// a script, not a failure to run one.
-pub fn run(script: &str, name: &str, unit: &Unit, events: &[ScriptEvent], frames: u32) -> Timeline {
-    match Run::start(script, name, unit) {
+pub fn run(
+    script: &str,
+    name: &str,
+    unit: &Unit,
+    events: &[ScriptEvent],
+    frames: u32,
+    values: &HashMap<i32, i32>,
+) -> Timeline {
+    match Run::start(script, name, unit, values) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(unit.pieces, error),
     }
@@ -329,7 +346,7 @@ const PROBE_CALLS: usize = 16;
 /// Never returns an error. A script that will not load comes back with `error`
 /// set, and one that loads but answers badly says so on the probe itself.
 pub fn probe(script: &str, name: &str, unit: &Unit, callins: &[String]) -> Probes {
-    let mut run = match Run::start(script, name, unit) {
+    let mut run = match Run::start(script, name, unit, &HashMap::new()) {
         Ok(run) => run,
         Err(error) => {
             return Probes {
@@ -357,6 +374,9 @@ struct Run {
     /// instructions run out.
     fatal: Rc<Cell<bool>>,
     script: Table,
+    /// The script's own function names, read off the `script` table once the
+    /// chunk's top level has run and it has whatever it is going to define.
+    functions: Vec<String>,
     runners: Vec<Runner>,
     frame: u32,
 }
@@ -365,11 +385,21 @@ impl Run {
     /// Build the VM, install the unit script API and execute the chunk's top
     /// level, which is where its `piece(...)` calls and `script.X` definitions
     /// happen.
-    fn start(script: &str, name: &str, unit: &Unit) -> Result<Self, String> {
+    ///
+    /// `values` seeds the unit value store before anything else runs, so a
+    /// script reading its own unit sees what the caller supplied unless it has
+    /// already set that id itself.
+    fn start(
+        script: &str,
+        name: &str,
+        unit: &Unit,
+        values: &HashMap<i32, i32>,
+    ) -> Result<Self, String> {
         let mut model = Model::new(unit.pieces);
         model.place(unit.rest);
         let sim = Rc::new(RefCell::new(Sim {
             model,
+            values: values.clone(),
             ..Sim::default()
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
@@ -386,12 +416,24 @@ impl Run {
             .exec()
             .map_err(|e| describe(&e))?;
 
+        // The keys the top level defined, which is what a caller offering
+        // "call any function" has to run the script once to learn. Sorted
+        // because a Lua table's own order is not one, and a caller listing
+        // these wants the same order every time.
+        let mut functions: Vec<String> = table
+            .pairs::<String, Value>()
+            .filter_map(Result::ok)
+            .map(|(name, _)| name)
+            .collect();
+        functions.sort();
+
         Ok(Self {
             lua,
             sim,
             budget,
             fatal,
             script: table,
+            functions,
             runners: Vec::new(),
             frame: 0,
         })
@@ -469,6 +511,8 @@ impl Run {
         }
 
         self.sim.borrow().model.finish(&mut timeline);
+        timeline.asked = std::mem::take(&mut self.sim.borrow_mut().asked);
+        timeline.functions = self.functions.clone();
         timeline
     }
 
@@ -2039,6 +2083,10 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         lua.create_function(move |_, (id, p1, p2): (i64, Option<i64>, Option<i64>)| {
             let id = id as i32;
             let (p1, p2) = (p1.unwrap_or(0) as i32, p2.unwrap_or(0) as i32);
+            // Noted before anything else answers, so a caller offering
+            // controls for this script's unit values sees every id it read,
+            // however the read was answered.
+            unitvalue::note_asked(&mut state.borrow_mut().asked, id);
             // First, because none of the maths is about the unit and none of it
             // can be set. A `.cob` asks for its arithmetic this way and a Lua
             // script has `math`, so this is mostly here so that the two

@@ -21,7 +21,25 @@ fn create() -> Vec<ScriptEvent> {
 }
 
 fn play(script: &str, frames: u32) -> Timeline {
-    run(script, "test.lua", &Unit::new(&pieces()), &create(), frames)
+    run(
+        script,
+        "test.lua",
+        &Unit::new(&pieces()),
+        &create(),
+        frames,
+        &HashMap::new(),
+    )
+}
+
+fn play_with_values(script: &str, frames: u32, values: &HashMap<i32, i32>) -> Timeline {
+    run(
+        script,
+        "test.lua",
+        &Unit::new(&pieces()),
+        &create(),
+        frames,
+        values,
+    )
 }
 
 /// One piece's numbers on one frame: x, y, z offset then x, y, z rotation.
@@ -377,6 +395,7 @@ fn a_table_is_a_mask_of_its_own() {
         &Unit::new(&names),
         &events,
         10,
+        &HashMap::new(),
     );
     assert_eq!(killed.error, None);
     assert_close(rot_y(&killed, 9, "turret"), 0.0);
@@ -388,6 +407,7 @@ fn a_table_is_a_mask_of_its_own() {
         &Unit::new(&names),
         &events,
         10,
+        &HashMap::new(),
     );
     assert_eq!(spared.error, None);
     assert_close(rot_y(&spared, 9, "turret"), 1.5);
@@ -429,6 +449,7 @@ fn a_weapon_carries_the_fields_the_engine_builds() {
         },
         &create(),
         3,
+        &HashMap::new(),
     );
 
     assert_eq!(timeline.error, None);
@@ -459,6 +480,7 @@ fn a_weapon_that_says_nothing_points_forward_and_is_slaved_to_nothing() {
         },
         &create(),
         3,
+        &HashMap::new(),
     );
 
     assert_eq!(timeline.error, None);
@@ -605,6 +627,7 @@ fn the_move_type_falls_back_to_the_definitions_max_velocity() {
         },
         &create(),
         3,
+        &HashMap::new(),
     );
 
     assert_eq!(timeline.error, None);
@@ -632,6 +655,7 @@ fn the_move_type_reports_the_speed_the_definition_gives() {
         },
         &create(),
         3,
+        &HashMap::new(),
     );
 
     assert_eq!(timeline.error, None);
@@ -674,6 +698,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
             },
         ],
         60,
+        &HashMap::new(),
     );
     assert_eq!(timeline.error, None);
     // Killed and turned back to rest, and nothing moved it again afterwards.
@@ -726,6 +751,7 @@ fn a_call_in_with_arguments_gets_them() {
             ambient: false,
         }],
         3,
+        &HashMap::new(),
     );
     assert_eq!(timeline.error, None);
     assert_close(rot_y(&timeline, 0, "turret"), 0.75);
@@ -801,6 +827,7 @@ fn the_generated_script_shape_runs() {
             },
         ],
         120,
+        &HashMap::new(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 120);
@@ -869,6 +896,7 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
             },
         ],
         30,
+        &HashMap::new(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 30);
@@ -939,6 +967,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             ambient: false,
         }],
         5,
+        &HashMap::new(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 5);
@@ -1087,6 +1116,7 @@ mod probing {
                 ambient: true,
             }],
             3,
+            &HashMap::new(),
         );
 
         assert_eq!(timeline.warnings, Vec::<String>::new());
@@ -1197,7 +1227,7 @@ mod unit_definition {
             def: Some(&def),
             ..Unit::new(&pieces)
         };
-        run(script, "test.lua", &unit, &create(), 3)
+        run(script, "test.lua", &unit, &create(), 3, &HashMap::new())
     }
 
     /// The exact line out of Beyond All Reason's `coralab.lua` that started
@@ -1273,6 +1303,7 @@ mod unit_definition {
             &Unit::new(&pieces()),
             &create(),
             3,
+            &HashMap::new(),
         );
 
         assert_eq!(timeline.error, None);
@@ -1416,7 +1447,7 @@ mod includes {
             includes: &sources,
             ..Unit::new(&pieces)
         };
-        run(script, "test.lua", &unit, &create(), 3)
+        run(script, "test.lua", &unit, &create(), 3, &HashMap::new())
     }
 
     /// Zero-K's shape. The library fills the table the game's gadgets share,
@@ -1510,6 +1541,7 @@ mod includes {
             &Unit::new(&pieces()),
             &create(),
             3,
+            &HashMap::new(),
         );
 
         assert_eq!(timeline.error, None);
@@ -1577,7 +1609,7 @@ mod world {
             def: Some(&def),
             ..Unit::new(&pieces)
         };
-        run(script, "test.lua", &unit, &create(), 6)
+        run(script, "test.lua", &unit, &create(), 6, &HashMap::new())
     }
 
     fn note_about(timeline: &Timeline, want: &str) -> bool {
@@ -1989,6 +2021,7 @@ mod world {
             },
             &create(),
             3,
+            &HashMap::new(),
         );
 
         assert_eq!(timeline.error, None);
@@ -2058,5 +2091,113 @@ mod world {
             "{:?}",
             timeline.warnings
         );
+    }
+}
+
+/// What a caller offering controls for a script's own unit values, or a way to
+/// fire any function it defines, has to run the script once to learn: which
+/// ids it reads, what a supplied seed looks like once it gets there, and what
+/// its own functions are called.
+mod unit_values_and_functions {
+    use super::*;
+
+    /// Reported by name, in the order the script first asked, the same as the
+    /// compiled runtime reports them.
+    #[test]
+    fn reading_two_values_reports_both_by_name() {
+        let timeline = play(
+            r#"
+            function script.Create()
+                local health = GetUnitValue(COB.HEALTH)
+                local activation = GetUnitValue(COB.ACTIVATION)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        let names: Vec<Option<&str>> = timeline
+            .asked
+            .iter()
+            .map(|value| value.name.as_deref())
+            .collect();
+        assert_eq!(names, vec![Some("HEALTH"), Some("ACTIVATION")]);
+    }
+
+    /// A caller's seed is what the script sees, in place of the answer a
+    /// finished unit would otherwise give it, the same as a script's own
+    /// `SetUnitValue` would be if it had already run.
+    #[test]
+    fn a_supplied_value_is_what_the_script_sees() {
+        let health = unitvalue::NAMES
+            .iter()
+            .find(|(name, _)| *name == "HEALTH")
+            .unwrap()
+            .1;
+        let mut values = HashMap::new();
+        values.insert(health, 5);
+
+        let timeline = play_with_values(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, GetUnitValue(COB.HEALTH) / 100)
+            end
+            "#,
+            3,
+            &values,
+        );
+
+        assert_eq!(timeline.error, None);
+        // A finished unit with no seed would answer 100 here, and turn by 1.0.
+        assert_close(rot_y(&timeline, 0, "turret"), 0.05);
+    }
+
+    /// The script's own function names, which is what a caller offering "call
+    /// any function" has to run the script once to learn. Sorted, since a Lua
+    /// table's own order is not one.
+    #[test]
+    fn functions_lists_the_scripts_own_table_keys() {
+        let timeline = play(
+            r#"
+            function script.Create() end
+            function script.Restore() end
+            function script.QueryTurret() end
+            "#,
+            1,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(timeline.functions, vec!["Create", "QueryTurret", "Restore"]);
+    }
+
+    /// The engine reaches a script's own functions by name off the `script`
+    /// table, exactly as it reaches a call-in such as `AimWeapon1`. An event
+    /// naming one of the script's own functions has to fire it the same way,
+    /// not just the call-ins the engine defines.
+    #[test]
+    fn an_event_fires_a_function_the_script_defines_for_its_own_reasons() {
+        let events = vec![ScriptEvent {
+            frame: 0,
+            callin: "DoTheThing".to_string(),
+            args: Vec::new(),
+            ambient: false,
+        }];
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            function script.DoTheThing()
+                Turn(turret, y_axis, 1.0)
+            end
+            "#,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            3,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
     }
 }

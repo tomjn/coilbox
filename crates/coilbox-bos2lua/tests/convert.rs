@@ -220,7 +220,14 @@ fn runs_without_a_thread_stopping_and_walks() {
         event(140, "StopBuilding", &[]),
         event(170, "Killed", &[80.0, 100.0]),
     ];
-    let timeline = run(&lua, "walker.lua", &Unit::new(&pieces), &events, 200);
+    let timeline = run(
+        &lua,
+        "walker.lua",
+        &Unit::new(&pieces),
+        &events,
+        200,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None);
     let stopped: Vec<_> = timeline
         .warnings
@@ -287,7 +294,14 @@ fn a_script_too_big_for_lua_s_locals_still_loads() {
     let lua = convert_with(&source, &HashMap::new(), MODERN_LINEAR).lua;
     assert!(lua.contains("\np0 = piece(\"p0\")"), "{lua}");
     let events = [event(0, "Killed", &[80.0, 100.0])];
-    let timeline = run(&lua, "big.lua", &Unit::new(&names), &events, 5);
+    let timeline = run(
+        &lua,
+        "big.lua",
+        &Unit::new(&names),
+        &events,
+        5,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None);
 }
 
@@ -330,7 +344,14 @@ fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
         conversion.warnings
     );
     let events = [event(0, "Create", &[]), event(5, "StartMoving", &[])];
-    let timeline = run(lua, "comet.lua", &Unit::new(&pieces_of(lua)), &events, 20);
+    let timeline = run(
+        lua,
+        "comet.lua",
+        &Unit::new(&pieces_of(lua)),
+        &events,
+        20,
+        &HashMap::new(),
+    );
     assert_eq!(timeline.error, None);
 }
 
@@ -347,6 +368,7 @@ fn for_loops_run_as_the_compiled_script_runs_them() {
         &Unit::new(&pieces),
         &[event(0, "Create", &[])],
         30,
+        &HashMap::new(),
     );
     assert_eq!(timeline.error, None, "{lua}");
     let last = timeline.frames.last().unwrap();

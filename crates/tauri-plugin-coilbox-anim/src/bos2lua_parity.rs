@@ -165,7 +165,14 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
         };
         let pieces = pieces_of(&conversion.lua);
         let from_cob = crate::cobrun::run(&bytes, &pieces, &events, FRAMES, &[], &HashMap::new());
-        let from_lua = run_lua(&conversion.lua, &name, &Unit::new(&pieces), &events, FRAMES);
+        let from_lua = run_lua(
+            &conversion.lua,
+            &name,
+            &Unit::new(&pieces),
+            &events,
+            FRAMES,
+            &HashMap::new(),
+        );
         if let Some(e) = &from_cob.error {
             skipped.push(format!("{name}: the COB itself stops: {e}"));
             continue;
@@ -322,7 +329,14 @@ fn the_converter_s_fixture_moves_as_its_compiled_cob_does() {
         event(180, "Killed", &[80.0, 100.0]),
     ];
     let from_cob = crate::cobrun::run(&cob, &pieces, &events, 220, &[], &HashMap::new());
-    let from_lua = run_lua(&lua, "walker.lua", &Unit::new(&pieces), &events, 220);
+    let from_lua = run_lua(
+        &lua,
+        "walker.lua",
+        &Unit::new(&pieces),
+        &events,
+        220,
+        &HashMap::new(),
+    );
     assert_eq!(from_cob.error, None);
     assert_eq!(from_lua.error, None);
     assert_eq!(
