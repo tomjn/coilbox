@@ -18,6 +18,7 @@ import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { presetRoute } from "../../play/presets";
 import {
+  dlEvolutionRtsMaps,
   dlGithubReleaseArchives,
   dlHakoraMaps,
   dlInstalledContent,
@@ -46,7 +47,12 @@ import { HIDE_INSTALLED_KEY } from "./hideInstalled";
  * `bar-maps-gh` is BAR's maps on GitHub releases, which is a mirror we can
  * fetch from rather than an index of BAR's.
  */
-type Source = "springfiles" | "hakora" | "bar-maps-gh" | "tap-maps";
+type Source =
+  | "springfiles"
+  | "hakora"
+  | "evolutionrts"
+  | "bar-maps-gh"
+  | "tap-maps";
 
 /** Curated GitHub map repos (from skylobby's shipped source list), fetched via
  * their release assets. */
@@ -182,6 +188,17 @@ export default function MapsPage() {
             springName: m.filename, // no springname on the mirror; filename is unique
             title: m.filename.replace(/\.(sd7|sdz)$/i, ""),
             subtitle: m.size || undefined,
+            filename: m.filename,
+            url: m.url, // marks the direct-fetch path
+          })),
+        );
+      } else if (src === "evolutionrts") {
+        const { maps } = await dlEvolutionRtsMaps(undefined);
+        setItems(
+          maps.map((m) => ({
+            springName: m.filename, // no springname on the mirror; filename is unique
+            title: m.filename.replace(/\.(sd7|sdz)$/i, ""),
+            subtitle: m.size ? formatBytes(m.size) : undefined,
             filename: m.filename,
             url: m.url, // marks the direct-fetch path
           })),
@@ -329,8 +346,8 @@ export default function MapsPage() {
           <h1 className="text-lg font-semibold leading-none">Maps</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
             Browse and download maps from Beyond All Reason, springfiles, the
-            hakora mirror, or curated GitHub map repos into the configured
-            content folder.
+            hakora and evolutionrts mirrors, or curated GitHub map repos into
+            the configured content folder.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -344,6 +361,7 @@ export default function MapsPage() {
             options={[
               { value: "springfiles", label: "springfiles" },
               { value: "hakora", label: "hakora" },
+              { value: "evolutionrts", label: "evolutionrts mirror" },
               { value: "bar-maps-gh", label: "BAR Maps (GitHub)" },
               { value: "tap-maps", label: "TAP Maps (GitHub)" },
             ]}

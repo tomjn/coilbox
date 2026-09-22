@@ -11,11 +11,14 @@
  * end of the rapid step and is gone. `downloadMap.ts` carries why.
  */
 
-export type MapSource = "springfiles" | "hakora" | "rapid";
+export type MapSource = "springfiles" | "hakora" | "evolutionrts" | "rapid";
 
 /**
  * The sources to try, in order, for a map.
  *
+ * - `evolutionrts`: the maps.evolutionrts.info mirror of maps first made for
+ *   Beyond All Reason (direct download). Needs a write root. First because its
+ *   list is one small JSON file, where springfiles sends its whole catalogue.
  * - `springfiles`: the springfiles catalog mirror (direct download). Needs a
  *   write root.
  * - `hakora`: the hakora.xyz maps mirror (direct download). Needs a write root.
@@ -24,7 +27,7 @@ export type MapSource = "springfiles" | "hakora" | "rapid";
  */
 export function mapSourceOrder(opts: { hasWritePath: boolean }): MapSource[] {
   const order: MapSource[] = [];
-  if (opts.hasWritePath) order.push("springfiles", "hakora");
+  if (opts.hasWritePath) order.push("evolutionrts", "springfiles", "hakora");
   order.push("rapid");
   return order;
 }

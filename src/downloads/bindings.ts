@@ -144,6 +144,23 @@ export const dlHakoraMaps = defineCommand<undefined, { maps: HakoraMap[] }>(
 );
 
 /**
+ * A map archive from the maps.evolutionrts.info mirror of maps first made for
+ * Beyond All Reason. No springname, so `url` is fetched directly via
+ * `dlDownloadFile`. `size` is in bytes.
+ */
+export interface EvolutionRtsMap {
+  filename: string;
+  url: string;
+  size: number;
+}
+
+/** The maps.evolutionrts.info mirror, as a flat file list. */
+export const dlEvolutionRtsMaps = defineCommand<
+  undefined,
+  { maps: EvolutionRtsMap[] }
+>("coilbox-downloads", "dl_evolutionrts_maps");
+
+/**
  * A Spring content archive (`.sd7`/`.sdz`) from a curated GitHub release repo. Like
  * `HakoraMap` it has no springname — `url` is fetched directly via `dlDownloadFile`.
  * `tag` is the release it came from.

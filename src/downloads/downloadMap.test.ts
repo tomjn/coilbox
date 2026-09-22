@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   dlDownloadFileRaw,
   dlDownloadMapRaw,
+  dlEvolutionRtsMaps,
   dlHakoraMaps,
   dlSpringfilesList,
   notify,
 } = vi.hoisted(() => ({
   dlDownloadFileRaw: vi.fn(),
   dlDownloadMapRaw: vi.fn(),
+  dlEvolutionRtsMaps: vi.fn(),
   dlHakoraMaps: vi.fn(),
   dlSpringfilesList: vi.fn(),
   notify: vi.fn(),
@@ -17,6 +19,7 @@ const {
 vi.mock("./bindings", () => ({
   dlDownloadFileRaw,
   dlDownloadMapRaw,
+  dlEvolutionRtsMaps,
   dlHakoraMaps,
   dlSpringfilesList,
 }));
@@ -42,6 +45,40 @@ beforeEach(() => {
   vi.clearAllMocks();
   dlSpringfilesList.mockResolvedValue({ results: [] });
   dlHakoraMaps.mockResolvedValue({ maps: [] });
+  dlEvolutionRtsMaps.mockResolvedValue({ maps: [] });
+});
+
+describe("downloadMapAnySource, evolutionrts step", () => {
+  it("fetches from evolutionrts before asking any other source", async () => {
+    dlEvolutionRtsMaps.mockResolvedValueOnce({
+      maps: [
+        {
+          filename: "acidicquarry_5.17.sd7",
+          url: "https://maps.evolutionrts.info/maps/acidicquarry_5.17.sd7",
+          size: 50602762,
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({
+      message: "ok",
+      path: "/data/maps/acidicquarry_5.17.sd7",
+    });
+
+    await expect(run("Acidic Quarry 5.17")).resolves.toBe(
+      "evolutionrts mirror",
+    );
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://maps.evolutionrts.info/maps/acidicquarry_5.17.sd7",
+        destDir: "/data/maps",
+        filename: "acidicquarry_5.17.sd7",
+      }),
+    );
+    expect(dlSpringfilesList).not.toHaveBeenCalled();
+    expect(dlHakoraMaps).not.toHaveBeenCalled();
+    expect(dlDownloadMapRaw).not.toHaveBeenCalled();
+  });
 });
 
 describe("downloadMapAnySource, hakora step (issue #2860)", () => {

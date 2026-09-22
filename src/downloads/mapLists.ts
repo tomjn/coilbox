@@ -14,7 +14,7 @@ import type { EnqueueInput, QueueStatus } from "./DownloadQueueProvider";
  *
  * A `map` download with no `searchUrl` goes through the source order rather than
  * one pinned source, so a curated card resolves the same way as any other map:
- * springfiles, then hakora, then pr-downloader. It used to default to Beyond All
+ * evolutionrts, then springfiles, then hakora, then pr-downloader. It used to default to Beyond All
  * Reason's search endpoint, which asked BAR for maps that were never theirs.
  * An author naming a `searchUrl` still gets exactly that source and nothing else.
  */
