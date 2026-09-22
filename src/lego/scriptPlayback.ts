@@ -44,6 +44,12 @@ export interface ScriptTimeline {
    *  unit script's `script` table keys. What a caller offering "call any
    *  function" has to run the script once to learn. */
   functions: string[];
+  /** Main-script source lines the run executed at least once, 1-indexed.
+   *  Empty for a compiled run, which reports `offsetsRun` instead. */
+  linesRun: number[];
+  /** COB instruction word offsets the run executed at least once. Empty for a
+   *  Lua run, which reports `linesRun` instead. */
+  offsetsRun: number[];
 }
 
 /** What one call-in that answers with a piece said. */

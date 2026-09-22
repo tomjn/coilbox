@@ -94,13 +94,16 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
 /// listing (scripts, pieces, opcode + operand stream). Not recompilable BOS.
 #[tauri::command]
 async fn anim_cob_disasm(path: String) -> CliResult {
-    let result = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
-        let bytes = std::fs::read(&path).map_err(|e| format!("could not read {path}: {e}"))?;
-        disasm::disassemble(&bytes)
-    })
-    .await;
+    let result =
+        tauri::async_runtime::spawn_blocking(move || -> Result<disasm::Disassembly, String> {
+            let bytes = std::fs::read(&path).map_err(|e| format!("could not read {path}: {e}"))?;
+            disasm::disassemble(&bytes)
+        })
+        .await;
     match result {
-        Ok(Ok(listing)) => CliResult::ok(json!({ "listing": listing })),
+        Ok(Ok(result)) => {
+            CliResult::ok(json!({ "listing": result.text, "lineOffsets": result.line_offsets }))
+        }
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("disasm task failed: {e}")),
     }
@@ -120,7 +123,9 @@ async fn anim_cob_disasm(path: String) -> CliResult {
 async fn anim_cob_disasm_bytes(bytes: Vec<u8>) -> CliResult {
     let result = tauri::async_runtime::spawn_blocking(move || disasm::disassemble(&bytes)).await;
     match result {
-        Ok(Ok(listing)) => CliResult::ok(json!({ "listing": listing })),
+        Ok(Ok(result)) => {
+            CliResult::ok(json!({ "listing": result.text, "lineOffsets": result.line_offsets }))
+        }
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("disasm task failed: {e}")),
     }

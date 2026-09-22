@@ -29,7 +29,7 @@
 //! preview has no unit and no map, and a number that looks like an answer is
 //! worse than being told there is none.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use coilbox_unitpose::{unitvalue, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
 
@@ -296,6 +296,9 @@ struct Run {
     set_values: HashMap<i32, i32>,
     /// Every unit value id a script has asked for, in the order it first asked.
     asked: Vec<coilbox_unitpose::AskedValue>,
+    /// Offsets, into the whole code stream, of every opcode word actually
+    /// executed. Sorted by construction, since it fills from a `BTreeSet`.
+    offsets_run: BTreeSet<u32>,
 }
 
 impl Run {
@@ -328,6 +331,7 @@ impl Run {
             rng: 0x2545_F491_4F6C_DD1D,
             set_values: values.clone(),
             asked: Vec::new(),
+            offsets_run: BTreeSet::new(),
         })
     }
 
@@ -353,6 +357,7 @@ impl Run {
         self.model.finish(&mut timeline);
         timeline.asked = std::mem::take(&mut self.asked);
         timeline.functions = self.program.names.clone();
+        timeline.offsets_run = self.offsets_run.iter().copied().collect();
         timeline
     }
 
@@ -549,7 +554,9 @@ impl Run {
                     self.threads[index].origin
                 ));
             }
+            let pc = self.threads[index].pc as u32;
             let word = self.word(index)? as u32;
+            self.offsets_run.insert(pc);
             self.execute(index, word)?;
         }
         Ok(())

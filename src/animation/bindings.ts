@@ -6,11 +6,21 @@ import { defineCommand } from "@picoframe/plugin-sdk";
  * byte-exact BOS→COB compilation (matching the reference's `--nopcpp` mode).
  */
 
+/** One field both disassembly commands answer with: the listing text, plus
+ *  which offset into the whole code stream each of its lines is about. `null`
+ *  for a line that names no instruction: the header, a blank line, or a
+ *  script's own `=== name ===`. The same offsets a run's `offsetsRun`
+ *  reports, so a caller can dim the lines a run never reached. */
+interface Disassembly {
+  listing: string;
+  lineOffsets: (number | null)[];
+}
+
 /** Disassemble a `.cob` into a human-readable listing (not recompilable BOS). */
-export const animCobDisasm = defineCommand<
-  { path: string },
-  { listing: string }
->("coilbox-anim", "anim_cob_disasm");
+export const animCobDisasm = defineCommand<{ path: string }, Disassembly>(
+  "coilbox-anim",
+  "anim_cob_disasm",
+);
 
 /**
  * The same disassembly for a `.cob` that is not a file on disk.
@@ -21,7 +31,7 @@ export const animCobDisasm = defineCommand<
  */
 export const animCobDisasmBytes = defineCommand<
   { bytes: number[] },
-  { listing: string }
+  Disassembly
 >("coilbox-anim", "anim_cob_disasm_bytes");
 
 /**

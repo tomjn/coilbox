@@ -25,7 +25,7 @@
 //! [`SpringLua`]: crate::SpringLua
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 
 use mlua::{
@@ -373,6 +373,9 @@ struct Run {
     /// carrying on. Shared with the VM's hook, which sets it when a frame's
     /// instructions run out.
     fatal: Rc<Cell<bool>>,
+    /// Main-script source lines the VM's hook has seen executed, 1-indexed.
+    /// Sorted by construction, since it fills from a `BTreeSet`.
+    lines_run: Rc<RefCell<BTreeSet<u32>>>,
     script: Table,
     /// The script's own function names, read off the `script` table once the
     /// chunk's top level has run and it has whatever it is going to define.
@@ -404,8 +407,17 @@ impl Run {
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
         let fatal = Rc::new(Cell::new(false));
-        let lua = sandbox(&sim, &budget, &fatal, unit.def, unit.includes)
-            .map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
+        let lines_run = Rc::new(RefCell::new(BTreeSet::new()));
+        let lua = sandbox(
+            &sim,
+            &budget,
+            &fatal,
+            &lines_run,
+            name,
+            unit.def,
+            unit.includes,
+        )
+        .map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
         let table: Table = lua
             .globals()
             .get("script")
@@ -432,6 +444,7 @@ impl Run {
             sim,
             budget,
             fatal,
+            lines_run,
             script: table,
             functions,
             runners: Vec::new(),
@@ -513,6 +526,7 @@ impl Run {
         self.sim.borrow().model.finish(&mut timeline);
         timeline.asked = std::mem::take(&mut self.sim.borrow_mut().asked);
         timeline.functions = self.functions.clone();
+        timeline.lines_run = self.lines_run.borrow().iter().copied().collect();
         timeline
     }
 
@@ -790,10 +804,13 @@ fn describe(error: &mlua::Error) -> String {
 }
 
 /// Build the VM and install everything a unit script expects to find.
+#[allow(clippy::too_many_arguments)]
 fn sandbox(
     sim: &Rc<RefCell<Sim>>,
     budget: &Rc<Cell<i64>>,
     fatal: &Rc<Cell<bool>>,
+    lines_run: &Rc<RefCell<BTreeSet<u32>>>,
+    main_chunk_name: &str,
     unit_def: Option<&serde_json::Value>,
     includes: &HashMap<String, String>,
 ) -> mlua::Result<Lua> {
@@ -805,11 +822,29 @@ fn sandbox(
     // A global hook rather than a plain one, because Lua counts instructions per
     // thread and every call-in is a thread. Set before any of them exist, since
     // only threads made afterwards pick it up.
+    //
+    // The same hook also watches every line, which is a different question from
+    // the instruction budget: coverage for the Script tab's dimming, not a cap
+    // on how long a frame may run. An `include`d file's lines are not main
+    // script lines, so only a line whose chunk is named exactly what the main
+    // script was loaded under counts.
     let left = Rc::clone(budget);
     let spent = Rc::clone(fatal);
+    let seen = Rc::clone(lines_run);
+    let main_chunk_name = main_chunk_name.to_string();
     lua.set_global_hook(
-        mlua::HookTriggers::new().every_nth_instruction(HOOK_EVERY),
-        move |_lua, _debug| {
+        mlua::HookTriggers::new()
+            .every_nth_instruction(HOOK_EVERY)
+            .every_line(),
+        move |_lua, debug| {
+            if debug.event() == mlua::DebugEvent::Line {
+                if debug.source().source.as_deref() == Some(main_chunk_name.as_str()) {
+                    if let Some(line) = debug.current_line() {
+                        seen.borrow_mut().insert(line as u32);
+                    }
+                }
+                return Ok(mlua::VmState::Continue);
+            }
             let remaining = left.get() - i64::from(HOOK_EVERY);
             left.set(remaining);
             if remaining < 0 {

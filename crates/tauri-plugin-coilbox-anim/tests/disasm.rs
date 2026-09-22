@@ -25,7 +25,8 @@ mod opcodes;
 fn disassembles_golden_min_cob() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/min.cob");
     let bytes = std::fs::read(&path).expect("read fixture");
-    let listing = disasm::disassemble(&bytes).expect("disassemble");
+    let result = disasm::disassemble(&bytes).expect("disassemble");
+    let listing = result.text;
 
     // Header line: COB v4, two scripts (Create, Killed), two pieces, one static.
     assert!(listing.contains("COB v4"), "header:\n{listing}");
@@ -47,4 +48,40 @@ fn disassembles_golden_min_cob() {
     assert!(listing.contains("JUMP_NOT_EQUAL"), "{listing}");
     assert!(listing.contains("EXPLODE"), "{listing}");
     assert!(listing.contains("RETURN"), "{listing}");
+
+    // One offset per line, and only the instruction lines have one: not the
+    // header, not a blank line, not a script's own `=== name ===`.
+    assert_eq!(result.line_offsets.len(), listing.lines().count());
+    let none_lines: Vec<&str> = listing
+        .lines()
+        .zip(&result.line_offsets)
+        .filter(|(_, offset)| offset.is_none())
+        .map(|(line, _)| line)
+        .collect();
+    assert!(none_lines
+        .iter()
+        .all(|line| line.is_empty() || line.starts_with(';') || line.starts_with("===")));
+
+    // Killed is the second script, so its instructions carry on from where
+    // Create's left off, rather than each restarting at zero.
+    let create_offsets: Vec<u32> = listing
+        .lines()
+        .zip(&result.line_offsets)
+        .skip_while(|(line, _)| *line != "=== Create ===")
+        .skip(1)
+        .take_while(|(line, _)| !line.starts_with("==="))
+        .filter_map(|(_, offset)| *offset)
+        .collect();
+    let killed_offsets: Vec<u32> = listing
+        .lines()
+        .zip(&result.line_offsets)
+        .skip_while(|(line, _)| *line != "=== Killed ===")
+        .skip(1)
+        .filter_map(|(_, offset)| *offset)
+        .collect();
+    assert_eq!(create_offsets.first().copied(), Some(0));
+    assert_eq!(
+        killed_offsets.first().copied(),
+        Some(*create_offsets.last().unwrap() + 1)
+    );
 }

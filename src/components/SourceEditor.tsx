@@ -1,5 +1,6 @@
 /**
- * The BOS text box, with line numbers and find's matches highlighted in it.
+ * A source text box, with line numbers, find's matches highlighted, and lint
+ * problems marked in the gutter with a tooltip.
  *
  * A text box cannot colour part of its own text, and WebKit does not paint the
  * selection of one that is not focused, which it is not while the find box is.
@@ -10,6 +11,13 @@
  *
  * Long lines wrap, so a line's number has to be as tall as the line. The copy
  * holds each line in its own block, and the gutter takes each block's height.
+ *
+ * `readOnly` is a view rather than an editor, for a generated or compiled
+ * script nothing here can write back to. `dimmedLines` fades the lines a run
+ * never reached, in a layer of its own above the text: the tint layer sits
+ * behind the box so its colours show through gaps in the real, opaque
+ * characters, and fading those same characters needs the opposite, a layer
+ * the text is behind instead.
  */
 import {
   useCallback,
@@ -18,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { LintDiagnostic } from "@/animation/bindings";
 import {
   SEVERITY_COLOR,
   SEVERITY_ICON,
@@ -31,7 +40,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { LuaMatch } from "@/scenario/pages/components/missionLuaSearch";
-import type { LintDiagnostic } from "../bindings";
 
 const TEXT =
   "font-mono text-xs leading-relaxed whitespace-pre-wrap [overflow-wrap:break-word]";
@@ -62,7 +70,7 @@ function rowTint(severity: "error" | "warning" | null) {
   return undefined;
 }
 
-export function BosSource({
+export function SourceEditor({
   id,
   value,
   onChange,
@@ -72,10 +80,13 @@ export function BosSource({
   activeMatch,
   highlightLine,
   problems,
+  readOnly,
+  dimmedLines,
 }: {
   id: string;
   value: string;
-  onChange: (value: string) => void;
+  /** Unused, and never called, when `readOnly` is set. */
+  onChange?: (value: string) => void;
   placeholder: string;
   lines: string[];
   matches: LuaMatch[];
@@ -87,9 +98,17 @@ export function BosSource({
    *  the gutter and a tint behind the line, each with the message(s) on
    *  hover. */
   problems?: Map<number, LintDiagnostic[]>;
+  /** A view rather than an editor: what a generated or compiled script's own
+   *  read-only text wants, since nothing typed here would go anywhere. */
+  readOnly?: boolean;
+  /** 0-indexed lines to show at reduced opacity, such as the ones a run never
+   *  reached. Drawn over the text rather than behind it, which is what makes
+   *  faded characters actually look faded rather than unaffected. */
+  dimmedLines?: Set<number>;
 }) {
   const boxRef = useRef<HTMLTextAreaElement | null>(null);
   const backRef = useRef<HTMLDivElement | null>(null);
+  const dimRef = useRef<HTMLDivElement | null>(null);
   const gutterRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef<HTMLElement | null>(null);
   const highlightRef = useRef<HTMLDivElement | null>(null);
@@ -102,6 +121,10 @@ export function BosSource({
     if (backRef.current) {
       backRef.current.scrollTop = box.scrollTop;
       backRef.current.scrollLeft = box.scrollLeft;
+    }
+    if (dimRef.current) {
+      dimRef.current.scrollTop = box.scrollTop;
+      dimRef.current.scrollLeft = box.scrollLeft;
     }
     if (gutterRef.current) {
       gutterRef.current.style.transform = `translateY(${-box.scrollTop}px)`;
@@ -244,12 +267,30 @@ export function BosSource({
           ref={boxRef}
           id={id}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange?.(e.target.value)}
           onScroll={follow}
           placeholder={placeholder}
           spellCheck={false}
+          readOnly={readOnly}
           className={`${LAYOUT} ${numbered ? "pl-0" : "pl-3"} h-full min-h-0 resize-none rounded-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent md:text-xs`}
         />
+        {dimmedLines && dimmedLines.size > 0 && (
+          <div
+            ref={dimRef}
+            aria-hidden="true"
+            className={`${LAYOUT} pointer-events-none overflow-hidden text-transparent ${numbered ? "" : "pl-3"}`}
+          >
+            {lines.map((line, n) => (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position in the text
+                key={n}
+                className={dimmedLines.has(n) ? "bg-background/60" : undefined}
+              >
+                {line === "" ? " " : line}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

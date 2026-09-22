@@ -109,6 +109,17 @@ pub struct Timeline {
     /// function" has to run the script once to learn.
     #[serde(default)]
     pub functions: Vec<String>,
+    /// Main-script source lines the run executed at least once, 1-indexed as
+    /// Lua counts them. A line in an `include`d file is not one of these: only
+    /// the script named at the top counts, which is what a caller dimming the
+    /// lines a run never reached is dimming against. Empty for a compiled run,
+    /// which reports `offsets_run` instead.
+    #[serde(default)]
+    pub lines_run: Vec<u32>,
+    /// COB instruction word offsets the run executed at least once. Empty for a
+    /// Lua run, which reports `lines_run` instead.
+    #[serde(default)]
+    pub offsets_run: Vec<u32>,
 }
 
 impl Timeline {
@@ -123,6 +134,8 @@ impl Timeline {
             warnings: Vec::new(),
             asked: Vec::new(),
             functions: Vec::new(),
+            lines_run: Vec::new(),
+            offsets_run: Vec::new(),
         }
     }
 
