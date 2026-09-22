@@ -93,6 +93,7 @@ pub async fn discover(base_url: &str) -> Result<Endpoints, AuthError> {
     }
 
     let url = format!("{base}{DISCOVERY_PATH}");
+    coilbox_oauth::use_ring_provider();
     let client = reqwest::Client::builder()
         .timeout(HTTP_TIMEOUT)
         .build()
@@ -557,6 +558,7 @@ mod tests {
             }
             let target = format!("{redirect}?{}", reply(&state));
             tokio::spawn(async move {
+                coilbox_oauth::use_ring_provider();
                 let _ = reqwest::get(&target).await;
             });
             Ok(())

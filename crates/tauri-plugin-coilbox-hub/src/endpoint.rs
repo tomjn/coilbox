@@ -140,6 +140,7 @@ async fn post_json(
 /// A client with both deadlines set. One per call rather than one per request,
 /// so a run that makes several reuses the connection.
 pub fn json_client() -> Result<reqwest::Client, String> {
+    coilbox_oauth::use_ring_provider();
     reqwest::Client::builder()
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(REQUEST_TIMEOUT)

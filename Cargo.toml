@@ -104,6 +104,34 @@ sevenz-rust2 = "0.21.1"
 # declared per crate.
 image = { version = "0.25", default-features = false }
 
+# The HTTP client the five crates that talk to a network service share. It was
+# left out of #2438 because it needed a version bump first: we were on 0.12 and
+# tauri-plugin-updater 2.10 moved to 0.13, so the binary linked both majors
+# (issue #2489). One declaration here, so the next bump is one edit.
+#
+# `rustls-no-provider` rather than `rustls`. 0.13 made rustls the default TLS
+# backend and, with it, aws-lc-rs the default crypto provider. The updater sets
+# `reqwest/rustls-no-provider` and installs `ring` as the process default, so
+# taking 0.13's own default here would compile both providers into the binary
+# instead of the one it has today. `rustls-no-provider` leaves the choice to
+# whoever installs the process default, and every client constructor in these
+# five crates calls `use_ring_provider` first to make that ring. reqwest panics
+# when building a client if nothing has installed one.
+#
+# Roots do change: 0.12's `rustls-tls` bundled the Mozilla set through
+# webpki-roots, 0.13 removed the roots features and verifies against the
+# platform trust store through rustls-platform-verifier. That is the same
+# verifier the updater already uses, and it means a machine-wide trust decision
+# (a corporate root, a revoked CA) now applies to our requests too.
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls-no-provider",
+] }
+
+# One rustls crypto provider for the whole binary. Only the crates that build a
+# reqwest client need this, to install ring as the process default before they
+# do. See the reqwest comment above.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+
 # russimp-sys cannot be built from crates.io at all: the published package ships
 # `assimp/include` and no CMakeLists.txt, so its build script panics looking for
 # the source it means to compile. The git tree carries Assimp as a submodule and

@@ -214,9 +214,27 @@ fn extension_for(content_type: &str) -> &'static str {
     }
 }
 
+/// Make `ring` the process-default rustls crypto provider, unless something
+/// already picked one.
+///
+/// Call this before building a `reqwest::Client`. We take reqwest's
+/// `rustls-no-provider` feature so the binary keeps one crypto provider instead
+/// of gaining aws-lc-rs alongside the ring the lobby socket and the updater
+/// already use, and reqwest panics on `build()` when no provider is installed.
+/// The root `Cargo.toml` has the full reasoning.
+///
+/// Idempotent, and safe from several threads at once: a second call and the
+/// loser of a race both get an `Err` back and leave the installed one alone.
+fn use_ring_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+}
+
 /// Fetch the catalog JSON text over HTTP, giving up after `CATALOG_FETCH_TIMEOUT`.
 /// Errors carry the reqwest message.
 pub(crate) async fn fetch_catalog_text(url: &str) -> Result<String, String> {
+    use_ring_provider();
     let client = reqwest::Client::builder()
         .timeout(CATALOG_FETCH_TIMEOUT)
         .build()
@@ -469,6 +487,7 @@ fn outcome_for_status(status: reqwest::StatusCode) -> Fetched {
 /// JPEG-encoded (for opaque photographic art). Bytes that can't be decoded
 /// (SVG/WebP) pass through raw.
 async fn fetch_image(url: &str, reencode: bool) -> Fetched {
+    use_ring_provider();
     let client = match reqwest::Client::builder()
         .connect_timeout(IMAGE_CONNECT_TIMEOUT)
         .read_timeout(IMAGE_READ_TIMEOUT)

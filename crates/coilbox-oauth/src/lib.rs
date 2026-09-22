@@ -53,6 +53,23 @@ use loopback::Loopback;
 /// a listener bound for the rest of the session.
 pub const CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Make `ring` the process-default rustls crypto provider, unless something
+/// already picked one.
+///
+/// Call this before building a `reqwest::Client`. We take reqwest's
+/// `rustls-no-provider` feature so the binary keeps one crypto provider instead
+/// of gaining aws-lc-rs alongside the ring the lobby socket and the updater
+/// already use, and reqwest panics on `build()` when no provider is installed.
+/// The root `Cargo.toml` has the full reasoning.
+///
+/// Idempotent, and safe from several threads at once: a second call and the
+/// loser of a race both get an `Err` back and leave the installed one alone.
+pub fn use_ring_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+}
+
 /// The three things a service has to put on its authorization URL, handed to it
 /// once the loopback listener is bound.
 pub struct AuthRequest {
@@ -160,6 +177,7 @@ mod tests {
             let state = query.get("state").cloned().unwrap();
             let target = format!("{redirect}?{}", reply(&state));
             tokio::spawn(async move {
+                super::use_ring_provider();
                 let _ = reqwest::get(&target).await;
             });
             Ok(())
