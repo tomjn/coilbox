@@ -27,6 +27,8 @@ function timeline(overrides: Partial<ScriptTimeline> = {}): ScriptTimeline {
     warnings: [],
     asked: [],
     functions: [],
+    linesRun: [],
+    offsetsRun: [],
     ...overrides,
   };
 }

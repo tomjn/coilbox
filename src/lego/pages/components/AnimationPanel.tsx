@@ -62,7 +62,6 @@ import {
 } from "../../scriptPlayback";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
-import { ScriptDrawer } from "./ScriptDrawer";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
  *  rather than one of the canned scenarios above it. Not a real scenario id:
@@ -145,10 +144,9 @@ interface Props {
   playing: boolean;
   onPlayingChange: (playing: boolean) => void;
   onChange: (applied: AppliedPreset[]) => void;
-  /** Stores the unit's own Lua. The first call is the unit taking it over. */
-  onScriptChange: (script: string) => void;
-  /** Drops the stored Lua, putting the unit back on the presets below. */
-  onScriptRelease: () => void;
+  /** Opens the strip on its Script tab, which is where a script is read,
+   *  edited, taken over or handed back now. */
+  onShowScript: () => void;
   /** What the unit builds with, written into its definition. Only asked for
    *  when the unit has a build arm on it. */
   onBuilderChange: (builder: LegoBuilder) => void;
@@ -157,6 +155,12 @@ interface Props {
    * play. Null whenever the presets are what is playing, or nothing is.
    */
   onScriptTimeline: (timeline: ScriptTimeline | null) => void;
+  /**
+   * The same run, reported whatever it managed rather than only a playable
+   * one, for the Script tab's error and coverage marks. Null once the script
+   * has changed since, because playback stops on that same change.
+   */
+  onScriptRun: (timeline: ScriptTimeline | null) => void;
   /**
    * Whether the run's clock is frozen on `scriptFrame`. Pausing holds the
    * viewport on one frame without losing the run. Stepping and scrubbing both
@@ -175,17 +179,16 @@ export function AnimationPanel({
   playing,
   onPlayingChange,
   onChange,
-  onScriptChange,
-  onScriptRelease,
+  onShowScript,
   onBuilderChange,
   onScriptTimeline,
+  onScriptRun,
   scriptPaused,
   onScriptPausedChange,
   scriptFrame,
   onScriptFrameChange,
 }: Props) {
   const reduceMotion = useReduceMotion();
-  const [showScript, setShowScript] = useState(false);
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
   const [timeline, setTimeline] = useState<ScriptTimeline | null>(null);
   const [running, setRunning] = useState(false);
@@ -216,6 +219,7 @@ export function AnimationPanel({
   const stop = useCallback(() => {
     onPlayingChange(false);
     onScriptTimeline(null);
+    onScriptRun(null);
     setTimeline(null);
     setFailure(null);
     onScriptPausedChange(false);
@@ -223,6 +227,7 @@ export function AnimationPanel({
   }, [
     onPlayingChange,
     onScriptTimeline,
+    onScriptRun,
     onScriptPausedChange,
     onScriptFrameChange,
   ]);
@@ -276,12 +281,16 @@ export function AnimationPanel({
         // A run that produced nothing has only its reason to show. One that
         // failed part way through is still worth watching up to that point.
         onScriptTimeline(result.frames.length > 0 ? result : null);
+        // The Script tab wants the run regardless, since a script that fails
+        // before its first frame is exactly the run its own error matters for.
+        onScriptRun(result);
         onPlayingChange(result.frames.length > 0);
         onScriptPausedChange(false);
         onScriptFrameChange(0);
       } catch (error) {
         setTimeline(null);
         onScriptTimeline(null);
+        onScriptRun(null);
         onPlayingChange(false);
         setFailure(error instanceof Error ? error.message : String(error));
       } finally {
@@ -294,6 +303,7 @@ export function AnimationPanel({
       compiled,
       onPlayingChange,
       onScriptTimeline,
+      onScriptRun,
       onScriptPausedChange,
       onScriptFrameChange,
     ],
@@ -404,16 +414,6 @@ export function AnimationPanel({
     );
   }
 
-  const scriptDrawer = (
-    <ScriptDrawer
-      open={showScript}
-      onOpenChange={setShowScript}
-      project={project}
-      onScriptChange={onScriptChange}
-      onScriptRelease={onScriptRelease}
-    />
-  );
-
   if (playsOwnScript) {
     const scenario = scenarioById(scenarioId);
     const stopped = timeline?.error ?? null;
@@ -462,11 +462,7 @@ export function AnimationPanel({
               : `${PREVIEW_SECONDS} seconds, looped`}
           </span>
           {owned ? (
-            <Button
-              size="sm"
-              className="ml-auto"
-              onClick={() => setShowScript(true)}
-            >
+            <Button size="sm" className="ml-auto" onClick={onShowScript}>
               <FileCode size={14} /> Edit
             </Button>
           ) : null}
@@ -509,8 +505,6 @@ export function AnimationPanel({
             </span>
           </div>
         ) : null}
-
-        {owned ? scriptDrawer : null}
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
           <div className="flex flex-col gap-1.5">
@@ -763,14 +757,12 @@ export function AnimationPanel({
           size="sm"
           variant="outline"
           className="ml-auto"
-          onClick={() => setShowScript(true)}
+          onClick={onShowScript}
           title="The animation script these presets generate"
         >
           <FileCode size={14} /> Script
         </Button>
       </div>
-
-      {scriptDrawer}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Above the presets, because it is what makes them mean anything: a

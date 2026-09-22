@@ -104,6 +104,7 @@ import { PartPicker } from "./components/PartPicker";
 import { collisionHandlePieceId } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
 import { SaveModelPopover } from "./components/SaveModelPopover";
+import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
 import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
@@ -158,7 +159,11 @@ function Builder({ id }: { id: string | undefined }) {
   // onto its own texture rather than onto the pack's sheet, so a part dropped
   // into it would sample the wrong image and nothing could put that right.
   const imported = draft?.imported ?? null;
-  const [strip, setStrip] = useState<"parts" | "compounds">("parts");
+  const [strip, setStrip] = useState<"parts" | "compounds" | "script">("parts");
+  // Parts and Compounds have nothing for a unit imported whole (issue #712):
+  // it has no parts to build with. Script is the one tab that still applies,
+  // since an imported unit is usually the one carrying its game's own script.
+  const effectiveStrip = imported ? "script" : strip;
   // Open or closed is remembered between runs. Which tab is showing is not, so
   // the side panel always comes back on Pieces. See `../panels`.
   const [stripOpen, setStripOpen] = usePanelOpen("strip");
@@ -174,6 +179,15 @@ function Builder({ id }: { id: string | undefined }) {
    * script produced, rather than the presets it no longer has.
    */
   const [scriptTimeline, setScriptTimeline] = useState<ScriptTimeline | null>(
+    null,
+  );
+  /**
+   * The last run the Animation panel produced, whatever it managed rather
+   * than only a playable one. `scriptTimeline` above is null the moment a run
+   * fails before its first frame, which is exactly the run the Script tab's
+   * checks most need to see, so the two are kept apart.
+   */
+  const [lastScriptRun, setLastScriptRun] = useState<ScriptTimeline | null>(
     null,
   );
   /**
@@ -671,8 +685,27 @@ function Builder({ id }: { id: string | undefined }) {
   function stopPlayback() {
     setPlaying(false);
     setScriptTimeline(null);
+    setLastScriptRun(null);
     setScriptPaused(false);
     setScriptFrame(0);
+  }
+
+  /** Stores the unit's own Lua. The first call is the unit taking it over. */
+  function changeScript(script: string) {
+    stopPlayback();
+    edit((project) => ({ ...project, script }));
+  }
+
+  /** Drops the stored Lua, so the unit goes back to a script generated from
+   *  its animation presets. */
+  function releaseScript() {
+    stopPlayback();
+    edit((project) => {
+      // Back on a generated script, which is the absence of the key rather
+      // than a stored copy of what was generated.
+      const { script: _dropped, ...rest } = project;
+      return rest;
+    });
   }
 
   if (doc.loading || !draft || !pack) {
@@ -1050,107 +1083,136 @@ function Builder({ id }: { id: string | undefined }) {
               />
             </div>
 
-            {/* Hidden for an imported unit, which has no parts to reach for: its
-              UVs point onto its own texture rather than onto the pack's sheet,
-              so a part dropped into it would sample the wrong image and nothing
-              here could put that right. Compounds go with it, being pieces made
-              of parts. See https://github.com/tomjn/coilbox/issues/712.
+            {/* Parts and Compounds are hidden for an imported unit, which has no
+              parts to reach for: its UVs point onto its own texture rather than
+              onto the pack's sheet, so a part dropped into it would sample the
+              wrong image and nothing here could put that right. See
+              https://github.com/tomjn/coilbox/issues/712. Script stays, since
+              an imported unit is usually the one carrying its game's own.
 
               Collapsible otherwise: most of a session is spent moving what is
               already there, not reaching for another part. */}
-            {imported ? null : (
-              <div
-                className={`flex shrink-0 flex-col border-t border-border ${
-                  stripOpen ? "h-72" : ""
-                }`}
-              >
-                <div className="flex items-center gap-2 px-3 py-2">
+            <div
+              className={`flex shrink-0 flex-col border-t border-border ${
+                stripOpen ? "h-72" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2 px-3 py-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setStripOpen(!stripOpen)}
+                  aria-expanded={stripOpen}
+                  aria-label={
+                    stripOpen
+                      ? effectiveStrip === "script"
+                        ? "Hide the script"
+                        : "Hide the parts"
+                      : effectiveStrip === "script"
+                        ? "Show the script"
+                        : "Show the parts"
+                  }
+                >
+                  {stripOpen ? (
+                    <ChevronDown size={16} />
+                  ) : (
+                    <ChevronUp size={16} />
+                  )}
+                </Button>
+
+                <ButtonGroup>
+                  {imported ? null : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant={strip === "parts" ? "default" : "outline"}
+                        onClick={() => {
+                          setStrip("parts");
+                          setStripOpen(true);
+                        }}
+                        aria-pressed={strip === "parts"}
+                      >
+                        Parts
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={strip === "compounds" ? "default" : "outline"}
+                        onClick={() => {
+                          setStrip("compounds");
+                          setStripOpen(true);
+                        }}
+                        aria-pressed={strip === "compounds"}
+                      >
+                        Compounds
+                      </Button>
+                    </>
+                  )}
                   <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setStripOpen(!stripOpen)}
-                    aria-expanded={stripOpen}
-                    aria-label={stripOpen ? "Hide the parts" : "Show the parts"}
+                    size="sm"
+                    variant={
+                      effectiveStrip === "script" ? "default" : "outline"
+                    }
+                    onClick={() => {
+                      setStrip("script");
+                      setStripOpen(true);
+                    }}
+                    aria-pressed={effectiveStrip === "script"}
                   >
-                    {stripOpen ? (
-                      <ChevronDown size={16} />
-                    ) : (
-                      <ChevronUp size={16} />
-                    )}
+                    Script
                   </Button>
+                </ButtonGroup>
 
-                  <ButtonGroup>
-                    <Button
-                      size="sm"
-                      variant={strip === "parts" ? "default" : "outline"}
-                      onClick={() => {
-                        setStrip("parts");
-                        setStripOpen(true);
-                      }}
-                      aria-pressed={strip === "parts"}
-                    >
-                      Parts
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={strip === "compounds" ? "default" : "outline"}
-                      onClick={() => {
-                        setStrip("compounds");
-                        setStripOpen(true);
-                      }}
-                      aria-pressed={strip === "compounds"}
-                    >
-                      Compounds
-                    </Button>
-                  </ButtonGroup>
-
-                  {stripOpen && strip === "parts" ? (
-                    <PartFilters
-                      pack={pack}
-                      query={filter.query}
-                      onQuery={filter.setQuery}
-                      category={filter.category}
-                      onCategory={filter.setCategory}
-                      packId={filter.packId}
-                      onPackId={filter.setPackId}
-                      shown={filter.parts.length}
-                      className="flex-1"
-                    />
-                  ) : null}
-                </div>
-
-                {/* Flex, not block: the picker sizes itself with flex-1 and its contents
-                are absolutely positioned, so in a block parent it collapses to
-                nothing and the panel looks empty. */}
-                {stripOpen ? (
-                  <div className="flex min-h-0 flex-1 border-t border-border">
-                    {strip === "compounds" ? (
-                      <CompoundPicker
-                        pack={pack}
-                        compounds={compounds}
-                        atlas={drawAtlas}
-                        onInsert={addCompound}
-                        onDelete={(compoundId) =>
-                          void deleteCompound(compoundId)
-                        }
-                        onRename={(compound, name) =>
-                          void saveCompound({ ...compound, name })
-                        }
-                      />
-                    ) : filter.parts.length === 0 ? (
-                      <NoMatches />
-                    ) : (
-                      <PartPicker
-                        pack={pack}
-                        parts={filter.parts}
-                        atlas={drawAtlas}
-                        onSelect={addPart}
-                      />
-                    )}
-                  </div>
+                {stripOpen && effectiveStrip === "parts" ? (
+                  <PartFilters
+                    pack={pack}
+                    query={filter.query}
+                    onQuery={filter.setQuery}
+                    category={filter.category}
+                    onCategory={filter.setCategory}
+                    packId={filter.packId}
+                    onPackId={filter.setPackId}
+                    shown={filter.parts.length}
+                    className="flex-1"
+                  />
                 ) : null}
               </div>
-            )}
+
+              {/* Flex, not block: the picker sizes itself with flex-1 and its contents
+                are absolutely positioned, so in a block parent it collapses to
+                nothing and the panel looks empty. */}
+              {stripOpen ? (
+                <div className="flex min-h-0 flex-1 border-t border-border">
+                  {effectiveStrip === "script" ? (
+                    <ScriptTab
+                      project={draft}
+                      onScriptChange={changeScript}
+                      onScriptRelease={releaseScript}
+                      lastRun={lastScriptRun}
+                    />
+                  ) : effectiveStrip === "compounds" ? (
+                    <CompoundPicker
+                      pack={pack}
+                      compounds={compounds}
+                      atlas={drawAtlas}
+                      onInsert={addCompound}
+                      onDelete={(compoundId) => void deleteCompound(compoundId)}
+                      onRename={(compound, name) =>
+                        void saveCompound({ ...compound, name })
+                      }
+                    />
+                  ) : filter.parts.length === 0 ? (
+                    <NoMatches />
+                  ) : (
+                    <PartPicker
+                      pack={pack}
+                      parts={filter.parts}
+                      atlas={drawAtlas}
+                      onSelect={addPart}
+                    />
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <CollapsibleContent asChild>
@@ -1273,26 +1335,18 @@ function Builder({ id }: { id: string | undefined }) {
                     edit((project) => ({ ...project, animations }))
                   }
                   onScriptTimeline={setScriptTimeline}
+                  onScriptRun={setLastScriptRun}
                   scriptPaused={scriptPaused}
                   onScriptPausedChange={setScriptPaused}
                   scriptFrame={scriptFrame}
                   onScriptFrameChange={setScriptFrame}
-                  onScriptChange={(script) => {
-                    stopPlayback();
-                    edit((project) => ({ ...project, script }));
+                  onShowScript={() => {
+                    setStrip("script");
+                    setStripOpen(true);
                   }}
                   onBuilderChange={(builder) =>
                     edit((project) => ({ ...project, builder }))
                   }
-                  onScriptRelease={() => {
-                    stopPlayback();
-                    edit((project) => {
-                      // Back on a generated script, which is the absence of the
-                      // key rather than a stored copy of what was generated.
-                      const { script: _dropped, ...rest } = project;
-                      return rest;
-                    });
-                  }}
                 />
               ) : (
                 <>

@@ -26,3 +26,20 @@ export function missingPieces(lua: string, pieces: Iterable<string>): string[] {
   const present = new Set(pieces);
   return [...new Set(declaredPieces(lua))].filter((name) => !present.has(name));
 }
+
+/**
+ * The 1-indexed line of the first `piece(...)` call naming `name`, so a
+ * missing-piece warning can point somewhere rather than just naming the piece.
+ *
+ * Line 1 for a name that names nowhere, which should not happen for anything
+ * {@link missingPieces} itself returned.
+ */
+export function lineNamingPiece(lua: string, name: string): number {
+  const re = /piece\s*\(?\s*(?:"([^"]+)"|'([^']+)'|\[\[([^\]]+)\]\])\s*\)?/g;
+  for (const match of lua.matchAll(re)) {
+    if ((match[1] ?? match[2] ?? match[3]) === name) {
+      return lua.slice(0, match.index).split("\n").length;
+    }
+  }
+  return 1;
+}

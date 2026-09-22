@@ -49,6 +49,8 @@ function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
     warnings: [],
     asked: [],
     functions: [],
+    linesRun: [],
+    offsetsRun: [],
     ...over,
   };
 }
@@ -86,10 +88,10 @@ function show(value: LegoProject) {
       playing={false}
       onPlayingChange={vi.fn()}
       onChange={vi.fn()}
-      onScriptChange={vi.fn()}
-      onScriptRelease={vi.fn()}
+      onShowScript={vi.fn()}
       onBuilderChange={vi.fn()}
       onScriptTimeline={vi.fn()}
+      onScriptRun={vi.fn()}
       scriptPaused={false}
       onScriptPausedChange={vi.fn()}
       scriptFrame={0}
