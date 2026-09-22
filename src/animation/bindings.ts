@@ -46,6 +46,9 @@ export const animCobRun = defineCommand<
     /** Where each piece sits, in the same order as `pieces`, for a script that
      *  asks where one of them is. Absent when nobody said. */
     rest?: import("../lego/pieceRest").PieceRest[];
+    /** Unit values to seed before the first frame runs, keyed by id. A
+     *  script's own `SET` still overrides its own id. */
+    values?: Record<number, number>;
   },
   import("../lego/scriptPlayback").ScriptTimeline
 >("coilbox-anim", "anim_cob_run");

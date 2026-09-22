@@ -25,6 +25,8 @@ function timeline(overrides: Partial<ScriptTimeline> = {}): ScriptTimeline {
     hidden: [],
     error: null,
     warnings: [],
+    asked: [],
+    functions: [],
     ...overrides,
   };
 }

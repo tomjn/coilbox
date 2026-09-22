@@ -36,6 +36,14 @@ export interface ScriptTimeline {
   error: string | null;
   /** What the run wants to say that did not stop it. */
   warnings: string[];
+  /** Every unit value id the script read, in the order it first read each one.
+   *  A caller offering controls for a script's unit values has to run it once
+   *  before it knows which to offer. */
+  asked: { id: number; name: string | null; default: number | null }[];
+  /** The functions the script defines: a `.cob`'s script name table, or a Lua
+   *  unit script's `script` table keys. What a caller offering "call any
+   *  function" has to run the script once to learn. */
+  functions: string[];
 }
 
 /** What one call-in that answers with a piece said. */
@@ -78,8 +86,11 @@ export interface Scenario {
   events: ScriptEvent[];
 }
 
-/** Seconds to frames, for writing a scenario in the units it reads in. */
-function at(seconds: number): number {
+/** Seconds to frames, for writing a scenario in the units it reads in.
+ *  Exported so anything that builds its own events, such as a call to a
+ *  function the panel does not have a scenario for, starts them the same
+ *  half second in as every scenario above does. */
+export function at(seconds: number): number {
   return Math.round(seconds * 30);
 }
 

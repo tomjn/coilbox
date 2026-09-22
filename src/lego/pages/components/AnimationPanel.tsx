@@ -10,7 +10,7 @@
  * unit, and the viewport plays what the script does about it.
  */
 
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import {
   FileCode,
   Pause,
@@ -49,16 +49,44 @@ import {
 } from "../../model";
 import { pieceRest } from "../../pieceRest";
 import {
+  at,
+  CREATED,
   clampFrame,
   PREVIEW_FRAMES,
   PREVIEW_SECONDS,
   playable,
   SCENARIOS,
+  type ScriptEvent,
   type ScriptTimeline,
   scenarioById,
 } from "../../scriptPlayback";
 import { isBuilder } from "../../unitDef";
+import { controlFor } from "../../unitValueControls";
 import { ScriptDrawer } from "./ScriptDrawer";
+
+/** The scenario Select's own entry for firing an arbitrary function by name,
+ *  rather than one of the canned scenarios above it. Not a real scenario id:
+ *  nothing in `SCENARIOS` uses it, and `scenarioById` finding nothing for it
+ *  is how the panel tells the two apart. */
+const CALL_FUNCTION = "call";
+
+/**
+ * `"0.8, 0.15"` into `[0.8, 0.15]`, or null when it is not a clean list of
+ * numbers. Empty text is zero arguments rather than an error, since a
+ * function that takes none is exactly as valid as one that does.
+ */
+function parseArgList(text: string): number[] | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return [];
+  const numbers: number[] = [];
+  for (const part of trimmed.split(",")) {
+    const piece = part.trim();
+    const value = Number(piece);
+    if (piece === "" || Number.isNaN(value)) return null;
+    numbers.push(value);
+  }
+  return numbers;
+}
 
 /**
  * What each parameter's number is measured in, beside the slider.
@@ -163,6 +191,18 @@ export function AnimationPanel({
   const [running, setRunning] = useState(false);
   /** A run that never reached the runtime, as opposed to one that failed in it. */
   const [failure, setFailure] = useState<string | null>(null);
+  /** Unit values the panel has changed away from what the last run's `asked`
+   *  reported as their default. Never saved to the project: this is a way to
+   *  poke at a script's preview, not a decision about the unit. */
+  const [values, setValues] = useState<Record<number, number>>({});
+  /** The function chosen for the "Call a function" scenario, and the text of
+   *  its arguments, kept apart from `values` because neither is a unit value. */
+  const [callFunction, setCallFunction] = useState("");
+  const [callArgsText, setCallArgsText] = useState("");
+  const [callArgsError, setCallArgsError] = useState<string | null>(null);
+  const argsDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(argsDebounce.current), []);
+  const isCallMode = scenarioId === CALL_FUNCTION;
   const applied = project.animations ?? [];
   const counts = countRoles(project.pieces);
   const owned = project.script !== undefined;
@@ -187,15 +227,22 @@ export function AnimationPanel({
     onScriptFrameChange,
   ]);
 
-  const start = useCallback(
-    async (scenario: string) => {
+  /**
+   * Run `events` through whichever runtime this unit's script belongs to,
+   * seeded with `withValues`, and report what came back.
+   *
+   * The one place either runtime is called from: a scenario, a scrub of a
+   * unit value, and a call to one of the script's own functions are all just
+   * a different `events` list over the same run.
+   */
+  const runEvents = useCallback(
+    async (events: ScriptEvent[], withValues: Record<number, number>) => {
       const script = project.script;
       if (script === undefined && !compiled) return;
       setRunning(true);
       setFailure(null);
       try {
         const pieces = project.pieces.map((piece) => piece.name);
-        const events = scenarioById(scenario)?.events ?? [];
         // Two runtimes, one timeline. The compiled one runs the bytecode the
         // game shipped and reports the same poses the Lua one does.
         const result = compiled
@@ -205,6 +252,7 @@ export function AnimationPanel({
               events,
               frames: PREVIEW_FRAMES,
               rest: pieceRest(project),
+              values: withValues,
             })
           : await legoRunScript({
               script: script ?? "",
@@ -222,6 +270,7 @@ export function AnimationPanel({
               // A script may ask where one of its pieces is, and neither
               // runtime reads models, so the shape travels with the run (#1948).
               rest: pieceRest(project),
+              values: withValues,
             });
         setTimeline(result);
         // A run that produced nothing has only its reason to show. One that
@@ -248,6 +297,71 @@ export function AnimationPanel({
       onScriptPausedChange,
       onScriptFrameChange,
     ],
+  );
+
+  const start = useCallback(
+    (scenario: string) =>
+      runEvents(scenarioById(scenario)?.events ?? [], values),
+    [runEvents, values],
+  );
+
+  /** Fire one of the script's own functions, the way `CREATED` then a scenario's
+   *  own call-ins do, `at(0.5)` seconds in for the same reason those wait: a
+   *  `Create` that sleeps is still setting the unit up on frame zero. */
+  const fireCall = useCallback(
+    (
+      name: string,
+      argsText: string,
+      withValues: Record<number, number> = values,
+    ) => {
+      if (!name) return;
+      const args = parseArgList(argsText);
+      if (args === null) {
+        setCallArgsError(
+          "Numbers, comma separated. Call-ins that aim take radians, as the engine hands them.",
+        );
+        return;
+      }
+      setCallArgsError(null);
+      void runEvents(
+        [...CREATED, { frame: at(0.5), callin: name, args }],
+        withValues,
+      );
+    },
+    [runEvents, values],
+  );
+
+  /** A unit value changed, by hand or by reset: keep it, and run again with it. */
+  const changeValue = useCallback(
+    (id: number, raw: number | undefined) => {
+      const next = { ...values };
+      if (raw === undefined) delete next[id];
+      else next[id] = raw;
+      setValues(next);
+      if (isCallMode) fireCall(callFunction, callArgsText, next);
+      else void runEvents(scenarioById(scenarioId)?.events ?? [], next);
+    },
+    [
+      values,
+      isCallMode,
+      fireCall,
+      callFunction,
+      callArgsText,
+      runEvents,
+      scenarioId,
+    ],
+  );
+
+  const onArgsTextChange = useCallback(
+    (text: string) => {
+      setCallArgsText(text);
+      clearTimeout(argsDebounce.current);
+      argsDebounce.current = setTimeout(
+        () => fireCall(callFunction, text),
+        400,
+      );
+    },
+    [fireCall, callFunction],
   );
 
   /** Stepping only makes sense on a held frame, so it pauses first. */
@@ -310,11 +424,13 @@ export function AnimationPanel({
           <Button
             size="sm"
             variant={playing && !scriptPaused ? "default" : "outline"}
-            disabled={reduceMotion || running}
+            disabled={reduceMotion || running || (isCallMode && !callFunction)}
             onClick={() =>
               playing
                 ? onScriptPausedChange(!scriptPaused)
-                : void start(scenarioId)
+                : isCallMode
+                  ? fireCall(callFunction, callArgsText)
+                  : void start(scenarioId)
             }
           >
             {playing && !scriptPaused ? (
@@ -405,6 +521,14 @@ export function AnimationPanel({
               value={scenarioId}
               onValueChange={(next) => {
                 setScenarioId(next);
+                if (next === CALL_FUNCTION) {
+                  // A function to call has to come from somewhere, and the
+                  // idle scenario is the cheapest run that learns it.
+                  if (!timeline || timeline.functions.length === 0) {
+                    void runEvents(scenarioById("idle")?.events ?? [], values);
+                  }
+                  return;
+                }
                 if (playing || timeline) void start(next);
               }}
             >
@@ -417,12 +541,143 @@ export function AnimationPanel({
                     {option.label}
                   </SelectItem>
                 ))}
+                <SelectItem value={CALL_FUNCTION}>Call a function</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              {scenario?.description}
-            </p>
+            {isCallMode ? (
+              <>
+                <Select
+                  value={callFunction}
+                  onValueChange={(name) => {
+                    setCallFunction(name);
+                    fireCall(name, callArgsText);
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-full">
+                    <SelectValue placeholder="Choose a function" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(timeline?.functions ?? []).map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={callArgsText}
+                  aria-label="Arguments"
+                  placeholder="0.8, 0.15"
+                  onChange={(e) => onArgsTextChange(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Numbers, comma separated. Call-ins that aim take radians, as
+                  the engine hands them.
+                </p>
+                {callArgsError ? (
+                  <p className="text-xs text-destructive">{callArgsError}</p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {scenario?.description}
+              </p>
+            )}
           </div>
+
+          {timeline && timeline.asked.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium">Unit values</span>
+              <p className="text-xs text-muted-foreground">
+                What the script reads about its unit. Change one and the preview
+                runs again with it.
+              </p>
+              {timeline.asked.map((asked) => {
+                const control = controlFor(asked.id, asked.name);
+                const changed = values[asked.id] !== undefined;
+                const raw = values[asked.id] ?? asked.default ?? 0;
+                return (
+                  <div key={asked.id} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span>{control.label}</span>
+                      <div className="flex items-center gap-2">
+                        {control.kind === "slider" ? (
+                          <span className="text-muted-foreground">
+                            {control.toDisplay(raw)}
+                            {control.suffix}
+                          </span>
+                        ) : null}
+                        {changed ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 px-1.5 text-xs"
+                            onClick={() => changeValue(asked.id, undefined)}
+                          >
+                            Reset
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    {control.kind === "switch" ? (
+                      <Switch
+                        checked={raw !== 0}
+                        onCheckedChange={(on) =>
+                          changeValue(asked.id, on ? 1 : 0)
+                        }
+                        aria-label={control.label}
+                      />
+                    ) : null}
+                    {control.kind === "slider" ? (
+                      <Slider
+                        min={control.min}
+                        max={control.max}
+                        step={control.step}
+                        value={[control.toDisplay(raw)]}
+                        onValueChange={([next]) =>
+                          changeValue(asked.id, control.toRaw(next))
+                        }
+                        aria-label={control.label}
+                      />
+                    ) : null}
+                    {control.kind === "select" ? (
+                      <Select
+                        value={String(raw)}
+                        onValueChange={(next) =>
+                          changeValue(asked.id, Number(next))
+                        }
+                      >
+                        <SelectTrigger size="sm" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {control.options.map((option) => (
+                            <SelectItem
+                              key={option.value}
+                              value={String(option.value)}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    {control.kind === "number" ? (
+                      <Input
+                        type="number"
+                        value={raw}
+                        aria-label={control.label}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          if (!Number.isNaN(next)) changeValue(asked.id, next);
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
 
           {failure ? (
             <p className="text-xs text-destructive">

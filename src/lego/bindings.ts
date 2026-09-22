@@ -658,6 +658,9 @@ export const legoRunScript = defineCommand<
     /** Where each piece sits, in the same order as `pieces`, for a script that
      *  asks where one of them is. */
     rest?: PieceRest[] | null;
+    /** Unit values to seed before the first frame runs, keyed by id. A
+     *  script's own `SetUnitValue` still overrides its own id. */
+    values?: Record<number, number>;
   },
   ScriptTimeline
 >("coilbox-lego", "lego_run_script");

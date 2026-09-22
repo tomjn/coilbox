@@ -78,6 +78,8 @@ function turned(turns: { piece: string; axis: 0 | 1 | 2 }[]): ScriptTimeline {
     hidden: [],
     error: null,
     warnings: [],
+    asked: [],
+    functions: [],
   };
 }
 
