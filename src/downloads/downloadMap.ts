@@ -1,6 +1,7 @@
 import {
   dlDownloadFileRaw,
   dlDownloadMapRaw,
+  dlEvolutionRtsMaps,
   dlHakoraMaps,
   dlSpringfilesList,
 } from "./bindings";
@@ -17,14 +18,16 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * 511, following #500's game ordering) that order is known mirrors first, then
  * pr-downloader (rapid) as the last resort.
  *
- * 1. springfiles catalog mirror. Match by springname/name, fetch the first mirror.
- * 2. the hakora.xyz mirror. Match by filename, since it carries no springname.
- * 3. rapid via pr-downloader, on its own default search, which is springfiles.
+ * 1. the maps.evolutionrts.info mirror of maps first made for Beyond All
+ *    Reason. Match by filename, since it carries no springname.
+ * 2. springfiles catalog mirror. Match by springname/name, fetch the first mirror.
+ * 3. the hakora.xyz mirror. Match by filename, like evolutionrts.
+ * 4. rapid via pr-downloader, on its own default search, which is springfiles.
  *
- * Steps 1-2 need a write root. Without one only rapid is attempted. Throws with
+ * Steps 1-3 need a write root. Without one only rapid is attempted. Throws with
  * every attempted source's error when all fail.
  *
- * There was a fourth step: retrying rapid against Beyond All Reason's
+ * There was another step: retrying rapid against Beyond All Reason's
  * `files-cdn` search. It is gone, and deliberately not replaced. That endpoint
  * resolves a springname by fetching the archive and storing a copy, so asking it
  * for a map BAR does not have makes BAR host somebody else's map at their own
@@ -78,6 +81,20 @@ async function downloadMapAnySourceImpl(opts: {
           onProgress: progressChannel(onProgress),
         });
         return "hakora";
+      }
+      case "evolutionrts": {
+        if (!writePath) return null;
+        const { maps } = await dlEvolutionRtsMaps(undefined);
+        const hit = maps.find((m) => norm(m.filename) === target);
+        if (!hit) return null;
+        await dlDownloadFileRaw({
+          url: hit.url,
+          destDir: `${writePath}/maps`,
+          filename: hit.filename,
+          opId,
+          onProgress: progressChannel(onProgress),
+        });
+        return "evolutionrts mirror";
       }
       case "rapid": {
         const label = "springfiles (pr-downloader)";

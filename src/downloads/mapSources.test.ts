@@ -12,7 +12,8 @@ describe("mapSourceOrder (issue #511)", () => {
     const order = mapSourceOrder({ hasWritePath: true });
     expect(at(order, "springfiles")).toBeLessThan(at(order, "rapid"));
     expect(at(order, "hakora")).toBeLessThan(at(order, "rapid"));
-    expect(order).toEqual(["springfiles", "hakora", "rapid"]);
+    expect(at(order, "evolutionrts")).toBeLessThan(at(order, "rapid"));
+    expect(order).toEqual(["evolutionrts", "springfiles", "hakora", "rapid"]);
   });
 
   it("always keeps rapid as the final fallback", () => {

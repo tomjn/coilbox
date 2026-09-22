@@ -35,6 +35,7 @@ vi.mock("../bindings", () => ({
   dlDownloadMap: downloadMap,
   dlGithubReleaseArchives: vi.fn(async () => ({ archives: [] })),
   dlHakoraMaps: vi.fn(async () => ({ maps: [] })),
+  dlEvolutionRtsMaps: vi.fn(async () => ({ maps: [] })),
   dlInstalledContent: vi.fn(async () => ({ maps: [], games: [] })),
   dlSpringfilesList: vi.fn(async ({ category }: { category: string }) => ({
     results: [

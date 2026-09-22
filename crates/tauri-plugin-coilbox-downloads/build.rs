@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "dl_springfiles_list",
     "dl_springfiles_engines",
     "dl_hakora_maps",
+    "dl_evolutionrts_maps",
     "dl_download_map",
     "dl_download_file",
     "dl_recoil_engines",

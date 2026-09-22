@@ -102,9 +102,11 @@ fn cancel_slots(op_id: &Option<String>) -> (Arc<AtomicBool>, Arc<Mutex<Option<Ch
 
 /// A reqwest client with idle read + connect timeouts, so a stalled transfer
 /// errors out instead of hanging forever. Built per download (cheap) rather than
-/// shared, matching the existing per-call `reqwest::get` usage.
+/// shared, matching the existing per-call `reqwest::get` usage. The evolutionrts
+/// mirror refuses archive requests that carry no `User-Agent`.
 fn timed_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
+        .user_agent("coilbox")
         .connect_timeout(DL_CONNECT_LIMIT)
         .read_timeout(DL_IDLE_LIMIT)
         .build()
@@ -513,9 +515,14 @@ async fn dl_download(
     }
 }
 
-/// Fetch a URL as text. springfiles/BAR serve plain (non-gzipped) JSON.
+/// Fetch a URL as text. springfiles/BAR serve plain (non-gzipped) JSON. The
+/// evolutionrts mirror answers 406 to a request with no `User-Agent`.
 async fn fetch_text(url: String) -> Result<String, String> {
-    let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    let client = reqwest::Client::builder()
+        .user_agent("coilbox")
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     resp.text().await.map_err(|e| e.to_string())
 }
@@ -649,6 +656,20 @@ async fn dl_hakora_maps() -> CliResult {
     match fetch_text(sources::HAKORA_MAPS_URL.to_string()).await {
         Ok(body) => CliResult::ok(json!({ "maps": sources::parse_hakora_index(&body) })),
         Err(e) => CliResult::err(format!("failed to fetch hakora maps: {e}")),
+    }
+}
+
+/// `dl_evolutionrts_maps` - the maps.evolutionrts.info mirror of maps first made
+/// for Beyond All Reason. Returns filename + url + size, downloaded through the
+/// direct `dl_download_file` path like hakora.
+#[tauri::command]
+async fn dl_evolutionrts_maps() -> CliResult {
+    match fetch_text(sources::EVOLUTIONRTS_MAPS_URL.to_string()).await {
+        Ok(body) => match sources::parse_evolutionrts_list(&body) {
+            Ok(maps) => CliResult::ok(json!({ "maps": maps })),
+            Err(e) => CliResult::err(format!("could not parse evolutionrts maps: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch evolutionrts maps: {e}")),
     }
 }
 
@@ -1393,6 +1414,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_springfiles_list,
             dl_springfiles_engines,
             dl_hakora_maps,
+            dl_evolutionrts_maps,
             dl_download_map,
             dl_download_file,
             dl_recoil_engines,
