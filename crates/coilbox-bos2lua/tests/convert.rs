@@ -274,7 +274,10 @@ fn asks_for_pieces_by_the_model_s_spelling() {
         conversion.lua
     );
     assert!(
-        conversion.warnings.iter().any(|w| w.contains("pad")),
+        conversion
+            .warnings
+            .iter()
+            .any(|w| w.to_string().contains("pad")),
         "{:?}",
         conversion.warnings
     );
@@ -336,10 +339,10 @@ fn a_macro_with_arguments_writes_the_functions_it_stands_for() {
         "{lua}"
     );
     assert!(
-        conversion
-            .warnings
-            .iter()
-            .any(|w| w.contains("THIS.h line 3") && w.contains("fireStealthTime = 1000;")),
+        conversion.warnings.iter().any(|w| {
+            let w = w.to_string();
+            w.contains("THIS.h line 3") && w.contains("fireStealthTime = 1000;")
+        }),
         "{:?}",
         conversion.warnings
     );
@@ -405,7 +408,10 @@ fn a_missing_include_is_said_and_the_engine_s_names_stand_in() {
         .missing_includes
         .is_empty());
     assert!(
-        conversion.warnings.iter().any(|w| w.contains("flags.h")),
+        conversion
+            .warnings
+            .iter()
+            .any(|w| w.to_string().contains("flags.h")),
         "{:?}",
         conversion.warnings
     );
@@ -415,7 +421,10 @@ fn a_missing_include_is_said_and_the_engine_s_names_stand_in() {
         conversion.lua
     );
     assert!(
-        conversion.warnings.iter().any(|w| w.contains("SHATTER")),
+        conversion
+            .warnings
+            .iter()
+            .any(|w| w.to_string().contains("SHATTER")),
         "{:?}",
         conversion.warnings
     );

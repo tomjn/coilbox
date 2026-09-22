@@ -259,6 +259,39 @@ pub fn parse_file(tokens: Vec<String>) -> Result<Node, String> {
     Ok(root)
 }
 
+/// Warnings for a bare assignment sitting outside any function (the
+/// `_strayDeclaration` grammar rule). It parses but compiles to nothing, so
+/// it is worth telling whoever is compiling about it rather than staying
+/// silent the way Scriptor did.
+pub fn stray_warnings(root: &Node) -> Vec<String> {
+    let mut warnings = Vec::new();
+    collect_stray_warnings(root, &mut warnings);
+    warnings
+}
+
+fn collect_stray_warnings(node: &Node, warnings: &mut Vec<String>) {
+    if node.ntype == "strayDeclaration" {
+        let assign = node.children.first();
+        let text = match assign {
+            Some(a) if a.children.len() == 3 && a.children[0].ntype == "varName" => {
+                format!(
+                    "{} = {};",
+                    a.children[0].get_text(),
+                    a.children[2].get_text()
+                )
+            }
+            _ => node.get_text(),
+        };
+        warnings.push(format!(
+            "`{text}` is outside any function, where the compiler drops it."
+        ));
+        return;
+    }
+    for child in &node.children {
+        collect_stray_warnings(child, warnings);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,6 +331,20 @@ mod tests {
         let root = parse_file(tokenize("F(){ x = a == b; }")).unwrap();
         let op = find(&root, "op").expect("op node");
         assert_eq!(op.get_text(), "==");
+    }
+
+    #[test]
+    fn accepts_a_bare_assignment_at_file_scope_and_warns_about_it() {
+        let root = parse_file(tokenize(
+            "static-var fireStealthTime;\nfireStealthTime = 1000;\nF(){}",
+        ))
+        .unwrap();
+        assert!(find(&root, "strayDeclaration").is_some(), "{root:#?}");
+        let warnings = stray_warnings(&root);
+        assert_eq!(
+            warnings,
+            ["`fireStealthTime = 1000;` is outside any function, where the compiler drops it."]
+        );
     }
 
     #[test]

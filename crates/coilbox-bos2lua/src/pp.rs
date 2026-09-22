@@ -15,7 +15,7 @@
 //! whole script before the real one.
 
 use crate::lex::{lex, Kind, Token};
-use crate::Precedence;
+use crate::{Precedence, Warning};
 use std::collections::{HashMap, HashSet};
 
 /// Finds an included file: `(name as written, the including file's name)` to
@@ -36,7 +36,7 @@ pub struct Output {
     pub constants: HashMap<String, Constant>,
     /// The ones something actually used.
     pub used: HashSet<String>,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<Warning>,
     /// The name of each file a token's `file` index stands for.
     pub files: Vec<String>,
     /// The includes that could not be found, as the script names them.
@@ -104,7 +104,7 @@ struct Pre<'r, 'a> {
     files: Vec<String>,
     constants: HashMap<String, Constant>,
     used: HashSet<String>,
-    warnings: Vec<String>,
+    warnings: Vec<Warning>,
     missing: Vec<String>,
 }
 
@@ -149,6 +149,12 @@ impl<'r, 'a> Pre<'r, 'a> {
         self.conds.last().is_none_or(|c| c.parent && c.taking)
     }
 
+    /// Whether `file_name` is the script's own file: [`self.files`][0], set
+    /// once at the top of [`run`][Self::run] before anything else is read.
+    fn is_main(&self, file_name: &str) -> bool {
+        self.files.first().is_some_and(|f| f == file_name)
+    }
+
     fn run(&mut self, source: &str, name: &str, depth: usize) {
         let file = self.files.len();
         self.files.push(name.to_string());
@@ -166,8 +172,9 @@ impl<'r, 'a> Pre<'r, 'a> {
             }
         }
         if self.conds.len() > open {
-            self.warnings
-                .push(format!("{name} leaves an #if open at its end."));
+            self.warnings.push(Warning::unlocated(format!(
+                "{name} leaves an #if open at its end."
+            )));
             self.conds.truncate(open);
         }
     }
@@ -215,9 +222,11 @@ impl<'r, 'a> Pre<'r, 'a> {
             }
             "endif" => {
                 if self.conds.pop().is_none() {
-                    self.warnings.push(format!(
-                        "{file_name} line {}: #endif with no #if.",
-                        token.line
+                    self.warnings.push(Warning::at(
+                        file_name.to_string(),
+                        token.line,
+                        self.is_main(file_name),
+                        "#endif with no #if.".to_string(),
                     ));
                 }
             }
@@ -229,9 +238,11 @@ impl<'r, 'a> Pre<'r, 'a> {
                 }
             }
             "include" => self.include(token, rest, file_name, depth),
-            other => self.warnings.push(format!(
-                "{file_name} line {}: #{other} means nothing to the converter and was skipped.",
-                token.line
+            other => self.warnings.push(Warning::at(
+                file_name.to_string(),
+                token.line,
+                self.is_main(file_name),
+                format!("#{other} means nothing to the converter and was skipped."),
             )),
         }
     }
@@ -252,9 +263,14 @@ impl<'r, 'a> Pre<'r, 'a> {
             match parameters(&rest[1..]) {
                 Some((params, read)) => (Some(params), 1 + read),
                 None => {
-                    self.warnings.push(format!(
-                        "{file_name} line {}: could not read the arguments {} takes, so it was skipped.",
-                        token.line, name.text
+                    self.warnings.push(Warning::at(
+                        file_name.to_string(),
+                        token.line,
+                        self.is_main(file_name),
+                        format!(
+                            "could not read the arguments {} takes, so it was skipped.",
+                            name.text
+                        ),
                     ));
                     return;
                 }
@@ -312,24 +328,30 @@ impl<'r, 'a> Pre<'r, 'a> {
                 .map(|t| t.text.as_str())
                 .collect(),
             _ => {
-                self.warnings.push(format!(
-                    "{file_name} line {}: #include names no file.",
-                    token.line
+                self.warnings.push(Warning::at(
+                    file_name.to_string(),
+                    token.line,
+                    self.is_main(file_name),
+                    "#include names no file.".to_string(),
                 ));
                 return;
             }
         };
         if depth >= MAX_INCLUDE_DEPTH {
-            self.warnings.push(format!(
-                "{file_name} line {}: includes nest deeper than {MAX_INCLUDE_DEPTH}, so {wanted} was not read.",
-                token.line
+            self.warnings.push(Warning::at(
+                file_name.to_string(),
+                token.line,
+                self.is_main(file_name),
+                format!("includes nest deeper than {MAX_INCLUDE_DEPTH}, so {wanted} was not read."),
             ));
             return;
         }
         let Some((found, text)) = (self.resolve)(&wanted, file_name) else {
-            self.warnings.push(format!(
-                "{file_name} line {}: could not find {wanted}, so anything it defines is missing.",
-                token.line
+            self.warnings.push(Warning::at(
+                file_name.to_string(),
+                token.line,
+                self.is_main(file_name),
+                format!("could not find {wanted}, so anything it defines is missing."),
             ));
             self.missing.push(wanted);
             return;
@@ -387,13 +409,16 @@ impl<'r, 'a> Pre<'r, 'a> {
                     args.clear();
                 }
                 if args.len() != params.len() {
-                    self.warnings.push(format!(
-                        "{} line {}: {} takes {} arguments and was given {}, so it was left as written.",
-                        self.files[token.file],
+                    self.warnings.push(Warning::at(
+                        self.files[token.file].clone(),
                         token.line,
-                        token.text,
-                        params.len(),
-                        args.len()
+                        token.file == 0,
+                        format!(
+                            "{} takes {} arguments and was given {}, so it was left as written.",
+                            token.text,
+                            params.len(),
+                            args.len()
+                        ),
                     ));
                     self.out.push(token);
                     return 0;
@@ -517,8 +542,11 @@ impl<'r, 'a> Pre<'r, 'a> {
         match value {
             Some(v) => v != 0,
             None => {
-                self.warnings.push(format!(
-                    "{file_name} line {line}: could not work out an #if, so it counts as false."
+                self.warnings.push(Warning::at(
+                    file_name.to_string(),
+                    line,
+                    self.is_main(file_name),
+                    "could not work out an #if, so it counts as false.".to_string(),
                 ));
                 false
             }
@@ -912,7 +940,11 @@ mod tests {
     #[test]
     fn a_missing_include_is_a_warning_not_a_failure() {
         let out = run("#include \"nowhere.h\"\npiece p;", &[]);
-        assert!(out.warnings[0].contains("nowhere.h"), "{:?}", out.warnings);
+        assert!(
+            out.warnings[0].to_string().contains("nowhere.h"),
+            "{:?}",
+            out.warnings
+        );
         assert_eq!(code(&out), ["piece", "p", ";"]);
     }
 

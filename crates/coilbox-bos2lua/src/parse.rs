@@ -61,6 +61,9 @@ pub struct Func {
     pub body: Vec<Stmt>,
     /// Comments after the last statement, before the closing brace.
     pub tail: Vec<Comment>,
+    /// Where the function's name starts, for the linter.
+    pub line: u32,
+    pub file: usize,
 }
 
 #[derive(Debug)]
@@ -68,6 +71,9 @@ pub struct Stmt {
     pub kind: StmtKind,
     pub leading: Vec<Comment>,
     pub trailing: Option<Comment>,
+    /// Where the statement starts, for the linter.
+    pub line: u32,
+    pub file: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -479,6 +485,8 @@ impl<'t> Parser<'t> {
 
     fn func(&mut self) -> Result<Func, String> {
         let name = self.ident()?;
+        let line = self.last_line;
+        let file = self.last_file;
         self.sym("(")?;
         let params = if self.eat_sym(")") {
             Vec::new()
@@ -491,6 +499,8 @@ impl<'t> Parser<'t> {
             params,
             body,
             tail,
+            line,
+            file,
         })
     }
 
@@ -576,12 +586,19 @@ impl<'t> Parser<'t> {
     }
 
     fn statement(&mut self, leading: Vec<Comment>) -> Result<Stmt, String> {
+        // The first token of the statement, before parsing it consumes it.
+        let (line, file) = self
+            .peek()
+            .map(|t| (t.line, t.file))
+            .unwrap_or((self.last_line, self.last_file));
         let kind = self.statement_kind()?;
         let trailing = self.trailing();
         Ok(Stmt {
             kind,
             leading,
             trailing,
+            line,
+            file,
         })
     }
 

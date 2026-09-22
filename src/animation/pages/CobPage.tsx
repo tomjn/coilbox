@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, Drawer } from "@picoframe/frame";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ask, open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -11,12 +11,21 @@ import {
   Hammer,
   Info,
   RefreshCw,
+  TriangleAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SEVERITY_COLOR, worstSeverity } from "@/components/CheckItem";
 import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
 import { errorText } from "@/lib/helpers";
-import { animBos2cob, animCobDisasm } from "../bindings";
+import {
+  animBos2cob,
+  animBosLint,
+  animBosRead,
+  animCobDisasm,
+  type LintDiagnostic,
+} from "../bindings";
+import { LintProblems } from "./LintProblems";
 
 const COB = /\.cob$/i;
 const BOS = /\.bos$/i;
@@ -45,8 +54,31 @@ export default function CobPage() {
   const [revealTarget, setRevealTarget] = useState("");
   const [listing, setListing] = useState("");
   const [banner, setBanner] = useState<Banner | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([]);
+  const [lintError, setLintError] = useState<string | null>(null);
+  const [checksOpen, setChecksOpen] = useState(false);
+
+  // Lints a .bos once it has compiled, so the same source that just produced
+  // the listing is what the problems below it are about. Never for a .cob
+  // loaded straight from disk, since there is no source to lint.
+  async function lintBos(p: string) {
+    try {
+      const { source } = await animBosRead({ path: p });
+      const { diagnostics, error } = await animBosLint({
+        source,
+        name: p,
+        path: p,
+      });
+      setDiagnostics(diagnostics);
+      setLintError(error ?? null);
+    } catch (e) {
+      setDiagnostics([]);
+      setLintError(errorText(e));
+    }
+  }
 
   async function disassemble(p: string) {
     const res = await animCobDisasm({ path: p });
@@ -57,9 +89,12 @@ export default function CobPage() {
   // Asks before overwriting an existing .cob.
   async function compile(p: string, overwrite = false) {
     setBanner(null);
+    setWarnings([]);
     setBusy(true);
     setPath(p);
     setKind("bos");
+    setDiagnostics([]);
+    setLintError(null);
     try {
       const res = await animBos2cob({ path: p, overwrite });
       if (res.needsOverwrite) {
@@ -80,7 +115,9 @@ export default function CobPage() {
         kind: "success",
         text: `Compiled to ${res.output} (${res.bytes} bytes).`,
       });
+      setWarnings(res.warnings);
       await disassemble(res.output);
+      await lintBos(p);
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
     } finally {
@@ -90,11 +127,14 @@ export default function CobPage() {
 
   async function loadCob(p: string) {
     setBanner(null);
+    setWarnings([]);
     setBusy(true);
     setPath(p);
     setKind("cob");
     setRevealTarget(p);
     setListing("");
+    setDiagnostics([]);
+    setLintError(null);
     try {
       await disassemble(p);
     } catch (e) {
@@ -172,6 +212,15 @@ export default function CobPage() {
   }, []);
 
   const BannerIcon = banner ? BANNER_ICONS[banner.kind] : null;
+  // The button's count is only what needs acting on: errors and warnings. An
+  // info diagnostic still lists in the drawer, but does not add to the
+  // number on the button.
+  const infoCount = diagnostics.filter((d) => d.severity === "info").length;
+  const severeCount = diagnostics.length - infoCount;
+  const showChecks = kind === "bos" && (diagnostics.length > 0 || !!lintError);
+  const checksSeverity = lintError
+    ? "error"
+    : worstSeverity(diagnostics.map((d) => d.severity));
 
   return (
     <div className="flex h-full flex-col">
@@ -223,6 +272,29 @@ export default function CobPage() {
             >
               <FolderOpen /> Open .cob…
             </Button>
+            {showChecks && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={
+                  severeCount > 0 && checksSeverity
+                    ? SEVERITY_COLOR[checksSeverity]
+                    : ""
+                }
+                onClick={() => setChecksOpen(true)}
+              >
+                {severeCount > 0 || lintError ? (
+                  <TriangleAlert className="size-4" />
+                ) : (
+                  <Info className="size-4" />
+                )}
+                {lintError
+                  ? "Parse error"
+                  : severeCount > 0
+                    ? `${severeCount} ${severeCount === 1 ? "check" : "checks"}`
+                    : `${infoCount} ${infoCount === 1 ? "note" : "notes"}`}
+              </Button>
+            )}
           </>
         }
       />
@@ -242,6 +314,15 @@ export default function CobPage() {
             <span className="break-all">{banner.text}</span>
           </p>
         )}
+        {warnings.length > 0 && (
+          <ul className="shrink-0 list-disc space-y-0.5 rounded-md border border-border bg-muted/50 px-3 py-2 pl-8 text-xs text-muted-foreground">
+            {warnings.map((w) => (
+              <li key={w} className="break-all">
+                {w}
+              </li>
+            ))}
+          </ul>
+        )}
         {listing ? (
           <Textarea
             value={listing}
@@ -257,6 +338,15 @@ export default function CobPage() {
           </div>
         )}
       </div>
+      <Drawer
+        open={checksOpen && showChecks}
+        onOpenChange={setChecksOpen}
+        title="Checks"
+        description="What the lint pass found in this .bos."
+        width="34rem"
+      >
+        <LintProblems diagnostics={diagnostics} error={lintError} />
+      </Drawer>
     </div>
   );
 }

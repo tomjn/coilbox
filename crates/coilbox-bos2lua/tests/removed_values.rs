@@ -68,7 +68,7 @@ fn a_team_value_that_is_set_reads_back() {
         conversion
             .warnings
             .iter()
-            .any(|w| w.contains("rules params")),
+            .any(|w| w.to_string().contains("rules params")),
         "{:?}",
         conversion.warnings
     );
@@ -118,7 +118,7 @@ fn an_id_only_known_while_running_is_checked_then() {
         conversion
             .warnings
             .iter()
-            .any(|w| w.contains("while running")),
+            .any(|w| w.to_string().contains("while running")),
         "{:?}",
         conversion.warnings
     );
@@ -351,7 +351,10 @@ fn fuel_and_the_alpha_threshold_are_said_to_be_gone() {
     );
     for name in ["CURRENT_FUEL", "ALPHA_THRESHOLD"] {
         assert!(
-            conversion.warnings.iter().any(|w| w.contains(name)),
+            conversion
+                .warnings
+                .iter()
+                .any(|w| w.to_string().contains(name)),
             "{name} in {:?}",
             conversion.warnings
         );

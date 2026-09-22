@@ -4,10 +4,10 @@
 //! byte-exact porting spec and golden-test harness.
 //!
 //! Implemented: `anim_cob_disasm` (disassemble a `.cob`), `anim_bos2cob`
-//! (compile a `.bos` to `.cob`, byte-exact vs the Python reference's `--nopcpp`
-//! mode), `anim_cob_run` (play a `.cob`) and `anim_bos2lua` (convert a `.bos` to
-//! a Lua unit script, through `coilbox-bos2lua`). See PORTING.md for the porting
-//! spec and golden-test harness.
+//! (compile a `.bos` to `.cob`, byte-exact vs the Python reference), `anim_cob_run`
+//! (play a `.cob`) and `anim_bos2lua` (convert a `.bos` to a Lua unit script,
+//! through `coilbox-bos2lua`). See PORTING.md for the porting spec and
+//! golden-test harness.
 
 #[cfg(test)]
 mod bos2lua_parity;
@@ -33,13 +33,22 @@ use tauri::{
 };
 
 /// Compile BOS source to COB bytes: `preprocess -> parse -> fold -> codegen`.
-/// `include_dir` resolves `#include` targets. Mirrors the reference `--nopcpp`
-/// pipeline (builtin preprocessor, constant folding on, COB version 4).
+/// `include_dir` resolves `#include` targets. Mirrors the reference pipeline
+/// (preprocess, constant folding on, COB version 4).
 ///
 /// Runs on a dedicated large-stack thread so deeply-nested input can't overflow
 /// (and abort the process), and catches any unexpected internal panic so even a
 /// malformed script surfaces as an error rather than crashing the caller.
 pub fn compile_bos(source: &str, include_dir: &Path) -> Result<Vec<u8>, String> {
+    compile_bos_with_warnings(source, include_dir).map(|(bytes, _)| bytes)
+}
+
+/// Same as [`compile_bos`], plus any warnings gathered along the way (for
+/// instance, a bare assignment sitting outside any function).
+pub fn compile_bos_with_warnings(
+    source: &str,
+    include_dir: &Path,
+) -> Result<(Vec<u8>, Vec<String>), String> {
     let source = source.to_string();
     let include_dir = include_dir.to_path_buf();
     std::thread::Builder::new()
@@ -61,11 +70,13 @@ pub fn compile_bos(source: &str, include_dir: &Path) -> Result<Vec<u8>, String> 
         .map_err(|_| "compiler thread panicked".to_string())?
 }
 
-fn compile_inner(source: &str, include_dir: &Path) -> Result<Vec<u8>, String> {
+fn compile_inner(source: &str, include_dir: &Path) -> Result<(Vec<u8>, Vec<String>), String> {
     let tokens = preprocess::preprocess(source, include_dir)?;
     let mut root = parser::parse_file(tokens)?;
+    let warnings = parser::stray_warnings(&root);
     fold::fold_tree(&mut root);
-    compiler::Compiler::compile(&root, 4)
+    let bytes = compiler::Compiler::compile(&root, 4)?;
+    Ok((bytes, warnings))
 }
 
 /// Best-effort message from a caught panic payload.
@@ -222,7 +233,12 @@ async fn anim_bos2lua(
     match result {
         Ok(Ok((conversion, linear_scale))) => CliResult::ok(json!({
             "lua": conversion.lua,
-            "warnings": conversion.warnings,
+            "warnings": conversion.warnings.iter().map(|w| json!({
+                "file": w.file,
+                "line": w.line,
+                "message": w.message,
+                "main": w.main,
+            })).collect::<Vec<_>>(),
             "linearScale": linear_scale,
             "cobVars": conversion
                 .shared_values
@@ -231,6 +247,73 @@ async fn anim_bos2lua(
         })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("conversion task failed: {e}")),
+    }
+}
+
+/// `anim_bos_lint`: the diagnostics a BOS lint pass finds in `source`.
+///
+/// Same inputs as `anim_bos2lua`, minus `prune`, which no rule cares about.
+/// `path`, when given, reads the script's includes from disk exactly as
+/// `anim_bos2lua` does, and still settles the linear scale and precedence
+/// from the `.cob` beside it when `cob` is not given.
+///
+/// A script that fails to parse comes back `{ diagnostics: [], error }`
+/// rather than a thrown error, so the UI can show the parse failure next to
+/// whatever partial source is on screen instead of losing it to a toast.
+#[tauri::command]
+async fn anim_bos_lint(
+    source: String,
+    name: String,
+    includes: Option<HashMap<String, String>>,
+    pieces: Option<Vec<String>>,
+    cob: Option<Vec<u8>>,
+    path: Option<String>,
+) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut includes = includes.unwrap_or_default();
+        let mut name = name;
+        let mut cob = cob;
+        if let Some(path) = path.as_deref().map(Path::new) {
+            let (root, in_game) = bos_disk::locate(path);
+            for (key, text) in bos_disk::includes(&source, &root, &in_game) {
+                includes.entry(key).or_insert(text);
+            }
+            name = in_game;
+            if cob.is_none() {
+                cob = bos_disk::cob_beside(path);
+            }
+        }
+        let linear_scale = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::linear_scale(&source, cob))
+            .unwrap_or(coilbox_bos2lua::MODERN_LINEAR);
+        let precedence = cob
+            .as_deref()
+            .and_then(|cob| coilbox_bos2lua::precedence(&source, cob))
+            .unwrap_or_default();
+        coilbox_bos2lua::lint(
+            &source,
+            &coilbox_bos2lua::LintOptions {
+                name: &name,
+                includes: &includes,
+                pieces: pieces.as_deref(),
+                linear_scale,
+                precedence,
+            },
+        )
+    })
+    .await;
+    match result {
+        Ok(Ok(diagnostics)) => CliResult::ok(json!({
+            "diagnostics": diagnostics.iter().map(|d| json!({
+                "rule": d.rule,
+                "severity": d.severity.as_str(),
+                "line": d.line,
+                "message": d.message,
+            })).collect::<Vec<_>>(),
+        })),
+        Ok(Err(e)) => CliResult::ok(json!({ "diagnostics": [], "error": e })),
+        Err(e) => CliResult::err(format!("lint task failed: {e}")),
     }
 }
 
@@ -250,14 +333,14 @@ async fn anim_bos_read(path: String) -> CliResult {
 #[tauri::command]
 async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bool>) -> CliResult {
     let overwrite = overwrite.unwrap_or(false);
-    let result =
-        tauri::async_runtime::spawn_blocking(move || -> Result<(String, usize, bool), String> {
+    let result = tauri::async_runtime::spawn_blocking(
+        move || -> Result<(String, usize, bool, Vec<String>), String> {
             let source = std::fs::read_to_string(&path)
                 .map_err(|e| format!("could not read {path}: {e}"))?;
             let src_path = Path::new(&path);
             let include_dir = src_path.parent().unwrap_or_else(|| Path::new("."));
             // Compile first so compile errors surface regardless of the output state.
-            let bytes = compile_bos(&source, include_dir)?;
+            let (bytes, warnings) = compile_bos_with_warnings(&source, include_dir)?;
             let out_path = output.unwrap_or_else(|| {
                 src_path
                     .with_extension("cob")
@@ -265,18 +348,20 @@ async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bo
                     .into_owned()
             });
             if Path::new(&out_path).exists() && !overwrite {
-                return Ok((out_path, bytes.len(), true)); // ask before overwriting
+                return Ok((out_path, bytes.len(), true, warnings)); // ask before overwriting
             }
             std::fs::write(&out_path, &bytes)
                 .map_err(|e| format!("could not write {out_path}: {e}"))?;
-            Ok((out_path, bytes.len(), false))
-        })
-        .await;
+            Ok((out_path, bytes.len(), false, warnings))
+        },
+    )
+    .await;
     match result {
-        Ok(Ok((out_path, len, needs_overwrite))) => CliResult::ok(json!({
+        Ok(Ok((out_path, len, needs_overwrite, warnings))) => CliResult::ok(json!({
             "output": out_path,
             "bytes": len,
             "needsOverwrite": needs_overwrite,
+            "warnings": warnings,
         })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("compile task failed: {e}")),
@@ -291,6 +376,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             anim_cob_run,
             anim_bos2cob,
             anim_bos2lua,
+            anim_bos_lint,
             anim_bos_read
         ])
         .build()

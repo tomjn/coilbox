@@ -110,7 +110,7 @@ fn a_header_function_nothing_calls_is_left_out_and_said_so() {
     assert!(
         c.warnings
             .iter()
-            .any(|w| w.contains("RestoreStealth") && w.contains("shared.h")),
+            .any(|w| w.to_string().contains("RestoreStealth") && w.to_string().contains("shared.h")),
         "{:?}",
         c.warnings
     );
@@ -128,7 +128,7 @@ fn a_function_in_the_script_s_own_file_stays_with_no_caller() {
     let c = converted(true);
     assert!(c.lua.contains("function NewPerk(p)"), "{}", c.lua);
     assert!(
-        !c.warnings.iter().any(|w| w.contains("NewPerk")),
+        !c.warnings.iter().any(|w| w.to_string().contains("NewPerk")),
         "{:?}",
         c.warnings
     );
