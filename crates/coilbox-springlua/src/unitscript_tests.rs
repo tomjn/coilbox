@@ -2201,3 +2201,83 @@ mod unit_values_and_functions {
         assert_close(rot_y(&timeline, 0, "turret"), 1.0);
     }
 }
+
+mod coverage {
+    use super::*;
+
+    /// A branch never taken never lights up: the Script tab dims a line the
+    /// run could have reached but did not, and that has to mean the branch
+    /// actually not run, not every line the parser saw.
+    #[test]
+    fn a_branch_not_taken_is_not_among_the_lines_run() {
+        let script = r#"
+            local turret = piece("turret")
+            function script.Create()
+                if false then
+                    Turn(turret, y_axis, 1.0)
+                else
+                    Turn(turret, y_axis, 2.0)
+                end
+            end
+            "#;
+        let timeline = play(script, 3);
+
+        assert_eq!(timeline.error, None);
+        let line_of = |needle: &str| -> u32 {
+            let at = script.find(needle).expect("needle is in the script");
+            script[..at].matches('\n').count() as u32 + 1
+        };
+        let taken = line_of("Turn(turret, y_axis, 2.0)");
+        let not_taken = line_of("Turn(turret, y_axis, 1.0)");
+
+        assert!(
+            timeline.lines_run.contains(&taken),
+            "{:?}",
+            timeline.lines_run
+        );
+        assert!(
+            !timeline.lines_run.contains(&not_taken),
+            "{:?}",
+            timeline.lines_run
+        );
+    }
+
+    /// A line an `include`d file runs is not a main script line, so it does not
+    /// count toward the main script's coverage.
+    #[test]
+    fn a_line_run_inside_an_include_is_not_counted() {
+        let mut includes = HashMap::new();
+        includes.insert(
+            "lib.lua".to_string(),
+            "function helper() return 1 end\n".to_string(),
+        );
+        let script = r#"
+            include("lib.lua")
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, helper())
+            end
+            "#;
+        let timeline = run(
+            script,
+            "test.lua",
+            &Unit {
+                includes: &includes,
+                ..Unit::new(&pieces())
+            },
+            &create(),
+            3,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        let line_of = |needle: &str| -> u32 {
+            let at = script.find(needle).expect("needle is in the script");
+            script[..at].matches('\n').count() as u32 + 1
+        };
+        // The include's own line 1 would collide with the main script's line 1
+        // if the two were not told apart by chunk name.
+        assert!(timeline.lines_run.contains(&line_of("Turn(turret")));
+        assert!(!timeline.lines_run.is_empty());
+    }
+}

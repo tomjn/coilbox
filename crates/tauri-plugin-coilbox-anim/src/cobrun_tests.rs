@@ -701,3 +701,33 @@ mod what_it_says_about_itself {
         );
     }
 }
+
+mod coverage {
+    use super::*;
+
+    /// A branch not taken never lights up: the disassembly's dimming has to be
+    /// against instructions actually executed, not every one the bytes hold.
+    #[test]
+    fn a_branch_not_taken_is_not_among_the_offsets_run() {
+        let mut code = push(0); // false, so the jump is taken
+        code.extend([op("JUMP_NOT_EQUAL"), 9]);
+        code.extend(push(ELMO)); // skipped: PUSH_CONSTANT at offset 4
+        code.extend([op("MOVE_NOW"), 0, 2]); // skipped
+        code.extend(push(ELMO * 5)); // taken: PUSH_CONSTANT at offset 9
+        code.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+
+        let timeline = play(&create_only(code), 2);
+
+        assert!(close(pose(&timeline, 0, "base")[2], 5.0));
+        assert!(
+            !timeline.offsets_run.contains(&4),
+            "{:?}",
+            timeline.offsets_run
+        );
+        assert!(
+            timeline.offsets_run.contains(&9),
+            "{:?}",
+            timeline.offsets_run
+        );
+    }
+}
