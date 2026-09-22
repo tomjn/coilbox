@@ -6,6 +6,7 @@ permissions = [
   "allow-anim-cob-disasm",
   "allow-anim-cob-disasm-bytes",
   "allow-anim-cob-decompile",
+  "allow-anim-cob-decompile-bytes",
   "allow-anim-cob-hex",
   "allow-anim-cob-run",
   "allow-anim-bos2cob",
