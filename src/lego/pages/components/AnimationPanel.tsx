@@ -19,7 +19,7 @@ import {
   StepBack,
   StepForward,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,6 +32,8 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { animCobRun } from "../../../animation/bindings";
 import { useReduceMotion } from "../../../general/display";
+import { aimPoint } from "../../aimPoint";
+import { resolveScenario } from "../../aimResolver";
 import {
   type AppliedPreset,
   countRoles,
@@ -41,13 +43,16 @@ import {
   roleLabel,
   unmetRequirements,
 } from "../../animPresets";
-import { legoRunScript } from "../../bindings";
+import { legoProbeScript, legoRunScript } from "../../bindings";
 import {
   DEFAULT_BUILDER,
   type LegoBuilder,
   type LegoProject,
 } from "../../model";
+import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
+import type { RawGeometry } from "../../rawGeometry";
+import { pieceWorldRest, unitBounds } from "../../s3oBuild";
 import {
   at,
   CREATED,
@@ -56,10 +61,13 @@ import {
   PREVIEW_SECONDS,
   playable,
   SCENARIOS,
+  type Scenario,
   type ScriptEvent,
   type ScriptTimeline,
+  type StandInTrack,
   scenarioById,
 } from "../../scriptPlayback";
+import { standInRadius } from "../../standIn";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
 
@@ -68,6 +76,41 @@ import { controlFor } from "../../unitValueControls";
  *  nothing in `SCENARIOS` uses it, and `scenarioById` finding nothing for it
  *  is how the panel tells the two apart. */
 const CALL_FUNCTION = "call";
+
+/**
+ * The call-ins a scenario asks a script to name a piece for.
+ *
+ * All three answer with a piece rather than doing anything, which is what makes
+ * them safe to call directly rather than drive over frames: see
+ * `legoProbeScript`. The answer is a fixed piece in every script anyone ships.
+ * Reading a real per-call return value means a new channel out of both
+ * runtimes, which is a project of its own.
+ */
+const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo", "QueryTransport"];
+
+/** Nothing to place, which is what a scenario with no track asks for. */
+const NO_STAND_IN: {
+  track: StandInTrack | null;
+  attachPieces: Map<string, string>;
+} = { track: null, attachPieces: new Map() };
+
+/** What a scenario's attachment could not be resolved to, in words. */
+function attachNotes(
+  scenario: Scenario,
+  named: Map<string, string>,
+  isCompiled: boolean,
+): string[] {
+  const attach = scenario.standIn?.attach;
+  if (!attach || named.has(attach.from)) return [];
+  if (isCompiled) {
+    return [
+      `This unit's script is compiled, and a compiled script cannot be asked which piece its ${attach.from} names. The stand-in stays where the scenario puts it.`,
+    ];
+  }
+  return [
+    `This script names no ${attach.from} piece, so the stand-in stays where the scenario puts it rather than sitting on the unit.`,
+  ];
+}
 
 /**
  * `"0.8, 0.15"` into `[0.8, 0.15]`, or null when it is not a clean list of
@@ -172,6 +215,16 @@ interface Props {
    *  currently showing. */
   scriptFrame: number;
   onScriptFrameChange: (frame: number) => void;
+  /** Both needed to measure the unit, which is what sizes the stand-in, and to
+   *  work out where a piece rests, which is where an aim is measured from. */
+  pack: LoadedPack;
+  raw: RawGeometry | null;
+  /** The track the running scenario puts a stand-in on, and the pieces its
+   *  attachments resolved to, for the viewport to place it. */
+  onStandIn: (placement: {
+    track: StandInTrack | null;
+    attachPieces: Map<string, string>;
+  }) => void;
 }
 
 export function AnimationPanel({
@@ -187,6 +240,9 @@ export function AnimationPanel({
   onScriptPausedChange,
   scriptFrame,
   onScriptFrameChange,
+  pack,
+  raw,
+  onStandIn,
 }: Props) {
   const reduceMotion = useReduceMotion();
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
@@ -194,6 +250,16 @@ export function AnimationPanel({
   const [running, setRunning] = useState(false);
   /** A run that never reached the runtime, as opposed to one that failed in it. */
   const [failure, setFailure] = useState<string | null>(null);
+  /** What the preview could not work out about the stand-in: an aim piece the
+   *  script does not name, a transport piece it does not name. Said rather
+   *  than hidden, because that is exactly the bug the preview exists to show. */
+  const [standInNotes, setStandInNotes] = useState<string[]>([]);
+  // Memoised: measuring the unit bakes every piece, and this is read on each
+  // run rather than on each render.
+  const bounds = useMemo(
+    () => unitBounds(project, pack, raw),
+    [project, pack, raw],
+  );
   /** Unit values the panel has changed away from what the last run's `asked`
    *  reported as their default. Never saved to the project: this is a way to
    *  poke at a script's preview, not a decision about the unit. */
@@ -222,12 +288,15 @@ export function AnimationPanel({
     onScriptRun(null);
     setTimeline(null);
     setFailure(null);
+    setStandInNotes([]);
+    onStandIn(NO_STAND_IN);
     onScriptPausedChange(false);
     onScriptFrameChange(0);
   }, [
     onPlayingChange,
     onScriptTimeline,
     onScriptRun,
+    onStandIn,
     onScriptPausedChange,
     onScriptFrameChange,
   ]);
@@ -309,10 +378,61 @@ export function AnimationPanel({
     ],
   );
 
+  /**
+   * Run a scenario, first working out where its stand-in goes and what that
+   * makes its aiming call-ins' arguments.
+   *
+   * A scenario with neither is run exactly as it always was, with no probe:
+   * most of them want neither and a probe is a second trip into the runtime.
+   */
   const start = useCallback(
-    (scenario: string) =>
-      runEvents(scenarioById(scenario)?.events ?? [], values),
-    [runEvents, values],
+    async (scenarioId: string, withValues: Record<number, number> = values) => {
+      const scenario = scenarioById(scenarioId);
+      if (!scenario) return;
+
+      if (!scenario.standIn && !scenario.events.some((e) => e.aimAtStandIn)) {
+        setStandInNotes([]);
+        onStandIn(NO_STAND_IN);
+        return runEvents(scenario.events, withValues);
+      }
+
+      // A compiled script has no probe: `anim_cob_run` plays bytecode and
+      // there is no `anim_cob_probe` beside it. Such a unit gets its stand-in
+      // where the keys put it and is told the piece is unknown, which is the
+      // same answer a Lua script that names none gets.
+      const probes = compiled
+        ? null
+        : await legoProbeScript({
+            script: project.script ?? "",
+            unitName: project.unitName,
+            pieces: project.pieces.map((piece) => piece.name),
+            callins: STAND_IN_PROBES,
+            unitDef: project.gameUnitDef ?? null,
+            includes: project.gameScriptIncludes ?? null,
+            rest: pieceRest(project),
+          });
+
+      const named = new Map<string, string>();
+      for (const probe of probes?.probes ?? []) {
+        const first = probe.pieces[0];
+        if (first) named.set(probe.callin, first);
+      }
+
+      const { events, notes } = resolveScenario(scenario, {
+        radius: standInRadius(bounds),
+        mid: aimPoint(project, bounds),
+        pieceRest: pieceWorldRest(project, pack, raw),
+        probed: (callin) => named.get(callin) ?? null,
+      });
+
+      setStandInNotes([
+        ...notes,
+        ...attachNotes(scenario, named, compiled !== undefined),
+      ]);
+      onStandIn({ track: scenario.standIn ?? null, attachPieces: named });
+      return runEvents(events, withValues);
+    },
+    [runEvents, values, project, compiled, bounds, pack, raw, onStandIn],
   );
 
   /** Fire one of the script's own functions, the way `CREATED` then a scenario's
@@ -349,7 +469,10 @@ export function AnimationPanel({
       else next[id] = raw;
       setValues(next);
       if (isCallMode) fireCall(callFunction, callArgsText, next);
-      else void runEvents(scenarioById(scenarioId)?.events ?? [], next);
+      // Through `start` rather than straight to the runtime, so a scenario
+      // that aims at its stand-in is resolved again with the new value rather
+      // than fired with no arguments at all.
+      else void start(scenarioId, next);
     },
     [
       values,
@@ -357,7 +480,7 @@ export function AnimationPanel({
       fireCall,
       callFunction,
       callArgsText,
-      runEvents,
+      start,
       scenarioId,
     ],
   );
@@ -708,6 +831,12 @@ export function AnimationPanel({
           {timeline?.warnings.map((warning) => (
             <p key={warning} className="text-xs text-muted-foreground">
               {warning}
+            </p>
+          ))}
+
+          {standInNotes.map((note) => (
+            <p key={note} className="text-xs text-muted-foreground">
+              {note}
             </p>
           ))}
 

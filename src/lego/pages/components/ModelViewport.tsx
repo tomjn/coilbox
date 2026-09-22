@@ -33,7 +33,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
@@ -1410,7 +1410,12 @@ function useStandInSize(
   pack: LoadedPack,
   raw: RawGeometry | null,
 ) {
-  const radius = standInRadius(unitBounds(project, pack, raw));
+  // Memoised: measuring the unit bakes every piece, and the answer only moves
+  // when the unit does.
+  const radius = useMemo(
+    () => standInRadius(unitBounds(project, pack, raw)),
+    [project, pack, raw],
+  );
   useEffect(() => {
     const state = sceneRef.current;
     if (!state || state.standInRadius === radius) return;

@@ -87,7 +87,7 @@ import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
 import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
-import type { ScriptTimeline } from "../scriptPlayback";
+import type { ScriptTimeline, StandInTrack } from "../scriptPlayback";
 import { shortcutLabel } from "../shortcuts";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
@@ -206,6 +206,12 @@ function Builder({ id }: { id: string | undefined }) {
   const [lastScriptRun, setLastScriptRun] = useState<ScriptTimeline | null>(
     null,
   );
+  /** The stand-in the running scenario asks for, and the pieces it sits on.
+   *  Empty whenever nothing is playing or the scenario places none. */
+  const [standIn, setStandIn] = useState<{
+    track: StandInTrack | null;
+    attachPieces: Map<string, string>;
+  }>({ track: null, attachPieces: new Map() });
   /**
    * Whether a script run's clock is frozen on `scriptFrame` rather than
    * advancing, and the frame it is either frozen on or, while running,
@@ -702,6 +708,7 @@ function Builder({ id }: { id: string | undefined }) {
     setPlaying(false);
     setScriptTimeline(null);
     setLastScriptRun(null);
+    setStandIn({ track: null, attachPieces: new Map() });
     setScriptPaused(false);
     setScriptFrame(0);
   }
@@ -1058,6 +1065,7 @@ function Builder({ id }: { id: string | undefined }) {
                   scriptPaused,
                   scriptFrame,
                   onScriptFrame: setScriptFrame,
+                  standIn: { ...standIn, show: true },
                 }}
                 uniformScale={uniformScale}
                 onGround={() =>
@@ -1423,6 +1431,9 @@ function Builder({ id }: { id: string | undefined }) {
                   }
                   onScriptTimeline={setScriptTimeline}
                   onScriptRun={setLastScriptRun}
+                  pack={loaded}
+                  raw={raw}
+                  onStandIn={setStandIn}
                   scriptPaused={scriptPaused}
                   onScriptPausedChange={setScriptPaused}
                   scriptFrame={scriptFrame}
