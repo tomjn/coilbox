@@ -4,10 +4,24 @@
  * loads fine and the call-in its author meant simply never fires.
  *
  * Two ways that happens in practice, and the two this checks for: a name that
- * differs from the engine's only in case, and a COB-style numbered weapon name
- * such as `AimWeapon1`, which is how the compiled script named a weapon's own
- * instance and has no meaning to a Lua one. A Lua script gets one
- * `script.AimWeapon`, with the weapon number as its own first argument.
+ * differs from the engine's only in case, and a numbered weapon call-in on a
+ * script that has no `AimWeapon1`.
+ *
+ * The numbered rule needs the reason spelled out, because the engine and the
+ * framework above it disagree and only one of them is the whole story. The
+ * engine calls one `script.AimWeapon(weaponNum, heading, pitch)`
+ * (`LuaUnitScript.cpp`), which on its own would make `AimWeapon1` dead. But
+ * every game using Lua unit scripts loads springcontent's `unit_script.lua`,
+ * and that builds a dispatcher over `AimWeapon1..N` and installs it as
+ * `AimWeapon` for the engine to find. So numbered names are a real and
+ * supported convention.
+ *
+ * The catch is the condition it does that under: only when `AimWeapon` is
+ * absent and `AimWeapon1` is present (or the same pair for `AimShield`). A
+ * script with `QueryWeapon1` and no `AimWeapon1` gets no dispatcher for any of
+ * them, and every numbered call-in on it is dead. That is the case worth
+ * warning about, and `coilbox-bos2lua`'s `emit.rs` already warns about it on
+ * the conversion side.
  *
  * The engine's own names, from `rts/Sim/Units/Scripts/LuaScriptNames.cpp`.
  * `Create` is the one exception: it is not in that array at all.
@@ -63,20 +77,24 @@ const ENGINE_CALLINS = [
   "TargetWeight",
 ];
 
-/** The call-ins a `.cob` numbers per weapon, which a Lua one never does: it
- *  gets one call-in per name, and the weapon number arrives as an argument
- *  instead. `AimShield` is left out: a unit has one shield, so nothing in the
- *  engine or a real game numbers it. */
-const NUMBERED_IN_COB = [
+/** The call-ins `unit_script.lua` will dispatch per weapon, its own
+ *  `weapon_funcs` list verbatim. */
+const NUMBERED_PER_WEAPON = [
   "QueryWeapon",
-  "AimWeapon",
   "AimFromWeapon",
+  "AimWeapon",
+  "AimShield",
   "FireWeapon",
-  "EndBurst",
   "Shot",
+  "EndBurst",
   "BlockShot",
   "TargetWeight",
 ];
+
+/** The two names that switch that dispatch on, checked in the framework as
+ *  `(not callins.AimWeapon and callins.AimWeapon1) or (not callins.AimShield
+ *  and callins.AimShield1)`. Without one of them nothing numbered is read. */
+const DISPATCH_KEYS = ["AimWeapon1", "AimShield1"];
 
 export interface CallinLintProblem {
   /** 1-indexed, matching where the definition's line sits in the script. */
@@ -104,7 +122,8 @@ function definitions(lua: string): { name: string; line: number }[] {
 /**
  * Lint a Lua unit script's own call-in definitions against the engine's real
  * names, and warn about the two ways a definition can be wrong and silent:
- * the wrong case, or a COB-style number the engine never reads off a Lua one.
+ * the wrong case, or a numbered weapon call-in on a script that never turns
+ * the framework's per-weapon dispatch on.
  *
  * Says nothing about a name that matches nothing at all: that is either a
  * script's own helper or a call-in this list does not know, and guessing
@@ -112,22 +131,29 @@ function definitions(lua: string): { name: string; line: number }[] {
  */
 export function lintLuaCallins(lua: string): CallinLintProblem[] {
   const problems: CallinLintProblem[] = [];
+  const defined = definitions(lua);
+  const names = new Set(defined.map((entry) => entry.name));
+  const dispatches = DISPATCH_KEYS.some((key) => names.has(key));
 
-  for (const { name, line } of definitions(lua)) {
+  for (const { name, line } of defined) {
     if (ENGINE_CALLINS.includes(name)) continue;
 
     const numbered = name.match(/^(.*?)(\d+)$/);
     const numberedBase = numbered
-      ? NUMBERED_IN_COB.find(
+      ? NUMBERED_PER_WEAPON.find(
           (callin) => callin.toLowerCase() === numbered[1].toLowerCase(),
         )
       : undefined;
     if (numberedBase) {
-      problems.push({
-        line,
-        severity: "warning",
-        message: `A Lua unit script gets one \`script.${numberedBase}\` with the weapon number as its first argument. \`${name}\` is never called.`,
-      });
+      // The dispatch is all or nothing across every numbered name, so one
+      // script either reads them all or reads none of them.
+      if (!dispatches) {
+        problems.push({
+          line,
+          severity: "warning",
+          message: `\`unit_script.lua\` only reads numbered weapon call-ins when the script defines \`AimWeapon1\` or \`AimShield1\`, and this one defines neither, so \`${name}\` is never called.`,
+        });
+      }
       continue;
     }
 

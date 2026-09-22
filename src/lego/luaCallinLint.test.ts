@@ -37,28 +37,44 @@ describe("a name differing from the engine's only in case", () => {
   });
 });
 
-describe("a COB-style numbered weapon name", () => {
-  it("says a Lua script gets one call-in with the weapon number as an argument", () => {
-    const problems = lintLuaCallins(
-      "function script.AimWeapon1(heading, pitch)\nend\n",
-    );
-    expect(problems).toHaveLength(1);
-    expect(problems[0].message).toBe(
-      "A Lua unit script gets one `script.AimWeapon` with the weapon number as its first argument. `AimWeapon1` is never called.",
-    );
+describe("a numbered weapon call-in", () => {
+  it("is fine when the script defines AimWeapon1, which is what turns the dispatch on", () => {
+    const script = [
+      "function script.AimWeapon1(heading, pitch)",
+      "end",
+      "function script.QueryWeapon1()",
+      "end",
+      "function script.Shot1()",
+      "end",
+    ].join("\n");
+    expect(lintLuaCallins(script)).toEqual([]);
   });
 
-  it("catches it as an assignment too", () => {
+  it("is fine on AimShield1 alone, the framework's other switch", () => {
+    const script = [
+      "function script.AimShield1()",
+      "end",
+      "function script.QueryWeapon1()",
+      "end",
+    ].join("\n");
+    expect(lintLuaCallins(script)).toEqual([]);
+  });
+
+  it("is dead when nothing turns the dispatch on, and says which name switches it", () => {
     const problems = lintLuaCallins("script.QueryWeapon2 = QueryTurret\n");
     expect(problems).toHaveLength(1);
-    expect(problems[0].message).toContain("`script.QueryWeapon`");
+    expect(problems[0].message).toContain("`AimWeapon1`");
     expect(problems[0].message).toContain("`QueryWeapon2`");
   });
 
-  it("leaves a call-in nobody numbers alone even with a digit on the end", () => {
-    // AimShield is not numbered in real content, so a script naming
-    // "AimShield1" is naming something nobody calls, not a near miss.
-    expect(lintLuaCallins("function script.AimShield1()\nend\n")).toEqual([]);
+  it("flags every numbered name on such a script, since the dispatch is all or nothing", () => {
+    const script = [
+      "function script.QueryWeapon1()",
+      "end",
+      "function script.Shot1()",
+      "end",
+    ].join("\n");
+    expect(lintLuaCallins(script).map((p) => p.line)).toEqual([1, 3]);
   });
 });
 
@@ -75,7 +91,7 @@ describe("several definitions", () => {
       "end",
       "function script.Startmoving()",
       "end",
-      "function script.AimWeapon1()",
+      "function script.Stopmoving()",
       "end",
     ].join("\n");
     const problems = lintLuaCallins(script);
