@@ -36,6 +36,16 @@ Two more facts, confirmed as the spec states them:
 - Prefer picoframe components. The new toggle goes in `ViewControls` beside `ReferencePicker`, using the existing `ViewToggle`.
 - Run the full seven-command CI suite before any PR. See `CLAUDE.md`.
 
+## Deviations found by running it
+
+Four numbers in the plan below are no longer what the code says, because task 9 and task 10 put it on screen and the screen disagreed. The plan is left as it was written, so that what changed on contact with the viewport stays legible.
+
+The preview ran for 6 seconds and now runs for 15. Six was enough to read a walk cycle as a cycle and is not enough for a builder reaching one way and then the other at something, so the four scenarios that place a stand-in were retimed to fill the longer window. A moving stand-in also has to end a loop where it began, or it leaps across the scene on the frame the preview restarts, and `scriptPlayback.test.ts` now enforces that rather than trusting a comment.
+
+The stand-in was a third of the unit's wider horizontal extent and is now 7/30 of it, with both clamps coming down by the same 30%. It crowded the unit it is meant to be a target for. Because a track's positions are multiples of that same radius, shrinking it also pulled it nearer, and the mobile builder's target then sat inside a walker's own silhouette. That target went from 2.6 radii forward to 7, and 1.6 across to 3.5.
+
+The shape comparison in task 9 did not end in a straight preference. The eight-sided domed prism read as a rock, because the dome left no flat deck to judge "up" against and one pushed vertex out of eight is not a visible point, so only its coloured facet said which way it faced. The chamfered box won. Looking at it also turned up that ten of its sixteen triangles were wound inside out, which front-face culling had been hiding as a solid shape with its colours in the wrong places. `standIn.test.ts` gained a check that every face normal agrees with the direction out of the shape's middle, which is exact for a convex shape and would have caught all ten.
+
 ## Deviation from the spec, stated
 
 The spec says the visibility toggle is "placed with the existing environment and reference controls in `BuilderPage.tsx`, persisted through `src/lego/panels.ts` the way the other view settings are". Both halves are wrong about where the code is. The environment and reference controls are in `ModelViewport.tsx:1295-1338`, and none of the view settings is persisted: `ModelViewport.tsx:505-509` documents them as "View settings, held for as long as the viewport is open and no longer". This plan follows the code: a plain `useState` in `ModelViewport.tsx`, beside the other toggles, matching every neighbour. `panels.ts` is untouched.
