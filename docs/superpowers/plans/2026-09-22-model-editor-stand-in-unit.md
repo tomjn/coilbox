@@ -36,15 +36,17 @@ Two more facts, confirmed as the spec states them:
 - Prefer picoframe components. The new toggle goes in `ViewControls` beside `ReferencePicker`, using the existing `ViewToggle`.
 - Run the full seven-command CI suite before any PR. See `CLAUDE.md`.
 
-## Deviations found by running it
+## What running it changed
 
-Four numbers in the plan below are no longer what the code says, because task 9 and task 10 put it on screen and the screen disagreed. The plan is left as it was written, so that what changed on contact with the viewport stays legible.
+The plan below has been brought back in line with what shipped. This section is the why, since the diff of a plan against itself says nothing. All of it came from task 9 and task 10 putting the thing on screen.
 
 The preview ran for 6 seconds and now runs for 15. Six was enough to read a walk cycle as a cycle and is not enough for a builder reaching one way and then the other at something, so the four scenarios that place a stand-in were retimed to fill the longer window. A moving stand-in also has to end a loop where it began, or it leaps across the scene on the frame the preview restarts, and `scriptPlayback.test.ts` now enforces that rather than trusting a comment.
 
 The stand-in was a third of the unit's wider horizontal extent and is now 7/30 of it, with both clamps coming down by the same 30%. It crowded the unit it is meant to be a target for. Because a track's positions are multiples of that same radius, shrinking it also pulled it nearer, and the mobile builder's target then sat inside a walker's own silhouette. That target went from 2.6 radii forward to 7, and 1.6 across to 3.5.
 
-The shape comparison in task 9 did not end in a straight preference. The eight-sided domed prism read as a rock, because the dome left no flat deck to judge "up" against and one pushed vertex out of eight is not a visible point, so only its coloured facet said which way it faced. The chamfered box won. Looking at it also turned up that ten of its sixteen triangles were wound inside out, which front-face culling had been hiding as a solid shape with its colours in the wrong places. `standIn.test.ts` gained a check that every face normal agrees with the direction out of the shape's middle, which is exact for a convex shape and would have caught all ten.
+The shape comparison in task 9 came out one-sided. The eight-sided domed prism read as a rock, because the dome left no flat deck to judge "up" against and one pushed vertex out of eight is not a visible point, so only its coloured facet said which way it faced. The chamfered box won and the loser is gone, along with the constant that chose between them.
+
+Looking at the winner on screen also turned up that ten of its sixteen triangles were wound inside out. Front-face culling had been showing that as a solid shape with its colours in the wrong places, which is exactly the kind of wrong that survives a screenshot. `standIn.test.ts` gained a check that every face normal agrees with the direction out of the shape's middle, exact for a convex shape, which catches all ten.
 
 ## Deviation from the spec, stated
 
@@ -209,30 +211,30 @@ describe("attachedAt", () => {
 });
 
 describe("standInRadius", () => {
-  /** A third of the unit's larger horizontal extent, so it reads as another
+  /** A fraction of the unit's larger horizontal extent, so it reads as another
    *  unit rather than a speck or a wall. */
-  it("is a third of the wider horizontal extent", () => {
+  it("is a fraction of the wider horizontal extent", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 60, sizeY: 20, sizeZ: 30 }),
-    ).toBe(20);
+    ).toBe(14);
   });
 
   it("uses z when the unit is longer than it is wide", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 30, sizeY: 20, sizeZ: 60 }),
-    ).toBe(20);
+    ).toBe(14);
   });
 
   it("never disappears for a unit with almost nothing in it", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 0, sizeY: 0, sizeZ: 0 }),
-    ).toBe(6);
+    ).toBe(4.2);
   });
 
   it("never grows into a wall beside a very large unit", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 600, sizeY: 100, sizeZ: 600 }),
-    ).toBe(40);
+    ).toBe(28);
   });
 });
 ```
@@ -326,20 +328,25 @@ import type { UnitBounds } from "./s3oBuild";
 type Vec3 = [number, number, number];
 
 /**
- * How big the stand-in is beside the unit being edited: a third of the unit's
- * wider horizontal extent.
+ * How big the stand-in is beside the unit being edited: a fifth or so of the
+ * unit's wider horizontal extent.
  *
  * Judged by looking rather than derived. A fixed size is a speck beside a
  * factory and a wall beside a scout, and the point of the thing is that it
- * reads as another unit.
+ * reads as another unit. It was a third until it was watched on screen, where
+ * it crowded the unit it is meant to be a target for.
+ *
+ * A track's positions are multiples of this too, so a stand-in that shrinks
+ * also stands proportionally nearer. That is deliberate: the two together are
+ * what make one track serve a scout and a factory alike.
  */
-const RADIUS_FRACTION = 1 / 3;
+const RADIUS_FRACTION = 7 / 30;
 /** The smallest it goes, in elmos, so a unit with almost nothing built yet
  *  still has something visible to aim at. */
-const MIN_RADIUS = 6;
+const MIN_RADIUS = 4.2;
 /** The largest, so the biggest factory in a game gets a target rather than a
  *  second building. */
-const MAX_RADIUS = 40;
+const MAX_RADIUS = 28;
 
 /**
  * How high the stand-in's middle is above its base, in multiples of its
@@ -1080,10 +1087,9 @@ Replace the `keep the mobile builder aiming where it was told to` test in `src/l
    * rather than riding it.
    */
   it("puts a factory's stand-in on its build piece, sitting still", () => {
-    const track = scenarioById("building-factory")?.standIn;
-    expect(track?.attach).toEqual({
+    expect(scenarioById("building-factory")?.standIn?.attach).toEqual({
       from: "QueryBuildInfo",
-      frame: at(1.5),
+      frame: at(2),
       until: null,
       follow: false,
     });
@@ -1184,22 +1190,34 @@ Replace the `building` scenario's events and add a track:
         callin: "StartBuilding",
         aimAtStandIn: { from: "midPos" },
       },
-      { frame: at(2.5), callin: "StopBuilding" },
+      { frame: at(5), callin: "StopBuilding" },
       {
-        frame: at(3.5),
+        frame: at(6.5),
         callin: "StartBuilding",
         aimAtStandIn: { from: "midPos" },
       },
-      { frame: at(5.5), callin: "StopBuilding" },
+      { frame: at(11), callin: "StopBuilding" },
     ],
     // On the ground ahead and to one side, then across to the other during the
     // gap between the two builds, so the arm is seen to follow it.
+    //
+    // Well out in front. These are multiples of the stand-in's own radius,
+    // which is itself a fraction of the unit, so the distance works out at
+    // about 1.8 times the unit's wider horizontal extent: a unit filling the
+    // 5x5 plate gets a build target a little over 120 elmos away. Anything
+    // nearer and it sits inside the unit's own silhouette and reads as a part
+    // of it rather than as a thing being built, which is what it did at half
+    // this distance on a walker.
+    //
+    // It comes back to where it started, so the preview loops without the
+    // stand-in jumping across the scene on the frame it restarts.
     standIn: {
       keys: [
-        { frame: 0, pos: [1.6, 0, 2.6] },
-        { frame: at(2.5), pos: [1.6, 0, 2.6] },
-        { frame: at(3.5), pos: [-1.6, 0, 2.6] },
-        { frame: at(5.5), pos: [-1.6, 0, 2.6] },
+        { frame: 0, pos: [3.5, 0, 7] },
+        { frame: at(5), pos: [3.5, 0, 7] },
+        { frame: at(6.5), pos: [-3.5, 0, 7] },
+        { frame: at(11), pos: [-3.5, 0, 7] },
+        { frame: at(PREVIEW_SECONDS), pos: [3.5, 0, 7] },
       ],
     },
   },
@@ -1211,7 +1229,7 @@ Replace the `building-factory` scenario's track. Its events are unchanged:
     standIn: {
       // Nowhere until the factory starts building. A key on the same frame the
       // attach begins, so the keyed position is never what is drawn.
-      keys: [{ frame: at(1.5), pos: [0, 0, 0] }],
+      keys: [{ frame: at(2), pos: [0, 0, 0] }],
       // A factory spawns what it builds at the world position of the piece
       // `QueryBuildInfo` names, and leaves it there
       // (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`). It does not carry
@@ -1219,7 +1237,7 @@ Replace the `building-factory` scenario's track. Its events are unchanged:
       // riding it through whatever the doors do.
       attach: {
         from: "QueryBuildInfo",
-        frame: at(1.5),
+        frame: at(2),
         until: null,
         follow: false,
       },
@@ -1239,22 +1257,26 @@ Replace the `firing` scenario's events and add a track:
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(2), callin: "Shot1" },
+      { frame: at(4), callin: "Shot1" },
       {
-        frame: at(3),
+        frame: at(6),
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(4.5), callin: "Shot1" },
+      { frame: at(9.5), callin: "Shot1" },
     ],
     // Off the ground and well out, so the second aim differs from the first in
     // pitch as well as heading and a barrel that only turns is obvious.
+    //
+    // Back where it started by the end, so the turret tracks it round rather
+    // than the stand-in jumping across the scene when the preview loops.
     standIn: {
       keys: [
         { frame: 0, pos: [2.6, 2.2, 4] },
-        { frame: at(2), pos: [2.6, 2.2, 4] },
-        { frame: at(3), pos: [-2.6, 0.6, 4] },
-        { frame: at(5.5), pos: [-2.6, 0.6, 4] },
+        { frame: at(4), pos: [2.6, 2.2, 4] },
+        { frame: at(6), pos: [-2.6, 0.6, 4] },
+        { frame: at(10), pos: [-2.6, 0.6, 4] },
+        { frame: at(PREVIEW_SECONDS), pos: [2.6, 2.2, 4] },
       ],
     },
   },
@@ -1275,22 +1297,24 @@ Append the two new scenarios after `firing`:
       // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup`
       // is the ground and ship arm, which needs the attach piece the script
       // chooses for itself and is not previewable yet.
-      {
-        frame: at(2),
-        callin: "BeginTransport",
-        args: [STAND_IN_UNIT_ID],
-      },
+      { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
     ],
     standIn: {
       keys: [
         // Approaching on the ground, from in front.
         { frame: 0, pos: [0, 0, 4.5] },
-        { frame: at(2), pos: [0, 0, 1] },
+        { frame: at(4), pos: [0, 0, 1] },
+        // The return leg, which is the preview's rather than the engine's: no
+        // unload call-in fires during it. It is here so the stand-in walks
+        // back to where it started instead of teleporting there on the frame
+        // the preview loops.
+        { frame: at(11), pos: [0, 0, 1] },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 4.5] },
       ],
       attach: {
         from: "QueryTransport",
-        frame: at(2),
-        until: null,
+        frame: at(4),
+        until: at(11),
         follow: true,
       },
     },
@@ -1306,25 +1330,30 @@ Append the two new scenarios after `firing`:
       // (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:806-826`). The position is
       // where the passenger is going, which is the ground under the transport.
       {
-        frame: at(2.5),
+        frame: at(5),
         callin: "TransportDrop",
         args: [STAND_IN_UNIT_ID, 0, 0, 0],
       },
       // Once the last passenger is off (`MobileCAI.cpp:2094-2098`).
-      { frame: at(3), callin: "EndTransport" },
+      { frame: at(6), callin: "EndTransport" },
     ],
+    // Every key is measured from the piece it was riding, so it leaves from
+    // where the transport was holding it rather than from the unit's origin,
+    // and so the last key lands exactly where the first frame's attachment
+    // puts it. That is what closes the loop.
     standIn: {
       keys: [
-        // Measured from the piece it was riding, so it leaves from where the
-        // transport was holding it rather than from the unit's origin.
-        { frame: at(2.5), pos: [0, 0, 0], fromAttachPiece: true },
-        { frame: at(4), pos: [0, -1.6, -1.2], fromAttachPiece: true },
-        { frame: at(6), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        { frame: at(5), pos: [0, 0, 0], fromAttachPiece: true },
+        { frame: at(7.5), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        { frame: at(12), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        // Back up to the piece. The preview's own return leg, not a reload: no
+        // call-in fires during it.
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromAttachPiece: true },
       ],
       attach: {
         from: "QueryTransport",
         frame: 0,
-        until: at(2.5),
+        until: at(5),
         follow: true,
       },
     },
@@ -1543,6 +1572,8 @@ git commit -m "Hand a compiled script the transport arguments it counts in"
 ### Task 6: The stand-in's shape, as two candidates
 
 Both candidates ship in this commit. Task 9 screenshots them, picks one and deletes the other. Building both and looking is what the spec asks for: silhouette legibility is judged by looking, not specified.
+
+**Outcome:** the chamfered box won and the domed prism was deleted, so `STAND_IN_SHAPE` is gone and `buildStandIn` calls one geometry. Looking at the winner in the viewport also turned up that ten of its sixteen triangles were wound inside out, which front-face culling had been showing as a solid shape with its colours in the wrong places. `standIn.test.ts` gained a check that every face normal agrees with the direction out of the shape's middle.
 
 **Files:**
 - Modify: `src/lego/standIn.ts`
@@ -2700,6 +2731,8 @@ Save as `docs/reports/stand-in-wedge.png`.
 Set `STAND_IN_SHAPE` to `"glacis"` in `src/lego/standIn.ts`, let vite reload, and take the same shot from the same camera. Save as `docs/reports/stand-in-glacis.png`.
 
 - [ ] **Step 5: Pick, and delete the loser**
+
+**Decided: the glacis.** The wedge read as a rock. Its dome left no flat deck to judge "up" against, and one vertex pushed forward out of eight is not a visible point, so only the coloured facet said which way it faced, which is the failure the whole exercise exists to avoid.
 
 Judge on two questions and nothing else:
 
