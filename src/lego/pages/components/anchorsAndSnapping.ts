@@ -11,7 +11,7 @@ import {
   snapRotation,
   type Vec3,
 } from "../../snapping";
-import { points } from "./dotsAndPoints";
+import { cornerMark, faceMark, points } from "./dotsAndPoints";
 import { pieceIdOf } from "./gizmoCommit";
 import {
   CORNER_COLOUR,
@@ -47,13 +47,11 @@ function localAnchorsOf(
   raw: RawGeometry | null,
   piece: LegoPiece,
 ): { anchor: Anchor; position: Vec3 }[] {
-  // A part carries its box in the pack manifest and an imported mesh carries
-  // its own, computed once on import, so both answer this the same way.
-  const box =
-    pieceMesh(raw, piece)?.bbox ??
-    (piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined);
   const pivot = piece.pivot ?? [0, 0, 0];
-  return pieceAnchors(box ?? null, piece.customAnchors).map((anchor) => ({
+  return pieceAnchors(
+    pieceBox(pack, raw, piece) ?? null,
+    piece.customAnchors,
+  ).map((anchor) => ({
     anchor,
     position: [
       anchor.position[0] - pivot[0],
@@ -61,6 +59,15 @@ function localAnchorsOf(
       anchor.position[2] - pivot[2],
     ],
   }));
+}
+
+/** A part carries its box in the pack manifest and an imported mesh carries
+ *  its own, computed once on import, so both answer this the same way. */
+function pieceBox(pack: LoadedPack, raw: RawGeometry | null, piece: LegoPiece) {
+  return (
+    pieceMesh(raw, piece)?.bbox ??
+    (piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined)
+  );
 }
 
 /**
@@ -404,6 +411,19 @@ export function showAnchors(
       // The middle and the origin coincide, and two dots in one place read
       // as one dot of the wrong colour. A custom anchor still draws there: it
       // is a point someone put down, and it has to be visible to be moved.
+      continue;
+    }
+    // A face gets a square in its own plane and a corner a cube meeting it,
+    // so each says which surface it is about rather than only where it is.
+    if (anchor.out && (anchor.kind === "face" || anchor.kind === "corner")) {
+      const at = { x: position[0], y: position[1], z: position[2] };
+      const out = { x: anchor.out[0], y: anchor.out[1], z: anchor.out[2] };
+      const colour = anchorColour(anchor.kind);
+      marks.add(
+        anchor.kind === "face"
+          ? faceMark(at, out, colour)
+          : cornerMark(at, out, colour),
+      );
       continue;
     }
     positions.push(...position);
