@@ -15,8 +15,11 @@ python bos2cob_py3.py --dontfold foo.bos       # skip constant folding
 python cob_decompiler.py foo.cob               # disassembly listing + opcode/arg stats
 ```
 
-The checked-out reference has no `--nopcpp` flag any more. Its only mode runs
-pcpp, a full C preprocessor, ahead of its own `preprocess()`.
+**Pinned reference: `9a2a84d`** (2026-09-18, "Readd --gltf-swap and update exe
+to 1.3"), the parity commit this port is checked against. The checked-out
+reference has no `--nopcpp` flag any more. Upstream removed the old
+preprocessor in `c4ab7be`, so its only mode runs pcpp, a full C preprocessor,
+ahead of its own `preprocess()`.
 
 **Parity target: the reference's default mode (pcpp).** The checked-out
 reference has dropped `--nopcpp` and always runs pcpp, a full C preprocessor,
@@ -48,7 +51,7 @@ its own. `parser::stray_warnings` reports it instead of staying silent.
 ## Pipeline
 
 `text → preprocess() (macros incl. function-like, #if/#elif, #ifdef, #include)
-→ tokenizer → Pump → parse(_file) → fold (fixpoint) → Compiler → COB bytes`
+→ tokenizer → Pump → parse(_file) → fold (single post-order pass) → Compiler → COB bytes`
 
 - Args: `--shortopcodes` (opcode table swap, cobVersion 8 else 4), `--dontfold`.
   Constants: `LINEAR_SCALE=65536`, `ANGULAR_SCALE=182`.
@@ -101,18 +104,46 @@ wins, else `clear()`+backtrack. Grammar/node types: see L574-690 (file,
 pieceDec, staticVarDec, funcDec, statement/keywordStatement and all animation
 statements, axis, expression/term/op/constant/get/rand).
 
-## Constant folding — `fold_node` L361-469 (post-order, fixpoint via main loop)
+## Constant folding, `fold.rs`, ported from upstream's "Rewrite constant
+folding" and "Add compile-time-constant folding to emit-sfx" (both after this
+port's original cutoff, see "Pinned reference" below)
 
-- Negative collapse: `signedFloatConstant [-,X]` → `'-'+X.text`.
-- Bracket scaling on `constant` w/ 3 children: `[X]`→`X.text=str(float(X)*65536)`,
-  `<X>`→`*182`; pops the bracket symbols.
-- Arithmetic (`expression` ≥2 children): precedence `% * / + - | & ^`
-  (`OPS_PYEVAL_PRECEDENCE` L254); evaluate adjacent constant pairs via Python
-  `eval`. **Division yielding `abs(result)<1` with nonzero numerator is SKIPPED**
-  (L425-427). `& | ^` map to `&& || ^^` for eval.
-- Parenthesis collapse: `term=( expr )` with single foldable constant → inner.
-- Quirk: `return foldcount` is INSIDE the while loop (L469) → at most one
-  iteration per call; main loops to fixpoint. Replicate.
+- Single post-order pass, no fixpoint loop. Children fold before their parent,
+  so a nested paren or a chain of operators resolves in one walk.
+- `constant_value(node)` = `int(scale * float(node.get_text()))`, scale 65536
+  for `[X]`, 182 for `<X>`, else 1. Works the same whether the node is a raw
+  parse (`signedFloatConstant`/`signedIntegerConstant`) or an already-folded
+  `integerConstant` leaf, since it only ever reads `get_text()`.
+- `term_constant_value(term)` treats a piece name as a compile-time constant
+  too, its index in the piece list, from `collect_piece_names` run once over
+  the whole tree before folding starts. `base + 1` folds like a literal would.
+- `fold_expression` scans every possible island start position, extends it
+  while the next operator is one of `+ - * / % & | ^` and its operand is a
+  constant, then folds the whole run at once with a small shunting-yard
+  (`evaluate_island`) that respects real operator precedence, so `2 + 1 * 2`
+  folds to `4`, not `6`. `island_starts_safe`/`island_ends_safe` refuse a
+  start or end that would change which operand an outside operator binds to.
+  An unsafe start, the operator right before the island binds tighter than
+  the island's own first operator, unless it is the exact same associative
+  operator repeated. An unsafe end, the island's own last operator binds
+  looser than the operator right after it.
+- Every folded value is a plain 32-bit integer. `/` truncates toward zero and
+  `%` takes the sign of the left operand (C semantics, not Python's floored
+  division/mod). A fold that would divide or mod by zero, or push any
+  intermediate or final value outside `i32` range, is skipped, leaving the
+  runtime opcode in place rather than erroring.
+- Parenthesis collapse: `term = ( expression )` with a single
+  compile-time-constant term collapses straight to that term's child.
+- emit-sfx's `from` clause is a full expression now, not just a bare piece
+  name. `Compiler::get_emit_sfx_piece` resolves it to a piece index after
+  folding runs, either a bare piece name, or an already-folded constant in
+  range. Anything else (a runtime variable, an out-of-range or negative
+  index) is a compile error, not a silent fallback.
+- A piece name can no longer double as a static-var or local-var name
+  (checked once, in `parse_file`, after the whole tree has been walked, so
+  declaration order does not matter). Bundled into the same upstream commit
+  as the emit-sfx change because both guard the same assumption, that a piece
+  name used as a variable always means the piece.
 
 ## Codegen — `Compiler` L699-1097, §6
 
@@ -141,9 +172,9 @@ State: `_static_vars/_local_vars/_pieces/_functions` (index = append order),
 - for: **no codegen** (unsupported).
 - expression L998: shunting-yard, pop while top precedence ≤ current (left-assoc),
   emit `OPS[op]`. term L1027: unaryOp postfix; varName→`get_variable(push=True)`.
-- constant L1036: `PUSH_CONSTANT` then 4 bytes. 1 child: `value=round(float(text))`
-  (**Python banker's rounding, ties-to-even** — NOT f64::round); `<0`→signed pack.
-  3 children `[`: `int(65536*float)` (truncate toward 0); `<`: `int(182*float)`.
+- constant L1036: `PUSH_CONSTANT` then 4 bytes. 1 child: `value=int(float(text))`
+  (truncate toward zero, matches Rust `as i64`), `<0`→signed pack.
+  3 children `[`: `int(65536*float)` (truncate toward 0), `<`: `int(182*float)`.
 - `get_variable(name,push)` L1081: search [local,static,(pieces if push)] in order,
   case-insensitive, first match → `opcode + get_num(index)`.
 
@@ -158,39 +189,43 @@ OffsetToScriptCodeIndexArray, OffsetToScriptNameOffsetArray,
 OffsetToPieceNameOffsetArray, OffsetToScriptCode(=44), OffsetToNamesArray.
 Name strings byte-packed (no alignment). Sounds list unused.
 
-## Byte-exactness hazards (§7)
+## Byte-exactness hazards
 
-1. plain constant uses **ties-to-even** `round()`; bracket uses `int()` truncation.
-2. division-skip-when-`abs<1` changes which folds happen.
-3. `--dontfold` `[x]`/`<x>` uses `int()` (truncation) vs folded `round()` → can differ.
-4. RETURN appended only if not already trailing.
-5. keywordStatement double-reversal (children reversed, int args reversed again).
-6. emit-sfx: `expr` pushed + `EMIT_SFX` + piece idx. explode: expr + `EXPLODE` + piece idx.
-7. signal/set-signal-mask: expr pushed + opcode (no implicit shift).
-8. start/call-script operand order = [func_index, arg_count] — **verified** against
+1. plain and bracket constants both use `int()` truncation toward zero. No
+   divergence between them any more (both were already `int()` on the bracket
+   side, the fold rewrite moved the plain side off `round()` to match).
+2. RETURN appended only if not already trailing.
+3. keywordStatement double-reversal (children reversed, int args reversed again).
+4. emit-sfx: `from` expression resolved to a piece index at compile time
+   (see "Constant folding" above), then `EMIT_SFX` + piece idx. explode:
+   expr pushed + `EXPLODE` + piece idx.
+5. signal/set-signal-mask: expr pushed + opcode (no implicit shift).
+6. start/call-script operand order = [func_index, arg_count], verified against
    a golden .cob (`START_SCRIPT [func_index, arg_count]`).
-9. all code is 4-byte words; no padding inside code.
-10. **Fold left-operand quirk:** `term_is_a_signedFloatConstant()` returns a
-    `floatConstant` Node whose `__len__()==0`, so it is *falsy*. The fold branch
-    that would let `term1` come from an `opterm`'s right term ANDs in that falsy
-    node and never fires — so a fold's left operand can ONLY be the expression's
-    first child. Net: `y + 1 * 2` folds nothing; `1 * 2 + y` folds `1*2`. The
-    Rust port replicates this (only `children[i]` as a bare `term` is `term1`).
-11. **`#if`/`#elif`** are handled by `preprocess.rs` directly now (see
-    "Parity target" above), evaluating an integer constant expression with C
-    precedence over macros and `defined(X)`/`defined X`. A branch that is
-    never taken is never evaluated, so a malformed condition inside dead code
-    is not an error.
+7. all code is 4-byte words, no padding inside code.
+8. `#if`/`#elif` are handled by `preprocess.rs` directly now (see
+   "Parity target" above), evaluating an integer constant expression with C
+   precedence over macros and `defined(X)`/`defined X`. A branch that is
+   never taken is never evaluated, so a malformed condition inside dead code
+   is not an error.
 
 ## Status
 
 Compiler (`anim_bos2cob`) implemented and byte-exact vs the reference across the
 golden fixtures in `tests/`: `min`, `features` (broad keyword/jump/operator
-coverage), `folds` (rounding/division-skip/bracket/bitwise hazards), and `anims`
+coverage), `folds` (truncation/bracket/bitwise/precedence hazards), and `anims`
 (remaining animation keywords). These four also guard that function-like
 macros and `#if`/`#elif` left the pre-existing object-macro/`#ifdef`/`#include`
 behaviour byte-identical, since none of them exercise the new code paths.
-`cargo test -p tauri-plugin-coilbox-anim`.
+`tests/fold.rs` ports upstream's `test_constant_folding.py` cases plus the
+emit-sfx and piece-name-uniqueness cases from "Add compile-time-constant
+folding to emit-sfx", each checked against bytes the pinned reference
+produces for the same snippet. `cargo test -p tauri-plugin-coilbox-anim`.
+
+Out of scope: `--gltf-swap`/`--gltf-swap-s3o` and the `#define GLTF` custom
+axis-spec syntax (`dd01436`, `da1fb14`, `482e919`). This port has no
+`--gltf-swap` flag at all, and upstream itself deprecated then re-added the
+feature across these commits, so there is nothing here for it to extend.
 
 ## cob_decompiler.py (disassembler, NOT a BOS regenerator)
 

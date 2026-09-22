@@ -43,21 +43,23 @@ fn min_bos() {
     assert_golden("min");
 }
 
-/// Broad coverage: brackets/angular constants, ties-to-even rounding, the
-/// division-skip fold (`1/2` stays a runtime DIV, `4/2` folds), if/else and
-/// while jump back-patching, spin/turn/move with speed/now, signal/set-mask,
-/// emit-sfx, wait-for-turn, inc/dec, get/set, rand, unary not, explode, sleep,
-/// and call-script/start-script operand order.
+/// Broad coverage: brackets/angular constants, truncating-integer folds
+/// (`gun + 1 * 2` and `1 / 2` both fold now that folding respects
+/// precedence), if/else and while jump back-patching, spin/turn/move with
+/// speed/now, signal/set-mask, emit-sfx, wait-for-turn, inc/dec, get/set,
+/// rand, unary not, explode, sleep, and call-script/start-script operand
+/// order.
 #[test]
 fn features_bos() {
     assert_golden("features");
 }
 
-/// Folding/rounding hazards: ties-to-even rounding (0.5->0, 2.5->2, 3.5->4,
-/// -1.5->-2), division-skip (`1/2` unfolded, `4/2`/`7/2` folded), modulo,
-/// bitwise folds, parenthesis collapse, the left-only fold quirk
-/// (`4 + 2 * 3` vs `2 * 3 + 4`), bracket/angular scaling, negative brackets,
-/// and a hex literal (not folded).
+/// Folding hazards: truncating-toward-zero constants (0.5->0, 1.5->1,
+/// 2.5->2, 3.5->3, -1.5->-1, -2.5->-2), truncating integer division that now
+/// always folds (`1/2`->0, `7/2`->3), modulo, bitwise folds, parenthesis
+/// collapse, precedence-respecting folds regardless of source order
+/// (`4 + 2 * 3` and `2 * 3 + 4` both fold to 10), bracket/angular scaling,
+/// negative brackets, and a hex literal (not folded on its own).
 #[test]
 fn folds_bos() {
     assert_golden("folds");
