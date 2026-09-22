@@ -27,14 +27,17 @@ import {
   animCobDecompile,
   animCobDisasm,
   animCobHex,
-  type LintDiagnostic,
 } from "../bindings";
+import {
+  type CobSession,
+  EMPTY_COB_SESSION,
+  updateCobSession,
+  useCobSession,
+} from "../cobSession";
 import { LintProblems } from "./LintProblems";
 
 const COB = /\.cob$/i;
 const BOS = /\.bos$/i;
-
-type Kind = "bos" | "cob";
 
 /** One read-only panel of monospaced text, the same in all three tabs. */
 function ScriptText({ value }: { value: string }) {
@@ -66,7 +69,7 @@ const VIEW_NOTES = {
 } as const;
 /** Which reading of the script is on screen. The same file is all three: the
  *  source, the bytes it compiles to, and the instructions in those bytes. */
-type View = "bos" | "cob" | "opcodes";
+type View = CobSession["view"];
 type Banner = { kind: "success" | "info" | "error"; text: string };
 
 const BANNER_STYLES: Record<Banner["kind"], string> = {
@@ -79,25 +82,32 @@ const BANNER_ICONS = { success: CheckCircle2, info: Info, error: AlertCircle };
 
 /**
  * COB tools: compile a `.bos` unit script to `.cob` (byte-exact with the
- * BARScriptCompiler reference, see the crate's PORTING.md) and disassemble a
- * `.cob` into its scripts, pieces, and opcode stream. Pick files or drag them
- * in — `.bos` compiles, `.cob` disassembles. Re-run repeats the last action on
- * the same file; Reveal opens it in the OS file manager.
+ * BARScriptCompiler reference, see the crate's PORTING.md), or open a `.cob`
+ * and read it as source, as bytes and as the instructions it holds. Pick files
+ * or drag them in. Re-run repeats the last action on the same file, and Reveal
+ * opens it in the OS file manager.
  */
 export default function CobPage() {
-  const [path, setPath] = useState("");
-  const [kind, setKind] = useState<Kind | null>(null);
-  const [revealTarget, setRevealTarget] = useState("");
-  const [listing, setListing] = useState("");
-  const [bos, setBos] = useState("");
-  const [hex, setHex] = useState("");
-  const [view, setView] = useState<View>("bos");
+  // The file and everything derived from it live in a session store, so
+  // leaving the page and coming back finds it as it was rather than empty.
+  const {
+    path,
+    kind,
+    revealTarget,
+    listing,
+    bos,
+    hex,
+    view,
+    warnings,
+    diagnostics,
+    lintError,
+  } = useCobSession();
+  const set = (patch: Partial<CobSession>) => updateCobSession(patch);
+  // A banner reports what just happened, and busy and dragging are about this
+  // visit, so none of the three are worth carrying back.
   const [banner, setBanner] = useState<Banner | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([]);
-  const [lintError, setLintError] = useState<string | null>(null);
   const [checksOpen, setChecksOpen] = useState(false);
 
   // Lints a .bos once it has compiled, so the same source that just produced
@@ -111,11 +121,9 @@ export default function CobPage() {
         name: p,
         path: p,
       });
-      setDiagnostics(diagnostics);
-      setLintError(error ?? null);
+      set({ diagnostics, lintError: error ?? null });
     } catch (e) {
-      setDiagnostics([]);
-      setLintError(errorText(e));
+      set({ diagnostics: [], lintError: errorText(e) });
     }
   }
 
@@ -129,9 +137,11 @@ export default function CobPage() {
       animCobDecompile({ path: p }),
       animCobHex({ path: p }),
     ]);
-    setListing(disasm.listing);
-    setBos(decompiled.source);
-    setHex(dump.dump);
+    set({
+      listing: disasm.listing,
+      bos: decompiled.source,
+      hex: dump.dump,
+    });
     return decompiled.warnings;
   }
 
@@ -148,7 +158,7 @@ export default function CobPage() {
     setBusy(true);
     try {
       await animCobDecompile({ path, output: dest });
-      setRevealTarget(dest);
+      set({ revealTarget: dest });
       setBanner({ kind: "success", text: `Saved ${dest}.` });
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
@@ -161,12 +171,12 @@ export default function CobPage() {
   // Asks before overwriting an existing .cob.
   async function compile(p: string, overwrite = false) {
     setBanner(null);
-    setWarnings([]);
     setBusy(true);
-    setPath(p);
-    setKind("bos");
-    setDiagnostics([]);
-    setLintError(null);
+    set({
+      ...EMPTY_COB_SESSION,
+      path: p,
+      kind: "bos",
+    });
     try {
       const res = await animBos2cob({ path: p, overwrite });
       if (res.needsOverwrite) {
@@ -182,16 +192,14 @@ export default function CobPage() {
           });
         return;
       }
-      setRevealTarget(res.output);
       setBanner({
         kind: "success",
         text: `Compiled to ${res.output} (${res.bytes} bytes).`,
       });
-      setWarnings(res.warnings);
+      set({ revealTarget: res.output, warnings: res.warnings });
       await readCob(res.output);
       const { source } = await animBosRead({ path: p });
-      setBos(source);
-      setView("opcodes");
+      set({ bos: source, view: "opcodes" });
       await lintBos(p);
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
@@ -202,19 +210,15 @@ export default function CobPage() {
 
   async function loadCob(p: string) {
     setBanner(null);
-    setWarnings([]);
     setBusy(true);
-    setPath(p);
-    setKind("cob");
-    setRevealTarget(p);
-    setListing("");
-    setBos("");
-    setHex("");
-    setView("bos");
-    setDiagnostics([]);
-    setLintError(null);
+    set({
+      ...EMPTY_COB_SESSION,
+      path: p,
+      kind: "cob",
+      revealTarget: p,
+    });
     try {
-      setWarnings(await readCob(p));
+      set({ warnings: await readCob(p) });
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
     } finally {
@@ -414,7 +418,7 @@ export default function CobPage() {
         {listing ? (
           <Tabs
             value={view}
-            onValueChange={(v) => setView(v as View)}
+            onValueChange={(v) => set({ view: v as View })}
             className="flex min-h-0 flex-1 flex-col gap-3"
           >
             <div className="flex shrink-0 items-center justify-between gap-3">
