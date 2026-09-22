@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
-import { buildS3o, type S3oPiece, sitOnGround, unitBounds } from "./s3oBuild";
+import {
+  buildS3o,
+  pieceWorldRest,
+  type S3oPiece,
+  sitOnGround,
+  unitBounds,
+} from "./s3oBuild";
 
 /**
  * A pack holding one part: a single triangle on the x/z plane, one metre out
@@ -703,5 +709,42 @@ describe("baking an imported unit", () => {
 
     expect(hull.vertices[1].pos).toEqual([0, 2, 0]);
     expect(hull.vertices[1].uv).toEqual([0.5, 1]);
+  });
+});
+
+describe("pieceWorldRest", () => {
+  /** A chain of three pieces, each a step out along x, so the third sits at
+   *  three steps whatever the bake does to the geometry in between. */
+  it("accumulates a piece's offsets up to the root", () => {
+    const doc = project([
+      { id: "a", name: "a", parentId: "root", position: [1, 0, 0] },
+      { id: "b", name: "b", parentId: "a", position: [1, 0, 0] },
+      { id: "c", name: "c", parentId: "b", position: [1, 0, 0] },
+    ]);
+
+    expect(pieceWorldRest(doc, pack(), null).get("c")).toEqual([3, 0, 0]);
+  });
+
+  /**
+   * A parent's rotation turns where its child sits, which is exactly what
+   * summing the document's own offsets would miss. A quarter turn about y
+   * sends a child that sits one step along x round to one step along -z.
+   */
+  it("carries a parent's rotation into where its child rests", () => {
+    const doc = project([
+      { id: "a", name: "a", parentId: "root", rotation: [0, Math.PI / 2, 0] },
+      { id: "b", name: "b", parentId: "a", position: [1, 0, 0] },
+    ]);
+
+    const [x, y, z] = pieceWorldRest(doc, pack(), null).get("b") ?? [0, 0, 0];
+    expect(x).toBeCloseTo(0);
+    expect(y).toBeCloseTo(0);
+    expect(z).toBeCloseTo(-1);
+  });
+
+  it("has nothing for a piece the unit does not have", () => {
+    expect(
+      pieceWorldRest(project([]), pack(), null).get("nope"),
+    ).toBeUndefined();
   });
 });

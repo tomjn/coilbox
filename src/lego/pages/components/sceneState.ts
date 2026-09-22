@@ -67,6 +67,15 @@ export interface SceneState {
   reference: THREE.Group;
   /** Frees whichever figure `reference` currently is. */
   disposeReference: () => void;
+  /** The crude second unit a scenario aims at, builds or carries. A view aid
+   *  like `reference`, but rebuilt whenever the edited unit's size changes,
+   *  because its own size comes from that. */
+  standIn: THREE.Group;
+  /** Frees whichever shape `standIn` currently is. */
+  disposeStandIn: () => void;
+  /** How big it was built, in elmos, so a track's radius multiples are read
+   *  against the shape actually in the scene. */
+  standInRadius: number;
   /** The collision volume's wireframe, while it is being shown. Rebuilt on
    *  every change rather than rescaled, because the shape itself changes with
    *  the volume's type, and null the rest of the time. */

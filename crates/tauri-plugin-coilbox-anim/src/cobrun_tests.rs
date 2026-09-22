@@ -590,6 +590,99 @@ mod what_it_says_about_itself {
         assert!((pose(&timeline, 0, "base")[2] - expected).abs() < 1e-4);
     }
 
+    /// COB identifies a passenger by its model height in 65536ths, not by a
+    /// unit id: `CCobInstance::BeginTransport` at
+    /// `rts/Sim/Units/Scripts/CobInstance.cpp:355-360`. The scenario is written
+    /// in the Lua form, so the runtime converts, exactly as it does for radians.
+    #[test]
+    fn hands_begin_transport_a_height_rather_than_a_unit_id() {
+        // BeginTransport takes one argument and moves the base by it.
+        let mut begin = vec![op("CREATE_LOCAL_VAR")];
+        begin.extend([op("PUSH_LOCAL_VAR"), 0]);
+        begin.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+
+        let bytes = build(&[("BeginTransport", begin)], PIECES, 0);
+        let timeline = run(
+            &bytes,
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "BeginTransport".to_string(),
+                // The stand-in's height in elmos, which is what the scenario's
+                // single argument means once the runtime has it.
+                args: vec![12.0],
+                ambient: false,
+            }],
+            3,
+            &[],
+            &HashMap::new(),
+        );
+
+        // 12 elmos as 65536ths, read back out through the distance scale.
+        assert!(close(pose(&timeline, 0, "base")[2], 12.0));
+    }
+
+    /// `CCobInstance::TransportDrop` packs x and z into one word and drops y
+    /// entirely (`CobInstance.cpp:385-395`, `CobInstance.h:10`), where Lua
+    /// takes four separate numbers.
+    #[test]
+    fn packs_a_transport_drop_position_the_way_a_cob_reads_it() {
+        // TransportDrop takes two arguments in COB. Move by the second, along
+        // z rather than x, because a move along x is one of the engine's three
+        // sign flips and this is about the packing rather than the axes.
+        let mut drop = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        drop.extend([op("PUSH_LOCAL_VAR"), 1]);
+        drop.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+
+        let bytes = build(&[("TransportDrop", drop)], PIECES, 0);
+        let timeline = run(
+            &bytes,
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportDrop".to_string(),
+                // Lua's (unitID, x, y, z).
+                args: vec![1.0, 3.0, 9.0, 5.0],
+                ambient: false,
+            }],
+            3,
+            &[],
+            &HashMap::new(),
+        );
+
+        // PACKXZ(3, 5) is (3 << 16) + 5, which the distance scale reads back as
+        // three and a very small fraction. The y of 9 is nowhere in it.
+        let packed = f64::from((3i32 << 16) + 5) / 65536.0;
+        assert!((pose(&timeline, 0, "base")[2] - packed).abs() < 1e-4);
+    }
+
+    /// A call-in that takes plain numbers is still handed them unchanged, so
+    /// the conversions above cannot leak into everything else.
+    #[test]
+    fn leaves_an_ordinary_callins_arguments_alone() {
+        let mut hit = vec![op("CREATE_LOCAL_VAR")];
+        hit.extend([op("PUSH_LOCAL_VAR"), 0]);
+        hit.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+
+        let bytes = build(&[("HitByWeapon", hit)], PIECES, 0);
+        let timeline = run(
+            &bytes,
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "HitByWeapon".to_string(),
+                args: vec![7.0],
+                ambient: false,
+            }],
+            3,
+            &[],
+            &HashMap::new(),
+        );
+
+        // Seven straight through, read back out through the distance scale.
+        assert!(close(pose(&timeline, 0, "base")[2], 7.0 / 65536.0));
+    }
+
     /// The script names its pieces and so does the model, and only the names
     /// tie them together: a `.cob` numbers its pieces its own way.
     #[test]

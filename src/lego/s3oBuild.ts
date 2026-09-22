@@ -114,6 +114,41 @@ export function bakedPieces(
 }
 
 /**
+ * Where each piece rests in the unit's own space, by piece name.
+ *
+ * Off the bake rather than off the document's offsets, because the two part
+ * company the moment an ancestor carries a rotation or a scale, and the bake
+ * is what an s3o stores and therefore what the engine animates. Anything
+ * reasoning about where a piece actually is has to agree with the file.
+ *
+ * Keyed by name rather than by id because callers reaching for this have a
+ * name: a script probe answers with one, and so does a timeline.
+ */
+export function pieceWorldRest(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+): Map<string, [number, number, number]> {
+  const { pieces } = bakedPieces(project, pack, raw);
+  const world = new Map<string, [number, number, number]>();
+
+  const walk = (pieceId: string, from: [number, number, number]) => {
+    const baked = pieces.get(pieceId);
+    if (!baked) return;
+    const at: [number, number, number] = [
+      from[0] + baked.offset[0],
+      from[1] + baked.offset[1],
+      from[2] + baked.offset[2],
+    ];
+    world.set(baked.name, at);
+    for (const child of childrenOf(project, pieceId)) walk(child.id, at);
+  };
+
+  walk(project.rootPieceId, [0, 0, 0]);
+  return world;
+}
+
+/**
  * Drop the whole unit so its lowest point rests on the ground.
  *
  * The engine stands a unit on y = 0, so geometry below that is buried and

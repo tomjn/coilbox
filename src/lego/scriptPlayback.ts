@@ -21,6 +21,18 @@ export interface ScriptEvent {
    *  runtime saying it does not have one would say it about nearly every
    *  unit. */
   ambient?: boolean;
+  /**
+   * Work this event's arguments out from where the stand-in is on its frame,
+   * rather than taking them as literals.
+   *
+   * A literal aim is a number somebody picked, and a script that aims at it
+   * correctly looks exactly like one that does not. `aimResolver.ts` replaces
+   * the marker with `args` before the run, using the engine's own formula:
+   * `AimFromWeapon` measures from the piece that call-in names
+   * (`rts/Sim/Weapons/Weapon.cpp:410-424`), `midPos` from the unit's mid
+   * (`rts/Sim/Units/UnitTypes/Builder.cpp:942-955`).
+   */
+  aimAtStandIn?: { from: "AimFromWeapon" | "midPos" };
 }
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
@@ -75,14 +87,60 @@ export interface ScriptProbes {
 /**
  * How long a preview runs before it loops.
  *
- * Six seconds is two or three cycles of anything the presets generate, which is
- * enough to see a loop as a loop, and short enough that the wait before it
- * plays is not one.
+ * Six seconds was enough to see a walk cycle as a cycle, and it is not enough
+ * once there is a second object in the scene: a builder reaching one way and
+ * then the other, with something to reach at, is a sequence rather than a
+ * cycle, and it needs room to play out before it starts again.
  */
-export const PREVIEW_SECONDS = 6;
+export const PREVIEW_SECONDS = 15;
 
 /** Frames in a preview, at the sim rate the runtime works in. */
 export const PREVIEW_FRAMES = PREVIEW_SECONDS * 30;
+
+/** Where the stand-in is on one frame, and which way it faces. */
+export interface StandInKey {
+  frame: number;
+  /** Unit-local, in multiples of the stand-in's radius. A track written this
+   *  way serves a scout and a factory alike, since the radius comes from the
+   *  edited unit's own size rather than from the track. */
+  pos: [number, number, number];
+  /**
+   * Measure `pos` from the attach piece's rest position rather than from the
+   * unit's origin.
+   *
+   * What a dropped passenger needs: it leaves the transport from where the
+   * transport was holding it, not from where the unit's origin happens to be.
+   */
+  fromAttachPiece?: boolean;
+  /** Radians about the vertical axis, relative to the unit's facing. Zero
+   *  where no key sets one. */
+  heading?: number;
+}
+
+/** The piece the stand-in sits on, and for how long. */
+export interface StandInAttach {
+  /** The call-in the probe asks for that piece. */
+  from: "QueryTransport" | "QueryBuildInfo";
+  /** The first frame the stand-in sits on it. */
+  frame: number;
+  /** The frame it comes off again, or null to stay on to the end. */
+  until: number | null;
+  /**
+   * Ride the piece as it animates, rather than sitting where the piece rests.
+   *
+   * A transport carries its passenger, so it follows. A factory spawns the
+   * unit it builds at the piece's world position once and leaves it there
+   * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), so it does not.
+   */
+  follow: boolean;
+}
+
+/** Where the stand-in goes over a scenario, as a preview aid layered over the
+ *  timeline. The runtimes know nothing about it. */
+export interface StandInTrack {
+  keys: StandInKey[];
+  attach?: StandInAttach | null;
+}
 
 export interface Scenario {
   id: string;
@@ -90,6 +148,9 @@ export interface Scenario {
   /** Why you would pick it, in the panel under the picker. */
   description: string;
   events: ScriptEvent[];
+  /** The stand-in this scenario puts in the scene, if it puts one there at
+   *  all. A scenario with no track shows no stand-in. */
+  standIn?: StandInTrack;
 }
 
 /** Seconds to frames, for writing a scenario in the units it reads in.
@@ -136,6 +197,20 @@ export const CREATED: ScriptEvent[] = [
   { frame: 0, callin: "Create" },
   { frame: 1, callin: "setSFXoccupy", args: [ON_LAND], ambient: true },
 ];
+
+/**
+ * The stand-in that stands in for a passenger, in the Lua argument form.
+ *
+ * `BeginTransport`, `QueryTransport` and `TransportDrop` all take a unit id in
+ * Lua where COB takes the passenger's model height or a packed position
+ * (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:139-141,787-826` against
+ * `CobInstance.cpp:355-395`). The scenario writes the Lua form and the COB
+ * runtime converts, which is how radians are already handled.
+ *
+ * The preview has no unit table for a script to look this up in, so the number
+ * only has to be a plausible id: what a script does with it is open a door.
+ */
+const STAND_IN_UNIT_ID = 1;
 
 /**
  * What a preview can put a unit through.
@@ -186,16 +261,48 @@ export const SCENARIOS: Scenario[] = [
     id: "building",
     label: "Building (mobile)",
     description:
-      "A construction unit reaching one way, stopping, then reaching the other. Its nanolathe is aimed, so this is the one with angles in it.",
+      "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it.",
     events: [
       ...CREATED,
-      // Heading and pitch in radians, relative to the unit's own facing, which
-      // is what the engine works out from the build target and hands over.
-      { frame: at(0.5), callin: "StartBuilding", args: [0.7, -0.2] },
-      { frame: at(2.5), callin: "StopBuilding" },
-      { frame: at(3.5), callin: "StartBuilding", args: [-0.6, 0.15] },
-      { frame: at(5.5), callin: "StopBuilding" },
+      // No literal angles. `aimResolver.ts` works them out from where the
+      // stand-in is on each of these frames, using the builder's own formula
+      // (`rts/Sim/Units/UnitTypes/Builder.cpp:942-955`), so an arm that aims
+      // at the wrong place is visibly aiming at the wrong place.
+      {
+        frame: at(0.5),
+        callin: "StartBuilding",
+        aimAtStandIn: { from: "midPos" },
+      },
+      { frame: at(5), callin: "StopBuilding" },
+      {
+        frame: at(6.5),
+        callin: "StartBuilding",
+        aimAtStandIn: { from: "midPos" },
+      },
+      { frame: at(11), callin: "StopBuilding" },
     ],
+    // On the ground ahead and to one side, then across to the other during the
+    // gap between the two builds, so the arm is seen to follow it.
+    //
+    // Well out in front. These are multiples of the stand-in's own radius,
+    // which is itself a fraction of the unit, so the distance works out at
+    // about 1.8 times the unit's wider horizontal extent: a unit filling the
+    // 5x5 plate gets a build target a little over 120 elmos away. Anything
+    // nearer and it sits inside the unit's own silhouette and reads as a part
+    // of it rather than as a thing being built, which is what it did at half
+    // this distance on a walker.
+    //
+    // It comes back to where it started, so the preview loops without the
+    // stand-in jumping across the scene on the frame it restarts.
+    standIn: {
+      keys: [
+        { frame: 0, pos: [3.5, 0, 7] },
+        { frame: at(5), pos: [3.5, 0, 7] },
+        { frame: at(6.5), pos: [-3.5, 0, 7] },
+        { frame: at(11), pos: [-3.5, 0, 7] },
+        { frame: at(PREVIEW_SECONDS), pos: [3.5, 0, 7] },
+      ],
+    },
   },
   {
     id: "building-factory",
@@ -212,10 +319,26 @@ export const SCENARIOS: Scenario[] = [
       // No arguments. `CFactory::StartBuild` calls the no-argument form, unlike
       // a construction unit, which is handed a heading and a pitch to aim its
       // nanolathe with (`CBuilder`).
-      { frame: at(1.5), callin: "StartBuilding" },
-      { frame: at(4.5), callin: "StopBuilding" },
-      { frame: at(5.5), callin: "Deactivate" },
+      { frame: at(2), callin: "StartBuilding" },
+      { frame: at(11), callin: "StopBuilding" },
+      { frame: at(13), callin: "Deactivate" },
     ],
+    standIn: {
+      // Nowhere until the factory starts building. A key on the same frame the
+      // attach begins, so the keyed position is never what is drawn.
+      keys: [{ frame: at(2), pos: [0, 0, 0] }],
+      // A factory spawns what it builds at the world position of the piece
+      // `QueryBuildInfo` names, and leaves it there
+      // (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`). It does not carry
+      // it, so the stand-in sits at the piece's rest position rather than
+      // riding it through whatever the doors do.
+      attach: {
+        from: "QueryBuildInfo",
+        frame: at(2),
+        until: null,
+        follow: false,
+      },
+    },
   },
   {
     id: "destroyed",
@@ -242,12 +365,109 @@ export const SCENARIOS: Scenario[] = [
     description: "Aims one way, fires, aims the other, fires again.",
     events: [
       ...CREATED,
-      // Heading and pitch in radians, which is what the call-in is handed.
-      { frame: at(0.5), callin: "AimWeapon1", args: [0.8, 0.15] },
-      { frame: at(2), callin: "Shot1" },
-      { frame: at(3), callin: "AimWeapon1", args: [-0.8, 0.3] },
-      { frame: at(4.5), callin: "Shot1" },
+      // Aimed at the stand-in rather than at two numbers, and measured from
+      // the piece `AimFromWeapon1` names, as the engine measures it
+      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`).
+      {
+        frame: at(0.5),
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon" },
+      },
+      { frame: at(4), callin: "Shot1" },
+      {
+        frame: at(6),
+        callin: "AimWeapon1",
+        aimAtStandIn: { from: "AimFromWeapon" },
+      },
+      { frame: at(9.5), callin: "Shot1" },
     ],
+    // Off the ground and well out, so the second aim differs from the first in
+    // pitch as well as heading and a barrel that only turns is obvious.
+    //
+    // Back where it started by the end, so the turret tracks it round rather
+    // than the stand-in jumping across the scene when the preview loops.
+    standIn: {
+      keys: [
+        { frame: 0, pos: [2.6, 2.2, 4] },
+        { frame: at(4), pos: [2.6, 2.2, 4] },
+        { frame: at(6), pos: [-2.6, 0.6, 4] },
+        { frame: at(10), pos: [-2.6, 0.6, 4] },
+        { frame: at(PREVIEW_SECONDS), pos: [2.6, 2.2, 4] },
+      ],
+    },
+  },
+  {
+    id: "transport-load",
+    label: "Loading a transport",
+    description:
+      "An air transport picking something up: it is told what it is carrying, and the stand-in rides the piece the script names for it.",
+    events: [
+      ...CREATED,
+      // The engine's air arm calls `BeginTransport` and then attaches with the
+      // piece `QueryTransport` names
+      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup`
+      // is the ground and ship arm, which needs the attach piece the script
+      // chooses for itself and is not previewable yet.
+      { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
+    ],
+    standIn: {
+      keys: [
+        // Approaching on the ground, from in front.
+        { frame: 0, pos: [0, 0, 4.5] },
+        { frame: at(4), pos: [0, 0, 1] },
+        // The return leg, which is the preview's rather than the engine's: no
+        // unload call-in fires during it. It is here so the stand-in walks
+        // back to where it started instead of teleporting there on the frame
+        // the preview loops.
+        { frame: at(11), pos: [0, 0, 1] },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 4.5] },
+      ],
+      attach: {
+        from: "QueryTransport",
+        frame: at(4),
+        until: at(11),
+        follow: true,
+      },
+    },
+  },
+  {
+    id: "transport-unload",
+    label: "Unloading a transport",
+    description:
+      "The same transport putting its passenger down: the stand-in comes off the piece it was riding and settles below.",
+    events: [
+      ...CREATED,
+      // `TransportDrop(unitID, x, y, z)` in the Lua form
+      // (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:806-826`). The position is
+      // where the passenger is going, which is the ground under the transport.
+      {
+        frame: at(5),
+        callin: "TransportDrop",
+        args: [STAND_IN_UNIT_ID, 0, 0, 0],
+      },
+      // Once the last passenger is off (`MobileCAI.cpp:2094-2098`).
+      { frame: at(6), callin: "EndTransport" },
+    ],
+    // Every key is measured from the piece it was riding, so it leaves from
+    // where the transport was holding it rather than from the unit's origin,
+    // and so the last key lands exactly where the first frame's attachment
+    // puts it. That is what closes the loop.
+    standIn: {
+      keys: [
+        { frame: at(5), pos: [0, 0, 0], fromAttachPiece: true },
+        { frame: at(7.5), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        { frame: at(12), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        // Back up to the piece. The preview's own return leg, not a reload: no
+        // call-in fires during it.
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromAttachPiece: true },
+      ],
+      attach: {
+        from: "QueryTransport",
+        frame: 0,
+        until: at(5),
+        follow: true,
+      },
+    },
   },
 ];
 

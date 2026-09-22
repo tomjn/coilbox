@@ -19,14 +19,21 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type LegoProject, newProject } from "../../model";
+import type { LoadedPack } from "../../pack";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import { AnimationPanel } from "./AnimationPanel";
 
 const runLua = vi.fn();
 const runCob = vi.fn();
+const probe = vi.fn(async (_args: unknown) => ({
+  pieces: [],
+  probes: [],
+  error: null,
+}));
 
 vi.mock("../../bindings", () => ({
   legoRunScript: (args: unknown) => runLua(args),
+  legoProbeScript: (args: unknown) => probe(args),
 }));
 
 vi.mock("../../../animation/bindings", () => ({
@@ -96,8 +103,24 @@ function show(value: LegoProject) {
       onScriptPausedChange={vi.fn()}
       scriptFrame={0}
       onScriptFrameChange={vi.fn()}
+      pack={pack()}
+      raw={null}
+      onStandIn={vi.fn()}
     />,
   );
+}
+
+/** An empty parts library. Nothing here draws, and no piece carries a part, so
+ *  measuring this unit gives an empty box and the stand-in its smallest size. */
+function pack(): LoadedPack {
+  return {
+    manifest: {} as LoadedPack["manifest"],
+    library: { packs: [], atlases: [], dir: "", problems: [] },
+    parts: [],
+    byId: new Map(),
+    vertices: new Float32Array(),
+    indices: new Uint16Array(),
+  };
 }
 
 const COMPILED = { member: "scripts/armcom.cob", bytes: [4, 0, 0, 0] };

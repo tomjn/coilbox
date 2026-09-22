@@ -29,10 +29,11 @@ import {
   PackagePlus,
   RotateCw,
   Scaling,
+  Target,
   Trash2,
 } from "lucide-react";
-import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
@@ -83,6 +84,7 @@ import {
 import { unitBounds } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import type { Vec3 } from "../../snapping";
+import { buildStandIn, disposeStandIn, standInRadius } from "../../standIn";
 import { captureThumbnail, readyToCapture } from "../../thumbnail";
 import {
   applySnap,
@@ -118,6 +120,7 @@ import {
   refreshSelectionOutlines,
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
+import type { StandInPlacement } from "./standInPlayback";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useGizmoMode } from "./useGizmoMode";
 import { useModelAnchors } from "./useModelAnchors";
@@ -255,6 +258,18 @@ export const ZOOM_OUT_PADDING = 1.3;
 /** Rotation lands on 15 degree steps unless snapping is held off. */
 export const ROTATION_STEP = Math.PI / 12;
 
+/** What a caller who says nothing about a stand-in gets. A module constant
+ *  rather than a literal in the destructure, so it is the same object on every
+ *  render and the effect that paints a paused frame does not rerun for it. */
+const NO_STAND_IN: StandInPlacement = {
+  track: null,
+  attachPieces: new Map(),
+  show: true,
+};
+
+/** The same, for the toggle being off. Stable for the same reason. */
+const HIDDEN_STAND_IN: StandInPlacement = { ...NO_STAND_IN, show: false };
+
 interface Props {
   /**
    * The unit's own chrome, drawn along the top of the view.
@@ -334,6 +349,15 @@ interface Props {
      * so a scrubber can track playback and know where a pause should hold.
      */
     onScriptFrame?: (frame: number) => void;
+    /**
+     * The running scenario's stand-in track and the pieces its attachments
+     * name, or a null track when the scenario defines none.
+     *
+     * It rides with the playback props rather than in a block of its own
+     * because it is part of what is playing: a track means nothing without the
+     * timeline it is laid over.
+     */
+    standIn?: StandInPlacement;
   };
   /** Scale handles keep the piece's proportions. */
   uniformScale?: boolean;
@@ -455,6 +479,7 @@ export function ModelViewport({
     scriptPaused = false,
     scriptFrame = 0,
     onScriptFrame,
+    standIn = NO_STAND_IN,
   } = scriptPlayback;
   const {
     onDuplicate,
@@ -502,6 +527,9 @@ export function ModelViewport({
     useState<GameReferenceChoice | null>(null);
   const [showCollision, setShowCollision] = useState(false);
   const [showAim, setShowAim] = useState(false);
+  // On by default: a scenario that defines a track wants it seen, and the
+  // toggle exists for getting it out of the way rather than for opting in.
+  const [showStandIn, setShowStandIn] = useState(true);
   // View settings, held for as long as the viewport is open and no longer,
   // exactly as the two above are. Both open on what the builder has always
   // shown, so nothing about opening a project changes.
@@ -617,6 +645,14 @@ export function ModelViewport({
       reference.position.set(REFERENCE_PARK_X, 0, 0);
       reference.visible = false;
       scene.add(reference);
+
+      // The stand-in a scenario aims at, builds or carries. Hidden until a
+      // scenario with a track plays, and rebuilt whenever the edited unit's
+      // size changes, since its own size comes from that.
+      const radius = standInRadius(unitBounds(project, pack, raw));
+      const standInGroup = buildStandIn(radius);
+      standInGroup.visible = false;
+      scene.add(standInGroup);
 
       // The collision volume's wireframe. Drawn over everything rather than
       // depth-tested, because a volume set smaller than the unit sits inside
@@ -803,6 +839,9 @@ export function ModelViewport({
         axes,
         reference,
         disposeReference: () => disposeReferenceUnit(reference),
+        standIn: standInGroup,
+        disposeStandIn: () => disposeStandIn(standInGroup),
+        standInRadius: radius,
         collision: null,
         collisionMaterial,
         editCollision: false,
@@ -976,6 +1015,9 @@ export function ModelViewport({
           // Not `reference`: the figure may have been swapped for a unit read
           // out of an installed game since the scene was built.
           state.disposeReference();
+          // Not `standInGroup`, for the same reason: the shape is rebuilt when
+          // the unit's size changes, so the one in the scene may not be this.
+          state.disposeStandIn();
           state.collision?.geometry.dispose();
           collisionMaterial.dispose();
           // One square shared by all six plates, so it is freed once.
@@ -1028,6 +1070,8 @@ export function ModelViewport({
     ground,
   });
 
+  useStandInSize(sceneRef, project, pack, raw);
+
   useScriptFrameStepping(sceneRef, {
     playing,
     reduceMotion,
@@ -1035,6 +1079,7 @@ export function ModelViewport({
     scriptPaused,
     scriptTimeline,
     scriptFrame,
+    standIn: showStandIn ? standIn : HIDDEN_STAND_IN,
     packRef,
     rawRef,
     projectRef,
@@ -1328,6 +1373,13 @@ export function ModelViewport({
                 if (choice) setShowReference(true);
               }}
             />
+            <ViewToggle
+              icon={Target}
+              on={showStandIn}
+              onChange={setShowStandIn}
+              hideTitle="Hide the stand-in unit"
+              showTitle="Show the stand-in unit, the thing a scenario aims at, builds or carries"
+            />
             <ViewButton
               title="Keyboard shortcuts (?)"
               onClick={() => setShortcutsOpen(true)}
@@ -1342,6 +1394,47 @@ export function ModelViewport({
       <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
+}
+
+/**
+ * Rebuild the stand-in when the unit it stands beside changes size.
+ *
+ * Its radius comes from the unit's own bounding box, so a unit growing from one
+ * part to fifty would otherwise keep a stand-in sized for the first part.
+ * Rebuilt rather than scaled, because its panel texture is projected in elmos
+ * and a scaled shape would stretch them.
+ */
+function useStandInSize(
+  sceneRef: RefObject<SceneState | null>,
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+) {
+  // Memoised: measuring the unit bakes every piece, and the answer only moves
+  // when the unit does.
+  const radius = useMemo(
+    () => standInRadius(unitBounds(project, pack, raw)),
+    [project, pack, raw],
+  );
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state || state.standInRadius === radius) return;
+    const wasVisible = state.standIn.visible;
+    const at = state.standIn.position.clone();
+    const facing = state.standIn.rotation.y;
+    state.scene.remove(state.standIn);
+    state.disposeStandIn();
+
+    const group = buildStandIn(radius);
+    group.position.copy(at);
+    group.rotation.set(0, facing, 0);
+    group.visible = wasVisible;
+    state.standIn = group;
+    state.disposeStandIn = () => disposeStandIn(group);
+    state.standInRadius = radius;
+    state.scene.add(group);
+    state.render();
+  }, [sceneRef, radius]);
 }
 
 /**
