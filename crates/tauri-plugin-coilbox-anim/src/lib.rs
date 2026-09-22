@@ -3,7 +3,8 @@
 //! animation scripts. ACL identifier: `coilbox-anim`. See `PORTING.md` for the
 //! byte-exact porting spec and golden-test harness.
 //!
-//! Implemented: `anim_cob_disasm` (disassemble a `.cob`), `anim_bos2cob`
+//! Implemented: `anim_cob_disasm` (disassemble a `.cob`), `anim_cob_decompile`
+//! (rebuild recompilable BOS from a `.cob`), `anim_bos2cob`
 //! (compile a `.bos` to `.cob`, byte-exact vs the Python reference), `anim_cob_run`
 //! (play a `.cob`) and `anim_bos2lua` (convert a `.bos` to a Lua unit script,
 //! through `coilbox-bos2lua`). See PORTING.md for the porting spec and
@@ -15,6 +16,7 @@ mod bos_disk;
 mod cob;
 mod cobrun;
 mod compiler;
+mod decompile;
 mod disasm;
 mod fold;
 mod grammar;
@@ -51,14 +53,33 @@ pub fn compile_bos_with_warnings(
 ) -> Result<(Vec<u8>, Vec<String>), String> {
     let source = source.to_string();
     let include_dir = include_dir.to_path_buf();
+    on_large_stack("bos2cob", move || compile_inner(&source, &include_dir))
+}
+
+pub use decompile::Decompiled;
+
+/// Rebuild BOS source from COB bytes, written so that [`compile_bos`] turns it
+/// back into the same bytes. A script BOS cannot express is left as a comment
+/// that fails to compile, and named in `warnings`.
+///
+/// On the same large-stack thread as the compiler, since each nested block in
+/// the script is one level of recursion.
+pub fn decompile_cob(bytes: &[u8]) -> Result<Decompiled, String> {
+    let bytes = bytes.to_vec();
+    on_large_stack("cob2bos", move || decompile::decompile(&bytes))
+}
+
+/// Run `work` on a dedicated large-stack thread so deeply nested input cannot
+/// overflow and abort the process, turning any internal panic into an error.
+fn on_large_stack<T: Send + 'static>(
+    name: &str,
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
     std::thread::Builder::new()
-        .name("bos2cob".into())
+        .name(name.into())
         .stack_size(64 * 1024 * 1024)
         .spawn(move || {
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                compile_inner(&source, &include_dir)
-            }))
-            .unwrap_or_else(|p| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(work)).unwrap_or_else(|p| {
                 Err(format!(
                     "internal compiler error: {}",
                     panic_message(p.as_ref())
@@ -128,6 +149,105 @@ async fn anim_cob_disasm_bytes(bytes: Vec<u8>) -> CliResult {
         }
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("disasm task failed: {e}")),
+    }
+}
+
+/// `anim_cob_decompile`: rebuild BOS source from a `.cob`, which `anim_bos2cob`
+/// compiles back into the same bytes. Writes it to `output` as well when given,
+/// which must be a `.bos`.
+#[tauri::command]
+async fn anim_cob_decompile(path: String, output: Option<String>) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<Decompiled, String> {
+        if let Some(output) = &output {
+            if !output.to_lowercase().ends_with(".bos") {
+                return Err(format!("{output} is not a .bos file"));
+            }
+        }
+        let bytes = std::fs::read(&path).map_err(|e| format!("could not read {path}: {e}"))?;
+        let decompiled = decompile_cob(&bytes)?;
+        if let Some(output) = &output {
+            std::fs::write(output, &decompiled.source)
+                .map_err(|e| format!("could not write {output}: {e}"))?;
+        }
+        Ok(decompiled)
+    })
+    .await;
+    match result {
+        Ok(Ok(d)) => CliResult::ok(json!({ "source": d.source, "warnings": d.warnings })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("decompile task failed: {e}")),
+    }
+}
+
+/// `anim_cob_hex`: the bytes of a `.cob` as a hex dump, for reading the file
+/// itself rather than the scripts in it.
+#[tauri::command]
+async fn anim_cob_hex(path: String) -> CliResult {
+    let result =
+        tauri::async_runtime::spawn_blocking(move || -> Result<(String, usize), String> {
+            let bytes = std::fs::read(&path).map_err(|e| format!("could not read {path}: {e}"))?;
+            Ok((hex_dump(&bytes), bytes.len()))
+        })
+        .await;
+    match result {
+        Ok(Ok((dump, len))) => CliResult::ok(json!({ "dump": dump, "bytes": len })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("hex dump task failed: {e}")),
+    }
+}
+
+/// Sixteen bytes a line: offset, the bytes, then the printable ones.
+fn hex_dump(bytes: &[u8]) -> String {
+    use std::fmt::Write;
+    let mut out = String::with_capacity(bytes.len() * 5);
+    for (row, chunk) in bytes.chunks(16).enumerate() {
+        let _ = write!(out, "{:08x} ", row * 16);
+        for (i, b) in chunk.iter().enumerate() {
+            let _ = write!(out, "{}{b:02x}", if i == 8 { "  " } else { " " });
+        }
+        let padding = (16 - chunk.len()) * 3 + usize::from(chunk.len() <= 8);
+        let text: String = chunk
+            .iter()
+            .map(|b| {
+                if b.is_ascii_graphic() || *b == b' ' {
+                    *b as char
+                } else {
+                    '.'
+                }
+            })
+            .collect();
+        let _ = writeln!(out, "{:padding$}  |{text}|", "");
+    }
+    out
+}
+
+#[cfg(test)]
+mod hex_tests {
+    #[test]
+    fn dumps_sixteen_bytes_a_line() {
+        let bytes: Vec<u8> = (0u8..=20).collect();
+        let dump = super::hex_dump(&bytes);
+        let lines: Vec<&str> = dump.lines().collect();
+        assert_eq!(
+            lines[0],
+            "00000000  00 01 02 03 04 05 06 07  08 09 0a 0b 0c 0d 0e 0f  |................|"
+        );
+        assert!(
+            lines[1].starts_with("00000010  10 11 12 13 14  "),
+            "{}",
+            lines[1]
+        );
+        assert!(lines[1].ends_with("|.....|"), "{}", lines[1]);
+        // A short last line keeps the text column where the full lines put it.
+        assert_eq!(
+            lines[0].find('|'),
+            lines[1].find('|'),
+            "{}\n{}",
+            lines[0],
+            lines[1]
+        );
+        let text = super::hex_dump(b"Create\0AB");
+        assert!(text.ends_with("|Create.AB|\n"), "{text}");
     }
 }
 
@@ -378,6 +498,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             anim_cob_disasm,
             anim_cob_disasm_bytes,
+            anim_cob_decompile,
+            anim_cob_hex,
             anim_cob_run,
             anim_bos2cob,
             anim_bos2lua,
