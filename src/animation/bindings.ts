@@ -35,6 +35,26 @@ export const animCobDisasmBytes = defineCommand<
 >("coilbox-anim", "anim_cob_disasm_bytes");
 
 /**
+ * Rebuild BOS source from a `.cob`, which `animBos2cob` compiles back into the
+ * same bytes. Pass `output` (a `.bos` path) to write it out as well.
+ *
+ * A script that does something BOS cannot say comes back as a comment holding
+ * its disassembly, plus a line that will not compile, and is named in
+ * `warnings`. Nothing that cannot be rebuilt is guessed at.
+ */
+export const animCobDecompile = defineCommand<
+  { path: string; output?: string },
+  { source: string; warnings: string[] }
+>("coilbox-anim", "anim_cob_decompile");
+
+/** The bytes of a `.cob` as a hex dump, for reading the file rather than the
+ *  scripts in it. */
+export const animCobHex = defineCommand<
+  { path: string },
+  { dump: string; bytes: number }
+>("coilbox-anim", "anim_cob_hex");
+
+/**
  * Play a `.cob` and report where its pieces are on each frame.
  *
  * The disassembly makes a compiled script legible. This makes it move, which is
