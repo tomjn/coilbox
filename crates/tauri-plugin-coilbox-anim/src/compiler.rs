@@ -2,12 +2,12 @@
 //! parse tree and emits the COB instruction stream, then hands it to the COB
 //! container writer (`cob::encode`).
 //!
-//! Byte-exactness landmines handled here (see PORTING.md §7):
-//! - plain constants use Python `round()` (ties-to-even), bracket constants use
-//!   `int()` truncation;
-//! - a function gets a trailing `RETURN` only if it doesn't already end in one;
+//! Byte-exactness landmines handled here (see PORTING.md, byte-exactness hazards).
+//! - both plain and bracket constants use `int()` truncation toward zero
+//!   (Rust's `as i64` on an `f64` matches).
+//! - a function gets a trailing `RETURN` only if it doesn't already end in one.
 //! - `keywordStatement` reverses its children (except `set`/`attach-unit`) and
-//!   then reverses the collected int operands again — net declared order;
+//!   then reverses the collected int operands again, net declared order.
 //! - if/while jump targets are absolute word offsets into the whole script-code
 //!   stream, back-patched by overwriting a 4-byte placeholder.
 
@@ -43,6 +43,10 @@ fn get_signed_num(n: i64) -> [u8; 4] {
 pub struct Compiler {
     static_vars: Vec<String>,
     local_vars: Vec<String>,
+    /// Every local-var name ever created, across all functions (`local_vars`
+    /// is cleared per function). Used only for the piece-name-uniqueness
+    /// check in `parse_file`.
+    all_local_vars: Vec<String>,
     pieces: Vec<String>,
     functions: Vec<String>,
     code: Vec<u8>,
@@ -57,6 +61,7 @@ impl Compiler {
         let mut c = Compiler {
             static_vars: Vec::new(),
             local_vars: Vec::new(),
+            all_local_vars: Vec::new(),
             pieces: Vec::new(),
             functions: Vec::new(),
             code: Vec::new(),
@@ -136,7 +141,22 @@ impl Compiler {
                 }
             }
         }
-        self.parse_children(node)
+        self.parse_children(node)?;
+
+        // A piece name must not double as a static-var or local-var name
+        // (across every function, since a piece is pushed as a variable and
+        // the two namespaces would otherwise collide).
+        let mut var_names: std::collections::HashSet<String> =
+            self.static_vars.iter().map(|v| v.to_lowercase()).collect();
+        var_names.extend(self.all_local_vars.iter().map(|v| v.to_lowercase()));
+        for piece_name in &self.pieces {
+            if var_names.contains(&piece_name.to_lowercase()) {
+                return Err(format!(
+                    "Piece name \"{piece_name}\" cannot be used as a static-var or local variable. Piece names must be unique overall!"
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn parse_static_var_dec(&mut self, node: &Node) -> Result<(), String> {
@@ -237,7 +257,8 @@ impl Compiler {
                 "Local-var named \"{name}\" already exists. Multiple definitions are not allowed!"
             ));
         }
-        self.local_vars.push(name);
+        self.local_vars.push(name.clone());
+        self.all_local_vars.push(name);
         Ok(())
     }
 
@@ -295,7 +316,24 @@ impl Compiler {
         };
 
         let mut arguments: Vec<i64> = Vec::new();
+
+        // emit-sfx's `from` clause is a compile-time-constant piece
+        // expression, not a plain piece name, so its index is resolved up
+        // front and the expression is skipped in the generic loop below
+        // (compared by identity, since the emit-sfx node has two `expression`
+        // children and only this one is special).
+        let emit_sfx_from: Option<*const Node> = if keyword == "emit-sfx" {
+            let from_expr = &node.children[5];
+            arguments.push(self.get_emit_sfx_piece(from_expr)?);
+            Some(from_expr as *const Node)
+        } else {
+            None
+        };
+
         for child in children {
+            if emit_sfx_from == Some(child as *const Node) {
+                continue;
+            }
             match child.ntype.as_str() {
                 "pieceName" => {
                     let name = child.get_text();
@@ -359,6 +397,37 @@ impl Compiler {
             self.emit(&get_num(*arg));
         }
         Ok(())
+    }
+
+    /// `get_emit_sfx_piece`, resolve emit-sfx's `from` expression to a piece
+    /// index at compile time. By the time this runs, `fold.rs` has already
+    /// folded any arithmetic on piece names, so the expression must be either
+    /// a bare piece name or a single already-folded constant.
+    fn get_emit_sfx_piece(&self, expr: &Node) -> Result<i64, String> {
+        let bad_expr = || {
+            format!(
+                "emit-sfx 'from' must be a compile-time constant piece expression: {}",
+                expr.get_text()
+            )
+        };
+        if expr.children.len() != 1 {
+            return Err(bad_expr());
+        }
+        let term = &expr.children[0];
+        if term.ntype != "term" || term.children.len() != 1 {
+            return Err(bad_expr());
+        }
+        let child = &term.children[0];
+        if child.ntype == "varName" {
+            let name = child.get_text();
+            return index_of(&self.pieces, &name)
+                .map(|i| i as i64)
+                .ok_or_else(|| format!("Piece not found: {name}"));
+        }
+        match crate::fold::constant_value(child) {
+            Some(value) if value >= 0 && (value as usize) < self.pieces.len() => Ok(value),
+            _ => Err(format!("emit-sfx piece out of range: {}", expr.get_text())),
+        }
     }
 
     fn parse_rand(&mut self, node: &Node) -> Result<(), String> {
@@ -482,7 +551,7 @@ impl Compiler {
         let value: i64 = if node.children.len() == 1 {
             let text = node.get_text();
             let f: f64 = text.parse().map_err(|_| format!("bad constant: {text}"))?;
-            f.round_ties_even() as i64
+            f as i64
         } else {
             let inner: f64 = node.children[1]
                 .get_text()
@@ -555,7 +624,9 @@ impl Compiler {
 }
 
 /// `OPS_PRECEDENCE` (bos2cob_py3.py L256-281). Lower = higher precedence.
-fn precedence(op: &str) -> u8 {
+/// `pub(crate)`: `fold.rs`'s island safety checks need the same table so an
+/// island can never disagree with codegen about which operator binds first.
+pub(crate) fn precedence(op: &str) -> u8 {
     match op {
         "*" | "/" | "%" => 1,
         "+" | "-" => 2,

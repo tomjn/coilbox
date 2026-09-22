@@ -1,312 +1,334 @@
-//! Constant folder — a port of `Node.fold_node` (bos2cob_py3.py L361-469) plus
-//! the fixpoint driver in `main()`. Post-order, one transform per node per pass;
-//! the driver re-runs until no fold occurs.
+//! Constant folder, a port of `Node.fold_node`, `fold_expression`,
+//! `constant_value`, `term_constant_value`, `island_starts_safe`,
+//! `island_ends_safe`, `evaluate_island` and `collect_piece_names`
+//! (bos2cob_py3.py, "Rewrite constant folding" and "Add compile-time-constant
+//! folding to emit-sfx"). Post-order, single pass: children are folded before
+//! their parent, so nested parentheses and chained operators resolve in one
+//! tree walk with no fixpoint loop.
 //!
-//! Byte-exactness hazards (PORTING.md §7):
-//! - division folds that yield `abs(result) < 1` with a nonzero numerator are
-//!   SKIPPED (left for the runtime `DIV`);
-//! - arithmetic uses Python `eval` typing: `int op int -> int`, anything with a
-//!   float -> float, `/` is always float; bitwise `& | ^` require ints (folding
-//!   is skipped — like Python's `TypeError` — when an operand is a float);
-//! - `str(result)` distinguishes int from float text, which decides whether a
-//!   later pass can re-fold the value.
+//! Byte-exactness notes (PORTING.md, byte-exactness hazards):
+//! - folding only ever combines a run of terms (an "island") where the
+//!   operator just before the island and the operator just after it cannot
+//!   change meaning from the grouping, checked by `island_starts_safe` and
+//!   `island_ends_safe` against real operator precedence.
+//! - all folded values are plain 32-bit integers. `/` truncates toward zero
+//!   and `%` takes the sign of the left operand (C semantics), not Python's
+//!   floor semantics.
+//! - a fold that would divide/mod by zero or overflow `i32` is skipped,
+//!   leaving the runtime opcode in place.
+//! - a piece name is a compile-time constant too (its index in the piece
+//!   list), so `base + 1` folds the same way a literal would.
 
+use crate::compiler::precedence;
 use crate::parser::Node;
+use std::collections::HashMap;
 
 pub const LINEAR_SCALE: i64 = 65536;
 pub const ANGULAR_SCALE: i64 = 182;
 
-/// `OPS_PYEVAL_PRECEDENCE` (L254) — the order folds are attempted in.
-const OPS_PYEVAL_PRECEDENCE: [&str; 8] = ["%", "*", "/", "+", "-", "|", "&", "^"];
+const INT32_MIN: i64 = -2147483648;
+const INT32_MAX: i64 = 2147483647;
 
-/// Fold the tree to a fixpoint (mirrors the `while folds > 0` loop in `main`).
+/// `FOLDABLE_OPS`, operators `fold_expression` will combine.
+const FOLDABLE_OPS: [&str; 8] = ["+", "-", "*", "/", "%", "&", "|", "^"];
+/// `ASSOCIATIVE_OPS`, operators that may start an island at an equal-precedence
+/// boundary, because repeating the same associative operator can't change
+/// which operand belongs to which side.
+const ASSOCIATIVE_OPS: [&str; 5] = ["+", "*", "&", "|", "^"];
+
+/// Fold the tree in a single post-order pass, using piece names collected from
+/// the whole tree as compile-time constants (their index in the piece list).
 pub fn fold_tree(root: &mut Node) {
-    let mut folds = fold_node(root);
-    while folds > 0 {
-        folds = fold_node(root);
-    }
+    let piece_map = build_piece_map(root);
+    fold_node(root, &piece_map);
 }
 
-fn fold_node(node: &mut Node) -> i64 {
-    let mut foldcount = 0;
-    for child in &mut node.children {
-        foldcount += fold_node(child);
-    }
-
-    match node.ntype.as_str() {
-        "signedFloatConstant" => negative_collapse(node),
-        "constant" => bracket_scale(node),
-        "expression" => foldcount += fold_expression(node),
-        "term" => foldcount += paren_collapse(node),
-        _ => {}
-    }
-    foldcount
+fn build_piece_map(root: &Node) -> HashMap<String, i64> {
+    let mut names = Vec::new();
+    collect_piece_names(root, &mut names);
+    names
+        .into_iter()
+        .enumerate()
+        .map(|(i, name)| (name.to_lowercase(), i as i64))
+        .collect()
 }
 
-/// `signedFloatConstant [-, X]` -> single `floatConstant` with text `-X`.
-fn negative_collapse(node: &mut Node) {
-    if node.children.len() == 2 && node.children[0].text.as_deref() == Some("-") {
-        node.children.remove(0);
-        if let Some(t) = node.children[0].text.as_mut() {
-            *t = format!("-{t}");
-        }
-    }
-}
-
-/// `[X]` -> `X*65536`, `<X>` -> `X*182`; pops the bracket symbols.
-fn bracket_scale(node: &mut Node) {
-    if node.children.len() != 3 {
-        return;
-    }
-    let sym1 = node.children[0].text.clone();
-    let sym2 = node.children[2].text.clone();
-    let scale = match (sym1.as_deref(), sym2.as_deref()) {
-        (Some("["), Some("]")) => LINEAR_SCALE,
-        (Some("<"), Some(">")) => ANGULAR_SCALE,
-        _ => return,
-    };
-    node.children.remove(2);
-    node.children.remove(0);
-    // children[0] is now the signedFloatConstant; its floatConstant child holds
-    // the value text.
-    if let Some(float_node) = node.children[0].children.get_mut(0) {
-        if let Some(t) = float_node.text.as_ref() {
-            if let Ok(v) = t.parse::<f64>() {
-                float_node.text = Some(py_float_str(v * scale as f64));
+/// `collect_piece_names`, walk the whole tree gathering every `pieceDec`'s
+/// names, in declared order (so the index matches the piece list the
+/// compiler builds later).
+fn collect_piece_names(node: &Node, names: &mut Vec<String>) {
+    if node.ntype == "pieceDec" {
+        names.push(node.children[1].get_text());
+        for child in &node.children[2..] {
+            if child.ntype == "commaPiece" {
+                names.push(child.children[1].get_text());
             }
         }
     }
+    for child in &node.children {
+        collect_piece_names(child, names);
+    }
 }
 
-/// `( signedFloatConstant )` term -> the inner constant.
-fn paren_collapse(node: &mut Node) -> i64 {
-    if node.children.len() != 3 {
+fn fold_node(node: &mut Node, piece_map: &HashMap<String, i64>) -> i64 {
+    let mut count = 0;
+    for child in &mut node.children {
+        count += fold_node(child, piece_map);
+    }
+
+    if node.ntype == "term" && node.children.len() == 3 {
+        count += paren_collapse(node, piece_map);
+    } else if node.ntype == "expression" {
+        count += fold_expression(node, piece_map);
+    }
+    count
+}
+
+/// `( expression )` where the expression is a single compile-time-constant
+/// term collapses to that term's child directly (a `constant` node, or a
+/// `varName` node when a piece name folded via `piece_map`).
+fn paren_collapse(node: &mut Node, piece_map: &HashMap<String, i64>) -> i64 {
+    let is_paren = node.children[0].ntype == "symbol"
+        && node.children[2].ntype == "symbol"
+        && node.children[0].get_text() == "("
+        && node.children[2].get_text() == ")"
+        && node.children[1].ntype == "expression"
+        && node.children[1].children.len() == 1;
+    if !is_paren {
         return 0;
     }
-    if node.children[0].ntype != "symbol"
-        || node.children[2].ntype != "symbol"
-        || node.children[1].children.len() != 1
-    {
+    if term_constant_value(&node.children[1].children[0], piece_map).is_none() {
         return 0;
     }
-    let inner_term = &node.children[1].children[0];
-    if term_float_node(inner_term).is_none() {
-        return 0;
-    }
-    let constant = node.children[1].children[0].children[0].clone();
-    node.children = vec![constant];
+    let inner = node.children[1].children[0].children[0].clone();
+    node.children = vec![inner];
     1
 }
 
-/// Fold adjacent constant pairs in an expression (`L392-441`).
-///
-/// Reference quirk: the left operand (`term1`) can ONLY be the child at index
-/// `i` when that child is itself a bare constant `term`. The Python branch that
-/// would let `term1` come from an `opterm`'s right term is dead code: it ANDs in
-/// the result of `term_is_a_signedFloatConstant()`, which is a `floatConstant`
-/// Node whose `__len__()` is 0 and therefore falsy. Since expression children
-/// are `[term, opterm, opterm, …]`, this means folding only ever chains from the
-/// leading term — e.g. `y + 1 * 2` folds nothing, but `1 * 2 + y` folds `1*2`.
-fn fold_expression(node: &mut Node) -> i64 {
-    let mut foldcount = 0;
-    for pyop in OPS_PYEVAL_PRECEDENCE {
-        let mut i = 0usize;
-        while i + 1 < node.children.len() {
-            let Some(t1) = term_float_node(&node.children[i]).map(|f| f.get_text()) else {
-                i += 1;
-                continue;
+/// `constant_value`, the compile-time value of a `constant` node: `int(scale
+/// * float(raw))`, where `raw` is the whole node's text (so both the plain
+/// `signedFloatConstant`/`signedIntegerConstant` form and a folded
+/// `integerConstant` leaf work the same way) and `scale` is `LINEAR_SCALE`
+/// for `[X]`, `ANGULAR_SCALE` for `<X>`, or `1` for a plain number.
+pub(crate) fn constant_value(node: &Node) -> Option<i64> {
+    if node.ntype != "constant" {
+        return None;
+    }
+    let (scale, raw) = match node.children.len() {
+        3 => {
+            let scale = match (
+                node.children[0].get_text().as_str(),
+                node.children[2].get_text().as_str(),
+            ) {
+                ("[", "]") => LINEAR_SCALE,
+                ("<", ">") => ANGULAR_SCALE,
+                _ => return None,
             };
-
-            let opterm = &node.children[i + 1];
-            if opterm.ntype != "opterm"
-                || opterm.children.len() < 2
-                || opterm.children[0].ntype != "op"
-            {
-                i += 1;
-                continue;
-            }
-            let Some(t2) = term_float_node(&opterm.children[1]).map(|f| f.get_text()) else {
-                i += 1;
-                continue;
-            };
-            let op = opterm.children[0].get_text();
-            if op != pyop {
-                i += 1;
-                continue;
-            }
-
-            match eval_binop(&t1, &op, &t2) {
-                Some(result) => {
-                    if let Some(float_node) = term_float_node_mut(&mut node.children[i]) {
-                        float_node.text = Some(result);
-                    }
-                    node.children.remove(i + 1);
-                    foldcount += 1;
-                    // do not advance i: keep folding into the same left term
-                }
-                None => i += 1,
-            }
+            (scale, node.children[1].get_text())
         }
-    }
-    foldcount
-}
-
-/// `term_is_a_signedFloatConstant` (L350-359): the `floatConstant` leaf of a
-/// `term -> constant -> signedFloatConstant -> floatConstant` chain, or `None`.
-fn term_float_node(term: &Node) -> Option<&Node> {
-    if term.ntype != "term" || term.children.len() != 1 {
-        return None;
-    }
-    let constant = &term.children[0];
-    if constant.ntype != "constant" || constant.children.len() != 1 {
-        return None;
-    }
-    let sfc = &constant.children[0];
-    if sfc.ntype != "signedFloatConstant" || sfc.children.len() != 1 {
-        return None;
-    }
-    let float = &sfc.children[0];
-    if float.ntype != "floatConstant" || !float.children.is_empty() {
-        return None;
-    }
-    Some(float)
-}
-
-fn term_float_node_mut(term: &mut Node) -> Option<&mut Node> {
-    if term.ntype != "term" || term.children.len() != 1 {
-        return None;
-    }
-    let constant = &mut term.children[0];
-    if constant.ntype != "constant" || constant.children.len() != 1 {
-        return None;
-    }
-    let sfc = &mut constant.children[0];
-    if sfc.ntype != "signedFloatConstant" || sfc.children.len() != 1 {
-        return None;
-    }
-    let float = &mut sfc.children[0];
-    if float.ntype != "floatConstant" || !float.children.is_empty() {
-        return None;
-    }
-    Some(float)
-}
-
-/// A folded numeric value, tracking int-vs-float like Python's `eval`.
-#[derive(Clone, Copy)]
-enum Num {
-    Int(i64),
-    Float(f64),
-}
-
-impl Num {
-    fn as_f64(self) -> f64 {
-        match self {
-            Num::Int(i) => i as f64,
-            Num::Float(f) => f,
-        }
-    }
-    fn as_int(self) -> Option<i64> {
-        match self {
-            Num::Int(i) => Some(i),
-            Num::Float(_) => None, // bitwise on a float is a TypeError in Python
-        }
-    }
-    fn to_py_str(self) -> String {
-        match self {
-            Num::Int(i) => i.to_string(),
-            Num::Float(f) => py_float_str(f),
-        }
-    }
-}
-
-fn parse_num(s: &str) -> Option<Num> {
-    let s = s.trim();
-    let looks_float = s.contains('.')
-        || s.contains('e')
-        || s.contains('E')
-        || s.contains("inf")
-        || s.contains("nan");
-    if looks_float {
-        s.parse::<f64>().ok().map(Num::Float)
-    } else {
-        s.parse::<i64>()
-            .ok()
-            .map(Num::Int)
-            .or_else(|| s.parse::<f64>().ok().map(Num::Float))
-    }
-}
-
-/// Evaluate `a op b` with Python semantics; `None` means "don't fold" (the
-/// reference's `except` path: division-below-one or a bitwise type error).
-fn eval_binop(a: &str, op: &str, b: &str) -> Option<String> {
-    let a = parse_num(a)?;
-    let b = parse_num(b)?;
-    let result = match op {
-        "+" => arith(a, b, |x, y| x + y, |x, y| x + y),
-        "-" => arith(a, b, |x, y| x - y, |x, y| x - y),
-        "*" => arith(a, b, |x, y| x * y, |x, y| x * y),
-        "/" => {
-            // Python 3 `/` is always float.
-            let r = a.as_f64() / b.as_f64();
-            if r.abs() < 1.0 && a.as_f64() != 0.0 {
-                return None; // skip: leave as runtime DIV
-            }
-            Num::Float(r)
-        }
-        "%" => arith(a, b, py_mod_i, py_mod_f),
-        "&" | "|" | "^" => {
-            let (ia, ib) = (a.as_int()?, b.as_int()?);
-            Num::Int(match op {
-                "&" => ia & ib,
-                "|" => ia | ib,
-                "^" => ia ^ ib,
-                _ => unreachable!(),
-            })
-        }
+        1 => (1, node.children[0].get_text()),
         _ => return None,
     };
-    Some(result.to_py_str())
+    let raw: f64 = raw.parse().ok()?;
+    Some((scale as f64 * raw) as i64)
 }
 
-fn arith(a: Num, b: Num, fi: fn(i64, i64) -> i64, ff: fn(f64, f64) -> f64) -> Num {
-    match (a, b) {
-        (Num::Int(x), Num::Int(y)) => Num::Int(fi(x, y)),
-        _ => Num::Float(ff(a.as_f64(), b.as_f64())),
+/// `term_constant_value`, the compile-time value of a bare `term`: a piece
+/// name looked up in `piece_map` (its index), or `constant_value` of the
+/// term's single child.
+fn term_constant_value(term: &Node, piece_map: &HashMap<String, i64>) -> Option<i64> {
+    if term.ntype != "term" || term.children.len() != 1 {
+        return None;
     }
+    let child = &term.children[0];
+    if child.ntype == "varName" {
+        return piece_map.get(&child.get_text().to_lowercase()).copied();
+    }
+    constant_value(child)
 }
 
-/// Python floored modulo (sign follows the divisor).
-fn py_mod_i(a: i64, b: i64) -> i64 {
-    let r = a % b;
-    if r != 0 && (r < 0) != (b < 0) {
-        r + b
-    } else {
-        r
+/// `island_starts_safe`, an island may open at position `k` (`k == 0`
+/// always may) only if the operator right before it doesn't bind tighter than
+/// the island's own first operator, or ties with it via a repeated
+/// associative operator.
+fn island_starts_safe(children: &[Node], k: usize) -> bool {
+    if k == 0 {
+        return true;
     }
+    let left_op = children[k].children[0].get_text();
+    let first_op = children[k + 1].children[0].get_text();
+    let (lp, fp) = (precedence(&left_op), precedence(&first_op));
+    if fp < lp {
+        return true;
+    }
+    fp == lp && left_op == first_op && ASSOCIATIVE_OPS.contains(&first_op.as_str())
 }
 
-fn py_mod_f(a: f64, b: f64) -> f64 {
-    let r = a % b;
-    if r != 0.0 && (r < 0.0) != (b < 0.0) {
-        r + b
-    } else {
-        r
+/// `island_ends_safe`, an island may close at position `m` (end-of-expression
+/// always may) only if its own last operator doesn't bind looser than the
+/// operator right after it.
+fn island_ends_safe(children: &[Node], m: usize) -> bool {
+    if m + 1 >= children.len() {
+        return true;
     }
+    let last_op = children[m].children[0].get_text();
+    let boundary_op = children[m + 1].children[0].get_text();
+    precedence(&last_op) <= precedence(&boundary_op)
 }
 
-/// Approximate Python `str(float)`: always carries a decimal point (or exponent)
-/// so a later fold pass treats the value as a float, like the reference.
-fn py_float_str(f: f64) -> String {
-    if !f.is_finite() {
-        return format!("{f}");
+enum Token {
+    Value(i64),
+    Op(String),
+}
+
+/// A fold that can't be done: divide/mod by zero, or a partial or final
+/// result outside `i32`. Either way the island is left unfolded.
+struct FoldError;
+
+fn apply_fold_op(left: i64, op: &str, right: i64) -> Result<i64, FoldError> {
+    let result = match op {
+        "+" => left + right,
+        "-" => left - right,
+        "*" => left * right,
+        "/" => {
+            if right == 0 {
+                return Err(FoldError);
+            }
+            let quotient = left.abs() / right.abs();
+            if (left < 0) == (right < 0) {
+                quotient
+            } else {
+                -quotient
+            }
+        }
+        "%" => {
+            if right == 0 {
+                return Err(FoldError);
+            }
+            let remainder = left.abs() % right.abs();
+            if left >= 0 {
+                remainder
+            } else {
+                -remainder
+            }
+        }
+        "&" => left & right,
+        "|" => left | right,
+        "^" => left ^ right,
+        _ => unreachable!("non-foldable op reached apply_fold_op: {op}"),
+    };
+    if !(INT32_MIN..=INT32_MAX).contains(&result) {
+        return Err(FoldError);
     }
-    if f == f.trunc() && f.abs() < 1e16 {
-        return format!("{}.0", f as i64);
+    Ok(result)
+}
+
+/// `evaluate_island`, reduce a flat `[value, op, value, op, value, ...]` run
+/// with a small shunting-yard, so a mixed-precedence island (e.g. `2 + 1 * 2`)
+/// evaluates the same way the real expression would.
+fn evaluate_island(tokens: &[Token]) -> Result<i64, FoldError> {
+    let mut values: Vec<i64> = Vec::new();
+    let mut pending: Vec<&str> = Vec::new();
+    for token in tokens {
+        match token {
+            Token::Op(op) => {
+                while let Some(top) = pending.last() {
+                    if precedence(top) <= precedence(op) {
+                        let top = pending.pop().unwrap();
+                        let right = values.pop().unwrap();
+                        let left = values.pop().unwrap();
+                        values.push(apply_fold_op(left, top, right)?);
+                    } else {
+                        break;
+                    }
+                }
+                pending.push(op);
+            }
+            Token::Value(v) => {
+                if !(INT32_MIN..=INT32_MAX).contains(v) {
+                    return Err(FoldError);
+                }
+                values.push(*v);
+            }
+        }
     }
-    let s = format!("{f}");
-    if s.contains('.') || s.contains('e') {
-        s
-    } else {
-        format!("{s}.0")
+    while let Some(op) = pending.pop() {
+        let right = values.pop().unwrap();
+        let left = values.pop().unwrap();
+        values.push(apply_fold_op(left, op, right)?);
     }
+    Ok(values[0])
+}
+
+/// `fold_expression`, scan every possible island start `k`, extend it while
+/// the following operators are foldable and their operands are compile-time
+/// constants, then fold the whole island in one shot if both boundaries are
+/// safe. Replaces the folded span with a single `term -> constant ->
+/// integerConstant` node.
+fn fold_expression(node: &mut Node, piece_map: &HashMap<String, i64>) -> i64 {
+    let mut count = 0;
+    let mut k = 0usize;
+    while k < node.children.len() {
+        let term_value = if k == 0 {
+            term_constant_value(&node.children[0], piece_map)
+        } else {
+            term_constant_value(&node.children[k].children[1], piece_map)
+        };
+        let Some(value) = term_value else {
+            k += 1;
+            continue;
+        };
+        if k + 1 >= node.children.len() || !island_starts_safe(&node.children, k) {
+            k += 1;
+            continue;
+        }
+
+        let mut tokens = vec![Token::Value(value)];
+        let mut m = k;
+        while m + 1 < node.children.len() {
+            let op = node.children[m + 1].children[0].get_text();
+            if !FOLDABLE_OPS.contains(&op.as_str()) {
+                break;
+            }
+            let Some(right) = term_constant_value(&node.children[m + 1].children[1], piece_map)
+            else {
+                break;
+            };
+            tokens.push(Token::Op(op));
+            tokens.push(Token::Value(right));
+            m += 1;
+        }
+
+        if m == k || !island_ends_safe(&node.children, m) {
+            k = if m > k { m + 1 } else { k + 1 };
+            continue;
+        }
+
+        match evaluate_island(&tokens) {
+            Ok(result) => {
+                let mut constant = Node::new("constant");
+                let mut leaf = Node::new("integerConstant");
+                leaf.text = Some(result.to_string());
+                constant.children.push(leaf);
+                let mut new_term = Node::new("term");
+                new_term.children.push(constant);
+
+                if k == 0 {
+                    node.children.splice(0..=m, [new_term]);
+                } else {
+                    node.children[k].children[1] = new_term;
+                    node.children.drain(k + 1..=m);
+                }
+                count += 1;
+                k += 1;
+            }
+            Err(FoldError) => {
+                // Matches the reference: leave the runtime opcodes in place
+                // rather than folding a divide-by-zero or an
+                // out-of-i32-range result.
+                k = m + 1;
+            }
+        }
+    }
+    count
 }
