@@ -53,11 +53,13 @@ pub struct Compiler {
     total_offset: u32,
     functions_code: HashMap<String, Vec<u8>>,
     cob_version: u32,
+    warnings: Vec<String>,
 }
 
 impl Compiler {
-    /// Compile a parsed (and folded) `root` node to COB bytes.
-    pub fn compile(root: &Node, cob_version: u32) -> Result<Vec<u8>, String> {
+    /// Compile a parsed (and folded) `root` node to COB bytes, with anything
+    /// worth saying about what was compiled.
+    pub fn compile(root: &Node, cob_version: u32) -> Result<(Vec<u8>, Vec<String>), String> {
         let mut c = Compiler {
             static_vars: Vec::new(),
             local_vars: Vec::new(),
@@ -68,15 +70,17 @@ impl Compiler {
             total_offset: 0,
             functions_code: HashMap::new(),
             cob_version,
+            warnings: Vec::new(),
         };
         c.parse(root)?;
-        Ok(cob::encode(
+        let bytes = cob::encode(
             &c.functions,
             &c.functions_code,
             &c.pieces,
             &c.static_vars,
             c.cob_version,
-        ))
+        );
+        Ok((bytes, c.warnings))
     }
 
     fn current_offset(&self) -> u32 {
@@ -308,6 +312,19 @@ impl Compiler {
             i += 2;
         }
 
+        // A scale statement names an axis that the engine has no use for: it
+        // scales the whole piece, and `CobThread.cpp` reads a piece and
+        // nothing else for the scale opcodes. BARScriptCompiler writes the
+        // axis anyway, where the engine reads it as its next instruction and
+        // the script stops. Parse the axis, since that is the syntax scripts
+        // are written in, then leave it out of the file and say so.
+        let scaling = keyword == "scale" || keyword == "wait-for-scale";
+        if scaling {
+            self.warnings.push(format!(
+                "`{keyword}` ignores the axis it is given, because the engine scales the whole piece."
+            ));
+        }
+
         // Declared order for set/attach-unit; reversed otherwise.
         let children: Vec<&Node> = if keyword == "set" || keyword == "attach-unit" {
             node.children.iter().collect()
@@ -353,7 +370,9 @@ impl Compiler {
                         .iter()
                         .position(|a| *a == letter)
                         .ok_or_else(|| format!("Unknown axis: {letter}"))?;
-                    arguments.push(idx as i64);
+                    if !scaling {
+                        arguments.push(idx as i64);
+                    }
                 }
                 "expression" => self.parse(child)?,
                 "expressionList" => {

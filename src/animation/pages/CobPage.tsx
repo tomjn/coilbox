@@ -1,11 +1,12 @@
 import { Button, Drawer } from "@picoframe/frame";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { ask, open } from "@tauri-apps/plugin-dialog";
+import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   AlertCircle,
   Binary,
   CheckCircle2,
+  FileCode,
   FolderOpen,
   FolderSearch,
   Hammer,
@@ -16,21 +17,59 @@ import {
 import { useEffect, useState } from "react";
 import { SEVERITY_COLOR, worstSeverity } from "@/components/CheckItem";
 import { PageHeader } from "@/components/PageHeader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { errorText } from "@/lib/helpers";
 import {
   animBos2cob,
   animBosLint,
   animBosRead,
+  animCobDecompile,
   animCobDisasm,
-  type LintDiagnostic,
+  animCobHex,
 } from "../bindings";
+import {
+  type CobSession,
+  EMPTY_COB_SESSION,
+  updateCobSession,
+  useCobSession,
+} from "../cobSession";
 import { LintProblems } from "./LintProblems";
 
 const COB = /\.cob$/i;
 const BOS = /\.bos$/i;
 
-type Kind = "bos" | "cob";
+/** One read-only panel of monospaced text, the same in all three tabs. */
+function ScriptText({ value }: { value: string }) {
+  return (
+    <Textarea
+      value={value}
+      readOnly
+      spellCheck={false}
+      className="h-full min-h-0 resize-none bg-card/30 font-mono text-xs leading-relaxed"
+    />
+  );
+}
+
+/** What each tab is showing, which depends on which file was opened: a `.bos`
+ *  brings its own source, and a `.cob` has one rebuilt from its instructions. */
+const VIEW_NOTES = {
+  bos: {
+    bos: "The source that was compiled, as it is on disk.",
+    cob: "Source rebuilt from the file. Compiling it gives back this .cob.",
+  },
+  cob: {
+    bos: "The bytes that were written, sixteen to a line.",
+    cob: "The bytes of the file, sixteen to a line.",
+  },
+  opcodes: {
+    bos: "The instructions those bytes hold.",
+    cob: "The instructions in the file, as they are stored.",
+  },
+} as const;
+/** Which reading of the script is on screen. The same file is all three: the
+ *  source, the bytes it compiles to, and the instructions in those bytes. */
+type View = CobSession["view"];
 type Banner = { kind: "success" | "info" | "error"; text: string };
 
 const BANNER_STYLES: Record<Banner["kind"], string> = {
@@ -43,22 +82,32 @@ const BANNER_ICONS = { success: CheckCircle2, info: Info, error: AlertCircle };
 
 /**
  * COB tools: compile a `.bos` unit script to `.cob` (byte-exact with the
- * BARScriptCompiler reference, see the crate's PORTING.md) and disassemble a
- * `.cob` into its scripts, pieces, and opcode stream. Pick files or drag them
- * in — `.bos` compiles, `.cob` disassembles. Re-run repeats the last action on
- * the same file; Reveal opens it in the OS file manager.
+ * BARScriptCompiler reference, see the crate's PORTING.md), or open a `.cob`
+ * and read it as source, as bytes and as the instructions it holds. Pick files
+ * or drag them in. Re-run repeats the last action on the same file, and Reveal
+ * opens it in the OS file manager.
  */
 export default function CobPage() {
-  const [path, setPath] = useState("");
-  const [kind, setKind] = useState<Kind | null>(null);
-  const [revealTarget, setRevealTarget] = useState("");
-  const [listing, setListing] = useState("");
+  // The file and everything derived from it live in a session store, so
+  // leaving the page and coming back finds it as it was rather than empty.
+  const {
+    path,
+    kind,
+    revealTarget,
+    listing,
+    bos,
+    hex,
+    view,
+    warnings,
+    diagnostics,
+    lintError,
+  } = useCobSession();
+  const set = (patch: Partial<CobSession>) => updateCobSession(patch);
+  // A banner reports what just happened, and busy and dragging are about this
+  // visit, so none of the three are worth carrying back.
   const [banner, setBanner] = useState<Banner | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<LintDiagnostic[]>([]);
-  const [lintError, setLintError] = useState<string | null>(null);
   const [checksOpen, setChecksOpen] = useState(false);
 
   // Lints a .bos once it has compiled, so the same source that just produced
@@ -72,29 +121,62 @@ export default function CobPage() {
         name: p,
         path: p,
       });
-      setDiagnostics(diagnostics);
-      setLintError(error ?? null);
+      set({ diagnostics, lintError: error ?? null });
     } catch (e) {
-      setDiagnostics([]);
-      setLintError(errorText(e));
+      set({ diagnostics: [], lintError: errorText(e) });
     }
   }
 
-  async function disassemble(p: string) {
-    const res = await animCobDisasm({ path: p });
-    setListing(res.listing);
+  // All three readings of the same `.cob` at once, so a tab never waits on a
+  // command. Which one is worth opening on differs: somebody who opened a
+  // compiled file wants the source back, and somebody who just compiled one
+  // wants to see what they produced.
+  async function readCob(p: string) {
+    const [disasm, decompiled, dump] = await Promise.all([
+      animCobDisasm({ path: p }),
+      animCobDecompile({ path: p }),
+      animCobHex({ path: p }),
+    ]);
+    set({
+      listing: disasm.listing,
+      bos: decompiled.source,
+      hex: dump.dump,
+    });
+    return decompiled.warnings;
+  }
+
+  // Write the rebuilt BOS somewhere the user picks. Decompiling again rather
+  // than writing what is on screen keeps the file and the view the same thing.
+  async function saveBos() {
+    const suggested = path.replace(COB, ".bos");
+    const dest = await save({
+      title: "Save the rebuilt .bos",
+      defaultPath: suggested,
+      filters: [{ name: "Unit script source", extensions: ["bos"] }],
+    });
+    if (!dest) return;
+    setBusy(true);
+    try {
+      await animCobDecompile({ path, output: dest });
+      set({ revealTarget: dest });
+      setBanner({ kind: "success", text: `Saved ${dest}.` });
+    } catch (e) {
+      setBanner({ kind: "error", text: errorText(e) });
+    } finally {
+      setBusy(false);
+    }
   }
 
   // Compile a .bos, then disassemble the produced .cob so the result is visible.
   // Asks before overwriting an existing .cob.
   async function compile(p: string, overwrite = false) {
     setBanner(null);
-    setWarnings([]);
     setBusy(true);
-    setPath(p);
-    setKind("bos");
-    setDiagnostics([]);
-    setLintError(null);
+    set({
+      ...EMPTY_COB_SESSION,
+      path: p,
+      kind: "bos",
+    });
     try {
       const res = await animBos2cob({ path: p, overwrite });
       if (res.needsOverwrite) {
@@ -110,13 +192,14 @@ export default function CobPage() {
           });
         return;
       }
-      setRevealTarget(res.output);
       setBanner({
         kind: "success",
         text: `Compiled to ${res.output} (${res.bytes} bytes).`,
       });
-      setWarnings(res.warnings);
-      await disassemble(res.output);
+      set({ revealTarget: res.output, warnings: res.warnings });
+      await readCob(res.output);
+      const { source } = await animBosRead({ path: p });
+      set({ bos: source, view: "opcodes" });
       await lintBos(p);
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
@@ -127,16 +210,15 @@ export default function CobPage() {
 
   async function loadCob(p: string) {
     setBanner(null);
-    setWarnings([]);
     setBusy(true);
-    setPath(p);
-    setKind("cob");
-    setRevealTarget(p);
-    setListing("");
-    setDiagnostics([]);
-    setLintError(null);
+    set({
+      ...EMPTY_COB_SESSION,
+      path: p,
+      kind: "cob",
+      revealTarget: p,
+    });
     try {
-      await disassemble(p);
+      set({ warnings: await readCob(p) });
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
     } finally {
@@ -234,8 +316,8 @@ export default function CobPage() {
         description={
           <>
             Compile a <code>.bos</code> unit script to <code>.cob</code>, or
-            disassemble a <code>.cob</code> into its scripts, pieces, and opcode
-            stream.
+            open a <code>.cob</code> and read it back as source, as bytes, and
+            as the instructions it holds.
           </>
         }
         actions={
@@ -256,6 +338,16 @@ export default function CobPage() {
             >
               <FolderSearch /> Reveal in folder
             </Button>
+            {kind === "cob" && bos && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={saveBos}
+                disabled={busy}
+              >
+                <FileCode /> Save as .bos…
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -324,16 +416,35 @@ export default function CobPage() {
           </ul>
         )}
         {listing ? (
-          <Textarea
-            value={listing}
-            readOnly
-            spellCheck={false}
-            className="min-h-0 flex-1 resize-none bg-card/30 font-mono text-xs leading-relaxed"
-          />
+          <Tabs
+            value={view}
+            onValueChange={(v) => set({ view: v as View })}
+            className="flex min-h-0 flex-1 flex-col gap-3"
+          >
+            <div className="flex shrink-0 items-center justify-between gap-3">
+              <TabsList>
+                <TabsTrigger value="bos">BOS</TabsTrigger>
+                <TabsTrigger value="cob">COB</TabsTrigger>
+                <TabsTrigger value="opcodes">Opcodes</TabsTrigger>
+              </TabsList>
+              <span className="text-xs text-muted-foreground">
+                {VIEW_NOTES[view][kind === "cob" ? "cob" : "bos"]}
+              </span>
+            </div>
+            <TabsContent value="bos" className="min-h-0 flex-1">
+              <ScriptText value={bos} />
+            </TabsContent>
+            <TabsContent value="cob" className="min-h-0 flex-1">
+              <ScriptText value={hex} />
+            </TabsContent>
+            <TabsContent value="opcodes" className="min-h-0 flex-1">
+              <ScriptText value={listing} />
+            </TabsContent>
+          </Tabs>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <Binary size={26} className="opacity-30" />
-            <p>Open or drop a .bos to compile, or a .cob to disassemble.</p>
+            <p>Open or drop a .bos to compile, or a .cob to read back.</p>
             {path && <p className="font-mono text-xs">{path}</p>}
           </div>
         )}

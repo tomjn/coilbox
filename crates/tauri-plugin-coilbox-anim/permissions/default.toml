@@ -1,10 +1,12 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the animation plugin's commands (COB disassembly, running a COB, BOS->COB compilation, BOS->Lua conversion, linting a BOS script, and reading a .bos to convert)."
+description = "Allows the animation plugin's commands (COB disassembly, COB->BOS decompilation, a hex dump of a COB, running a COB, BOS->COB compilation, BOS->Lua conversion, linting a BOS script, and reading a .bos to convert)."
 permissions = [
   "allow-anim-cob-disasm",
   "allow-anim-cob-disasm-bytes",
+  "allow-anim-cob-decompile",
+  "allow-anim-cob-hex",
   "allow-anim-cob-run",
   "allow-anim-bos2cob",
   "allow-anim-bos2lua",

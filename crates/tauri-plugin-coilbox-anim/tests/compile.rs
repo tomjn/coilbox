@@ -65,8 +65,8 @@ fn folds_bos() {
     assert_golden("folds");
 }
 
-/// Remaining animation keywords: spin+accelerate, stop-spin+decelerate, scale,
-/// wait-for-move/scale, cache/dont-cache/dont-shade/dont-shadow, attach-unit
+/// Remaining animation keywords: spin+accelerate, stop-spin+decelerate,
+/// wait-for-move, cache/dont-cache/dont-shade/dont-shadow, attach-unit
 /// (with its dummy push), drop-unit, comparison/logical/unary operators.
 #[test]
 fn anims_bos() {
@@ -75,6 +75,35 @@ fn anims_bos() {
 
 /// Pathological input must surface a clean error, never abort the process via a
 /// stack overflow (regression for the app-crash report).
+/// A scale statement writes a piece and no axis, which is what the engine
+/// reads (`CobThread.cpp`). BARScriptCompiler writes the axis too, where the
+/// engine reads it as the next instruction and the script stops, so this is
+/// the one place the port deliberately differs from the reference. The axis
+/// stays in the syntax, since that is how scripts are written, and the
+/// compiler says it went unused.
+#[test]
+fn scale_writes_no_axis_and_says_so() {
+    let src = "piece base;\nCreate()\n{\n\tscale base to x-axis [2] speed [1];\n}\n";
+    let (bytes, warnings) =
+        tauri_plugin_coilbox_anim::compile_bos_with_warnings(src, &fixtures()).expect("compile");
+    let words: Vec<u32> = bytes[44..]
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|w| u32::from_le_bytes(*w))
+        .collect();
+    // PUSH speed, PUSH destination, SCALE base, then the appended return.
+    assert_eq!(
+        &words[..7],
+        &[0x10021001, 65536, 0x10021001, 131072, 0x100A0000, 0, 0x10021001],
+        "{words:?}"
+    );
+    assert!(
+        warnings.iter().any(|w| w.contains("ignores the axis")),
+        "{warnings:?}"
+    );
+}
+
 #[test]
 fn deeply_nested_input_errors_gracefully() {
     let src = format!(
