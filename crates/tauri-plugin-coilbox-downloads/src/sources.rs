@@ -1,5 +1,5 @@
 //! HTTP content sources for the Maps/Games browse screens: the springfiles
-//! catalog API and the hakora.xyz mirror, reshaped into lean records for the
+//! catalog API and the hakora.xyz and evolutionrts mirrors, reshaped into lean records for the
 //! frontend.
 //!
 //! Beyond All Reason's maps-metadata list was a third source and is gone, as
@@ -203,6 +203,57 @@ pub fn parse_hakora_index(html: &str) -> Vec<HakoraMap> {
         });
     }
     out
+}
+
+/// The maps.evolutionrts.info mirror of maps first made for Beyond All Reason,
+/// run by Scary le poo. `?list=json` returns every file with its size and md5.
+/// Its Mod Security rules answer 406 to a request with no `User-Agent`, for the
+/// archives as well as the list.
+pub const EVOLUTIONRTS_MAPS_URL: &str = "https://maps.evolutionrts.info/maps/?list=json";
+
+#[derive(Deserialize)]
+struct EvolutionRtsListing {
+    files: Vec<EvolutionRtsFile>,
+}
+
+#[derive(Deserialize)]
+struct EvolutionRtsFile {
+    name: String,
+    url: String,
+    #[serde(default)]
+    size: u64,
+}
+
+/// One map archive from the evolutionrts mirror. Like hakora it has no
+/// springname, so it is matched by filename and fetched via `dl_download_file`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvolutionRtsMap {
+    pub filename: String,
+    pub url: String,
+    pub size: u64,
+}
+
+/// Parse the evolutionrts `?list=json` listing into map entries. The name
+/// becomes a path under the maps folder, so any entry that is not a plain
+/// `.sd7`/`.sdz` filename is dropped rather than trusted.
+pub fn parse_evolutionrts_list(json: &str) -> Result<Vec<EvolutionRtsMap>, serde_json::Error> {
+    let listing: EvolutionRtsListing = serde_json::from_str(json)?;
+    Ok(listing
+        .files
+        .into_iter()
+        .filter(|f| {
+            let lower = f.name.to_ascii_lowercase();
+            (lower.ends_with(".sd7") || lower.ends_with(".sdz"))
+                && !f.name.contains(['/', '\\'])
+                && !f.name.starts_with('.')
+        })
+        .map(|f| EvolutionRtsMap {
+            filename: f.name,
+            url: f.url,
+            size: f.size,
+        })
+        .collect())
 }
 
 /// A GitHub release (subset) from the releases API. `name`/`body` are `Option`
@@ -516,6 +567,34 @@ mod tests {
         assert_eq!(maps[0].size, "6.9M");
         assert_eq!(maps[1].filename, "some_map.sdz");
         assert_eq!(maps[1].size, "12M"); // right-aligned cell, trimmed
+    }
+
+    #[test]
+    fn parse_evolutionrts_list_keeps_only_plain_map_archives() {
+        let json = r#"{
+            "generated": "2026-09-22T11:29:51+00:00",
+            "files": [
+                {"name": "acidicquarry_5.17.sd7", "url": "https://maps.evolutionrts.info/maps/acidicquarry_5.17.sd7", "size": 50602762, "md5": "04a3fb20acf6ce3b140e02175fe8450c"},
+                {"name": "Some_Map.SDZ", "url": "https://maps.evolutionrts.info/maps/Some_Map.SDZ", "size": 12},
+                {"name": "readme.txt", "url": "https://maps.evolutionrts.info/maps/readme.txt", "size": 1},
+                {"name": "../escape.sd7", "url": "https://maps.evolutionrts.info/maps/x", "size": 1},
+                {"name": "sub\\escape.sd7", "url": "https://maps.evolutionrts.info/maps/x", "size": 1},
+                {"name": "..sd7", "url": "https://maps.evolutionrts.info/maps/x", "size": 1}
+            ]
+        }"#;
+        let maps = parse_evolutionrts_list(json).unwrap();
+        let names: Vec<_> = maps.iter().map(|m| m.filename.as_str()).collect();
+        assert_eq!(names, ["acidicquarry_5.17.sd7", "Some_Map.SDZ"]);
+        assert_eq!(
+            maps[0].url,
+            "https://maps.evolutionrts.info/maps/acidicquarry_5.17.sd7"
+        );
+        assert_eq!(maps[0].size, 50602762);
+    }
+
+    #[test]
+    fn parse_evolutionrts_list_rejects_a_page_that_is_not_the_listing() {
+        assert!(parse_evolutionrts_list("<html>Error 406 - Not Acceptable</html>").is_err());
     }
 
     #[test]
