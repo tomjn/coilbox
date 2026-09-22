@@ -293,6 +293,13 @@ export interface LegoPiece {
   normalsAngle?: number;
 }
 
+/** A game's own compiled animation script: where it sits in the archive, and
+ *  the bytes themselves. */
+export interface LegoCompiledScript {
+  member: string;
+  bytes: number[];
+}
+
 export interface LegoProject {
   schemaVersion: typeof LEGO_SCHEMA_VERSION;
   id: string;
@@ -387,7 +394,7 @@ export interface LegoProject {
    * A unit that also has `script` is past this. Taking a script over is a
    * decision, and the text somebody owns beats the file they came in with.
    */
-  compiledScript?: { member: string; bytes: number[] };
+  compiledScript?: LegoCompiledScript;
   /**
    * The definition the unit's game gives it, for a script that reads one.
    *

@@ -28,9 +28,24 @@ import { newProject } from "../../model";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import { ScriptTab } from "./ScriptTab";
 
-const disasmBytes = vi.fn();
+const decompileBytes = vi.fn();
 vi.mock("@/animation/bindings", () => ({
-  animCobDisasmBytes: (args: unknown) => disasmBytes(args),
+  animCobDecompileBytes: (args: unknown) => decompileBytes(args),
+}));
+
+// The engine the reload would mount the archive with. Real here would mean a
+// settings store and a unitsync call, neither of which this file is about.
+const target = { enginePath: "/engine", dataDir: "/data" };
+const preferredTarget = vi.fn<() => { target: typeof target | undefined }>(
+  () => ({ target }),
+);
+vi.mock("@/play/config", () => ({
+  usePreferredTarget: () => preferredTarget(),
+}));
+
+const adopt = vi.fn();
+vi.mock("../../adoptGameScript", () => ({
+  adoptGameScript: (...args: unknown[]) => adopt(...args),
 }));
 
 function unit(over: Partial<LegoProject> = {}): LegoProject {
@@ -47,6 +62,7 @@ function unit(over: Partial<LegoProject> = {}): LegoProject {
 
 const onScriptChange = vi.fn();
 const onScriptRelease = vi.fn();
+const onCompiledReload = vi.fn();
 
 function show(project: LegoProject, lastRun: ScriptTimeline | null = null) {
   return render(
@@ -54,6 +70,7 @@ function show(project: LegoProject, lastRun: ScriptTimeline | null = null) {
       project={project}
       onScriptChange={onScriptChange}
       onScriptRelease={onScriptRelease}
+      onCompiledReload={onCompiledReload}
       lastRun={lastRun}
     />,
   );
@@ -70,8 +87,11 @@ function dimmedLineCount(container: HTMLElement): number {
 beforeEach(() => {
   onScriptChange.mockClear();
   onScriptRelease.mockClear();
-  disasmBytes.mockReset();
-  disasmBytes.mockResolvedValue({ listing: "", lineOffsets: [] });
+  decompileBytes.mockReset();
+  decompileBytes.mockResolvedValue({ source: "", warnings: [] });
+  onCompiledReload.mockClear();
+  adopt.mockReset();
+  preferredTarget.mockReturnValue({ target });
 });
 
 afterEach(() => {
@@ -195,11 +215,30 @@ describe("a unit that owns its script", () => {
 });
 
 describe("a unit whose game compiled its animation", () => {
-  it("shows the disassembly as read-only and says export does not write it", async () => {
-    disasmBytes.mockResolvedValue({
-      listing: "; COB v4\n\n=== Create ===\n0000  RETURN",
-      lineOffsets: [null, null, null, 0],
+  const BOS = "piece base;\n\nCreate()\n{\n\treturn;\n}";
+
+  /** A unit carrying a game's compiled script, with the archive it came out
+   *  of still named on it, which is what a reload needs. */
+  function fromGame(): LegoProject {
+    const base = unit({
+      compiledScript: { member: "scripts/walker.cob", bytes: [1] },
     });
+    return {
+      ...base,
+      imported: {
+        ...(base.imported ?? {}),
+        game: {
+          name: "Walkers",
+          archive: "walkers.sdd",
+          member: "objects3d/walker.s3o",
+          unit: "walker",
+        },
+      } as LegoProject["imported"],
+    };
+  }
+
+  it("shows the BOS it was built from, not the opcodes, and not to edit", async () => {
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
     show(
       unit({ compiledScript: { member: "scripts/walker.cob", bytes: [1] } }),
     );
@@ -207,11 +246,113 @@ describe("a unit whose game compiled its animation", () => {
     await waitFor(() =>
       expect(
         (screen.getByRole("textbox") as HTMLTextAreaElement).value,
-      ).toContain("RETURN"),
+      ).toContain("Create()"),
     );
     expect(screen.getByRole("textbox")).toHaveProperty("readOnly", true);
-    expect(screen.getByText(/scripts\/walker\.cob/)).toBeTruthy();
-    expect(screen.getByText(/cannot be edited here/)).toBeTruthy();
+  });
+
+  it("names the game's own file rather than a .lua it would never write", async () => {
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
+    show(
+      unit({ compiledScript: { member: "scripts/walker.cob", bytes: [1] } }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("scripts/walker.cob")).toBeTruthy(),
+    );
+    expect(screen.queryByText(/\.lua/)).toBeNull();
+  });
+
+  it("leaves out the export note, which is about a script coilbox writes", async () => {
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
+    show(
+      unit({ compiledScript: { member: "scripts/walker.cob", bytes: [1] } }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("scripts/walker.cob")).toBeTruthy(),
+    );
+    expect(screen.queryByText(/Export writes it/)).toBeNull();
+    expect(screen.queryByText(/compiled rather than Lua/)).toBeNull();
+  });
+
+  it("offers no coverage toggle, since a run's lines are not these lines", async () => {
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
+    show(
+      unit({ compiledScript: { member: "scripts/walker.cob", bytes: [1] } }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("scripts/walker.cob")).toBeTruthy(),
+    );
+    expect(screen.queryByLabelText("Show what ran")).toBeNull();
+  });
+
+  it("reads the game's file again on Reload, for a folder still being worked in", async () => {
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
+    const fresh = { member: "scripts/walker.cob", bytes: [9] };
+    adopt.mockResolvedValue({ compiled: fresh, notes: [] });
+    show(fromGame());
+
+    await waitFor(() =>
+      expect(screen.getByText("scripts/walker.cob")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+
+    await waitFor(() => expect(onCompiledReload).toHaveBeenCalledWith(fresh));
+  });
+
+  it("says why nothing changed when the game no longer has the script", async () => {
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
+    adopt.mockResolvedValue({
+      compiled: null,
+      notes: ["The archive would not mount."],
+    });
+    show(fromGame());
+
+    await waitFor(() =>
+      expect(screen.getByText("scripts/walker.cob")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("The archive would not mount.")).toBeTruthy(),
+    );
+    expect(onCompiledReload).not.toHaveBeenCalled();
+  });
+
+  it("offers no Reload for a unit with no game behind it", async () => {
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
+    show(
+      unit({ compiledScript: { member: "scripts/walker.cob", bytes: [1] } }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("scripts/walker.cob")).toBeTruthy(),
+    );
+    expect(screen.queryByRole("button", { name: "Reload" })).toBeNull();
+  });
+
+  it("offers no Reload with no engine configured to mount the archive", async () => {
+    preferredTarget.mockReturnValue({ target: undefined });
+    decompileBytes.mockResolvedValue({ source: BOS, warnings: [] });
+    show(fromGame());
+
+    await waitFor(() =>
+      expect(screen.getByText("scripts/walker.cob")).toBeTruthy(),
+    );
+    expect(screen.queryByRole("button", { name: "Reload" })).toBeNull();
+  });
+
+  it("says so when the rebuild fails, rather than showing an empty box", async () => {
+    decompileBytes.mockRejectedValue(new Error("bad header"));
+    show(
+      unit({ compiledScript: { member: "scripts/walker.cob", bytes: [1] } }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/could not be read back as BOS/)).toBeTruthy(),
+    );
   });
 });
 

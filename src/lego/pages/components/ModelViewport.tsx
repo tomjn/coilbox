@@ -31,6 +31,7 @@ import {
   Scaling,
   Trash2,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -255,6 +256,17 @@ export const ZOOM_OUT_PADDING = 1.3;
 export const ROTATION_STEP = Math.PI / 12;
 
 interface Props {
+  /**
+   * The unit's own chrome, drawn along the top of the view.
+   *
+   * A slot rather than something this component builds, because what it says
+   * is about the unit rather than about the 3D. It comes in here all the same
+   * so that one place owns the column every overlay shares: pinned separately
+   * to the same box, the chrome, the tool rail and the key below it each
+   * assumed the others were far away, and a short view had all three in the
+   * same place.
+   */
+  chrome?: ReactNode;
   /** The piece hierarchy, and the raw geometry of a unit imported from
    *  somebody else's model rather than built from parts. */
   document: {
@@ -415,6 +427,7 @@ interface Props {
 }
 
 export function ModelViewport({
+  chrome,
   document,
   selection,
   onReady,
@@ -1056,252 +1069,277 @@ export function ModelViewport({
         className={`h-full w-full ${placingAnchor ? "cursor-crosshair" : ""}`}
       />
 
-      {/* Down the left edge and vertically centred, out of the way of the
-          unit's own chrome at the top of the view. Bounded top and bottom and
-          scrollable, rather than centred on a fixed point: with three button
-          groups now stacked here, a short window has it scroll instead of
-          spilling into that chrome. `m-auto` on the inner column rather than
-          `justify-center` on the outer one: centring a flex container that
-          way clips content off both ends once it overflows, since a plain
-          `center` does not yield to the scrollport the way auto margins do. */}
-      <TooltipProvider delayDuration={300}>
-        <div className="absolute inset-y-3 left-3 flex flex-col overflow-y-auto">
-          <div className="m-auto flex flex-col gap-2">
-            <ButtonGroup orientation="vertical">
-              {MODES.map(({ id, label, key, Icon }) => {
-                // A collision volume is measured along the model's own axes and
-                // has nothing to turn, so the handles for it are move and scale.
-                // The aim point is a point: move is all it has.
-                const off = showAimPoint
-                  ? id !== "translate"
-                  : editingVolume && id === "rotate";
-                return (
-                  <Tooltip key={id}>
+      {/* One column rather than four overlays pinned to the same box. The
+          chrome, the rail, the key and the view's own controls share this
+          height instead of each assuming the others are elsewhere, so a view
+          too short to hold them all crowds nobody: the rail scrolls, and that
+          is the whole of it.
+
+          Clicks fall through to the model except on the controls themselves,
+          which take `pointer-events-auto` back one at a time. */}
+      <div className="pointer-events-none absolute inset-3 z-10 flex flex-col gap-3">
+        {chrome}
+
+        {/* `m-auto` on the inner column rather than `justify-center` on the
+            scrollport: centring a flex container that way clips content off
+            both ends once it overflows, since a plain `center` does not yield
+            to the scrollport the way auto margins do.
+
+            `pr-2` gives the scrollbar a lane of its own. macOS draws an
+            overlay scrollbar, which sits over whatever is under it, and
+            `scrollbar-gutter: stable` reserves nothing for one: the spec only
+            has it hold room for a classic scrollbar. Padding is what works on
+            both. */}
+        <TooltipProvider delayDuration={300}>
+          <div className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2">
+            <div className="m-auto flex flex-col gap-2">
+              <ButtonGroup orientation="vertical">
+                {MODES.map(({ id, label, key, Icon }) => {
+                  // A collision volume is measured along the model's own axes and
+                  // has nothing to turn, so the handles for it are move and scale.
+                  // The aim point is a point: move is all it has.
+                  const off = showAimPoint
+                    ? id !== "translate"
+                    : editingVolume && id === "rotate";
+                  return (
+                    <Tooltip key={id}>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant={mode === id && !off ? "default" : "outline"}
+                          onClick={() => setMode(id)}
+                          disabled={off}
+                          aria-label={label}
+                          aria-pressed={mode === id && !off}
+                        >
+                          <Icon className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        {!off
+                          ? `${label} (${key})`
+                          : showAimPoint
+                            ? "An aim point is one point, so it only moves"
+                            : "A collision volume has no rotation"}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </ButtonGroup>
+
+              {/* A group of its own. The three above are a mode you are in, this
+              is a thing you do once. */}
+              {onGround ? (
+                <ButtonGroup orientation="vertical">
+                  <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         size="icon"
-                        variant={mode === id && !off ? "default" : "outline"}
-                        onClick={() => setMode(id)}
-                        disabled={off}
-                        aria-label={label}
-                        aria-pressed={mode === id && !off}
+                        variant="outline"
+                        onClick={onGround}
+                        aria-label="Sit the unit on the ground"
                       >
-                        <Icon className="size-4" />
+                        <ArrowDownToLine className="size-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      {!off
-                        ? `${label} (${key})`
-                        : showAimPoint
-                          ? "An aim point is one point, so it only moves"
-                          : "A collision volume has no rotation"}
+                      Sit on the ground
                     </TooltipContent>
                   </Tooltip>
-                );
-              })}
-            </ButtonGroup>
+                </ButtonGroup>
+              ) : null}
 
-            {/* A group of its own. The three above are a mode you are in, this
-              is a thing you do once. */}
-            {onGround ? (
+              {/* A third group: what you do to the selected piece, rather than a
+              mode or a one-off on the whole unit. */}
               <ButtonGroup orientation="vertical">
+                {/* Held on rather than pressed once, so it reads as a state the
+                  builder is in: everything placed while it is lit comes in
+                  pairs. */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant={symmetryOn ? "default" : "outline"}
+                      onClick={() => onSymmetryChange(!symmetryOn)}
+                      aria-pressed={symmetryOn}
+                      aria-label="Symmetry"
+                    >
+                      <FlipHorizontal2 className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Symmetry: a new piece gets a twin, which follows it for as
+                    long as it stays selected (M)
+                  </TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       size="icon"
                       variant="outline"
-                      onClick={onGround}
-                      aria-label="Sit the unit on the ground"
+                      onClick={onDuplicate}
+                      disabled={!canDuplicate}
+                      aria-label="Duplicate the selection"
                     >
-                      <ArrowDownToLine className="size-4" />
+                      <Copy className="size-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    Sit on the ground
+                    Duplicate (Cmd D)
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={onPaste}
+                      aria-label="Paste"
+                    >
+                      <ClipboardPaste className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Paste (Cmd V)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={onSaveAsCompound}
+                      disabled={!canSaveAsCompound}
+                      aria-label="Save the selection as a compound"
+                    >
+                      <PackagePlus className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Save as a compound
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={onDelete}
+                      disabled={!canDelete}
+                      aria-label="Delete the selection"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Delete (Backspace)
                   </TooltipContent>
                 </Tooltip>
               </ButtonGroup>
-            ) : null}
-
-            {/* A third group: what you do to the selected piece, rather than a
-              mode or a one-off on the whole unit. */}
-            <ButtonGroup orientation="vertical">
-              {/* Held on rather than pressed once, so it reads as a state the
-                  builder is in: everything placed while it is lit comes in
-                  pairs. */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant={symmetryOn ? "default" : "outline"}
-                    onClick={() => onSymmetryChange(!symmetryOn)}
-                    aria-pressed={symmetryOn}
-                    aria-label="Symmetry"
-                  >
-                    <FlipHorizontal2 className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  Symmetry: a new piece gets a twin, which follows it for as
-                  long as it stays selected (M)
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={onDuplicate}
-                    disabled={!canDuplicate}
-                    aria-label="Duplicate the selection"
-                  >
-                    <Copy className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Duplicate (Cmd D)</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={onPaste}
-                    aria-label="Paste"
-                  >
-                    <ClipboardPaste className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Paste (Cmd V)</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={onSaveAsCompound}
-                    disabled={!canSaveAsCompound}
-                    aria-label="Save the selection as a compound"
-                  >
-                    <PackagePlus className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Save as a compound</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={onDelete}
-                    disabled={!canDelete}
-                    aria-label="Delete the selection"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Delete (Backspace)</TooltipContent>
-              </Tooltip>
-            </ButtonGroup>
+            </div>
           </div>
-        </div>
-      </TooltipProvider>
+        </TooltipProvider>
 
-      {/* Camera and scene, in the opposite corner from the notes. Stacked
-          rather than side by side, so the compass keeps the corner and the
-          buttons do not push it inward. */}
-      <ViewControls>
-        <GridToggle
-          on={showGrid}
-          onChange={setShowGrid}
-          showTitle="Show the ground grid, marked in footprint steps and plate sizes"
-        />
-        <ViewToggle
-          icon={Box}
-          on={showCollision}
-          onChange={setShowCollision}
-          hideTitle="Hide the collision volume"
-          showTitle="Show the collision volume, the shape the engine hits and clicks"
-        />
-        <ViewToggle
-          icon={Crosshair}
-          on={showAim}
-          onChange={setShowAim}
-          hideTitle="Hide the aim point"
-          showTitle="Show the aim point, the one point another unit shoots at"
-        />
-        <EnvironmentPicker
-          backdrop={backdrop}
-          onBackdrop={setBackdrop}
-          ground={ground}
-          onGround={setGround}
-        />
-        <ReferencePicker
-          show={showReference}
-          onShowChange={setShowReference}
-          onReference={(choice) => {
-            setGameReference(choice);
-            // Picking a unit and having nothing appear reads as a broken
-            // picker, so choosing one turns the figure on.
-            if (choice) setShowReference(true);
-          }}
-        />
-        <ViewButton
-          title="Keyboard shortcuts (?)"
-          onClick={() => setShortcutsOpen(true)}
-        >
-          <Keyboard className="size-4" />
-        </ViewButton>
-        <AxisCompass svgRef={compassRef} onClick={resetView} />
-      </ViewControls>
-
-      <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-
-      {/* Notes and the key sit at the bottom, where they can be read when
-          wanted and ignored when not. */}
-      <div className="pointer-events-none absolute bottom-3 left-3 flex flex-col gap-1 text-xs text-muted-foreground">
-        {soleSelectedId && !playing ? (
-          <div className="flex gap-3">
-            <Dot colour="#8b5cf6" label="Turns here" />
-            {/* A piece with anchors of its own offers only those, so the box's
+        {/* The key on the left, the camera and scene controls on the right,
+            in one row. Side by side rather than each pinned to its own
+            corner, so a long key runs out of room before it runs under the
+            buttons. Stacked within their group, so the compass keeps the
+            corner and the buttons do not push it inward. */}
+        <div className="flex items-end justify-between gap-3">
+          {/* One row, wrapping only when the view is too narrow to hold it:
+              each group is a handful of words, and stacking them took a strip
+              off the model for no gain. */}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {soleSelectedId && !playing ? (
+              <div className="flex gap-3">
+                <Dot colour="#8b5cf6" label="Turns here" />
+                {/* A piece with anchors of its own offers only those, so the box's
                 key would be naming dots that are not drawn. */}
-            {ownAnchors > 0 ? (
-              <Dot colour="#f472b6" label="Anchors" />
-            ) : (
-              <>
-                <Dot colour="#38bdf8" label="Faces" />
-                <Dot colour="#fbbf24" label="Corners" />
-              </>
-            )}
-          </div>
-        ) : null}
-        {/* Named only while the boxes are drawn, and the piece swatch only
+                {ownAnchors > 0 ? (
+                  <Dot colour="#f472b6" label="Anchors" />
+                ) : (
+                  <>
+                    <Dot colour="#38bdf8" label="Faces" shape="face" />
+                    <Dot colour="#fbbf24" label="Corners" shape="corner" />
+                  </>
+                )}
+              </div>
+            ) : null}
+            {/* Named only while the boxes are drawn, and the piece swatch only
             while there are piece boxes to name. Two oranges with no key was
             the thing that made a piece's box hard to place at all. */}
-        {showCollision || editingVolume ? (
-          <div className="flex gap-3">
-            <Dot colour="#f97316" label="Unit volume" />
-            {project.pieceCollision ||
-            project.pieceSelection ||
-            editPieceCollisionId ? (
-              <Dot colour="#facc15" label="Piece boxes" />
+            {showCollision || editingVolume ? (
+              <div className="flex gap-3">
+                <Dot colour="#f97316" label="Unit volume" />
+                {project.pieceCollision ||
+                project.pieceSelection ||
+                editPieceCollisionId ? (
+                  <Dot colour="#facc15" label="Piece boxes" />
+                ) : null}
+              </div>
             ) : null}
+            {showAim || showAimPoint ? (
+              <div className="flex gap-3">
+                <Dot colour="#ef4444" label="Aim point" />
+              </div>
+            ) : null}
+            <span>
+              {placingAnchor
+                ? "Click the model to put an anchor there. Escape to stop"
+                : snapped
+                  ? snappedTo
+                    ? `Snapped to "${snappedTo}". Hold Alt to place freely`
+                    : "Snapped. Hold Alt to place freely"
+                  : "Hold Alt to place freely"}
+            </span>
           </div>
-        ) : null}
-        {showAim || showAimPoint ? (
-          <div className="flex gap-3">
-            <Dot colour="#ef4444" label="Aim point" />
-          </div>
-        ) : null}
-        <span>
-          {placingAnchor
-            ? "Click the model to put an anchor there. Escape to stop"
-            : snapped
-              ? snappedTo
-                ? `Snapped to "${snappedTo}". Hold Alt to place freely`
-                : "Snapped. Hold Alt to place freely"
-              : "Hold Alt to place freely"}
-        </span>
+
+          <ViewControls className="pointer-events-auto shrink-0">
+            <GridToggle
+              on={showGrid}
+              onChange={setShowGrid}
+              showTitle="Show the ground grid, marked in footprint steps and plate sizes"
+            />
+            <ViewToggle
+              icon={Box}
+              on={showCollision}
+              onChange={setShowCollision}
+              hideTitle="Hide the collision volume"
+              showTitle="Show the collision volume, the shape the engine hits and clicks"
+            />
+            <ViewToggle
+              icon={Crosshair}
+              on={showAim}
+              onChange={setShowAim}
+              hideTitle="Hide the aim point"
+              showTitle="Show the aim point, the one point another unit shoots at"
+            />
+            <EnvironmentPicker
+              backdrop={backdrop}
+              onBackdrop={setBackdrop}
+              ground={ground}
+              onGround={setGround}
+            />
+            <ReferencePicker
+              show={showReference}
+              onShowChange={setShowReference}
+              onReference={(choice) => {
+                setGameReference(choice);
+                // Picking a unit and having nothing appear reads as a broken
+                // picker, so choosing one turns the figure on.
+                if (choice) setShowReference(true);
+              }}
+            />
+            <ViewButton
+              title="Keyboard shortcuts (?)"
+              onClick={() => setShortcutsOpen(true)}
+            >
+              <Keyboard className="size-4" />
+            </ViewButton>
+            <AxisCompass svgRef={compassRef} onClick={resetView} />
+          </ViewControls>
+        </div>
       </div>
+
+      <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 }
@@ -1407,14 +1445,62 @@ function AxisCompass({
 }
 
 /** A key to the dots drawn on the selected piece. */
-function Dot({ colour, label }: { colour: string; label: string }) {
+function Dot({
+  colour,
+  label,
+  shape = "dot",
+}: {
+  colour: string;
+  label: string;
+  /** What the key draws, matching what the view draws for it: a square lying
+   *  in a face, a cube on a corner, a plain dot for everything else. */
+  shape?: "dot" | "face" | "corner";
+}) {
   return (
     <span className="flex items-center gap-1">
-      <span
-        className="size-1.5 rounded-full"
-        style={{ backgroundColor: colour }}
-      />
+      {shape === "dot" ? (
+        <span
+          className="size-1.5 rounded-full"
+          style={{ backgroundColor: colour }}
+        />
+      ) : (
+        <Iso colour={colour} shape={shape} />
+      )}
       {label}
     </span>
+  );
+}
+
+/**
+ * The key's own swatch for a face or a corner, drawn at the angle the view
+ * shows them from.
+ *
+ * A flat square and a cube both come out as a circle in plan, so a key of
+ * round dots says nothing about which marker it names. Shaded per face rather
+ * than outlined, because an outline dark enough to read against the model is
+ * invisible against the panel behind the key.
+ */
+function Iso({ colour, shape }: { colour: string; shape: "face" | "corner" }) {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      className="size-3 shrink-0"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {shape === "face" ? (
+        <polygon points="6,2 11,6 6,10 1,6" fill={colour} />
+      ) : (
+        <>
+          <polygon points="6,1 11,3.5 6,6 1,3.5" fill={colour} />
+          <polygon points="1,3.5 6,6 6,11 1,8.5" fill={colour} opacity={0.75} />
+          <polygon
+            points="11,3.5 6,6 6,11 11,8.5"
+            fill={colour}
+            opacity={0.5}
+          />
+        </>
+      )}
+    </svg>
   );
 }

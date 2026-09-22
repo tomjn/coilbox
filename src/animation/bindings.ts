@@ -47,6 +47,16 @@ export const animCobDecompile = defineCommand<
   { source: string; warnings: string[] }
 >("coilbox-anim", "anim_cob_decompile");
 
+/**
+ * The same rebuild for a `.cob` that is not a file on disk, and never written
+ * back. The builder shows a game's compiled unit script as BOS, and that
+ * script arrives out of the archive as bytes.
+ */
+export const animCobDecompileBytes = defineCommand<
+  { bytes: number[] },
+  { source: string; warnings: string[] }
+>("coilbox-anim", "anim_cob_decompile_bytes");
+
 /** The bytes of a `.cob` as a hex dump, for reading the file rather than the
  *  scripts in it. */
 export const animCobHex = defineCommand<

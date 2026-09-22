@@ -185,6 +185,23 @@ async fn anim_cob_decompile(path: String, output: Option<String>) -> CliResult {
     }
 }
 
+/// `anim_cob_decompile_bytes`: the same rebuild for a `.cob` that is not a file
+/// on disk, and never written back.
+///
+/// The builder shows a game's compiled script as BOS, and that script comes out
+/// of somebody else's archive as bytes in memory. There is no `output` here for
+/// the same reason `anim_cob_disasm_bytes` has no path: nothing about reading
+/// an archive's script should put a file anywhere.
+#[tauri::command]
+async fn anim_cob_decompile_bytes(bytes: Vec<u8>) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || decompile_cob(&bytes)).await;
+    match result {
+        Ok(Ok(d)) => CliResult::ok(json!({ "source": d.source, "warnings": d.warnings })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("decompile task failed: {e}")),
+    }
+}
+
 /// `anim_cob_hex`: the bytes of a `.cob` as a hex dump, for reading the file
 /// itself rather than the scripts in it.
 #[tauri::command]
@@ -505,6 +522,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             anim_cob_disasm,
             anim_cob_disasm_bytes,
             anim_cob_decompile,
+            anim_cob_decompile_bytes,
             anim_cob_hex,
             anim_cob_run,
             anim_bos2cob,

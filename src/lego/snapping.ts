@@ -33,6 +33,15 @@ export interface Anchor {
   kind: AnchorKind;
   /** A custom anchor's name, so a snap can say which seat it took. */
   name?: string;
+  /**
+   * Which way out of the box the anchor sits, as one step per axis: the
+   * outward normal for a face, and the diagonal for a corner. Absent for the
+   * centre and for a custom anchor, neither of which is on a side.
+   *
+   * Only the drawing reads it, so a face can be marked in its own plane and a
+   * corner with a cube that meets it. Snapping is about the position alone.
+   */
+  out?: Vec3;
 }
 
 /**
@@ -50,21 +59,25 @@ export function localAnchors(bounds: Bounds): Anchor[] {
   ];
 
   const anchors: Anchor[] = [];
-  for (const x of [min[0], max[0]]) {
-    for (const y of [min[1], max[1]]) {
-      for (const z of [min[2], max[2]]) {
-        anchors.push({ position: [x, y, z], kind: "corner" });
+  for (const [ix, x] of [min[0], max[0]].entries()) {
+    for (const [iy, y] of [min[1], max[1]].entries()) {
+      for (const [iz, z] of [min[2], max[2]].entries()) {
+        anchors.push({
+          position: [x, y, z],
+          kind: "corner",
+          out: [ix ? 1 : -1, iy ? 1 : -1, iz ? 1 : -1],
+        });
       }
     }
   }
 
   anchors.push(
-    { position: [min[0], mid[1], mid[2]], kind: "face" },
-    { position: [max[0], mid[1], mid[2]], kind: "face" },
-    { position: [mid[0], min[1], mid[2]], kind: "face" },
-    { position: [mid[0], max[1], mid[2]], kind: "face" },
-    { position: [mid[0], mid[1], min[2]], kind: "face" },
-    { position: [mid[0], mid[1], max[2]], kind: "face" },
+    { position: [min[0], mid[1], mid[2]], kind: "face", out: [-1, 0, 0] },
+    { position: [max[0], mid[1], mid[2]], kind: "face", out: [1, 0, 0] },
+    { position: [mid[0], min[1], mid[2]], kind: "face", out: [0, -1, 0] },
+    { position: [mid[0], max[1], mid[2]], kind: "face", out: [0, 1, 0] },
+    { position: [mid[0], mid[1], min[2]], kind: "face", out: [0, 0, -1] },
+    { position: [mid[0], mid[1], max[2]], kind: "face", out: [0, 0, 1] },
     { position: mid, kind: "centre" },
   );
 
