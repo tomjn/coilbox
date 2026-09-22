@@ -259,7 +259,7 @@ pub fn rule(name: &str) -> Option<&'static [&'static [&'static str]]> {
             "along",
             "_axis",
         ]],
-        "_emitSfxStatement" => &[&["emit", "-", "sfx", "_expression", "from", "_pieceName"]],
+        "_emitSfxStatement" => &[&["emit", "-", "sfx", "_expression", "from", "_expression"]],
         "_sleepStatement" => &[&["sleep", "_expression"]],
         "_hideStatement" => &[&["hide", "_pieceName"]],
         "_showStatement" => &[&["show", "_pieceName"]],
