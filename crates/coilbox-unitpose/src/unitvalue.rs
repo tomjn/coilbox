@@ -228,6 +228,51 @@ pub fn known(id: i32) -> Option<i32> {
     }
 }
 
+/// Ids [`crate::Timeline::asked`] leaves out, because none of them is a
+/// question about the unit that a control could stand in for: the arithmetic
+/// call-outs, the shared values Spring stopped keeping, the running frame, the
+/// packed piece-position pair, and the slots a `.cob`'s Lua call answers in.
+///
+/// `arithmetic` always answers the same way for a given id regardless of its
+/// arguments, being `Some` for exactly the ids it has a match arm for, so
+/// asking it with zeroes is a membership test rather than a real calculation.
+fn excluded_from_asked(id: i32) -> bool {
+    const GAME_FRAME: i32 = 134;
+    const PIECE_XZ: i32 = 7;
+    const PIECE_Y: i32 = 8;
+    const LUA0: i32 = 110;
+    const LUA9: i32 = 119;
+    arithmetic(id, 0, 0).is_some()
+        || removed_shared(id)
+        || id == GAME_FRAME
+        || id == PIECE_XZ
+        || id == PIECE_Y
+        || (LUA0..=LUA9).contains(&id)
+}
+
+/// Note that a script read unit value `id`, unless it is one [`Timeline::asked`]
+/// leaves out or has already been noted.
+///
+/// Shared between the two runtimes so a script's own values controls are the
+/// same whichever one ran it: the two are asked the same questions by the same
+/// numbers and have to agree on which of them are worth a control.
+///
+/// [`Timeline::asked`]: crate::Timeline::asked
+pub fn note_asked(asked: &mut Vec<crate::AskedValue>, id: i32) {
+    if excluded_from_asked(id) || asked.iter().any(|value| value.id == id) {
+        return;
+    }
+    let name = NAMES
+        .iter()
+        .find(|(_, value)| *value == id)
+        .map(|(name, _)| (*name).to_string());
+    asked.push(crate::AskedValue {
+        id,
+        name,
+        default: known(id),
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,5 +350,36 @@ mod tests {
         let count = ids.len();
         ids.dedup();
         assert_eq!(ids.len(), count);
+    }
+
+    /// A read is noted once, by name, with the default a reset would put back.
+    #[test]
+    fn notes_a_read_by_name_and_default_once() {
+        let activation = NAMES
+            .iter()
+            .find(|(name, _)| *name == "ACTIVATION")
+            .unwrap()
+            .1;
+        let mut asked = Vec::new();
+        note_asked(&mut asked, HEALTH);
+        note_asked(&mut asked, HEALTH);
+        note_asked(&mut asked, activation);
+
+        assert_eq!(asked.len(), 2, "{asked:?}");
+        assert_eq!(asked[0].name.as_deref(), Some("HEALTH"));
+        assert_eq!(asked[0].default, Some(100));
+        assert_eq!(asked[1].name.as_deref(), Some("ACTIVATION"));
+        assert_eq!(asked[1].default, None);
+    }
+
+    /// None of these describe the unit, so a control for one of them would not
+    /// mean anything.
+    #[test]
+    fn leaves_out_ids_that_are_not_questions_about_the_unit() {
+        let mut asked = Vec::new();
+        for id in [ABS, 1024, 134, 7, 8, 110, 119] {
+            note_asked(&mut asked, id);
+        }
+        assert!(asked.is_empty(), "{asked:?}");
     }
 }

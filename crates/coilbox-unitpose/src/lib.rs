@@ -60,6 +60,22 @@ pub struct ScriptEvent {
     pub ambient: bool,
 }
 
+/// One unit value id a script read while it ran, and what a control offered
+/// for it would show.
+///
+/// Recorded rather than guessed at: a caller wanting to offer "set HEALTH"
+/// before a script has ever asked for HEALTH would be offering a control for
+/// something that may mean nothing to this particular script.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AskedValue {
+    pub id: i32,
+    /// The name from [`unitvalue::NAMES`], when this id has one.
+    pub name: Option<String>,
+    /// What [`unitvalue::known`] answers for this id, for a reset to put back.
+    pub default: Option<i32>,
+}
+
 /// Every piece's pose on every frame, which is what the viewport plays.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,6 +99,16 @@ pub struct Timeline {
     /// Things the run wants to say that did not stop it: a call-in the script
     /// does not define, a call the preview cannot honour.
     pub warnings: Vec<String>,
+    /// Every unit value id the script read, in the order it first read each one
+    /// and with duplicates left out. A caller offering controls for a script's
+    /// unit values has to run it once before it knows which to offer.
+    #[serde(default)]
+    pub asked: Vec<AskedValue>,
+    /// The functions the script defines: a `.cob`'s script name table, or a Lua
+    /// unit script's `script` table keys. What a caller offering "call any
+    /// function" has to run the script once to learn.
+    #[serde(default)]
+    pub functions: Vec<String>,
 }
 
 impl Timeline {
@@ -95,6 +121,8 @@ impl Timeline {
             hidden: Vec::new(),
             error: None,
             warnings: Vec::new(),
+            asked: Vec::new(),
+            functions: Vec::new(),
         }
     }
 
