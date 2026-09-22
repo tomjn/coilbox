@@ -284,15 +284,20 @@ export const SCENARIOS: Scenario[] = [
     // On the ground ahead and to one side, then across to the other during the
     // gap between the two builds, so the arm is seen to follow it.
     //
+    // As far out as the target the `firing` scenario puts in the air, and for
+    // the same reason: at arm's length it reads as a thing being built, and up
+    // close it reads as part of the unit. A build this far out is still well
+    // inside a builder's default reach of 128 elmos.
+    //
     // It comes back to where it started, so the preview loops without the
     // stand-in jumping across the scene on the frame it restarts.
     standIn: {
       keys: [
-        { frame: 0, pos: [1.6, 0, 2.6] },
-        { frame: at(5), pos: [1.6, 0, 2.6] },
-        { frame: at(6.5), pos: [-1.6, 0, 2.6] },
-        { frame: at(11), pos: [-1.6, 0, 2.6] },
-        { frame: at(PREVIEW_SECONDS), pos: [1.6, 0, 2.6] },
+        { frame: 0, pos: [2.6, 0, 4.5] },
+        { frame: at(5), pos: [2.6, 0, 4.5] },
+        { frame: at(6.5), pos: [-2.6, 0, 4.5] },
+        { frame: at(11), pos: [-2.6, 0, 4.5] },
+        { frame: at(PREVIEW_SECONDS), pos: [2.6, 0, 4.5] },
       ],
     },
   },
