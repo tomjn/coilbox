@@ -6,6 +6,8 @@ import {
   Copy,
   FlipHorizontal2,
   FlipVertical2,
+  Maximize2,
+  Minimize2,
   PanelRightClose,
   PanelRightOpen,
   Plus,
@@ -16,7 +18,7 @@ import {
   Undo,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -57,6 +59,7 @@ import { canFixMesh, DEFAULT_SMOOTHING_ANGLE_DEG } from "../meshFix";
 import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
 import {
   descendantIds,
+  type LegoCompiledScript,
   type LegoImported,
   type LegoPiece,
   type LegoProject,
@@ -71,7 +74,7 @@ import {
   loadPack,
   projectPackProblems,
 } from "../pack";
-import { usePanelOpen } from "../panels";
+import { usePanelHeight, usePanelOpen } from "../panels";
 import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import {
@@ -106,6 +109,7 @@ import { PieceTree } from "./components/PieceTree";
 import { SaveModelPopover } from "./components/SaveModelPopover";
 import { ScriptTab } from "./components/ScriptTab";
 import { SetPanel } from "./components/SetPanel";
+import { StripResizer } from "./components/StripResizer";
 import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
@@ -150,6 +154,10 @@ function Builder({ id }: { id: string | undefined }) {
   const { projects } = useLegoProjects();
 
   const [pack, setPack] = useState<LoadedPack | null>(null);
+  // Its own flag, because a null pack is both "still reading the library" and
+  // "the library would not read". Without it the wait showed as a failure for
+  // however long the read took, which is the first thing anybody saw.
+  const [packFailed, setPackFailed] = useState(false);
   // The meshes of a unit imported from somebody else's model. Read once
   // alongside the document, and null for a unit built out of parts.
   const geometry = useRawGeometry(draft);
@@ -167,6 +175,14 @@ function Builder({ id }: { id: string | undefined }) {
   // Open or closed is remembered between runs. Which tab is showing is not, so
   // the side panel always comes back on Pieces. See `../panels`.
   const [stripOpen, setStripOpen] = usePanelOpen("strip");
+  // How tall the drawer is comes back too, brought inside this window by the
+  // resizer's own measurement. Whether it was covering the model view does
+  // not: see `../panels`.
+  const [stripHeight, setStripHeight] = usePanelHeight("strip");
+  const [stripFull, setStripFull] = useState(false);
+  // The model view and the drawer share this, and it is what a drag is
+  // measured against.
+  const columnRef = useRef<HTMLDivElement | null>(null);
   const [asideOpen, setAsideOpen] = usePanelOpen("aside");
   const [aside, setAside] = useState<
     "pieces" | "animation" | "collision" | "aim" | "texture"
@@ -220,7 +236,7 @@ function Builder({ id }: { id: string | undefined }) {
   const filter = usePartFilter(pack);
 
   useEffect(() => {
-    loadPack().then(setPack, () => setPack(null));
+    loadPack().then(setPack, () => setPackFailed(true));
   }, []);
 
   // The document's own problems, plus anything wrong between it and the packs
@@ -696,6 +712,16 @@ function Builder({ id }: { id: string | undefined }) {
     edit((project) => ({ ...project, script }));
   }
 
+  /**
+   * Takes the game's compiled script again, for a unit read out of an SDD
+   * somebody is still editing. Playback stops for the same reason an edit
+   * stops it: what is on screen is no longer what ran.
+   */
+  function reloadCompiled(compiledScript: LegoCompiledScript) {
+    stopPlayback();
+    edit((project) => ({ ...project, compiledScript }));
+  }
+
   /** Drops the stored Lua, so the unit goes back to a script generated from
    *  its animation presets. */
   function releaseScript() {
@@ -709,9 +735,13 @@ function Builder({ id }: { id: string | undefined }) {
   }
 
   if (doc.loading || !draft || !pack) {
+    // A document that finished loading with nothing to show did not load, and
+    // so did the parts library when its own read threw. Everything else here
+    // is a read still in flight.
+    const failed = (!doc.loading && !draft) || packFailed;
     return (
       <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-        {doc.loading ? "Opening the unit." : "This unit could not be opened."}
+        {failed ? "This unit could not be opened." : "Opening the unit."}
       </p>
     );
   }
@@ -798,207 +828,221 @@ function Builder({ id }: { id: string | undefined }) {
         />
 
         <div className="flex min-h-0 flex-1">
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div ref={columnRef} className="flex min-h-0 flex-1 flex-col">
             {/* The unit's chrome floats over the view rather than taking a strip
-              off the top of it. The 3D is the point of this screen. */}
-            <div className="relative min-h-0 flex-1">
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-3">
-                <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
-                  <Blocks
-                    size={16}
-                    className="shrink-0 text-muted-foreground"
-                  />
-                  <div className="min-w-0">
-                    <Input
-                      value={draft.name}
-                      onChange={(event) => renameUnit(event.target.value)}
-                      aria-label="Unit name"
-                      className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
-                    />
-                    <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-                      {draft.pieces.length}{" "}
-                      {draft.pieces.length === 1 ? "piece" : "pieces"} · exports
-                      as
-                      <NameInput
-                        value={draft.unitName}
-                        onCommit={renameExport}
-                        aria-label="Export name"
-                        className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
-                      />
-                    </p>
-                    {imported ? (
-                      <TexturePicker
-                        imported={imported}
-                        onChange={changeTextures}
-                      />
-                    ) : (
-                      <AtlasPicker
-                        project={draft}
-                        pack={pack}
-                        onChange={setAtlas}
-                      />
-                    )}
-                  </div>
-                </div>
+              off the top of it. The 3D is the point of this screen.
 
-                {/* Icons only, and no card behind them: the same viewport
-                  chrome as the toolbars in the other corners, rather than a
-                  panel of labelled buttons sitting on top of the model. */}
-                <TooltipProvider delayDuration={300}>
-                  <div className="pointer-events-auto flex items-center gap-2">
-                    <ButtonGroup>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={doc.undo}
-                            disabled={!doc.canUndo}
-                            aria-label="Undo"
-                          >
-                            <Undo size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Undo ({shortcutLabel("undo")})
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={doc.redo}
-                            disabled={!doc.canRedo}
-                            aria-label="Redo"
-                          >
-                            <Redo size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Redo ({shortcutLabel("redo")})
-                        </TooltipContent>
-                      </Tooltip>
-                    </ButtonGroup>
-                    <ButtonGroup>
-                      {/* The save status was a word beside this button and is
-                        now a dot on it: a mark while there is work not yet on
-                        disk, gone once there isn't. The word itself survives
-                        in the tooltip, which is where the difference between
-                        saving and saved belongs. */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => doc.save()}
-                            disabled={doc.saving}
-                            className="relative"
-                            aria-label="Save"
-                          >
-                            <Save size={14} />
-                            {doc.dirty || doc.saving ? (
-                              <span
-                                aria-hidden
-                                className={cn(
-                                  "absolute right-1 top-1 size-2 rounded-full bg-amber-500",
-                                  doc.saving && "motion-safe:animate-pulse",
-                                )}
+              Hidden rather than unmounted while the drawer covers it, so the
+              renderer keeps its context and the camera is where you left it.
+              `useCanvas3D` ignores a host with no size, so nothing redraws
+              until it comes back. */}
+            <div
+              className={cn(
+                "relative min-h-0 flex-1",
+                stripOpen && stripFull && "hidden",
+              )}
+            >
+              <ModelViewport
+                chrome={
+                  <>
+                    <div className="pointer-events-none flex items-start justify-between gap-3">
+                      <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+                        <Blocks
+                          size={16}
+                          className="shrink-0 text-muted-foreground"
+                        />
+                        <div className="min-w-0">
+                          <Input
+                            value={draft.name}
+                            onChange={(event) => renameUnit(event.target.value)}
+                            aria-label="Unit name"
+                            className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
+                          />
+                          <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
+                            {draft.pieces.length}{" "}
+                            {draft.pieces.length === 1 ? "piece" : "pieces"} ·
+                            exports as
+                            <NameInput
+                              value={draft.unitName}
+                              onCommit={renameExport}
+                              aria-label="Export name"
+                              className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+                            />
+                          </p>
+                          {imported ? (
+                            <TexturePicker
+                              imported={imported}
+                              onChange={changeTextures}
+                            />
+                          ) : (
+                            <AtlasPicker
+                              project={draft}
+                              pack={pack}
+                              onChange={setAtlas}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Icons only, and no card behind them: the same viewport
+                    chrome as the toolbars in the other corners, rather than a
+                    panel of labelled buttons sitting on top of the model. */}
+                      <TooltipProvider delayDuration={300}>
+                        <div className="pointer-events-auto flex items-center gap-2">
+                          <ButtonGroup>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={doc.undo}
+                                  disabled={!doc.canUndo}
+                                  aria-label="Undo"
+                                >
+                                  <Undo size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Undo ({shortcutLabel("undo")})
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={doc.redo}
+                                  disabled={!doc.canRedo}
+                                  aria-label="Redo"
+                                >
+                                  <Redo size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Redo ({shortcutLabel("redo")})
+                              </TooltipContent>
+                            </Tooltip>
+                          </ButtonGroup>
+                          <ButtonGroup>
+                            {/* The save status was a word beside this button and is
+                          now a dot on it: a mark while there is work not yet on
+                          disk, gone once there isn't. The word itself survives
+                          in the tooltip, which is where the difference between
+                          saving and saved belongs. */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => doc.save()}
+                                  disabled={doc.saving}
+                                  className="relative"
+                                  aria-label="Save"
+                                >
+                                  <Save size={14} />
+                                  {doc.dirty || doc.saving ? (
+                                    <span
+                                      aria-hidden
+                                      className={cn(
+                                        "absolute right-1 top-1 size-2 rounded-full bg-amber-500",
+                                        doc.saving &&
+                                          "motion-safe:animate-pulse",
+                                      )}
+                                    />
+                                  ) : null}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                {doc.saving
+                                  ? "Saving"
+                                  : doc.dirty
+                                    ? "Unsaved changes - save now"
+                                    : "Saved"}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => setTesting(true)}
+                                  aria-label="Test in game"
+                                >
+                                  <Rocket size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Test in game
+                              </TooltipContent>
+                            </Tooltip>
+                            {/* Only a unit that came from a file has a model to save
+                          back to. One built out of parts has no such file, and
+                          Export is the only way it ever leaves the builder. */}
+                            {imported ? (
+                              <SaveModelPopover
+                                project={draft}
+                                imported={imported}
+                                pack={pack}
+                                raw={raw}
                               />
                             ) : null}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          {doc.saving
-                            ? "Saving"
-                            : doc.dirty
-                              ? "Unsaved changes - save now"
-                              : "Saved"}
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => setTesting(true)}
-                            aria-label="Test in game"
-                          >
-                            <Rocket size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Test in game
-                        </TooltipContent>
-                      </Tooltip>
-                      {/* Only a unit that came from a file has a model to save
-                        back to. One built out of parts has no such file, and
-                        Export is the only way it ever leaves the builder. */}
-                      {imported ? (
-                        <SaveModelPopover
-                          project={draft}
-                          imported={imported}
-                          pack={pack}
-                          raw={raw}
-                        />
-                      ) : null}
-                      {/* The one filled button here, as it was the one filled
-                        button before: without its label, colour is what still
-                        says this is the thing you are working towards. */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            onClick={() => setExporting(true)}
-                            aria-label="Export"
-                          >
-                            <Upload size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">Export</TooltipContent>
-                      </Tooltip>
-                    </ButtonGroup>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <CollapsibleTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            aria-label={
-                              asideOpen
+                            {/* The one filled button here, as it was the one filled
+                          button before: without its label, colour is what still
+                          says this is the thing you are working towards. */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  onClick={() => setExporting(true)}
+                                  aria-label="Export"
+                                >
+                                  <Upload size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Export
+                              </TooltipContent>
+                            </Tooltip>
+                          </ButtonGroup>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <CollapsibleTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  aria-label={
+                                    asideOpen
+                                      ? "Hide the side panel"
+                                      : "Show the side panel"
+                                  }
+                                >
+                                  {asideOpen ? (
+                                    <PanelRightClose size={16} />
+                                  ) : (
+                                    <PanelRightOpen size={16} />
+                                  )}
+                                </Button>
+                              </CollapsibleTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              {asideOpen
                                 ? "Hide the side panel"
-                                : "Show the side panel"
-                            }
-                          >
-                            {asideOpen ? (
-                              <PanelRightClose size={16} />
-                            ) : (
-                              <PanelRightOpen size={16} />
-                            )}
-                          </Button>
-                        </CollapsibleTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        {asideOpen
-                          ? "Hide the side panel"
-                          : "Show the side panel"}
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </TooltipProvider>
-              </div>
+                                : "Show the side panel"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
+                    </div>
 
-              {problems.length > 0 ? (
-                // Below the unit's chrome card, which is three rows tall when a
-                // unit has an atlas to choose.
-                <ul className="pointer-events-none absolute inset-x-0 top-24 z-10 mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
-                  {problems.map((problem) => (
-                    <li key={problem}>{problem}</li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <ModelViewport
+                    {problems.length > 0 ? (
+                      <ul className="pointer-events-none mx-auto w-fit max-w-[80%] rounded-md border border-amber-500/40 bg-background/90 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
+                        {problems.map((problem) => (
+                          <li key={problem}>{problem}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </>
+                }
                 document={{ pack, raw, project: draft }}
                 selection={{
                   selectedIds,
@@ -1093,15 +1137,36 @@ function Builder({ id }: { id: string | undefined }) {
               Collapsible otherwise: most of a session is spent moving what is
               already there, not reaching for another part. */}
             <div
-              className={`flex shrink-0 flex-col border-t border-border ${
-                stripOpen ? "h-72" : ""
-              }`}
+              id="lego-strip"
+              className={cn(
+                "relative flex flex-col border-t border-border",
+                stripOpen && stripFull ? "min-h-0 flex-1" : "shrink-0",
+              )}
+              style={
+                stripOpen && !stripFull ? { height: stripHeight } : undefined
+              }
             >
-              <div className="flex items-center gap-2 px-3 py-2">
+              {/* On the top edge, over the border, out of the layout. Whatever
+                the tabs put in the row below stays where it is. */}
+              {stripOpen && !stripFull ? (
+                <StripResizer
+                  height={stripHeight}
+                  onHeight={setStripHeight}
+                  columnRef={columnRef}
+                  controls="lego-strip"
+                />
+              ) : null}
+
+              <div className="flex items-center gap-2 px-2 py-1">
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => setStripOpen(!stripOpen)}
+                  onClick={() => {
+                    setStripOpen(!stripOpen);
+                    // Reopening to a drawer still covering the whole window
+                    // would read as the model having gone missing.
+                    setStripFull(false);
+                  }}
                   aria-expanded={stripOpen}
                   aria-label={
                     stripOpen
@@ -1175,6 +1240,27 @@ function Builder({ id }: { id: string | undefined }) {
                     className="flex-1"
                   />
                 ) : null}
+
+                {stripOpen ? (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="ml-auto"
+                    onClick={() => setStripFull(!stripFull)}
+                    aria-pressed={stripFull}
+                    aria-label={
+                      stripFull
+                        ? "Bring the model back"
+                        : "Fill the window with this panel"
+                    }
+                  >
+                    {stripFull ? (
+                      <Minimize2 size={16} />
+                    ) : (
+                      <Maximize2 size={16} />
+                    )}
+                  </Button>
+                ) : null}
               </div>
 
               {/* Flex, not block: the picker sizes itself with flex-1 and its contents
@@ -1187,6 +1273,7 @@ function Builder({ id }: { id: string | undefined }) {
                       project={draft}
                       onScriptChange={changeScript}
                       onScriptRelease={releaseScript}
+                      onCompiledReload={reloadCompiled}
                       lastRun={lastScriptRun}
                     />
                   ) : effectiveStrip === "compounds" ? (

@@ -20,6 +20,7 @@
  * the text is behind instead.
  */
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -70,7 +71,15 @@ function rowTint(severity: "error" | "warning" | null) {
   return undefined;
 }
 
-export function SourceEditor({
+/**
+ * Memoised, because a long script is thousands of DOM nodes across three
+ * layers and the builder re-renders on every frame of a playing animation:
+ * one `setScriptFrame` per rAF tick. Reconciling all of that sixty times a
+ * second is what made the model view stutter and the gutter lag half a second
+ * behind a scroll. Every prop has to be stable for this to bite, which is why
+ * callers pass a hoisted empty array rather than `matches={[]}`.
+ */
+export const SourceEditor = memo(function SourceEditor({
   id,
   value,
   onChange,
@@ -294,7 +303,7 @@ export function SourceEditor({
       </div>
     </div>
   );
-}
+});
 
 /** A line cut into plain runs and the matches on it. */
 function segments(line: string, matches: LuaMatch[]) {

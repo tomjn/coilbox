@@ -46,12 +46,18 @@ import { ButtonGroup } from "@/components/ui/button-group";
  * controls below.
  *
  * Bottom right, because the top of a viewport is where an editor's own chrome
- * goes and the bottom left is where its notes go.
+ * goes and the bottom left is where its notes go. `className` replaces that
+ * pinning for a viewport that lays its overlays out in a column instead, which
+ * is what a view short enough for them to collide needs.
  */
-export function ViewControls({ children }: { children: ReactNode }) {
-  return (
-    <ButtonGroup className="absolute bottom-3 right-3">{children}</ButtonGroup>
-  );
+export function ViewControls({
+  children,
+  className = "absolute bottom-3 right-3",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <ButtonGroup className={className}>{children}</ButtonGroup>;
 }
 
 /**
