@@ -1,4 +1,4 @@
-import { type RefObject, useEffect } from "react";
+import { type RefObject, useEffect, useRef } from "react";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
@@ -12,6 +12,7 @@ import {
 import { disposeBaked, showBaked } from "./bakedPlayback";
 import { attachGizmo } from "./gizmoCommit";
 import { type SceneState, syncScene } from "./sceneState";
+import { placeStandIn, type StandInPlacement } from "./standInPlayback";
 
 export interface ScriptFrameSteppingDeps {
   playing: boolean;
@@ -20,6 +21,8 @@ export interface ScriptFrameSteppingDeps {
   scriptPaused: boolean;
   scriptTimeline: ScriptTimeline | null;
   scriptFrame: number;
+  /** The running scenario's stand-in, and whether it is being shown. */
+  standIn: StandInPlacement;
   packRef: RefObject<LoadedPack>;
   rawRef: RefObject<RawGeometry | null>;
   projectRef: RefObject<LegoProject>;
@@ -46,6 +49,7 @@ export function useScriptFrameStepping(
     scriptPaused,
     scriptTimeline,
     scriptFrame,
+    standIn,
     packRef,
     rawRef,
     projectRef,
@@ -56,6 +60,11 @@ export function useScriptFrameStepping(
     placingAnchorRef,
   }: ScriptFrameSteppingDeps,
 ) {
+  // Read inside the tick for the same reason the timeline is: switching
+  // scenario must not rebuild the bake.
+  const standInRef = useRef(standIn);
+  standInRef.current = standIn;
+
   // Playback. The gizmo comes off first: it would be dragging a transform that
   // is overwritten on the next frame. Stopping puts the scene back from the
   // document, which is the rest pose by definition.
@@ -92,10 +101,19 @@ export function useScriptFrameStepping(
           }
           elapsed += dt;
           applyTimeline(state, projectRef.current, timeline, elapsed);
+          placeStandIn(
+            state,
+            projectRef.current,
+            standInRef.current,
+            frameAt(timeline, elapsed),
+          );
           onScriptFrameRef.current?.(frameAt(timeline, elapsed));
         } else {
           elapsed += dt;
           applyAnimation(state, projectRef.current, elapsed);
+          // The presets are not a scenario, so there is no track and nothing
+          // for a stand-in to be about.
+          state.standIn.visible = false;
         }
         state.render();
       }
@@ -108,6 +126,9 @@ export function useScriptFrameStepping(
       const current = sceneRef.current;
       if (!current) return;
       restoreFromPlayback(current);
+      // Stopping puts the scene back to the built pose, and the built pose has
+      // nothing standing beside it.
+      current.standIn.visible = false;
       disposeBaked(current);
       syncScene(current, packRef.current, rawRef.current, projectRef.current);
       attachGizmo(
@@ -139,12 +160,9 @@ export function useScriptFrameStepping(
   useEffect(() => {
     const state = sceneRef.current;
     if (!state || !playing || !scriptPaused || !scriptTimeline) return;
-    applyTimelineFrame(
-      state,
-      projectRef.current,
-      scriptTimeline,
-      clampFrame(scriptTimeline, scriptFrame),
-    );
+    const frame = clampFrame(scriptTimeline, scriptFrame);
+    applyTimelineFrame(state, projectRef.current, scriptTimeline, frame);
+    placeStandIn(state, projectRef.current, standIn, frame);
     state.render();
   }, [
     sceneRef,
@@ -152,6 +170,7 @@ export function useScriptFrameStepping(
     scriptPaused,
     scriptTimeline,
     scriptFrame,
+    standIn,
     projectRef,
   ]);
 }

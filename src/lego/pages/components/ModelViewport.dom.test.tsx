@@ -20,7 +20,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
-import { type SceneGraph, syncScene } from "./sceneState";
+import { type SceneGraph, type SceneState, syncScene } from "./sceneState";
+import { placeStandIn } from "./standInPlayback";
 
 /** A pack holding one part: a triangle a metre out along x and z. */
 function pack(): LoadedPack {
@@ -352,5 +353,187 @@ describe("what a group carries", () => {
 
     expect(scene.groups.get("hull")?.visible).toBe(false);
     expect(scene.groups.get("skirt")?.visible).toBe(true);
+  });
+});
+
+describe("placeStandIn", () => {
+  /** Enough of a scene for `placeStandIn`: a group per piece, a stand-in, and
+   *  a radius. Nothing here draws. */
+  function standInScene(): SceneState {
+    const base = new THREE.Group();
+    const arm = new THREE.Group();
+    base.add(arm);
+    return {
+      standIn: new THREE.Group(),
+      standInRadius: 10,
+      rest: new Map([
+        ["base", [0, 0, 0]],
+        ["arm", [0, 4, 0]],
+      ]),
+      groups: new Map([
+        ["base", base],
+        ["arm", arm],
+      ]),
+    } as unknown as SceneState;
+  }
+
+  const doc = project(piece("arm", "base"));
+
+  it("shows nothing at all for a scenario with no track", () => {
+    const state = standInScene();
+    placeStandIn(
+      state,
+      doc,
+      { track: null, attachPieces: new Map(), show: true },
+      0,
+    );
+
+    expect(state.standIn.visible).toBe(false);
+  });
+
+  it("shows it where a track's keys put it", () => {
+    const state = standInScene();
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: { keys: [{ frame: 0, pos: [1, 0, 2] }] },
+        attachPieces: new Map(),
+        show: true,
+      },
+      0,
+    );
+
+    expect(state.standIn.visible).toBe(true);
+    expect(state.standIn.position.toArray()).toEqual([10, 0, 20]);
+  });
+
+  it("stays hidden while the toggle is off, track or no track", () => {
+    const state = standInScene();
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: { keys: [{ frame: 0, pos: [1, 0, 2] }] },
+        attachPieces: new Map(),
+        show: false,
+      },
+      0,
+    );
+
+    expect(state.standIn.visible).toBe(false);
+  });
+
+  /** An attach that follows rides the piece wherever the pose put it, which is
+   *  the whole point of previewing a transport. */
+  it("rides the attach piece where the pose put it", () => {
+    const state = standInScene();
+    state.groups.get("base")?.position.set(3, 0, 0);
+    state.groups.get("arm")?.position.set(0, 7, 0);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: {
+            from: "QueryTransport",
+            frame: 0,
+            until: null,
+            follow: true,
+          },
+        },
+        attachPieces: new Map([["QueryTransport", "arm"]]),
+        show: true,
+      },
+      0,
+    );
+
+    expect(state.standIn.position.toArray()).toEqual([3, 7, 0]);
+  });
+
+  /** A factory does not carry what it builds, so its stand-in sits where the
+   *  piece rests rather than following it through whatever the doors do. */
+  it("sits at the attach piece's rest position when it does not follow", () => {
+    const state = standInScene();
+    state.groups.get("arm")?.position.set(0, 99, 0);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: {
+            from: "QueryBuildInfo",
+            frame: 0,
+            until: null,
+            follow: false,
+          },
+        },
+        attachPieces: new Map([["QueryBuildInfo", "arm"]]),
+        show: true,
+      },
+      0,
+    );
+
+    expect(state.standIn.position.toArray()).toEqual([0, 4, 0]);
+  });
+
+  /**
+   * A probe that named no piece leaves the stand-in on its keyed position
+   * rather than dropping it to the origin. Saying so is the panel's job. Not
+   * lying about where it is, is this function's.
+   */
+  it("holds the keyed position when the probe named no piece", () => {
+    const state = standInScene();
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 1, 4] }],
+          attach: {
+            from: "QueryTransport",
+            frame: 0,
+            until: null,
+            follow: true,
+          },
+        },
+        attachPieces: new Map(),
+        show: true,
+      },
+      0,
+    );
+
+    expect(state.standIn.visible).toBe(true);
+    expect(state.standIn.position.toArray()).toEqual([0, 10, 40]);
+  });
+
+  /** A key measured from the attach piece is measured from where that piece is,
+   *  so a dropped passenger leaves from the transport rather than from the
+   *  unit's origin. */
+  it("measures a fromAttachPiece key from the piece", () => {
+    const state = standInScene();
+    state.groups.get("arm")?.position.set(0, 7, 0);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, -0.5, 0], fromAttachPiece: true }],
+          attach: {
+            from: "QueryTransport",
+            frame: 0,
+            until: 0,
+            follow: true,
+          },
+        },
+        attachPieces: new Map([["QueryTransport", "arm"]]),
+        show: true,
+      },
+      0,
+    );
+
+    expect(state.standIn.position.toArray()).toEqual([0, 2, 0]);
   });
 });
