@@ -532,7 +532,11 @@ export function AnimationPanel({
                 if (playing || timeline) void start(next);
               }}
             >
-              <SelectTrigger size="sm" className="w-full">
+              <SelectTrigger
+                size="sm"
+                className="w-full"
+                aria-label="What happens to the unit"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -553,7 +557,11 @@ export function AnimationPanel({
                     fireCall(name, callArgsText);
                   }}
                 >
-                  <SelectTrigger size="sm" className="w-full">
+                  <SelectTrigger
+                    size="sm"
+                    className="w-full"
+                    aria-label="Function to call"
+                  >
                     <SelectValue placeholder="Choose a function" />
                   </SelectTrigger>
                   <SelectContent>
@@ -647,7 +655,11 @@ export function AnimationPanel({
                           changeValue(asked.id, Number(next))
                         }
                       >
-                        <SelectTrigger size="sm" className="w-full">
+                        <SelectTrigger
+                          size="sm"
+                          className="w-full"
+                          aria-label={control.label}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

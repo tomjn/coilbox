@@ -223,8 +223,9 @@ describe("calling a function", () => {
     );
     show(project({ compiledScript: COMPILED }));
 
-    const [scenarioPicker] = screen.getAllByRole("combobox");
-    fireEvent.click(scenarioPicker);
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
     fireEvent.click(await screen.findByText("Call a function"));
 
     // Nothing was playing yet, so learning the functions took a run of its own.
@@ -236,9 +237,7 @@ describe("calling a function", () => {
       ],
     });
 
-    // The scenario picker, then the function picker beside it.
-    const [, functionPicker] = screen.getAllByRole("combobox");
-    fireEvent.click(functionPicker);
+    fireEvent.click(screen.getByRole("combobox", { name: "Function to call" }));
     fireEvent.click(await screen.findByText("QueryTurret"));
 
     await waitFor(() => expect(runCob).toHaveBeenCalledTimes(2));
@@ -255,12 +254,13 @@ describe("calling a function", () => {
     runCob.mockResolvedValue(timeline({ functions: ["AimWeapon1"] }));
     show(project({ compiledScript: COMPILED }));
 
-    fireEvent.click(screen.getAllByRole("combobox")[0]);
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
     fireEvent.click(await screen.findByText("Call a function"));
     await waitFor(() => expect(runCob).toHaveBeenCalledTimes(1));
 
-    const [, functionPicker] = screen.getAllByRole("combobox");
-    fireEvent.click(functionPicker);
+    fireEvent.click(screen.getByRole("combobox", { name: "Function to call" }));
     fireEvent.click(await screen.findByText("AimWeapon1"));
     await waitFor(() => expect(runCob).toHaveBeenCalledTimes(2));
 
