@@ -2888,4 +2888,94 @@ mod engine_attach {
 
         assert_eq!(timeline.events[1], ScriptOutput::Drop { frame: 3, unit: 2 });
     }
+
+    /// `BeginTransport` runs its first tick before `AttachUnit(QueryTransport(...))`
+    /// asks, on a shared frame (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_begin_transport_before_query_transport_reads_what_it_set() {
+        let timeline = carried(
+            r#"
+            local base, turret = piece("base", "turret")
+            local height
+            function script.BeginTransport(passengerHeight)
+                height = passengerHeight
+            end
+            function script.QueryTransport()
+                if height then return turret end
+                return base
+            end
+            "#,
+            &[
+                ScriptEvent {
+                    frame: 0,
+                    callin: "BeginTransport".to_string(),
+                    args: vec![6.0],
+                    ambient: false,
+                    world: None,
+                    engine: None,
+                },
+                engine(0, EngineAction::Attach),
+            ],
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("turret".to_string())
+            }]
+        );
+    }
+
+    /// `TransportDrop` runs its first tick before the landing detach, on a
+    /// shared frame (`MobileCAI.cpp:2090-2091`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_transport_drop_before_the_detach_acts() {
+        let timeline = carried(
+            r#"
+            local turret, barrel = piece("turret"), piece("barrel")
+            function script.QueryTransport() return turret end
+            function script.TransportDrop(passenger)
+                Spring.UnitScript.AttachUnit(barrel, passenger)
+            end
+            "#,
+            &[
+                engine(0, EngineAction::Attach),
+                ScriptEvent {
+                    frame: 3,
+                    callin: "TransportDrop".to_string(),
+                    args: vec![2.0, 0.0, 0.0, 0.0],
+                    ambient: false,
+                    world: Some(scene()),
+                    engine: None,
+                },
+                engine(3, EngineAction::Detach),
+            ],
+        );
+
+        let on_frame_three: Vec<_> = timeline
+            .events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    ScriptOutput::Attach { frame: 3, .. } | ScriptOutput::Drop { frame: 3, .. }
+                )
+            })
+            .cloned()
+            .collect();
+        assert_eq!(
+            on_frame_three,
+            [
+                ScriptOutput::Attach {
+                    frame: 3,
+                    unit: 2,
+                    piece: Some("barrel".to_string())
+                },
+                ScriptOutput::Drop { frame: 3, unit: 2 },
+            ]
+        );
+    }
 }

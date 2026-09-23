@@ -1367,4 +1367,102 @@ mod engine_attach {
         assert!(timeline.events.is_empty());
         assert!(timeline.warnings.iter().any(|w| w.contains("no stand-in")));
     }
+
+    /// `BeginTransport` runs its first tick before `AttachUnit(QueryTransport(...))`
+    /// asks, on a shared frame (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_begin_transport_before_query_transport_reads_what_it_set() {
+        let mut begin = push(1);
+        begin.extend([op("POP_STATIC"), 0, op("RETURN")]);
+        let mut query = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        query.extend([op("PUSH_STATIC"), 0]);
+        query.extend([op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+        let bytes = build(
+            &[("BeginTransport", begin), ("QueryTransport", query)],
+            PIECES,
+            1,
+        );
+        let events = vec![
+            ScriptEvent {
+                frame: 0,
+                callin: "BeginTransport".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: None,
+                engine: None,
+            },
+            engine(0, EngineAction::Attach, Some(scene(6.0))),
+        ];
+
+        let timeline = carried(&bytes, &events);
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("turret".to_string())
+            }]
+        );
+    }
+
+    /// `TransportDrop` runs its first tick before the landing detach, on a
+    /// shared frame (`MobileCAI.cpp:2090-2091`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_transport_drop_before_the_detach_acts() {
+        let mut query = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        query.extend(push(1));
+        query.extend([op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+
+        let mut drop = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        drop.extend([op("PUSH_LOCAL_VAR"), 0]);
+        drop.extend(push(2));
+        drop.extend(push(0));
+        drop.push(op("ATTACH_UNIT"));
+        drop.push(op("RETURN"));
+
+        let bytes = build(
+            &[("QueryTransport", query), ("TransportDrop", drop)],
+            PIECES,
+            0,
+        );
+        let events = vec![
+            engine(0, EngineAction::Attach, Some(scene(6.0))),
+            ScriptEvent {
+                frame: 3,
+                callin: "TransportDrop".to_string(),
+                args: vec![2.0, 0.0, 0.0, 0.0],
+                ambient: false,
+                world: Some(scene(6.0)),
+                engine: None,
+            },
+            engine(3, EngineAction::Detach, Some(scene(6.0))),
+        ];
+
+        let timeline = carried(&bytes, &events);
+
+        let on_frame_three: Vec<_> = timeline
+            .events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    ScriptOutput::Attach { frame: 3, .. } | ScriptOutput::Drop { frame: 3, .. }
+                )
+            })
+            .cloned()
+            .collect();
+        assert_eq!(
+            on_frame_three,
+            [
+                ScriptOutput::Attach {
+                    frame: 3,
+                    unit: 2,
+                    piece: Some("barrel".to_string())
+                },
+                ScriptOutput::Drop { frame: 3, unit: 2 },
+            ]
+        );
+    }
 }

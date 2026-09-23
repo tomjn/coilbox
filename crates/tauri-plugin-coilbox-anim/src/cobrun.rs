@@ -445,6 +445,10 @@ impl Run {
 
     fn fire_due(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         let frame = self.frame;
+        // Where this call's own queued threads start, so an engine event can
+        // give them their first tick ahead of itself. See
+        // `tick_queued_call_ins`.
+        let start = self.threads.len();
         for event in events.iter().filter(|event| event.frame == frame) {
             // Before the call-in, and whether or not the script has one, so
             // the scene is right for every thread from this frame on.
@@ -452,6 +456,7 @@ impl Run {
                 self.world = Some(world.clone());
             }
             if let Some(action) = event.engine {
+                self.tick_queued_call_ins(start)?;
                 self.engine(action)?;
                 continue;
             }
@@ -498,15 +503,11 @@ impl Run {
     /// What the engine does to the stand-in itself: the air transport arm's
     /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
     ///
-    /// Known limit. The engine calls `BeginTransport(unit)` and then
-    /// `AttachUnit(unit, QueryTransport(unit))`, and each call runs its first
-    /// tick straight away (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:594`).
-    /// Here `fire_due` only queues a call-in's thread, which first runs in the
-    /// frame's thread loop, while this method calls `query_transport` inline.
-    /// So on a shared frame `query_transport` answers before `BeginTransport`'s
-    /// body has run, and on landing the detach happens before `TransportDrop`'s
-    /// body has run. This only matters to a script whose `QueryTransport` reads
-    /// state its `BeginTransport` set.
+    /// `fire_due` gives every call-in it has queued so far this frame its
+    /// first tick, with `tick_queued_call_ins`, before calling this. That is
+    /// what makes `BeginTransport` and `TransportDrop` have run before this
+    /// acts, the way the engine's own call to each runs its first tick inline
+    /// before the next call (`CobInstance.cpp:593`).
     fn engine(&mut self, action: EngineAction) -> Result<(), String> {
         let Some(stand_in) = self.world.as_ref().and_then(|world| world.stand_in) else {
             self.model.note(
@@ -529,10 +530,10 @@ impl Run {
     }
 
     /// Ask `QueryTransport` for the piece to carry the stand-in on, straight
-    /// away, the way the engine's `Call` runs a call-in's first tick inline.
-    /// Unlike the engine, this runs ahead of `BeginTransport` on a shared
-    /// frame, since `engine` calls this before `fire_due` runs that call-in's
-    /// thread. See the known limit noted on `Run::engine`.
+    /// away, the way the engine's `Call` runs a call-in's first tick inline
+    /// (`CobInstance.cpp:593`). `fire_due` has already given `BeginTransport`'s
+    /// queued thread its first tick when this frame has one, so this sees
+    /// whatever it set.
     ///
     /// COB hands it the passenger's height in 65536ths and reads the answer
     /// back out of its first argument (`rts/Sim/Units/Scripts/CobInstance.cpp:363-374`).
@@ -572,6 +573,33 @@ impl Run {
                 .to_string(),
         );
         Ok(UNANSWERED)
+    }
+
+    /// Give a first tick to every call-in thread this frame's `fire_due` has
+    /// queued so far, from `start` to wherever the thread list now ends, in
+    /// the order they were queued, then leave them exactly as `run_threads`
+    /// would find them next.
+    ///
+    /// The engine runs a call-in's first tick inline before moving on to the
+    /// next thing on the same frame (`CobInstance.cpp:593`), which is what
+    /// makes `BeginTransport` run before `AttachUnit(QueryTransport(...))`
+    /// and `TransportDrop` run before the landing detach
+    /// (`MobileCAI.cpp:1451-1453,2090-2091`). Here the queue only adds a
+    /// thread to the list, so this ticks it early to match.
+    ///
+    /// A step runs a thread until it sleeps, waits or dies, never leaving it
+    /// `Ready` again, so the later pass in `run_threads` only continues it.
+    fn tick_queued_call_ins(&mut self, start: usize) -> Result<(), String> {
+        let end = self.threads.len();
+        for index in start..end {
+            if matches!(self.threads[index].state, State::Ready) {
+                self.step_thread(index)?;
+                for thread in std::mem::take(&mut self.queued) {
+                    self.add(thread)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn add(&mut self, thread: Thread) -> Result<(), String> {

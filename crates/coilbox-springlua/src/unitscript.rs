@@ -577,6 +577,10 @@ impl Run {
 
     fn fire_due(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         let frame = self.frame;
+        // Where this call's own queued runners start, so an engine event can
+        // give them their first tick ahead of itself. See
+        // `tick_queued_call_ins`.
+        let start = self.runners.len();
         for event in events.iter().filter(|event| event.frame == frame) {
             // Before the call-in, and whether or not the script has one, so
             // the scene is right for every thread from this frame on.
@@ -584,6 +588,7 @@ impl Run {
                 self.sim.borrow_mut().world = Some(world.clone());
             }
             if let Some(action) = event.engine {
+                self.tick_queued_call_ins(start)?;
                 self.engine(action);
                 continue;
             }
@@ -614,15 +619,11 @@ impl Run {
     /// What the engine does to the stand-in itself: the air transport arm's
     /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
     ///
-    /// Known limit. The engine calls `BeginTransport(unit)` and then
-    /// `AttachUnit(unit, QueryTransport(unit))`, and each call runs its first
-    /// tick straight away (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:594`).
-    /// Here `fire_due` only queues a call-in's thread, which first runs in the
-    /// frame's coroutine loop, while this method calls `query_transport`
-    /// inline. So on a shared frame `query_transport` answers before
-    /// `BeginTransport`'s body has run, and on landing the detach happens
-    /// before `TransportDrop`'s body has run. This only matters to a script
-    /// whose `QueryTransport` reads state its `BeginTransport` set.
+    /// `fire_due` gives every runner it has queued so far this frame its
+    /// first tick, with `tick_queued_call_ins`, before calling this. That is
+    /// what makes `BeginTransport` and `TransportDrop` have run before this
+    /// acts, the way the engine's own call to each runs its first tick inline
+    /// before the next call (`CobInstance.cpp:593`).
     fn engine(&mut self, action: EngineAction) {
         let stand_in = self
             .sim
@@ -669,8 +670,8 @@ impl Run {
     /// out, less one. A script with no `QueryTransport`, or one that fails or
     /// answers with no number, gets -1, the void
     /// (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:505-519,535-550,794-797`).
-    /// Called ahead of `BeginTransport` on a shared frame. See the known
-    /// limit noted on `Run::engine`.
+    /// `fire_due` has already given `BeginTransport`'s queued runner its
+    /// first tick when this frame has one, so this sees whatever it set.
     fn query_transport(&mut self, passenger: i32) -> i64 {
         let function: Option<Function> = self.script.get("QueryTransport").ok().flatten();
         let Some(function) = function else {
@@ -744,6 +745,31 @@ impl Run {
             State::Sleeping(frame) => frame <= self.frame,
             _ => false,
         })
+    }
+
+    /// Give a first tick to every call-in runner this frame's `fire_due` has
+    /// queued so far, from `start` to wherever the runner list now ends, in
+    /// the order they were queued, then leave them exactly as `run_threads`
+    /// would find them next.
+    ///
+    /// The engine runs a call-in's first tick inline before moving on to the
+    /// next thing on the same frame (`CobInstance.cpp:593`), which is what
+    /// makes `BeginTransport` run before `AttachUnit(QueryTransport(...))`
+    /// and `TransportDrop` run before the landing detach
+    /// (`MobileCAI.cpp:1451-1453,2090-2091`). Here `add_runner` only adds a
+    /// runner to the list, so this ticks it early to match.
+    ///
+    /// `resume` runs a thread until it yields or finishes, and `read_yield`
+    /// never answers `Ready`, so the later pass in `run_threads` only
+    /// continues it.
+    fn tick_queued_call_ins(&mut self, start: usize) -> Result<(), String> {
+        let end = self.runners.len();
+        for index in start..end {
+            if matches!(self.runners[index].state, State::Ready) {
+                self.resume(index)?;
+            }
+        }
+        Ok(())
     }
 
     /// Resume one thread, and decide what its failing means.
