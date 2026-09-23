@@ -19,24 +19,21 @@ const VERTEX = /* glsl */ `
 attribute vec3 center;
 attribute float halfSize;
 attribute vec3 tint;
-varying vec2 vCorner;
 varying vec3 vTint;
 void main() {
   vec4 view = modelViewMatrix * vec4(center, 1.0);
   view.xy += position.xy * halfSize;
   gl_Position = projectionMatrix * view;
-  vCorner = position.xy;
   vTint = tint;
 }
 `;
 
 /** The colour goes out as it came in. It is sRGB already, so no colour space
- *  conversion is included. */
+ *  conversion is included. The quad is drawn whole, with no discard: TA's own
+ *  nano dot is a hard-edged square, not a circle. */
 const FRAGMENT = /* glsl */ `
-varying vec2 vCorner;
 varying vec3 vTint;
 void main() {
-  if (dot(vCorner, vCorner) > 1.0) discard;
   gl_FragColor = vec4(vTint, 1.0);
 }
 `;
