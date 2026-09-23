@@ -45,6 +45,7 @@ export function ScrubberMarks({
   const marks = scrubberMarks(events, frameCount, width);
   return (
     <TooltipProvider>
+      {/* biome-ignore lint/a11y/useSemanticElements: the marks are a role=group cluster of seek buttons, not a form <fieldset> */}
       <div
         ref={row}
         role="group"
@@ -67,6 +68,7 @@ export function ScrubberMarks({
             <TooltipContent>
               <ul className="flex flex-col gap-0.5 text-xs">
                 {mark.events.map((event, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: one frame can carry identical events, so position is the only stable key
                   <li key={`${event.frame}-${index}`}>
                     Frame {event.frame + 1}: {describeOutput(event)}
                   </li>
