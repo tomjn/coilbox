@@ -1109,8 +1109,8 @@ impl Run {
         // piece's place in the unit is also its place in the world, which is
         // what the engine answers with.
         if id == PIECE_XZ || id == PIECE_Y {
-            let index = self.program.pieces.get((p1 - 1).max(0) as usize).copied();
-            let at = index.flatten().and_then(|at| self.model.piece_position(at));
+            // Counted from 0, as every other piece a `.cob` names is.
+            let at = model_piece(&self.program, p1).and_then(|at| self.model.piece_position(at));
             let Some(at) = at else {
                 self.model.note(
                     "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit.".to_string(),
