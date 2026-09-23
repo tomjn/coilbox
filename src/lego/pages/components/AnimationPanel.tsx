@@ -79,15 +79,14 @@ import { ScrubberMarks } from "./ScrubberMarks";
 const CALL_FUNCTION = "call";
 
 /**
- * The call-ins a scenario asks a script to name a piece for.
+ * The call-ins a scenario asks a script to name a piece for, before the run.
  *
- * All three answer with a piece rather than doing anything, which is what makes
+ * Both answer with a piece rather than doing anything, which is what makes
  * them safe to call directly rather than drive over frames: see
- * `legoProbeScript`. The answer is a fixed piece in every script anyone ships.
- * Reading a real per-call return value means a new channel out of both
- * runtimes, which is a project of its own.
+ * `legoProbeScript`. `QueryTransport` is not here: the runtime asks it
+ * itself, at the moment the engine attaches a passenger.
  */
-const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo", "QueryTransport"];
+const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo"];
 
 /** Nothing to place, which is what a scenario with no track asks for. */
 const NO_STAND_IN: {

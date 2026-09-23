@@ -14,7 +14,8 @@
 /** A call-in to fire, and when. Frames are counted from the start of the run. */
 export interface ScriptEvent {
   frame: number;
-  callin: string;
+  /** The call-in to fire. Absent on an event the engine acts on. */
+  callin?: string;
   args?: number[];
   /** Whether this is the preview describing the world rather than putting the
    *  unit through something. Almost no unit defines those call-ins, so a
@@ -39,6 +40,14 @@ export interface ScriptEvent {
    * same reason `aimAtStandIn` is resolved rather than literal.
    */
   world?: ScriptWorld;
+  /**
+   * Something the engine does to the stand-in itself, rather than a call-in it
+   * fires. The air transport arm attaches a passenger to the piece
+   * `QueryTransport` names, and detaches it, without the script asking
+   * (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2041-2042,2090-2091`).
+   * The runtime asks `QueryTransport` at the moment it attaches.
+   */
+  engine?: "attach" | "detach";
 }
 
 /** The scene one frame of a script run is told about. */
@@ -141,9 +150,8 @@ export interface StandInKey {
    * unit's origin.
    *
    * What a dropped passenger needs: it moves off from where the transport put
-   * it down. Until something has let it go, the track's attach piece stands in
-   * for that point, which is what a track is measured from before a run has
-   * said where anything was dropped.
+   * it down. Before anything has let it go it is measured from the unit's
+   * origin, as any other key is.
    */
   fromRelease?: boolean;
   /** Radians about the vertical axis, relative to the unit's facing. Zero
@@ -151,22 +159,22 @@ export interface StandInKey {
   heading?: number;
 }
 
-/** The piece the stand-in sits on, and for how long. */
+/**
+ * The piece a factory builds on, and for how long.
+ *
+ * A factory spawns what it builds at the world position of the piece
+ * `QueryBuildInfo` names and leaves it there
+ * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), so the stand-in sits at
+ * the piece's rest position rather than riding it. A transport's passenger is
+ * carried by the runtime instead, from the attach events it reports.
+ */
 export interface StandInAttach {
   /** The call-in the probe asks for that piece. */
-  from: "QueryTransport" | "QueryBuildInfo";
+  from: "QueryBuildInfo";
   /** The first frame the stand-in sits on it. */
   frame: number;
   /** The frame it comes off again, or null to stay on to the end. */
   until: number | null;
-  /**
-   * Ride the piece as it animates, rather than sitting where the piece rests.
-   *
-   * A transport carries its passenger, so it follows. A factory spawns the
-   * unit it builds at the piece's world position once and leaves it there
-   * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), so it does not.
-   */
-  follow: boolean;
 }
 
 /** Where the stand-in goes over a scenario, as a preview aid layered over the
@@ -374,7 +382,6 @@ export const SCENARIOS: Scenario[] = [
         from: "QueryBuildInfo",
         frame: at(2),
         until: null,
-        follow: false,
       },
     },
   },
@@ -441,12 +448,14 @@ export const SCENARIOS: Scenario[] = [
       "An air transport picking something up: it is told what it is carrying, and the stand-in rides the piece the script names for it.",
     events: [
       ...CREATED,
-      // The engine's air arm calls `BeginTransport` and then attaches with the
-      // piece `QueryTransport` names
-      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup`
-      // is the ground and ship arm, which needs the attach piece the script
-      // chooses for itself and is not previewable yet.
+      // The engine's air arm calls `BeginTransport`, then attaches the
+      // passenger to the piece `QueryTransport` names, itself
+      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
       { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
+      { frame: at(4), engine: "attach" },
+      // Where its attachment has always ended in this scenario, so the return
+      // leg below has somewhere to start from.
+      { frame: at(11), engine: "detach" },
     ],
     standIn: {
       keys: [
@@ -454,18 +463,11 @@ export const SCENARIOS: Scenario[] = [
         { frame: 0, pos: [0, 0, 4.5] },
         { frame: at(4), pos: [0, 0, 1] },
         // The return leg, which is the preview's rather than the engine's: no
-        // unload call-in fires during it. It is here so the stand-in walks
-        // back to where it started instead of teleporting there on the frame
-        // the preview loops.
-        { frame: at(11), pos: [0, 0, 1] },
+        // unload call-in fires during it. It walks from wherever the detach
+        // left the stand-in back to where it started, so the loop does not
+        // jump.
         { frame: at(PREVIEW_SECONDS), pos: [0, 0, 4.5] },
       ],
-      attach: {
-        from: "QueryTransport",
-        frame: at(4),
-        until: at(11),
-        follow: true,
-      },
     },
   },
   {
@@ -502,6 +504,8 @@ export const SCENARIOS: Scenario[] = [
       "The same transport putting its passenger down: the stand-in comes off the piece it was riding and settles below.",
     events: [
       ...CREATED,
+      // Carried from the start. The air arm attaches for itself.
+      { frame: 0, engine: "attach" },
       // `TransportDrop(unitID, x, y, z)` in the Lua form
       // (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:806-826`). The position is
       // where the passenger is going, which is the ground under the transport.
@@ -510,28 +514,22 @@ export const SCENARIOS: Scenario[] = [
         callin: "TransportDrop",
         args: [STAND_IN_UNIT_ID, 0, 0, 0],
       },
+      // Landing detaches straight after `TransportDrop` (`MobileCAI.cpp:2090-2091`).
+      { frame: at(5), engine: "detach" },
       // Once the last passenger is off (`MobileCAI.cpp:2094-2098`).
       { frame: at(6), callin: "EndTransport" },
     ],
-    // Every key is measured from the piece it was riding, so it leaves from
-    // where the transport was holding it rather than from the unit's origin,
-    // and so the last key lands exactly where the first frame's attachment
-    // puts it. That is what closes the loop.
+    // Every key is measured from where the transport let go, so the stand-in
+    // settles below the piece it rode.
     standIn: {
       keys: [
         { frame: at(5), pos: [0, 0, 0], fromRelease: true },
         { frame: at(7.5), pos: [0, -1.6, -1.2], fromRelease: true },
         { frame: at(12), pos: [0, -1.6, -1.2], fromRelease: true },
-        // Back up to the piece. The preview's own return leg, not a reload: no
-        // call-in fires during it.
+        // Back up to the release point. The preview's own return leg, not a
+        // reload: no call-in fires during it.
         { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromRelease: true },
       ],
-      attach: {
-        from: "QueryTransport",
-        frame: 0,
-        until: at(5),
-        follow: true,
-      },
     },
   },
 ];

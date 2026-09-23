@@ -106,42 +106,19 @@ function placeLoose(
   state.standIn.visible = true;
   state.standIn.rotation.set(0, pose.heading, 0);
 
-  // The track's own attach piece rather than the one in force on this frame:
-  // a key measured from it is measured from it after the detachment too.
-  const piece = track.attach ? attachPieces.get(track.attach.from) : undefined;
-  const group = piece ? groupOfPiece(state, project, piece) : undefined;
+  // A factory's build spot: where its piece rests, not where the doors have
+  // swung it. The rest offsets are what `showBaked` wrote.
   const attach = attachedAt(track, frame);
-  group?.updateWorldMatrix(true, false);
-
-  // Riding a piece the probe named: the stand-in takes that piece's position
-  // outright. Its own keyed position says nothing while it is being carried.
-  if (attach?.follow && group) {
-    state.standIn.position.copy(group.getWorldPosition(AT));
+  const piece = attach ? attachPieces.get(attach.from) : undefined;
+  const rest = piece ? restOfPiece(state, project, piece) : null;
+  if (rest) {
+    state.standIn.position.set(...rest);
     return;
   }
 
-  // Sitting where a piece rests rather than riding it: a factory's build spot.
-  // The rest offsets are what `showBaked` wrote, so this is the piece's place
-  // before anything animated it.
-  if (attach && !attach.follow && piece) {
-    const rest = restOfPiece(state, project, piece);
-    if (rest) {
-      state.standIn.position.set(...rest);
-      return;
-    }
-  }
-
-  // Loose, or attached to a piece the probe never named. Nothing has been let
-  // go yet, so a `fromRelease` key is measured from the attach piece. With no
-  // piece to measure from it falls back to the unit's origin, which is the
-  // same answer an ordinary key gives.
-  AT.set(0, 0, 0);
-  if (pose.fromRelease && group) group.getWorldPosition(AT);
-  state.standIn.position.set(
-    AT.x + pose.pos[0],
-    AT.y + pose.pos[1],
-    AT.z + pose.pos[2],
-  );
+  // Loose, or on a build piece the probe never named. Nothing has been let go
+  // yet, so every key is measured from the unit's origin.
+  state.standIn.position.set(...pose.pos);
 }
 
 /** Release points already read, per timeline and drop frame, so scrubbing

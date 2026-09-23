@@ -187,9 +187,9 @@ export interface WorldContext {
 /**
  * The scene on one frame, as a script asking about it is told.
  *
- * A carried stand-in is where its attach piece rests, because a carried unit
- * is where its transport holds it. Rest rather than animated, for the reason
- * the aim is measured from rest: the answer has to exist before the run.
+ * A stand-in on a build piece is where that piece rests. Rest rather than
+ * animated, for the reason the aim is measured from rest: the answer has to
+ * exist before the run.
  */
 export function worldAt(
   track: StandInTrack | null,
@@ -203,10 +203,9 @@ export function worldAt(
     height: standInHeight(ctx.radius),
   };
 
-  // On the attach's own first frame the passenger has not moved yet: the
-  // engine calls script->BeginTransport(unit) before owner->AttachUnit(...)
-  // (RecoilEngine MobileCAI.cpp:1451-1453), so a call-in firing on that
-  // frame still reads the stand-in where it stood, not on the piece.
+  // A factory's stand-in sits on its build piece from the frame after the
+  // attach. The rule came from the air arm, which attaches in the runtime
+  // now, and is kept for the factory rather than changed in passing.
   const attach = attachedAt(track, frame);
   const riding =
     attach && frame > attach.frame ? ctx.attachPiece(attach.from) : null;
@@ -214,14 +213,7 @@ export function worldAt(
 
   const pose = standInAt(track, frame, ctx.radius);
   if (!pose) return { standIn: { ...base, pos: null }, self: ctx.self };
-  const from =
-    pose.fromRelease && track.attach
-      ? ctx.attachPiece(track.attach.from)
-      : null;
-  const pos: Vec3 = from
-    ? [from[0] + pose.pos[0], from[1] + pose.pos[1], from[2] + pose.pos[2]]
-    : pose.pos;
-  return { standIn: { ...base, pos }, self: ctx.self };
+  return { standIn: { ...base, pos: pose.pos }, self: ctx.self };
 }
 
 /** Every event with the scene on its own frame. */

@@ -76,10 +76,9 @@ describe("attachedAt", () => {
   const riding: StandInTrack = {
     keys: [{ frame: 0, pos: [0, 0, 0] }],
     attach: {
-      from: "QueryTransport",
+      from: "QueryBuildInfo",
       frame: 10,
       until: 20,
-      follow: true,
     },
   };
 
@@ -88,8 +87,8 @@ describe("attachedAt", () => {
   });
 
   it("is the attach from its own frame on", () => {
-    expect(attachedAt(riding, 10)?.from).toBe("QueryTransport");
-    expect(attachedAt(riding, 19)?.from).toBe("QueryTransport");
+    expect(attachedAt(riding, 10)?.from).toBe("QueryBuildInfo");
+    expect(attachedAt(riding, 19)?.from).toBe("QueryBuildInfo");
   });
 
   it("is nothing again once it detaches", () => {
@@ -103,7 +102,6 @@ describe("attachedAt", () => {
         from: "QueryBuildInfo",
         frame: 0,
         until: null,
-        follow: false,
       },
     };
     expect(attachedAt(held, 999)?.from).toBe("QueryBuildInfo");

@@ -198,42 +198,45 @@ describe("scenarios", () => {
       from: "QueryBuildInfo",
       frame: at(2),
       until: null,
-      follow: false,
     });
   });
 
   /**
-   * Air transport, which is the only kind in scope. The engine's air arm calls
-   * `BeginTransport` then attaches with the piece `QueryTransport` names
-   * (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup` is
-   * the ground and ship arm and is deliberately absent.
+   * The engine's air arm calls `BeginTransport`, then attaches with the piece
+   * `QueryTransport` names, itself (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
+   * `TransportPickup` is the ground and ship arm and is deliberately absent.
    */
   it("loads a transport the way the engine's air arm does", () => {
     const load = scenarioById("transport-load");
-    const callins = load?.events.map((e) => e.callin) ?? [];
-    expect(callins).toContain("BeginTransport");
-    expect(callins).not.toContain("TransportPickup");
-    expect(load?.standIn?.attach?.from).toBe("QueryTransport");
-    expect(load?.standIn?.attach?.follow).toBe(true);
-    // Attached from the frame the transport is told it has a passenger.
-    const begin = load?.events.find((e) => e.callin === "BeginTransport");
-    expect(load?.standIn?.attach?.frame).toBe(begin?.frame);
+    const events = load?.events ?? [];
+    const begin = events.findIndex((e) => e.callin === "BeginTransport");
+    expect(begin).toBeGreaterThan(-1);
+    expect(events.map((e) => e.callin)).not.toContain("TransportPickup");
+    expect(events[begin + 1]).toEqual({
+      frame: events[begin].frame,
+      engine: "attach",
+    });
+    expect(events.some((e) => e.engine === "detach")).toBe(true);
+    expect(load?.standIn?.attach ?? null).toBeNull();
   });
 
   /**
    * `StartUnload` is not here on purpose: nothing in `rts/` outside the script
-   * interface files calls it, the same reason `QueryLandingPad` has no
-   * scenario.
+   * interface files calls it. Landing calls `TransportDrop` and then detaches
+   * (`MobileCAI.cpp:2090-2091`).
    */
-  it("unloads with the two call-ins the engine actually fires", () => {
+  it("unloads with the call-ins the engine fires, then detaches", () => {
     const unload = scenarioById("transport-unload");
-    const callins = unload?.events.map((e) => e.callin) ?? [];
-    expect(callins).toContain("TransportDrop");
-    expect(callins).toContain("EndTransport");
-    expect(callins).not.toContain("StartUnload");
-    // It comes off on the frame it is dropped, and not before.
-    const drop = unload?.events.find((e) => e.callin === "TransportDrop");
-    expect(unload?.standIn?.attach?.until).toBe(drop?.frame);
+    const events = unload?.events ?? [];
+    expect(events.map((e) => e.callin)).toContain("EndTransport");
+    expect(events.map((e) => e.callin)).not.toContain("StartUnload");
+    expect(events.find((e) => e.engine === "attach")?.frame).toBe(0);
+    const drop = events.findIndex((e) => e.callin === "TransportDrop");
+    expect(events[drop + 1]).toEqual({
+      frame: events[drop].frame,
+      engine: "detach",
+    });
+    expect(unload?.standIn?.attach ?? null).toBeNull();
   });
 
   /** `TransportDrop` takes a unit id then x, y and z in Lua, which is the form
