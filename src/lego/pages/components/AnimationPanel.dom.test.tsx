@@ -325,7 +325,9 @@ describe("the scene a script is told about", () => {
     fireEvent.click(
       screen.getByRole("combobox", { name: "What happens to the unit" }),
     );
-    fireEvent.click(await screen.findByText("Loading a transport"));
+    fireEvent.click(
+      await screen.findByText("Loading and unloading a transport"),
+    );
     fireEvent.click(screen.getByRole("button", { name: /Play/ }));
 
     await waitFor(() => expect(runCob).toHaveBeenCalled());

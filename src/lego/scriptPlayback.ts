@@ -473,48 +473,24 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: "transport-load",
-    label: "Loading a transport",
-    description:
-      "An air transport picking something up: it is told what it is carrying, and the stand-in rides the piece the script names for it.",
-    events: [
-      ...CREATED,
-      // The engine's air arm calls `BeginTransport`, then attaches the
-      // passenger to the piece `QueryTransport` names, itself
-      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
-      { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
-      { frame: at(4), engine: "attach" },
-      // Where its attachment has always ended in this scenario, so the return
-      // leg below has somewhere to start from.
-      { frame: at(11), engine: "detach" },
-    ],
-    // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
-    // transport.
-    standIn: {
-      size: 0.1,
-      keys: [
-        // Approaching on the ground, from in front.
-        { frame: 0, pos: [0, 0, 2], fromEdge: STAND_OFF },
-        { frame: at(4), pos: [0, 0, 1] },
-        // The return leg, which is the preview's rather than the engine's: no
-        // unload call-in fires during it. It walks from wherever the detach
-        // left the stand-in back to where it started, so the loop does not
-        // jump.
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 2], fromEdge: STAND_OFF },
-      ],
-    },
-  },
-  {
     id: "transport-pickup",
-    label: "Loading a ship or hover transport",
+    label: "Loading and unloading a ship or hover transport",
     description:
-      "A ship, hovercraft or ground transport picking something up. It is told what to load and reaches for it, and the script decides where it goes.",
+      "A ship, hovercraft or ground transport picking something up, then putting it back down where it found it. It is told what to load and reaches for it, and the script decides where it goes in between.",
     events: [
       ...CREATED,
       // The engine's other arm: anything that is not an air transport stops,
       // then calls `TransportPickup` with the passenger and leaves the script
       // to attach it (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1459-1463`).
       { frame: at(4), callin: "TransportPickup", args: [STAND_IN_UNIT_ID] },
+      // Then puts it down where it found it. The Hulk's pickup ends on frame
+      // 156, measured by running armtship from balanced_annihilation-v15.9.8,
+      // and this is a second later so the stand-in is seen to go.
+      {
+        frame: 156 + at(1),
+        callin: "TransportDrop",
+        dropAtStandIn: { frame: at(4) },
+      },
     ],
     // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
     // transport.
@@ -527,48 +503,56 @@ export const SCENARIOS: Scenario[] = [
         // that asked to be loaded stops there (`MobileCAI.cpp:430-465`).
         { frame: 0, pos: [0, 0, 2], fromEdge: STAND_OFF },
         { frame: at(3), pos: [0, 0, 0], fromEdge: STAND_OFF },
-        // The return leg, which is the preview's rather than the engine's. No
-        // call-in fires during it.
-        { frame: at(11), pos: [0, 0, 0], fromEdge: STAND_OFF },
+        // Still there when it is picked up, which is where it is put down.
+        { frame: at(4), pos: [0, 0, 0], fromEdge: STAND_OFF },
+        // Held where the Hulk put it down, then the preview's own return leg.
+        // No call-in fires during it.
+        { frame: at(13), pos: [0, 0, 0], fromRelease: true },
         { frame: at(PREVIEW_SECONDS), pos: [0, 0, 2], fromEdge: STAND_OFF },
       ],
     },
   },
   {
-    id: "transport-unload",
-    label: "Unloading a transport",
+    id: "transport-load",
+    label: "Loading and unloading a transport",
     description:
-      "The same transport putting its passenger down: the stand-in comes off the piece it was riding and settles below.",
+      "An air transport picking something up on the piece the script names, carrying it, then landing and letting it go.",
     events: [
       ...CREATED,
-      // Carried from the start. The air arm attaches for itself.
-      { frame: 0, engine: "attach" },
-      // `TransportDrop(unitID, x, y, z)` in the Lua form
-      // (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:806-826`). The position is
-      // where the passenger is going, which is the ground under the transport.
+      // The engine's air arm calls `BeginTransport`, then attaches the
+      // passenger to the piece `QueryTransport` names, itself
+      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
+      { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
+      { frame: at(4), engine: "attach" },
+      // Landing: `TransportDrop` with where the passenger is going, then the
+      // arm detaches it itself (`MobileCAI.cpp:2090-2091`). At the frame this
+      // scenario's attachment has always ended. Put down where it was picked
+      // up.
       {
-        frame: at(5),
+        frame: at(11),
         callin: "TransportDrop",
-        args: [STAND_IN_UNIT_ID, 0, 0, 0],
+        dropAtStandIn: { frame: at(4) },
       },
-      // Landing detaches straight after `TransportDrop` (`MobileCAI.cpp:2090-2091`).
-      { frame: at(5), engine: "detach" },
-      // Once the last passenger is off (`MobileCAI.cpp:2094-2098`).
-      { frame: at(6), callin: "EndTransport" },
+      { frame: at(11), engine: "detach" },
+      // Once the last passenger is off (`MobileCAI.cpp:2094-2098`), a second
+      // later, as the unload scenario this replaces had it.
+      { frame: at(12), callin: "EndTransport" },
     ],
-    // Every key is measured from where the transport let go, so the stand-in
-    // settles below the piece it rode.
     // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
     // transport.
     standIn: {
       size: 0.1,
       keys: [
-        { frame: at(5), pos: [0, 0, 0], fromRelease: true },
-        { frame: at(7.5), pos: [0, -1.6, -1.2], fromRelease: true },
-        { frame: at(12), pos: [0, -1.6, -1.2], fromRelease: true },
-        // Back up to the release point. The preview's own return leg, not a
-        // reload: no call-in fires during it.
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromRelease: true },
+        // Approaching on the ground, from in front.
+        { frame: 0, pos: [0, 0, 2], fromEdge: STAND_OFF },
+        { frame: at(4), pos: [0, 0, 1] },
+        // Let go wherever the piece had it, then settles onto the spot it was
+        // picked up from, over the two and a half seconds the unload scenario
+        // this replaces took. The preview has no falling, so this stands in
+        // for it.
+        { frame: at(13.5), pos: [0, 0, 1] },
+        // The preview's own return leg. No call-in fires during it.
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 2], fromEdge: STAND_OFF },
       ],
     },
   },

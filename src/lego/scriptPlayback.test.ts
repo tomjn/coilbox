@@ -223,30 +223,31 @@ describe("scenarios", () => {
   /**
    * `StartUnload` is not here on purpose: nothing in `rts/` outside the script
    * interface files calls it. Landing calls `TransportDrop` and then detaches
-   * (`MobileCAI.cpp:2090-2091`).
+   * (`MobileCAI.cpp:2090-2091`), and the last passenger off ends the
+   * transport (`MobileCAI.cpp:2094-2098`).
    */
-  it("unloads with the call-ins the engine fires, then detaches", () => {
-    const unload = scenarioById("transport-unload");
-    const events = unload?.events ?? [];
-    expect(events.map((e) => e.callin)).toContain("EndTransport");
+  it("lands and lets go, then ends the transport", () => {
+    const load = scenarioById("transport-load");
+    const events = load?.events ?? [];
     expect(events.map((e) => e.callin)).not.toContain("StartUnload");
-    expect(events.find((e) => e.engine === "attach")?.frame).toBe(0);
     const drop = events.findIndex((e) => e.callin === "TransportDrop");
+    expect(drop).toBeGreaterThan(-1);
+    expect(events[drop]).toEqual(
+      expect.objectContaining({ dropAtStandIn: { frame: at(4) } }),
+    );
     expect(events[drop + 1]).toEqual({
       frame: events[drop].frame,
       engine: "detach",
     });
-    expect(unload?.standIn?.attach ?? null).toBeNull();
+    const end = events.findIndex((e) => e.callin === "EndTransport");
+    expect(end).toBeGreaterThan(drop);
   });
 
-  /** `TransportDrop` takes a unit id then x, y and z in Lua, which is the form
-   *  the scenarios are written in. `LuaUnitScript.cpp:806-826`. */
-  it("writes the transport call-ins in their Lua form", () => {
-    expect(
-      scenarioById("transport-unload")?.events.find(
-        (e) => e.callin === "TransportDrop",
-      )?.args,
-    ).toHaveLength(4);
+  /** `BeginTransport` takes a unit id alone in Lua, which is the form the
+   *  scenarios are written in. `TransportDrop`'s own Lua form, a unit id then
+   *  x, y and z, is checked where it is resolved, in
+   *  `aimResolver.test.ts`. */
+  it("writes BeginTransport in its Lua form", () => {
     expect(
       scenarioById("transport-load")?.events.find(
         (e) => e.callin === "BeginTransport",
@@ -258,7 +259,9 @@ describe("scenarios", () => {
    * Every transport that is not a `CHoverAirMoveType` is handed
    * `TransportPickup(unit)` once the passenger is in range, and attaches the
    * passenger itself (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1459-1463`).
-   * Nothing tells it which piece, so the scenario attaches nothing.
+   * Nothing tells it which piece, so the scenario attaches nothing. It plays
+   * the Hulk's whole cycle, so a `TransportDrop` puts the passenger back down
+   * where it was picked up.
    */
   it("loads a ship or hover transport the way the engine's other arm does", () => {
     const pickup = scenarioById("transport-pickup");
@@ -267,9 +270,12 @@ describe("scenarios", () => {
     expect(callins).not.toContain("BeginTransport");
     expect(pickup?.standIn?.attach ?? null).toBeNull();
     // Lua's form is the unit id alone.
-    expect(
-      pickup?.events.find((e) => e.callin === "TransportPickup")?.args,
-    ).toHaveLength(1);
+    const pickupEvent = pickup?.events.find(
+      (e) => e.callin === "TransportPickup",
+    );
+    expect(pickupEvent?.args).toHaveLength(1);
+    const drop = pickup?.events.find((e) => e.callin === "TransportDrop");
+    expect(drop?.dropAtStandIn).toEqual({ frame: pickupEvent?.frame });
   });
 
   /** The engine calls it once the passenger has stopped, so the stand-in is
@@ -293,21 +299,13 @@ describe("scenarios", () => {
    * usual size, since it was tuned by eye for aiming and building at.
    */
   it("sizes only a transport's stand-in as a passenger", () => {
-    for (const id of [
-      "transport-load",
-      "transport-pickup",
-      "transport-unload",
-    ]) {
+    for (const id of ["transport-load", "transport-pickup"]) {
       const size = scenarioById(id)?.standIn?.size;
       expect(size).toBeDefined();
       expect(size).toBeLessThan(7 / 30);
     }
     for (const scenario of SCENARIOS) {
-      if (
-        ["transport-load", "transport-pickup", "transport-unload"].includes(
-          scenario.id,
-        )
-      ) {
+      if (["transport-load", "transport-pickup"].includes(scenario.id)) {
         continue;
       }
       expect(scenario.standIn?.size).toBeUndefined();
