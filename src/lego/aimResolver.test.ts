@@ -290,6 +290,33 @@ describe("worldAt", () => {
     expect(worldAt(loading, 120, CTX).standIn?.pos).toEqual([0, 0, 10]);
     expect(worldAt(loading, 121, CTX).standIn?.pos).toEqual([0, 20, -5]);
   });
+
+  /**
+   * `building-factory`'s own attach carries no `frame`, since the real start
+   * is the run's `build-start`, which this pre-run world cannot know. Before
+   * construction starts the buildee does not exist, so `worldAt` takes the
+   * scenario's own `factory-build` event frame instead: nothing before it,
+   * the build piece's rest position from it on.
+   */
+  it("has no stand-in before a frame-less factory attach's build-start, then its rest position", () => {
+    const noStart: StandInTrack = {
+      ...PARKED,
+      attach: { from: "QueryBuildInfo", until: 150 },
+    };
+    expect(worldAt(noStart, 30, CTX, 60).standIn?.pos).toBeNull();
+    expect(worldAt(noStart, 60, CTX, 60).standIn?.pos).toEqual([0, 20, -5]);
+    expect(worldAt(noStart, 90, CTX, 60).standIn?.pos).toEqual([0, 20, -5]);
+  });
+
+  /** With no `factory-build` event to read at all, a frame-less attach never
+   *  reports a stand-in. */
+  it("has no stand-in for a frame-less attach with no build-start given", () => {
+    const noStart: StandInTrack = {
+      ...PARKED,
+      attach: { from: "QueryBuildInfo", until: 150 },
+    };
+    expect(worldAt(noStart, 120, CTX).standIn?.pos).toBeNull();
+  });
 });
 
 describe("withWorld", () => {
@@ -304,5 +331,26 @@ describe("withWorld", () => {
     );
     expect(events[0].world?.standIn?.pos).toEqual([0, 0, 50]);
     expect(events[1].world?.standIn?.pos).toEqual([0, 0, 30]);
+  });
+
+  /** Reads the frame-less attach's start out of the events themselves, since
+   *  `worldAt` has nowhere else to learn it before the run. */
+  it("reads a frame-less factory attach's start off its own factory-build event", () => {
+    const noStart: StandInTrack = {
+      ...PARKED,
+      attach: { from: "QueryBuildInfo", until: 150 },
+    };
+    const events = withWorld(
+      [
+        { frame: 10, callin: "Create" },
+        { frame: 30, callin: "Activate" },
+        { frame: 30, engine: "factory-build" },
+        { frame: 90, callin: "Deactivate" },
+      ],
+      noStart,
+      CTX,
+    );
+    expect(events[0].world?.standIn?.pos).toBeNull();
+    expect(events[3].world?.standIn?.pos).toEqual([0, 20, -5]);
   });
 });
