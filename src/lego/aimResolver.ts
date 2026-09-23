@@ -203,8 +203,12 @@ export function worldAt(
     height: standInHeight(ctx.radius),
   };
 
+  // On the attach's own first frame the passenger has not moved yet: the
+  // engine calls script->BeginTransport(unit) before owner->AttachUnit(...)
+  // (RecoilEngine MobileCAI.cpp:1451-1453), so a call-in firing on that
+  // frame still reads the stand-in where it stood, not on the piece.
   const attach = attachedAt(track, frame);
-  const riding = attach ? ctx.attachPiece(attach.from) : null;
+  const riding = attach && frame > attach.frame ? ctx.attachPiece(attach.from) : null;
   if (riding) return { standIn: { ...base, pos: riding }, self: ctx.self };
 
   const pose = standInAt(track, frame, ctx.radius);

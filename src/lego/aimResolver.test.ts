@@ -246,6 +246,20 @@ describe("worldAt", () => {
   it("has no stand-in at all when the scenario has none", () => {
     expect(worldAt(null, 0, CTX).standIn).toBeNull();
   });
+
+  /** BeginTransport fires before AttachUnit in the engine, so a call-in on
+   *  the attach's own frame still finds the passenger where it stood. */
+  it("keeps a passenger off the piece on the attach's own frame", () => {
+    const loading: StandInTrack = {
+      keys: [
+        { frame: 0, pos: [0, 0, 5] },
+        { frame: 120, pos: [0, 0, 1] },
+      ],
+      attach: { from: "QueryTransport", frame: 120, until: null, follow: true },
+    };
+    expect(worldAt(loading, 120, CTX).standIn?.pos).toEqual([0, 0, 10]);
+    expect(worldAt(loading, 121, CTX).standIn?.pos).toEqual([0, 20, -5]);
+  });
 });
 
 describe("withWorld", () => {
