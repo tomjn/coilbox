@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import type * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildEffectsLayer } from "./effectsLayer";
 
 function particles(count: number) {
@@ -30,6 +30,19 @@ describe("buildEffectsLayer", () => {
 
     layer.update(particles(0));
     expect(geometry.instanceCount).toBe(0);
+    layer.dispose();
+  });
+
+  it("disposes the old instanced attributes when it grows past its capacity", () => {
+    const layer = buildEffectsLayer();
+    const geometry = layer.object.geometry as THREE.InstancedBufferGeometry;
+    layer.update(particles(2));
+    const oldCenter = geometry.getAttribute("center");
+    const disposeSpy = vi.spyOn(oldCenter, "dispose");
+
+    layer.update(particles(500));
+
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
     layer.dispose();
   });
 
