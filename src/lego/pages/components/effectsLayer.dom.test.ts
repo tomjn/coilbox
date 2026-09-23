@@ -37,7 +37,9 @@ describe("buildEffectsLayer", () => {
     const layer = buildEffectsLayer();
     const geometry = layer.object.geometry as THREE.InstancedBufferGeometry;
     layer.update(particles(2));
-    const oldCenter = geometry.getAttribute("center");
+    const oldCenter = geometry.getAttribute(
+      "center",
+    ) as THREE.InstancedBufferAttribute;
     const disposeSpy = vi.spyOn(oldCenter, "dispose");
 
     layer.update(particles(500));

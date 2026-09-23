@@ -52,7 +52,9 @@ export function buildEffectsLayer(): EffectsLayer {
   const grow = (count: number) => {
     capacity = Math.max(count, capacity * 2, 64);
     for (const name of ["center", "halfSize", "tint"]) {
-      geometry.getAttribute(name)?.dispose();
+      (
+        geometry.getAttribute(name) as THREE.InstancedBufferAttribute | null
+      )?.dispose();
     }
     geometry.setAttribute(
       "center",

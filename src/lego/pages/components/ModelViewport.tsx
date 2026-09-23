@@ -122,7 +122,7 @@ import {
   refreshSelectionOutlines,
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
-import { standInFor, type StandInPlacement } from "./standInPlayback";
+import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useGizmoMode } from "./useGizmoMode";
 import { useModelAnchors } from "./useModelAnchors";
