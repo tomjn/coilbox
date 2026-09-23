@@ -34,7 +34,7 @@ use mlua::{
 use serde::Serialize;
 
 use coilbox_unitpose::{axis_index, unitvalue, Model, Wait, TICK_MS};
-pub use coilbox_unitpose::{Rest, ScriptEvent, Timeline, FPS, MAX_FRAMES};
+pub use coilbox_unitpose::{EngineAction, Rest, ScriptEvent, Timeline, FPS, MAX_FRAMES};
 
 /// Instructions one frame may execute before the run is abandoned.
 ///

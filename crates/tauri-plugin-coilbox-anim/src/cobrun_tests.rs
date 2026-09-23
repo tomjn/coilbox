@@ -60,6 +60,7 @@ fn created() -> Vec<ScriptEvent> {
         args: Vec::new(),
         ambient: false,
         world: None,
+        engine: None,
     }]
 }
 
@@ -307,6 +308,7 @@ mod stack_and_arithmetic {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 1,
@@ -314,6 +316,7 @@ mod stack_and_arithmetic {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ];
 
@@ -506,6 +509,7 @@ mod what_it_says_about_itself {
                 args: vec![4.0],
                 ambient: true,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -526,6 +530,7 @@ mod what_it_says_about_itself {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -555,6 +560,7 @@ mod what_it_says_about_itself {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -585,6 +591,7 @@ mod what_it_says_about_itself {
                 args: vec![0.8, 0.15],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -620,6 +627,7 @@ mod what_it_says_about_itself {
                 args: vec![12.0],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -670,6 +678,7 @@ mod what_it_says_about_itself {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene(Some([0.0, 3.0, 84.0]))),
+                engine: None,
             }],
             2,
             &[],
@@ -714,6 +723,7 @@ mod what_it_says_about_itself {
             args: vec![2.0],
             ambient: false,
             world: Some(scene(Some([0.0, 1.0, 0.0]))),
+            engine: None,
         };
         // No call-in the script defines, so this event only carries the world
         // forward to the frame the sleeping thread wakes into.
@@ -723,6 +733,7 @@ mod what_it_says_about_itself {
             args: Vec::new(),
             ambient: false,
             world: Some(scene(Some([0.0, 5.0, 0.0]))),
+            engine: None,
         };
         let timeline = run(
             &bytes,
@@ -754,6 +765,7 @@ mod what_it_says_about_itself {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene(Some([0.0, 0.0, 0.0]))),
+                engine: None,
             }],
             2,
             &[],
@@ -786,6 +798,7 @@ mod what_it_says_about_itself {
                 args: vec![1.0, 3.0, 9.0, 5.0],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -816,6 +829,7 @@ mod what_it_says_about_itself {
                 args: vec![7.0],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -1039,6 +1053,7 @@ mod announcements {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene()),
+                engine: None,
             }],
             2,
             &[],

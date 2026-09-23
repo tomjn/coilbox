@@ -192,6 +192,7 @@ fn the_pruned_script_loads_and_runs() {
         args: vec![0.5, 0.0],
         ambient: true,
         world: None,
+        engine: None,
     }];
     let timeline = run(
         &lua,

@@ -174,6 +174,7 @@ fn the_script_loads_and_runs() {
         args: args.to_vec(),
         ambient: true,
         world: None,
+        engine: None,
     };
     let events = [
         event(0, "Create", &[]),

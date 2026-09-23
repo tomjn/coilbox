@@ -50,7 +50,9 @@ pub const MAX_FRAMES: u32 = FPS * 30;
 pub struct ScriptEvent {
     /// Frame to fire on, counted from 0.
     pub frame: u32,
-    /// The call-in's name, such as `Create` or `AimWeapon1`.
+    /// The call-in's name, such as `Create` or `AimWeapon1`. Empty on an event
+    /// the engine acts on rather than calling into the script for.
+    #[serde(default)]
     pub callin: String,
     /// Numeric arguments, for the call-ins that take them.
     #[serde(default)]
@@ -69,6 +71,23 @@ pub struct ScriptEvent {
     /// is. None from every caller that is not the model editor's panel.
     #[serde(default)]
     pub world: Option<World>,
+    /// Something the engine does to the stand-in itself, rather than a call-in
+    /// it fires. Such an event has no `callin`.
+    #[serde(default)]
+    pub engine: Option<EngineAction>,
+}
+
+/// What the engine does to the stand-in without the script asking.
+///
+/// The air transport arm attaches a passenger to the piece `QueryTransport`
+/// answers, and detaches it again, itself
+/// (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2041-2042,2090-2091`).
+/// Every other transport leaves both to its script.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EngineAction {
+    Attach,
+    Detach,
 }
 
 /// What the preview's scene holds on one event's frame, for a script that asks.
@@ -1011,5 +1030,20 @@ mod world_tests {
         )
         .unwrap();
         assert_eq!(gone.stand_in.unwrap().pos, None);
+    }
+
+    /// An event the engine acts on carries no call-in at all.
+    #[test]
+    fn reads_an_event_the_engine_acts_on() {
+        let attach: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 120, "engine": "attach" }"#).unwrap();
+        assert_eq!(attach.engine, Some(EngineAction::Attach));
+        assert_eq!(attach.callin, "");
+        let detach: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 330, "engine": "detach" }"#).unwrap();
+        assert_eq!(detach.engine, Some(EngineAction::Detach));
+        let plain: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 0, "callin": "Create" }"#).unwrap();
+        assert_eq!(plain.engine, None);
     }
 }

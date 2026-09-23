@@ -18,6 +18,7 @@ fn create() -> Vec<ScriptEvent> {
         args: Vec::new(),
         ambient: false,
         world: None,
+        engine: None,
     }]
 }
 
@@ -380,6 +381,7 @@ fn a_table_is_a_mask_of_its_own() {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         },
         ScriptEvent {
             frame: 1,
@@ -387,6 +389,7 @@ fn a_table_is_a_mask_of_its_own() {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         },
     ];
     let names = pieces();
@@ -693,6 +696,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 10,
@@ -700,6 +704,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ],
         60,
@@ -755,6 +760,7 @@ fn a_call_in_with_arguments_gets_them() {
             args: vec![0.75, 0.1],
             ambient: false,
             world: None,
+            engine: None,
         }],
         3,
         &HashMap::new(),
@@ -819,6 +825,7 @@ fn the_generated_script_shape_runs() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 0,
@@ -826,6 +833,7 @@ fn the_generated_script_shape_runs() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 60,
@@ -833,6 +841,7 @@ fn the_generated_script_shape_runs() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ],
         120,
@@ -897,6 +906,7 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 5,
@@ -904,6 +914,7 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ],
         30,
@@ -977,6 +988,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         }],
         5,
         &HashMap::new(),
@@ -1126,6 +1138,7 @@ mod probing {
                 args: vec![4.0],
                 ambient: true,
                 world: None,
+                engine: None,
             }],
             3,
             &HashMap::new(),
@@ -2207,6 +2220,7 @@ mod world {
                 args: vec![2.0],
                 ambient: false,
                 world,
+                engine: None,
             }],
             2,
             &HashMap::new(),
@@ -2384,6 +2398,7 @@ mod unit_values_and_functions {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         }];
         let timeline = run(
             r#"
@@ -2541,6 +2556,7 @@ mod announcements {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene()),
+                engine: None,
             }],
             frames,
             &HashMap::new(),
