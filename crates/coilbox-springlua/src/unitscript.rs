@@ -623,7 +623,7 @@ impl Run {
     /// first tick, with `tick_queued_call_ins`, before calling this. That is
     /// what makes `BeginTransport` and `TransportDrop` have run before this
     /// acts, the way the engine's own call to each runs its first tick inline
-    /// before the next call (`CobInstance.cpp:593`).
+    /// before the next call (`LuaUnitScript.cpp:787-790,975`).
     fn engine(&mut self, action: EngineAction) {
         let stand_in = self
             .sim
@@ -753,7 +753,7 @@ impl Run {
     /// would find them next.
     ///
     /// The engine runs a call-in's first tick inline before moving on to the
-    /// next thing on the same frame (`CobInstance.cpp:593`), which is what
+    /// next thing on the same frame (`LuaUnitScript.cpp:787-790,975`), which is what
     /// makes `BeginTransport` run before `AttachUnit(QueryTransport(...))`
     /// and `TransportDrop` run before the landing detach
     /// (`MobileCAI.cpp:1451-1453,2090-2091`). Here `add_runner` only adds a
