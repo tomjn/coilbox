@@ -58,6 +58,47 @@ pub struct ScriptEvent {
     /// every unit, which is noise rather than news.
     #[serde(default)]
     pub ambient: bool,
+    /// The scene on this event's frame, for a script that asks where something
+    /// is. None from every caller that is not the model editor's panel.
+    #[serde(default)]
+    pub world: Option<World>,
+}
+
+/// What the preview's scene holds on one event's frame, for a script that asks.
+///
+/// Sent with each event rather than once per run, because a scenario can pick
+/// the stand-in up in one place and put it down in another. A runtime keeps the
+/// last one it was handed. That is truthful for everything a script reads about
+/// its passenger, because the engine only calls a transport once the passenger
+/// has stopped (`rts/Sim/Units/CommandAI/MobileCAI.cpp:430-465,1414-1463`).
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct World {
+    /// The one other unit in the scene, or none when the scenario has none.
+    #[serde(rename = "standIn", default)]
+    pub stand_in: Option<StandIn>,
+    /// The unit the script runs on, which stands at the origin facing +z.
+    #[serde(rename = "self")]
+    pub own: Size,
+}
+
+/// The stand-in, in elmos, in the unit's own space, which is world space
+/// because the unit stands at the origin facing +z.
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct StandIn {
+    pub id: i32,
+    /// Where its base is, or none when the scenario puts it nowhere on this
+    /// frame.
+    pub pos: Option<[f64; 3]>,
+    pub radius: f64,
+    pub height: f64,
+}
+
+/// A unit's size as the engine keeps it: `radius` is the collision sphere's,
+/// `height` the model's.
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+pub struct Size {
+    pub radius: f64,
+    pub height: f64,
 }
 
 /// One unit value id a script read while it ran, and what a control offered
@@ -574,5 +615,44 @@ mod tests {
         ]);
 
         assert!(model.piece_position(0).is_some());
+    }
+}
+
+#[cfg(test)]
+mod world_tests {
+    use super::*;
+
+    /// The shape the panel sends, field for field.
+    #[test]
+    fn reads_the_world_the_panel_sends() {
+        let event: ScriptEvent = serde_json::from_str(
+            r#"{
+                "frame": 120, "callin": "TransportPickup", "args": [2],
+                "world": {
+                    "standIn": { "id": 2, "pos": [0, 0, 84], "radius": 28, "height": 30.8 },
+                    "self": { "radius": 60, "height": 40 }
+                }
+            }"#,
+        )
+        .unwrap();
+        let world = event.world.unwrap();
+        let stand_in = world.stand_in.unwrap();
+        assert_eq!(stand_in.id, 2);
+        assert_eq!(stand_in.pos, Some([0.0, 0.0, 84.0]));
+        assert_eq!(world.own.radius, 60.0);
+    }
+
+    /// Every caller outside the panel sends no world, and a stand-in with no
+    /// place on this frame sends no position.
+    #[test]
+    fn reads_an_event_with_no_world_and_a_stand_in_with_no_place() {
+        let bare: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 0, "callin": "Create" }"#).unwrap();
+        assert!(bare.world.is_none());
+        let gone: World = serde_json::from_str(
+            r#"{ "standIn": { "id": 2, "pos": null, "radius": 4, "height": 4 }, "self": { "radius": 1, "height": 1 } }"#,
+        )
+        .unwrap();
+        assert_eq!(gone.stand_in.unwrap().pos, None);
     }
 }

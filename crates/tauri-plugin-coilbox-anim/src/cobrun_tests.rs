@@ -59,6 +59,7 @@ fn created() -> Vec<ScriptEvent> {
         callin: "Create".to_string(),
         args: Vec::new(),
         ambient: false,
+        world: None,
     }]
 }
 
@@ -305,12 +306,14 @@ mod stack_and_arithmetic {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 1,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ];
 
@@ -502,6 +505,7 @@ mod what_it_says_about_itself {
                 callin: "setSFXoccupy".to_string(),
                 args: vec![4.0],
                 ambient: true,
+                world: None,
             }],
             3,
             &[],
@@ -521,6 +525,7 @@ mod what_it_says_about_itself {
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -549,6 +554,7 @@ mod what_it_says_about_itself {
                 callin: "AimWeapon1".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -578,6 +584,7 @@ mod what_it_says_about_itself {
                 callin: "AimWeapon1".to_string(),
                 args: vec![0.8, 0.15],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -612,6 +619,7 @@ mod what_it_says_about_itself {
                 // single argument means once the runtime has it.
                 args: vec![12.0],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -644,6 +652,7 @@ mod what_it_says_about_itself {
                 // Lua's (unitID, x, y, z).
                 args: vec![1.0, 3.0, 9.0, 5.0],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -673,6 +682,7 @@ mod what_it_says_about_itself {
                 callin: "HitByWeapon".to_string(),
                 args: vec![7.0],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],

@@ -191,6 +191,7 @@ fn the_pruned_script_loads_and_runs() {
         callin: "AimWeapon1".into(),
         args: vec![0.5, 0.0],
         ambient: true,
+        world: None,
     }];
     let timeline = run(
         &lua,

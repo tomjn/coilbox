@@ -38,6 +38,7 @@ fn y_after_defining(defines: &str, body: &str, precedence: Precedence) -> f64 {
         callin: "Create".into(),
         args: Vec::new(),
         ambient: true,
+        world: None,
     }];
     let timeline = run(
         &lua,
@@ -183,6 +184,7 @@ fn scales_a_piece() {
         callin: "Create".into(),
         args: Vec::new(),
         ambient: true,
+        world: None,
     }];
     let timeline = run(
         &lua,
@@ -235,6 +237,7 @@ fn a_lua_call_goes_to_the_game_s_lua() {
         callin: "Create".into(),
         args: Vec::new(),
         ambient: true,
+        world: None,
     }];
     let timeline = run(
         &lua,
@@ -275,6 +278,7 @@ fn a_minus_before_a_negative_value_is_not_a_comment() {
         callin: "Create".into(),
         args: Vec::new(),
         ambient: true,
+        world: None,
     }];
     let timeline = run(
         &lua,

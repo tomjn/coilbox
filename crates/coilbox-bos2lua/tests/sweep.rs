@@ -32,6 +32,7 @@ fn event(frame: u32, callin: &str, args: &[f64]) -> ScriptEvent {
         callin: callin.into(),
         args: args.to_vec(),
         ambient: true,
+        world: None,
     }
 }
 

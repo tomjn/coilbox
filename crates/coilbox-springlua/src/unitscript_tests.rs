@@ -17,6 +17,7 @@ fn create() -> Vec<ScriptEvent> {
         callin: "Create".to_string(),
         args: Vec::new(),
         ambient: false,
+        world: None,
     }]
 }
 
@@ -378,12 +379,14 @@ fn a_table_is_a_mask_of_its_own() {
             callin: "Create".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         },
         ScriptEvent {
             frame: 1,
             callin: "StopMoving".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         },
     ];
     let names = pieces();
@@ -689,12 +692,14 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 10,
                 callin: "StopMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ],
         60,
@@ -749,6 +754,7 @@ fn a_call_in_with_arguments_gets_them() {
             callin: "AimWeapon1".to_string(),
             args: vec![0.75, 0.1],
             ambient: false,
+            world: None,
         }],
         3,
         &HashMap::new(),
@@ -812,18 +818,21 @@ fn the_generated_script_shape_runs() {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 0,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 60,
                 callin: "StopMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ],
         120,
@@ -887,12 +896,14 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 5,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ],
         30,
@@ -965,6 +976,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             callin: "StartMoving".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         }],
         5,
         &HashMap::new(),
@@ -1114,6 +1126,7 @@ mod probing {
                 callin: "setSFXoccupy".to_string(),
                 args: vec![4.0],
                 ambient: true,
+                world: None,
             }],
             3,
             &HashMap::new(),
@@ -2256,6 +2269,7 @@ mod unit_values_and_functions {
             callin: "DoTheThing".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         }];
         let timeline = run(
             r#"
