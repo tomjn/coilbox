@@ -295,9 +295,16 @@ pub fn who(id: i64, world: &crate::World) -> Who<'_> {
 ///
 /// `rts/Sim/Units/Scripts/UnitScript.cpp:1060-1105`. The unit itself stands at
 /// the origin, and the ground is flat at 0, which is what the viewport draws.
+/// `carried` is where the stand-in is once a script has held it
+/// ([`crate::Passenger::at`]), which the scene no longer decides.
 /// `None` for an id this does not cover, and for one it cannot answer without
 /// a scene, so the caller's own "no world" note still says so.
-pub fn world(id: i32, p1: i32, world: Option<&crate::World>) -> Option<Answer> {
+pub fn world(
+    id: i32,
+    p1: i32,
+    world: Option<&crate::World>,
+    carried: Option<[f64; 3]>,
+) -> Option<Answer> {
     let plain = |value: i32| Answer { value, note: None };
     if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT) {
         return None;
@@ -318,7 +325,7 @@ pub fn world(id: i32, p1: i32, world: Option<&crate::World>) -> Option<Answer> {
     if id == UNIT_HEIGHT {
         return Some(plain((stand_in.radius * f64::from(COBSCALE)) as i32));
     }
-    let Some(pos) = stand_in.pos else {
+    let Some(pos) = carried.or(stand_in.pos) else {
         return Some(Answer {
             value: 0,
             note: Some(
@@ -528,7 +535,7 @@ mod tests {
     }
 
     fn value(id: i32, p1: i32, world: Option<&crate::World>) -> Option<i32> {
-        self::world(id, p1, world).map(|answer| answer.value)
+        self::world(id, p1, world, None).map(|answer| answer.value)
     }
 
     /// `rts/Sim/Units/Scripts/UnitScript.cpp:1060-1092`, a cell at a time.
@@ -556,14 +563,14 @@ mod tests {
     #[test]
     fn answers_zero_for_a_unit_that_is_not_there() {
         let w = scene(Some([10.0, 2.0, 84.0]));
-        let answer = world(UNIT_XZ, 7, Some(&w)).unwrap();
+        let answer = world(UNIT_XZ, 7, Some(&w), None).unwrap();
         assert_eq!(answer.value, 0);
         assert_eq!(answer.note, None);
     }
 
     #[test]
     fn says_so_when_the_stand_in_is_nowhere_on_this_frame() {
-        let answer = world(UNIT_XZ, 2, Some(&scene(None))).unwrap();
+        let answer = world(UNIT_XZ, 2, Some(&scene(None)), None).unwrap();
         assert_eq!(answer.value, 0);
         assert!(answer.note.is_some());
     }
@@ -575,9 +582,39 @@ mod tests {
     fn answers_the_stand_ins_height_even_when_it_is_nowhere_on_this_frame() {
         assert_eq!(value(UNIT_HEIGHT, 2, Some(&scene(None))), Some(28 * 65536));
         assert_eq!(
-            world(UNIT_HEIGHT, 2, Some(&scene(None))).unwrap().note,
+            world(UNIT_HEIGHT, 2, Some(&scene(None)), None)
+                .unwrap()
+                .note,
             None
         );
+    }
+
+    /// Once a script holds the stand-in, the runtime says where it is and the
+    /// scene does not. Its size still comes from the scene.
+    #[test]
+    fn answers_a_carried_stand_in_from_where_it_is_carried() {
+        let w = scene(Some([10.0, 2.0, 84.0]));
+        let carried = Some([1.0, 2.0, 3.0]);
+        assert_eq!(
+            world(UNIT_XZ, 2, Some(&w), carried).map(|a| a.value),
+            Some(pack_xz(1.0, 3.0))
+        );
+        assert_eq!(
+            world(UNIT_Y, 2, Some(&w), carried).map(|a| a.value),
+            Some(2 * 65536)
+        );
+        assert_eq!(
+            world(UNIT_HEIGHT, 2, Some(&w), carried).map(|a| a.value),
+            Some(28 * 65536)
+        );
+    }
+
+    /// A scene that puts the stand-in nowhere does not matter once it is held.
+    #[test]
+    fn a_carried_stand_in_is_somewhere_even_when_the_scene_says_nowhere() {
+        let answer = world(UNIT_XZ, 2, Some(&scene(None)), Some([1.0, 0.0, 3.0])).unwrap();
+        assert_eq!(answer.value, pack_xz(1.0, 3.0));
+        assert_eq!(answer.note, None);
     }
 
     #[test]
@@ -597,7 +634,7 @@ mod tests {
 
     #[test]
     fn leaves_everything_else_to_the_caller() {
-        assert!(world(HEALTH, 0, Some(&scene(None))).is_none());
+        assert!(world(HEALTH, 0, Some(&scene(None)), None).is_none());
     }
 
     #[test]

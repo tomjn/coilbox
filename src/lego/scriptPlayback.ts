@@ -52,6 +52,18 @@ export interface ScriptWorld {
   self: { radius: number; height: number };
 }
 
+/**
+ * Something a script announced, on the frame it did. Mirrors `ScriptOutput` in
+ * `crates/coilbox-unitpose/src/lib.rs`. Pieces are named, because a name means
+ * the same in both runtimes.
+ */
+export type ScriptOutput =
+  | { frame: number; kind: "attach"; unit: number; piece: string | null } // null is the void
+  | { frame: number; kind: "drop"; unit: number }
+  | { frame: number; kind: "sfx"; piece: string; sfx: number }
+  | { frame: number; kind: "explode"; piece: string; flags: number }
+  | { frame: number; kind: "sound"; name: string | null };
+
 /** What one run of a script produced. Mirrors the runtime's own report. */
 export interface ScriptTimeline {
   fps: number;
@@ -79,6 +91,9 @@ export interface ScriptTimeline {
   /** COB instruction word offsets the run executed at least once. Empty for a
    *  Lua run, which reports `linesRun` instead. */
   offsetsRun: number[];
+  /** What the script announced, in frame order: effects, sound, and carrying
+   *  the stand-in. */
+  events: ScriptOutput[];
 }
 
 /** What one call-in that answers with a piece said. */

@@ -373,6 +373,7 @@ describe("coverage dimming", () => {
       functions: [],
       linesRun: [],
       offsetsRun: [],
+      events: [],
       ...over,
     };
   }

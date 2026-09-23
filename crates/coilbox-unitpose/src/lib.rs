@@ -15,7 +15,14 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod passenger;
 pub mod unitvalue;
+
+pub use passenger::Passenger;
+
+/// Said once when a run recorded an effect, an explosion or a sound, none of
+/// which the preview draws or plays.
+pub const EFFECTS_NOTE: &str = "Effects are marked on the scrubber, not drawn.";
 
 /// Sim frames per second. The engine's `GAME_SPEED`, which every `Sleep` and
 /// every per-second speed is measured against.
@@ -117,6 +124,49 @@ pub struct AskedValue {
     pub default: Option<i32>,
 }
 
+/// Something a script announced, on the frame it did.
+///
+/// Pieces are named rather than numbered, because a name means the same in
+/// both runtimes and is what the viewport looks a piece up by.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum ScriptOutput {
+    /// `attach-unit` or `AttachUnit`. `piece` is none for the void.
+    Attach {
+        frame: u32,
+        unit: i32,
+        piece: Option<String>,
+    },
+    /// `drop-unit` or `DropUnit`.
+    Drop { frame: u32, unit: i32 },
+    /// `emit-sfx` or `EmitSfx`, with the raw effect number. From 1024 it
+    /// indexes the unit's own generator list, from 2048 it fires a weapon and
+    /// from 4096 it detonates one (`rts/Sim/Units/Scripts/CobDefines.h:9-20`).
+    /// The editor has no unit definition to name a generator from.
+    Sfx { frame: u32, piece: String, sfx: i32 },
+    /// `explode` or `Explode`, with the raw flags.
+    Explode {
+        frame: u32,
+        piece: String,
+        flags: i32,
+    },
+    /// A COB sound table entry or the Lua call's first argument. None for a
+    /// compiled script with no sound table, which is a TA script rather than
+    /// a TA:K one.
+    Sound { frame: u32, name: Option<String> },
+}
+
+impl ScriptOutput {
+    /// Whether this is something the preview would draw or play, as opposed
+    /// to carrying the stand-in.
+    fn is_effect(&self) -> bool {
+        matches!(
+            self,
+            Self::Sfx { .. } | Self::Explode { .. } | Self::Sound { .. }
+        )
+    }
+}
+
 /// Every piece's pose on every frame, which is what the viewport plays.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -161,6 +211,9 @@ pub struct Timeline {
     /// Lua run, which reports `lines_run` instead.
     #[serde(default)]
     pub offsets_run: Vec<u32>,
+    /// What the script announced, in frame order.
+    #[serde(default)]
+    pub events: Vec<ScriptOutput>,
 }
 
 impl Timeline {
@@ -177,6 +230,7 @@ impl Timeline {
             functions: Vec::new(),
             lines_run: Vec::new(),
             offsets_run: Vec::new(),
+            events: Vec::new(),
         }
     }
 
@@ -272,6 +326,10 @@ pub struct Model {
     /// origin as though every piece were stacked at the unit's feet.
     pub placed: bool,
     pub warnings: Vec<String>,
+    /// What scripts have done with the stand-in.
+    pub passenger: Passenger,
+    /// What the script announced, in the order it did.
+    pub events: Vec<ScriptOutput>,
 }
 
 impl Model {
@@ -431,6 +489,83 @@ impl Model {
         self.pieces[piece].hidden = hidden;
     }
 
+    /// A piece a script named is not one of this unit's. The engine reports it
+    /// and does nothing (`ShowUnitScriptError`), so nothing is recorded.
+    pub fn no_such_piece(&mut self, call: &str, piece: i64) {
+        self.note(format!(
+            "{call} names piece {piece}, which this unit does not have, so it did nothing."
+        ));
+    }
+
+    pub fn emit_sfx(&mut self, frame: u32, piece: usize, sfx: i32) {
+        let piece = self.pieces[piece].name.clone();
+        self.events.push(ScriptOutput::Sfx { frame, piece, sfx });
+    }
+
+    pub fn explode(&mut self, frame: u32, piece: usize, flags: i32) {
+        let piece = self.pieces[piece].name.clone();
+        self.events.push(ScriptOutput::Explode {
+            frame,
+            piece,
+            flags,
+        });
+    }
+
+    pub fn play_sound(&mut self, frame: u32, name: Option<String>) {
+        self.events.push(ScriptOutput::Sound { frame, name });
+    }
+
+    /// Attach a unit to `piece`, or to the void when there is none.
+    ///
+    /// Recorded whichever unit it names. Only the stand-in moves, because it is
+    /// the only other unit there is, and the engine does nothing for an id
+    /// with no unit behind it (`UnitScript.cpp:838-841`).
+    pub fn attach_unit(
+        &mut self,
+        frame: u32,
+        unit: i32,
+        piece: Option<usize>,
+        world: Option<&World>,
+    ) {
+        let name = piece.map(|piece| self.pieces[piece].name.clone());
+        self.events.push(ScriptOutput::Attach {
+            frame,
+            unit,
+            piece: name,
+        });
+        if unit == unitvalue::UNIT_ID {
+            self.carries_itself();
+        } else if let Some(stand_in) = stand_in(unit, world) {
+            self.passenger.attach(piece, stand_in.pos);
+        }
+    }
+
+    /// Let a unit go. Recorded whichever unit it names, as an attach is
+    /// (`UnitScript.cpp:852-855`).
+    pub fn drop_unit(&mut self, frame: u32, unit: i32, world: Option<&World>) {
+        self.events.push(ScriptOutput::Drop { frame, unit });
+        if unit == unitvalue::UNIT_ID {
+            self.carries_itself();
+        } else if stand_in(unit, world).is_some() {
+            self.passenger.release();
+        }
+    }
+
+    /// The engine asserts against a unit carrying itself (`Unit.cpp:2638`).
+    fn carries_itself(&mut self) {
+        self.note(
+            "This script tells the unit to carry or drop itself, which the engine does not allow, so nothing happened.".to_string(),
+        );
+    }
+
+    /// Move the stand-in onto its piece once every thread has run this frame,
+    /// which is the engine's `UpdatePostAnimation` (`rts/Game/Game.cpp:1796-1798`).
+    pub fn after_frame(&mut self) {
+        let mut passenger = std::mem::take(&mut self.passenger);
+        passenger.after_frame(self);
+        self.passenger = passenger;
+    }
+
     /// Append this frame's poses to a timeline.
     pub fn sample(&self, timeline: &mut Timeline) {
         let mut frame = Vec::with_capacity(self.pieces.len() * 6);
@@ -444,14 +579,27 @@ impl Model {
         timeline.hidden.push(hidden);
     }
 
-    /// Close a timeline off: carry the warnings over, and drop the visibility
-    /// track when nothing ever used it.
+    /// Close a timeline off: carry the warnings and events over, say once that
+    /// effects are marked rather than drawn, and drop the visibility track when
+    /// nothing ever used it.
     pub fn finish(&self, timeline: &mut Timeline) {
         timeline.warnings.extend(self.warnings.iter().cloned());
+        timeline.events = self.events.clone();
+        if self.events.iter().any(ScriptOutput::is_effect) {
+            timeline.warnings.push(EFFECTS_NOTE.to_string());
+        }
         if !self.visibility_used {
             timeline.hidden.clear();
         }
     }
+}
+
+/// The stand-in, when `unit` is its id.
+fn stand_in(unit: i32, world: Option<&World>) -> Option<&StandIn> {
+    world?
+        .stand_in
+        .as_ref()
+        .filter(|stand_in| stand_in.id == unit)
 }
 
 /// Move one axis one frame toward its target, and report the animation that is
@@ -615,6 +763,215 @@ mod tests {
         ]);
 
         assert!(model.piece_position(0).is_some());
+    }
+
+    fn scene(pos: [f64; 3]) -> World {
+        World {
+            stand_in: Some(StandIn {
+                id: 2,
+                pos: Some(pos),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    /// `CUnit::AttachUnit` records the piece and nothing else. The passenger
+    /// moves once every script has ticked (`rts/Game/Game.cpp:1796-1798`).
+    #[test]
+    fn an_attach_does_not_move_the_stand_in_until_the_frame_ends() {
+        let mut model = placed();
+        model.attach_unit(0, 2, Some(2), Some(&scene([30.0, 0.0, 40.0])));
+
+        assert_eq!(model.passenger.at(), Some([30.0, 0.0, 40.0]));
+        model.after_frame();
+        assert_eq!(model.passenger.at(), Some([4.0, 12.0, 0.0]));
+    }
+
+    /// A later event's scene says where it last saw the stand-in, which is
+    /// no longer where a held stand-in is.
+    #[test]
+    fn a_later_scene_does_not_move_an_attached_stand_in() {
+        let mut model = placed();
+        model.attach_unit(0, 2, Some(2), Some(&scene([30.0, 0.0, 40.0])));
+        model.after_frame();
+        let later = scene([90.0, 0.0, 90.0]);
+
+        let answer = unitvalue::world(unitvalue::UNIT_XZ, 2, Some(&later), model.passenger.at());
+        assert_eq!(answer.map(|a| a.value), Some(unitvalue::pack_xz(4.0, 0.0)));
+    }
+
+    /// A riding stand-in follows its piece frame by frame.
+    #[test]
+    fn a_riding_stand_in_follows_its_piece() {
+        let mut model = placed();
+        model.attach_unit(0, 2, Some(2), Some(&scene([30.0, 0.0, 40.0])));
+        model.after_frame();
+        model.pieces[1].pos[1] = 5.0;
+        model.after_frame();
+
+        assert_eq!(model.passenger.at(), Some([4.0, 17.0, 0.0]));
+    }
+
+    /// A negative piece puts a passenger at the transporter's own position
+    /// (`rts/Sim/Units/Unit.cpp:726-732`), which is the origin here.
+    #[test]
+    fn the_void_is_the_origin() {
+        let mut model = placed();
+        model.attach_unit(0, 2, None, Some(&scene([30.0, 0.0, 40.0])));
+        model.after_frame();
+
+        assert_eq!(model.passenger, Passenger::Void { at: [0.0; 3] });
+    }
+
+    /// `DetachUnit` does not move the passenger (`Unit.cpp:2715-2780`).
+    #[test]
+    fn a_drop_keeps_the_last_position() {
+        let mut model = placed();
+        let world = scene([30.0, 0.0, 40.0]);
+        model.attach_unit(0, 2, Some(2), Some(&world));
+        model.after_frame();
+        model.drop_unit(1, 2, Some(&world));
+        model.pieces[1].pos[1] = 50.0;
+        model.after_frame();
+
+        assert_eq!(
+            model.passenger,
+            Passenger::Released {
+                at: [4.0, 12.0, 0.0]
+            }
+        );
+    }
+
+    /// A second attach while carried moves the passenger to the new piece
+    /// (`Unit.cpp:2640-2654`), and still waits for the frame to end.
+    #[test]
+    fn a_second_attach_moves_to_the_new_piece() {
+        let mut model = placed();
+        let world = scene([30.0, 0.0, 40.0]);
+        model.attach_unit(0, 2, Some(2), Some(&world));
+        model.after_frame();
+        model.attach_unit(1, 2, Some(1), Some(&world));
+
+        assert_eq!(model.passenger.at(), Some([4.0, 12.0, 0.0]));
+        model.after_frame();
+        assert_eq!(model.passenger.at(), Some([0.0, 10.0, 0.0]));
+    }
+
+    /// `DetachUnitCore` refuses a unit it is not carrying (`Unit.cpp:2715-2720`).
+    #[test]
+    fn dropping_a_stand_in_nobody_carries_moves_nothing() {
+        let mut model = placed();
+        model.drop_unit(0, 2, Some(&scene([30.0, 0.0, 40.0])));
+
+        assert_eq!(model.passenger, Passenger::Loose);
+        assert_eq!(model.events, [ScriptOutput::Drop { frame: 0, unit: 2 }]);
+    }
+
+    /// The engine does nothing for an id with no unit behind it
+    /// (`rts/Sim/Units/Scripts/UnitScript.cpp:838-841,852-855`), and the
+    /// stand-in is the only other unit.
+    #[test]
+    fn attaching_another_unit_is_recorded_and_moves_nothing() {
+        let mut model = placed();
+        model.attach_unit(3, 7, Some(2), Some(&scene([30.0, 0.0, 40.0])));
+
+        assert_eq!(model.passenger, Passenger::Loose);
+        assert_eq!(
+            model.events,
+            [ScriptOutput::Attach {
+                frame: 3,
+                unit: 7,
+                piece: Some("arm".to_string()),
+            }]
+        );
+    }
+
+    /// The engine asserts against a unit carrying itself (`Unit.cpp:2638`).
+    #[test]
+    fn attaching_the_unit_to_itself_is_noted() {
+        let mut model = placed();
+        model.attach_unit(0, unitvalue::UNIT_ID, Some(2), None);
+
+        assert_eq!(model.passenger, Passenger::Loose);
+        assert_eq!(model.events.len(), 1);
+        assert!(model
+            .warnings
+            .iter()
+            .any(|w| w.contains("carry or drop itself")));
+    }
+
+    #[test]
+    fn records_effects_by_piece_name() {
+        let mut model = placed();
+        model.emit_sfx(4, 2, 1025);
+        model.explode(5, 1, 257);
+        model.play_sound(6, Some("krogtaunt".to_string()));
+
+        assert_eq!(
+            model.events,
+            [
+                ScriptOutput::Sfx {
+                    frame: 4,
+                    piece: "arm".to_string(),
+                    sfx: 1025
+                },
+                ScriptOutput::Explode {
+                    frame: 5,
+                    piece: "torso".to_string(),
+                    flags: 257
+                },
+                ScriptOutput::Sound {
+                    frame: 6,
+                    name: Some("krogtaunt".to_string())
+                },
+            ]
+        );
+    }
+
+    /// The effects note is said only when there is an effect to mark. An
+    /// attach on its own is not one.
+    #[test]
+    fn notes_effects_only_when_the_run_recorded_one() {
+        let mut quiet = placed();
+        quiet.attach_unit(0, 2, None, None);
+        let mut timeline = Timeline::new(names(), 0);
+        quiet.finish(&mut timeline);
+        assert!(!timeline.warnings.iter().any(|w| w == EFFECTS_NOTE));
+        assert_eq!(timeline.events.len(), 1);
+
+        let mut loud = placed();
+        loud.play_sound(0, None);
+        let mut timeline = Timeline::new(names(), 0);
+        loud.finish(&mut timeline);
+        assert!(timeline.warnings.iter().any(|w| w == EFFECTS_NOTE));
+    }
+
+    /// The shape `ScriptTimeline.events` reads in `src/lego/scriptPlayback.ts`.
+    #[test]
+    fn serialises_an_event_the_way_the_panel_reads_it() {
+        let attach = ScriptOutput::Attach {
+            frame: 3,
+            unit: 2,
+            piece: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&attach).unwrap(),
+            serde_json::json!({ "kind": "attach", "frame": 3, "unit": 2, "piece": null })
+        );
+        let sfx = ScriptOutput::Sfx {
+            frame: 1,
+            piece: "flare".to_string(),
+            sfx: 1025,
+        };
+        assert_eq!(
+            serde_json::to_value(&sfx).unwrap(),
+            serde_json::json!({ "kind": "sfx", "frame": 1, "piece": "flare", "sfx": 1025 })
+        );
     }
 }
 

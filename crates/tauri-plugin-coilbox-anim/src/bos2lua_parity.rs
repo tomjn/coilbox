@@ -8,7 +8,8 @@
 //! Set `COILBOX_BOS_SWEEP` to a game's unpacked `scripts` folder. Skipped when
 //! it is unset, because no game ships in this repo.
 
-use coilbox_springlua::unitscript::{run as run_lua, ScriptEvent, Unit};
+use coilbox_springlua::unitscript::{run as run_lua, Rest, ScriptEvent, Unit};
+use coilbox_unitpose::ScriptOutput;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -196,6 +197,19 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
             Some(_) if KNOWN.iter().any(|(known, _)| *known == name) => same += 1,
             Some(d) => differ.push(d),
         }
+        let heard = |t: &coilbox_unitpose::Timeline| -> Vec<ScriptOutput> {
+            t.events
+                .iter()
+                .cloned()
+                .map(|e| match e {
+                    ScriptOutput::Sound { frame, .. } => ScriptOutput::Sound { frame, name: None },
+                    other => other,
+                })
+                .collect()
+        };
+        if heard(&from_cob) != heard(&from_lua) && !KNOWN.iter().any(|(known, _)| *known == name) {
+            differ.push(format!("{name}: the two announce different events"));
+        }
     }
     eprintln!(
         "{same} match or are known, {} differ, {} skipped",
@@ -344,4 +358,219 @@ fn the_converter_s_fixture_moves_as_its_compiled_cob_does() {
         first_difference(&from_cob, &from_lua, &pieces, "walker", false),
         None
     );
+}
+
+/// Compile `source` with this crate's compiler and convert it with the
+/// converter, as the fixture test above does, and name its pieces.
+fn both(source: &str) -> (Vec<u8>, String, Vec<String>) {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+    let cob = crate::compile_bos(source, &dir).unwrap();
+    let lua = coilbox_bos2lua::convert(
+        source,
+        &coilbox_bos2lua::Options {
+            name: "scripts/events.bos",
+            includes: &HashMap::new(),
+            pieces: None,
+            linear_scale: coilbox_bos2lua::linear_scale(source, &cob)
+                .unwrap_or(coilbox_bos2lua::MODERN_LINEAR),
+            precedence: coilbox_bos2lua::Precedence::Modern,
+            prune: false,
+        },
+    )
+    .unwrap()
+    .lua;
+    let pieces = pieces_of(&lua);
+    (cob, lua, pieces)
+}
+
+/// `TransportPickup(2)`, with the stand-in parked at (30, 0, 40).
+fn pickup_at(frame: u32) -> ScriptEvent {
+    ScriptEvent {
+        frame,
+        callin: "TransportPickup".into(),
+        args: vec![2.0],
+        ambient: false,
+        world: Some(coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }),
+    }
+}
+
+/// Rest positions in the order the conversion lists its pieces, by name, so
+/// the test does not depend on that order.
+fn rest_for(pieces: &[String], at: &[(&str, Option<&str>, [f64; 3])]) -> Vec<Rest> {
+    let index = |name: &str| pieces.iter().position(|p| p == name).unwrap();
+    pieces
+        .iter()
+        .map(|piece| {
+            let (_, parent, position) = at.iter().find(|(name, _, _)| name == piece).unwrap();
+            Rest {
+                parent: parent.map(index),
+                position: *position,
+            }
+        })
+        .collect()
+}
+
+/// Sound is left out: this crate's compiler writes no sound table, so a
+/// compiled `play-sound` has no name, and the converter plays
+/// `sounds/<name>.wav`. Each runtime's own tests cover sound.
+#[test]
+fn both_runtimes_announce_the_same_events() {
+    let (cob, lua, pieces) = both(
+        r#"
+#define SHATTER 1
+#define BITMAP1 256
+piece base, flare, arm1, link;
+Create()
+{
+	emit-sfx 1025 from flare;
+	explode arm1 type SHATTER | BITMAP1;
+}
+TransportPickup(unitid)
+{
+	attach-unit unitid to link;
+	sleep 100;
+	attach-unit unitid to 0 - 1;
+	sleep 100;
+	drop-unit unitid;
+}
+"#,
+    );
+    let events = [event(0, "Create", &[]), pickup_at(10)];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 40, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "events.lua",
+        &Unit::new(&pieces),
+        &events,
+        40,
+        &HashMap::new(),
+    );
+
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(from_cob.events, from_lua.events);
+    assert_eq!(
+        from_cob.events[..3],
+        [
+            ScriptOutput::Sfx {
+                frame: 0,
+                piece: "flare".into(),
+                sfx: 1025
+            },
+            ScriptOutput::Explode {
+                frame: 0,
+                piece: "arm1".into(),
+                flags: 257
+            },
+            ScriptOutput::Attach {
+                frame: 10,
+                unit: 2,
+                piece: Some("link".into())
+            },
+        ]
+    );
+    assert!(matches!(
+        from_cob.events[3],
+        ScriptOutput::Attach {
+            unit: 2,
+            piece: None,
+            ..
+        }
+    ));
+    assert!(matches!(
+        from_cob.events[4],
+        ScriptOutput::Drop { unit: 2, .. }
+    ));
+    assert_eq!(from_cob.events.len(), 5);
+}
+
+/// Shaped like `intruder.bos` `AreaUnload`, in both runtimes. The passenger is
+/// not on the piece on the attach's own frame, because the engine moves it
+/// after every script has ticked (`rts/Game/Game.cpp:1796-1798`), and it is on
+/// the piece at the second poll. After a drop, moving the piece leaves the
+/// passenger where it was.
+#[test]
+fn both_runtimes_move_a_passenger_once_the_frame_is_over() {
+    let (cob, lua, pieces) = both(
+        r#"
+#define PIECE_XZ 7
+#define UNIT_XZ 9
+piece base, link, mark;
+static-var polls, held;
+TransportPickup(unitid)
+{
+	attach-unit unitid to link;
+	polls = 1;
+	while (get UNIT_XZ(unitid) != get PIECE_XZ(link))
+	{
+		polls = polls + 1;
+		sleep 100;
+	}
+	if (polls == 1) { move base to y-axis [1] now; }
+	if (polls == 2) { move base to y-axis [2] now; }
+	if (polls > 2) { move base to y-axis [3] now; }
+	held = get PIECE_XZ(link);
+	drop-unit unitid;
+	move link to x-axis [50] now;
+	sleep 100;
+	if (get UNIT_XZ(unitid) != get PIECE_XZ(link)) { move mark to y-axis [1] now; }
+	if (get UNIT_XZ(unitid) == held) { move mark to z-axis [1] now; }
+}
+"#,
+    );
+    let rest = rest_for(
+        &pieces,
+        &[
+            ("base", None, [0.0; 3]),
+            ("link", Some("base"), [0.0, 10.0, 20.0]),
+            ("mark", Some("base"), [0.0; 3]),
+        ],
+    );
+    let events = [pickup_at(0)];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 20, &rest, &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "areaunload.lua",
+        &Unit {
+            rest: &rest,
+            ..Unit::new(&pieces)
+        },
+        &events,
+        20,
+        &HashMap::new(),
+    );
+
+    for (runtime, timeline) in [("COB", &from_cob), ("Lua", &from_lua)] {
+        assert_eq!(timeline.error, None, "{runtime}");
+        let last = timeline.frames.last().unwrap();
+        let at = |piece: &str, value: usize| {
+            last[pieces.iter().position(|p| p == piece).unwrap() * 6 + value]
+        };
+        // 1 would mean the attach moved the stand-in at once. 0 would mean it
+        // never reached the piece.
+        assert!(
+            (at("base", 1) - 2.0).abs() < TOLERANCE,
+            "{runtime}: polls {}",
+            at("base", 1)
+        );
+        assert!(
+            (at("mark", 1) - 1.0).abs() < TOLERANCE,
+            "{runtime}: the passenger followed the piece after the drop"
+        );
+        assert!(
+            (at("mark", 2) - 1.0).abs() < TOLERANCE,
+            "{runtime}: the passenger moved when it was dropped"
+        );
+    }
 }

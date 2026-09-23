@@ -58,6 +58,7 @@ function timeline(over: Partial<ScriptTimeline> = {}): ScriptTimeline {
     functions: [],
     linesRun: [],
     offsetsRun: [],
+    events: [],
     ...over,
   };
 }

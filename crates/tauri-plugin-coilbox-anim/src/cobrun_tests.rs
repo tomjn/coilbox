@@ -1009,3 +1009,185 @@ mod coverage {
         );
     }
 }
+
+mod announcements {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn scene() -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    fn pickup(bytes: &[u8]) -> Timeline {
+        run(
+            bytes,
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportPickup".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene()),
+            }],
+            2,
+            &[],
+            &HashMap::new(),
+        )
+    }
+
+    #[test]
+    fn records_an_effect_on_its_piece_and_frame() {
+        let mut create = push(1025);
+        create.extend([op("EMIT_SFX"), 2, op("RETURN")]);
+        let timeline = play(&create_only(create), 2);
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Sfx {
+                frame: 0,
+                piece: "barrel".to_string(),
+                sfx: 1025
+            }]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w == coilbox_unitpose::EFFECTS_NOTE));
+        assert!(!timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("not drawn in the preview")));
+    }
+
+    #[test]
+    fn records_an_explosion_with_its_flags() {
+        let mut create = push(257);
+        create.extend([op("EXPLODE"), 1, op("RETURN")]);
+        let timeline = play(&create_only(create), 2);
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Explode {
+                frame: 0,
+                piece: "turret".to_string(),
+                flags: 257
+            }]
+        );
+    }
+
+    /// A TA:K file names its sounds, and the index picks one.
+    #[test]
+    fn names_a_sound_from_the_table() {
+        let mut create = push(0);
+        create.extend([op("PLAY_SOUND"), 1, op("RETURN")]);
+        let bytes = crate::cob::ta_kingdoms(
+            build(&[("Pad", vec![0, 0]), ("Create", create)], PIECES, 0),
+            &["krogtaunt", "krogdeath"],
+        );
+        let timeline = play(&bytes, 2);
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Sound {
+                frame: 0,
+                name: Some("krogdeath".to_string())
+            }]
+        );
+    }
+
+    /// A TA file has no table, so the sound has no name and the run says which
+    /// index it was.
+    #[test]
+    fn a_sound_with_no_table_is_recorded_without_a_name() {
+        let mut create = push(0);
+        create.extend([op("PLAY_SOUND"), 3, op("RETURN")]);
+        let timeline = play(&create_only(create), 2);
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Sound {
+                frame: 0,
+                name: None
+            }]
+        );
+        assert!(
+            timeline
+                .warnings
+                .iter()
+                .any(|w| w.contains("plays sound 3")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// `ShowUnitScriptError` and nothing else, in the engine.
+    #[test]
+    fn a_piece_that_is_not_there_records_nothing() {
+        let mut create = push(1025);
+        create.extend([op("EMIT_SFX"), 9, op("RETURN")]);
+        let timeline = play(&create_only(create), 2);
+
+        assert!(timeline.events.is_empty());
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("emit-sfx names piece 9")));
+    }
+
+    /// The unit first, then the piece, then an operand nothing reads, which is
+    /// the order the engine pops them in reverse.
+    #[test]
+    fn attaches_and_drops_in_the_engine_s_operand_order() {
+        let mut words = vec![op("CREATE_LOCAL_VAR")];
+        words.extend([op("PUSH_LOCAL_VAR"), 0]);
+        words.extend(push(1));
+        words.extend(push(0));
+        words.push(op("ATTACH_UNIT"));
+        words.extend([op("PUSH_LOCAL_VAR"), 0]);
+        words.extend([op("DROP_UNIT"), op("RETURN")]);
+        let timeline = pickup(&build(&[("TransportPickup", words)], PIECES, 0));
+
+        assert_eq!(
+            timeline.events,
+            [
+                ScriptOutput::Attach {
+                    frame: 0,
+                    unit: 2,
+                    piece: Some("turret".to_string())
+                },
+                ScriptOutput::Drop { frame: 0, unit: 2 },
+            ]
+        );
+    }
+
+    /// `attach-unit unitid to 0 - 1` is the Hulk hiding its passenger.
+    #[test]
+    fn a_negative_piece_is_the_void() {
+        let mut words = vec![op("CREATE_LOCAL_VAR")];
+        words.extend([op("PUSH_LOCAL_VAR"), 0]);
+        words.extend(push(u32::MAX));
+        words.extend(push(0));
+        words.extend([op("ATTACH_UNIT"), op("RETURN")]);
+        let timeline = pickup(&build(&[("TransportPickup", words)], PIECES, 0));
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: None
+            }]
+        );
+    }
+}

@@ -82,6 +82,7 @@ function turned(turns: { piece: string; axis: 0 | 1 | 2 }[]): ScriptTimeline {
     functions: [],
     linesRun: [],
     offsetsRun: [],
+    events: [],
   };
 }
 
