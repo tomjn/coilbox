@@ -178,7 +178,7 @@ function releasePoint(
 
 /** The scene group standing for a piece, found by the piece's name because
  *  that is what a script probe answers with. */
-function groupOfPiece(
+export function groupOfPiece(
   state: SceneState,
   project: LegoProject,
   name: string,

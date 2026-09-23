@@ -18,6 +18,7 @@ import { seatPieceMesh } from "../../pivot";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
 import type { Vec3 } from "../../snapping";
 import type { CollisionFaceDrag } from "./collisionHandles";
+import type { EffectsLayer } from "./effectsLayer";
 
 export interface SceneState {
   renderer: THREE.WebGLRenderer;
@@ -76,6 +77,8 @@ export interface SceneState {
   /** How big it was built, in elmos, so a track's radius multiples are read
    *  against the shape actually in the scene. */
   standInRadius: number;
+  /** The dots a script's effects are drawn with. A view aid, never exported. */
+  effects: EffectsLayer;
   /** The collision volume's wireframe, while it is being shown. Rebuilt on
    *  every change rather than rescaled, because the shape itself changes with
    *  the volume's type, and null the rest of the time. */

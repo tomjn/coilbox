@@ -22,8 +22,10 @@ import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
 import { applyTimelineFrame } from "./animationPlayback";
+import { buildEffectsLayer, type EffectsLayer } from "./effectsLayer";
+import { placeEffects } from "./effectsPlayback";
 import { type SceneGraph, type SceneState, syncScene } from "./sceneState";
-import { placeStandIn } from "./standInPlayback";
+import { placeStandIn, type StandInPlacement } from "./standInPlayback";
 
 /** A pack holding one part: a triangle a metre out along x and z. */
 function pack(): LoadedPack {
@@ -641,5 +643,84 @@ describe("placeStandIn", () => {
 
     // Halfway from (0, 4, 0) to ten elmos above it.
     expect(state.standIn.position.toArray()).toEqual([0, 9, 0]);
+  });
+
+  describe("placeEffects", () => {
+    const beside: StandInPlacement = {
+      track: { keys: [{ frame: 0, pos: [1, 0, 2] }] },
+      attachPieces: new Map(),
+      show: true,
+      nano: "builder",
+    };
+
+    function sprayScene(): SceneState {
+      const state = standInScene();
+      (state as { effects: EffectsLayer }).effects = buildEffectsLayer();
+      return state;
+    }
+
+    function geometry(state: SceneState) {
+      return state.effects.object.geometry as THREE.InstancedBufferGeometry;
+    }
+
+    it("sprays from the nano piece on the frame it was emitted", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      placeEffects(state, doc, beside, true, timeline, 5);
+
+      expect(state.effects.object.visible).toBe(true);
+      expect(geometry(state).instanceCount).toBe(1);
+      expect(
+        Array.from(geometry(state).getAttribute("center").array).slice(0, 3),
+      ).toEqual([0, 4, 0]);
+    });
+
+    /** The engine places a frame-N emission where the pieces were at the end
+     *  of frame N - 1's animation. */
+    it("uses the pose of the frame before", () => {
+      const state = sprayScene();
+      const timeline = run(40, (frame) => frame, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      placeEffects(state, doc, beside, true, timeline, 5);
+
+      expect(geometry(state).getAttribute("center").array[0]).toBe(4);
+    });
+
+    it("leaves the scene posed on the frame it was asked for", () => {
+      const state = sprayScene();
+      const timeline = run(40, (frame) => frame, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      applyTimelineFrame(state, doc, timeline, 12);
+      placeEffects(state, doc, beside, true, timeline, 12);
+
+      expect(state.groups.get("arm")?.position.x).toBe(12);
+    });
+
+    it("draws nothing for a scenario that does not spray, or with the toggle off", () => {
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      const quiet = sprayScene();
+      placeEffects(quiet, doc, { ...beside, nano: null }, true, timeline, 5);
+      expect(geometry(quiet).instanceCount).toBe(0);
+
+      const hidden = sprayScene();
+      placeEffects(hidden, doc, beside, false, timeline, 5);
+      expect(hidden.effects.object.visible).toBe(false);
+    });
+
+    it("sprays at the stand-in even while the stand-in is hidden", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      placeEffects(state, doc, { ...beside, show: false }, true, timeline, 5);
+      expect(geometry(state).instanceCount).toBe(1);
+      expect(state.standIn.visible).toBe(false);
+    });
   });
 });
