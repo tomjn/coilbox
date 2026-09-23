@@ -161,9 +161,9 @@ jobs:
       - name: Build unitsync worker and relay agent sidecars
         run: bash scripts/build-sidecars.sh --profile dev coilbox-unitsync-worker coilbox-relay-agent
       # nextest runs every test binary at once, where `cargo test` runs them
-      # one after another. It does not run doctests, so the next step does.
-      # Locally, `cargo test --workspace` still covers both.
+      # one after another. It does not run doctests, and CI skips them on
+      # purpose: the workspace has none, and a doctest step spent 3m01s
+      # rebuilding every crate to find that out. Locally, `cargo test
+      # --workspace` still runs any doctest that gets added.
       - name: Cargo nextest
         run: cargo nextest run --workspace
-      - name: Doctests
-        run: cargo test --workspace --doc

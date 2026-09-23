@@ -12,7 +12,7 @@ Before pushing, run the **full** check suite locally and confirm it passes. CI (
 - Lua job: `scripts/mission-tests.sh`
 - Rust lint and test jobs: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace`
 
-The two easiest to miss are `scripts/mission-tests.sh` and `cargo test --workspace`. The Lua job is a job of its own with no lint in it at all: the mission runtime and the blueprint widget are Lua the engine runs, so none of the other jobs compiles them and a break would otherwise reach a game. The Rust tests have their own job because clippy compiles `#[cfg(test)]` modules but never runs them, so a wrong Rust test would otherwise pass forever. CI runs them as `cargo nextest run --workspace` plus `cargo test --workspace --doc`, and locally `cargo test --workspace` covers both.
+The two easiest to miss are `scripts/mission-tests.sh` and `cargo test --workspace`. The Lua job is a job of its own with no lint in it at all: the mission runtime and the blueprint widget are Lua the engine runs, so none of the other jobs compiles them and a break would otherwise reach a game. The Rust tests have their own job because clippy compiles `#[cfg(test)]` modules but never runs them, so a wrong Rust test would otherwise pass forever. CI runs them as `cargo nextest run --workspace`, which skips doctests. The workspace has none, and locally `cargo test --workspace` still runs any that get added.
 
 Both Lua suites need `luajit` on PATH (`brew install luajit`), as do two vitest files that shell out to it to check the Lua they generate compiles. Without the binary they fail on the missing dependency rather than on a real error.
 
