@@ -431,6 +431,33 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: "transport-pickup",
+    label: "Loading a ship or hover transport",
+    description:
+      "A ship, hovercraft or ground transport picking something up. It is told what to load and reaches for it, and the script decides where it goes.",
+    events: [
+      ...CREATED,
+      // The engine's other arm: anything that is not an air transport stops,
+      // then calls `TransportPickup` with the passenger and leaves the script
+      // to attach it (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1459-1463`).
+      { frame: at(4), callin: "TransportPickup", args: [STAND_IN_UNIT_ID] },
+    ],
+    standIn: {
+      keys: [
+        // Approaching on the ground, from in front, and still by the time the
+        // transport is told to pick it up. The engine only calls
+        // `TransportPickup` once the passenger is in range, and a passenger
+        // that asked to be loaded stops there (`MobileCAI.cpp:430-465`).
+        { frame: 0, pos: [0, 0, 5] },
+        { frame: at(3), pos: [0, 0, 3] },
+        // The return leg, which is the preview's rather than the engine's. No
+        // call-in fires during it.
+        { frame: at(11), pos: [0, 0, 3] },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 5] },
+      ],
+    },
+  },
+  {
     id: "transport-unload",
     label: "Unloading a transport",
     description:
