@@ -47,6 +47,21 @@ export interface StandInPlacement {
 const AT = new THREE.Vector3();
 const LOOSE: PassengerState = { kind: "loose" };
 
+/**
+ * The placement to hand to script frame stepping, with the viewport's own
+ * toggle swapped in for `show`.
+ *
+ * The track and `nano` come along unchanged, because nano spray goes to the
+ * stand-in whether or not it is being shown: only the mesh's own visibility
+ * should follow the toggle.
+ */
+export function standInFor(
+  standIn: StandInPlacement,
+  showStandIn: boolean,
+): StandInPlacement {
+  return { ...standIn, show: showStandIn };
+}
+
 export function placeStandIn(
   state: SceneState,
   project: LegoProject,

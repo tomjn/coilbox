@@ -122,7 +122,7 @@ import {
   refreshSelectionOutlines,
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
-import type { StandInPlacement } from "./standInPlayback";
+import { standInFor, type StandInPlacement } from "./standInPlayback";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useGizmoMode } from "./useGizmoMode";
 import { useModelAnchors } from "./useModelAnchors";
@@ -268,9 +268,6 @@ const NO_STAND_IN: StandInPlacement = {
   attachPieces: new Map(),
   show: true,
 };
-
-/** The same, for the toggle being off. Stable for the same reason. */
-const HIDDEN_STAND_IN: StandInPlacement = { ...NO_STAND_IN, show: false };
 
 interface Props {
   /**
@@ -1083,6 +1080,14 @@ export function ModelViewport({
 
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
 
+  // The toggle only ever hides the stand-in mesh itself: the track and nano
+  // it carries go on to script frame stepping unchanged, so the spray keeps
+  // aiming at it while it is out of sight.
+  const standInPlacement = useMemo(
+    () => standInFor(standIn, showStandIn),
+    [standIn, showStandIn],
+  );
+
   useScriptFrameStepping(sceneRef, {
     playing,
     reduceMotion,
@@ -1090,7 +1095,7 @@ export function ModelViewport({
     scriptPaused,
     scriptTimeline,
     scriptFrame,
-    standIn: showStandIn ? standIn : HIDDEN_STAND_IN,
+    standIn: standInPlacement,
     showEffects,
     packRef,
     rawRef,

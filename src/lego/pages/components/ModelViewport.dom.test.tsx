@@ -25,7 +25,11 @@ import { applyTimelineFrame } from "./animationPlayback";
 import { buildEffectsLayer, type EffectsLayer } from "./effectsLayer";
 import { placeEffects } from "./effectsPlayback";
 import { type SceneGraph, type SceneState, syncScene } from "./sceneState";
-import { placeStandIn, type StandInPlacement } from "./standInPlayback";
+import {
+  placeStandIn,
+  type StandInPlacement,
+  standInFor,
+} from "./standInPlayback";
 
 /** A pack holding one part: a triangle a metre out along x and z. */
 function pack(): LoadedPack {
@@ -713,14 +717,32 @@ describe("placeStandIn", () => {
       expect(hidden.effects.object.visible).toBe(false);
     });
 
-    it("sprays at the stand-in even while the stand-in is hidden", () => {
+    it("sprays at the stand-in even while the stand-in is hidden, using the placement the viewport builds", () => {
       const state = sprayScene();
       const timeline = run(40, () => 0, [
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
-      placeEffects(state, doc, { ...beside, show: false }, true, timeline, 5);
+      placeEffects(state, doc, standInFor(beside, false), true, timeline, 5);
       expect(geometry(state).instanceCount).toBe(1);
       expect(state.standIn.visible).toBe(false);
     });
+  });
+});
+
+describe("standInFor", () => {
+  it("keeps the track and nano, and swaps in the toggle for show", () => {
+    const standIn: StandInPlacement = {
+      track: { keys: [{ frame: 0, pos: [1, 0, 2] }] },
+      attachPieces: new Map(),
+      show: true,
+      nano: "builder",
+    };
+
+    const hidden = standInFor(standIn, false);
+
+    expect(hidden.track).toBe(standIn.track);
+    expect(hidden.nano).toBe("builder");
+    expect(hidden.attachPieces).toBe(standIn.attachPieces);
+    expect(hidden.show).toBe(false);
   });
 });
