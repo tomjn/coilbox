@@ -315,6 +315,9 @@ pub fn world(id: i32, p1: i32, world: Option<&crate::World>) -> Option<Answer> {
         Who::Nobody => return Some(plain(0)),
         Who::StandIn(stand_in) => stand_in,
     };
+    if id == UNIT_HEIGHT {
+        return Some(plain((stand_in.radius * f64::from(COBSCALE)) as i32));
+    }
     let Some(pos) = stand_in.pos else {
         return Some(Answer {
             value: 0,
@@ -563,6 +566,18 @@ mod tests {
         let answer = world(UNIT_XZ, 2, Some(&scene(None))).unwrap();
         assert_eq!(answer.value, 0);
         assert!(answer.note.is_some());
+    }
+
+    /// `UnitScript.cpp:1082-1092` answers the radius regardless of position,
+    /// as `GetUnitRadius` already does, so a missing position should not
+    /// blank out the stand-in's height.
+    #[test]
+    fn answers_the_stand_ins_height_even_when_it_is_nowhere_on_this_frame() {
+        assert_eq!(value(UNIT_HEIGHT, 2, Some(&scene(None))), Some(28 * 65536));
+        assert_eq!(
+            world(UNIT_HEIGHT, 2, Some(&scene(None))).unwrap().note,
+            None
+        );
     }
 
     #[test]
