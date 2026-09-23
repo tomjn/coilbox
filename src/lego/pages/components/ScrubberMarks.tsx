@@ -50,7 +50,12 @@ export function ScrubberMarks({
         ref={row}
         role="group"
         aria-label="What the script announced"
-        className="relative h-6"
+        // Inset by half the slider thumb's width (size-4, 16px) so a mark at
+        // frame 0 or the last frame lines up with the thumb centre instead of
+        // spilling past it. Radix's getThumbInBoundsOffset keeps the thumb
+        // centre 8px inside each edge of the track, and this mx-2 makes the
+        // marks row cover exactly that same travel range.
+        className="relative mx-2 h-6"
       >
         {marks.map((mark) => (
           <Tooltip key={mark.frame}>

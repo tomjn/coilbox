@@ -619,7 +619,7 @@ export function AnimationPanel({
         </div>
 
         {playable(timeline) ? (
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <div className="flex items-start gap-2 border-b border-border px-3 py-2">
             <Button
               size="sm"
               variant="ghost"
@@ -640,6 +640,11 @@ export function AnimationPanel({
                   onScriptFrameChange(next);
                 }}
                 aria-label="Scrub the script preview"
+                // Match the h-8 step buttons so the row can go items-start:
+                // with marks underneath, the column is taller than the
+                // buttons, and items-center would otherwise centre the
+                // buttons 14px below the thumb.
+                className="h-8"
               />
               {timeline && timeline.events.length > 0 ? (
                 <ScrubberMarks
@@ -661,7 +666,7 @@ export function AnimationPanel({
             >
               <StepForward size={14} />
             </Button>
-            <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+            <span className="w-14 shrink-0 text-right text-xs leading-8 tabular-nums text-muted-foreground">
               {scriptFrame + 1}/{timeline?.frames.length}
             </span>
           </div>
