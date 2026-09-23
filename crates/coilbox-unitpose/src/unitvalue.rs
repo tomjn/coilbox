@@ -105,6 +105,10 @@ pub const NAMES: &[(&str, i32)] = &[
 /// anything either of them hands that id to all mean the same unit.
 pub const UNIT_ID: i32 = 1;
 
+/// Whether a script has put its unit in build stance, which is what tells a
+/// factory to start building (`Factory.cpp:138-151`).
+pub const INBUILDSTANCE: i32 = 5;
+
 /// COB's fixed-point scale: 65536ths of an elmo, or of a full circle.
 const COBSCALE: f32 = 65536.0;
 

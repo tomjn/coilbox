@@ -3063,3 +3063,204 @@ mod engine_nano {
             .any(|w| w.contains("no QueryNanoPiece")));
     }
 }
+
+mod engine_factory {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(action),
+        }
+    }
+
+    fn callin(frame: u32, name: &str) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: name.to_string(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: None,
+        }
+    }
+
+    fn build_start_frames(timeline: &Timeline) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::BuildStart { frame } => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn nano_frames(timeline: &Timeline) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Nano { frame, .. } => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn sfx_frames(timeline: &Timeline, code: i32) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Sfx { frame, sfx, .. } if *sfx == code => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    const SCRIPT: &str = r#"
+        local barrel = piece("barrel")
+        function script.Activate()
+            SetUnitValue(COB.INBUILDSTANCE, true)
+        end
+        function script.StartBuilding()
+            EmitSfx(barrel, 42)
+        end
+    "#;
+
+    const SLEEPY_SCRIPT: &str = r#"
+        local barrel = piece("barrel")
+        function script.Activate()
+            Sleep(33)
+            SetUnitValue(COB.INBUILDSTANCE, true)
+        end
+        function script.StartBuilding()
+            EmitSfx(barrel, 42)
+        end
+    "#;
+
+    /// `Factory.cpp:138-151`: a script that puts its unit in build stance the
+    /// moment it is asked to starts building the same frame the engine asks.
+    #[test]
+    fn building_starts_on_the_frame_the_script_sets_build_stance() {
+        let events = vec![callin(0, "Activate"), action(0, EngineAction::FactoryBuild)];
+        let timeline = run(
+            SCRIPT,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 42), [0]);
+        assert!(nano_frames(&timeline).contains(&0));
+    }
+
+    /// A script that sleeps first, standing in for an opening animation, only
+    /// starts building once it actually sets the stance.
+    #[test]
+    fn building_waits_for_an_opening_animation_before_starting() {
+        let events = vec![callin(0, "Activate"), action(0, EngineAction::FactoryBuild)];
+        let timeline = run(
+            SLEEPY_SCRIPT,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [2]);
+        assert_eq!(sfx_frames(&timeline, 42), [2]);
+        assert_eq!(nano_frames(&timeline), [2, 3]);
+    }
+
+    /// The script never sets INBUILDSTANCE, so the factory never builds, and
+    /// `factory-finish` says so rather than firing `StopBuilding`.
+    #[test]
+    fn a_script_that_never_sets_build_stance_never_builds() {
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            action(3, EngineAction::FactoryFinish),
+        ];
+        let timeline = run(
+            "function script.Activate() end",
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(build_start_frames(&timeline).is_empty());
+        assert!(nano_frames(&timeline).is_empty());
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("never set INBUILDSTANCE")));
+    }
+
+    /// Build stance seeded from the preview's Unit values panel counts too:
+    /// building starts on the `factory-build` frame straight away.
+    #[test]
+    fn a_seeded_build_stance_starts_building_on_the_factory_build_frame() {
+        let events = vec![action(2, EngineAction::FactoryBuild)];
+        let values = HashMap::from([(unitvalue::INBUILDSTANCE, 1)]);
+        let timeline = run(
+            "function script.StartBuilding() end",
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &values,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [2]);
+    }
+
+    /// `factory-finish` stops the spraying and runs `StopBuilding`.
+    #[test]
+    fn factory_finish_stops_spraying_and_runs_stop_building() {
+        let script = r#"
+            local barrel = piece("barrel")
+            function script.Activate()
+                SetUnitValue(COB.INBUILDSTANCE, true)
+            end
+            function script.StartBuilding()
+                EmitSfx(barrel, 42)
+            end
+            function script.StopBuilding()
+                EmitSfx(barrel, 99)
+            end
+        "#;
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            action(3, EngineAction::FactoryFinish),
+        ];
+        let timeline = run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            6,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(nano_frames(&timeline), [0, 1, 2]);
+        assert_eq!(sfx_frames(&timeline, 99), [3]);
+    }
+}

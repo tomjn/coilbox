@@ -589,29 +589,42 @@ impl Run {
             }
             if let Some(action) = event.engine {
                 self.tick_queued_call_ins(start)?;
-                self.engine(action);
+                self.engine(action)?;
                 continue;
             }
-            let function: Option<Function> = self.script.get(event.callin.as_str()).ok().flatten();
-            let Some(function) = function else {
-                if !event.ambient {
-                    self.sim
-                        .borrow_mut()
-                        .model
-                        .note(format!("This script has no {} call-in.", event.callin));
+            let args = event.args.iter().map(|arg| Value::Number(*arg)).collect();
+            if !self.start_callin(&event.callin, args)? && !event.ambient {
+                self.sim
+                    .borrow_mut()
+                    .model
+                    .note(format!("This script has no {} call-in.", event.callin));
+            }
+        }
+        // A factory waiting for its script to set build stance, which is what
+        // starts a build (`Factory.cpp:138-151`). Checked before the spraying
+        // block below, so the frame the stance is seen is also the first frame
+        // that sprays.
+        let awaiting_build = self.sim.borrow().model.awaiting_build;
+        if awaiting_build {
+            let stance = self
+                .sim
+                .borrow()
+                .values
+                .get(&unitvalue::INBUILDSTANCE)
+                .copied()
+                .unwrap_or(0);
+            if stance != 0 {
+                {
+                    let mut sim = self.sim.borrow_mut();
+                    sim.model.awaiting_build = false;
+                    sim.model.building = true;
+                    sim.model.spraying = true;
+                    sim.model.build_start(frame);
                 }
-                continue;
-            };
-            let thread = self
-                .lua
-                .create_thread(function)
-                .map_err(|e| format!("could not start {}: {e}", event.callin))?;
-            self.add_runner(
-                thread,
-                event.args.iter().map(|arg| Value::Number(*arg)).collect(),
-                event.callin.clone(),
-                Mask::default(),
-            )?;
+                let queued_at = self.runners.len();
+                self.start_callin("StartBuilding", Vec::new())?;
+                self.tick_queued_call_ins(queued_at)?;
+            }
         }
         // After the frame's call-ins and before its threads, because the engine
         // updates builders before scripts tick (`rts/Game/Game.cpp:1782-1798`).
@@ -631,6 +644,22 @@ impl Run {
         Ok(())
     }
 
+    /// Start a runner for a call-in by name, with these arguments, exactly as
+    /// an event naming it would. `false` when the script defines no such
+    /// call-in, so a caller can decide what that means to it.
+    fn start_callin(&mut self, callin: &str, args: Vec<Value>) -> Result<bool, String> {
+        let function: Option<Function> = self.script.get(callin).ok().flatten();
+        let Some(function) = function else {
+            return Ok(false);
+        };
+        let thread = self
+            .lua
+            .create_thread(function)
+            .map_err(|e| format!("could not start {callin}: {e}"))?;
+        self.add_runner(thread, args, callin.to_string(), Mask::default())?;
+        Ok(true)
+    }
+
     /// What the engine does to the stand-in itself: the air transport arm's
     /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
     ///
@@ -639,10 +668,34 @@ impl Run {
     /// what makes `BeginTransport` and `TransportDrop` have run before this
     /// acts, the way the engine's own call to each runs its first tick inline
     /// before the next call (`LuaUnitScript.cpp:787-790,975`).
-    fn engine(&mut self, action: EngineAction) {
+    fn engine(&mut self, action: EngineAction) -> Result<(), String> {
         if matches!(action, EngineAction::NanoStart | EngineAction::NanoStop) {
             self.sim.borrow_mut().model.spraying = action == EngineAction::NanoStart;
-            return;
+            return Ok(());
+        }
+        if action == EngineAction::FactoryBuild {
+            self.sim.borrow_mut().model.awaiting_build = true;
+            return Ok(());
+        }
+        if action == EngineAction::FactoryFinish {
+            let (building, awaiting_build) = {
+                let sim = self.sim.borrow();
+                (sim.model.building, sim.model.awaiting_build)
+            };
+            if building {
+                self.sim.borrow_mut().model.building = false;
+                self.sim.borrow_mut().model.spraying = false;
+                let queued_at = self.runners.len();
+                self.start_callin("StopBuilding", Vec::new())?;
+                self.tick_queued_call_ins(queued_at)?;
+            } else if awaiting_build {
+                self.sim.borrow_mut().model.awaiting_build = false;
+                self.sim.borrow_mut().model.note(
+                    "The script never set INBUILDSTANCE, so the factory never started building, as in the engine (Factory.cpp:149). Switch on Build stance under Unit values to see it build anyway."
+                        .to_string(),
+                );
+            }
+            return Ok(());
         }
         let stand_in = self
             .sim
@@ -654,7 +707,7 @@ impl Run {
             self.sim.borrow_mut().model.note(
                 "The scenario has the engine carry the stand-in, and there is no stand-in in the scene.".to_string(),
             );
-            return;
+            return Ok(());
         };
         // Asked before the borrow below, because answering runs Lua.
         let piece = (action == EngineAction::Attach).then(|| self.query_transport(stand_in.id));
@@ -663,7 +716,7 @@ impl Run {
         let Some(piece) = piece else {
             sim.model
                 .drop_unit(sim.frame, stand_in.id, sim.world.as_ref());
-            return;
+            return Ok(());
         };
         let at = if piece < 0 {
             None
@@ -673,12 +726,13 @@ impl Run {
                 .filter(|index| *index < sim.model.pieces.len())
             else {
                 sim.model.no_such_piece("QueryTransport", piece + 1);
-                return;
+                return Ok(());
             };
             Some(at)
         };
         sim.model
             .attach_unit(sim.frame, stand_in.id, at, sim.world.as_ref());
+        Ok(())
     }
 
     /// Ask `QueryTransport` for the piece, straight away, as the engine's

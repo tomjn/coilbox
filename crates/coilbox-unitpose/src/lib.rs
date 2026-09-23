@@ -97,6 +97,14 @@ pub enum EngineAction {
     /// It stops.
     #[serde(rename = "nano-stop")]
     NanoStop,
+    /// A factory has a build queued, and starts it once the script puts the
+    /// unit in build stance (`Factory.cpp:138-151`).
+    #[serde(rename = "factory-build")]
+    FactoryBuild,
+    /// The buildee is finished. The factory stops spraying and calls
+    /// `StopBuilding`.
+    #[serde(rename = "factory-finish")]
+    FactoryFinish,
 }
 
 /// What the preview's scene holds on one event's frame, for a script that asks.
@@ -185,6 +193,11 @@ pub enum ScriptOutput {
     /// The piece one frame's nano particle comes from, as `NanoPieceCache`
     /// chose it. None when the script has named no piece of this unit yet.
     Nano { frame: u32, piece: Option<String> },
+    /// `build-start`. The frame the factory started building, once its
+    /// script set `INBUILDSTANCE`. Not an effect: the preview draws the
+    /// spraying it starts rather than marking it on the scrubber.
+    #[serde(rename = "build-start")]
+    BuildStart { frame: u32 },
 }
 
 impl ScriptOutput {
@@ -367,6 +380,13 @@ pub struct Model {
     /// Which piece it sprays from. Kept for the whole run, as the engine keeps
     /// one cache per builder.
     pub nano: NanoPieces,
+    /// A factory has a build queued and is waiting for its script to set
+    /// `INBUILDSTANCE`, between an engine `factory-build` and the frame the
+    /// runtime sees the stance set.
+    pub awaiting_build: bool,
+    /// Whether a factory is building, between the frame its script put it in
+    /// build stance and an engine `factory-finish`.
+    pub building: bool,
 }
 
 impl Model {
@@ -561,6 +581,11 @@ impl Model {
         }
         let piece = piece.map(|index| self.pieces[index].name.clone());
         self.events.push(ScriptOutput::Nano { frame, piece });
+    }
+
+    /// Note the frame a factory started building.
+    pub fn build_start(&mut self, frame: u32) {
+        self.events.push(ScriptOutput::BuildStart { frame });
     }
 
     /// Attach a unit to `piece`, or to the void when there is none.
@@ -1084,6 +1109,25 @@ mod world_tests {
         let stop: ScriptEvent =
             serde_json::from_str(r#"{ "frame": 150, "engine": "nano-stop" }"#).unwrap();
         assert_eq!(stop.engine, Some(EngineAction::NanoStop));
+    }
+
+    #[test]
+    fn reads_the_factory_actions() {
+        let build: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 15, "engine": "factory-build" }"#).unwrap();
+        assert_eq!(build.engine, Some(EngineAction::FactoryBuild));
+        let finish: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 150, "engine": "factory-finish" }"#).unwrap();
+        assert_eq!(finish.engine, Some(EngineAction::FactoryFinish));
+    }
+
+    #[test]
+    fn serialises_a_build_start_the_way_the_panel_reads_it() {
+        let build_start = ScriptOutput::BuildStart { frame: 42 };
+        assert_eq!(
+            serde_json::to_value(&build_start).unwrap(),
+            serde_json::json!({ "kind": "build-start", "frame": 42 })
+        );
     }
 
     #[test]
