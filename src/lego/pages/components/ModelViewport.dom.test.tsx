@@ -667,30 +667,54 @@ describe("placeStandIn", () => {
       return state.effects.object.geometry as THREE.InstancedBufferGeometry;
     }
 
+    /** No dot has left the nozzle on the birth frame itself (`effects.test.ts`
+     *  covers that in the pure function), so these tests read the frame after,
+     *  and check closeness rather than exact equality: by then every dot has
+     *  its own bit of travel and jitter behind it. A builder's pace is three
+     *  elmos a frame, and its jitter here is small, so this is a generous
+     *  upper bound on one frame's travel, not a tight one. */
+    const NOZZLE_TRAVEL_BOUND = 6;
+
+    function expectNear(actual: number, expected: number, bound: number) {
+      expect(Math.abs(actual - expected)).toBeLessThanOrEqual(bound);
+    }
+
     it("sprays from the nano piece on the frame it was emitted", () => {
       const state = sprayScene();
       const timeline = run(40, () => 0, [
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
+      // Nothing has left the nozzle yet on the birth frame itself.
       placeEffects(state, doc, beside, true, timeline, 5);
+      expect(geometry(state).instanceCount).toBe(0);
 
+      placeEffects(state, doc, beside, true, timeline, 6);
       expect(state.effects.object.visible).toBe(true);
-      expect(geometry(state).instanceCount).toBe(1);
-      expect(
-        Array.from(geometry(state).getAttribute("center").array).slice(0, 3),
-      ).toEqual([0, 4, 0]);
+      expect(geometry(state).instanceCount).toBeGreaterThan(0);
+      const center = geometry(state).getAttribute("center").array;
+      for (let i = 0; i < geometry(state).instanceCount; i++) {
+        expectNear(center[i * 3], 0, NOZZLE_TRAVEL_BOUND);
+        expectNear(center[i * 3 + 1], 4, NOZZLE_TRAVEL_BOUND);
+        expectNear(center[i * 3 + 2], 0, NOZZLE_TRAVEL_BOUND);
+      }
     });
 
     /** The engine places a frame-N emission where the pieces were at the end
-     *  of frame N - 1's animation. */
+     *  of frame N - 1's animation. The arm moves 100 elmos a frame here, so
+     *  a frame's worth of jitter and travel is nowhere near enough to confuse
+     *  frame 4's pose (400) with frame 5's (500). */
     it("uses the pose of the frame before", () => {
       const state = sprayScene();
-      const timeline = run(40, (frame) => frame, [
+      const timeline = run(40, (frame) => frame * 100, [
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
-      placeEffects(state, doc, beside, true, timeline, 5);
+      placeEffects(state, doc, beside, true, timeline, 6);
 
-      expect(geometry(state).getAttribute("center").array[0]).toBe(4);
+      const center = geometry(state).getAttribute("center").array;
+      expect(geometry(state).instanceCount).toBeGreaterThan(0);
+      for (let i = 0; i < geometry(state).instanceCount; i++) {
+        expectNear(center[i * 3], 400, NOZZLE_TRAVEL_BOUND);
+      }
     });
 
     /** The engine reads the buildee's own `midPos` on the emitting frame,
@@ -750,9 +774,64 @@ describe("placeStandIn", () => {
       const timeline = run(40, () => 0, [
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
-      placeEffects(state, doc, standInFor(beside, false), true, timeline, 5);
-      expect(geometry(state).instanceCount).toBe(1);
+      placeEffects(state, doc, standInFor(beside, false), true, timeline, 6);
+      expect(geometry(state).instanceCount).toBeGreaterThan(0);
       expect(state.standIn.visible).toBe(false);
+    });
+
+    /** A piece whose gap to its own next firing is bridged by other nozzles'
+     *  firings keeps spraying across that gap, because its span reaches to
+     *  when it next fires rather than defaulting to one frame. */
+    it("keeps a nozzle spraying through the run's other events, since its span reaches to when it next fires", () => {
+      const state = sprayScene();
+      state.standInRadius = 1;
+      // Arm is a child of base's group, so its world position is base's plus
+      // its own: this puts base's world position at 50, far from the target,
+      // and the arm's back at the origin, near it.
+      state.rest.set("base", [50, 0, 0]);
+      state.rest.set("arm", [-50, 0, 0]);
+      const staggered: StandInPlacement = {
+        track: { keys: [{ frame: 0, pos: [6, 0, 0] }] },
+        attachPieces: new Map(),
+        show: true,
+        nano: "builder",
+      };
+      const timeline = run(10, () => 0, [
+        { frame: 0, kind: "nano", piece: "arm" },
+        { frame: 1, kind: "nano", piece: "base" },
+        { frame: 2, kind: "nano", piece: "base" },
+        { frame: 3, kind: "nano", piece: "arm" },
+      ]);
+
+      placeEffects(state, doc, staggered, true, timeline, 3);
+
+      const center = geometry(state).getAttribute("center").array;
+      const nearArm = Array.from(
+        { length: geometry(state).instanceCount },
+        (_, i) => center[i * 3],
+      ).some((x) => x < 25);
+      expect(nearArm).toBe(true);
+    });
+
+    /** Without another nozzle's firing to bridge the gap, the same nozzle's
+     *  spray dies out at its own pace: the control for the test above. */
+    it("lets a lone nozzle's spray die out at its own pace when nothing bridges the gap", () => {
+      const state = sprayScene();
+      state.standInRadius = 1;
+      state.rest.set("arm", [0, 0, 0]);
+      const lone: StandInPlacement = {
+        track: { keys: [{ frame: 0, pos: [6, 0, 0] }] },
+        attachPieces: new Map(),
+        show: true,
+        nano: "builder",
+      };
+      const timeline = run(10, () => 0, [
+        { frame: 0, kind: "nano", piece: "arm" },
+      ]);
+
+      placeEffects(state, doc, lone, true, timeline, 3);
+
+      expect(geometry(state).instanceCount).toBe(0);
     });
   });
 });

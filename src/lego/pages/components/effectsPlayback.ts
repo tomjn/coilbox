@@ -72,8 +72,15 @@ function resolve(
   const seen = { ...standIn, show: true };
   const emissions: Emission[] = [];
   let posed = -1;
+  // Each nozzle's latest emission in the current unbroken run of spraying
+  // frames, so its span can reach to when that nozzle next fires.
+  const latest = new Map<string, Emission>();
+  let lastSpraying = -2;
   timeline.events.forEach((event, seed) => {
-    if (event.kind !== "nano" || event.piece === null) return;
+    if (event.kind !== "nano") return;
+    if (event.frame !== lastSpraying + 1) latest.clear();
+    lastSpraying = event.frame;
+    if (event.piece === null) return;
     const group = groupOfPiece(state, project, event.piece);
     if (!group) return;
 
@@ -100,7 +107,7 @@ function resolve(
       state.standIn.position.y + STAND_IN_MID_Y * state.standInRadius,
       state.standIn.position.z,
     ];
-    emissions.push({
+    const emission: Emission = {
       kind: "nano",
       birth: event.frame,
       at,
@@ -108,7 +115,11 @@ function resolve(
       radius: state.standInRadius * 0.5,
       style: nano,
       seed,
-    });
+    };
+    const previous = latest.get(event.piece);
+    if (previous) previous.span = event.frame - previous.birth;
+    latest.set(event.piece, emission);
+    emissions.push(emission);
   });
   if (posed !== -1) {
     applyTimelineFrame(state, project, timeline, frame);

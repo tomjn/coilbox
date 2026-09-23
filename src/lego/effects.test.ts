@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { type Emission, particlesAt, unitFloat } from "./effects";
+import {
+  type Emission,
+  NANO_DOTS_PER_FRAME,
+  NANO_SPREAD,
+  type Particles,
+  particlesAt,
+  unitFloat,
+} from "./effects";
 
 function nano(birth: number, overrides: Partial<Emission> = {}): Emission {
   return {
@@ -12,6 +19,35 @@ function nano(birth: number, overrides: Partial<Emission> = {}): Emission {
     seed: birth,
     ...overrides,
   };
+}
+
+/**
+ * Every dot drawn for `emission` at `age` sits along the line from `at` to
+ * `to`, no further than its pace (3 elmos a frame for a builder, 1 for a
+ * factory) times how long it can have been flying, scaled by at most one plus
+ * its jitter. Only holds for a fixture whose `to` is straight out along x from
+ * an `at` of the origin, which is every fixture in this file, so the x
+ * coordinate is the along-track distance.
+ */
+function assertWithinTravel(
+  emission: Emission,
+  age: number,
+  particles: Particles,
+) {
+  const d = emission.to.map((v, i) => v - emission.at[i]);
+  const len = Math.hypot(...d);
+  const builder = emission.style === "builder";
+  const pace = builder ? 3 : 1;
+  const jitter = (builder ? emission.radius / len : 0.15) * NANO_SPREAD;
+  const span = emission.span ?? 1;
+  const flownMin = Math.max(0, age - span);
+  const alongMin = pace * flownMin * (1 - jitter);
+  const alongMax = pace * age * (1 + jitter);
+  for (let i = 0; i < particles.count; i++) {
+    const along = particles.centers[i * 3];
+    expect(along).toBeGreaterThanOrEqual(alongMin - 1e-6);
+    expect(along).toBeLessThanOrEqual(alongMax + 1e-6);
+  }
 }
 
 describe("unitFloat", () => {
@@ -40,29 +76,52 @@ describe("particlesAt", () => {
   });
 
   /** `int(len / 3)` frames at 3 elmos a frame (`ProjectileHandler.cpp:742`),
-   *  gone once the frame reaches its death frame (`NanoProjectile.cpp:71-77`). */
+   *  gone once the frame reaches its death frame (`NanoProjectile.cpp:71-77`),
+   *  plus however many frames its span spreads its dots' departures over. */
   it("lives len / 3 frames for a builder, starting where it was emitted", () => {
-    const emissions = [nano(10)];
-    expect(particlesAt(emissions, 9).count).toBe(0);
-    const born = particlesAt(emissions, 10);
-    expect(born.count).toBe(1);
-    expect(Array.from(born.centers)).toEqual([0, 0, 0]);
-    expect(particlesAt(emissions, 19).count).toBe(1);
-    expect(particlesAt(emissions, 20).count).toBe(0);
+    const emission = nano(10);
+    expect(particlesAt([emission], 9).count).toBe(0);
+    // Nothing has left the nozzle yet on the birth frame itself.
+    expect(particlesAt([emission], 10).count).toBe(0);
+    const born = particlesAt([emission], 11);
+    expect(born.count).toBeGreaterThan(0);
+    assertWithinTravel(emission, 1, born);
+    const dying = particlesAt([emission], 20);
+    expect(dying.count).toBeGreaterThan(0);
+    assertWithinTravel(emission, 10, dying);
+    expect(particlesAt([emission], 21).count).toBe(0);
   });
 
   it("moves a builder's particle three elmos a frame, give or take its jitter", () => {
-    const later = particlesAt([nano(0)], 5);
-    const x = later.centers[0];
-    expect(x).toBeGreaterThan(15 * 0.8);
-    expect(x).toBeLessThan(15 * 1.2);
+    const emission = nano(0);
+    const later = particlesAt([emission], 5);
+    expect(later.count).toBeGreaterThan(0);
+    assertWithinTravel(emission, 5, later);
   });
 
-  /** A factory's lives `int(len)` frames at 1 elmo a frame (`:703`). */
+  /** A factory's lives `int(len)` frames at 1 elmo a frame (`:703`), plus
+   *  however long its dots take to leave the nozzle. */
   it("lives len frames for a factory", () => {
-    const emissions = [nano(0, { style: "factory" })];
-    expect(particlesAt(emissions, 29).count).toBe(1);
-    expect(particlesAt(emissions, 30).count).toBe(0);
+    const emission = nano(0, { style: "factory" });
+    expect(particlesAt([emission], 0).count).toBe(0);
+    const born = particlesAt([emission], 1);
+    expect(born.count).toBeGreaterThan(0);
+    assertWithinTravel(emission, 1, born);
+    const dying = particlesAt([emission], 30);
+    expect(dying.count).toBeGreaterThan(0);
+    assertWithinTravel(emission, 30, dying);
+    expect(particlesAt([emission], 31).count).toBe(0);
+  });
+
+  it("keeps drawing more dots than an unspanned emission while a spanned one is still leaving the nozzle", () => {
+    const stillLeaving = nano(0, { to: [9, 0, 0], span: 4 });
+    const allLeftAtOnce = nano(0, { to: [9, 0, 0] });
+    expect(particlesAt([stillLeaving], 3).count).toBeLessThan(
+      NANO_DOTS_PER_FRAME,
+    );
+    expect(particlesAt([stillLeaving], 3.5).count).toBeGreaterThan(
+      particlesAt([allLeftAtOnce], 3.5).count,
+    );
   });
 
   it("varies its green from particle to particle, around the nano colour", () => {
