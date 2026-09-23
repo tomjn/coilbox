@@ -14,7 +14,13 @@
 
 import * as THREE from "three";
 import type { UnitBounds } from "./s3oBuild";
-import type { StandInAttach, StandInKey, StandInTrack } from "./scriptPlayback";
+import {
+  type ScriptOutput,
+  STAND_IN_UNIT_ID,
+  type StandInAttach,
+  type StandInKey,
+  type StandInTrack,
+} from "./scriptPlayback";
 
 type Vec3 = [number, number, number];
 
@@ -132,6 +138,48 @@ export function attachedAt(
   if (frame < attach.frame) return null;
   if (attach.until !== null && frame >= attach.until) return null;
   return attach;
+}
+
+/** Where the script's own attach and drop events leave the stand-in. */
+export type PassengerState =
+  | { kind: "loose" }
+  | { kind: "riding"; piece: string }
+  | { kind: "void" }
+  /** `from` is the piece it rode until it was let go, or null out of the void. */
+  | { kind: "released"; frame: number; from: string | null };
+
+/**
+ * Fold a run's attach and drop events up to `frame` into where they leave the
+ * stand-in.
+ *
+ * An event on its own frame counts, because the engine moves a passenger within
+ * the frame it was attached (`rts/Game/Game.cpp:1796-1798`). Events about any
+ * other unit id change nothing, and neither does a drop of a stand-in nobody is
+ * carrying (`rts/Sim/Units/Unit.cpp:2715-2720`).
+ */
+export function passengerAt(
+  events: ScriptOutput[],
+  frame: number,
+): PassengerState {
+  let state: PassengerState = { kind: "loose" };
+  for (const event of events) {
+    if (event.frame > frame) break;
+    if (event.kind !== "attach" && event.kind !== "drop") continue;
+    if (event.unit !== STAND_IN_UNIT_ID) continue;
+    if (event.kind === "attach") {
+      state =
+        event.piece === null
+          ? { kind: "void" }
+          : { kind: "riding", piece: event.piece };
+    } else if (state.kind === "riding" || state.kind === "void") {
+      state = {
+        kind: "released",
+        frame: event.frame,
+        from: state.kind === "riding" ? state.piece : null,
+      };
+    }
+  }
+  return state;
 }
 
 /**
