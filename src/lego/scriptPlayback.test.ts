@@ -30,6 +30,7 @@ function timeline(overrides: Partial<ScriptTimeline> = {}): ScriptTimeline {
     functions: [],
     linesRun: [],
     offsetsRun: [],
+    events: [],
     ...overrides,
   };
 }
