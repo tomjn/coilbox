@@ -14,7 +14,11 @@
 import * as THREE from "three";
 
 import type { LegoProject } from "../../model";
-import type { ScriptTimeline, StandInTrack } from "../../scriptPlayback";
+import type {
+  NanoStyle,
+  ScriptTimeline,
+  StandInTrack,
+} from "../../scriptPlayback";
 import {
   attachedAt,
   type PassengerState,
@@ -35,6 +39,9 @@ export interface StandInPlacement {
   attachPieces: Map<string, string>;
   /** The viewport's own toggle. */
   show: boolean;
+  /** How the running scenario's unit sprays nano at the stand-in, or null
+   *  when it does not. */
+  nano?: NanoStyle | null;
 }
 
 const AT = new THREE.Vector3();

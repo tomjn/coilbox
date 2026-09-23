@@ -323,6 +323,32 @@ describe("scenarios", () => {
   });
 });
 
+describe("nano spans", () => {
+  function span(id: string) {
+    const scenario = scenarioById(id);
+    if (!scenario) throw new Error(`no scenario ${id}`);
+    const frames = (name: string) =>
+      scenario.events.filter((e) => e.callin === name).map((e) => e.frame);
+    const engine = (name: string) =>
+      scenario.events.filter((e) => e.engine === name).map((e) => e.frame);
+    return { scenario, frames, engine };
+  }
+
+  it("sprays for as long as a construction unit builds", () => {
+    const { scenario, frames, engine } = span("building");
+    expect(scenario.nano).toBe("builder");
+    expect(engine("nano-start")).toEqual(frames("StartBuilding"));
+    expect(engine("nano-stop")).toEqual(frames("StopBuilding"));
+  });
+
+  it("sprays for as long as a factory builds", () => {
+    const { scenario, frames, engine } = span("building-factory");
+    expect(scenario.nano).toBe("factory");
+    expect(engine("nano-start")).toEqual(frames("StartBuilding"));
+    expect(engine("nano-stop")).toEqual(frames("StopBuilding"));
+  });
+});
+
 describe("frameAt", () => {
   it("loops rather than running out", () => {
     const played = timeline();

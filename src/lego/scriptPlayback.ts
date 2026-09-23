@@ -54,8 +54,12 @@ export interface ScriptEvent {
    * `QueryTransport` names, and detaches it, without the script asking
    * (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2041-2042,2090-2091`).
    * The runtime asks `QueryTransport` at the moment it attaches.
+   *
+   * `nano-start` and `nano-stop` bracket the frames a builder sprays nano on.
+   * The runtime asks `QueryNanoPiece` on each of them, through the engine's
+   * cache (`rts/Sim/Misc/NanoPieceCache.cpp:17-50`).
    */
-  engine?: "attach" | "detach";
+  engine?: "attach" | "detach" | "nano-start" | "nano-stop";
 }
 
 /** The scene one frame of a script run is told about. */
@@ -79,7 +83,8 @@ export type ScriptOutput =
   | { frame: number; kind: "drop"; unit: number }
   | { frame: number; kind: "sfx"; piece: string; sfx: number }
   | { frame: number; kind: "explode"; piece: string; flags: number }
-  | { frame: number; kind: "sound"; name: string | null };
+  | { frame: number; kind: "sound"; name: string | null }
+  | { frame: number; kind: "nano"; piece: string | null }; // null when no piece is named yet
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
 export interface ScriptTimeline {
@@ -210,6 +215,11 @@ export interface StandInTrack {
   size?: number;
 }
 
+/** How a unit sprays nano, which sets the particle's speed and spread: a
+ *  construction unit's at 3 elmos a frame, a factory's at 1
+ *  (`rts/Sim/Projectiles/ProjectileHandler.cpp:670-746`). */
+export type NanoStyle = "builder" | "factory";
+
 export interface Scenario {
   id: string;
   label: string;
@@ -219,6 +229,8 @@ export interface Scenario {
   /** The stand-in this scenario puts in the scene, if it puts one there at
    *  all. A scenario with no track shows no stand-in. */
   standIn?: StandInTrack;
+  /** How this scenario's unit sprays nano, when it does. */
+  nano?: NanoStyle;
 }
 
 /** Seconds to frames, for writing a scenario in the units it reads in.
@@ -339,6 +351,7 @@ export const SCENARIOS: Scenario[] = [
     label: "Building (mobile)",
     description:
       "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it.",
+    nano: "builder",
     events: [
       ...CREATED,
       // No literal angles. `aimResolver.ts` works them out from where the
@@ -350,13 +363,17 @@ export const SCENARIOS: Scenario[] = [
         callin: "StartBuilding",
         aimAtStandIn: { from: "midPos" },
       },
+      { frame: at(0.5), engine: "nano-start" },
       { frame: at(5), callin: "StopBuilding" },
+      { frame: at(5), engine: "nano-stop" },
       {
         frame: at(6.5),
         callin: "StartBuilding",
         aimAtStandIn: { from: "midPos" },
       },
+      { frame: at(6.5), engine: "nano-start" },
       { frame: at(11), callin: "StopBuilding" },
+      { frame: at(11), engine: "nano-stop" },
     ],
     // On the ground ahead and to one side, then across to the other during the
     // gap between the two builds, so the arm is seen to follow it.
@@ -386,6 +403,7 @@ export const SCENARIOS: Scenario[] = [
     label: "Building (factory)",
     description:
       "A factory opening its yard and then building, which is a different pair of call-ins from a construction unit's.",
+    nano: "factory",
     events: [
       ...CREATED,
       // A factory is opened first. `CFactory::Update` calls `Activate` when the
@@ -397,7 +415,9 @@ export const SCENARIOS: Scenario[] = [
       // a construction unit, which is handed a heading and a pitch to aim its
       // nanolathe with (`CBuilder`).
       { frame: at(2), callin: "StartBuilding" },
+      { frame: at(2), engine: "nano-start" },
       { frame: at(11), callin: "StopBuilding" },
+      { frame: at(11), engine: "nano-stop" },
       { frame: at(13), callin: "Deactivate" },
     ],
     standIn: {

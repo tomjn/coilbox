@@ -87,7 +87,11 @@ import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
 import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
-import type { ScriptTimeline, StandInTrack } from "../scriptPlayback";
+import type {
+  NanoStyle,
+  ScriptTimeline,
+  StandInTrack,
+} from "../scriptPlayback";
 import { shortcutLabel } from "../shortcuts";
 import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
@@ -211,6 +215,7 @@ function Builder({ id }: { id: string | undefined }) {
   const [standIn, setStandIn] = useState<{
     track: StandInTrack | null;
     attachPieces: Map<string, string>;
+    nano?: NanoStyle | null;
   }>({ track: null, attachPieces: new Map() });
   /**
    * Whether a script run's clock is frozen on `scriptFrame` rather than
