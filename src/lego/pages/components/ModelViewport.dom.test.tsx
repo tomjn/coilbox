@@ -693,6 +693,34 @@ describe("placeStandIn", () => {
       expect(geometry(state).getAttribute("center").array[0]).toBe(4);
     });
 
+    /** The engine reads the buildee's own `midPos` on the emitting frame,
+     *  never the frame before (`Builder.cpp:353`). Only the nozzle comes from
+     *  the frame before. */
+    it("aims at the stand-in's position on the emitting frame, not the frame before", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      const swinging: StandInPlacement = {
+        track: {
+          keys: [
+            { frame: 4, pos: [-1000, 0, 0] },
+            { frame: 5, pos: [1000, 0, 0] },
+          ],
+        },
+        attachPieces: new Map(),
+        show: true,
+        nano: "factory",
+      };
+      placeEffects(state, doc, swinging, true, timeline, 6);
+
+      // The nozzle stayed at x = 0, so a particle drifting to positive x one
+      // frame after it fired means the target read the emitting frame's
+      // position rather than the frame before's.
+      const center = geometry(state).getAttribute("center").array;
+      expect(center[0]).toBeGreaterThan(0);
+    });
+
     it("leaves the scene posed on the frame it was asked for", () => {
       const state = sprayScene();
       const timeline = run(40, (frame) => frame, [

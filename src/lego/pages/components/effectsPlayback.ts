@@ -3,9 +3,10 @@
  *
  * Called beside `placeStandIn`, from the same two places. Where each emission
  * starts and what it aims at is worked out once per timeline, by posing the
- * scene on the frame before it, then putting the scene back, the way
- * `releasePoint` reads a release. After that every frame is `particlesAt`,
- * so scrubbing back to a frame draws what it drew before.
+ * scene on the frame before it for the start and on the frame it fires for the
+ * target, then putting the scene back, the way `releasePoint` reads a release.
+ * After that every frame is `particlesAt`, so scrubbing back to a frame draws
+ * what it drew before.
  */
 
 import * as THREE from "three";
@@ -75,15 +76,25 @@ function resolve(
     if (event.kind !== "nano" || event.piece === null) return;
     const group = groupOfPiece(state, project, event.piece);
     if (!group) return;
+
+    // The nozzle is the nano piece's position on the frame before the one it
+    // fires on, but the target is the buildee's own `midPos` read on the
+    // firing frame itself (`Builder.cpp:353,987-988`), so the two are posed
+    // separately.
     const before = Math.max(event.frame - 1, 0);
     if (before !== posed) {
       applyTimelineFrame(state, project, timeline, before);
-      placeStandIn(state, project, seen, timeline, before);
       posed = before;
     }
     group.updateWorldMatrix(true, false);
     group.getWorldPosition(AT);
     const at: Vec3 = [AT.x, AT.y, AT.z];
+
+    if (event.frame !== posed) {
+      applyTimelineFrame(state, project, timeline, event.frame);
+      posed = event.frame;
+    }
+    placeStandIn(state, project, seen, timeline, event.frame);
     const to: Vec3 = [
       state.standIn.position.x,
       state.standIn.position.y + STAND_IN_MID_Y * state.standInRadius,
