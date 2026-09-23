@@ -1,11 +1,13 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import type { StandInTrack } from "./scriptPlayback";
+import type { ScriptOutput, StandInTrack } from "./scriptPlayback";
 import {
   attachedAt,
   buildStandIn,
   disposeStandIn,
+  passengerAt,
+  standInAfterRelease,
   standInAt,
   standInRadius,
 } from "./standIn";
@@ -61,12 +63,12 @@ describe("standInAt", () => {
   it("reports which origin a key is measured from", () => {
     const dropped = track({
       keys: [
-        { frame: 0, pos: [0, 0, 0], fromAttachPiece: true },
-        { frame: 10, pos: [0, -1, -1], fromAttachPiece: true },
+        { frame: 0, pos: [0, 0, 0], fromRelease: true },
+        { frame: 10, pos: [0, -1, -1], fromRelease: true },
       ],
     });
-    expect(standInAt(dropped, 5, 8)?.fromAttachPiece).toBe(true);
-    expect(standInAt(track(), 15, 8)?.fromAttachPiece).toBe(false);
+    expect(standInAt(dropped, 5, 8)?.fromRelease).toBe(true);
+    expect(standInAt(track(), 15, 8)?.fromRelease).toBe(false);
   });
 });
 
@@ -225,6 +227,105 @@ describe("the stand-in's winding", () => {
   });
 });
 
+describe("passengerAt", () => {
+  const attach = (
+    frame: number,
+    piece: string | null,
+    unit = 2,
+  ): ScriptOutput => ({
+    frame,
+    kind: "attach",
+    unit,
+    piece,
+  });
+  const drop = (frame: number, unit = 2): ScriptOutput => ({
+    frame,
+    kind: "drop",
+    unit,
+  });
+
+  it("is loose before anything attaches it", () => {
+    expect(passengerAt([attach(10, "link")], 9)).toEqual({ kind: "loose" });
+    expect(passengerAt([], 100)).toEqual({ kind: "loose" });
+  });
+
+  /** `UpdateTransportees` runs within the attach's own frame
+   *  (`rts/Game/Game.cpp:1796-1798`), so the picture already has it there. */
+  it("rides from the attach's own frame", () => {
+    expect(passengerAt([attach(10, "link")], 10)).toEqual({
+      kind: "riding",
+      piece: "link",
+    });
+  });
+
+  it("is in the void when attached to no piece", () => {
+    expect(passengerAt([attach(10, "link"), attach(20, null)], 25)).toEqual({
+      kind: "void",
+    });
+  });
+
+  it("remembers the frame and the piece it was let go from", () => {
+    const events = [attach(10, "link"), drop(30)];
+    expect(passengerAt(events, 29)).toEqual({ kind: "riding", piece: "link" });
+    expect(passengerAt(events, 30)).toEqual({
+      kind: "released",
+      frame: 30,
+      from: "link",
+    });
+    expect(passengerAt(events, 99)).toEqual({
+      kind: "released",
+      frame: 30,
+      from: "link",
+    });
+  });
+
+  it("is let go from nowhere when it was dropped out of the void", () => {
+    expect(passengerAt([attach(10, null), drop(30)], 30)).toEqual({
+      kind: "released",
+      frame: 30,
+      from: null,
+    });
+  });
+
+  /** The Hulk picks up, hides, then reaches out and puts down again. */
+  it("follows several attach and drop cycles", () => {
+    const events = [
+      attach(10, "link"),
+      attach(40, null),
+      drop(60),
+      attach(80, "link"),
+      drop(120),
+    ];
+    expect(passengerAt(events, 50)).toEqual({ kind: "void" });
+    expect(passengerAt(events, 70)).toEqual({
+      kind: "released",
+      frame: 60,
+      from: null,
+    });
+    expect(passengerAt(events, 90)).toEqual({ kind: "riding", piece: "link" });
+    expect(passengerAt(events, 130)).toEqual({
+      kind: "released",
+      frame: 120,
+      from: "link",
+    });
+  });
+
+  /** The engine does nothing for an id with no unit behind it, and a drop of a
+   *  unit nobody carries does nothing either (`Unit.cpp:2715-2720`). */
+  it("ignores other units, and a drop of a stand-in nobody carries", () => {
+    expect(passengerAt([attach(10, "link", 7)], 20)).toEqual({ kind: "loose" });
+    expect(passengerAt([drop(10)], 20)).toEqual({ kind: "loose" });
+  });
+
+  it("ignores effects", () => {
+    const events: ScriptOutput[] = [
+      attach(10, "link"),
+      { frame: 15, kind: "sfx", piece: "flare", sfx: 1025 },
+    ];
+    expect(passengerAt(events, 20)).toEqual({ kind: "riding", piece: "link" });
+  });
+});
+
 /** How wide the shape is across x at one height, read off its vertices. */
 function widthAt(group: THREE.Group, y: number): number {
   let min = Number.POSITIVE_INFINITY;
@@ -240,3 +341,65 @@ function widthAt(group: THREE.Group, y: number): number {
   });
   return max - min;
 }
+
+describe("standInAfterRelease", () => {
+  const release = { frame: 100, at: [5, 4, 0] as [number, number, number] };
+
+  /** A dropped stand-in holds where it was let go and does not fall. */
+  it("holds at the release point when no key follows it", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 0, pos: [0, 0, 9] }] },
+      150,
+      release,
+      10,
+    );
+    expect(pose).toEqual({ pos: [5, 4, 0], heading: 0 });
+  });
+
+  /** The release point is an implicit key on the drop's frame. */
+  it("moves from the release point to the next key", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 200, pos: [0, 0, 1] }] },
+      150,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([2.5, 2, 5]);
+  });
+
+  it("measures a fromRelease key from the release point", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 200, pos: [0, 1, 0], fromRelease: true }] },
+      200,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([5, 14, 0]);
+  });
+
+  /** The runtime owned the stand-in while it was carried. */
+  it("passes over keys at or before the drop", () => {
+    const pose = standInAfterRelease(
+      {
+        keys: [
+          { frame: 50, pos: [9, 9, 9] },
+          { frame: 100, pos: [9, 9, 9] },
+        ],
+      },
+      120,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([5, 4, 0]);
+  });
+
+  it("is at the release point on the drop's own frame", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 200, pos: [0, 0, 1] }] },
+      100,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([5, 4, 0]);
+  });
+});

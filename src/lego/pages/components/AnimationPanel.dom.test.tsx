@@ -16,11 +16,11 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { type LegoProject, newProject } from "../../model";
 import type { LoadedPack } from "../../pack";
-import type { ScriptTimeline } from "../../scriptPlayback";
+import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
 import { AnimationPanel } from "./AnimationPanel";
 
 const runLua = vi.fn();
@@ -89,7 +89,10 @@ function project(over: Partial<LegoProject> = {}): LegoProject {
   };
 }
 
-function show(value: LegoProject) {
+function show(
+  value: LegoProject,
+  over: Partial<React.ComponentProps<typeof AnimationPanel>> = {},
+) {
   return render(
     <AnimationPanel
       project={value}
@@ -107,6 +110,7 @@ function show(value: LegoProject) {
       pack={pack()}
       raw={null}
       onStandIn={vi.fn()}
+      {...over}
     />,
   );
 }
@@ -331,5 +335,98 @@ describe("the scene a script is told about", () => {
     );
     expect(begin.world.standIn).toMatchObject({ id: 2 });
     expect(begin.world.standIn.pos).toHaveLength(3);
+  });
+});
+
+/** happy-dom's ResizeObserver never calls back, so a test that needs the row
+ *  measured brings its own, firing once with a fixed width. The same pattern as
+ *  `src/workshop/pages/components/UnitList.dom.test.tsx`. */
+class FixedWidthResizeObserver {
+  #callback: ResizeObserverCallback;
+  constructor(callback: ResizeObserverCallback) {
+    this.#callback = callback;
+  }
+  observe() {
+    this.#callback(
+      [{ contentRect: { width: 50 } } as ResizeObserverEntry],
+      this as unknown as ResizeObserver,
+    );
+  }
+  unobserve() {}
+  disconnect() {}
+}
+
+describe("marks under the scrubber", () => {
+  const frames = (count: number) =>
+    Array.from({ length: count }, () => [0, 0, 0, 0, 0, 0]);
+
+  async function played(events: ScriptOutput[], count = 100, over = {}) {
+    runCob.mockResolvedValue(timeline({ frames: frames(count), events }));
+    show(project({ compiledScript: COMPILED }), over);
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    // The frame counter beside the scrubber, which only renders once the run
+    // came back with frames to play.
+    await waitFor(() => expect(screen.getByText(`1/${count}`)).toBeTruthy());
+  }
+
+  it("marks nothing for a run that announced nothing", async () => {
+    await played([]);
+    expect(
+      screen.queryByRole("group", { name: /What the script announced/ }),
+    ).toBeNull();
+  });
+
+  it("marks each frame that has events, named for what happened", async () => {
+    await played([
+      { frame: 10, kind: "attach", unit: 2, piece: "link" },
+      { frame: 40, kind: "sfx", piece: "flare", sfx: 1025 },
+    ]);
+    expect(
+      screen.getByRole("button", { name: "Frame 11: Attach stand-in to link" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Frame 41: EmitSfx 1025 from flare (CEG 1)",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("seeks to a mark's frame, pausing first", async () => {
+    const onScriptFrameChange = vi.fn();
+    const onScriptPausedChange = vi.fn();
+    await played([{ frame: 10, kind: "drop", unit: 2 }], 100, {
+      onScriptFrameChange,
+      onScriptPausedChange,
+    });
+    onScriptFrameChange.mockClear();
+    onScriptPausedChange.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: /Frame 11/ }));
+
+    expect(onScriptPausedChange).toHaveBeenCalledWith(true);
+    expect(onScriptFrameChange).toHaveBeenCalledWith(10);
+  });
+
+  it("merges frames that fall on the same pixel", async () => {
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver =
+      FixedWidthResizeObserver as unknown as typeof ResizeObserver;
+    try {
+      await played(
+        [
+          { frame: 500, kind: "drop", unit: 2 },
+          { frame: 501, kind: "sfx", piece: "flare", sfx: 1024 },
+        ],
+        1000,
+      );
+      expect(
+        screen.getByRole("button", {
+          name: "Frame 501: Drop stand-in, and 1 more",
+        }),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Frame 502/ })).toBeNull();
+    } finally {
+      globalThis.ResizeObserver = original;
+    }
   });
 });

@@ -1,5 +1,6 @@
 /**
- * Put the stand-in where a scenario's track says it is on one frame.
+ * Put the stand-in where the running script and the scenario's track say it is
+ * on one frame.
  *
  * Called from the same places that pose the pieces, because it is the same
  * question asked about a different object: a running clock's tick, and the one
@@ -13,9 +14,18 @@
 import * as THREE from "three";
 
 import type { LegoProject } from "../../model";
-import type { StandInTrack } from "../../scriptPlayback";
-import { attachedAt, standInAt } from "../../standIn";
+import type { ScriptTimeline, StandInTrack } from "../../scriptPlayback";
+import {
+  attachedAt,
+  type PassengerState,
+  passengerAt,
+  standInAfterRelease,
+  standInAt,
+} from "../../standIn";
+import { applyTimelineFrame } from "./animationPlayback";
 import type { SceneState } from "./sceneState";
+
+type Vec3 = [number, number, number];
 
 export interface StandInPlacement {
   /** The running scenario's track, or null when it defines none. */
@@ -28,34 +38,83 @@ export interface StandInPlacement {
 }
 
 const AT = new THREE.Vector3();
+const LOOSE: PassengerState = { kind: "loose" };
 
 export function placeStandIn(
   state: SceneState,
   project: LegoProject,
   { track, attachPieces, show }: StandInPlacement,
+  timeline: ScriptTimeline | null,
   frame: number,
 ): void {
-  const pose = track ? standInAt(track, frame, state.standInRadius) : null;
-  if (!show || !track || !pose) {
+  if (!show || !track) {
+    state.standIn.visible = false;
+    return;
+  }
+
+  // From its first attach the script owns where the stand-in is, so its events
+  // come ahead of the track.
+  const passenger = timeline ? passengerAt(timeline.events, frame) : LOOSE;
+  if (passenger.kind === "void") {
+    state.standIn.visible = false;
+    return;
+  }
+  if (passenger.kind === "riding") {
+    const group = groupOfPiece(state, project, passenger.piece);
+    if (group) {
+      // The pose was written onto the groups a moment ago and nothing has
+      // rendered since, so their world matrices are a frame out until this
+      // asks for them. Drawn from the three.js hierarchy, which composes
+      // rotations, so a stand-in on a turned boom is where the boom is.
+      group.updateWorldMatrix(true, false);
+      state.standIn.visible = true;
+      state.standIn.rotation.set(0, 0, 0);
+      state.standIn.position.copy(group.getWorldPosition(AT));
+      return;
+    }
+  }
+  if (passenger.kind === "released" && timeline) {
+    const at = releasePoint(state, project, timeline, passenger, frame);
+    const pose = standInAfterRelease(
+      track,
+      frame,
+      { frame: passenger.frame, at },
+      state.standInRadius,
+    );
+    state.standIn.visible = true;
+    state.standIn.rotation.set(0, pose.heading, 0);
+    state.standIn.position.set(...pose.pos);
+    return;
+  }
+
+  placeLoose(state, project, track, attachPieces, frame);
+}
+
+/** Before anything has attached it, the track, as it always was. */
+function placeLoose(
+  state: SceneState,
+  project: LegoProject,
+  track: StandInTrack,
+  attachPieces: Map<string, string>,
+  frame: number,
+): void {
+  const pose = standInAt(track, frame, state.standInRadius);
+  if (!pose) {
     state.standIn.visible = false;
     return;
   }
   state.standIn.visible = true;
   state.standIn.rotation.set(0, pose.heading, 0);
 
-  // The track's own attach piece rather than the one in force on this frame: a
-  // key measured from it is measured from it after the detachment too, which is
-  // how a dropped passenger falls away from the transport rather than from the
-  // unit's origin.
+  // The track's own attach piece rather than the one in force on this frame:
+  // a key measured from it is measured from it after the detachment too.
   const piece = track.attach ? attachPieces.get(track.attach.from) : undefined;
   const group = piece ? groupOfPiece(state, project, piece) : undefined;
   const attach = attachedAt(track, frame);
-  // The pose was written onto the groups a moment ago and nothing has rendered
-  // since, so their world matrices are a frame out until this asks for them.
   group?.updateWorldMatrix(true, false);
 
-  // Riding a piece: the stand-in takes that piece's position outright. Its own
-  // keyed position says nothing while it is being carried.
+  // Riding a piece the probe named: the stand-in takes that piece's position
+  // outright. Its own keyed position says nothing while it is being carried.
   if (attach?.follow && group) {
     state.standIn.position.copy(group.getWorldPosition(AT));
     return;
@@ -72,18 +131,65 @@ export function placeStandIn(
     }
   }
 
-  // Loose, or attached to a piece the probe never named. A key measured from
-  // the attach piece is offset from wherever that piece is, so a dropped
-  // passenger leaves the transport rather than the unit's origin. With no piece
-  // to measure from it falls back to the unit's origin, which is the same
-  // answer an ordinary key gives.
+  // Loose, or attached to a piece the probe never named. Nothing has been let
+  // go yet, so a `fromRelease` key is measured from the attach piece. With no
+  // piece to measure from it falls back to the unit's origin, which is the
+  // same answer an ordinary key gives.
   AT.set(0, 0, 0);
-  if (pose.fromAttachPiece && group) group.getWorldPosition(AT);
+  if (pose.fromRelease && group) group.getWorldPosition(AT);
   state.standIn.position.set(
     AT.x + pose.pos[0],
     AT.y + pose.pos[1],
     AT.z + pose.pos[2],
   );
+}
+
+/** Release points already read, per timeline and drop frame, so scrubbing
+ *  stays a pure function of the frame. A new run is a new timeline. */
+const RELEASES = new WeakMap<ScriptTimeline, Map<number, Vec3>>();
+
+/**
+ * Where a dropped stand-in was let go: its piece's world position on the frame
+ * before the drop, which is the last place `UpdateTransportees` put it
+ * (`rts/Sim/Units/Unit.cpp:718-757`). The unit's own origin for one dropped out
+ * of the void (`Unit.cpp:726-732`).
+ *
+ * Read by posing the scene on that frame and asking the group, so a piece on a
+ * turned boom is where it is, then posing the scene back to `frame`.
+ */
+function releasePoint(
+  state: SceneState,
+  project: LegoProject,
+  timeline: ScriptTimeline,
+  released: { frame: number; from: string | null },
+  frame: number,
+): Vec3 {
+  let known = RELEASES.get(timeline);
+  if (!known) {
+    known = new Map();
+    RELEASES.set(timeline, known);
+  }
+  const cached = known.get(released.frame);
+  if (cached) return cached;
+
+  let at: Vec3 = [0, 0, 0];
+  const group = released.from
+    ? groupOfPiece(state, project, released.from)
+    : undefined;
+  if (group) {
+    applyTimelineFrame(
+      state,
+      project,
+      timeline,
+      Math.max(released.frame - 1, 0),
+    );
+    group.updateWorldMatrix(true, false);
+    group.getWorldPosition(AT);
+    at = [AT.x, AT.y, AT.z];
+    applyTimelineFrame(state, project, timeline, frame);
+  }
+  known.set(released.frame, at);
+  return at;
 }
 
 /** The scene group standing for a piece, found by the piece's name because

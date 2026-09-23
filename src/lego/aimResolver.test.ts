@@ -231,7 +231,7 @@ describe("worldAt", () => {
 
   it("measures a key from the attach piece when the key says to", () => {
     const leaving: StandInTrack = {
-      keys: [{ frame: 0, pos: [0, -1, 0], fromAttachPiece: true }],
+      keys: [{ frame: 0, pos: [0, -1, 0], fromRelease: true }],
       attach: { from: "QueryTransport", frame: 100, until: null, follow: true },
     };
     expect(worldAt(leaving, 0, CTX).standIn?.pos).toEqual([0, 10, -5]);

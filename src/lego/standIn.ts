@@ -14,7 +14,13 @@
 
 import * as THREE from "three";
 import type { UnitBounds } from "./s3oBuild";
-import type { StandInAttach, StandInKey, StandInTrack } from "./scriptPlayback";
+import {
+  type ScriptOutput,
+  STAND_IN_UNIT_ID,
+  type StandInAttach,
+  type StandInKey,
+  type StandInTrack,
+} from "./scriptPlayback";
 
 type Vec3 = [number, number, number];
 
@@ -58,12 +64,12 @@ export function standInRadius(bounds: UnitBounds): number {
 
 /** Where the stand-in is on one frame, in elmos, and which way it faces. */
 export interface StandInPose {
-  /** Unit-local, in elmos. Measured from the attach piece when
-   *  `fromAttachPiece` says so, and from the unit's origin otherwise. */
+  /** Unit-local, in elmos. Measured from where the stand-in was last let go
+   *  when `fromRelease` says so, and from the unit's origin otherwise. */
   pos: Vec3;
   /** Radians about the vertical axis, relative to the unit's facing. */
   heading: number;
-  fromAttachPiece: boolean;
+  fromRelease: boolean;
 }
 
 /**
@@ -104,7 +110,7 @@ export function standInAt(
       heading: mix(from.heading ?? 0, to.heading ?? 0, t),
       // The key being moved towards, since that is the one that says where the
       // motion ends up. Tracks never mix the two origins mid-move.
-      fromAttachPiece: to.fromAttachPiece ?? false,
+      fromRelease: to.fromRelease ?? false,
     };
   }
   return posed(last, radius);
@@ -114,7 +120,7 @@ function posed(key: StandInKey, radius: number): StandInPose {
   return {
     pos: [key.pos[0] * radius, key.pos[1] * radius, key.pos[2] * radius],
     heading: key.heading ?? 0,
-    fromAttachPiece: key.fromAttachPiece ?? false,
+    fromRelease: key.fromRelease ?? false,
   };
 }
 
@@ -132,6 +138,100 @@ export function attachedAt(
   if (frame < attach.frame) return null;
   if (attach.until !== null && frame >= attach.until) return null;
   return attach;
+}
+
+/** Where the script's own attach and drop events leave the stand-in. */
+export type PassengerState =
+  | { kind: "loose" }
+  | { kind: "riding"; piece: string }
+  | { kind: "void" }
+  /** `from` is the piece it rode until it was let go, or null out of the void. */
+  | { kind: "released"; frame: number; from: string | null };
+
+/**
+ * Fold a run's attach and drop events up to `frame` into where they leave the
+ * stand-in.
+ *
+ * An event on its own frame counts, because the engine moves a passenger within
+ * the frame it was attached (`rts/Game/Game.cpp:1796-1798`). Events about any
+ * other unit id change nothing, and neither does a drop of a stand-in nobody is
+ * carrying (`rts/Sim/Units/Unit.cpp:2715-2720`).
+ */
+export function passengerAt(
+  events: ScriptOutput[],
+  frame: number,
+): PassengerState {
+  let state: PassengerState = { kind: "loose" };
+  for (const event of events) {
+    if (event.frame > frame) break;
+    if (event.kind !== "attach" && event.kind !== "drop") continue;
+    if (event.unit !== STAND_IN_UNIT_ID) continue;
+    if (event.kind === "attach") {
+      state =
+        event.piece === null
+          ? { kind: "void" }
+          : { kind: "riding", piece: event.piece };
+    } else if (state.kind === "riding" || state.kind === "void") {
+      state = {
+        kind: "released",
+        frame: event.frame,
+        from: state.kind === "riding" ? state.piece : null,
+      };
+    }
+  }
+  return state;
+}
+
+/**
+ * Where a track puts the stand-in after it was let go, in elmos.
+ *
+ * The release point is an implicit key on the drop's frame, and keys after it
+ * interpolate from there. Keys at or before the drop are passed over, because
+ * the runtime owned the stand-in while it was carried. A `fromRelease` key is
+ * measured from the release point. The implicit key faces the way the unit
+ * does, because a carried unit takes its transporter's heading
+ * (`rts/Sim/Units/Unit.cpp:734-748`), which is 0 in the editor.
+ *
+ * A stand-in let go holds where it was put down and does not fall. Falling
+ * belongs to the move type, which the preview does not have.
+ *
+ * Known gap, recorded rather than designed for: a return leg keyed after a drop
+ * walks the stand-in back while the runtime still answers the release point,
+ * because no call-in fires during a return leg.
+ */
+export function standInAfterRelease(
+  track: StandInTrack,
+  frame: number,
+  release: { frame: number; at: Vec3 },
+  radius: number,
+): { pos: Vec3; heading: number } {
+  const place = (key: StandInKey): Vec3 => {
+    const from = key.fromRelease ? release.at : [0, 0, 0];
+    return [
+      from[0] + key.pos[0] * radius,
+      from[1] + key.pos[1] * radius,
+      from[2] + key.pos[2] * radius,
+    ];
+  };
+  let from = { frame: release.frame, pos: release.at, heading: 0 };
+  for (const key of track.keys) {
+    if (key.frame <= release.frame) continue;
+    const to = { frame: key.frame, pos: place(key), heading: key.heading ?? 0 };
+    if (frame <= to.frame) {
+      const span = to.frame - from.frame;
+      const t = span === 0 ? 1 : (frame - from.frame) / span;
+      return {
+        pos: [
+          mix(from.pos[0], to.pos[0], t),
+          mix(from.pos[1], to.pos[1], t),
+          mix(from.pos[2], to.pos[2], t),
+        ],
+        heading: mix(from.heading, to.heading, t),
+      };
+    }
+    from = to;
+  }
+  return { pos: from.pos, heading: from.heading };
 }
 
 /**

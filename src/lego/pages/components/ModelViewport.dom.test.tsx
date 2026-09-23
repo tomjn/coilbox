@@ -20,6 +20,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
+import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
+import { applyTimelineFrame } from "./animationPlayback";
 import { type SceneGraph, type SceneState, syncScene } from "./sceneState";
 import { placeStandIn } from "./standInPlayback";
 
@@ -385,6 +387,7 @@ describe("placeStandIn", () => {
       state,
       doc,
       { track: null, attachPieces: new Map(), show: true },
+      null,
       0,
     );
 
@@ -401,6 +404,7 @@ describe("placeStandIn", () => {
         attachPieces: new Map(),
         show: true,
       },
+      null,
       0,
     );
 
@@ -418,6 +422,7 @@ describe("placeStandIn", () => {
         attachPieces: new Map(),
         show: false,
       },
+      null,
       0,
     );
 
@@ -446,6 +451,7 @@ describe("placeStandIn", () => {
         attachPieces: new Map([["QueryTransport", "arm"]]),
         show: true,
       },
+      null,
       0,
     );
 
@@ -473,6 +479,7 @@ describe("placeStandIn", () => {
         attachPieces: new Map([["QueryBuildInfo", "arm"]]),
         show: true,
       },
+      null,
       0,
     );
 
@@ -502,6 +509,7 @@ describe("placeStandIn", () => {
         attachPieces: new Map(),
         show: true,
       },
+      null,
       0,
     );
 
@@ -512,7 +520,7 @@ describe("placeStandIn", () => {
   /** A key measured from the attach piece is measured from where that piece is,
    *  so a dropped passenger leaves from the transport rather than from the
    *  unit's origin. */
-  it("measures a fromAttachPiece key from the piece", () => {
+  it("measures a fromRelease key from the attach piece before anything is let go", () => {
     const state = standInScene();
     state.groups.get("arm")?.position.set(0, 7, 0);
     placeStandIn(
@@ -520,7 +528,7 @@ describe("placeStandIn", () => {
       doc,
       {
         track: {
-          keys: [{ frame: 0, pos: [0, -0.5, 0], fromAttachPiece: true }],
+          keys: [{ frame: 0, pos: [0, -0.5, 0], fromRelease: true }],
           attach: {
             from: "QueryTransport",
             frame: 0,
@@ -531,9 +539,145 @@ describe("placeStandIn", () => {
         attachPieces: new Map([["QueryTransport", "arm"]]),
         show: true,
       },
+      null,
       0,
     );
 
     expect(state.standIn.position.toArray()).toEqual([0, 2, 0]);
+  });
+
+  /** A run of `frames` frames over `base` and `arm`, with the arm moved along x
+   *  by `armX(frame)` and nothing else moving. */
+  function run(
+    frames: number,
+    armX: (frame: number) => number,
+    events: ScriptOutput[],
+  ): ScriptTimeline {
+    return {
+      fps: 30,
+      pieces: ["base", "arm"],
+      frames: Array.from({ length: frames }, (_, f) => [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        armX(f),
+        0,
+        0,
+        0,
+        0,
+        0,
+      ]),
+      hidden: [],
+      error: null,
+      warnings: [],
+      asked: [],
+      functions: [],
+      linesRun: [],
+      offsetsRun: [],
+      events,
+    };
+  }
+
+  const held = {
+    track: { keys: [{ frame: 0, pos: [9, 0, 9] as [number, number, number] }] },
+    attachPieces: new Map(),
+    show: true,
+  };
+
+  /** The track says one place and the script says another. The script wins. */
+  it("rides the piece its script attached it to, from the attach's own frame", () => {
+    const state = standInScene();
+    state.groups.get("base")?.position.set(3, 0, 0);
+    state.groups.get("arm")?.position.set(0, 7, 0);
+    const timeline = run(4, () => 0, [
+      { frame: 2, kind: "attach", unit: 2, piece: "arm" },
+    ]);
+
+    placeStandIn(state, doc, held, timeline, 2);
+
+    expect(state.standIn.visible).toBe(true);
+    expect(state.standIn.position.toArray()).toEqual([3, 7, 0]);
+    expect(state.standIn.rotation.y).toBe(0);
+  });
+
+  /** `rts/Rendering/Units/UnitDrawer.cpp:418` draws nothing in the void. */
+  it("hides it in the void", () => {
+    const state = standInScene();
+    const timeline = run(4, () => 0, [
+      { frame: 1, kind: "attach", unit: 2, piece: null },
+    ]);
+
+    placeStandIn(state, doc, held, timeline, 2);
+
+    expect(state.standIn.visible).toBe(false);
+  });
+
+  /** Let go where the piece was on the frame before the drop, which is the
+   *  last place the engine put it (`rts/Sim/Units/Unit.cpp:718-757`). */
+  it("leaves it where the piece was the frame before the drop", () => {
+    const state = standInScene();
+    const timeline = run(6, (f) => (f === 0 ? 0 : f === 1 ? 5 : 9), [
+      { frame: 0, kind: "attach", unit: 2, piece: "arm" },
+      { frame: 2, kind: "drop", unit: 2 },
+    ]);
+    applyTimelineFrame(state, doc, timeline, 4);
+
+    placeStandIn(state, doc, held, timeline, 4);
+
+    // The arm rests at y 4 and was 5 along x on frame 1.
+    expect(state.standIn.position.toArray()).toEqual([5, 4, 0]);
+    // Posed back to the frame being drawn.
+    expect(state.groups.get("arm")?.position.toArray()).toEqual([9, 4, 0]);
+  });
+
+  /** Scrubbing back and forth gives the same picture each time. */
+  it("gives the same release point however it is reached", () => {
+    const state = standInScene();
+    const timeline = run(6, (f) => f, [
+      { frame: 0, kind: "attach", unit: 2, piece: "arm" },
+      { frame: 3, kind: "drop", unit: 2 },
+    ]);
+    applyTimelineFrame(state, doc, timeline, 5);
+    placeStandIn(state, doc, held, timeline, 5);
+    const first = state.standIn.position.toArray();
+    applyTimelineFrame(state, doc, timeline, 1);
+    placeStandIn(state, doc, held, timeline, 1);
+    applyTimelineFrame(state, doc, timeline, 5);
+    placeStandIn(state, doc, held, timeline, 5);
+
+    expect(state.standIn.position.toArray()).toEqual(first);
+    expect(first).toEqual([2, 4, 0]);
+  });
+
+  it("follows the track from the release point once it is let go", () => {
+    const state = standInScene();
+    const timeline = run(20, () => 0, [
+      { frame: 0, kind: "attach", unit: 2, piece: "arm" },
+      { frame: 2, kind: "drop", unit: 2 },
+    ]);
+    const track = {
+      keys: [
+        { frame: 0, pos: [9, 9, 9] as [number, number, number] },
+        {
+          frame: 12,
+          pos: [0, 1, 0] as [number, number, number],
+          fromRelease: true,
+        },
+      ],
+    };
+
+    placeStandIn(
+      state,
+      doc,
+      { track, attachPieces: new Map(), show: true },
+      timeline,
+      7,
+    );
+
+    // Halfway from (0, 4, 0) to ten elmos above it.
+    expect(state.standIn.position.toArray()).toEqual([0, 9, 0]);
   });
 });
