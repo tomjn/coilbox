@@ -7,6 +7,7 @@ import {
   buildStandIn,
   disposeStandIn,
   passengerAt,
+  standInAfterRelease,
   standInAt,
   standInRadius,
 } from "./standIn";
@@ -62,12 +63,12 @@ describe("standInAt", () => {
   it("reports which origin a key is measured from", () => {
     const dropped = track({
       keys: [
-        { frame: 0, pos: [0, 0, 0], fromAttachPiece: true },
-        { frame: 10, pos: [0, -1, -1], fromAttachPiece: true },
+        { frame: 0, pos: [0, 0, 0], fromRelease: true },
+        { frame: 10, pos: [0, -1, -1], fromRelease: true },
       ],
     });
-    expect(standInAt(dropped, 5, 8)?.fromAttachPiece).toBe(true);
-    expect(standInAt(track(), 15, 8)?.fromAttachPiece).toBe(false);
+    expect(standInAt(dropped, 5, 8)?.fromRelease).toBe(true);
+    expect(standInAt(track(), 15, 8)?.fromRelease).toBe(false);
   });
 });
 
@@ -340,3 +341,65 @@ function widthAt(group: THREE.Group, y: number): number {
   });
   return max - min;
 }
+
+describe("standInAfterRelease", () => {
+  const release = { frame: 100, at: [5, 4, 0] as [number, number, number] };
+
+  /** A dropped stand-in holds where it was let go and does not fall. */
+  it("holds at the release point when no key follows it", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 0, pos: [0, 0, 9] }] },
+      150,
+      release,
+      10,
+    );
+    expect(pose).toEqual({ pos: [5, 4, 0], heading: 0 });
+  });
+
+  /** The release point is an implicit key on the drop's frame. */
+  it("moves from the release point to the next key", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 200, pos: [0, 0, 1] }] },
+      150,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([2.5, 2, 5]);
+  });
+
+  it("measures a fromRelease key from the release point", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 200, pos: [0, 1, 0], fromRelease: true }] },
+      200,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([5, 14, 0]);
+  });
+
+  /** The runtime owned the stand-in while it was carried. */
+  it("passes over keys at or before the drop", () => {
+    const pose = standInAfterRelease(
+      {
+        keys: [
+          { frame: 50, pos: [9, 9, 9] },
+          { frame: 100, pos: [9, 9, 9] },
+        ],
+      },
+      120,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([5, 4, 0]);
+  });
+
+  it("is at the release point on the drop's own frame", () => {
+    const pose = standInAfterRelease(
+      { keys: [{ frame: 200, pos: [0, 0, 1] }] },
+      100,
+      release,
+      10,
+    );
+    expect(pose.pos).toEqual([5, 4, 0]);
+  });
+});

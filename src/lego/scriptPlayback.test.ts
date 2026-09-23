@@ -183,9 +183,7 @@ describe("scenarios", () => {
 
       expect(last.frame).toBe(PREVIEW_FRAMES);
       expect(last.pos).toEqual(first.pos);
-      expect(last.fromAttachPiece ?? false).toBe(
-        first.fromAttachPiece ?? false,
-      );
+      expect(last.fromRelease ?? false).toBe(first.fromRelease ?? false);
     }
   });
 

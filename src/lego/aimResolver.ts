@@ -215,7 +215,7 @@ export function worldAt(
   const pose = standInAt(track, frame, ctx.radius);
   if (!pose) return { standIn: { ...base, pos: null }, self: ctx.self };
   const from =
-    pose.fromAttachPiece && track.attach
+    pose.fromRelease && track.attach
       ? ctx.attachPiece(track.attach.from)
       : null;
   const pos: Vec3 = from

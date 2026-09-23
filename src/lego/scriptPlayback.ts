@@ -137,13 +137,15 @@ export interface StandInKey {
    *  edited unit's own size rather than from the track. */
   pos: [number, number, number];
   /**
-   * Measure `pos` from the attach piece's rest position rather than from the
+   * Measure `pos` from where the stand-in was last let go, rather than from the
    * unit's origin.
    *
-   * What a dropped passenger needs: it leaves the transport from where the
-   * transport was holding it, not from where the unit's origin happens to be.
+   * What a dropped passenger needs: it moves off from where the transport put
+   * it down. Until something has let it go, the track's attach piece stands in
+   * for that point, which is what a track is measured from before a run has
+   * said where anything was dropped.
    */
-  fromAttachPiece?: boolean;
+  fromRelease?: boolean;
   /** Radians about the vertical axis, relative to the unit's facing. Zero
    *  where no key sets one. */
   heading?: number;
@@ -517,12 +519,12 @@ export const SCENARIOS: Scenario[] = [
     // puts it. That is what closes the loop.
     standIn: {
       keys: [
-        { frame: at(5), pos: [0, 0, 0], fromAttachPiece: true },
-        { frame: at(7.5), pos: [0, -1.6, -1.2], fromAttachPiece: true },
-        { frame: at(12), pos: [0, -1.6, -1.2], fromAttachPiece: true },
+        { frame: at(5), pos: [0, 0, 0], fromRelease: true },
+        { frame: at(7.5), pos: [0, -1.6, -1.2], fromRelease: true },
+        { frame: at(12), pos: [0, -1.6, -1.2], fromRelease: true },
         // Back up to the piece. The preview's own return leg, not a reload: no
         // call-in fires during it.
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromAttachPiece: true },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromRelease: true },
       ],
       attach: {
         from: "QueryTransport",

@@ -512,7 +512,7 @@ describe("placeStandIn", () => {
   /** A key measured from the attach piece is measured from where that piece is,
    *  so a dropped passenger leaves from the transport rather than from the
    *  unit's origin. */
-  it("measures a fromAttachPiece key from the piece", () => {
+  it("measures a fromRelease key from the attach piece before anything is let go", () => {
     const state = standInScene();
     state.groups.get("arm")?.position.set(0, 7, 0);
     placeStandIn(
@@ -520,7 +520,7 @@ describe("placeStandIn", () => {
       doc,
       {
         track: {
-          keys: [{ frame: 0, pos: [0, -0.5, 0], fromAttachPiece: true }],
+          keys: [{ frame: 0, pos: [0, -0.5, 0], fromRelease: true }],
           attach: {
             from: "QueryTransport",
             frame: 0,

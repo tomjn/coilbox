@@ -78,7 +78,7 @@ export function placeStandIn(
   // to measure from it falls back to the unit's origin, which is the same
   // answer an ordinary key gives.
   AT.set(0, 0, 0);
-  if (pose.fromAttachPiece && group) group.getWorldPosition(AT);
+  if (pose.fromRelease && group) group.getWorldPosition(AT);
   state.standIn.position.set(
     AT.x + pose.pos[0],
     AT.y + pose.pos[1],
