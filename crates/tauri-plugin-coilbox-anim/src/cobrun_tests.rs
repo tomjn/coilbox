@@ -630,6 +630,120 @@ mod what_it_says_about_itself {
         assert!(close(pose(&timeline, 0, "base")[2], 12.0));
     }
 
+    fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    /// `get UNIT_Y(unitid)` then move the base by it, from a call-in handed
+    /// the stand-in's id, as `TransportPickup` is.
+    fn reads_y_of_the_passenger() -> Vec<u8> {
+        let mut pickup = vec![op("CREATE_LOCAL_VAR")];
+        pickup.extend(push(10));
+        pickup.extend([op("PUSH_LOCAL_VAR"), 0]);
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.push(op("GET"));
+        pickup.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        build(&[("TransportPickup", pickup)], PIECES, 0)
+    }
+
+    #[test]
+    fn tells_a_transport_where_its_passenger_is() {
+        let timeline = run(
+            &reads_y_of_the_passenger(),
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportPickup".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene(Some([0.0, 3.0, 84.0]))),
+            }],
+            2,
+            &[],
+            &HashMap::new(),
+        );
+
+        assert!(close(pose(&timeline, 0, "base")[2], 3.0));
+        assert!(
+            !timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("the world")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// A call-in fired later reads the scene its own event brought, which is
+    /// what a parked passenger looks like to it.
+    #[test]
+    fn a_later_event_moves_the_passenger() {
+        let first = ScriptEvent {
+            frame: 0,
+            callin: "Create".to_string(),
+            args: Vec::new(),
+            ambient: false,
+            world: Some(scene(Some([0.0, 1.0, 0.0]))),
+        };
+        let second = ScriptEvent {
+            frame: 1,
+            callin: "TransportPickup".to_string(),
+            args: vec![2.0],
+            ambient: false,
+            world: Some(scene(Some([0.0, 5.0, 0.0]))),
+        };
+        let timeline = run(
+            &reads_y_of_the_passenger(),
+            &model_pieces(),
+            &[first, second],
+            3,
+            &[],
+            &HashMap::new(),
+        );
+
+        assert!(close(pose(&timeline, 1, "base")[2], 5.0));
+    }
+
+    /// COB's `BeginTransport` takes the passenger's model height, not its id
+    /// (`CobInstance.cpp:355-360`).
+    #[test]
+    fn hands_begin_transport_the_stand_ins_height_when_there_is_one() {
+        let mut begin = vec![op("CREATE_LOCAL_VAR")];
+        begin.extend([op("PUSH_LOCAL_VAR"), 0]);
+        begin.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        let bytes = build(&[("BeginTransport", begin)], PIECES, 0);
+
+        let timeline = run(
+            &bytes,
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "BeginTransport".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene(Some([0.0, 0.0, 0.0]))),
+            }],
+            2,
+            &[],
+            &HashMap::new(),
+        );
+
+        assert!((pose(&timeline, 0, "base")[2] - 30.8).abs() < 1e-4);
+    }
+
     /// `CCobInstance::TransportDrop` packs x and z into one word and drops y
     /// entirely (`CobInstance.cpp:385-395`, `CobInstance.h:10`), where Lua
     /// takes four separate numbers.
