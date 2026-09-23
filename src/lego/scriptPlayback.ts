@@ -190,6 +190,14 @@ export interface StandInAttach {
 export interface StandInTrack {
   keys: StandInKey[];
   attach?: StandInAttach | null;
+  /** The stand-in's radius as a fraction of the unit's wider footprint, in
+   *  place of the usual 7/30. Absent means the usual size.
+   *
+   *  A transport's passenger is set smaller: at the usual size it reads as
+   *  half the transport's own length rather than as cargo. A track's keys
+   *  are counted in radii too, so a smaller stand-in also stands closer,
+   *  the same way a smaller `RADIUS_FRACTION` would. */
+  size?: number;
 }
 
 export interface Scenario {
@@ -465,7 +473,10 @@ export const SCENARIOS: Scenario[] = [
       // leg below has somewhere to start from.
       { frame: at(11), engine: "detach" },
     ],
+    // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
+    // transport.
     standIn: {
+      size: 0.1,
       keys: [
         // Approaching on the ground, from in front.
         { frame: 0, pos: [0, 0, 4.5] },
@@ -490,7 +501,10 @@ export const SCENARIOS: Scenario[] = [
       // to attach it (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1459-1463`).
       { frame: at(4), callin: "TransportPickup", args: [STAND_IN_UNIT_ID] },
     ],
+    // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
+    // transport.
     standIn: {
+      size: 0.1,
       keys: [
         // Approaching on the ground, from in front, and still by the time the
         // transport is told to pick it up. The engine only calls
@@ -529,7 +543,10 @@ export const SCENARIOS: Scenario[] = [
     ],
     // Every key is measured from where the transport let go, so the stand-in
     // settles below the piece it rode.
+    // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
+    // transport.
     standIn: {
+      size: 0.1,
       keys: [
         { frame: at(5), pos: [0, 0, 0], fromRelease: true },
         { frame: at(7.5), pos: [0, -1.6, -1.2], fromRelease: true },

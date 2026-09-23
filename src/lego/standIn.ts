@@ -56,9 +56,13 @@ const MAX_RADIUS = 28;
  */
 export const STAND_IN_MID_Y = 0.55;
 
-/** How big the stand-in beside this unit should be, in elmos. */
-export function standInRadius(bounds: UnitBounds): number {
-  const across = Math.max(bounds.sizeX, bounds.sizeZ) * RADIUS_FRACTION;
+/** How big the stand-in beside this unit should be, in elmos. `size` stands
+ *  in for `RADIUS_FRACTION` where a scenario's track sets one, before the
+ *  clamps are applied, so the clamps still mean the same thing at either
+ *  end. */
+export function standInRadius(bounds: UnitBounds, size?: number): number {
+  const across =
+    Math.max(bounds.sizeX, bounds.sizeZ) * (size ?? RADIUS_FRACTION);
   return Math.min(Math.max(across, MIN_RADIUS), MAX_RADIUS);
 }
 

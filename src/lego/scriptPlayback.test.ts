@@ -286,6 +286,33 @@ describe("scenarios", () => {
     const before = keys.filter((key) => key.frame < frame).at(-1);
     for (const key of parked) expect(key.pos).toEqual(before?.pos);
   });
+
+  /**
+   * A transport's passenger is set smaller than the usual size, so it does not
+   * read as half the transport's own length. Every other scenario keeps the
+   * usual size, since it was tuned by eye for aiming and building at.
+   */
+  it("sizes only a transport's stand-in as a passenger", () => {
+    for (const id of [
+      "transport-load",
+      "transport-pickup",
+      "transport-unload",
+    ]) {
+      const size = scenarioById(id)?.standIn?.size;
+      expect(size).toBeDefined();
+      expect(size).toBeLessThan(7 / 30);
+    }
+    for (const scenario of SCENARIOS) {
+      if (
+        ["transport-load", "transport-pickup", "transport-unload"].includes(
+          scenario.id,
+        )
+      ) {
+        continue;
+      }
+      expect(scenario.standIn?.size).toBeUndefined();
+    }
+  });
 });
 
 describe("frameAt", () => {

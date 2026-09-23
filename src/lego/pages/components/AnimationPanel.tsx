@@ -437,7 +437,7 @@ export function AnimationPanel({
 
       const rest = pieceWorldRest(project, pack, raw);
       const { events, notes } = resolveScenario(scenario, {
-        radius: standInRadius(bounds),
+        radius: standInRadius(bounds, scenario.standIn?.size),
         mid: aimPoint(project, bounds),
         pieceRest: rest,
         probed: (callin) => named.get(callin) ?? null,
@@ -449,7 +449,7 @@ export function AnimationPanel({
       ]);
       onStandIn({ track: scenario.standIn ?? null, attachPieces: named });
       const scene = withWorld(events, scenario.standIn ?? null, {
-        radius: standInRadius(bounds),
+        radius: standInRadius(bounds, scenario.standIn?.size),
         self: size,
         attachPiece: (from) => {
           const piece = named.get(from);

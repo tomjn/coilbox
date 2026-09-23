@@ -138,6 +138,26 @@ describe("standInRadius", () => {
       standInRadius({ mid: [0, 0, 0], sizeX: 600, sizeY: 100, sizeZ: 600 }),
     ).toBe(28);
   });
+
+  /** A track's own size stands in for the usual 7/30, for a passenger sized
+   *  smaller than the usual target. */
+  it("uses a track's own size in place of the usual fraction", () => {
+    expect(
+      standInRadius({ mid: [0, 0, 0], sizeX: 60, sizeY: 20, sizeZ: 30 }, 0.1),
+    ).toBe(6);
+  });
+
+  it("still clamps a track's own size at both ends", () => {
+    expect(
+      standInRadius({ mid: [0, 0, 0], sizeX: 0, sizeY: 0, sizeZ: 0 }, 0.1),
+    ).toBe(4.2);
+    expect(
+      standInRadius(
+        { mid: [0, 0, 0], sizeX: 600, sizeY: 100, sizeZ: 600 },
+        0.1,
+      ),
+    ).toBe(28);
+  });
 });
 
 describe("buildStandIn", () => {
