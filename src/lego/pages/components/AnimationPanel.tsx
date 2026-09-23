@@ -625,54 +625,56 @@ export function AnimationPanel({
         </div>
 
         {playable(timeline) ? (
-          <div className="flex items-start gap-2 border-b border-border px-3 py-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={scriptFrame <= 0}
-              onClick={() => step(-1)}
-              title="Step back one frame"
-            >
-              <StepBack size={14} />
-            </Button>
-            <div className="flex flex-1 flex-col gap-1">
-              <Slider
-                min={0}
-                max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
-                step={1}
-                value={[scriptFrame]}
-                onValueChange={([next]) => {
-                  onScriptPausedChange(true);
-                  onScriptFrameChange(next);
-                }}
-                aria-label="Scrub the script preview"
-                // Match the h-8 step buttons so the row can go items-start:
-                // with marks underneath, the column is taller than the
-                // buttons, and items-center would otherwise centre the
-                // buttons 14px below the thumb.
-                className="h-8"
-              />
-              {timeline && timeline.events.length > 0 ? (
-                <ScrubberMarks
-                  events={timeline.events}
-                  frameCount={timeline.frames.length}
-                  onSeek={(frame) => {
+          <div className="flex flex-col gap-1 border-b border-border px-3 py-2">
+            <div className="flex items-start gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={scriptFrame <= 0}
+                onClick={() => step(-1)}
+                title="Step back one frame"
+              >
+                <StepBack size={14} />
+              </Button>
+              <div className="flex flex-1 flex-col gap-1">
+                <Slider
+                  min={0}
+                  max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
+                  step={1}
+                  value={[scriptFrame]}
+                  onValueChange={([next]) => {
                     onScriptPausedChange(true);
-                    onScriptFrameChange(frame);
+                    onScriptFrameChange(next);
                   }}
+                  aria-label="Scrub the script preview"
+                  // Match the h-8 step buttons so the row can go items-start:
+                  // with marks underneath, the column is taller than the
+                  // buttons, and items-center would otherwise centre the
+                  // buttons 14px below the thumb.
+                  className="h-8"
                 />
-              ) : null}
+                {timeline && timeline.events.length > 0 ? (
+                  <ScrubberMarks
+                    events={timeline.events}
+                    frameCount={timeline.frames.length}
+                    onSeek={(frame) => {
+                      onScriptPausedChange(true);
+                      onScriptFrameChange(frame);
+                    }}
+                  />
+                ) : null}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
+                onClick={() => step(1)}
+                title="Step forward one frame"
+              >
+                <StepForward size={14} />
+              </Button>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
-              onClick={() => step(1)}
-              title="Step forward one frame"
-            >
-              <StepForward size={14} />
-            </Button>
-            <span className="w-14 shrink-0 text-right text-xs leading-8 tabular-nums text-muted-foreground">
+            <span className="text-right text-xs tabular-nums text-muted-foreground">
               {scriptFrame + 1}/{timeline?.frames.length}
             </span>
           </div>
