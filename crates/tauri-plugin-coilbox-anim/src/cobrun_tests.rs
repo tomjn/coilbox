@@ -60,6 +60,7 @@ fn created() -> Vec<ScriptEvent> {
         args: Vec::new(),
         ambient: false,
         world: None,
+        engine: None,
     }]
 }
 
@@ -307,6 +308,7 @@ mod stack_and_arithmetic {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 1,
@@ -314,6 +316,7 @@ mod stack_and_arithmetic {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ];
 
@@ -506,6 +509,7 @@ mod what_it_says_about_itself {
                 args: vec![4.0],
                 ambient: true,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -526,6 +530,7 @@ mod what_it_says_about_itself {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -555,6 +560,7 @@ mod what_it_says_about_itself {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -585,6 +591,7 @@ mod what_it_says_about_itself {
                 args: vec![0.8, 0.15],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -620,6 +627,7 @@ mod what_it_says_about_itself {
                 args: vec![12.0],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -670,6 +678,7 @@ mod what_it_says_about_itself {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene(Some([0.0, 3.0, 84.0]))),
+                engine: None,
             }],
             2,
             &[],
@@ -714,6 +723,7 @@ mod what_it_says_about_itself {
             args: vec![2.0],
             ambient: false,
             world: Some(scene(Some([0.0, 1.0, 0.0]))),
+            engine: None,
         };
         // No call-in the script defines, so this event only carries the world
         // forward to the frame the sleeping thread wakes into.
@@ -723,6 +733,7 @@ mod what_it_says_about_itself {
             args: Vec::new(),
             ambient: false,
             world: Some(scene(Some([0.0, 5.0, 0.0]))),
+            engine: None,
         };
         let timeline = run(
             &bytes,
@@ -754,6 +765,7 @@ mod what_it_says_about_itself {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene(Some([0.0, 0.0, 0.0]))),
+                engine: None,
             }],
             2,
             &[],
@@ -786,6 +798,7 @@ mod what_it_says_about_itself {
                 args: vec![1.0, 3.0, 9.0, 5.0],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -816,6 +829,7 @@ mod what_it_says_about_itself {
                 args: vec![7.0],
                 ambient: false,
                 world: None,
+                engine: None,
             }],
             3,
             &[],
@@ -1039,6 +1053,7 @@ mod announcements {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene()),
+                engine: None,
             }],
             2,
             &[],
@@ -1188,6 +1203,266 @@ mod announcements {
                 unit: 2,
                 piece: None
             }]
+        );
+    }
+}
+
+mod engine_attach {
+    use super::*;
+    use coilbox_unitpose::{EngineAction, ScriptOutput};
+
+    fn scene(height: f64) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    fn engine(
+        frame: u32,
+        action: EngineAction,
+        world: Option<coilbox_unitpose::World>,
+    ) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world,
+            engine: Some(action),
+        }
+    }
+
+    fn carried(bytes: &[u8], events: &[ScriptEvent]) -> Timeline {
+        run(bytes, &model_pieces(), events, 6, &[], &HashMap::new())
+    }
+
+    /// `QueryTransport(piecenum, height)` claims both arguments and sets the
+    /// first, which is how a COB call-in answers.
+    fn answers(piece: u32) -> Vec<u8> {
+        let mut words = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        words.extend(push(piece));
+        words.extend([op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+        build(&[("QueryTransport", words)], PIECES, 0)
+    }
+
+    #[test]
+    fn asks_query_transport_straight_away_and_attaches_there() {
+        let timeline = carried(
+            &answers(1),
+            &[engine(0, EngineAction::Attach, Some(scene(6.0)))],
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("turret".to_string())
+            }]
+        );
+        assert!(
+            !timeline
+                .warnings
+                .iter()
+                .any(|w| w.contains("QueryTransport")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// `CobInstance.cpp:368-370`: the passenger's height in 65536ths.
+    #[test]
+    fn hands_query_transport_the_height_in_65536ths() {
+        let mut words = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        words.extend([op("PUSH_LOCAL_VAR"), 1]);
+        words.extend(push(65536));
+        words.extend([op("DIV"), op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+        let bytes = build(&[("QueryTransport", words)], PIECES, 0);
+        let timeline = carried(&bytes, &[engine(0, EngineAction::Attach, Some(scene(2.0)))]);
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("barrel".to_string())
+            }]
+        );
+    }
+
+    /// With no `QueryTransport` the engine's arguments are left as they were,
+    /// and the first of them is the count, 2 (`CobInstance.cpp:564-579`).
+    #[test]
+    fn a_missing_query_transport_answers_script_piece_two() {
+        let timeline = carried(
+            &create_only(vec![op("RETURN")]),
+            &[engine(0, EngineAction::Attach, Some(scene(6.0)))],
+        );
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("barrel".to_string())
+            }]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryTransport")));
+    }
+
+    /// A call that does not finish in one tick leaves the arguments alone too
+    /// (`CobInstance.cpp:590-622`).
+    #[test]
+    fn a_query_transport_that_waits_answers_script_piece_two() {
+        let mut words = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        words.extend(push(100));
+        words.push(op("SLEEP"));
+        words.extend(push(0));
+        words.extend([op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+        let bytes = build(&[("QueryTransport", words)], PIECES, 0);
+        let timeline = carried(&bytes, &[engine(0, EngineAction::Attach, Some(scene(6.0)))]);
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("barrel".to_string())
+            }]
+        );
+        assert!(timeline.warnings.iter().any(|w| w.contains("waited")));
+    }
+
+    /// `DetachUnitFromAir` (`MobileCAI.cpp:2090-2091`).
+    #[test]
+    fn detaches_when_the_engine_says() {
+        let timeline = carried(
+            &answers(1),
+            &[
+                engine(0, EngineAction::Attach, Some(scene(6.0))),
+                engine(3, EngineAction::Detach, Some(scene(6.0))),
+            ],
+        );
+
+        assert_eq!(timeline.events[1], ScriptOutput::Drop { frame: 3, unit: 2 });
+    }
+
+    #[test]
+    fn needs_a_stand_in_to_carry() {
+        let timeline = carried(&answers(1), &[engine(0, EngineAction::Attach, None)]);
+
+        assert!(timeline.events.is_empty());
+        assert!(timeline.warnings.iter().any(|w| w.contains("no stand-in")));
+    }
+
+    /// `BeginTransport` runs its first tick before `AttachUnit(QueryTransport(...))`
+    /// asks, on a shared frame (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_begin_transport_before_query_transport_reads_what_it_set() {
+        let mut begin = push(1);
+        begin.extend([op("POP_STATIC"), 0, op("RETURN")]);
+        let mut query = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        query.extend([op("PUSH_STATIC"), 0]);
+        query.extend([op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+        let bytes = build(
+            &[("BeginTransport", begin), ("QueryTransport", query)],
+            PIECES,
+            1,
+        );
+        let events = vec![
+            ScriptEvent {
+                frame: 0,
+                callin: "BeginTransport".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: None,
+                engine: None,
+            },
+            engine(0, EngineAction::Attach, Some(scene(6.0))),
+        ];
+
+        let timeline = carried(&bytes, &events);
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("turret".to_string())
+            }]
+        );
+    }
+
+    /// `TransportDrop` runs its first tick before the landing detach, on a
+    /// shared frame (`MobileCAI.cpp:2090-2091`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_transport_drop_before_the_detach_acts() {
+        let mut query = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        query.extend(push(1));
+        query.extend([op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+
+        let mut drop = vec![op("CREATE_LOCAL_VAR"), op("CREATE_LOCAL_VAR")];
+        drop.extend([op("PUSH_LOCAL_VAR"), 0]);
+        drop.extend(push(2));
+        drop.extend(push(0));
+        drop.push(op("ATTACH_UNIT"));
+        drop.push(op("RETURN"));
+
+        let bytes = build(
+            &[("QueryTransport", query), ("TransportDrop", drop)],
+            PIECES,
+            0,
+        );
+        let events = vec![
+            engine(0, EngineAction::Attach, Some(scene(6.0))),
+            ScriptEvent {
+                frame: 3,
+                callin: "TransportDrop".to_string(),
+                args: vec![2.0, 0.0, 0.0, 0.0],
+                ambient: false,
+                world: Some(scene(6.0)),
+                engine: None,
+            },
+            engine(3, EngineAction::Detach, Some(scene(6.0))),
+        ];
+
+        let timeline = carried(&bytes, &events);
+
+        let on_frame_three: Vec<_> = timeline
+            .events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    ScriptOutput::Attach { frame: 3, .. } | ScriptOutput::Drop { frame: 3, .. }
+                )
+            })
+            .cloned()
+            .collect();
+        assert_eq!(
+            on_frame_three,
+            [
+                ScriptOutput::Attach {
+                    frame: 3,
+                    unit: 2,
+                    piece: Some("barrel".to_string())
+                },
+                ScriptOutput::Drop { frame: 3, unit: 2 },
+            ]
         );
     }
 }

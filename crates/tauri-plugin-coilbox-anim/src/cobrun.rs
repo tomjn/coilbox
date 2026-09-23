@@ -31,7 +31,9 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use coilbox_unitpose::{unitvalue, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
+use coilbox_unitpose::{
+    unitvalue, EngineAction, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS,
+};
 
 use crate::cob;
 use crate::opcodes::opcode;
@@ -216,8 +218,8 @@ fn alias(callin: &str) -> Option<String> {
 ///
 /// Everything else is handed straight through.
 ///
-/// `QueryTransport` is not here. It is never fired as an event: it answers with
-/// a piece, and the preview asks it through the probe rather than driving it.
+/// `QueryTransport` is not here. It is never fired as an event: the engine asks
+/// it for a piece when it attaches, which `Run::query_transport` does.
 fn cob_args(callin: &str, args: &[f64], world: Option<&coilbox_unitpose::World>) -> Vec<i32> {
     let lower = callin.to_ascii_lowercase();
 
@@ -443,11 +445,20 @@ impl Run {
 
     fn fire_due(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         let frame = self.frame;
+        // Where this call's own queued threads start, so an engine event can
+        // give them their first tick ahead of itself. See
+        // `tick_queued_call_ins`.
+        let start = self.threads.len();
         for event in events.iter().filter(|event| event.frame == frame) {
             // Before the call-in, and whether or not the script has one, so
             // the scene is right for every thread from this frame on.
             if let Some(world) = &event.world {
                 self.world = Some(world.clone());
+            }
+            if let Some(action) = event.engine {
+                self.tick_queued_call_ins(start)?;
+                self.engine(action)?;
+                continue;
             }
             let Some(function) = self.program.script(&event.callin) else {
                 if !event.ambient {
@@ -482,6 +493,108 @@ impl Run {
                     );
                     thread.data = vec![0];
                     thread.params = 1;
+                    self.add(thread)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// What the engine does to the stand-in itself: the air transport arm's
+    /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
+    ///
+    /// `fire_due` gives every call-in it has queued so far this frame its
+    /// first tick, with `tick_queued_call_ins`, before calling this. That is
+    /// what makes `BeginTransport` and `TransportDrop` have run before this
+    /// acts, the way the engine's own call to each runs its first tick inline
+    /// before the next call (`CobInstance.cpp:593`).
+    fn engine(&mut self, action: EngineAction) -> Result<(), String> {
+        let Some(stand_in) = self.world.as_ref().and_then(|world| world.stand_in) else {
+            self.model.note(
+                "The scenario has the engine carry the stand-in, and there is no stand-in in the scene."
+                    .to_string(),
+            );
+            return Ok(());
+        };
+        match action {
+            EngineAction::Attach => {
+                let piece = self.query_transport(stand_in.height)?;
+                self.attach(stand_in.id, piece);
+            }
+            EngineAction::Detach => {
+                self.model
+                    .drop_unit(self.frame, stand_in.id, self.world.as_ref());
+            }
+        }
+        Ok(())
+    }
+
+    /// Ask `QueryTransport` for the piece to carry the stand-in on, straight
+    /// away, the way the engine's `Call` runs a call-in's first tick inline
+    /// (`CobInstance.cpp:593`). `fire_due` has already given `BeginTransport`'s
+    /// queued thread its first tick when this frame has one, so this sees
+    /// whatever it set.
+    ///
+    /// COB hands it the passenger's height in 65536ths and reads the answer
+    /// back out of its first argument (`rts/Sim/Units/Scripts/CobInstance.cpp:363-374`).
+    /// The engine's argument array starts with its count, 2, and a script
+    /// with no `QueryTransport`, or one that waits rather than finishing in one
+    /// tick, leaves it there (`CobInstance.cpp:564-622`). So those answer
+    /// script piece 2.
+    fn query_transport(&mut self, height: f64) -> Result<i32, String> {
+        const UNANSWERED: i32 = 2;
+        let Some(function) = self.program.script("QueryTransport") else {
+            self.model.note(
+                "This script has no QueryTransport call-in, so the stand-in rides script piece 2, which is what the engine answers for it."
+                    .to_string(),
+            );
+            return Ok(UNANSWERED);
+        };
+        let mut thread = Thread::new(
+            function,
+            self.program.offsets[function],
+            0,
+            "QueryTransport".into(),
+        );
+        thread.data = vec![0, (height * COBSCALE) as i32];
+        thread.params = 2;
+        self.add(thread)?;
+        let index = self.threads.len() - 1;
+        self.step_thread(index)?;
+        for thread in std::mem::take(&mut self.queued) {
+            self.add(thread)?;
+        }
+        if matches!(self.threads[index].state, State::Dead) {
+            return Ok(self.threads[index].data.first().copied().unwrap_or(0));
+        }
+        // Still running, as the engine leaves it (`CobInstance.cpp:620`).
+        self.model.note(
+            "QueryTransport waited rather than answering, so the stand-in rides script piece 2, which is what the engine answers for it."
+                .to_string(),
+        );
+        Ok(UNANSWERED)
+    }
+
+    /// Give a first tick to every call-in thread this frame's `fire_due` has
+    /// queued so far, from `start` to wherever the thread list now ends, in
+    /// the order they were queued, then leave them exactly as `run_threads`
+    /// would find them next.
+    ///
+    /// The engine runs a call-in's first tick inline before moving on to the
+    /// next thing on the same frame (`CobInstance.cpp:593`), which is what
+    /// makes `BeginTransport` run before `AttachUnit(QueryTransport(...))`
+    /// and `TransportDrop` run before the landing detach
+    /// (`MobileCAI.cpp:1451-1453,2090-2091`). Here the queue only adds a
+    /// thread to the list, so this ticks it early to match.
+    ///
+    /// A step runs a thread until it sleeps, waits or dies, never leaving it
+    /// `Ready` again, so the later pass in `run_threads` only continues it.
+    fn tick_queued_call_ins(&mut self, start: usize) -> Result<(), String> {
+        let end = self.threads.len();
+        for index in start..end {
+            if matches!(self.threads[index].state, State::Ready) {
+                self.step_thread(index)?;
+                for thread in std::mem::take(&mut self.queued) {
                     self.add(thread)?;
                 }
             }

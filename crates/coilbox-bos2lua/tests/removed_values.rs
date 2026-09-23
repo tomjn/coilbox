@@ -37,6 +37,7 @@ fn create() -> [ScriptEvent; 1] {
         args: Vec::new(),
         ambient: true,
         world: None,
+        engine: None,
     }]
 }
 
@@ -196,6 +197,7 @@ fn the_converter_and_the_polyfill_agree_on_a_unit_an_allyteam_and_a_game_value()
             args: Vec::new(),
             ambient: true,
             world: None,
+            engine: None,
         },
         ScriptEvent {
             frame: 3,
@@ -203,6 +205,7 @@ fn the_converter_and_the_polyfill_agree_on_a_unit_an_allyteam_and_a_game_value()
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         },
     ];
     let timeline = with_polyfill_events(&lua, &events, 5);

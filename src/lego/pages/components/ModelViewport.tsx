@@ -1070,7 +1070,7 @@ export function ModelViewport({
     ground,
   });
 
-  useStandInSize(sceneRef, project, pack, raw);
+  useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
 
   useScriptFrameStepping(sceneRef, {
     playing,
@@ -1409,12 +1409,13 @@ function useStandInSize(
   project: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null,
+  size: number | undefined,
 ) {
   // Memoised: measuring the unit bakes every piece, and the answer only moves
-  // when the unit does.
+  // when the unit or the scenario's own size does.
   const radius = useMemo(
-    () => standInRadius(unitBounds(project, pack, raw)),
-    [project, pack, raw],
+    () => standInRadius(unitBounds(project, pack, raw), size),
+    [project, pack, raw, size],
   );
   useEffect(() => {
     const state = sceneRef.current;

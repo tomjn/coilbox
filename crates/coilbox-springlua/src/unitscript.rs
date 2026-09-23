@@ -34,7 +34,7 @@ use mlua::{
 use serde::Serialize;
 
 use coilbox_unitpose::{axis_index, unitvalue, Model, Wait, TICK_MS};
-pub use coilbox_unitpose::{Rest, ScriptEvent, Timeline, FPS, MAX_FRAMES};
+pub use coilbox_unitpose::{EngineAction, Rest, ScriptEvent, Timeline, FPS, MAX_FRAMES};
 
 /// Instructions one frame may execute before the run is abandoned.
 ///
@@ -577,11 +577,20 @@ impl Run {
 
     fn fire_due(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         let frame = self.frame;
+        // Where this call's own queued runners start, so an engine event can
+        // give them their first tick ahead of itself. See
+        // `tick_queued_call_ins`.
+        let start = self.runners.len();
         for event in events.iter().filter(|event| event.frame == frame) {
             // Before the call-in, and whether or not the script has one, so
             // the scene is right for every thread from this frame on.
             if let Some(world) = &event.world {
                 self.sim.borrow_mut().world = Some(world.clone());
+            }
+            if let Some(action) = event.engine {
+                self.tick_queued_call_ins(start)?;
+                self.engine(action);
+                continue;
             }
             let function: Option<Function> = self.script.get(event.callin.as_str()).ok().flatten();
             let Some(function) = function else {
@@ -605,6 +614,88 @@ impl Run {
             )?;
         }
         Ok(())
+    }
+
+    /// What the engine does to the stand-in itself: the air transport arm's
+    /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
+    ///
+    /// `fire_due` gives every runner it has queued so far this frame its
+    /// first tick, with `tick_queued_call_ins`, before calling this. That is
+    /// what makes `BeginTransport` and `TransportDrop` have run before this
+    /// acts, the way the engine's own call to each runs its first tick inline
+    /// before the next call (`LuaUnitScript.cpp:787-790,975`).
+    fn engine(&mut self, action: EngineAction) {
+        let stand_in = self
+            .sim
+            .borrow()
+            .world
+            .as_ref()
+            .and_then(|world| world.stand_in);
+        let Some(stand_in) = stand_in else {
+            self.sim.borrow_mut().model.note(
+                "The scenario has the engine carry the stand-in, and there is no stand-in in the scene.".to_string(),
+            );
+            return;
+        };
+        // Asked before the borrow below, because answering runs Lua.
+        let piece = match action {
+            EngineAction::Attach => Some(self.query_transport(stand_in.id)),
+            EngineAction::Detach => None,
+        };
+        let mut guard = self.sim.borrow_mut();
+        let sim = &mut *guard;
+        let Some(piece) = piece else {
+            sim.model
+                .drop_unit(sim.frame, stand_in.id, sim.world.as_ref());
+            return;
+        };
+        let at = if piece < 0 {
+            None
+        } else {
+            let Some(at) = usize::try_from(piece)
+                .ok()
+                .filter(|index| *index < sim.model.pieces.len())
+            else {
+                sim.model.no_such_piece("QueryTransport", piece + 1);
+                return;
+            };
+            Some(at)
+        };
+        sim.model
+            .attach_unit(sim.frame, stand_in.id, at, sim.world.as_ref());
+    }
+
+    /// Ask `QueryTransport` for the piece, straight away, as the engine's
+    /// `RunQueryCallIn` does: the passenger's id in, a piece counted from one
+    /// out, less one. A script with no `QueryTransport`, or one that fails or
+    /// answers with no number, gets -1, the void
+    /// (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:505-519,535-550,794-797`).
+    /// `fire_due` has already given `BeginTransport`'s queued runner its
+    /// first tick when this frame has one, so this sees whatever it set.
+    fn query_transport(&mut self, passenger: i32) -> i64 {
+        let function: Option<Function> = self.script.get("QueryTransport").ok().flatten();
+        let Some(function) = function else {
+            self.sim.borrow_mut().model.note(
+                "This script has no QueryTransport call-in, so the stand-in goes in the void, which is what the engine answers for it.".to_string(),
+            );
+            return -1;
+        };
+        match function.call::<Option<f64>>(passenger) {
+            Ok(Some(piece)) => piece as i64 - 1,
+            Ok(None) => {
+                self.sim.borrow_mut().model.note(
+                    "QueryTransport answered with no piece, so the stand-in goes in the void, which is what the engine answers for it.".to_string(),
+                );
+                -1
+            }
+            Err(error) => {
+                self.sim.borrow_mut().model.note(format!(
+                    "QueryTransport failed, so the stand-in goes in the void, which is what the engine answers for it: {}",
+                    describe(&error)
+                ));
+                -1
+            }
+        }
     }
 
     fn add_runner(
@@ -654,6 +745,31 @@ impl Run {
             State::Sleeping(frame) => frame <= self.frame,
             _ => false,
         })
+    }
+
+    /// Give a first tick to every call-in runner this frame's `fire_due` has
+    /// queued so far, from `start` to wherever the runner list now ends, in
+    /// the order they were queued, then leave them exactly as `run_threads`
+    /// would find them next.
+    ///
+    /// The engine runs a call-in's first tick inline before moving on to the
+    /// next thing on the same frame (`LuaUnitScript.cpp:787-790,975`), which is what
+    /// makes `BeginTransport` run before `AttachUnit(QueryTransport(...))`
+    /// and `TransportDrop` run before the landing detach
+    /// (`MobileCAI.cpp:1451-1453,2090-2091`). Here `add_runner` only adds a
+    /// runner to the list, so this ticks it early to match.
+    ///
+    /// `resume` runs a thread until it yields or finishes, and `read_yield`
+    /// never answers `Ready`, so the later pass in `run_threads` only
+    /// continues it.
+    fn tick_queued_call_ins(&mut self, start: usize) -> Result<(), String> {
+        let end = self.runners.len();
+        for index in start..end {
+            if matches!(self.runners[index].state, State::Ready) {
+                self.resume(index)?;
+            }
+        }
+        Ok(())
     }
 
     /// Resume one thread, and decide what its failing means.

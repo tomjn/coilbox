@@ -18,6 +18,7 @@ fn create() -> Vec<ScriptEvent> {
         args: Vec::new(),
         ambient: false,
         world: None,
+        engine: None,
     }]
 }
 
@@ -380,6 +381,7 @@ fn a_table_is_a_mask_of_its_own() {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         },
         ScriptEvent {
             frame: 1,
@@ -387,6 +389,7 @@ fn a_table_is_a_mask_of_its_own() {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         },
     ];
     let names = pieces();
@@ -693,6 +696,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 10,
@@ -700,6 +704,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ],
         60,
@@ -755,6 +760,7 @@ fn a_call_in_with_arguments_gets_them() {
             args: vec![0.75, 0.1],
             ambient: false,
             world: None,
+            engine: None,
         }],
         3,
         &HashMap::new(),
@@ -819,6 +825,7 @@ fn the_generated_script_shape_runs() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 0,
@@ -826,6 +833,7 @@ fn the_generated_script_shape_runs() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 60,
@@ -833,6 +841,7 @@ fn the_generated_script_shape_runs() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ],
         120,
@@ -897,6 +906,7 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
             ScriptEvent {
                 frame: 5,
@@ -904,6 +914,7 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
                 args: Vec::new(),
                 ambient: false,
                 world: None,
+                engine: None,
             },
         ],
         30,
@@ -977,6 +988,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         }],
         5,
         &HashMap::new(),
@@ -1126,6 +1138,7 @@ mod probing {
                 args: vec![4.0],
                 ambient: true,
                 world: None,
+                engine: None,
             }],
             3,
             &HashMap::new(),
@@ -2207,6 +2220,7 @@ mod world {
                 args: vec![2.0],
                 ambient: false,
                 world,
+                engine: None,
             }],
             2,
             &HashMap::new(),
@@ -2384,6 +2398,7 @@ mod unit_values_and_functions {
             args: Vec::new(),
             ambient: false,
             world: None,
+            engine: None,
         }];
         let timeline = run(
             r#"
@@ -2541,6 +2556,7 @@ mod announcements {
                 args: vec![2.0],
                 ambient: false,
                 world: Some(scene()),
+                engine: None,
             }],
             frames,
             &HashMap::new(),
@@ -2745,5 +2761,221 @@ mod announcements {
         assert_close(base[0], 0.0);
         assert_close(base[1], 10.0);
         assert_close(base[2], 20.0);
+    }
+}
+
+mod engine_attach {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn scene() -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    fn engine(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: Some(scene()),
+            engine: Some(action),
+        }
+    }
+
+    fn carried(script: &str, events: &[ScriptEvent]) -> Timeline {
+        run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            events,
+            6,
+            &HashMap::new(),
+        )
+    }
+
+    #[test]
+    fn asks_query_transport_with_the_passenger_s_id() {
+        let timeline = carried(
+            r#"
+            local base, turret = piece("base", "turret")
+            function script.QueryTransport(passenger)
+                if passenger == 2 then return turret end
+                return base
+            end
+            "#,
+            &[engine(0, EngineAction::Attach)],
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("turret".to_string())
+            }]
+        );
+    }
+
+    /// `RunQueryCallIn` answers -1 when there is nothing to call
+    /// (`LuaUnitScript.cpp:505-519`), which is the void.
+    #[test]
+    fn a_missing_query_transport_is_the_void() {
+        let timeline = carried(
+            "function script.Create() end",
+            &[engine(0, EngineAction::Attach)],
+        );
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: None
+            }]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryTransport")));
+    }
+
+    #[test]
+    fn a_query_transport_that_fails_is_the_void() {
+        let timeline = carried(
+            r#"function script.QueryTransport() error("boom") end"#,
+            &[engine(0, EngineAction::Attach)],
+        );
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: None
+            }]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("QueryTransport failed")));
+    }
+
+    #[test]
+    fn detaches_when_the_engine_says() {
+        let timeline = carried(
+            r#"
+            local turret = piece("turret")
+            function script.QueryTransport() return turret end
+            "#,
+            &[
+                engine(0, EngineAction::Attach),
+                engine(3, EngineAction::Detach),
+            ],
+        );
+
+        assert_eq!(timeline.events[1], ScriptOutput::Drop { frame: 3, unit: 2 });
+    }
+
+    /// `BeginTransport` runs its first tick before `AttachUnit(QueryTransport(...))`
+    /// asks, on a shared frame (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_begin_transport_before_query_transport_reads_what_it_set() {
+        let timeline = carried(
+            r#"
+            local base, turret = piece("base", "turret")
+            local height
+            function script.BeginTransport(passengerHeight)
+                height = passengerHeight
+            end
+            function script.QueryTransport()
+                if height then return turret end
+                return base
+            end
+            "#,
+            &[
+                ScriptEvent {
+                    frame: 0,
+                    callin: "BeginTransport".to_string(),
+                    args: vec![6.0],
+                    ambient: false,
+                    world: None,
+                    engine: None,
+                },
+                engine(0, EngineAction::Attach),
+            ],
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("turret".to_string())
+            }]
+        );
+    }
+
+    /// `TransportDrop` runs its first tick before the landing detach, on a
+    /// shared frame (`MobileCAI.cpp:2090-2091`, `CobInstance.cpp:593`).
+    #[test]
+    fn ticks_transport_drop_before_the_detach_acts() {
+        let timeline = carried(
+            r#"
+            local turret, barrel = piece("turret"), piece("barrel")
+            function script.QueryTransport() return turret end
+            function script.TransportDrop(passenger)
+                Spring.UnitScript.AttachUnit(barrel, passenger)
+            end
+            "#,
+            &[
+                engine(0, EngineAction::Attach),
+                ScriptEvent {
+                    frame: 3,
+                    callin: "TransportDrop".to_string(),
+                    args: vec![2.0, 0.0, 0.0, 0.0],
+                    ambient: false,
+                    world: Some(scene()),
+                    engine: None,
+                },
+                engine(3, EngineAction::Detach),
+            ],
+        );
+
+        let on_frame_three: Vec<_> = timeline
+            .events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    ScriptOutput::Attach { frame: 3, .. } | ScriptOutput::Drop { frame: 3, .. }
+                )
+            })
+            .cloned()
+            .collect();
+        assert_eq!(
+            on_frame_three,
+            [
+                ScriptOutput::Attach {
+                    frame: 3,
+                    unit: 2,
+                    piece: Some("barrel".to_string())
+                },
+                ScriptOutput::Drop { frame: 3, unit: 2 },
+            ]
+        );
     }
 }

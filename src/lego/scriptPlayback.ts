@@ -14,7 +14,8 @@
 /** A call-in to fire, and when. Frames are counted from the start of the run. */
 export interface ScriptEvent {
   frame: number;
-  callin: string;
+  /** The call-in to fire. Absent on an event the engine acts on. */
+  callin?: string;
   args?: number[];
   /** Whether this is the preview describing the world rather than putting the
    *  unit through something. Almost no unit defines those call-ins, so a
@@ -34,11 +35,27 @@ export interface ScriptEvent {
    */
   aimAtStandIn?: { from: "AimFromWeapon" | "midPos" };
   /**
+   * Put the stand-in down where the track had it on `frame`, rather than at
+   * literal coordinates. `resolveScenario` replaces the marker with
+   * `TransportDrop`'s Lua arguments, the unit id then x, y and z in elmos,
+   * because a track is measured in the stand-in's radius and that depends on
+   * the unit.
+   */
+  dropAtStandIn?: { frame: number };
+  /**
    * The scene on this event's frame, for a script that asks where something is.
    * Filled in by `withWorld` before the run, never written by hand, for the
    * same reason `aimAtStandIn` is resolved rather than literal.
    */
   world?: ScriptWorld;
+  /**
+   * Something the engine does to the stand-in itself, rather than a call-in it
+   * fires. The air transport arm attaches a passenger to the piece
+   * `QueryTransport` names, and detaches it, without the script asking
+   * (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2041-2042,2090-2091`).
+   * The runtime asks `QueryTransport` at the moment it attaches.
+   */
+  engine?: "attach" | "detach";
 }
 
 /** The scene one frame of a script run is told about. */
@@ -141,32 +158,41 @@ export interface StandInKey {
    * unit's origin.
    *
    * What a dropped passenger needs: it moves off from where the transport put
-   * it down. Until something has let it go, the track's attach piece stands in
-   * for that point, which is what a track is measured from before a run has
-   * said where anything was dropped.
+   * it down. Before anything has let it go it is measured from the unit's
+   * origin, as any other key is.
    */
   fromRelease?: boolean;
+  /**
+   * Measure `pos` from a spot a fixed number of elmos clear of the unit's
+   * edge, rather than from the unit's origin.
+   *
+   * `trackBesideUnit` in `standIn.ts` resolves this into an ordinary `pos`
+   * once the unit's and stand-in's radii are both known, so nothing
+   * downstream reads `fromEdge` itself. Never set together with
+   * `fromRelease`.
+   */
+  fromEdge?: number;
   /** Radians about the vertical axis, relative to the unit's facing. Zero
    *  where no key sets one. */
   heading?: number;
 }
 
-/** The piece the stand-in sits on, and for how long. */
+/**
+ * The piece a factory builds on, and for how long.
+ *
+ * A factory spawns what it builds at the world position of the piece
+ * `QueryBuildInfo` names and leaves it there
+ * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), so the stand-in sits at
+ * the piece's rest position rather than riding it. A transport's passenger is
+ * carried by the runtime instead, from the attach events it reports.
+ */
 export interface StandInAttach {
   /** The call-in the probe asks for that piece. */
-  from: "QueryTransport" | "QueryBuildInfo";
+  from: "QueryBuildInfo";
   /** The first frame the stand-in sits on it. */
   frame: number;
   /** The frame it comes off again, or null to stay on to the end. */
   until: number | null;
-  /**
-   * Ride the piece as it animates, rather than sitting where the piece rests.
-   *
-   * A transport carries its passenger, so it follows. A factory spawns the
-   * unit it builds at the piece's world position once and leaves it there
-   * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), so it does not.
-   */
-  follow: boolean;
 }
 
 /** Where the stand-in goes over a scenario, as a preview aid layered over the
@@ -174,6 +200,14 @@ export interface StandInAttach {
 export interface StandInTrack {
   keys: StandInKey[];
   attach?: StandInAttach | null;
+  /** The stand-in's radius as a fraction of the unit's wider footprint, in
+   *  place of the usual 7/30. Absent means the usual size.
+   *
+   *  A transport's passenger is set smaller: at the usual size it reads as
+   *  half the transport's own length rather than as cargo. A track's keys
+   *  are counted in radii too, so a smaller stand-in also stands closer,
+   *  the same way a smaller `RADIUS_FRACTION` would. */
+  size?: number;
 }
 
 export interface Scenario {
@@ -249,6 +283,11 @@ export const CREATED: ScriptEvent[] = [
  * passenger is would otherwise be told where it is itself.
  */
 export const STAND_IN_UNIT_ID = 2;
+
+/** Elmos between the transport's edge and a stand-in waiting beside it,
+ *  chosen by the user as a fixed gap rather than one that scales with the
+ *  unit. */
+const STAND_OFF = 5;
 
 /**
  * What a preview can put a unit through.
@@ -374,7 +413,6 @@ export const SCENARIOS: Scenario[] = [
         from: "QueryBuildInfo",
         frame: at(2),
         until: null,
-        follow: false,
       },
     },
   },
@@ -435,103 +473,87 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: "transport-load",
-    label: "Loading a transport",
-    description:
-      "An air transport picking something up: it is told what it is carrying, and the stand-in rides the piece the script names for it.",
-    events: [
-      ...CREATED,
-      // The engine's air arm calls `BeginTransport` and then attaches with the
-      // piece `QueryTransport` names
-      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1448-1455`). `TransportPickup`
-      // is the ground and ship arm, which needs the attach piece the script
-      // chooses for itself and is not previewable yet.
-      { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
-    ],
-    standIn: {
-      keys: [
-        // Approaching on the ground, from in front.
-        { frame: 0, pos: [0, 0, 4.5] },
-        { frame: at(4), pos: [0, 0, 1] },
-        // The return leg, which is the preview's rather than the engine's: no
-        // unload call-in fires during it. It is here so the stand-in walks
-        // back to where it started instead of teleporting there on the frame
-        // the preview loops.
-        { frame: at(11), pos: [0, 0, 1] },
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 4.5] },
-      ],
-      attach: {
-        from: "QueryTransport",
-        frame: at(4),
-        until: at(11),
-        follow: true,
-      },
-    },
-  },
-  {
     id: "transport-pickup",
-    label: "Loading a ship or hover transport",
+    label: "Loading and unloading a ship or hover transport",
     description:
-      "A ship, hovercraft or ground transport picking something up. It is told what to load and reaches for it, and the script decides where it goes.",
+      "A ship, hovercraft or ground transport picking something up, then putting it back down where it found it. It is told what to load and reaches for it, and the script decides where it goes in between.",
     events: [
       ...CREATED,
       // The engine's other arm: anything that is not an air transport stops,
       // then calls `TransportPickup` with the passenger and leaves the script
       // to attach it (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1459-1463`).
       { frame: at(4), callin: "TransportPickup", args: [STAND_IN_UNIT_ID] },
+      // Then puts it down where it found it. The Hulk's pickup ends on frame
+      // 156, measured by running armtship from balanced_annihilation-v15.9.8,
+      // and this is a second later so the stand-in is seen to go.
+      {
+        frame: 156 + at(1),
+        callin: "TransportDrop",
+        dropAtStandIn: { frame: at(4) },
+      },
     ],
+    // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
+    // transport.
     standIn: {
+      size: 0.1,
       keys: [
         // Approaching on the ground, from in front, and still by the time the
         // transport is told to pick it up. The engine only calls
         // `TransportPickup` once the passenger is in range, and a passenger
         // that asked to be loaded stops there (`MobileCAI.cpp:430-465`).
-        { frame: 0, pos: [0, 0, 5] },
-        { frame: at(3), pos: [0, 0, 3] },
-        // The return leg, which is the preview's rather than the engine's. No
-        // call-in fires during it.
-        { frame: at(11), pos: [0, 0, 3] },
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 5] },
+        { frame: 0, pos: [0, 0, 2], fromEdge: STAND_OFF },
+        { frame: at(3), pos: [0, 0, 0], fromEdge: STAND_OFF },
+        // Still there when it is picked up, which is where it is put down.
+        { frame: at(4), pos: [0, 0, 0], fromEdge: STAND_OFF },
+        // Held where the Hulk put it down, then the preview's own return leg.
+        // No call-in fires during it.
+        { frame: at(13), pos: [0, 0, 0], fromRelease: true },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 2], fromEdge: STAND_OFF },
       ],
     },
   },
   {
-    id: "transport-unload",
-    label: "Unloading a transport",
+    id: "transport-load",
+    label: "Loading and unloading a transport",
     description:
-      "The same transport putting its passenger down: the stand-in comes off the piece it was riding and settles below.",
+      "An air transport picking something up on the piece the script names, carrying it, then landing and letting it go.",
     events: [
       ...CREATED,
-      // `TransportDrop(unitID, x, y, z)` in the Lua form
-      // (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:806-826`). The position is
-      // where the passenger is going, which is the ground under the transport.
+      // The engine's air arm calls `BeginTransport`, then attaches the
+      // passenger to the piece `QueryTransport` names, itself
+      // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
+      { frame: at(4), callin: "BeginTransport", args: [STAND_IN_UNIT_ID] },
+      { frame: at(4), engine: "attach" },
+      // Landing: `TransportDrop` with where the passenger is going, then the
+      // arm detaches it itself (`MobileCAI.cpp:2090-2091`). At the frame this
+      // scenario's attachment has always ended. Put down where it was picked
+      // up.
       {
-        frame: at(5),
+        frame: at(11),
         callin: "TransportDrop",
-        args: [STAND_IN_UNIT_ID, 0, 0, 0],
+        dropAtStandIn: { frame: at(4) },
       },
-      // Once the last passenger is off (`MobileCAI.cpp:2094-2098`).
-      { frame: at(6), callin: "EndTransport" },
+      { frame: at(11), engine: "detach" },
+      // Once the last passenger is off (`MobileCAI.cpp:2094-2098`), a second
+      // later, as the unload scenario this replaces had it.
+      { frame: at(12), callin: "EndTransport" },
     ],
-    // Every key is measured from the piece it was riding, so it leaves from
-    // where the transport was holding it rather than from the unit's origin,
-    // and so the last key lands exactly where the first frame's attachment
-    // puts it. That is what closes the loop.
+    // Chosen by eye, as RADIUS_FRACTION was: a passenger, not a second
+    // transport.
     standIn: {
+      size: 0.1,
       keys: [
-        { frame: at(5), pos: [0, 0, 0], fromRelease: true },
-        { frame: at(7.5), pos: [0, -1.6, -1.2], fromRelease: true },
-        { frame: at(12), pos: [0, -1.6, -1.2], fromRelease: true },
-        // Back up to the piece. The preview's own return leg, not a reload: no
-        // call-in fires during it.
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 0], fromRelease: true },
+        // Approaching on the ground, from in front.
+        { frame: 0, pos: [0, 0, 2], fromEdge: STAND_OFF },
+        { frame: at(4), pos: [0, 0, 1] },
+        // Let go wherever the piece had it, then settles onto the spot it was
+        // picked up from, over the two and a half seconds the unload scenario
+        // this replaces took. The preview has no falling, so this stands in
+        // for it.
+        { frame: at(13.5), pos: [0, 0, 1] },
+        // The preview's own return leg. No call-in fires during it.
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 2], fromEdge: STAND_OFF },
       ],
-      attach: {
-        from: "QueryTransport",
-        frame: 0,
-        until: at(5),
-        follow: true,
-      },
     },
   },
 ];

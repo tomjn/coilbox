@@ -191,12 +191,43 @@ describe("resolveScenario", () => {
     expect(events.find((e) => e.callin === "AimWeapon1")?.args).toEqual([0, 0]);
     expect(notes.join(" ")).toContain("no stand-in");
   });
+
+  /** The track is in radii, so where to put the stand-in down depends on the
+   *  unit, and has to be worked out rather than written as elmos. */
+  it("puts the stand-in down where the track had it", () => {
+    const putting: Scenario = {
+      ...firing,
+      events: [
+        { frame: 300, callin: "TransportDrop", dropAtStandIn: { frame: 120 } },
+      ],
+      standIn: { keys: [{ frame: 0, pos: [0, 0, 3] }] },
+    };
+    const { events } = resolveScenario(putting, context());
+    expect(events[0]).toEqual({
+      frame: 300,
+      callin: "TransportDrop",
+      args: [STAND_IN_UNIT_ID, 0, 0, 30],
+    });
+  });
+
+  it("puts it down at the origin, and says so, when the track has nowhere", () => {
+    const putting: Scenario = {
+      ...firing,
+      events: [
+        { frame: 300, callin: "TransportDrop", dropAtStandIn: { frame: 120 } },
+      ],
+      standIn: { keys: [] },
+    };
+    const { events, notes } = resolveScenario(putting, context());
+    expect(events[0].args).toEqual([STAND_IN_UNIT_ID, 0, 0, 0]);
+    expect(notes.join(" ")).toContain("TransportDrop");
+  });
 });
 
 const CTX: WorldContext = {
   radius: 10,
   self: { radius: 60, height: 40 },
-  attachPiece: (from) => (from === "QueryTransport" ? [0, 20, -5] : null),
+  attachPiece: (from) => (from === "QueryBuildInfo" ? [0, 20, -5] : null),
 };
 
 const PARKED: StandInTrack = {
@@ -219,22 +250,21 @@ describe("worldAt", () => {
     expect(world.self).toEqual({ radius: 60, height: 40 });
   });
 
-  /** A carried unit is where its attach piece is, so a transport dropping it
-   *  reads the pad rather than the ground (the Hulk's `TransportDrop`). */
-  it("puts an attached stand-in on the piece it rides", () => {
+  /** A carried unit is where its attach piece is, so a factory's stand-in
+   *  reads the build piece rather than the ground. */
+  it("puts a factory's stand-in on its build piece", () => {
     const riding: StandInTrack = {
       ...PARKED,
-      attach: { from: "QueryTransport", frame: 0, until: 150, follow: true },
+      attach: { from: "QueryBuildInfo", frame: 0, until: 150 },
     };
     expect(worldAt(riding, 120, CTX).standIn?.pos).toEqual([0, 20, -5]);
   });
 
-  it("measures a key from the attach piece when the key says to", () => {
+  it("measures a fromRelease key from the origin before anything is let go", () => {
     const leaving: StandInTrack = {
       keys: [{ frame: 0, pos: [0, -1, 0], fromRelease: true }],
-      attach: { from: "QueryTransport", frame: 100, until: null, follow: true },
     };
-    expect(worldAt(leaving, 0, CTX).standIn?.pos).toEqual([0, 10, -5]);
+    expect(worldAt(leaving, 0, CTX).standIn?.pos).toEqual([0, -10, 0]);
   });
 
   it("keeps the stand-in's id on a frame with nowhere to put it", () => {
@@ -247,15 +277,15 @@ describe("worldAt", () => {
     expect(worldAt(null, 0, CTX).standIn).toBeNull();
   });
 
-  /** BeginTransport fires before AttachUnit in the engine, so a call-in on
-   *  the attach's own frame still finds the passenger where it stood. */
+  /** The rule is kept for the factory, as in `worldAt`: a stand-in is not on
+   *  the build piece on the attach's own frame. */
   it("keeps a passenger off the piece on the attach's own frame", () => {
     const loading: StandInTrack = {
       keys: [
         { frame: 0, pos: [0, 0, 5] },
         { frame: 120, pos: [0, 0, 1] },
       ],
-      attach: { from: "QueryTransport", frame: 120, until: null, follow: true },
+      attach: { from: "QueryBuildInfo", frame: 120, until: null },
     };
     expect(worldAt(loading, 120, CTX).standIn?.pos).toEqual([0, 0, 10]);
     expect(worldAt(loading, 121, CTX).standIn?.pos).toEqual([0, 20, -5]);

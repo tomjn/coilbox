@@ -67,7 +67,7 @@ import {
   type StandInTrack,
   scenarioById,
 } from "../../scriptPlayback";
-import { standInRadius } from "../../standIn";
+import { standInRadius, trackBesideUnit } from "../../standIn";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
 import { ScrubberMarks } from "./ScrubberMarks";
@@ -79,15 +79,14 @@ import { ScrubberMarks } from "./ScrubberMarks";
 const CALL_FUNCTION = "call";
 
 /**
- * The call-ins a scenario asks a script to name a piece for.
+ * The call-ins a scenario asks a script to name a piece for, before the run.
  *
- * All three answer with a piece rather than doing anything, which is what makes
+ * Both answer with a piece rather than doing anything, which is what makes
  * them safe to call directly rather than drive over frames: see
- * `legoProbeScript`. The answer is a fixed piece in every script anyone ships.
- * Reading a real per-call return value means a new channel out of both
- * runtimes, which is a project of its own.
+ * `legoProbeScript`. `QueryTransport` is not here: the runtime asks it
+ * itself, at the moment the engine attaches a passenger.
  */
-const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo", "QueryTransport"];
+const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo"];
 
 /** Nothing to place, which is what a scenario with no track asks for. */
 const NO_STAND_IN: {
@@ -437,20 +436,27 @@ export function AnimationPanel({
       }
 
       const rest = pieceWorldRest(project, pack, raw);
-      const { events, notes } = resolveScenario(scenario, {
-        radius: standInRadius(bounds),
-        mid: aimPoint(project, bounds),
-        pieceRest: rest,
-        probed: (callin) => named.get(callin) ?? null,
-      });
+      const radius = standInRadius(bounds, scenario.standIn?.size);
+      const track = scenario.standIn
+        ? trackBesideUnit(scenario.standIn, bounds, radius)
+        : null;
+      const { events, notes } = resolveScenario(
+        { ...scenario, standIn: track ?? undefined },
+        {
+          radius,
+          mid: aimPoint(project, bounds),
+          pieceRest: rest,
+          probed: (callin) => named.get(callin) ?? null,
+        },
+      );
 
       setStandInNotes([
         ...notes,
         ...attachNotes(scenario, named, compiled !== undefined),
       ]);
-      onStandIn({ track: scenario.standIn ?? null, attachPieces: named });
-      const scene = withWorld(events, scenario.standIn ?? null, {
-        radius: standInRadius(bounds),
+      onStandIn({ track, attachPieces: named });
+      const scene = withWorld(events, track, {
+        radius,
         self: size,
         attachPiece: (from) => {
           const piece = named.get(from);
@@ -619,54 +625,56 @@ export function AnimationPanel({
         </div>
 
         {playable(timeline) ? (
-          <div className="flex items-start gap-2 border-b border-border px-3 py-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={scriptFrame <= 0}
-              onClick={() => step(-1)}
-              title="Step back one frame"
-            >
-              <StepBack size={14} />
-            </Button>
-            <div className="flex flex-1 flex-col gap-1">
-              <Slider
-                min={0}
-                max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
-                step={1}
-                value={[scriptFrame]}
-                onValueChange={([next]) => {
-                  onScriptPausedChange(true);
-                  onScriptFrameChange(next);
-                }}
-                aria-label="Scrub the script preview"
-                // Match the h-8 step buttons so the row can go items-start:
-                // with marks underneath, the column is taller than the
-                // buttons, and items-center would otherwise centre the
-                // buttons 14px below the thumb.
-                className="h-8"
-              />
-              {timeline && timeline.events.length > 0 ? (
-                <ScrubberMarks
-                  events={timeline.events}
-                  frameCount={timeline.frames.length}
-                  onSeek={(frame) => {
+          <div className="flex flex-col gap-1 border-b border-border px-3 py-2">
+            <div className="flex items-start gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={scriptFrame <= 0}
+                onClick={() => step(-1)}
+                title="Step back one frame"
+              >
+                <StepBack size={14} />
+              </Button>
+              <div className="flex flex-1 flex-col gap-1">
+                <Slider
+                  min={0}
+                  max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
+                  step={1}
+                  value={[scriptFrame]}
+                  onValueChange={([next]) => {
                     onScriptPausedChange(true);
-                    onScriptFrameChange(frame);
+                    onScriptFrameChange(next);
                   }}
+                  aria-label="Scrub the script preview"
+                  // Match the h-8 step buttons so the row can go items-start:
+                  // with marks underneath, the column is taller than the
+                  // buttons, and items-center would otherwise centre the
+                  // buttons 14px below the thumb.
+                  className="h-8"
                 />
-              ) : null}
+                {timeline && timeline.events.length > 0 ? (
+                  <ScrubberMarks
+                    events={timeline.events}
+                    frameCount={timeline.frames.length}
+                    onSeek={(frame) => {
+                      onScriptPausedChange(true);
+                      onScriptFrameChange(frame);
+                    }}
+                  />
+                ) : null}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
+                onClick={() => step(1)}
+                title="Step forward one frame"
+              >
+                <StepForward size={14} />
+              </Button>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
-              onClick={() => step(1)}
-              title="Step forward one frame"
-            >
-              <StepForward size={14} />
-            </Button>
-            <span className="w-14 shrink-0 text-right text-xs leading-8 tabular-nums text-muted-foreground">
+            <span className="text-right text-xs tabular-nums text-muted-foreground">
               {scriptFrame + 1}/{timeline?.frames.length}
             </span>
           </div>

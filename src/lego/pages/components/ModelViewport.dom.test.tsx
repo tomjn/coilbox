@@ -429,38 +429,9 @@ describe("placeStandIn", () => {
     expect(state.standIn.visible).toBe(false);
   });
 
-  /** An attach that follows rides the piece wherever the pose put it, which is
-   *  the whole point of previewing a transport. */
-  it("rides the attach piece where the pose put it", () => {
-    const state = standInScene();
-    state.groups.get("base")?.position.set(3, 0, 0);
-    state.groups.get("arm")?.position.set(0, 7, 0);
-    placeStandIn(
-      state,
-      doc,
-      {
-        track: {
-          keys: [{ frame: 0, pos: [0, 0, 0] }],
-          attach: {
-            from: "QueryTransport",
-            frame: 0,
-            until: null,
-            follow: true,
-          },
-        },
-        attachPieces: new Map([["QueryTransport", "arm"]]),
-        show: true,
-      },
-      null,
-      0,
-    );
-
-    expect(state.standIn.position.toArray()).toEqual([3, 7, 0]);
-  });
-
   /** A factory does not carry what it builds, so its stand-in sits where the
    *  piece rests rather than following it through whatever the doors do. */
-  it("sits at the attach piece's rest position when it does not follow", () => {
+  it("sits at a factory's build piece where it rests", () => {
     const state = standInScene();
     state.groups.get("arm")?.position.set(0, 99, 0);
     placeStandIn(
@@ -473,7 +444,6 @@ describe("placeStandIn", () => {
             from: "QueryBuildInfo",
             frame: 0,
             until: null,
-            follow: false,
           },
         },
         attachPieces: new Map([["QueryBuildInfo", "arm"]]),
@@ -500,10 +470,9 @@ describe("placeStandIn", () => {
         track: {
           keys: [{ frame: 0, pos: [0, 1, 4] }],
           attach: {
-            from: "QueryTransport",
+            from: "QueryBuildInfo",
             frame: 0,
             until: null,
-            follow: true,
           },
         },
         attachPieces: new Map(),
@@ -517,10 +486,9 @@ describe("placeStandIn", () => {
     expect(state.standIn.position.toArray()).toEqual([0, 10, 40]);
   });
 
-  /** A key measured from the attach piece is measured from where that piece is,
-   *  so a dropped passenger leaves from the transport rather than from the
-   *  unit's origin. */
-  it("measures a fromRelease key from the attach piece before anything is let go", () => {
+  /** Before anything has let it go, a `fromRelease` key is measured from the
+   *  unit's origin, the same as any other key. */
+  it("measures a fromRelease key from the origin before anything is let go", () => {
     const state = standInScene();
     state.groups.get("arm")?.position.set(0, 7, 0);
     placeStandIn(
@@ -529,21 +497,15 @@ describe("placeStandIn", () => {
       {
         track: {
           keys: [{ frame: 0, pos: [0, -0.5, 0], fromRelease: true }],
-          attach: {
-            from: "QueryTransport",
-            frame: 0,
-            until: 0,
-            follow: true,
-          },
         },
-        attachPieces: new Map([["QueryTransport", "arm"]]),
+        attachPieces: new Map(),
         show: true,
       },
       null,
       0,
     );
 
-    expect(state.standIn.position.toArray()).toEqual([0, 2, 0]);
+    expect(state.standIn.position.toArray()).toEqual([0, -5, 0]);
   });
 
   /** A run of `frames` frames over `base` and `arm`, with the arm moved along x

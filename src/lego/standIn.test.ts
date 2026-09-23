@@ -10,6 +10,7 @@ import {
   standInAfterRelease,
   standInAt,
   standInRadius,
+  trackBesideUnit,
 } from "./standIn";
 
 /** Two keys, ten frames apart, moving two radii along x and one up. */
@@ -76,10 +77,9 @@ describe("attachedAt", () => {
   const riding: StandInTrack = {
     keys: [{ frame: 0, pos: [0, 0, 0] }],
     attach: {
-      from: "QueryTransport",
+      from: "QueryBuildInfo",
       frame: 10,
       until: 20,
-      follow: true,
     },
   };
 
@@ -88,8 +88,8 @@ describe("attachedAt", () => {
   });
 
   it("is the attach from its own frame on", () => {
-    expect(attachedAt(riding, 10)?.from).toBe("QueryTransport");
-    expect(attachedAt(riding, 19)?.from).toBe("QueryTransport");
+    expect(attachedAt(riding, 10)?.from).toBe("QueryBuildInfo");
+    expect(attachedAt(riding, 19)?.from).toBe("QueryBuildInfo");
   });
 
   it("is nothing again once it detaches", () => {
@@ -103,7 +103,6 @@ describe("attachedAt", () => {
         from: "QueryBuildInfo",
         frame: 0,
         until: null,
-        follow: false,
       },
     };
     expect(attachedAt(held, 999)?.from).toBe("QueryBuildInfo");
@@ -138,6 +137,26 @@ describe("standInRadius", () => {
   it("never grows into a wall beside a very large unit", () => {
     expect(
       standInRadius({ mid: [0, 0, 0], sizeX: 600, sizeY: 100, sizeZ: 600 }),
+    ).toBe(28);
+  });
+
+  /** A track's own size stands in for the usual 7/30, for a passenger sized
+   *  smaller than the usual target. */
+  it("uses a track's own size in place of the usual fraction", () => {
+    expect(
+      standInRadius({ mid: [0, 0, 0], sizeX: 60, sizeY: 20, sizeZ: 30 }, 0.1),
+    ).toBe(6);
+  });
+
+  it("still clamps a track's own size at both ends", () => {
+    expect(
+      standInRadius({ mid: [0, 0, 0], sizeX: 0, sizeY: 0, sizeZ: 0 }, 0.1),
+    ).toBe(4.2);
+    expect(
+      standInRadius(
+        { mid: [0, 0, 0], sizeX: 600, sizeY: 100, sizeZ: 600 },
+        0.1,
+      ),
     ).toBe(28);
   });
 });
@@ -341,6 +360,41 @@ function widthAt(group: THREE.Group, y: number): number {
   });
   return max - min;
 }
+
+describe("trackBesideUnit", () => {
+  const bounds = {
+    mid: [0, 0, 0] as [number, number, number],
+    sizeX: 100,
+    sizeY: 20,
+    sizeZ: 60,
+  };
+
+  it("returns the same object when no key has fromEdge", () => {
+    const original = track();
+    expect(trackBesideUnit(original, bounds, 10)).toBe(original);
+  });
+
+  it("resolves a fromEdge key from the unit's radius and the stand-in's own", () => {
+    const beside = track({
+      keys: [{ frame: 0, pos: [0, 0, 2], fromEdge: 5 }],
+    });
+    const resolved = trackBesideUnit(beside, bounds, 10);
+    expect(resolved.keys).toEqual([
+      { frame: 0, pos: [0, 0, 2 + (50 + 5 + 10) / 10] },
+    ]);
+  });
+
+  it("leaves other keys untouched", () => {
+    const mixed = track({
+      keys: [
+        { frame: 0, pos: [0, 0, 2], fromEdge: 5 },
+        { frame: 10, pos: [1, 1, 1] },
+      ],
+    });
+    const resolved = trackBesideUnit(mixed, bounds, 10);
+    expect(resolved.keys[1]).toEqual({ frame: 10, pos: [1, 1, 1] });
+  });
+});
 
 describe("standInAfterRelease", () => {
   const release = { frame: 100, at: [5, 4, 0] as [number, number, number] };
