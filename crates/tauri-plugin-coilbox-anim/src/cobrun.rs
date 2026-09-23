@@ -31,7 +31,9 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use coilbox_unitpose::{unitvalue, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
+use coilbox_unitpose::{
+    unitvalue, EngineAction, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS,
+};
 
 use crate::cob;
 use crate::opcodes::opcode;
@@ -216,8 +218,8 @@ fn alias(callin: &str) -> Option<String> {
 ///
 /// Everything else is handed straight through.
 ///
-/// `QueryTransport` is not here. It is never fired as an event: it answers with
-/// a piece, and the preview asks it through the probe rather than driving it.
+/// `QueryTransport` is not here. It is never fired as an event: the engine asks
+/// it for a piece when it attaches, which `Run::query_transport` does.
 fn cob_args(callin: &str, args: &[f64], world: Option<&coilbox_unitpose::World>) -> Vec<i32> {
     let lower = callin.to_ascii_lowercase();
 
@@ -449,6 +451,10 @@ impl Run {
             if let Some(world) = &event.world {
                 self.world = Some(world.clone());
             }
+            if let Some(action) = event.engine {
+                self.engine(action)?;
+                continue;
+            }
             let Some(function) = self.program.script(&event.callin) else {
                 if !event.ambient {
                     self.model
@@ -487,6 +493,72 @@ impl Run {
             }
         }
         Ok(())
+    }
+
+    /// What the engine does to the stand-in itself: the air transport arm's
+    /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
+    fn engine(&mut self, action: EngineAction) -> Result<(), String> {
+        let Some(stand_in) = self.world.as_ref().and_then(|world| world.stand_in) else {
+            self.model.note(
+                "The scenario has the engine carry the stand-in, and there is no stand-in in the scene."
+                    .to_string(),
+            );
+            return Ok(());
+        };
+        match action {
+            EngineAction::Attach => {
+                let piece = self.query_transport(stand_in.height)?;
+                self.attach(stand_in.id, piece);
+            }
+            EngineAction::Detach => {
+                self.model
+                    .drop_unit(self.frame, stand_in.id, self.world.as_ref());
+            }
+        }
+        Ok(())
+    }
+
+    /// Ask `QueryTransport` for the piece to carry the stand-in on, straight
+    /// away, as the engine's `Call` does.
+    ///
+    /// COB hands it the passenger's height in 65536ths and reads the answer
+    /// back out of its first argument (`rts/Sim/Units/Scripts/CobInstance.cpp:363-374`).
+    /// The engine's argument array starts with its count, 2, and a script
+    /// with no `QueryTransport`, or one that waits rather than finishing in one
+    /// tick, leaves it there (`CobInstance.cpp:564-622`). So those answer
+    /// script piece 2.
+    fn query_transport(&mut self, height: f64) -> Result<i32, String> {
+        const UNANSWERED: i32 = 2;
+        let Some(function) = self.program.script("QueryTransport") else {
+            self.model.note(
+                "This script has no QueryTransport call-in, so the stand-in rides script piece 2, which is what the engine answers for it."
+                    .to_string(),
+            );
+            return Ok(UNANSWERED);
+        };
+        let mut thread = Thread::new(
+            function,
+            self.program.offsets[function],
+            0,
+            "QueryTransport".into(),
+        );
+        thread.data = vec![0, (height * COBSCALE) as i32];
+        thread.params = 2;
+        self.add(thread)?;
+        let index = self.threads.len() - 1;
+        self.step_thread(index)?;
+        for thread in std::mem::take(&mut self.queued) {
+            self.add(thread)?;
+        }
+        if matches!(self.threads[index].state, State::Dead) {
+            return Ok(self.threads[index].data.first().copied().unwrap_or(0));
+        }
+        // Still running, as the engine leaves it (`CobInstance.cpp:620`).
+        self.model.note(
+            "QueryTransport waited rather than answering, so the stand-in rides script piece 2, which is what the engine answers for it."
+                .to_string(),
+        );
+        Ok(UNANSWERED)
     }
 
     fn add(&mut self, thread: Thread) -> Result<(), String> {
