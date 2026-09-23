@@ -687,34 +687,53 @@ mod what_it_says_about_itself {
         );
     }
 
-    /// A call-in fired later reads the scene its own event brought, which is
-    /// what a parked passenger looks like to it.
+    /// A running thread reads whatever scene the timeline is on when it wakes,
+    /// even on a frame whose own event fires a call-in the script has no
+    /// handler for. A snapshot only the running script's frame carries would
+    /// leave the read stuck on stale data whenever a scenario steps the world
+    /// through a call-in the script does not define.
     #[test]
-    fn a_later_event_moves_the_passenger() {
+    fn a_snapshot_applies_even_without_a_call_in() {
+        // Claims the passenger's id, sleeps past frame 2, then reads its Y
+        // and moves the base by it.
+        let mut pickup = vec![op("CREATE_LOCAL_VAR")];
+        pickup.extend(push(200)); // 200ms, 6 frames at 30fps
+        pickup.push(op("SLEEP"));
+        pickup.extend(push(10)); // UNIT_Y
+        pickup.extend([op("PUSH_LOCAL_VAR"), 0]);
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.push(op("GET"));
+        pickup.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        let bytes = build(&[("TransportPickup", pickup)], PIECES, 0);
+
         let first = ScriptEvent {
             frame: 0,
-            callin: "Create".to_string(),
-            args: Vec::new(),
+            callin: "TransportPickup".to_string(),
+            args: vec![2.0],
             ambient: false,
             world: Some(scene(Some([0.0, 1.0, 0.0]))),
         };
+        // No call-in the script defines, so this event only carries the world
+        // forward to the frame the sleeping thread wakes into.
         let second = ScriptEvent {
-            frame: 1,
-            callin: "TransportPickup".to_string(),
-            args: vec![2.0],
+            frame: 2,
+            callin: "Activate".to_string(),
+            args: Vec::new(),
             ambient: false,
             world: Some(scene(Some([0.0, 5.0, 0.0]))),
         };
         let timeline = run(
-            &reads_y_of_the_passenger(),
+            &bytes,
             &model_pieces(),
             &[first, second],
-            3,
+            12,
             &[],
             &HashMap::new(),
         );
 
-        assert!(close(pose(&timeline, 1, "base")[2], 5.0));
+        assert!(close(pose(&timeline, 11, "base")[2], 5.0));
     }
 
     /// COB's `BeginTransport` takes the passenger's model height, not its id
