@@ -70,6 +70,7 @@ import {
 import { standInRadius } from "../../standIn";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
+import { ScrubberMarks } from "./ScrubberMarks";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
  *  rather than one of the canned scenarios above it. Not a real scenario id:
@@ -628,18 +629,29 @@ export function AnimationPanel({
             >
               <StepBack size={14} />
             </Button>
-            <Slider
-              className="flex-1"
-              min={0}
-              max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
-              step={1}
-              value={[scriptFrame]}
-              onValueChange={([next]) => {
-                onScriptPausedChange(true);
-                onScriptFrameChange(next);
-              }}
-              aria-label="Scrub the script preview"
-            />
+            <div className="flex flex-1 flex-col gap-1">
+              <Slider
+                min={0}
+                max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
+                step={1}
+                value={[scriptFrame]}
+                onValueChange={([next]) => {
+                  onScriptPausedChange(true);
+                  onScriptFrameChange(next);
+                }}
+                aria-label="Scrub the script preview"
+              />
+              {timeline && timeline.events.length > 0 ? (
+                <ScrubberMarks
+                  events={timeline.events}
+                  frameCount={timeline.frames.length}
+                  onSeek={(frame) => {
+                    onScriptPausedChange(true);
+                    onScriptFrameChange(frame);
+                  }}
+                />
+              ) : null}
+            </div>
             <Button
               size="sm"
               variant="ghost"
