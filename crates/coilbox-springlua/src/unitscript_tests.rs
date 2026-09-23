@@ -2028,6 +2028,80 @@ mod world {
         assert_close(pose(&timeline, 0, "turret")[2], 12.0);
     }
 
+    /// The engine hands `GetUnitValue` its piece argument untouched
+    /// (`LuaUnitScript.cpp:1262-1286`), so it counts from 0 where every other
+    /// piece a Lua script names counts from 1. bos2lua writes `turret - 1` for
+    /// exactly this reason.
+    #[test]
+    fn answers_where_a_piece_is_counting_from_zero() {
+        let rest = [
+            Rest {
+                parent: None,
+                position: [0.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [3.0, 7.0, 5.0],
+            },
+            Rest::default(),
+            Rest::default(),
+        ];
+        let pieces = pieces();
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            function script.Create()
+                local y = GetUnitValue(COB.PIECE_Y, turret - 1)
+                local xz = GetUnitValue(COB.PIECE_XZ, turret - 1)
+                Move(barrel, y_axis, y / 65536)
+                Move(barrel, z_axis, xz)
+            end
+            "#,
+            "test.lua",
+            &Unit {
+                rest: &rest,
+                ..Unit::new(&pieces)
+            },
+            &create(),
+            3,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "barrel")[1], 7.0);
+        assert_close(
+            pose(&timeline, 0, "barrel")[2],
+            f64::from(unitvalue::pack_xz(3.0, 5.0)),
+        );
+        assert!(
+            !timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("the world")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The maths on a packed pair, answered as the compiled runtime answers it.
+    #[test]
+    fn measures_a_packed_pair_as_the_compiled_runtime_does() {
+        let timeline = play(
+            r#"
+            local base = piece("base")
+            function script.Create()
+                local far = GetUnitValue(COB.XZ_HYPOT, (3 * 65536) + 4)
+                Move(base, z_axis, far / 65536)
+            end
+            "#,
+            2,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "base")[2], 5.0);
+    }
+
     /// One walk cycle shared between units built from different models, which
     /// is what the piece map is for. A name the unit does not have must read as
     /// nothing, so that asking is safe.
