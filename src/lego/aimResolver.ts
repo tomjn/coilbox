@@ -225,7 +225,8 @@ export function worldAt(
 
   // A factory's stand-in sits on its build piece from the frame after the
   // attach. The rule came from the air arm, which attaches in the runtime
-  // now, and is kept for the factory rather than changed in passing.
+  // now, and is kept for the factory rather than changed in passing
+  // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
   const attach = attachedAt(track, frame);
   const riding =
     attach && frame > attach.frame ? ctx.attachPiece(attach.from) : null;

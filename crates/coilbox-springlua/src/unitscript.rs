@@ -613,6 +613,16 @@ impl Run {
 
     /// What the engine does to the stand-in itself: the air transport arm's
     /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
+    ///
+    /// Known limit. The engine calls `BeginTransport(unit)` and then
+    /// `AttachUnit(unit, QueryTransport(unit))`, and each call runs its first
+    /// tick straight away (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:594`).
+    /// Here `fire_due` only queues a call-in's thread, which first runs in the
+    /// frame's coroutine loop, while this method calls `query_transport`
+    /// inline. So on a shared frame `query_transport` answers before
+    /// `BeginTransport`'s body has run, and on landing the detach happens
+    /// before `TransportDrop`'s body has run. This only matters to a script
+    /// whose `QueryTransport` reads state its `BeginTransport` set.
     fn engine(&mut self, action: EngineAction) {
         let stand_in = self
             .sim
@@ -659,6 +669,8 @@ impl Run {
     /// out, less one. A script with no `QueryTransport`, or one that fails or
     /// answers with no number, gets -1, the void
     /// (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:505-519,535-550,794-797`).
+    /// Called ahead of `BeginTransport` on a shared frame. See the known
+    /// limit noted on `Run::engine`.
     fn query_transport(&mut self, passenger: i32) -> i64 {
         let function: Option<Function> = self.script.get("QueryTransport").ok().flatten();
         let Some(function) = function else {

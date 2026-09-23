@@ -497,6 +497,16 @@ impl Run {
 
     /// What the engine does to the stand-in itself: the air transport arm's
     /// attach and detach (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453,2090-2091`).
+    ///
+    /// Known limit. The engine calls `BeginTransport(unit)` and then
+    /// `AttachUnit(unit, QueryTransport(unit))`, and each call runs its first
+    /// tick straight away (`MobileCAI.cpp:1451-1453`, `CobInstance.cpp:594`).
+    /// Here `fire_due` only queues a call-in's thread, which first runs in the
+    /// frame's thread loop, while this method calls `query_transport` inline.
+    /// So on a shared frame `query_transport` answers before `BeginTransport`'s
+    /// body has run, and on landing the detach happens before `TransportDrop`'s
+    /// body has run. This only matters to a script whose `QueryTransport` reads
+    /// state its `BeginTransport` set.
     fn engine(&mut self, action: EngineAction) -> Result<(), String> {
         let Some(stand_in) = self.world.as_ref().and_then(|world| world.stand_in) else {
             self.model.note(
@@ -519,7 +529,10 @@ impl Run {
     }
 
     /// Ask `QueryTransport` for the piece to carry the stand-in on, straight
-    /// away, as the engine's `Call` does.
+    /// away, the way the engine's `Call` runs a call-in's first tick inline.
+    /// Unlike the engine, this runs ahead of `BeginTransport` on a shared
+    /// frame, since `engine` calls this before `fire_due` runs that call-in's
+    /// thread. See the known limit noted on `Run::engine`.
     ///
     /// COB hands it the passenger's height in 65536ths and reads the answer
     /// back out of its first argument (`rts/Sim/Units/Scripts/CobInstance.cpp:363-374`).

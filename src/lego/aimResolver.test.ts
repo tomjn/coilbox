@@ -250,8 +250,8 @@ describe("worldAt", () => {
     expect(world.self).toEqual({ radius: 60, height: 40 });
   });
 
-  /** A carried unit is where its attach piece is, so a transport dropping it
-   *  reads the pad rather than the ground (the Hulk's `TransportDrop`). */
+  /** A carried unit is where its attach piece is, so a factory's stand-in
+   *  reads the build piece rather than the ground. */
   it("puts a factory's stand-in on its build piece", () => {
     const riding: StandInTrack = {
       ...PARKED,
