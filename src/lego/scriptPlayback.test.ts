@@ -251,6 +251,39 @@ describe("scenarios", () => {
       )?.args,
     ).toHaveLength(1);
   });
+
+  /**
+   * Every transport that is not a `CHoverAirMoveType` is handed
+   * `TransportPickup(unit)` once the passenger is in range, and attaches the
+   * passenger itself (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1459-1463`).
+   * Nothing tells it which piece, so the scenario attaches nothing.
+   */
+  it("loads a ship or hover transport the way the engine's other arm does", () => {
+    const pickup = scenarioById("transport-pickup");
+    const callins = pickup?.events.map((e) => e.callin) ?? [];
+    expect(callins).toContain("TransportPickup");
+    expect(callins).not.toContain("BeginTransport");
+    expect(pickup?.standIn?.attach ?? null).toBeNull();
+    // Lua's form is the unit id alone.
+    expect(
+      pickup?.events.find((e) => e.callin === "TransportPickup")?.args,
+    ).toHaveLength(1);
+  });
+
+  /** The engine calls it once the passenger has stopped, so the stand-in is
+   *  parked for as long as the transport might be reading where it is. */
+  it("parks the passenger before the pickup and keeps it there", () => {
+    const pickup = scenarioById("transport-pickup");
+    const frame =
+      pickup?.events.find((e) => e.callin === "TransportPickup")?.frame ?? -1;
+    const keys = pickup?.standIn?.keys ?? [];
+    const parked = keys.filter(
+      (key) => key.frame >= frame && key.frame <= at(11),
+    );
+    expect(parked.length).toBeGreaterThanOrEqual(1);
+    const before = keys.filter((key) => key.frame < frame).at(-1);
+    for (const key of parked) expect(key.pos).toEqual(before?.pos);
+  });
 });
 
 describe("frameAt", () => {
