@@ -1744,4 +1744,81 @@ mod engine_factory {
         assert_eq!(nano_frames(&timeline), [0, 1, 2]);
         assert_eq!(sfx_frames(&timeline, 99), [3]);
     }
+
+    fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    /// `get UNIT_Y(2, 0, 0, 0)` then move `piece` along z by it, the same
+    /// smuggling trick `reads_y_of_the_passenger` in `what_it_says_about_itself`
+    /// uses to get a queried number out where a test can read it.
+    fn reads_y_of_the_stand_in(piece: u32) -> Vec<u32> {
+        let mut words = push(10); // UNIT_Y
+        words.extend(push(2)); // the stand-in's id, as p1
+        words.extend(push(0)); // p2
+        words.extend(push(0)); // p3
+        words.extend(push(0)); // p4
+        words.push(op("GET"));
+        words.extend([op("MOVE_NOW"), piece, 2, op("RETURN")]);
+        words
+    }
+
+    /// The world handed to `Run` before it starts already carries the stand-in
+    /// on its build piece's rest position, because the preview cannot know the
+    /// run's own `build-start` frame ahead of time. But the buildee itself does
+    /// not exist until the script actually reaches build stance, so a question
+    /// asked while `awaiting_build` reads as though there were no stand-in at
+    /// all, the same world data notwithstanding. Once building starts, the
+    /// same question reads the real position.
+    #[test]
+    fn hides_the_stand_in_from_the_world_while_awaiting_build_stance() {
+        let bytes = build(
+            &[
+                ("Activate", activate_after_sleep()),
+                ("ProbeBefore", reads_y_of_the_stand_in(0)),
+                ("ProbeAfter", reads_y_of_the_stand_in(1)),
+            ],
+            PIECES,
+            0,
+        );
+        let world = Some(scene(Some([0.0, 3.0, 84.0])));
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            ScriptEvent {
+                frame: 1,
+                callin: "ProbeBefore".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: world.clone(),
+                engine: None,
+            },
+            ScriptEvent {
+                frame: 4,
+                callin: "ProbeAfter".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world,
+                engine: None,
+            },
+        ];
+        let timeline = run(&bytes, &model_pieces(), &events, 6, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        // Confirms the probes land either side of build-start.
+        assert_eq!(build_start_frames(&timeline), [3]);
+        assert!(close(pose(&timeline, 1, "base")[2], 0.0));
+        assert!(close(pose(&timeline, 4, "turret")[2], 3.0));
+    }
 }

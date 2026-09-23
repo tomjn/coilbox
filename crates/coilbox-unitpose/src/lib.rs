@@ -874,7 +874,13 @@ mod tests {
         model.after_frame();
         let later = scene([90.0, 0.0, 90.0]);
 
-        let answer = unitvalue::world(unitvalue::UNIT_XZ, 2, Some(&later), model.passenger.at());
+        let answer = unitvalue::world(
+            unitvalue::UNIT_XZ,
+            2,
+            Some(&later),
+            model.passenger.at(),
+            false,
+        );
         assert_eq!(answer.map(|a| a.value), Some(unitvalue::pack_xz(4.0, 0.0)));
     }
 

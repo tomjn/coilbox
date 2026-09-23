@@ -3263,4 +3263,79 @@ mod engine_factory {
         assert_eq!(nano_frames(&timeline), [0, 1, 2]);
         assert_eq!(sfx_frames(&timeline, 99), [3]);
     }
+
+    fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    /// The world handed to `Run` before it starts already carries the stand-in
+    /// on its build piece's rest position, because the preview cannot know the
+    /// run's own `build-start` frame ahead of time. But the buildee itself does
+    /// not exist until the script actually reaches build stance, so a question
+    /// asked while awaiting build stance reads as though there were no
+    /// stand-in at all, the same world data notwithstanding. Once building
+    /// starts, the same question reads the real position.
+    #[test]
+    fn hides_the_stand_in_from_the_world_while_awaiting_build_stance() {
+        let script = r#"
+            local base = piece("base")
+            local turret = piece("turret")
+            function script.Activate()
+                Sleep(33)
+                SetUnitValue(COB.INBUILDSTANCE, true)
+            end
+            function script.ProbeBefore()
+                Move(base, z_axis, GetUnitValue(COB.UNIT_Y, 2) / 65536)
+            end
+            function script.ProbeAfter()
+                Move(turret, z_axis, GetUnitValue(COB.UNIT_Y, 2) / 65536)
+            end
+        "#;
+        let world = Some(scene(Some([0.0, 3.0, 84.0])));
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            ScriptEvent {
+                frame: 1,
+                callin: "ProbeBefore".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: world.clone(),
+                engine: None,
+            },
+            ScriptEvent {
+                frame: 4,
+                callin: "ProbeAfter".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world,
+                engine: None,
+            },
+        ];
+        let timeline = run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            6,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        // Confirms the probes land either side of build-start.
+        assert_eq!(build_start_frames(&timeline), [2]);
+        assert_close(pose(&timeline, 1, "base")[2], 0.0);
+        assert_close(pose(&timeline, 4, "turret")[2], 3.0);
+    }
 }

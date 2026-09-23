@@ -1386,9 +1386,13 @@ impl Run {
         }
         // Where a unit is and how big, from the scene the latest event brought.
         // Before the stored values, because a script cannot set these.
-        if let Some(answer) =
-            unitvalue::world(id, p1, self.world.as_ref(), self.model.passenger.at())
-        {
+        if let Some(answer) = unitvalue::world(
+            id,
+            p1,
+            self.world.as_ref(),
+            self.model.passenger.at(),
+            self.model.awaiting_build,
+        ) {
             if let Some(note) = answer.note {
                 self.model.note(note);
             }
