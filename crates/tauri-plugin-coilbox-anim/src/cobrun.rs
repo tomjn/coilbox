@@ -123,6 +123,8 @@ struct Program {
     pieces: Vec<Option<usize>>,
     /// This file's piece names, so a note can say which one is missing.
     piece_names: Vec<String>,
+    /// The sounds a TA:K file names, by the index `PLAY_SOUND` plays them by.
+    sounds: Vec<String>,
 }
 
 impl Program {
@@ -158,6 +160,7 @@ impl Program {
             offsets,
             lengths,
             pieces,
+            sounds: decoded.sounds,
             piece_names: decoded.pieces,
         })
     }
@@ -404,7 +407,7 @@ impl Run {
     }
 
     /// One frame: tick the animations, wake what they finished, fire what is
-    /// due, then run every thread that can run.
+    /// due, run every thread that can run, then carry the stand-in.
     ///
     /// Animations tick before threads run, so a turn issued this frame first
     /// moves on the next one. That is the engine's order, and it is what makes
@@ -414,7 +417,11 @@ impl Run {
         self.model.tick();
         self.wake_finished();
         self.fire_due(events)?;
-        self.run_threads()
+        self.run_threads()?;
+        // After every thread, as the engine moves its passengers once every
+        // script has ticked (`rts/Game/Game.cpp:1796-1798`).
+        self.model.after_frame();
+        Ok(())
     }
 
     /// Anything waiting on an animation that is no longer running is ready.
@@ -924,36 +931,49 @@ impl Run {
                 }
             }
 
-            // Things a preview cannot do, each said once.
+            // What a script announces. Each is recorded on the frame it
+            // happens, for the scrubber, and none is drawn.
             w if w == op("EMIT_SFX") => {
-                self.pop(i);
-                self.word(i)?;
-                self.model
-                    .note("Effects are not drawn in the preview.".to_string());
+                let sfx = self.pop(i);
+                let piece = self.word(i)?;
+                match model_piece(&self.program, piece) {
+                    Some(at) => self.model.emit_sfx(self.frame, at, sfx),
+                    None => self.model.no_such_piece("emit-sfx", i64::from(piece)),
+                }
             }
             w if w == op("EXPLODE") => {
-                self.word(i)?;
-                self.pop(i);
-                self.model
-                    .note("Explode throws no debris in the preview.".to_string());
+                let piece = self.word(i)?;
+                let flags = self.pop(i);
+                match model_piece(&self.program, piece) {
+                    Some(at) => self.model.explode(self.frame, at, flags),
+                    None => self.model.no_such_piece("explode", i64::from(piece)),
+                }
             }
             w if w == op("PLAY_SOUND") => {
-                self.word(i)?;
+                let index = self.word(i)?;
                 self.pop(i);
-                self.model
-                    .note("Sound is not played in the preview.".to_string());
+                let name = usize::try_from(index)
+                    .ok()
+                    .and_then(|at| self.program.sounds.get(at))
+                    .cloned();
+                if name.is_none() {
+                    self.model.note(format!(
+                        "This script plays sound {index}, and the file names no sound {index}, so the scrubber cannot say which."
+                    ));
+                }
+                self.model.play_sound(self.frame, name);
             }
+            // Popped in the engine's order: a third operand nothing reads, then
+            // the piece, then the unit (`CobThread.cpp:677-682`).
             w if w == op("ATTACH_UNIT") => {
                 self.pop(i);
-                self.pop(i);
-                self.pop(i);
-                self.model
-                    .note("Attaching a unit does nothing in the preview.".to_string());
+                let piece = self.pop(i);
+                let unit = self.pop(i);
+                self.attach(unit, piece);
             }
             w if w == op("DROP_UNIT") => {
-                self.pop(i);
-                self.model
-                    .note("Attaching a unit does nothing in the preview.".to_string());
+                let unit = self.pop(i);
+                self.model.drop_unit(self.frame, unit, self.world.as_ref());
             }
 
             // Renderer hints with one operand each, which the engine also
@@ -1016,6 +1036,22 @@ impl Run {
             f64::from(dest) * TAANG2RAD,
             f64::from(speed) * TAANG2RAD,
         );
+    }
+
+    /// A negative piece is the void, and any other has to be one of this
+    /// unit's (`rts/Sim/Units/Scripts/UnitScript.cpp:828-835`).
+    fn attach(&mut self, unit: i32, piece: i32) {
+        let at = if piece < 0 {
+            None
+        } else {
+            let Some(at) = model_piece(&self.program, piece) else {
+                self.model.no_such_piece("attach-unit", i64::from(piece));
+                return;
+            };
+            Some(at)
+        };
+        self.model
+            .attach_unit(self.frame, unit, at, self.world.as_ref());
     }
 
     /// Whether a script is a Lua call-out rather than a script in this file,
