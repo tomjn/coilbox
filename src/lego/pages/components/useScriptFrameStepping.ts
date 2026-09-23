@@ -105,6 +105,7 @@ export function useScriptFrameStepping(
             state,
             projectRef.current,
             standInRef.current,
+            timeline,
             frameAt(timeline, elapsed),
           );
           onScriptFrameRef.current?.(frameAt(timeline, elapsed));
@@ -162,7 +163,7 @@ export function useScriptFrameStepping(
     if (!state || !playing || !scriptPaused || !scriptTimeline) return;
     const frame = clampFrame(scriptTimeline, scriptFrame);
     applyTimelineFrame(state, projectRef.current, scriptTimeline, frame);
-    placeStandIn(state, projectRef.current, standIn, frame);
+    placeStandIn(state, projectRef.current, standIn, scriptTimeline, frame);
     state.render();
   }, [
     sceneRef,
