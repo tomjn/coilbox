@@ -2763,3 +2763,129 @@ mod announcements {
         assert_close(base[2], 20.0);
     }
 }
+
+mod engine_attach {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn scene() -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    fn engine(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: Some(scene()),
+            engine: Some(action),
+        }
+    }
+
+    fn carried(script: &str, events: &[ScriptEvent]) -> Timeline {
+        run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            events,
+            6,
+            &HashMap::new(),
+        )
+    }
+
+    #[test]
+    fn asks_query_transport_with_the_passenger_s_id() {
+        let timeline = carried(
+            r#"
+            local base, turret = piece("base", "turret")
+            function script.QueryTransport(passenger)
+                if passenger == 2 then return turret end
+                return base
+            end
+            "#,
+            &[engine(0, EngineAction::Attach)],
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: Some("turret".to_string())
+            }]
+        );
+    }
+
+    /// `RunQueryCallIn` answers -1 when there is nothing to call
+    /// (`LuaUnitScript.cpp:505-519`), which is the void.
+    #[test]
+    fn a_missing_query_transport_is_the_void() {
+        let timeline = carried(
+            "function script.Create() end",
+            &[engine(0, EngineAction::Attach)],
+        );
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: None
+            }]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryTransport")));
+    }
+
+    #[test]
+    fn a_query_transport_that_fails_is_the_void() {
+        let timeline = carried(
+            r#"function script.QueryTransport() error("boom") end"#,
+            &[engine(0, EngineAction::Attach)],
+        );
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Attach {
+                frame: 0,
+                unit: 2,
+                piece: None
+            }]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("QueryTransport failed")));
+    }
+
+    #[test]
+    fn detaches_when_the_engine_says() {
+        let timeline = carried(
+            r#"
+            local turret = piece("turret")
+            function script.QueryTransport() return turret end
+            "#,
+            &[
+                engine(0, EngineAction::Attach),
+                engine(3, EngineAction::Detach),
+            ],
+        );
+
+        assert_eq!(timeline.events[1], ScriptOutput::Drop { frame: 3, unit: 2 });
+    }
+}
