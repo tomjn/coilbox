@@ -215,7 +215,7 @@ fn alias(callin: &str) -> Option<String> {
 ///
 /// `QueryTransport` is not here. It is never fired as an event: it answers with
 /// a piece, and the preview asks it through the probe rather than driving it.
-fn cob_args(callin: &str, args: &[f64]) -> Vec<i32> {
+fn cob_args(callin: &str, args: &[f64], world: Option<&coilbox_unitpose::World>) -> Vec<i32> {
     let lower = callin.to_ascii_lowercase();
 
     if lower.starts_with("aim") || lower == "startbuilding" {
@@ -223,6 +223,12 @@ fn cob_args(callin: &str, args: &[f64]) -> Vec<i32> {
     }
 
     if lower == "begintransport" {
+        // The passenger's model height, which is what COB is handed where Lua
+        // is handed the id. Without a scene the argument is taken as that
+        // height, which is what a caller outside the panel means by it.
+        if let Some(stand_in) = world.and_then(|world| world.stand_in.as_ref()) {
+            return vec![(stand_in.height * 65536.0) as i32];
+        }
         return args.iter().map(|arg| (arg * 65536.0) as i32).collect();
     }
 
@@ -326,6 +332,9 @@ struct Run {
     /// whether the unit is armoured, whether it is switched on. Seeded from
     /// whatever the caller supplied before the first frame runs.
     set_values: HashMap<i32, i32>,
+    /// The scene the latest event brought, which is what a script asking where
+    /// something is gets told until the next event brings another.
+    world: Option<coilbox_unitpose::World>,
     /// Every unit value id a script has asked for, in the order it first asked.
     asked: Vec<coilbox_unitpose::AskedValue>,
     /// Offsets, into the whole code stream, of every opcode word actually
@@ -362,6 +371,7 @@ impl Run {
             fatal: false,
             rng: 0x2545_F491_4F6C_DD1D,
             set_values: values.clone(),
+            world: None,
             asked: Vec::new(),
             offsets_run: BTreeSet::new(),
         })
@@ -427,6 +437,11 @@ impl Run {
     fn fire_due(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         let frame = self.frame;
         for event in events.iter().filter(|event| event.frame == frame) {
+            // Before the call-in, and whether or not the script has one, so
+            // the scene is right for every thread from this frame on.
+            if let Some(world) = &event.world {
+                self.world = Some(world.clone());
+            }
             let Some(function) = self.program.script(&event.callin) else {
                 if !event.ambient {
                     self.model
@@ -442,7 +457,7 @@ impl Run {
             );
             // Arguments arrive on the stack, the way a call leaves them, and
             // `CREATE_LOCAL_VAR` claims them one at a time.
-            thread.data = cob_args(&event.callin, &event.args);
+            thread.data = cob_args(&event.callin, &event.args, self.world.as_ref());
             thread.params = thread.data.len() as i32;
             self.add(thread)?;
 
@@ -1122,6 +1137,14 @@ impl Run {
             } else {
                 pack_xz(at[0], at[2])
             };
+        }
+        // Where a unit is and how big, from the scene the latest event brought.
+        // Before the stored values, because a script cannot set these.
+        if let Some(answer) = unitvalue::world(id, p1, self.world.as_ref()) {
+            if let Some(note) = answer.note {
+                self.model.note(note);
+            }
+            return answer.value;
         }
         if let Some(value) = self.set_values.get(&id) {
             return *value;

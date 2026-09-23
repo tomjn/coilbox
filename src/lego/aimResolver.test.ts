@@ -5,8 +5,16 @@ import {
   aimWeaponAngles,
   resolveScenario,
   startBuildingAngles,
+  type WorldContext,
+  withWorld,
+  worldAt,
 } from "./aimResolver";
-import type { Scenario } from "./scriptPlayback";
+import {
+  type Scenario,
+  STAND_IN_UNIT_ID,
+  type StandInTrack,
+} from "./scriptPlayback";
+import { standInHeight } from "./standIn";
 
 /**
  * The unit's own axes in the editor: `+z` front, `+y` up, `+x` its left. Pinned
@@ -182,5 +190,89 @@ describe("resolveScenario", () => {
     );
     expect(events.find((e) => e.callin === "AimWeapon1")?.args).toEqual([0, 0]);
     expect(notes.join(" ")).toContain("no stand-in");
+  });
+});
+
+const CTX: WorldContext = {
+  radius: 10,
+  self: { radius: 60, height: 40 },
+  attachPiece: (from) => (from === "QueryTransport" ? [0, 20, -5] : null),
+};
+
+const PARKED: StandInTrack = {
+  keys: [
+    { frame: 0, pos: [0, 0, 5] },
+    { frame: 90, pos: [0, 0, 3] },
+    { frame: 330, pos: [0, 0, 3] },
+  ],
+};
+
+describe("worldAt", () => {
+  it("puts the stand-in where its track does, in elmos", () => {
+    const world = worldAt(PARKED, 120, CTX);
+    expect(world.standIn).toEqual({
+      id: STAND_IN_UNIT_ID,
+      pos: [0, 0, 30],
+      radius: 10,
+      height: standInHeight(10),
+    });
+    expect(world.self).toEqual({ radius: 60, height: 40 });
+  });
+
+  /** A carried unit is where its attach piece is, so a transport dropping it
+   *  reads the pad rather than the ground (the Hulk's `TransportDrop`). */
+  it("puts an attached stand-in on the piece it rides", () => {
+    const riding: StandInTrack = {
+      ...PARKED,
+      attach: { from: "QueryTransport", frame: 0, until: 150, follow: true },
+    };
+    expect(worldAt(riding, 120, CTX).standIn?.pos).toEqual([0, 20, -5]);
+  });
+
+  it("measures a key from the attach piece when the key says to", () => {
+    const leaving: StandInTrack = {
+      keys: [{ frame: 0, pos: [0, -1, 0], fromAttachPiece: true }],
+      attach: { from: "QueryTransport", frame: 100, until: null, follow: true },
+    };
+    expect(worldAt(leaving, 0, CTX).standIn?.pos).toEqual([0, 10, -5]);
+  });
+
+  it("keeps the stand-in's id on a frame with nowhere to put it", () => {
+    const world = worldAt({ keys: [] }, 0, CTX);
+    expect(world.standIn?.id).toBe(STAND_IN_UNIT_ID);
+    expect(world.standIn?.pos).toBeNull();
+  });
+
+  it("has no stand-in at all when the scenario has none", () => {
+    expect(worldAt(null, 0, CTX).standIn).toBeNull();
+  });
+
+  /** BeginTransport fires before AttachUnit in the engine, so a call-in on
+   *  the attach's own frame still finds the passenger where it stood. */
+  it("keeps a passenger off the piece on the attach's own frame", () => {
+    const loading: StandInTrack = {
+      keys: [
+        { frame: 0, pos: [0, 0, 5] },
+        { frame: 120, pos: [0, 0, 1] },
+      ],
+      attach: { from: "QueryTransport", frame: 120, until: null, follow: true },
+    };
+    expect(worldAt(loading, 120, CTX).standIn?.pos).toEqual([0, 0, 10]);
+    expect(worldAt(loading, 121, CTX).standIn?.pos).toEqual([0, 20, -5]);
+  });
+});
+
+describe("withWorld", () => {
+  it("gives every event the scene on its own frame", () => {
+    const events = withWorld(
+      [
+        { frame: 0, callin: "Create" },
+        { frame: 120, callin: "TransportPickup", args: [STAND_IN_UNIT_ID] },
+      ],
+      PARKED,
+      CTX,
+    );
+    expect(events[0].world?.standIn?.pos).toEqual([0, 0, 50]);
+    expect(events[1].world?.standIn?.pos).toEqual([0, 0, 30]);
   });
 });

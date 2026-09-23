@@ -298,3 +298,37 @@ describe("calling a function", () => {
     expect(runCob).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("the scene a script is told about", () => {
+  /** Every run carries at least the unit's own size, so a script asking how
+   *  big it is gets an answer rather than a note. */
+  it("goes with a scenario that has no stand-in", async () => {
+    show(project({ compiledScript: COMPILED }));
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(runCob).toHaveBeenCalled());
+    const events = runCob.mock.calls[0][0].events;
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) {
+      expect(event.world).toMatchObject({ standIn: null });
+      expect(event.world.self).toBeDefined();
+    }
+  });
+
+  it("puts the stand-in in it for a scenario that has one", async () => {
+    show(project({ compiledScript: COMPILED }));
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
+    fireEvent.click(await screen.findByText("Loading a transport"));
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(runCob).toHaveBeenCalled());
+    const events = runCob.mock.calls.at(-1)?.[0].events;
+    const begin = events.find(
+      (event: { callin: string }) => event.callin === "BeginTransport",
+    );
+    expect(begin.world.standIn).toMatchObject({ id: 2 });
+    expect(begin.world.standIn.pos).toHaveLength(3);
+  });
+});

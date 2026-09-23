@@ -59,6 +59,7 @@ fn created() -> Vec<ScriptEvent> {
         callin: "Create".to_string(),
         args: Vec::new(),
         ambient: false,
+        world: None,
     }]
 }
 
@@ -305,12 +306,14 @@ mod stack_and_arithmetic {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 1,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ];
 
@@ -502,6 +505,7 @@ mod what_it_says_about_itself {
                 callin: "setSFXoccupy".to_string(),
                 args: vec![4.0],
                 ambient: true,
+                world: None,
             }],
             3,
             &[],
@@ -521,6 +525,7 @@ mod what_it_says_about_itself {
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -549,6 +554,7 @@ mod what_it_says_about_itself {
                 callin: "AimWeapon1".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -578,6 +584,7 @@ mod what_it_says_about_itself {
                 callin: "AimWeapon1".to_string(),
                 args: vec![0.8, 0.15],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -612,6 +619,7 @@ mod what_it_says_about_itself {
                 // single argument means once the runtime has it.
                 args: vec![12.0],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -620,6 +628,139 @@ mod what_it_says_about_itself {
 
         // 12 elmos as 65536ths, read back out through the distance scale.
         assert!(close(pose(&timeline, 0, "base")[2], 12.0));
+    }
+
+    fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    /// `get UNIT_Y(unitid)` then move the base by it, from a call-in handed
+    /// the stand-in's id, as `TransportPickup` is.
+    fn reads_y_of_the_passenger() -> Vec<u8> {
+        let mut pickup = vec![op("CREATE_LOCAL_VAR")];
+        pickup.extend(push(10));
+        pickup.extend([op("PUSH_LOCAL_VAR"), 0]);
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.push(op("GET"));
+        pickup.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        build(&[("TransportPickup", pickup)], PIECES, 0)
+    }
+
+    #[test]
+    fn tells_a_transport_where_its_passenger_is() {
+        let timeline = run(
+            &reads_y_of_the_passenger(),
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportPickup".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene(Some([0.0, 3.0, 84.0]))),
+            }],
+            2,
+            &[],
+            &HashMap::new(),
+        );
+
+        assert!(close(pose(&timeline, 0, "base")[2], 3.0));
+        assert!(
+            !timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("the world")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// A running thread reads whatever scene the timeline is on when it wakes,
+    /// even on a frame whose own event fires a call-in the script has no
+    /// handler for. A snapshot only the running script's frame carries would
+    /// leave the read stuck on stale data whenever a scenario steps the world
+    /// through a call-in the script does not define.
+    #[test]
+    fn a_snapshot_applies_even_without_a_call_in() {
+        // Claims the passenger's id, sleeps past frame 2, then reads its Y
+        // and moves the base by it.
+        let mut pickup = vec![op("CREATE_LOCAL_VAR")];
+        pickup.extend(push(200)); // 200ms, 6 frames at 30fps
+        pickup.push(op("SLEEP"));
+        pickup.extend(push(10)); // UNIT_Y
+        pickup.extend([op("PUSH_LOCAL_VAR"), 0]);
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.extend(push(0));
+        pickup.push(op("GET"));
+        pickup.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        let bytes = build(&[("TransportPickup", pickup)], PIECES, 0);
+
+        let first = ScriptEvent {
+            frame: 0,
+            callin: "TransportPickup".to_string(),
+            args: vec![2.0],
+            ambient: false,
+            world: Some(scene(Some([0.0, 1.0, 0.0]))),
+        };
+        // No call-in the script defines, so this event only carries the world
+        // forward to the frame the sleeping thread wakes into.
+        let second = ScriptEvent {
+            frame: 2,
+            callin: "Activate".to_string(),
+            args: Vec::new(),
+            ambient: false,
+            world: Some(scene(Some([0.0, 5.0, 0.0]))),
+        };
+        let timeline = run(
+            &bytes,
+            &model_pieces(),
+            &[first, second],
+            12,
+            &[],
+            &HashMap::new(),
+        );
+
+        assert!(close(pose(&timeline, 11, "base")[2], 5.0));
+    }
+
+    /// COB's `BeginTransport` takes the passenger's model height, not its id
+    /// (`CobInstance.cpp:355-360`).
+    #[test]
+    fn hands_begin_transport_the_stand_ins_height_when_there_is_one() {
+        let mut begin = vec![op("CREATE_LOCAL_VAR")];
+        begin.extend([op("PUSH_LOCAL_VAR"), 0]);
+        begin.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        let bytes = build(&[("BeginTransport", begin)], PIECES, 0);
+
+        let timeline = run(
+            &bytes,
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "BeginTransport".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene(Some([0.0, 0.0, 0.0]))),
+            }],
+            2,
+            &[],
+            &HashMap::new(),
+        );
+
+        assert!((pose(&timeline, 0, "base")[2] - 30.8).abs() < 1e-4);
     }
 
     /// `CCobInstance::TransportDrop` packs x and z into one word and drops y
@@ -644,6 +785,7 @@ mod what_it_says_about_itself {
                 // Lua's (unitID, x, y, z).
                 args: vec![1.0, 3.0, 9.0, 5.0],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],
@@ -673,6 +815,7 @@ mod what_it_says_about_itself {
                 callin: "HitByWeapon".to_string(),
                 args: vec![7.0],
                 ambient: false,
+                world: None,
             }],
             3,
             &[],

@@ -33,7 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { animCobRun } from "../../../animation/bindings";
 import { useReduceMotion } from "../../../general/display";
 import { aimPoint } from "../../aimPoint";
-import { resolveScenario } from "../../aimResolver";
+import { resolveScenario, withWorld } from "../../aimResolver";
 import {
   type AppliedPreset,
   countRoles,
@@ -52,7 +52,7 @@ import {
 import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
 import type { RawGeometry } from "../../rawGeometry";
-import { pieceWorldRest, unitBounds } from "../../s3oBuild";
+import { pieceWorldRest, unitBounds, unitSize } from "../../s3oBuild";
 import {
   at,
   CREATED,
@@ -260,6 +260,12 @@ export function AnimationPanel({
     () => unitBounds(project, pack, raw),
     [project, pack, raw],
   );
+  // The unit's own size, for a script that asks how big it is. Memoised for
+  // the reason `bounds` is.
+  const size = useMemo(
+    () => unitSize(project, pack, raw),
+    [project, pack, raw],
+  );
   /** Unit values the panel has changed away from what the last run's `asked`
    *  reported as their default. Never saved to the project: this is a way to
    *  poke at a script's preview, not a decision about the unit. */
@@ -316,6 +322,16 @@ export function AnimationPanel({
       setRunning(true);
       setFailure(null);
       try {
+        // Every run carries the scene. A scenario with a stand-in has already
+        // been given it by `start`. Anything else, an idle run or a call to one
+        // of the script's own functions, is the unit alone.
+        const sent = events.some((event) => event.world)
+          ? events
+          : withWorld(events, null, {
+              radius: 0,
+              self: size,
+              attachPiece: () => null,
+            });
         const pieces = project.pieces.map((piece) => piece.name);
         // Two runtimes, one timeline. The compiled one runs the bytecode the
         // game shipped and reports the same poses the Lua one does.
@@ -323,7 +339,7 @@ export function AnimationPanel({
           ? await animCobRun({
               bytes: compiled.bytes,
               pieces,
-              events,
+              events: sent,
               frames: PREVIEW_FRAMES,
               rest: pieceRest(project),
               values: withValues,
@@ -332,7 +348,7 @@ export function AnimationPanel({
               script: script ?? "",
               unitName: project.unitName,
               pieces,
-              events,
+              events: sent,
               frames: PREVIEW_FRAMES,
               // A script may read its own definition, and without it those
               // scripts throw at load rather than losing a branch (#1936).
@@ -370,6 +386,7 @@ export function AnimationPanel({
       // The whole project, because where its pieces sit is read off it too.
       project,
       compiled,
+      size,
       onPlayingChange,
       onScriptTimeline,
       onScriptRun,
@@ -418,10 +435,11 @@ export function AnimationPanel({
         if (first) named.set(probe.callin, first);
       }
 
+      const rest = pieceWorldRest(project, pack, raw);
       const { events, notes } = resolveScenario(scenario, {
         radius: standInRadius(bounds),
         mid: aimPoint(project, bounds),
-        pieceRest: pieceWorldRest(project, pack, raw),
+        pieceRest: rest,
         probed: (callin) => named.get(callin) ?? null,
       });
 
@@ -430,9 +448,17 @@ export function AnimationPanel({
         ...attachNotes(scenario, named, compiled !== undefined),
       ]);
       onStandIn({ track: scenario.standIn ?? null, attachPieces: named });
-      return runEvents(events, withValues);
+      const scene = withWorld(events, scenario.standIn ?? null, {
+        radius: standInRadius(bounds),
+        self: size,
+        attachPiece: (from) => {
+          const piece = named.get(from);
+          return piece ? (rest.get(piece) ?? null) : null;
+        },
+      });
+      return runEvents(scene, withValues);
     },
-    [runEvents, values, project, compiled, bounds, pack, raw, onStandIn],
+    [runEvents, values, project, compiled, bounds, pack, raw, size, onStandIn],
   );
 
   /** Fire one of the script's own functions, the way `CREATED` then a scenario's

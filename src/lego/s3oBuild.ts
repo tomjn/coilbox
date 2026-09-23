@@ -546,3 +546,21 @@ export function unitBounds(
   const { mid, sizeX, sizeY, sizeZ } = header(world);
   return { mid, sizeX, sizeY, sizeZ };
 }
+
+/**
+ * The radius and height the exported header would carry, which is what the
+ * engine keeps as the unit's own `radius` and `height` and answers a script
+ * asking how big it is with.
+ */
+export function unitSize(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+): { radius: number; height: number } {
+  const { world } = bakedPieces(project, pack, raw);
+  const measured = header(world, project.mid);
+  return {
+    radius: project.radius ?? measured.radius,
+    height: project.height ?? measured.height,
+  };
+}

@@ -17,6 +17,7 @@ fn create() -> Vec<ScriptEvent> {
         callin: "Create".to_string(),
         args: Vec::new(),
         ambient: false,
+        world: None,
     }]
 }
 
@@ -378,12 +379,14 @@ fn a_table_is_a_mask_of_its_own() {
             callin: "Create".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         },
         ScriptEvent {
             frame: 1,
             callin: "StopMoving".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         },
     ];
     let names = pieces();
@@ -689,12 +692,14 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 10,
                 callin: "StopMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ],
         60,
@@ -749,6 +754,7 @@ fn a_call_in_with_arguments_gets_them() {
             callin: "AimWeapon1".to_string(),
             args: vec![0.75, 0.1],
             ambient: false,
+            world: None,
         }],
         3,
         &HashMap::new(),
@@ -812,18 +818,21 @@ fn the_generated_script_shape_runs() {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 0,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 60,
                 callin: "StopMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ],
         120,
@@ -887,12 +896,14 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
                 callin: "Create".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
             ScriptEvent {
                 frame: 5,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
                 ambient: false,
+                world: None,
             },
         ],
         30,
@@ -965,6 +976,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             callin: "StartMoving".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         }],
         5,
         &HashMap::new(),
@@ -1114,6 +1126,7 @@ mod probing {
                 callin: "setSFXoccupy".to_string(),
                 args: vec![4.0],
                 ambient: true,
+                world: None,
             }],
             3,
             &HashMap::new(),
@@ -1733,11 +1746,13 @@ mod world {
     }
 
     /// A question about the world is zero and says so, because a script handed
-    /// zero for the ground under it quietly concludes it is at sea level.
+    /// zero for another unit's position quietly concludes it is at sea level.
+    /// The ground itself is flat with no scene needed, so this asks about
+    /// another unit instead, which does need one.
     #[test]
     fn a_question_about_the_world_says_there_is_none() {
         let timeline = play(
-            "function script.Create() GetUnitValue(COB.GROUND_HEIGHT) end",
+            "function script.Create() GetUnitValue(COB.UNIT_XZ, 5) end",
             3,
         );
 
@@ -2166,6 +2181,119 @@ mod world {
             timeline.warnings
         );
     }
+
+    fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    fn pickup(script: &str, world: Option<coilbox_unitpose::World>) -> Timeline {
+        run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportPickup".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world,
+            }],
+            2,
+            &HashMap::new(),
+        )
+    }
+
+    /// The same question a converted BOS script asks, answered the same way.
+    #[test]
+    fn tells_a_transport_by_unit_value_where_its_passenger_is() {
+        let timeline = pickup(
+            r#"
+            local base = piece("base")
+            function script.TransportPickup(passenger)
+                Move(base, z_axis, GetUnitValue(COB.UNIT_Y, passenger) / 65536)
+            end
+            "#,
+            Some(scene(Some([0.0, 3.0, 84.0]))),
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "base")[2], 3.0);
+    }
+
+    /// How a Lua transport asks, which is SplinterFaction's
+    /// `lozdragonfly_lus.lua` on its first line.
+    #[test]
+    fn tells_a_transport_by_spring_call_where_and_how_big_its_passenger_is() {
+        let timeline = pickup(
+            r#"
+            local base = piece("base")
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            function script.TransportPickup(passenger)
+                local _, _, z = Spring.GetUnitPosition(passenger)
+                Move(base, z_axis, z)
+                Move(turret, z_axis, Spring.GetUnitHeight(passenger))
+                Move(barrel, z_axis, Spring.GetUnitRadius(passenger))
+            end
+            "#,
+            Some(scene(Some([0.0, 3.0, 84.0]))),
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "base")[2], 84.0);
+        assert_close(pose(&timeline, 0, "turret")[2], 30.8);
+        assert_close(pose(&timeline, 0, "barrel")[2], 28.0);
+    }
+
+    /// The engine hands back nothing for a unit that does not exist.
+    #[test]
+    fn a_unit_that_is_not_there_has_no_position_or_size() {
+        let timeline = pickup(
+            r#"
+            function script.TransportPickup(passenger)
+                if Spring.GetUnitPosition(7) ~= nil then error("found a unit") end
+                if Spring.GetUnitHeight(7) ~= nil then error("sized a unit") end
+            end
+            "#,
+            Some(scene(Some([0.0, 3.0, 84.0]))),
+        );
+        assert_eq!(timeline.error, None);
+        assert!(
+            !timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("stopped")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// Its own position is still the origin, as it was before there was a
+    /// scene.
+    #[test]
+    fn the_unit_itself_is_still_at_the_origin() {
+        let timeline = pickup(
+            r#"
+            local base = piece("base")
+            function script.TransportPickup(passenger)
+                local x, y, z = Spring.GetUnitPosition(unitID)
+                Move(base, z_axis, x + y + z + Spring.GetUnitRadius(unitID))
+            end
+            "#,
+            Some(scene(Some([0.0, 3.0, 84.0]))),
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "base")[2], 60.0);
+    }
 }
 
 /// What a caller offering controls for a script's own unit values, or a way to
@@ -2256,6 +2384,7 @@ mod unit_values_and_functions {
             callin: "DoTheThing".to_string(),
             args: Vec::new(),
             ambient: false,
+            world: None,
         }];
         let timeline = run(
             r#"

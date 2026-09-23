@@ -259,18 +259,94 @@ pub fn known(id: i32) -> Option<i32> {
     }
 }
 
+/// Ids that ask where a unit is or how big it is, from `CobDefines.h`.
+pub const UNIT_XZ: i32 = 9;
+pub const UNIT_Y: i32 = 10;
+pub const UNIT_HEIGHT: i32 = 11;
+pub const GROUND_HEIGHT: i32 = 16;
+
+/// What a question about the scene was answered with, and what the preview
+/// wants said about it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Answer {
+    pub value: i32,
+    pub note: Option<String>,
+}
+
+/// Which unit an id means in a scene with at most two in it.
+pub enum Who<'a> {
+    Own(&'a crate::Size),
+    StandIn(&'a crate::StandIn),
+    Nobody,
+}
+
+/// The engine reads 0 or less as "this unit" (`UnitScript.cpp:1061`).
+pub fn who(id: i64, world: &crate::World) -> Who<'_> {
+    if id <= 0 || id == i64::from(UNIT_ID) {
+        return Who::Own(&world.own);
+    }
+    match &world.stand_in {
+        Some(stand_in) if i64::from(stand_in.id) == id => Who::StandIn(stand_in),
+        _ => Who::Nobody,
+    }
+}
+
+/// Where a unit is and how big, answered off the scene the event carried.
+///
+/// `rts/Sim/Units/Scripts/UnitScript.cpp:1060-1105`. The unit itself stands at
+/// the origin, and the ground is flat at 0, which is what the viewport draws.
+/// `None` for an id this does not cover, and for one it cannot answer without
+/// a scene, so the caller's own "no world" note still says so.
+pub fn world(id: i32, p1: i32, world: Option<&crate::World>) -> Option<Answer> {
+    let plain = |value: i32| Answer { value, note: None };
+    if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT) {
+        return None;
+    }
+    if id == GROUND_HEIGHT {
+        return Some(plain(0));
+    }
+    let asks_itself = p1 <= 0 || p1 == UNIT_ID;
+    if asks_itself && id != UNIT_HEIGHT {
+        return Some(plain(0));
+    }
+    let world = world?;
+    let stand_in = match who(i64::from(p1), world) {
+        Who::Own(own) => return Some(plain((own.radius * f64::from(COBSCALE)) as i32)),
+        Who::Nobody => return Some(plain(0)),
+        Who::StandIn(stand_in) => stand_in,
+    };
+    if id == UNIT_HEIGHT {
+        return Some(plain((stand_in.radius * f64::from(COBSCALE)) as i32));
+    }
+    let Some(pos) = stand_in.pos else {
+        return Some(Answer {
+            value: 0,
+            note: Some(
+                "This script asks where the stand-in is on a frame this scenario puts it nowhere, so it read 0."
+                    .to_string(),
+            ),
+        });
+    };
+    Some(plain(match id {
+        UNIT_XZ => pack_xz(pos[0], pos[2]),
+        UNIT_Y => (pos[1] * f64::from(COBSCALE)) as i32,
+        // The radius, which is what the engine answers under this name.
+        _ => (stand_in.radius * f64::from(COBSCALE)) as i32,
+    }))
+}
+
 /// Ids [`crate::Timeline::asked`] leaves out, because none of them is a
 /// question about the unit that a control could stand in for: the arithmetic
 /// call-outs, the shared values Spring stopped keeping, the running frame, the
-/// packed piece-position pair, and the slots a `.cob`'s Lua call answers in.
+/// packed piece-position pair, the slots a `.cob`'s Lua call answers in, and
+/// the questions about where a unit is, which a control keyed by id alone
+/// cannot tell apart from one unit to the next.
 ///
 /// `arithmetic` always answers the same way for a given id regardless of its
 /// arguments, being `Some` for exactly the ids it has a match arm for, so
 /// asking it with zeroes is a membership test rather than a real calculation.
 fn excluded_from_asked(id: i32) -> bool {
     const GAME_FRAME: i32 = 134;
-    const PIECE_XZ: i32 = 7;
-    const PIECE_Y: i32 = 8;
     const LUA0: i32 = 110;
     const LUA9: i32 = 119;
     arithmetic(id, 0, 0).is_some()
@@ -279,6 +355,7 @@ fn excluded_from_asked(id: i32) -> bool {
         || id == PIECE_XZ
         || id == PIECE_Y
         || (LUA0..=LUA9).contains(&id)
+        || matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT)
 }
 
 /// Note that a script read unit value `id`, unless it is one [`Timeline::asked`]
@@ -430,6 +507,103 @@ mod tests {
     fn leaves_out_ids_that_are_not_questions_about_the_unit() {
         let mut asked = Vec::new();
         for id in [ABS, 1024, 134, 7, 8, 110, 119] {
+            note_asked(&mut asked, id);
+        }
+        assert!(asked.is_empty(), "{asked:?}");
+    }
+
+    fn scene(pos: Option<[f64; 3]>) -> crate::World {
+        crate::World {
+            stand_in: Some(crate::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: crate::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    fn value(id: i32, p1: i32, world: Option<&crate::World>) -> Option<i32> {
+        self::world(id, p1, world).map(|answer| answer.value)
+    }
+
+    /// `rts/Sim/Units/Scripts/UnitScript.cpp:1060-1092`, a cell at a time.
+    #[test]
+    fn answers_for_the_unit_itself_from_the_origin() {
+        let w = scene(Some([10.0, 2.0, 84.0]));
+        for asker in [0, -1, UNIT_ID] {
+            assert_eq!(value(UNIT_XZ, asker, Some(&w)), Some(0));
+            assert_eq!(value(UNIT_Y, asker, Some(&w)), Some(0));
+            assert_eq!(value(UNIT_HEIGHT, asker, Some(&w)), Some(60 * 65536));
+        }
+    }
+
+    #[test]
+    fn answers_for_the_stand_in_from_where_it_is() {
+        let w = scene(Some([10.0, 2.0, 84.0]));
+        assert_eq!(value(UNIT_XZ, 2, Some(&w)), Some(pack_xz(10.0, 84.0)));
+        assert_eq!(value(UNIT_Y, 2, Some(&w)), Some(2 * 65536));
+        // The radius, not the height: `UnitScript.cpp:1082-1092`.
+        assert_eq!(value(UNIT_HEIGHT, 2, Some(&w)), Some(28 * 65536));
+    }
+
+    /// The engine's answer for a unit that does not exist, which is not a gap
+    /// in the preview and so carries no note.
+    #[test]
+    fn answers_zero_for_a_unit_that_is_not_there() {
+        let w = scene(Some([10.0, 2.0, 84.0]));
+        let answer = world(UNIT_XZ, 7, Some(&w)).unwrap();
+        assert_eq!(answer.value, 0);
+        assert_eq!(answer.note, None);
+    }
+
+    #[test]
+    fn says_so_when_the_stand_in_is_nowhere_on_this_frame() {
+        let answer = world(UNIT_XZ, 2, Some(&scene(None))).unwrap();
+        assert_eq!(answer.value, 0);
+        assert!(answer.note.is_some());
+    }
+
+    /// `UnitScript.cpp:1082-1092` answers the radius regardless of position,
+    /// as `GetUnitRadius` already does, so a missing position should not
+    /// blank out the stand-in's height.
+    #[test]
+    fn answers_the_stand_ins_height_even_when_it_is_nowhere_on_this_frame() {
+        assert_eq!(value(UNIT_HEIGHT, 2, Some(&scene(None))), Some(28 * 65536));
+        assert_eq!(
+            world(UNIT_HEIGHT, 2, Some(&scene(None))).unwrap().note,
+            None
+        );
+    }
+
+    #[test]
+    fn the_ground_is_flat_at_zero_everywhere() {
+        assert_eq!(value(GROUND_HEIGHT, pack_xz(100.0, -50.0), None), Some(0));
+    }
+
+    /// No world at all is every caller outside the panel. What needs no facts
+    /// is still answered, and the rest is left for the caller's note.
+    #[test]
+    fn answers_what_needs_no_facts_when_given_no_world() {
+        assert_eq!(value(UNIT_XZ, 0, None), Some(0));
+        assert_eq!(value(UNIT_Y, 0, None), Some(0));
+        assert_eq!(value(UNIT_HEIGHT, 0, None), None);
+        assert_eq!(value(UNIT_XZ, 2, None), None);
+    }
+
+    #[test]
+    fn leaves_everything_else_to_the_caller() {
+        assert!(world(HEALTH, 0, Some(&scene(None))).is_none());
+    }
+
+    #[test]
+    fn offers_no_control_for_a_question_about_the_world() {
+        let mut asked = Vec::new();
+        for id in [UNIT_XZ, UNIT_Y, UNIT_HEIGHT, GROUND_HEIGHT] {
             note_asked(&mut asked, id);
         }
         assert!(asked.is_empty(), "{asked:?}");
