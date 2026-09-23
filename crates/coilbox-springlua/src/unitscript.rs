@@ -549,7 +549,11 @@ impl Run {
         }
         self.wake_finished();
         self.fire_due(events)?;
-        self.run_threads()
+        self.run_threads()?;
+        // After every coroutine, as the engine moves its passengers once every
+        // script has ticked (`rts/Game/Game.cpp:1796-1798`).
+        self.sim.borrow_mut().model.after_frame();
+        Ok(())
     }
 
     /// Anything waiting on an animation that is no longer running is ready.
@@ -886,6 +890,7 @@ fn sandbox(
     install_motion(&lua, sim)?;
     install_threading(&lua, sim)?;
     install_stubs(&lua, sim)?;
+    install_announcements(&lua, sim)?;
     install_bits(&lua)?;
     install_random(&lua)?;
     install_unit_value(&lua, sim)?;
@@ -1406,7 +1411,8 @@ fn install_spring(
     // The unit itself stands at the origin, which is where the viewport draws
     // it. The stand-in is where the scene the latest event brought puts it, and
     // any other id is a unit that does not exist, which the engine answers with
-    // nothing.
+    // nothing. Once a script has held the stand-in, it is where the runtime
+    // carried it.
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitPosition",
@@ -1421,15 +1427,17 @@ fn install_spring(
             };
             Ok(match unitvalue::who(asked, &world) {
                 unitvalue::Who::Own(_) => (Some(0.0), Some(0.0), Some(0.0)),
-                unitvalue::Who::StandIn(stand_in) => match stand_in.pos {
-                    Some([x, y, z]) => (Some(x), Some(y), Some(z)),
-                    None => {
-                        sim.model.note(
-                            "This script asks where the stand-in is on a frame this scenario puts it nowhere, so it read nothing.".to_string(),
-                        );
-                        (None, None, None)
+                unitvalue::Who::StandIn(stand_in) => {
+                    match sim.model.passenger.at().or(stand_in.pos) {
+                        Some([x, y, z]) => (Some(x), Some(y), Some(z)),
+                        None => {
+                            sim.model.note(
+                                "This script asks where the stand-in is on a frame this scenario puts it nowhere, so it read nothing.".to_string(),
+                            );
+                            (None, None, None)
+                        }
                     }
-                },
+                }
                 unitvalue::Who::Nobody => (None, None, None),
             })
         })?,
@@ -1552,7 +1560,6 @@ fn install_spring(
         // script that checks what `CreateUnit` gave it back reads a failure
         // rather than something that is not there.
         "CreateUnit",
-        "PlaySoundFile",
         "SetUnitCollisionVolumeData",
         "SetUnitPieceCollisionVolumeData",
     ] {
@@ -1569,6 +1576,13 @@ fn install_spring(
             })?,
         )?;
     }
+
+    // The same call as the framework's own `PlaySoundFile`, so a converted
+    // script's `Spring.PlaySoundFile` is recorded the same way.
+    spring.set(
+        "PlaySoundFile",
+        lua.globals().get::<Value>("PlaySoundFile")?,
+    )?;
 
     // One unit on its own, which is the team the preview has.
     spring.set(
@@ -1946,21 +1960,6 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         )?;
     }
 
-    // Explode(piece, sfx) throws debris and leaves the piece exactly as it was:
-    // a script that wants the piece gone hides it itself. So the honest preview
-    // of an explosion is nothing happening, said out loud.
-    let state = Rc::clone(sim);
-    globals.set(
-        "Explode",
-        lua.create_function(move |_, (piece, _sfx): (i64, Option<i64>)| {
-            let mut sim = state.borrow_mut();
-            piece_index(&sim, piece)?;
-            sim.model
-                .note("Explode throws no debris in the preview.".to_string());
-            Ok(())
-        })?,
-    )?;
-
     Ok(())
 }
 
@@ -2022,33 +2021,148 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     Ok(())
 }
 
-/// The calls a preview cannot honour but must not fail on: sound, effects and
-/// the world outside the model. Each one is noted the first time it is used, so
-/// the panel can say what it left out rather than pretending it did it.
+/// The calls a preview cannot honour but must not fail on. Each one is noted
+/// the first time it is used, so the panel can say what it left out rather
+/// than pretending it did it.
 fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let globals = lua.globals();
-    for name in [
-        "EmitSfx",
-        "PlaySoundFile",
-        "AttachUnit",
-        "DropUnit",
-        "ChangeHeading",
-    ] {
-        let state = Rc::clone(sim);
-        let label = name.to_string();
-        globals.set(
-            name,
-            lua.create_function(move |_, _: MultiValue| {
-                state
-                    .borrow_mut()
-                    .model
-                    .note(format!("{label} does nothing in the preview."));
-                Ok(())
-            })?,
-        )?;
-    }
+    let name = "ChangeHeading";
+    let state = Rc::clone(sim);
+    let label = name.to_string();
+    globals.set(
+        name,
+        lua.create_function(move |_, _: MultiValue| {
+            state
+                .borrow_mut()
+                .model
+                .note(format!("{label} does nothing in the preview."));
+            Ok(())
+        })?,
+    )?;
 
     Ok(())
+}
+
+/// `SFX_GLOBAL` (`rts/Sim/Units/Scripts/CobDefines.h:20`), which the engine ORs
+/// into a generator it looked up by name.
+const SFX_GLOBAL: i32 = 16384;
+
+/// What a script announces: effects, debris, sound, and carrying another unit.
+///
+/// Each is recorded on the frame it happens, for the scrubber to mark, and
+/// none is drawn or played. Pieces come in counted from one, as `piece()`
+/// hands them out, and the engine subtracts one
+/// (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:1422-1503`).
+fn install_announcements(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
+    let globals = lua.globals();
+
+    let state = Rc::clone(sim);
+    globals.set(
+        "EmitSfx",
+        lua.create_function(move |_, (piece, sfx): (i64, Value)| {
+            let mut guard = state.borrow_mut();
+            let sim = &mut *guard;
+            let Some(at) = announced_piece(sim, "EmitSfx", piece) else {
+                return Ok(());
+            };
+            let sfx = match sfx {
+                Value::Integer(number) => number as i32,
+                Value::Number(number) => number as i32,
+                // A generator named rather than numbered, which the engine
+                // looks up and marks global (`LuaUnitScript.cpp:1430`).
+                Value::String(name) => {
+                    sim.model.note(format!(
+                        "EmitSfx names the effect {}, which is marked as a global effect because the preview has no list of effects to number it from.",
+                        name.to_string_lossy()
+                    ));
+                    SFX_GLOBAL
+                }
+                _ => 0,
+            };
+            sim.model.emit_sfx(sim.frame, at, sfx);
+            Ok(())
+        })?,
+    )?;
+
+    // Explode(piece, flags) throws debris and leaves the piece exactly as it
+    // was. A script that wants the piece gone hides it itself.
+    let state = Rc::clone(sim);
+    globals.set(
+        "Explode",
+        lua.create_function(move |_, (piece, flags): (i64, Option<i64>)| {
+            let mut guard = state.borrow_mut();
+            let sim = &mut *guard;
+            if let Some(at) = announced_piece(sim, "Explode", piece) {
+                sim.model.explode(sim.frame, at, flags.unwrap_or(0) as i32);
+            }
+            Ok(())
+        })?,
+    )?;
+
+    // AttachUnit(piece, unit). The engine subtracts one from the piece, so
+    // zero and below are the void (`LuaUnitScript.cpp:1445-1457`).
+    let state = Rc::clone(sim);
+    globals.set(
+        "AttachUnit",
+        lua.create_function(move |_, (piece, unit): (i64, i64)| {
+            let mut guard = state.borrow_mut();
+            let sim = &mut *guard;
+            let at = if piece < 1 {
+                None
+            } else {
+                let Some(at) = announced_piece(sim, "AttachUnit", piece) else {
+                    return Ok(());
+                };
+                Some(at)
+            };
+            sim.model
+                .attach_unit(sim.frame, unit as i32, at, sim.world.as_ref());
+            Ok(())
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    globals.set(
+        "DropUnit",
+        lua.create_function(move |_, unit: i64| {
+            let mut guard = state.borrow_mut();
+            let sim = &mut *guard;
+            sim.model
+                .drop_unit(sim.frame, unit as i32, sim.world.as_ref());
+            Ok(())
+        })?,
+    )?;
+
+    // Answers nothing, as it did when it was a stub. Its name is the first
+    // argument, whatever follows it.
+    let state = Rc::clone(sim);
+    globals.set(
+        "PlaySoundFile",
+        lua.create_function(move |_, (name, _rest): (Value, MultiValue)| {
+            let mut guard = state.borrow_mut();
+            let sim = &mut *guard;
+            let name = match name {
+                Value::String(name) => Some(name.to_string_lossy()),
+                _ => None,
+            };
+            sim.model.play_sound(sim.frame, name);
+            Ok(())
+        })?,
+    )?;
+
+    Ok(())
+}
+
+/// The model piece a script's 1-based piece number names, or a note and none
+/// when it names no piece of this unit, which the engine reports and ignores.
+fn announced_piece(sim: &mut Sim, call: &str, piece: i64) -> Option<usize> {
+    let index = usize::try_from(piece - 1)
+        .ok()
+        .filter(|index| *index < sim.model.pieces.len());
+    if index.is_none() {
+        sim.model.no_such_piece(call, piece);
+    }
+    index
 }
 
 /// The engine's bitwise functions, which Lua 5.1 has no operators for. Kept to

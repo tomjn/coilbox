@@ -997,8 +997,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
 fn a_call_the_preview_cannot_honour_is_reported() {
     let timeline = play(
         r#"
-        local flare = piece("flare")
-        function script.Create() EmitSfx(flare, 1024) end
+        function script.Create() ChangeHeading(1.0) end
         "#,
         3,
     );
@@ -1007,7 +1006,7 @@ fn a_call_the_preview_cannot_honour_is_reported() {
         timeline
             .warnings
             .iter()
-            .any(|note| note.contains("EmitSfx")),
+            .any(|note| note.contains("ChangeHeading")),
         "{:?}",
         timeline.warnings
     );
@@ -2482,5 +2481,269 @@ mod coverage {
         // if the two were not told apart by chunk name.
         assert!(timeline.lines_run.contains(&line_of("Turn(turret")));
         assert!(!timeline.lines_run.is_empty());
+    }
+}
+
+mod announcements {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn scene() -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    /// base at the origin, turret on it at (0, 10, 20), the rest at base.
+    fn rest() -> Vec<Rest> {
+        vec![
+            Rest {
+                parent: None,
+                position: [0.0; 3],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0, 10.0, 20.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0; 3],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0; 3],
+            },
+        ]
+    }
+
+    fn pickup(script: &str, frames: u32) -> Timeline {
+        let names = pieces();
+        let rest = rest();
+        run(
+            script,
+            "test.lua",
+            &Unit {
+                rest: &rest,
+                ..Unit::new(&names)
+            },
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportPickup".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene()),
+            }],
+            frames,
+            &HashMap::new(),
+        )
+    }
+
+    #[test]
+    fn records_effects_and_sound_with_pieces_counted_from_one() {
+        let timeline = play(
+            r#"
+            local turret, flare = piece("turret", "flare")
+            function script.Create()
+                EmitSfx(flare, 1025)
+                Explode(turret, SFX.SHATTER)
+                PlaySoundFile("krogtaunt")
+                Spring.PlaySoundFile("sounds/krogdeath.wav", 1)
+            end
+            "#,
+            2,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [
+                ScriptOutput::Sfx {
+                    frame: 0,
+                    piece: "flare".to_string(),
+                    sfx: 1025
+                },
+                ScriptOutput::Explode {
+                    frame: 0,
+                    piece: "turret".to_string(),
+                    flags: 1
+                },
+                ScriptOutput::Sound {
+                    frame: 0,
+                    name: Some("krogtaunt".to_string())
+                },
+                ScriptOutput::Sound {
+                    frame: 0,
+                    name: Some("sounds/krogdeath.wav".to_string())
+                },
+            ]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w == coilbox_unitpose::EFFECTS_NOTE));
+        assert!(
+            !timeline
+                .warnings
+                .iter()
+                .any(|w| w.contains("does nothing in the preview")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The engine reports a piece it does not have and carries on, so the
+    /// thread keeps going rather than stopping on the line.
+    #[test]
+    fn a_piece_that_is_not_there_is_noted_and_the_thread_carries_on() {
+        let timeline = play(
+            r#"
+            local base = piece("base")
+            function script.Create()
+                Explode(99, 1)
+                Move(base, y_axis, 3)
+            end
+            "#,
+            2,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.events.is_empty());
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("Explode names piece 99")));
+        assert_close(pose(&timeline, 1, "base")[1], 3.0);
+    }
+
+    /// A generator named rather than numbered is marked global
+    /// (`LuaUnitScript.cpp:1430`).
+    #[test]
+    fn an_effect_named_rather_than_numbered_is_marked_global() {
+        let timeline = play(
+            r#"
+            local flare = piece("flare")
+            function script.Create() EmitSfx(flare, "muzzleflash") end
+            "#,
+            2,
+        );
+
+        assert_eq!(
+            timeline.events,
+            [ScriptOutput::Sfx {
+                frame: 0,
+                piece: "flare".to_string(),
+                sfx: 16384
+            }]
+        );
+        assert!(timeline.warnings.iter().any(|w| w.contains("muzzleflash")));
+    }
+
+    /// Both spellings of the framework's call-outs record the same thing.
+    #[test]
+    fn attaches_to_a_piece_then_the_void_then_drops() {
+        let timeline = pickup(
+            r#"
+            local turret = piece("turret")
+            function script.TransportPickup(passenger)
+                AttachUnit(turret, passenger)
+                Spring.UnitScript.AttachUnit(0, passenger)
+                UnitScript.DropUnit(passenger)
+            end
+            "#,
+            2,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline.events,
+            [
+                ScriptOutput::Attach {
+                    frame: 0,
+                    unit: 2,
+                    piece: Some("turret".to_string())
+                },
+                ScriptOutput::Attach {
+                    frame: 0,
+                    unit: 2,
+                    piece: None
+                },
+                ScriptOutput::Drop { frame: 0, unit: 2 },
+            ]
+        );
+    }
+
+    /// Shaped like `intruder.bos` `AreaUnload`: attach, then poll until the
+    /// passenger is on the piece. It is not there on the attach's own frame,
+    /// because the engine moves passengers after every script has ticked, and
+    /// it is there one poll later. After a drop, moving the piece leaves the
+    /// passenger behind.
+    #[test]
+    fn a_passenger_reaches_its_piece_after_the_frame_it_was_attached() {
+        let timeline = pickup(
+            r#"
+            local base, turret, barrel = piece("base", "turret", "barrel")
+            function script.TransportPickup(passenger)
+                AttachUnit(turret, passenger)
+                local polls = 1
+                while GetUnitValue(COB.UNIT_XZ, passenger) ~= GetUnitValue(COB.PIECE_XZ, turret - 1) do
+                    polls = polls + 1
+                    Sleep(100)
+                end
+                Move(base, y_axis, polls)
+                local held = GetUnitValue(COB.PIECE_XZ, turret - 1)
+                DropUnit(passenger)
+                Move(turret, x_axis, 50)
+                Sleep(100)
+                if GetUnitValue(COB.UNIT_XZ, passenger) ~= GetUnitValue(COB.PIECE_XZ, turret - 1) then
+                    Move(barrel, y_axis, 1)
+                end
+                if GetUnitValue(COB.UNIT_XZ, passenger) == held then
+                    Move(barrel, z_axis, 1)
+                end
+            end
+            "#,
+            20,
+        );
+
+        assert_eq!(timeline.error, None);
+        // 1 would mean the attach moved the stand-in at once. 0 would mean it
+        // never reached the piece.
+        assert_close(pose(&timeline, 19, "base")[1], 2.0);
+        assert_close(pose(&timeline, 19, "barrel")[1], 1.0);
+        assert_close(pose(&timeline, 19, "barrel")[2], 1.0);
+    }
+
+    /// Lua's own way of asking gets the same answer.
+    #[test]
+    fn spring_says_a_carried_passenger_is_on_its_piece() {
+        let timeline = pickup(
+            r#"
+            local base, turret = piece("base", "turret")
+            function script.TransportPickup(passenger)
+                AttachUnit(turret, passenger)
+                Sleep(33)
+                local x, y, z = Spring.GetUnitPosition(passenger)
+                Move(base, x_axis, x)
+                Move(base, y_axis, y)
+                Move(base, z_axis, z)
+            end
+            "#,
+            4,
+        );
+
+        assert_eq!(timeline.error, None);
+        let base = pose(&timeline, 3, "base");
+        assert_close(base[0], 0.0);
+        assert_close(base[1], 10.0);
+        assert_close(base[2], 20.0);
     }
 }
