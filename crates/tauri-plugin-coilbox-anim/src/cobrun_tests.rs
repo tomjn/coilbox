@@ -1508,14 +1508,19 @@ mod engine_nano {
     }
 
     /// `QueryNanoPiece(piecenum)` flips static 0 between 1 and 0 and answers
-    /// it plus one, so barrel, turret, barrel and so on.
+    /// it plus one, so barrel, turret, barrel and so on. Ends with the
+    /// trailing `push(0)` a compiled function's implicit `return 0` leaves
+    /// for `RETURN` to discard, so the answer already written to the
+    /// argument slot survives.
     fn alternating() -> Vec<u8> {
         let mut words = vec![op("CREATE_LOCAL_VAR")];
         words.extend(push(1));
         words.extend([op("PUSH_STATIC"), 0, op("SUB"), op("POP_STATIC"), 0]);
         words.extend([op("PUSH_STATIC"), 0]);
         words.extend(push(1));
-        words.extend([op("ADD"), op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+        words.extend([op("ADD"), op("POP_LOCAL_VAR"), 0]);
+        words.extend(push(0));
+        words.push(op("RETURN"));
         build(&[("QueryNanoPiece", words)], PIECES, 1)
     }
 

@@ -609,10 +609,7 @@ impl Run {
             0,
             "QueryNanoPiece".into(),
         );
-        // `RETURN` always discards the top of the stack, the way a script's
-        // own `return x` would, so the seeded `-1` sits above the count and
-        // is what that discard eats, leaving the script's answer in slot 0.
-        thread.data = vec![1, -1];
+        thread.data = vec![-1];
         thread.params = 1;
         self.add(thread)?;
         let index = self.threads.len() - 1;
