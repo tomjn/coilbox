@@ -6,13 +6,13 @@
 
 ## PR's
 
-Before pushing, run the **full** check suite locally and confirm it passes. CI (`.github/workflows/lint.yml`) runs **three jobs and seven commands**, and a green subset is not a green PR. Run all seven even when you only touched one surface, and run the **same commands CI runs**, not a narrower subset (a single-crate clippy or `biome check` without `ci` will miss failures):
+Before pushing, run the **full** check suite locally and confirm it passes. CI (`.github/workflows/lint.yml`) runs **seven commands** split across parallel jobs, and a green subset is not a green PR. Run all seven even when you only touched one surface, and run the **same commands CI runs**, not a narrower subset (a single-crate clippy or `biome check` without `ci` will miss failures):
 
-- Frontend job: `bunx biome ci .`, `bun run typecheck`, `bun run test`
+- Frontend and vitest jobs: `bunx biome ci .`, `bun run typecheck`, `bun run test`
 - Lua job: `scripts/mission-tests.sh`
-- Rust job: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace`
+- Rust lint and test jobs: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace`
 
-The two easiest to miss are `scripts/mission-tests.sh` and `cargo test --workspace`. The Lua job is a whole third job with no lint in it at all: the mission runtime and the blueprint widget are Lua the engine runs, so neither of the other jobs compiles them and a break would otherwise reach a game. `cargo test --workspace` is tucked inside the Rust job because clippy compiles `#[cfg(test)]` modules but never runs them, so a wrong Rust test would otherwise pass forever.
+The two easiest to miss are `scripts/mission-tests.sh` and `cargo test --workspace`. The Lua job is a job of its own with no lint in it at all: the mission runtime and the blueprint widget are Lua the engine runs, so none of the other jobs compiles them and a break would otherwise reach a game. The Rust tests have their own job because clippy compiles `#[cfg(test)]` modules but never runs them, so a wrong Rust test would otherwise pass forever. CI runs them as `cargo nextest run --workspace`, which skips doctests. The workspace has none, and locally `cargo test --workspace` still runs any that get added.
 
 Both Lua suites need `luajit` on PATH (`brew install luajit`), as do two vitest files that shell out to it to check the Lua they generate compiles. Without the binary they fail on the missing dependency rather than on a real error.
 

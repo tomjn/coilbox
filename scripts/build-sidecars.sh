@@ -81,10 +81,14 @@ if [ "$TIMINGS" -eq 1 ]; then
   TIMING_ARGS+=(--timings)
 fi
 
+# Copy from wherever cargo built, so a checkout with its own CARGO_TARGET_DIR
+# does not pick up a stale binary left in ./target.
+TARGET_DIR="${CARGO_TARGET_DIR:-target}"
+
 cargo build "${CARGO_ARGS[@]}" "${CARGO_PROFILE_ARGS[@]}" "${TIMING_ARGS[@]}"
 mkdir -p src-tauri/binaries
 for CRATE in "$@"; do
-  cp "target/${TARGET_SUBDIR}/${CRATE}${EXE}" \
+  cp "${TARGET_DIR}/${TARGET_SUBDIR}/${CRATE}${EXE}" \
     "src-tauri/binaries/${CRATE}-${TRIPLE}${EXE}"
   echo "Built src-tauri/binaries/${CRATE}-${TRIPLE}${EXE}"
 done

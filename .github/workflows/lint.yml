@@ -32,6 +32,24 @@ jobs:
         run: bunx biome ci .
       - name: Typecheck
         run: bun run typecheck
+
+  # Vitest is the long tail of the frontend checks, so it runs in its own jobs,
+  # split by file across two shards that run side by side.
+  vitest:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+      # Exact semver keeps setup-bun off api.github.com (see release.yml).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       # src/lego/luaScript.test.ts and pieceCollisionScript.test.ts shell out
       # to luajit via spawnSync to check the Lua they generate actually
       # compiles. Without the binary, spawnSync returns a null status and the
@@ -41,7 +59,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y luajit
       - name: Vitest
-        run: bun run test
+        run: bun run test --shard=${{ matrix.shard }}/2
 
   # The mission runtime and the blueprint widget are Lua the engine runs, so
   # neither the frontend nor the Rust job compiles them and a break would
@@ -60,10 +78,14 @@ jobs:
       - name: Lua tests
         run: scripts/mission-tests.sh
 
-  # 30 minutes rather than the other two jobs' limits: on a cache miss this job
-  # builds the Tauri app crate and the unitsync worker from cold, which is the
+  # The Rust checks are two jobs, lint and test, which run side by side. Each
+  # compiles different output (clippy metadata against test binaries), so each
+  # keeps its own cache, keyed by job id.
+  #
+  # 30 minutes rather than the other jobs' limits: on a cache miss these jobs
+  # build the Tauri app crate and the unitsync worker from cold, which is the
   # long tail of the workflow.
-  rust:
+  rust-lint:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -71,8 +93,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      # clippy must compile the Tauri crate before it can lint it, and the test
-      # step links it, so the same system libraries the release build needs are
+      # clippy must compile the Tauri crate before it can lint it, and rust-test
+      # links it, so the same system libraries the release build needs are
       # required here too.
       - name: Linux build dependencies
         run: |
@@ -100,8 +122,8 @@ jobs:
       # built for the runner's triple before clippy compiles the app crate.
       # One cargo call plans both dependency graphs together, so shared deps
       # build once and the two crates compile in parallel instead of in turn.
-      # --profile dev: nothing else in this job runs the release profile, and
-      # `cargo test --workspace` below runs the unitsync worker straight out
+      # --profile dev: nothing else in these jobs runs the release profile, and
+      # the tests in rust-test run the unitsync worker straight out
       # of target/debug/, so a release build here would be both wasted and a
       # risk of a release binary landing on that debug path instead of a dev
       # one (issue #2807).
@@ -111,9 +133,37 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
-      # Clippy compiles the #[cfg(test)] modules but never runs them, so a wrong
-      # Rust test would otherwise pass forever. Shares this job's toolchain,
-      # cache and the three prerequisites above rather than paying for them
-      # twice in a job of its own.
-      - name: Cargo test
-        run: cargo test --workspace
+
+  # Clippy compiles the #[cfg(test)] modules but never runs them, so a wrong
+  # Rust test would otherwise pass forever. The setup steps match rust-lint's,
+  # and the comments there explain them.
+  rust-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdevil-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: profile-dev
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Placeholder mapconv resource dir
+        run: mkdir -p src-tauri/mapconv
+      - name: Placeholder pr-downloader resource dir
+        run: mkdir -p src-tauri/prdownloader
+      - name: Build unitsync worker and relay agent sidecars
+        run: bash scripts/build-sidecars.sh --profile dev coilbox-unitsync-worker coilbox-relay-agent
+      # nextest runs every test binary at once, where `cargo test` runs them
+      # one after another. It does not run doctests, and CI skips them on
+      # purpose: the workspace has none, and a doctest step spent 3m01s
+      # rebuilding every crate to find that out. Locally, `cargo test
+      # --workspace` still runs any doctest that gets added.
+      - name: Cargo nextest
+        run: cargo nextest run --workspace
