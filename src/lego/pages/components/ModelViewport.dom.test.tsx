@@ -435,22 +435,17 @@ describe("placeStandIn", () => {
     expect(state.standIn.visible).toBe(false);
   });
 
-  /** A factory does not carry what it builds, so its stand-in sits where the
-   *  piece rests rather than following it through whatever the doors do. */
-  it("sits at a factory's build piece where it rests", () => {
+  /** A build with no timeline at all never asked the run whether building
+   *  started, so there is nothing to say it did. */
+  it("hides a factory's buildee with no timeline to say building started", () => {
     const state = standInScene();
-    state.groups.get("arm")?.position.set(0, 99, 0);
     placeStandIn(
       state,
       doc,
       {
         track: {
           keys: [{ frame: 0, pos: [0, 0, 0] }],
-          attach: {
-            from: "QueryBuildInfo",
-            frame: 0,
-            until: null,
-          },
+          attach: { from: "QueryBuildInfo", until: null },
         },
         attachPieces: new Map([["QueryBuildInfo", "arm"]]),
         show: true,
@@ -459,7 +454,80 @@ describe("placeStandIn", () => {
       0,
     );
 
-    expect(state.standIn.position.toArray()).toEqual([0, 4, 0]);
+    expect(state.standIn.visible).toBe(false);
+  });
+
+  /** Before the run's own `build-start` frame, the script may still be
+   *  opening the factory's doors, so there is nothing to show yet. */
+  it("hides a factory's buildee before the run says building started", () => {
+    const state = standInScene();
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: { from: "QueryBuildInfo", until: null },
+        },
+        attachPieces: new Map([["QueryBuildInfo", "arm"]]),
+        show: true,
+      },
+      timeline,
+      4,
+    );
+
+    expect(state.standIn.visible).toBe(false);
+  });
+
+  /** From `build-start` on, the buildee rides the piece's own posed world
+   *  position, the way `UpdateBuild` carries it, rather than sitting at its
+   *  rest position. */
+  it("rides the build piece's posed position from build-start", () => {
+    const state = standInScene();
+    state.groups.get("arm")?.position.set(0, 99, 0);
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: { from: "QueryBuildInfo", until: null },
+        },
+        attachPieces: new Map([["QueryBuildInfo", "arm"]]),
+        show: true,
+      },
+      timeline,
+      5,
+    );
+
+    expect(state.standIn.visible).toBe(true);
+    expect(state.standIn.position.toArray()).toEqual([0, 99, 0]);
+  });
+
+  /** A build pad turned by +0.5 radians about y turns the stand-in the same
+   *  way, per `Factory.cpp`'s `GetHeadingFromVector`. */
+  it("turns with the build piece", () => {
+    const state = standInScene();
+    state.groups.get("arm")?.rotation.set(0, 0.5, 0);
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: { from: "QueryBuildInfo", until: null },
+        },
+        attachPieces: new Map([["QueryBuildInfo", "arm"]]),
+        show: true,
+      },
+      timeline,
+      5,
+    );
+
+    expect(state.standIn.rotation.y).toBeCloseTo(0.5);
   });
 
   /**
@@ -469,23 +537,20 @@ describe("placeStandIn", () => {
    */
   it("holds the keyed position when the probe named no piece", () => {
     const state = standInScene();
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
     placeStandIn(
       state,
       doc,
       {
         track: {
           keys: [{ frame: 0, pos: [0, 1, 4] }],
-          attach: {
-            from: "QueryBuildInfo",
-            frame: 0,
-            until: null,
-          },
+          attach: { from: "QueryBuildInfo", until: null },
         },
         attachPieces: new Map(),
         show: true,
       },
-      null,
-      0,
+      timeline,
+      5,
     );
 
     expect(state.standIn.visible).toBe(true);

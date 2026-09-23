@@ -174,7 +174,7 @@ export function attachedAt(
 ): StandInAttach | null {
   const attach = track.attach;
   if (!attach) return null;
-  if (frame < attach.frame) return null;
+  if (attach.frame !== undefined && frame < attach.frame) return null;
   if (attach.until !== null && frame >= attach.until) return null;
   return attach;
 }

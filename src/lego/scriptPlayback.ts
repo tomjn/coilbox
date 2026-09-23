@@ -58,8 +58,21 @@ export interface ScriptEvent {
    * `nano-start` and `nano-stop` bracket the frames a builder sprays nano on.
    * The runtime asks `QueryNanoPiece` on each of them, through the engine's
    * cache (`rts/Sim/Misc/NanoPieceCache.cpp:17-50`).
+   *
+   * `factory-build` queues a build. The runtime starts it, and starts spraying
+   * nano, on the first frame the script puts the unit in build stance
+   * (`Factory.cpp:138-151`).
+   *
+   * `factory-finish` stops the spray and fires `StopBuilding`, or notes that
+   * the script never set stance.
    */
-  engine?: "attach" | "detach" | "nano-start" | "nano-stop";
+  engine?:
+    | "attach"
+    | "detach"
+    | "nano-start"
+    | "nano-stop"
+    | "factory-build"
+    | "factory-finish";
 }
 
 /** The scene one frame of a script run is told about. */
@@ -84,7 +97,8 @@ export type ScriptOutput =
   | { frame: number; kind: "sfx"; piece: string; sfx: number }
   | { frame: number; kind: "explode"; piece: string; flags: number }
   | { frame: number; kind: "sound"; name: string | null }
-  | { frame: number; kind: "nano"; piece: string | null }; // null when no piece is named yet
+  | { frame: number; kind: "nano"; piece: string | null } // null when no piece is named yet
+  | { frame: number; kind: "build-start" }; // the frame a factory started building
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
 export interface ScriptTimeline {
@@ -185,17 +199,22 @@ export interface StandInKey {
 /**
  * The piece a factory builds on, and for how long.
  *
- * A factory spawns what it builds at the world position of the piece
- * `QueryBuildInfo` names and leaves it there
- * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), so the stand-in sits at
- * the piece's rest position rather than riding it. A transport's passenger is
+ * `UpdateBuild` moves the buildee to the world position of the piece
+ * `QueryBuildInfo` names, and turns it with the piece, on every frame of the
+ * build (`rts/Sim/Units/UnitTypes/Factory.cpp:209-244`), so the stand-in rides
+ * it rather than sitting at its rest position. A transport's passenger is
  * carried by the runtime instead, from the attach events it reports.
  */
 export interface StandInAttach {
   /** The call-in the probe asks for that piece. */
   from: "QueryBuildInfo";
-  /** The first frame the stand-in sits on it. */
-  frame: number;
+  /**
+   * The first frame the stand-in could be riding it, for `aimResolver.ts`'s
+   * own pre-run use. The preview's own placement ignores this and waits for
+   * the run's `build-start` output instead, because a script can take longer
+   * than this to set build stance.
+   */
+  frame?: number;
   /** The frame it comes off again, or null to stay on to the end. */
   until: number | null;
 }
@@ -402,7 +421,7 @@ export const SCENARIOS: Scenario[] = [
     id: "building-factory",
     label: "Building (factory)",
     description:
-      "A factory opening its yard and then building, which is a different pair of call-ins from a construction unit's.",
+      "A factory opening its yard and waiting for its own script to be ready before it builds, which is a different pair of call-ins from a construction unit's.",
     nano: "factory",
     events: [
       ...CREATED,
@@ -411,29 +430,29 @@ export const SCENARIOS: Scenario[] = [
       // that animates its doors does it from here and most of them will not
       // animate a build at all until it has happened.
       { frame: at(0.5), callin: "Activate" },
-      // No arguments. `CFactory::StartBuild` calls the no-argument form, unlike
-      // a construction unit, which is handed a heading and a pitch to aim its
-      // nanolathe with (`CBuilder`).
-      { frame: at(2), callin: "StartBuilding" },
-      { frame: at(2), engine: "nano-start" },
-      { frame: at(11), callin: "StopBuilding" },
-      { frame: at(11), engine: "nano-stop" },
+      // The runtime queues the build behind this and starts it, and starts
+      // spraying nano, once the script puts the unit in build stance, which
+      // may be several frames after this event (`Factory.cpp:138-151`).
+      { frame: at(0.5), engine: "factory-build" },
+      // Stops the spray and fires `StopBuilding`.
+      { frame: at(11), engine: "factory-finish" },
       { frame: at(13), callin: "Deactivate" },
     ],
     standIn: {
-      // Nowhere until the factory starts building. A key on the same frame the
-      // attach begins, so the keyed position is never what is drawn.
-      keys: [{ frame: at(2), pos: [0, 0, 0] }],
-      // A factory spawns what it builds at the world position of the piece
-      // `QueryBuildInfo` names, and leaves it there
-      // (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`). It does not carry
-      // it, so the stand-in sits at the piece's rest position rather than
-      // riding it through whatever the doors do.
+      // Nowhere until the run reports `build-start`, which is the frame the
+      // script actually set build stance on rather than a frame picked here.
+      keys: [{ frame: 0, pos: [0, 0, 0] }],
+      // `UpdateBuild` moves the buildee to the build piece's world position
+      // and turns it with the piece, every frame of the build
+      // (`rts/Sim/Units/UnitTypes/Factory.cpp:209-244`), so the stand-in rides
+      // it rather than sitting at its rest position.
       attach: {
         from: "QueryBuildInfo",
-        frame: at(2),
         until: null,
       },
+      // Two thirds of the usual 7/30, set by eye with the user so the
+      // stand-in fits a factory's build pad.
+      size: (7 / 30) * (2 / 3),
     },
   },
   {

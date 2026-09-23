@@ -229,7 +229,9 @@ export function worldAt(
   // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
   const attach = attachedAt(track, frame);
   const riding =
-    attach && frame > attach.frame ? ctx.attachPiece(attach.from) : null;
+    attach && attach.frame !== undefined && frame > attach.frame
+      ? ctx.attachPiece(attach.from)
+      : null;
   if (riding) return { standIn: { ...base, pos: riding }, self: ctx.self };
 
   const pose = standInAt(track, frame, ctx.radius);

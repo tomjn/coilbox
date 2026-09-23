@@ -52,6 +52,12 @@ describe("describeOutput", () => {
       "Nano spray from no piece",
     );
   });
+
+  it("says a factory started building", () => {
+    expect(describeOutput({ frame: 15, kind: "build-start" })).toBe(
+      "Factory starts building",
+    );
+  });
 });
 
 /** `rts/Sim/Units/Scripts/UnitScript.cpp:597-790`, in its order. */
@@ -118,6 +124,12 @@ describe("scrubberMarks", () => {
     );
     expect(marks.map((mark) => mark.frame)).toEqual([5]);
     expect(isMarked({ frame: 3, kind: "nano", piece: null })).toBe(false);
+  });
+
+  it("marks build-start, unlike nano", () => {
+    expect(isMarked({ frame: 15, kind: "build-start" })).toBe(true);
+    const marks = scrubberMarks([{ frame: 15, kind: "build-start" }], 100, 0);
+    expect(marks.map((mark) => mark.frame)).toEqual([15]);
   });
 
   it("places a mark along the scrubber as a percentage", () => {

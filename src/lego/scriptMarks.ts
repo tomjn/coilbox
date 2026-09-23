@@ -3,7 +3,7 @@
  * announced something, and the words each one says.
  *
  * Nano spray is not marked. A build span records it on every frame, which
- * would bury everything else, and `StartBuilding` already says where it starts.
+ * would bury everything else, and `build-start` already says where it starts.
  */
 
 import { type ScriptOutput, STAND_IN_UNIT_ID } from "./scriptPlayback";
@@ -89,6 +89,8 @@ export function describeOutput(event: ScriptOutput): string {
       return event.piece === null
         ? "Nano spray from no piece"
         : `Nano spray from ${event.piece}`;
+    case "build-start":
+      return "Factory starts building";
   }
 }
 
