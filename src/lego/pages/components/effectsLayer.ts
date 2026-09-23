@@ -84,6 +84,10 @@ export function buildEffectsLayer(): EffectsLayer {
   const material = new THREE.ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
+    // Drawn over everything, as TA drew nano over the units. The engine's
+    // buildee is a see-through nanoframe, and the opaque stand-in would
+    // otherwise hide a factory's whole spray, which never leaves it.
+    depthTest: false,
     uniforms: {
       viewport: { value: new THREE.Vector2(1, 1) },
       pixelRatio: { value: 1 },
@@ -91,6 +95,7 @@ export function buildEffectsLayer(): EffectsLayer {
   });
   const object = new THREE.Mesh(geometry, material);
   object.frustumCulled = false;
+  object.renderOrder = 1;
   object.onBeforeRender = (renderer) => {
     renderer.getDrawingBufferSize(material.uniforms.viewport.value);
     material.uniforms.pixelRatio.value = renderer.getPixelRatio();

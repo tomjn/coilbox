@@ -57,6 +57,12 @@ describe("buildEffectsLayer", () => {
     expect(buildEffectsLayer().object.frustumCulled).toBe(false);
   });
 
+  it("draws over everything, so a spray inside the stand-in still shows", () => {
+    const { object } = buildEffectsLayer();
+    expect((object.material as THREE.ShaderMaterial).depthTest).toBe(false);
+    expect(object.renderOrder).toBeGreaterThan(0);
+  });
+
   it("carries a viewport and a pixel ratio uniform, filled from the renderer before it draws", () => {
     const layer = buildEffectsLayer();
     const material = layer.object.material as THREE.ShaderMaterial;
