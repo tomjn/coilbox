@@ -81,6 +81,9 @@ pub struct DecodedCob {
     /// Where each script starts in `code`, in the same order as `scripts`. A
     /// `CALL` names a script by index and jumps to its start.
     pub offsets: Vec<usize>,
+    /// The sounds a TA:K script plays by index, in its own order. Empty for a
+    /// TA script, which has no table (`CobFile.cpp:37-38,174-190`).
+    pub sounds: Vec<String>,
 }
 
 pub fn decode(buf: &[u8]) -> Result<DecodedCob, String> {
@@ -120,12 +123,23 @@ pub fn decode(buf: &[u8]) -> Result<DecodedCob, String> {
         })
         .collect();
 
+    // Version 6 is TA:K, whose header runs two words past the eleven: where
+    // the sound names are, then how many.
+    let sounds = if header.version == 6 {
+        let at = read_u32(buf, HEADER_WORDS * 4)?;
+        let count = read_u32(buf, HEADER_WORDS * 4 + 4)?;
+        names_at(at, count)?
+    } else {
+        Vec::new()
+    };
+
     Ok(DecodedCob {
         header,
         pieces,
         scripts,
         code,
         offsets: starts,
+        sounds,
     })
 }
 
@@ -222,6 +236,35 @@ pub fn encode(
     out
 }
 
+/// A TA:K file made out of a TA one, for tests.
+///
+/// `encode` writes TA's eleven-word header with the code straight after it.
+/// TA:K's header is two words longer, so `bytes` must come from an `encode`
+/// whose first script is two words of padding. Those two words become the
+/// sound table's offset and count, and the table goes on the end.
+// Unused where the disassembly integration test compiles this module on its
+// own, as `DecodedCob`'s fields are.
+#[cfg(test)]
+#[allow(dead_code)]
+pub(crate) fn ta_kingdoms(mut bytes: Vec<u8>, sounds: &[&str]) -> Vec<u8> {
+    let table = bytes.len() as u32;
+    let mut name_at = table + 4 * sounds.len() as u32;
+    let mut offsets = Vec::new();
+    let mut names = Vec::new();
+    for sound in sounds {
+        offsets.extend_from_slice(&name_at.to_le_bytes());
+        names.extend_from_slice(sound.as_bytes());
+        names.push(0);
+        name_at += sound.len() as u32 + 1;
+    }
+    bytes[0..4].copy_from_slice(&6u32.to_le_bytes());
+    bytes[44..48].copy_from_slice(&table.to_le_bytes());
+    bytes[48..52].copy_from_slice(&(sounds.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&offsets);
+    bytes.extend_from_slice(&names);
+    bytes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +294,32 @@ mod tests {
             }
             s
         }
+    }
+
+    fn padded() -> Vec<u8> {
+        let mut code = HashMap::new();
+        code.insert("Pad".to_string(), vec![0u8; 8]);
+        code.insert("Create".to_string(), vec![0u8; 4]);
+        encode(
+            &["Pad".to_string(), "Create".to_string()],
+            &code,
+            &["base".to_string()],
+            &[],
+            4,
+        )
+    }
+
+    /// `CobFile.cpp:174-190`: a TA:K script names its sounds in a table.
+    #[test]
+    fn reads_a_ta_kingdoms_sound_table() {
+        let decoded = decode(&ta_kingdoms(padded(), &["krogtaunt", "krogdeath"])).unwrap();
+        assert_eq!(decoded.sounds, ["krogtaunt", "krogdeath"]);
+        assert_eq!(decoded.pieces, ["base"]);
+    }
+
+    /// A TA script has no table, and the two words after its header are code.
+    #[test]
+    fn a_ta_script_has_no_sound_table() {
+        assert!(decode(&padded()).unwrap().sounds.is_empty());
     }
 }
