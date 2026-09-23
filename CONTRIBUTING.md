@@ -73,7 +73,7 @@ Don't reach for native `<select>` / `<input type=checkbox>` / `<textarea>`.
 
 ## Before you open a PR
 
-Run the **full** lint and test suite locally. CI (`.github/workflows/lint.yml`) runs three jobs and seven commands, so run all seven even if you only touched one surface. Use the same commands CI runs, not a narrower subset:
+Run the **full** lint and test suite locally. CI (`.github/workflows/lint.yml`) runs the seven commands below, split across parallel jobs, so run all seven even if you only touched one surface. Use the same commands CI runs, not a narrower subset:
 
 **Frontend**
 
@@ -101,7 +101,7 @@ Let rustfmt own formatting — run `cargo fmt --all` rather than hand-formatting
 
 Both Lua suites need `luajit` on your PATH (`brew install luajit` on macOS), as do two vitest files that shell out to it to check the Lua they generate compiles. Without the binary they fail on the missing dependency rather than on a real error.
 
-The two easiest checks to forget are `scripts/mission-tests.sh` and `cargo test --workspace`. The Lua job is a whole third CI job with no lint in it: the mission runtime and the blueprint widget are Lua the engine runs, so neither of the other jobs compiles them and a break would otherwise reach a game. `cargo test --workspace` sits at the end of the Rust job because clippy compiles `#[cfg(test)]` modules but never runs them, so a wrong Rust test would otherwise pass forever.
+The two easiest checks to forget are `scripts/mission-tests.sh` and `cargo test --workspace`. The Lua job is a CI job of its own with no lint in it: the mission runtime and the blueprint widget are Lua the engine runs, so none of the other jobs compiles them and a break would otherwise reach a game. The Rust tests have their own job because clippy compiles `#[cfg(test)]` modules but never runs them, so a wrong Rust test would otherwise pass forever. CI runs them with `cargo nextest run` plus `cargo test --doc`, which together cover what `cargo test --workspace` does locally.
 
 If a CI job fails on a step called `Install LuaJIT` or `Linux build dependencies`, that is an apt failure on the runner rather than your diff. Re-run the job.
 
