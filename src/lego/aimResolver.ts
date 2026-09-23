@@ -208,7 +208,8 @@ export function worldAt(
   // (RecoilEngine MobileCAI.cpp:1451-1453), so a call-in firing on that
   // frame still reads the stand-in where it stood, not on the piece.
   const attach = attachedAt(track, frame);
-  const riding = attach && frame > attach.frame ? ctx.attachPiece(attach.from) : null;
+  const riding =
+    attach && frame > attach.frame ? ctx.attachPiece(attach.from) : null;
   if (riding) return { standIn: { ...base, pos: riding }, self: ctx.self };
 
   const pose = standInAt(track, frame, ctx.radius);
