@@ -657,7 +657,7 @@ export function AnimationPanel({
                   // buttons 14px below the thumb.
                   className="h-8"
                 />
-                {timeline && timeline.events.some(isMarked) ? (
+                {timeline?.events.some(isMarked) ? (
                   <ScrubberMarks
                     events={timeline.events}
                     frameCount={timeline.frames.length}
