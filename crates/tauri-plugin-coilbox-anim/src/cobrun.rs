@@ -497,6 +497,18 @@ impl Run {
                 }
             }
         }
+        // After the frame's call-ins and before its threads, because the engine
+        // updates builders before scripts tick (`rts/Game/Game.cpp:1782-1798`).
+        if self.model.spraying {
+            self.tick_queued_call_ins(start)?;
+            let answer = if self.model.nano.wants_answer() {
+                let piece = self.query_nano_piece()?;
+                Some(model_piece(&self.program, piece))
+            } else {
+                None
+            };
+            self.model.spray(frame, answer);
+        }
         Ok(())
     }
 
@@ -509,16 +521,9 @@ impl Run {
     /// acts, the way the engine's own call to each runs its first tick inline
     /// before the next call (`CobInstance.cpp:593`).
     fn engine(&mut self, action: EngineAction) -> Result<(), String> {
-        match action {
-            EngineAction::NanoStart => {
-                self.model.spraying = true;
-                return Ok(());
-            }
-            EngineAction::NanoStop => {
-                self.model.spraying = false;
-                return Ok(());
-            }
-            EngineAction::Attach | EngineAction::Detach => {}
+        if matches!(action, EngineAction::NanoStart | EngineAction::NanoStop) {
+            self.model.spraying = action == EngineAction::NanoStart;
+            return Ok(());
         }
         let Some(stand_in) = self.world.as_ref().and_then(|world| world.stand_in) else {
             self.model.note(
@@ -527,16 +532,12 @@ impl Run {
             );
             return Ok(());
         };
-        match action {
-            EngineAction::Attach => {
-                let piece = self.query_transport(stand_in.height)?;
-                self.attach(stand_in.id, piece);
-            }
-            EngineAction::Detach => {
-                self.model
-                    .drop_unit(self.frame, stand_in.id, self.world.as_ref());
-            }
-            EngineAction::NanoStart | EngineAction::NanoStop => unreachable!(),
+        if action == EngineAction::Attach {
+            let piece = self.query_transport(stand_in.height)?;
+            self.attach(stand_in.id, piece);
+        } else {
+            self.model
+                .drop_unit(self.frame, stand_in.id, self.world.as_ref());
         }
         Ok(())
     }
@@ -582,6 +583,48 @@ impl Run {
         // Still running, as the engine leaves it (`CobInstance.cpp:620`).
         self.model.note(
             "QueryTransport waited rather than answering, so the stand-in rides script piece 2, which is what the engine answers for it."
+                .to_string(),
+        );
+        Ok(UNANSWERED)
+    }
+
+    /// Ask `QueryNanoPiece` straight away, as the engine's `Call` does.
+    ///
+    /// The engine seeds its arguments with a count of 1 and a -1, and returns
+    /// the first slot (`rts/Sim/Units/Scripts/CobInstance.cpp:411-421`). A
+    /// script with no `QueryNanoPiece`, or one that waits, leaves the count
+    /// there, so it answers script piece 1.
+    fn query_nano_piece(&mut self) -> Result<i32, String> {
+        const UNANSWERED: i32 = 1;
+        let Some(function) = self.program.script("QueryNanoPiece") else {
+            self.model.note(
+                "This script has no QueryNanoPiece call-in, so nano sprays from script piece 1, which is what the engine answers for it."
+                    .to_string(),
+            );
+            return Ok(UNANSWERED);
+        };
+        let mut thread = Thread::new(
+            function,
+            self.program.offsets[function],
+            0,
+            "QueryNanoPiece".into(),
+        );
+        // `RETURN` always discards the top of the stack, the way a script's
+        // own `return x` would, so the seeded `-1` sits above the count and
+        // is what that discard eats, leaving the script's answer in slot 0.
+        thread.data = vec![1, -1];
+        thread.params = 1;
+        self.add(thread)?;
+        let index = self.threads.len() - 1;
+        self.step_thread(index)?;
+        for thread in std::mem::take(&mut self.queued) {
+            self.add(thread)?;
+        }
+        if matches!(self.threads[index].state, State::Dead) {
+            return Ok(self.threads[index].data.first().copied().unwrap_or(0));
+        }
+        self.model.note(
+            "QueryNanoPiece waited rather than answering, so nano sprays from script piece 1, which is what the engine answers for it."
                 .to_string(),
         );
         Ok(UNANSWERED)

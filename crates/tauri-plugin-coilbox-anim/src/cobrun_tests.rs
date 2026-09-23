@@ -1466,3 +1466,91 @@ mod engine_attach {
         );
     }
 }
+
+mod engine_nano {
+    use super::*;
+    use coilbox_unitpose::{EngineAction, ScriptOutput};
+
+    fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(action),
+        }
+    }
+
+    fn sprayed(bytes: &[u8], frames: u32, start: u32, stop: u32) -> Timeline {
+        run(
+            bytes,
+            &model_pieces(),
+            &[
+                action(start, EngineAction::NanoStart),
+                action(stop, EngineAction::NanoStop),
+            ],
+            frames,
+            &[],
+            &HashMap::new(),
+        )
+    }
+
+    fn nano(timeline: &Timeline) -> Vec<(u32, Option<String>)> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Nano { frame, piece } => Some((*frame, piece.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `QueryNanoPiece(piecenum)` flips static 0 between 1 and 0 and answers
+    /// it plus one, so barrel, turret, barrel and so on.
+    fn alternating() -> Vec<u8> {
+        let mut words = vec![op("CREATE_LOCAL_VAR")];
+        words.extend(push(1));
+        words.extend([op("PUSH_STATIC"), 0, op("SUB"), op("POP_STATIC"), 0]);
+        words.extend([op("PUSH_STATIC"), 0]);
+        words.extend(push(1));
+        words.extend([op("ADD"), op("POP_LOCAL_VAR"), 0, op("RETURN")]);
+        build(&[("QueryNanoPiece", words)], PIECES, 1)
+    }
+
+    #[test]
+    fn sprays_from_what_query_nano_piece_answers_on_each_frame_between_start_and_stop() {
+        let timeline = sprayed(&alternating(), 8, 2, 6);
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            nano(&timeline),
+            [
+                (2, Some("barrel".to_string())),
+                (3, Some("turret".to_string())),
+                (4, Some("barrel".to_string())),
+                (5, Some("turret".to_string())),
+            ]
+        );
+    }
+
+    /// The engine seeds the call with `[1, -1]` and returns slot 0
+    /// (`CobInstance.cpp:411-421`), so with no call-in it is script piece 1.
+    #[test]
+    fn a_missing_query_nano_piece_answers_script_piece_one() {
+        let timeline = sprayed(&create_only(vec![op("RETURN")]), 3, 0, 2);
+
+        assert_eq!(
+            nano(&timeline),
+            [
+                (0, Some("turret".to_string())),
+                (1, Some("turret".to_string()))
+            ]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryNanoPiece")));
+    }
+}
