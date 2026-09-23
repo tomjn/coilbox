@@ -1,4 +1,5 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { ScriptEvent } from "../lego/scriptPlayback";
 
 /**
  * Typed bindings to `plugin:coilbox-anim|*` (the BOS/COB Rust crate). A port of
@@ -81,7 +82,7 @@ export const animCobRun = defineCommand<
   {
     bytes: number[];
     pieces: string[];
-    events: { frame: number; callin: string; args?: number[] }[];
+    events: ScriptEvent[];
     frames: number;
     /** Where each piece sits, in the same order as `pieces`, for a script that
      *  asks where one of them is. Absent when nobody said. */
