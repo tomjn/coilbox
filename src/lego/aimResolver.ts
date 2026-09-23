@@ -23,8 +23,20 @@
  * double the latency of every scrub.
  */
 
-import type { Scenario, ScriptEvent, StandInTrack } from "./scriptPlayback";
-import { STAND_IN_MID_Y, standInAt } from "./standIn";
+import {
+  type Scenario,
+  type ScriptEvent,
+  type ScriptWorld,
+  STAND_IN_UNIT_ID,
+  type StandInAttach,
+  type StandInTrack,
+} from "./scriptPlayback";
+import {
+  attachedAt,
+  STAND_IN_MID_Y,
+  standInAt,
+  standInHeight,
+} from "./standIn";
 
 type Vec3 = [number, number, number];
 
@@ -159,6 +171,64 @@ export function resolveScenario(
   });
 
   return { events, notes };
+}
+
+/** What the scene resolver needs to know about the unit and its script. */
+export interface WorldContext {
+  /** The stand-in's radius beside this unit, in elmos. */
+  radius: number;
+  /** The unit's own size, as its exported header would carry it. */
+  self: { radius: number; height: number };
+  /** Where the piece a call-in names rests, or null when the script names
+   *  none or cannot be asked. */
+  attachPiece: (from: StandInAttach["from"]) => Vec3 | null;
+}
+
+/**
+ * The scene on one frame, as a script asking about it is told.
+ *
+ * A carried stand-in is where its attach piece rests, because a carried unit
+ * is where its transport holds it. Rest rather than animated, for the reason
+ * the aim is measured from rest: the answer has to exist before the run.
+ */
+export function worldAt(
+  track: StandInTrack | null,
+  frame: number,
+  ctx: WorldContext,
+): ScriptWorld {
+  if (!track) return { standIn: null, self: ctx.self };
+  const base = {
+    id: STAND_IN_UNIT_ID,
+    radius: ctx.radius,
+    height: standInHeight(ctx.radius),
+  };
+
+  const attach = attachedAt(track, frame);
+  const riding = attach ? ctx.attachPiece(attach.from) : null;
+  if (riding) return { standIn: { ...base, pos: riding }, self: ctx.self };
+
+  const pose = standInAt(track, frame, ctx.radius);
+  if (!pose) return { standIn: { ...base, pos: null }, self: ctx.self };
+  const from =
+    pose.fromAttachPiece && track.attach
+      ? ctx.attachPiece(track.attach.from)
+      : null;
+  const pos: Vec3 = from
+    ? [from[0] + pose.pos[0], from[1] + pose.pos[1], from[2] + pose.pos[2]]
+    : pose.pos;
+  return { standIn: { ...base, pos }, self: ctx.self };
+}
+
+/** Every event with the scene on its own frame. */
+export function withWorld(
+  events: ScriptEvent[],
+  track: StandInTrack | null,
+  ctx: WorldContext,
+): ScriptEvent[] {
+  return events.map((event) => ({
+    ...event,
+    world: worldAt(track, event.frame, ctx),
+  }));
 }
 
 /**

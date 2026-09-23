@@ -151,6 +151,13 @@ const NOSE_COLOUR = 0x14b8a6;
 /** How tall the shape is, in multiples of its radius. `STAND_IN_MID_Y` is half
  *  this, which is where its middle sits. */
 const HEIGHT = STAND_IN_MID_Y * 2;
+
+/** How tall the stand-in is, in elmos, which is what the engine calls a
+ *  unit's height. */
+export function standInHeight(radius: number): number {
+  return HEIGHT * radius;
+}
+
 /** How far past the radius the nose reaches, in multiples of the radius. What
  *  makes a shape seen from behind different from one seen in front. */
 const NOSE_REACH = 1.35;

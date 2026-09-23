@@ -33,6 +33,23 @@ export interface ScriptEvent {
    * (`rts/Sim/Units/UnitTypes/Builder.cpp:942-955`).
    */
   aimAtStandIn?: { from: "AimFromWeapon" | "midPos" };
+  /**
+   * The scene on this event's frame, for a script that asks where something is.
+   * Filled in by `withWorld` before the run, never written by hand, for the
+   * same reason `aimAtStandIn` is resolved rather than literal.
+   */
+  world?: ScriptWorld;
+}
+
+/** The scene one frame of a script run is told about. */
+export interface ScriptWorld {
+  standIn: {
+    id: number;
+    pos: [number, number, number] | null;
+    radius: number;
+    height: number;
+  } | null;
+  self: { radius: number; height: number };
 }
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
@@ -209,8 +226,12 @@ export const CREATED: ScriptEvent[] = [
  *
  * The preview has no unit table for a script to look this up in, so the number
  * only has to be a plausible id: what a script does with it is open a door.
+ *
+ * Two, not one: one is the unit itself (`UNIT_ID` in
+ * `crates/coilbox-unitpose/src/unitvalue.rs`), and a script asking where its
+ * passenger is would otherwise be told where it is itself.
  */
-const STAND_IN_UNIT_ID = 1;
+export const STAND_IN_UNIT_ID = 2;
 
 /**
  * What a preview can put a unit through.

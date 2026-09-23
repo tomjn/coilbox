@@ -9,6 +9,7 @@ import {
   type S3oPiece,
   sitOnGround,
   unitBounds,
+  unitSize,
 } from "./s3oBuild";
 
 /**
@@ -441,6 +442,22 @@ describe("buildS3o", () => {
 
     expect(build?.texture1).toBe("probe.png");
     expect(build?.texture2).toBe("probe_glow.png");
+  });
+});
+
+describe("unitSize", () => {
+  it("matches the radius and height buildS3o's header would carry", () => {
+    const doc = project([
+      { id: "hull", name: "hull", parentId: "root" },
+      { id: "gun", name: "gun", parentId: "hull" },
+    ]);
+
+    const built = buildS3o(doc, pack(), null, TEXTURES);
+
+    expect(unitSize(doc, pack(), null)).toEqual({
+      radius: built?.radius,
+      height: built?.height,
+    });
   });
 });
 
