@@ -232,6 +232,9 @@ struct Sim {
     /// How many lines the script has printed, so a script printing every frame
     /// does not bury everything else the run has to say.
     printed: usize,
+    /// The scene the latest event brought, for a script asking where something
+    /// is. Kept until the next event brings another.
+    world: Option<coilbox_unitpose::World>,
 }
 
 /// One of the script's threads: a call-in the preview fired, or something a
@@ -571,6 +574,11 @@ impl Run {
     fn fire_due(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         let frame = self.frame;
         for event in events.iter().filter(|event| event.frame == frame) {
+            // Before the call-in, and whether or not the script has one, so
+            // the scene is right for every thread from this frame on.
+            if let Some(world) = &event.world {
+                self.sim.borrow_mut().world = Some(world.clone());
+            }
             let function: Option<Function> = self.script.get(event.callin.as_str()).ok().flatten();
             let Some(function) = function else {
                 if !event.ambient {
@@ -1396,15 +1404,51 @@ fn install_spring(
     )?;
 
     // The unit itself stands at the origin, which is where the viewport draws
-    // it, so a piece's place in the unit is also its place in the world.
+    // it. The stand-in is where the scene the latest event brought puts it, and
+    // any other id is a unit that does not exist, which the engine answers with
+    // nothing.
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitPosition",
-        lua.create_function(move |_, _: MultiValue| {
-            state.borrow_mut().model.note(
-                "GetUnitPosition answers the origin in the preview, which is where the unit stands because there is nowhere else to stand.".to_string(),
-            );
-            Ok((0.0, 0.0, 0.0))
+        lua.create_function(move |_, (id, _): (Option<i64>, MultiValue)| {
+            let mut sim = state.borrow_mut();
+            let asked = id.unwrap_or(i64::from(unitvalue::UNIT_ID));
+            let Some(world) = sim.world.clone() else {
+                sim.model.note(
+                    "GetUnitPosition answers the origin in the preview, which is where the unit stands because there is nowhere else to stand.".to_string(),
+                );
+                return Ok((Some(0.0), Some(0.0), Some(0.0)));
+            };
+            Ok(match unitvalue::who(asked, &world) {
+                unitvalue::Who::Own(_) => (Some(0.0), Some(0.0), Some(0.0)),
+                unitvalue::Who::StandIn(stand_in) => match stand_in.pos {
+                    Some([x, y, z]) => (Some(x), Some(y), Some(z)),
+                    None => {
+                        sim.model.note(
+                            "This script asks where the stand-in is on a frame this scenario puts it nowhere, so it read nothing.".to_string(),
+                        );
+                        (None, None, None)
+                    }
+                },
+                unitvalue::Who::Nobody => (None, None, None),
+            })
+        })?,
+    )?;
+
+    // A unit's size, which a transport reads to know how far to lower what it
+    // is carrying.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitHeight",
+        lua.create_function(move |_, (id, _): (Option<i64>, MultiValue)| {
+            Ok(unit_size(&state, "GetUnitHeight", id).map(|(_, height)| height))
+        })?,
+    )?;
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitRadius",
+        lua.create_function(move |_, (id, _): (Option<i64>, MultiValue)| {
+            Ok(unit_size(&state, "GetUnitRadius", id).map(|(radius, _)| radius))
         })?,
     )?;
 
@@ -1714,6 +1758,23 @@ fn piece_position(sim: &mut Sim, piece: Option<i64>) -> [f64; 3] {
             );
             [0.0; 3]
         }
+    }
+}
+
+/// A unit's radius and height from the scene the latest event brought, or
+/// nothing for a unit that does not exist, which is what the engine answers.
+fn unit_size(sim: &Rc<RefCell<Sim>>, asked_by: &str, id: Option<i64>) -> Option<(f64, f64)> {
+    let mut sim = sim.borrow_mut();
+    let Some(world) = sim.world.clone() else {
+        sim.model.note(format!(
+            "{asked_by} has nothing to answer with, because the preview was not told how big anything is."
+        ));
+        return None;
+    };
+    match unitvalue::who(id.unwrap_or(i64::from(unitvalue::UNIT_ID)), &world) {
+        unitvalue::Who::Own(own) => Some((own.radius, own.height)),
+        unitvalue::Who::StandIn(stand_in) => Some((stand_in.radius, stand_in.height)),
+        unitvalue::Who::Nobody => None,
     }
 }
 
@@ -2159,6 +2220,15 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                 } else {
                     unitvalue::pack_xz(at[0], at[2])
                 });
+            }
+            // Where a unit is and how big, from the scene the latest event
+            // brought. Before the stored values, because a script cannot set
+            // these.
+            if let Some(answer) = unitvalue::world(id, p1, sim.world.as_ref()) {
+                if let Some(note) = answer.note {
+                    sim.model.note(note);
+                }
+                return Ok(answer.value);
             }
             if let Some(value) = sim.values.get(&id) {
                 return Ok(*value);
