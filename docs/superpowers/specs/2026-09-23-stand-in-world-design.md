@@ -84,7 +84,7 @@ Each runtime keeps the last `world` it was handed and answers from it until the 
 
 - When the track places the stand-in on the event's frame, `standIn` is its base position from `standInAt(track, frame, radius)`. Its radius is `standInRadius(bounds)` and its height is the `HEIGHT * radius` the shape in `standIn.ts` is built to.
 - When the stand-in is attached on that frame, `pos` is the attach piece's rest position, which is the same compromise `aimResolver` makes for aim and for the same reason.
-- When the track places no stand-in on that frame, `standIn` is null.
+- When the track places no stand-in on that frame, `standIn` keeps its id and `pos` is null, as C2 describes.
 - A scenario with no track still gets `self`, so the unit can answer questions about itself.
 
 `AnimationPanel.start()` already runs `resolveScenario` before every run (`src/lego/pages/components/AnimationPanel.tsx:389-433`), so the new resolver runs in the same place and needs no new wiring. The "Call a function" mode passes `self` and no stand-in.
