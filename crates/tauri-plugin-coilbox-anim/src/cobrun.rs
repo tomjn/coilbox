@@ -509,6 +509,17 @@ impl Run {
     /// acts, the way the engine's own call to each runs its first tick inline
     /// before the next call (`CobInstance.cpp:593`).
     fn engine(&mut self, action: EngineAction) -> Result<(), String> {
+        match action {
+            EngineAction::NanoStart => {
+                self.model.spraying = true;
+                return Ok(());
+            }
+            EngineAction::NanoStop => {
+                self.model.spraying = false;
+                return Ok(());
+            }
+            EngineAction::Attach | EngineAction::Detach => {}
+        }
         let Some(stand_in) = self.world.as_ref().and_then(|world| world.stand_in) else {
             self.model.note(
                 "The scenario has the engine carry the stand-in, and there is no stand-in in the scene."
@@ -525,6 +536,7 @@ impl Run {
                 self.model
                     .drop_unit(self.frame, stand_in.id, self.world.as_ref());
             }
+            EngineAction::NanoStart | EngineAction::NanoStop => unreachable!(),
         }
         Ok(())
     }

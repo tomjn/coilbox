@@ -15,9 +15,11 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod nanopiece;
 pub mod passenger;
 pub mod unitvalue;
 
+pub use nanopiece::NanoPieces;
 pub use passenger::Passenger;
 
 /// Said once when a run recorded an effect, an explosion or a sound, none of
@@ -88,6 +90,13 @@ pub struct ScriptEvent {
 pub enum EngineAction {
     Attach,
     Detach,
+    /// A builder starts spraying nano. `CBuilder` adds build power, and
+    /// sprays, on every frame it builds (`rts/Sim/Units/UnitTypes/Builder.cpp:339-354`).
+    #[serde(rename = "nano-start")]
+    NanoStart,
+    /// It stops.
+    #[serde(rename = "nano-stop")]
+    NanoStop,
 }
 
 /// What the preview's scene holds on one event's frame, for a script that asks.
@@ -173,6 +182,9 @@ pub enum ScriptOutput {
     /// compiled script with no sound table, which is a TA script rather than
     /// a TA:K one.
     Sound { frame: u32, name: Option<String> },
+    /// The piece one frame's nano particle comes from, as `NanoPieceCache`
+    /// chose it. None when the script has named no piece of this unit yet.
+    Nano { frame: u32, piece: Option<String> },
 }
 
 impl ScriptOutput {
@@ -349,6 +361,12 @@ pub struct Model {
     pub passenger: Passenger,
     /// What the script announced, in the order it did.
     pub events: Vec<ScriptOutput>,
+    /// Whether a builder is spraying nano, between an engine `nano-start` and
+    /// `nano-stop`.
+    pub spraying: bool,
+    /// Which piece it sprays from. Kept for the whole run, as the engine keeps
+    /// one cache per builder.
+    pub nano: NanoPieces,
 }
 
 impl Model {
@@ -532,6 +550,17 @@ impl Model {
 
     pub fn play_sound(&mut self, frame: u32, name: Option<String>) {
         self.events.push(ScriptOutput::Sound { frame, name });
+    }
+
+    /// One spraying frame. `answer` is what `QueryNanoPiece` named, or none
+    /// when the cache has stopped asking (`NanoPieceCache.cpp:29-47`).
+    pub fn spray(&mut self, frame: u32, answer: Option<Option<usize>>) {
+        let piece = self.nano.next(frame, answer);
+        if piece.is_none() {
+            self.note("The script has named no nano piece, so nothing sprays.".to_string());
+        }
+        let piece = piece.map(|index| self.pieces[index].name.clone());
+        self.events.push(ScriptOutput::Nano { frame, piece });
     }
 
     /// Attach a unit to `piece`, or to the void when there is none.
@@ -1045,5 +1074,49 @@ mod world_tests {
         let plain: ScriptEvent =
             serde_json::from_str(r#"{ "frame": 0, "callin": "Create" }"#).unwrap();
         assert_eq!(plain.engine, None);
+    }
+
+    #[test]
+    fn reads_the_nano_actions() {
+        let start: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 15, "engine": "nano-start" }"#).unwrap();
+        assert_eq!(start.engine, Some(EngineAction::NanoStart));
+        let stop: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 150, "engine": "nano-stop" }"#).unwrap();
+        assert_eq!(stop.engine, Some(EngineAction::NanoStop));
+    }
+
+    #[test]
+    fn a_spraying_frame_records_its_piece_by_name() {
+        let mut model = Model::new(&["base".to_string(), "nozzle".to_string()]);
+        model.spray(4, Some(Some(1)));
+        model.spray(5, Some(None));
+        assert_eq!(
+            model.events,
+            [
+                ScriptOutput::Nano {
+                    frame: 4,
+                    piece: Some("nozzle".to_string())
+                },
+                ScriptOutput::Nano {
+                    frame: 5,
+                    piece: Some("nozzle".to_string())
+                },
+            ]
+        );
+        assert_eq!(
+            serde_json::to_value(&model.events[0]).unwrap(),
+            serde_json::json!({ "kind": "nano", "frame": 4, "piece": "nozzle" })
+        );
+    }
+
+    /// Nano is drawn, so it does not bring the note that effects are not.
+    #[test]
+    fn nano_alone_does_not_say_effects_are_not_drawn() {
+        let mut model = Model::new(&["base".to_string()]);
+        model.spray(0, Some(Some(0)));
+        let mut timeline = Timeline::new(vec!["base".to_string()], 1);
+        model.finish(&mut timeline);
+        assert!(!timeline.warnings.iter().any(|w| w == EFFECTS_NOTE));
     }
 }

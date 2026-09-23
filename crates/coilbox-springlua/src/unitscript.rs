@@ -625,6 +625,17 @@ impl Run {
     /// acts, the way the engine's own call to each runs its first tick inline
     /// before the next call (`LuaUnitScript.cpp:787-790,975`).
     fn engine(&mut self, action: EngineAction) {
+        match action {
+            EngineAction::NanoStart => {
+                self.sim.borrow_mut().model.spraying = true;
+                return;
+            }
+            EngineAction::NanoStop => {
+                self.sim.borrow_mut().model.spraying = false;
+                return;
+            }
+            EngineAction::Attach | EngineAction::Detach => {}
+        }
         let stand_in = self
             .sim
             .borrow()
@@ -641,6 +652,7 @@ impl Run {
         let piece = match action {
             EngineAction::Attach => Some(self.query_transport(stand_in.id)),
             EngineAction::Detach => None,
+            EngineAction::NanoStart | EngineAction::NanoStop => unreachable!(),
         };
         let mut guard = self.sim.borrow_mut();
         let sim = &mut *guard;
