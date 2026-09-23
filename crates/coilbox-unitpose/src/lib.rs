@@ -792,6 +792,19 @@ mod tests {
         assert_eq!(model.passenger.at(), Some([4.0, 12.0, 0.0]));
     }
 
+    /// A later event's scene says where it last saw the stand-in, which is
+    /// no longer where a held stand-in is.
+    #[test]
+    fn a_later_scene_does_not_move_an_attached_stand_in() {
+        let mut model = placed();
+        model.attach_unit(0, 2, Some(2), Some(&scene([30.0, 0.0, 40.0])));
+        model.after_frame();
+        let later = scene([90.0, 0.0, 90.0]);
+
+        let answer = unitvalue::world(unitvalue::UNIT_XZ, 2, Some(&later), model.passenger.at());
+        assert_eq!(answer.map(|a| a.value), Some(unitvalue::pack_xz(4.0, 0.0)));
+    }
+
     /// A riding stand-in follows its piece frame by frame.
     #[test]
     fn a_riding_stand_in_follows_its_piece() {
