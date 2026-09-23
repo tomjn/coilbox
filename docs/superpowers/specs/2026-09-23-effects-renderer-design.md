@@ -82,7 +82,7 @@ A `null` piece means the query named no piece, and the run notes it once.
 
 **`shot`.** `ScriptEvent.engine` gains `"fire"`, with a `weapon` number. On its frame the runtime calls `FireWeapon<n>`, then `Shot<n>`, then asks `QueryWeapon<n>` inline and records the answer. This follows project 2's `engine: "attach"`, which asks `QueryTransport` inline.
 
-**`nano`.** `ScriptEvent.engine` gains `"build"`, with `until` (a frame) and `as: "builder" | "factory"`. After each frame from `frame` up to but not including `until`, the runtime runs the `NanoPieceCache` rule and records the piece:
+**`nano`.** `ScriptEvent.engine` gains `"nano-start"` and `"nano-stop"`. Two plain actions rather than one with an end frame, because a new field on `ScriptEvent` would touch every one of the 52 places Rust builds one. The builder and factory difference only matters to drawing, so it lives on the TypeScript `Scenario` as `nano: "builder" | "factory"`. The spray is on from a `nano-start` frame up to but not including the next `nano-stop` frame. The engine updates builders before scripts tick (`Game.cpp:1782-1798`), so on each of those frames the runtime runs the `NanoPieceCache` rule after the frame's call-ins and before its threads, and records the piece:
 
 - ask `QueryNanoPiece` while fewer than 30 cached answers in a row have come back
 - after that, pick among the cached pieces with the preview's seeded hash (section 3)
@@ -91,8 +91,10 @@ The engine's `lastNanoPieceCnt` bookkeeping is ported as it is, including a new 
 
 The scenarios change:
 
-- `building` gains `{ engine: "build", as: "builder" }` spans matching its two `StartBuilding` to `StopBuilding` pairs (`scriptPlayback.ts:348-359`).
-- `building-factory` gains one `as: "factory"` span from its `StartBuilding` to its `StopBuilding` (`:399-400`).
+- `building` gains `nano: "builder"`, and a `nano-start` and `nano-stop` on the frames of each of its two `StartBuilding` and `StopBuilding` pairs (`scriptPlayback.ts:348-359`).
+- `building-factory` gains `nano: "factory"`, and one pair on its `StartBuilding` and `StopBuilding` frames (`:399-400`).
+
+A missing `QueryNanoPiece` answers as the engine's does. COB seeds the call with `[1, -1]` and returns slot 0 (`CobInstance.cpp:411-421`), so a missing call-in or one that waits answers script piece 1. Lua's `RunQueryCallIn` answers -1, which names no piece. The run notes either case once.
 - `firing` replaces its two `Shot1` events with `{ engine: "fire", weapon: 1 }` on the same frames.
 
 The scrubber marks `flare` and `shot`, reading "Flare from flare1" and "Shot, weapon 1 from flare1". It does not mark `nano`, because a build span records one on every frame and would bury the other marks. The `StartBuilding` call-in already shows where a span starts.
@@ -126,7 +128,7 @@ interface Emission {
 - The tracer runs from the muzzle to the stand-in.
 - An `sfx 2048 + n` tracer runs along the emit direction instead, because the engine aims it one elmo along that direction.
 
-**Caching.** Posing the scene once for each frame that emits costs at most 450 poses. It is done once per timeline, using the scene-posing helper that moves out of `releasePoint` so both share it, and is cached in a `WeakMap` keyed by timeline. The cache is also dropped when the scene's geometry changes, because an emit point reads the piece's vertices.
+**Caching.** Posing the scene once for each frame that emits costs at most 450 poses. It is done once per timeline, posing the scene with `applyTimelineFrame` and then putting it back, as `releasePoint` does, and is cached in a `WeakMap` keyed by timeline. The cache is also dropped when the scene's geometry changes, because an emit point reads the piece's vertices.
 
 ## 3. Particles as a pure function of the frame
 
@@ -159,7 +161,7 @@ A new module, `src/lego/pages/components/effectsLayer.ts`, owns one `THREE.Mesh`
 
 `placeEffects(state, timeline, frame)` sits beside `placeStandIn` in both callers in `useScriptFrameStepping.ts`. It fills the buffers from `particlesAt` and marks them for upload.
 
-An "Effects" toggle sits with the stand-in toggle in `BuilderPage.tsx`, persisted through `src/lego/panels.ts`.
+An "Effects" toggle sits beside the stand-in toggle in `ModelViewport.tsx`, held in local state as that one is.
 
 ## 5. Bitmaps from the unit's game
 
