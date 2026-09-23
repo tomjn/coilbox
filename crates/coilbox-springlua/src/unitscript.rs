@@ -613,6 +613,21 @@ impl Run {
                 Mask::default(),
             )?;
         }
+        // After the frame's call-ins and before its threads, because the engine
+        // updates builders before scripts tick (`rts/Game/Game.cpp:1782-1798`).
+        let spraying = self.sim.borrow().model.spraying;
+        if spraying {
+            self.tick_queued_call_ins(start)?;
+            let wants = self.sim.borrow().model.nano.wants_answer();
+            let answer = if wants {
+                let piece = self.query_nano_piece();
+                let count = self.sim.borrow().model.pieces.len();
+                Some(usize::try_from(piece).ok().filter(|index| *index < count))
+            } else {
+                None
+            };
+            self.sim.borrow_mut().model.spray(frame, answer);
+        }
         Ok(())
     }
 
@@ -625,16 +640,9 @@ impl Run {
     /// acts, the way the engine's own call to each runs its first tick inline
     /// before the next call (`LuaUnitScript.cpp:787-790,975`).
     fn engine(&mut self, action: EngineAction) {
-        match action {
-            EngineAction::NanoStart => {
-                self.sim.borrow_mut().model.spraying = true;
-                return;
-            }
-            EngineAction::NanoStop => {
-                self.sim.borrow_mut().model.spraying = false;
-                return;
-            }
-            EngineAction::Attach | EngineAction::Detach => {}
+        if matches!(action, EngineAction::NanoStart | EngineAction::NanoStop) {
+            self.sim.borrow_mut().model.spraying = action == EngineAction::NanoStart;
+            return;
         }
         let stand_in = self
             .sim
@@ -649,11 +657,7 @@ impl Run {
             return;
         };
         // Asked before the borrow below, because answering runs Lua.
-        let piece = match action {
-            EngineAction::Attach => Some(self.query_transport(stand_in.id)),
-            EngineAction::Detach => None,
-            EngineAction::NanoStart | EngineAction::NanoStop => unreachable!(),
-        };
+        let piece = (action == EngineAction::Attach).then(|| self.query_transport(stand_in.id));
         let mut guard = self.sim.borrow_mut();
         let sim = &mut *guard;
         let Some(piece) = piece else {
@@ -703,6 +707,36 @@ impl Run {
             Err(error) => {
                 self.sim.borrow_mut().model.note(format!(
                     "QueryTransport failed, so the stand-in goes in the void, which is what the engine answers for it: {}",
+                    describe(&error)
+                ));
+                -1
+            }
+        }
+    }
+
+    /// Ask `QueryNanoPiece` straight away, as the engine's `RunQueryCallIn`
+    /// does: a piece counted from one out, less one. A script with no
+    /// `QueryNanoPiece`, or one that fails or answers with no number, gets -1,
+    /// which names no piece (`rts/Sim/Units/Scripts/LuaUnitScript.cpp:505-519,836-840`).
+    fn query_nano_piece(&mut self) -> i64 {
+        let function: Option<Function> = self.script.get("QueryNanoPiece").ok().flatten();
+        let Some(function) = function else {
+            self.sim.borrow_mut().model.note(
+                "This script has no QueryNanoPiece call-in, so no nano sprays, which is what the engine does.".to_string(),
+            );
+            return -1;
+        };
+        match function.call::<Option<f64>>(()) {
+            Ok(Some(piece)) => piece as i64 - 1,
+            Ok(None) => {
+                self.sim.borrow_mut().model.note(
+                    "QueryNanoPiece answered with no piece, so no nano sprays from it.".to_string(),
+                );
+                -1
+            }
+            Err(error) => {
+                self.sim.borrow_mut().model.note(format!(
+                    "QueryNanoPiece failed, so no nano sprays from it: {}",
                     describe(&error)
                 ));
                 -1

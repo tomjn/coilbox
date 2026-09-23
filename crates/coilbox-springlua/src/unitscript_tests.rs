@@ -2979,3 +2979,87 @@ mod engine_attach {
         );
     }
 }
+
+mod engine_nano {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(action),
+        }
+    }
+
+    fn sprayed(script: &str, frames: u32, start: u32, stop: u32) -> Timeline {
+        run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &[
+                action(start, EngineAction::NanoStart),
+                action(stop, EngineAction::NanoStop),
+            ],
+            frames,
+            &HashMap::new(),
+        )
+    }
+
+    fn nano(timeline: &Timeline) -> Vec<(u32, Option<String>)> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Nano { frame, piece } => Some((*frame, piece.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The same answers as the compiled runtime's `alternating` script.
+    #[test]
+    fn sprays_from_what_query_nano_piece_answers_on_each_frame_between_start_and_stop() {
+        let timeline = sprayed(
+            r#"
+            local turret, barrel = piece("turret", "barrel")
+            local flip = 0
+            function script.QueryNanoPiece()
+                flip = 1 - flip
+                if flip == 1 then return barrel end
+                return turret
+            end
+            "#,
+            8,
+            2,
+            6,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            nano(&timeline),
+            [
+                (2, Some("barrel".to_string())),
+                (3, Some("turret".to_string())),
+                (4, Some("barrel".to_string())),
+                (5, Some("turret".to_string())),
+            ]
+        );
+    }
+
+    /// `RunQueryCallIn` answers -1 when there is nothing to call
+    /// (`LuaUnitScript.cpp:505-519`), which names no piece.
+    #[test]
+    fn a_missing_query_nano_piece_names_no_piece() {
+        let timeline = sprayed("function script.Create() end", 3, 0, 2);
+
+        assert_eq!(nano(&timeline), [(0, None), (1, None)]);
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryNanoPiece")));
+    }
+}
