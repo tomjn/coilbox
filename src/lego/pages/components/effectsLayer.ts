@@ -1,9 +1,9 @@
 /**
  * The dots a unit script's effects are drawn with.
  *
- * One instanced quad per particle, turned to face the camera in the vertex
- * shader, so orbiting the camera, which re-renders without a new frame, needs
- * no rebuild. Opaque and hard edged, which is how Total Annihilation drew nano.
+ * One instanced quad per particle, turned to face the camera and sized in
+ * screen pixels in the vertex shader, so orbiting or zooming the camera, which
+ * re-renders without a new frame, needs no rebuild. Opaque and hard edged, which is how Total Annihilation drew nano.
  */
 
 import * as THREE from "three";
@@ -15,15 +15,19 @@ export interface EffectsLayer {
   dispose(): void;
 }
 
+/** A dot's size is in screen pixels, not elmos, so it stays the same size at
+ *  any zoom, as TA's did. One pixel is 2 / viewport in clip space, scaled by w
+ *  to undo the perspective divide. */
 const VERTEX = /* glsl */ `
+uniform vec2 viewport;
+uniform float pixelRatio;
 attribute vec3 center;
 attribute float halfSize;
 attribute vec3 tint;
 varying vec3 vTint;
 void main() {
-  vec4 view = modelViewMatrix * vec4(center, 1.0);
-  view.xy += position.xy * halfSize;
-  gl_Position = projectionMatrix * view;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(center, 1.0);
+  gl_Position.xy += position.xy * halfSize * pixelRatio * 2.0 / viewport * gl_Position.w;
   vTint = tint;
 }
 `;
@@ -38,7 +42,10 @@ void main() {
 }
 `;
 
-export function buildEffectsLayer(): EffectsLayer {
+/** A geometry with room for `capacity` dots. three.js caches how many
+ *  instances a geometry can draw on its first render, so growing means a new
+ *  geometry, not new attributes on the old one. */
+function dotGeometry(capacity: number): THREE.InstancedBufferGeometry {
   const geometry = new THREE.InstancedBufferGeometry();
   geometry.setAttribute(
     "position",
@@ -48,36 +55,46 @@ export function buildEffectsLayer(): EffectsLayer {
     ),
   );
   geometry.setIndex([0, 1, 2, 0, 2, 3]);
-  let capacity = 0;
-  const grow = (count: number) => {
-    capacity = Math.max(count, capacity * 2, 64);
-    for (const name of ["center", "halfSize", "tint"]) {
-      (
-        geometry.getAttribute(name) as THREE.InstancedBufferAttribute | null
-      )?.dispose();
-    }
-    geometry.setAttribute(
-      "center",
-      new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
-    );
-    geometry.setAttribute(
-      "halfSize",
-      new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
-    );
-    geometry.setAttribute(
-      "tint",
-      new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
-    );
-  };
-  grow(0);
+  geometry.setAttribute(
+    "center",
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
+  );
+  geometry.setAttribute(
+    "halfSize",
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
+  );
+  geometry.setAttribute(
+    "tint",
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
+  );
   geometry.instanceCount = 0;
+  return geometry;
+}
+
+export function buildEffectsLayer(): EffectsLayer {
+  let capacity = 64;
+  let geometry = dotGeometry(capacity);
+  const grow = (count: number) => {
+    capacity = Math.max(count, capacity * 2);
+    geometry.dispose();
+    geometry = dotGeometry(capacity);
+    object.geometry = geometry;
+  };
 
   const material = new THREE.ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
+    uniforms: {
+      viewport: { value: new THREE.Vector2(1, 1) },
+      pixelRatio: { value: 1 },
+    },
   });
   const object = new THREE.Mesh(geometry, material);
   object.frustumCulled = false;
+  object.onBeforeRender = (renderer) => {
+    renderer.getDrawingBufferSize(material.uniforms.viewport.value);
+    material.uniforms.pixelRatio.value = renderer.getPixelRatio();
+  };
 
   return {
     object,
