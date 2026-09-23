@@ -191,6 +191,37 @@ describe("resolveScenario", () => {
     expect(events.find((e) => e.callin === "AimWeapon1")?.args).toEqual([0, 0]);
     expect(notes.join(" ")).toContain("no stand-in");
   });
+
+  /** The track is in radii, so where to put the stand-in down depends on the
+   *  unit, and has to be worked out rather than written as elmos. */
+  it("puts the stand-in down where the track had it", () => {
+    const putting: Scenario = {
+      ...firing,
+      events: [
+        { frame: 300, callin: "TransportDrop", dropAtStandIn: { frame: 120 } },
+      ],
+      standIn: { keys: [{ frame: 0, pos: [0, 0, 3] }] },
+    };
+    const { events } = resolveScenario(putting, context());
+    expect(events[0]).toEqual({
+      frame: 300,
+      callin: "TransportDrop",
+      args: [STAND_IN_UNIT_ID, 0, 0, 30],
+    });
+  });
+
+  it("puts it down at the origin, and says so, when the track has nowhere", () => {
+    const putting: Scenario = {
+      ...firing,
+      events: [
+        { frame: 300, callin: "TransportDrop", dropAtStandIn: { frame: 120 } },
+      ],
+      standIn: { keys: [] },
+    };
+    const { events, notes } = resolveScenario(putting, context());
+    expect(events[0].args).toEqual([STAND_IN_UNIT_ID, 0, 0, 0]);
+    expect(notes.join(" ")).toContain("TransportDrop");
+  });
 });
 
 const CTX: WorldContext = {

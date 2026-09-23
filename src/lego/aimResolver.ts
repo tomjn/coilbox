@@ -138,6 +138,8 @@ export function resolveScenario(
   const track = scenario.standIn;
 
   const events = scenario.events.map((event) => {
+    if (event.dropAtStandIn) return putDown(event, track, ctx.radius, notes);
+
     const marker = event.aimAtStandIn;
     if (!marker) return event;
     const { aimAtStandIn: _marker, ...rest } = event;
@@ -171,6 +173,24 @@ export function resolveScenario(
   });
 
   return { events, notes };
+}
+
+/** `TransportDrop`'s Lua arguments for a `dropAtStandIn` marker. */
+function putDown(
+  event: ScriptEvent,
+  track: StandInTrack | undefined,
+  radius: number,
+  notes: string[],
+): ScriptEvent {
+  const { dropAtStandIn: marker, ...rest } = event;
+  const pose = track && marker ? standInAt(track, marker.frame, radius) : null;
+  if (!pose) {
+    notes.push(
+      `${event.callin} puts the stand-in down where it stood on frame ${marker?.frame}, and this scenario places no stand-in then. It is put down at the unit's origin instead.`,
+    );
+    return { ...rest, args: [STAND_IN_UNIT_ID, 0, 0, 0] };
+  }
+  return { ...rest, args: [STAND_IN_UNIT_ID, ...pose.pos] };
 }
 
 /** What the scene resolver needs to know about the unit and its script. */

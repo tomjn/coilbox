@@ -35,6 +35,14 @@ export interface ScriptEvent {
    */
   aimAtStandIn?: { from: "AimFromWeapon" | "midPos" };
   /**
+   * Put the stand-in down where the track had it on `frame`, rather than at
+   * literal coordinates. `resolveScenario` replaces the marker with
+   * `TransportDrop`'s Lua arguments, the unit id then x, y and z in elmos,
+   * because a track is measured in the stand-in's radius and that depends on
+   * the unit.
+   */
+  dropAtStandIn?: { frame: number };
+  /**
    * The scene on this event's frame, for a script that asks where something is.
    * Filled in by `withWorld` before the run, never written by hand, for the
    * same reason `aimAtStandIn` is resolved rather than literal.
