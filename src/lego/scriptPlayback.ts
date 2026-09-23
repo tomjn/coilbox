@@ -162,6 +162,16 @@ export interface StandInKey {
    * origin, as any other key is.
    */
   fromRelease?: boolean;
+  /**
+   * Measure `pos` from a spot a fixed number of elmos clear of the unit's
+   * edge, rather than from the unit's origin.
+   *
+   * `trackBesideUnit` in `standIn.ts` resolves this into an ordinary `pos`
+   * once the unit's and stand-in's radii are both known, so nothing
+   * downstream reads `fromEdge` itself. Never set together with
+   * `fromRelease`.
+   */
+  fromEdge?: number;
   /** Radians about the vertical axis, relative to the unit's facing. Zero
    *  where no key sets one. */
   heading?: number;
@@ -273,6 +283,11 @@ export const CREATED: ScriptEvent[] = [
  * passenger is would otherwise be told where it is itself.
  */
 export const STAND_IN_UNIT_ID = 2;
+
+/** Elmos between the transport's edge and a stand-in waiting beside it,
+ *  chosen by the user as a fixed gap rather than one that scales with the
+ *  unit. */
+const STAND_OFF = 5;
 
 /**
  * What a preview can put a unit through.
@@ -479,13 +494,13 @@ export const SCENARIOS: Scenario[] = [
       size: 0.1,
       keys: [
         // Approaching on the ground, from in front.
-        { frame: 0, pos: [0, 0, 4.5] },
+        { frame: 0, pos: [0, 0, 2], fromEdge: STAND_OFF },
         { frame: at(4), pos: [0, 0, 1] },
         // The return leg, which is the preview's rather than the engine's: no
         // unload call-in fires during it. It walks from wherever the detach
         // left the stand-in back to where it started, so the loop does not
         // jump.
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 4.5] },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 2], fromEdge: STAND_OFF },
       ],
     },
   },
@@ -510,12 +525,12 @@ export const SCENARIOS: Scenario[] = [
         // transport is told to pick it up. The engine only calls
         // `TransportPickup` once the passenger is in range, and a passenger
         // that asked to be loaded stops there (`MobileCAI.cpp:430-465`).
-        { frame: 0, pos: [0, 0, 5] },
-        { frame: at(3), pos: [0, 0, 3] },
+        { frame: 0, pos: [0, 0, 2], fromEdge: STAND_OFF },
+        { frame: at(3), pos: [0, 0, 0], fromEdge: STAND_OFF },
         // The return leg, which is the preview's rather than the engine's. No
         // call-in fires during it.
-        { frame: at(11), pos: [0, 0, 3] },
-        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 5] },
+        { frame: at(11), pos: [0, 0, 0], fromEdge: STAND_OFF },
+        { frame: at(PREVIEW_SECONDS), pos: [0, 0, 2], fromEdge: STAND_OFF },
       ],
     },
   },

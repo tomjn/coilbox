@@ -313,6 +313,16 @@ describe("scenarios", () => {
       expect(scenario.standIn?.size).toBeUndefined();
     }
   });
+
+  /**
+   * A stand-in waiting beside a transport keeps a fixed gap from the
+   * transport's edge rather than a distance that scales with the unit, so
+   * its first key is measured `fromEdge` rather than from the unit's origin.
+   */
+  it("waits a fixed gap clear of the transport's edge before pickup", () => {
+    expect(scenarioById("transport-pickup")?.standIn?.keys[0].fromEdge).toBe(5);
+    expect(scenarioById("transport-load")?.standIn?.keys[0].fromEdge).toBe(5);
+  });
 });
 
 describe("frameAt", () => {

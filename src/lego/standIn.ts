@@ -132,6 +132,41 @@ function mix(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * Resolve a track's `fromEdge` keys into ordinary keys, once the unit's and
+ * the stand-in's radii are both known.
+ *
+ * A `fromEdge` key's centre sits `unitRadius + fromEdge + standInRadius`
+ * elmos out along +z, in elmos, which becomes that many stand-in radii once
+ * divided by `standInRadius`, added to the key's own `pos[2]`. Everything
+ * downstream reads plain keys, so this runs once rather than at every call
+ * site that reads the track.
+ *
+ * Returns the same object when no key sets `fromEdge`, so a track with
+ * nothing to resolve costs nothing extra to pass through.
+ */
+export function trackBesideUnit(
+  track: StandInTrack,
+  bounds: UnitBounds,
+  standInRadius: number,
+): StandInTrack {
+  if (!track.keys.some((key) => key.fromEdge !== undefined)) return track;
+
+  const unitRadius = Math.max(bounds.sizeX, bounds.sizeZ) / 2;
+  return {
+    ...track,
+    keys: track.keys.map((key) => {
+      if (key.fromEdge === undefined) return key;
+      const { fromEdge, ...rest } = key;
+      const offset = (unitRadius + fromEdge + standInRadius) / standInRadius;
+      return {
+        ...rest,
+        pos: [key.pos[0], key.pos[1], key.pos[2] + offset] as Vec3,
+      };
+    }),
+  };
+}
+
 /** The attachment in force on a frame, or null when the stand-in is loose. */
 export function attachedAt(
   track: StandInTrack,

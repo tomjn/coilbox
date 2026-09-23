@@ -67,7 +67,7 @@ import {
   type StandInTrack,
   scenarioById,
 } from "../../scriptPlayback";
-import { standInRadius } from "../../standIn";
+import { standInRadius, trackBesideUnit } from "../../standIn";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
 import { ScrubberMarks } from "./ScrubberMarks";
@@ -436,20 +436,27 @@ export function AnimationPanel({
       }
 
       const rest = pieceWorldRest(project, pack, raw);
-      const { events, notes } = resolveScenario(scenario, {
-        radius: standInRadius(bounds, scenario.standIn?.size),
-        mid: aimPoint(project, bounds),
-        pieceRest: rest,
-        probed: (callin) => named.get(callin) ?? null,
-      });
+      const radius = standInRadius(bounds, scenario.standIn?.size);
+      const track = scenario.standIn
+        ? trackBesideUnit(scenario.standIn, bounds, radius)
+        : null;
+      const { events, notes } = resolveScenario(
+        { ...scenario, standIn: track ?? undefined },
+        {
+          radius,
+          mid: aimPoint(project, bounds),
+          pieceRest: rest,
+          probed: (callin) => named.get(callin) ?? null,
+        },
+      );
 
       setStandInNotes([
         ...notes,
         ...attachNotes(scenario, named, compiled !== undefined),
       ]);
-      onStandIn({ track: scenario.standIn ?? null, attachPieces: named });
-      const scene = withWorld(events, scenario.standIn ?? null, {
-        radius: standInRadius(bounds, scenario.standIn?.size),
+      onStandIn({ track, attachPieces: named });
+      const scene = withWorld(events, track, {
+        radius,
         self: size,
         attachPiece: (from) => {
           const piece = named.get(from);
