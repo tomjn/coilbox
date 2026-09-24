@@ -1012,6 +1012,70 @@ describe("placeStandIn", () => {
       expect(sprites(state).instanceCount).toBe(0);
     });
 
+    /** The arm's emit vertex is ten elmos above its origin, and the arm's
+     *  rest position in `standInScene` is y = 4. */
+    const upTheArm: PieceVertices = (piece) =>
+      piece === "arm"
+        ? [
+            [0, 10, 0],
+            [1, 10, 0],
+          ]
+        : [];
+
+    it("draws sfx smoke at the emit vertex, on the pose of the frame before", () => {
+      const state = sprayScene();
+      const timeline = run(40, (frame) => frame * 100, [
+        { frame: 5, kind: "sfx", piece: "arm", sfx: 257 },
+      ]);
+      placeEffects(
+        state,
+        doc,
+        { ...aiming, track: null },
+        true,
+        timeline,
+        5,
+        upTheArm,
+      );
+      expect(sprites(state).instanceCount).toBe(1);
+      const center = sprites(state).getAttribute("center").array;
+      // Frame 4's pose puts the arm at x = 400. One update of smoke moves it
+      // at most half an elmo sideways and 1.1 plus or minus half an elmo up.
+      expectNear(center[0], 400, 0.51);
+      expectNear(center[1], 14 + 1.1, 0.51);
+    });
+
+    it("fires sfx 2048 + n as a tracer along the emit direction, with no stand-in", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "sfx", piece: "arm", sfx: 2048 },
+      ]);
+      placeEffects(
+        state,
+        doc,
+        { ...aiming, track: null },
+        true,
+        timeline,
+        6,
+        upTheArm,
+      );
+      expect(sprites(state).instanceCount).toBe(6);
+      const axis = sprites(state).getAttribute("axis").array;
+      const bodyOuter = 2;
+      expectNear(axis[bodyOuter * 3], 1, 1e-6);
+      expectNear(axis[bodyOuter * 3 + 1], 0, 1e-6);
+      expectNear(axis[bodyOuter * 3 + 2], 0, 1e-6);
+    });
+
+    it("draws nothing for a bubble or an sfx from a piece the model does not have", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "sfx", piece: "arm", sfx: 259 },
+        { frame: 5, kind: "sfx", piece: "nowhere", sfx: 257 },
+      ]);
+      placeEffects(state, doc, aiming, true, timeline, 5, upTheArm);
+      expect(sprites(state).instanceCount).toBe(0);
+    });
+
     it("hides the flame with the effects toggle", () => {
       const state = sprayScene();
       const timeline = run(40, () => 0, [

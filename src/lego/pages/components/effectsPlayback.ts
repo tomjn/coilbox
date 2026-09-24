@@ -1,6 +1,6 @@
 /**
  * Draw what a running script emitted, on one frame: nano spray, a muzzle
- * flame for each flare, and a tracer for each shot.
+ * flame for each flare, a tracer for each shot, and the engine's built-in sfx.
  *
  * Called beside `placeStandIn`, from the same two places. Where each emission
  * starts and what it aims at is worked out once per timeline, by posing the
@@ -19,6 +19,7 @@ import {
   emitPoint,
   type NanoEmission,
   particlesAt,
+  sfxEmission,
   type Vec3,
 } from "../../effects";
 import type { LegoProject } from "../../model";
@@ -36,6 +37,7 @@ import {
 } from "./standInPlayback";
 
 const AT = new THREE.Vector3();
+const DIR = new THREE.Vector3();
 const NOTHING = particlesAt([], 0);
 
 /** A piece's vertices as the export writes them, in its own space, by name. */
@@ -257,6 +259,28 @@ function resolve(
         seed,
         weapon: event.weapon,
       });
+    }
+
+    if (event.kind === "sfx") {
+      const group = groupOfPiece(state, project, event.piece);
+      if (!group) return;
+      poseBefore(event.frame);
+      group.updateWorldMatrix(true, false);
+      // The engine emits from the piece's emit vertex along its emit
+      // direction, normalised (`UnitScript.cpp:597-617`). The preview unit
+      // never moves or turns, so the piece's world matrix is the engine's
+      // piece to world transform.
+      const { pos, dir } = emitPoint(vertices(event.piece));
+      AT.set(...pos).applyMatrix4(group.matrixWorld);
+      DIR.set(...dir).transformDirection(group.matrixWorld);
+      const emission = sfxEmission(
+        event.sfx,
+        event.frame,
+        [AT.x, AT.y, AT.z],
+        [DIR.x, DIR.y, DIR.z],
+        seed,
+      );
+      if (emission) emissions.push(emission);
     }
   });
   if (posed !== -1) {
