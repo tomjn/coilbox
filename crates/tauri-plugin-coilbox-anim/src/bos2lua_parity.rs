@@ -129,8 +129,7 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
         event(120, "StopBuilding", &[]),
         event(130, "AimWeapon1", &[0.8, 0.1]),
         event(131, "AimWeapon2", &[-0.5, 0.2]),
-        event(150, "FireWeapon1", &[]),
-        event(151, "Shot1", &[]),
+        action(150, EngineAction::Fire),
         event(160, "Deactivate", &[]),
         event(200, "Killed", &[50.0, 100.0]),
     ];
@@ -423,6 +422,68 @@ fn both(source: &str) -> (Vec<u8>, String, Vec<String>) {
     .lua;
     let pieces = pieces_of(&lua);
     (cob, lua, pieces)
+}
+
+/// A flare in `FirePrimary`, a `show` in an ordinary function, a
+/// `QueryWeapon1` and an alternating `QueryNanoPiece`, through both runtimes.
+/// They announce the same events, and the flare piece stays hidden.
+#[test]
+fn both_runtimes_fire_and_spray_alike() {
+    let source = r#"
+        piece base, turret, flare1, flare2;
+        static-var alternate;
+        Create() { hide flare1; hide flare2; alternate = 0; }
+        QueryWeapon1(piecenum) { piecenum = flare1; }
+        AimFromWeapon1(piecenum) { piecenum = turret; }
+        FirePrimary() { show flare1; }
+        Shot1(zero) { show flare2; }
+        QueryNanoPiece(piecenum) {
+            if (alternate) { piecenum = flare1; alternate = 0; }
+            else { piecenum = flare2; alternate = 1; }
+        }
+    "#;
+    let (cob, lua, pieces) = both(source);
+    let events = [
+        event(0, "Create", &[]),
+        ScriptEvent {
+            frame: 10,
+            callin: String::new(),
+            args: vec![1.0],
+            ambient: false,
+            world: None,
+            engine: Some(EngineAction::Fire),
+        },
+        action(20, EngineAction::NanoStart),
+        action(30, EngineAction::NanoStop),
+    ];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 40, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "gun.lua",
+        &Unit::new(&pieces),
+        &events,
+        40,
+        &HashMap::new(),
+    );
+
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    assert_eq!(from_cob.events, from_lua.events);
+    assert!(from_cob.events.contains(&ScriptOutput::Flare {
+        frame: 10,
+        piece: "flare1".into()
+    }));
+    assert!(from_cob.events.contains(&ScriptOutput::Shot {
+        frame: 10,
+        weapon: 1,
+        piece: Some("flare1".into())
+    }));
+    let flare1 = pieces.iter().position(|p| p == "flare1").unwrap();
+    let flare2 = pieces.iter().position(|p| p == "flare2").unwrap();
+    for timeline in [&from_cob, &from_lua] {
+        assert!(timeline.hidden[39][flare1]);
+        assert!(!timeline.hidden[39][flare2]);
+    }
 }
 
 /// `TransportPickup(2)`, with the stand-in parked at (30, 0, 40).

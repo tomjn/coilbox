@@ -105,6 +105,7 @@ import {
 import { disposePieceCollision } from "./collisionVolumes";
 import { dotMaterial, points } from "./dotsAndPoints";
 import { EnvironmentPicker } from "./EnvironmentPicker";
+import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
 import {
   commitAim,
@@ -358,6 +359,9 @@ interface Props {
      */
     standIn?: StandInPlacement;
   };
+  /** The unit's game's own particle bitmaps, packed for the effects layer to
+   *  draw its sprites with. Null draws every sprite as a plain round one. */
+  effectsAtlas?: EffectsAtlas | null;
   /** Scale handles keep the piece's proportions. */
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
@@ -455,6 +459,7 @@ export function ModelViewport({
   selection,
   onReady,
   scriptPlayback,
+  effectsAtlas,
   uniformScale = false,
   onGround,
   pieceActions,
@@ -1079,6 +1084,7 @@ export function ModelViewport({
   });
 
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
+  useEffectsAtlas(sceneRef, effectsAtlas, reduceMotion);
 
   // The toggle only ever hides the stand-in mesh itself: the track and nano
   // it carries go on to script frame stepping unchanged, so the spray keeps
@@ -1460,6 +1466,28 @@ function useStandInSize(
     state.scene.add(group);
     state.render();
   }, [sceneRef, radius]);
+}
+
+/** Hands the effects layer whichever bitmaps the unit's game has, so its
+ *  sprites draw with them instead of the plain round fallback.
+ *
+ *  `reduceMotion` is only in the dependency list to pick up the fresh effects
+ *  layer `useCanvas3D` builds when it changes: that hook is declared earlier
+ *  in the component, so its effect rebuilds the scene before this one runs on
+ *  the same commit, and without `reduceMotion` here this effect has nothing
+ *  else telling it to reapply the atlas to the new layer. */
+function useEffectsAtlas(
+  sceneRef: RefObject<SceneState | null>,
+  atlas: EffectsAtlas | null | undefined,
+  reduceMotion: boolean,
+) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reduceMotion is the retrigger for the fresh effects layer useCanvas3D just built, not read in the body.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.effects.setAtlas(atlas ?? null);
+    state.render();
+  }, [sceneRef, atlas, reduceMotion]);
 }
 
 /**

@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "anim_cob_decompile_bytes",
     "anim_cob_hex",
     "anim_cob_run",
+    "anim_cob_probe",
     "anim_bos2cob",
     "anim_bos2lua",
     "anim_bos_lint",

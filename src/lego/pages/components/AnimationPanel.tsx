@@ -30,10 +30,17 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { animCobRun } from "../../../animation/bindings";
+import { animCobProbe, animCobRun } from "../../../animation/bindings";
 import { useReduceMotion } from "../../../general/display";
 import { aimPoint } from "../../aimPoint";
-import { resolveScenario, withWorld } from "../../aimResolver";
+import {
+  type Aim,
+  aimsOf,
+  expandForWeapons,
+  resolveScenario,
+  weaponCount,
+  withWorld,
+} from "../../aimResolver";
 import {
   type AppliedPreset,
   countRoles,
@@ -58,6 +65,7 @@ import {
   at,
   CREATED,
   clampFrame,
+  FIRE_INTERVAL_FRAMES,
   type NanoStyle,
   PREVIEW_FRAMES,
   PREVIEW_SECONDS,
@@ -85,8 +93,8 @@ const CALL_FUNCTION = "call";
  *
  * Both answer with a piece rather than doing anything, which is what makes
  * them safe to call directly rather than drive over frames: see
- * `legoProbeScript`. `QueryTransport` is not here: the runtime asks it
- * itself, at the moment the engine attaches a passenger.
+ * `legoProbeScript` and `animCobProbe`. `QueryTransport` is not here: the
+ * runtime asks it itself, at the moment the engine attaches a passenger.
  */
 const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo"];
 
@@ -98,18 +106,9 @@ const NO_STAND_IN: {
 } = { track: null, attachPieces: new Map() };
 
 /** What a scenario's attachment could not be resolved to, in words. */
-function attachNotes(
-  scenario: Scenario,
-  named: Map<string, string>,
-  isCompiled: boolean,
-): string[] {
+function attachNotes(scenario: Scenario, named: Map<string, string>): string[] {
   const attach = scenario.standIn?.attach;
   if (!attach || named.has(attach.from)) return [];
-  if (isCompiled) {
-    return [
-      `This unit's script is compiled, and a compiled script cannot be asked which piece its ${attach.from} names. The stand-in stays where the scenario puts it.`,
-    ];
-  }
   return [
     `This script names no ${attach.from} piece, so the stand-in stays where the scenario puts it rather than sitting on the unit.`,
   ];
@@ -228,7 +227,12 @@ interface Props {
     track: StandInTrack | null;
     attachPieces: Map<string, string>;
     nano?: NanoStyle | null;
+    aims?: Aim[];
   }) => void;
+  /** What the unit's game lacks for effects to draw its own bitmaps, or null
+   *  when it has everything they need. Shown only for a scenario that fires
+   *  something drawn with a bitmap. */
+  effectsNote?: string | null;
 }
 
 export function AnimationPanel({
@@ -247,6 +251,7 @@ export function AnimationPanel({
   pack,
   raw,
   onStandIn,
+  effectsNote,
 }: Props) {
   const reduceMotion = useReduceMotion();
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
@@ -417,26 +422,51 @@ export function AnimationPanel({
         return runEvents(scenario.events, withValues);
       }
 
-      // A compiled script has no probe: `anim_cob_run` plays bytecode and
-      // there is no `anim_cob_probe` beside it. Such a unit gets its stand-in
-      // where the keys put it and is told the piece is unknown, which is the
-      // same answer a Lua script that names none gets.
-      const probes = compiled
-        ? null
-        : await legoProbeScript({
-            script: project.script ?? "",
-            unitName: project.unitName,
-            pieces: project.pieces.map((piece) => piece.name),
-            callins: STAND_IN_PROBES,
-            unitDef: project.gameUnitDef ?? null,
-            includes: project.gameScriptIncludes ?? null,
-            rest: pieceRest(project),
-          });
+      const pieces = project.pieces.map((piece) => piece.name);
+      const probeOnce = (callins: string[]) =>
+        compiled
+          ? animCobProbe({ bytes: compiled.bytes, pieces, callins })
+          : legoProbeScript({
+              script: project.script ?? "",
+              unitName: project.unitName,
+              pieces,
+              callins,
+              unitDef: project.gameUnitDef ?? null,
+              includes: project.gameScriptIncludes ?? null,
+              rest: pieceRest(project),
+            });
+
+      // Both runtimes answer the same question: which piece a call-in like
+      // `AimFromWeapon1` names. `anim_cob_probe` asks the bytecode the same
+      // way `legoProbeScript` asks the Lua, so a compiled unit's stand-in
+      // sits on its aim-from piece rather than the unit's origin.
+      const probes = await probeOnce(STAND_IN_PROBES);
 
       const named = new Map<string, string>();
       for (const probe of probes?.probes ?? []) {
         const first = probe.pieces[0];
         if (first) named.set(probe.callin, first);
+      }
+
+      // How many weapons this scenario should drive, from the unit's own
+      // definition when there is one, else the script's own numbered weapon
+      // functions, which the probe above already asked for regardless of
+      // what it was told to name a piece for.
+      const weapons = weaponCount(
+        project.gameUnitDef ?? null,
+        probes?.functions ?? [],
+      );
+      if (weapons > 1) {
+        const more = await probeOnce(
+          Array.from(
+            { length: weapons - 1 },
+            (_, index) => `AimFromWeapon${index + 2}`,
+          ),
+        );
+        for (const probe of more?.probes ?? []) {
+          const first = probe.pieces[0];
+          if (first) named.set(probe.callin, first);
+        }
       }
 
       const rest = pieceWorldRest(project, pack, raw);
@@ -445,7 +475,15 @@ export function AnimationPanel({
         ? trackBesideUnit(scenario.standIn, bounds, radius)
         : null;
       const { events, notes } = resolveScenario(
-        { ...scenario, standIn: track ?? undefined },
+        {
+          ...scenario,
+          events: expandForWeapons(
+            scenario.events,
+            weapons,
+            FIRE_INTERVAL_FRAMES,
+          ),
+          standIn: track ?? undefined,
+        },
         {
           radius,
           mid: aimPoint(project, bounds),
@@ -454,11 +492,13 @@ export function AnimationPanel({
         },
       );
 
-      setStandInNotes([
-        ...notes,
-        ...attachNotes(scenario, named, compiled !== undefined),
-      ]);
-      onStandIn({ track, attachPieces: named, nano: scenario.nano ?? null });
+      setStandInNotes([...notes, ...attachNotes(scenario, named)]);
+      onStandIn({
+        track,
+        attachPieces: named,
+        nano: scenario.nano ?? null,
+        aims: aimsOf(events),
+      });
       const scene = withWorld(events, track, {
         radius,
         self: size,
@@ -894,6 +934,13 @@ export function AnimationPanel({
               {note}
             </p>
           ))}
+
+          {effectsNote &&
+          timeline?.events.some(
+            (event) => event.kind === "flare" || event.kind === "shot",
+          ) ? (
+            <p className="text-xs text-muted-foreground">{effectsNote}</p>
+          ) : null}
 
           {compiled ? (
             <p className="text-xs text-muted-foreground">

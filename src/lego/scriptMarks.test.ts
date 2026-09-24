@@ -58,6 +58,25 @@ describe("describeOutput", () => {
       "Factory starts building",
     );
   });
+
+  it("describes a flare and a shot", () => {
+    expect(describeOutput({ frame: 1, kind: "flare", piece: "flare1" })).toBe(
+      "Flare from flare1",
+    );
+    expect(
+      describeOutput({ frame: 1, kind: "shot", weapon: 1, piece: "flare1" }),
+    ).toBe("Shot, weapon 1 from flare1");
+    expect(
+      describeOutput({ frame: 1, kind: "shot", weapon: 2, piece: null }),
+    ).toBe("Shot, weapon 2 from no piece");
+  });
+
+  it("marks a flare and a shot on the scrubber", () => {
+    expect(isMarked({ frame: 1, kind: "flare", piece: "flare1" })).toBe(true);
+    expect(isMarked({ frame: 1, kind: "shot", weapon: 1, piece: null })).toBe(
+      true,
+    );
+  });
 });
 
 /** `rts/Sim/Units/Scripts/UnitScript.cpp:597-790`, in its order. */

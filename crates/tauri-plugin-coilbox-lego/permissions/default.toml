@@ -20,6 +20,7 @@ permissions = [
   "allow-lego-import-dae",
   "allow-lego-texture-import",
   "allow-lego-texture-png",
+  "allow-lego-bitmap-png",
   "allow-lego-texture-prune",
   "allow-lego-texture-compose-colour",
   "allow-lego-texture-compose-shading",

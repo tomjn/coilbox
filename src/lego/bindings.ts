@@ -582,6 +582,15 @@ export const legoTexturePng = defineCommand<
 >("coilbox-lego", "lego_texture_png");
 
 /**
+ * One particle bitmap already extracted to a path on disk, decoded with its
+ * alpha kept as a PNG `data:` URL.
+ */
+export const legoBitmapPng = defineCommand<
+  { path: string },
+  { dataUrl: string; width: number; height: number }
+>("coilbox-lego", "lego_bitmap_png");
+
+/**
  * Delete every stored texture `keep` does not name. Called after a texture
  * changes, because a content-addressed store leaves the version before it
  * behind.

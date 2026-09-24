@@ -769,6 +769,39 @@ fn a_call_in_with_arguments_gets_them() {
     assert_close(rot_y(&timeline, 0, "turret"), 0.75);
 }
 
+/// SplinterFaction's Bear and Cobra define a plain `AimWeapon(weaponID,
+/// heading, pitch)` rather than a numbered `AimWeapon1`, which the engine
+/// calls with the weapon number prepended (`LuaUnitScript.cpp:850-883,1018`).
+/// The event still carries the numbered name, since that is what an
+/// `AimWeapon1` engine call-in is, so the runtime has to know the plain form
+/// answers it.
+#[test]
+fn an_aim_weapon_event_turns_the_plain_call_ins_piece() {
+    let timeline = run(
+        r#"
+        local turret = piece("turret")
+        function script.AimWeapon(weaponID, heading, pitch)
+            Turn(turret, y_axis, heading)
+            return true
+        end
+        "#,
+        "test.lua",
+        &Unit::new(&pieces()),
+        &[ScriptEvent {
+            frame: 0,
+            callin: "AimWeapon1".to_string(),
+            args: vec![0.75, 0.1],
+            ambient: false,
+            world: None,
+            engine: None,
+        }],
+        3,
+        &HashMap::new(),
+    );
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 0, "turret"), 0.75);
+}
+
 /// The shape coilbox's own generator writes: locals, a signal, a looping cycle
 /// thread started from a call-in and stopped by a signal from another. If this
 /// does not run, nothing a user takes ownership of will either.
@@ -1176,6 +1209,35 @@ mod probing {
         let probe = answers(&probes, "QueryNanoPiece");
         assert!(probe.pieces.is_empty());
         assert!(probe.note.is_some(), "{probe:?}");
+    }
+
+    /// A script with a plain `AimFromWeapon(weaponID)` rather than a numbered
+    /// `AimFromWeapon1` still answers a probe asking for `AimFromWeapon1`,
+    /// with the weapon number as its argument, the same rule a run applies
+    /// when it fires the call-in for real.
+    #[test]
+    fn probes_the_plain_call_in_for_a_numbered_weapon_request() {
+        let probes = ask(
+            "local flare = piece('flare')\n\
+             function script.AimFromWeapon(weaponID) return flare end",
+            &["AimFromWeapon1"],
+        );
+
+        let probe = answers(&probes, "AimFromWeapon1");
+        assert_eq!(probe.pieces.first().map(String::as_str), Some("flare"));
+        assert_eq!(probe.note, None);
+    }
+
+    #[test]
+    fn reports_the_scripts_own_function_names() {
+        let probes = ask(
+            "function script.Create() end\nfunction script.AimWeapon(w, h, p) end",
+            &["QueryNanoPiece"],
+        );
+        assert_eq!(
+            probes.functions,
+            vec!["AimWeapon".to_string(), "Create".to_string()]
+        );
     }
 
     #[test]
@@ -3422,5 +3484,188 @@ mod engine_factory {
             timeline.warnings
         );
         assert_close(pose(&timeline, 4, "base")[2], 84.0);
+    }
+}
+
+mod engine_fire {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn fire(frame: u32, weapon: f64) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: vec![weapon],
+            ambient: false,
+            world: None,
+            engine: Some(EngineAction::Fire),
+        }
+    }
+
+    fn fired(script: &str, events: &[ScriptEvent], frames: u32) -> Timeline {
+        let mut all = vec![ScriptEvent {
+            frame: 0,
+            callin: "Create".into(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: None,
+        }];
+        all.extend_from_slice(events);
+        run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &all,
+            frames,
+            &HashMap::new(),
+        )
+    }
+
+    #[test]
+    fn show_flare_records_a_flare_and_leaves_the_piece_hidden() {
+        let timeline = fired(
+            r#"
+            local turret, barrel = piece("turret", "barrel")
+            function script.Create() Hide(barrel) end
+            function script.QueryWeapon1() return barrel end
+            function script.FireWeapon1() Spring.UnitScript.ShowFlare(barrel) end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "barrel".into()
+        }));
+        let index = timeline.pieces.iter().position(|p| p == "barrel").unwrap();
+        assert!(timeline.hidden[7][index]);
+    }
+
+    #[test]
+    fn fire_calls_fire_then_shot_then_query_weapon_on_its_frame() {
+        let timeline = fired(
+            r#"
+            local base, turret, barrel = piece("base", "turret", "barrel")
+            local muzzle = turret
+            function script.FireWeapon1() muzzle = base end
+            function script.Shot1() muzzle = barrel end
+            function script.QueryWeapon1() return muzzle end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("barrel".into())
+        }));
+    }
+
+    /// `RunQueryCallIn` answers -1 for a missing `QueryWeapon`, so the engine
+    /// falls back to the `AimFromWeapon` piece (`Weapon.cpp:235-260`).
+    #[test]
+    fn a_missing_query_weapon_falls_back_to_aim_from_weapon() {
+        let timeline = fired(
+            r#"
+            local turret = piece("turret")
+            function script.AimFromWeapon1() return turret end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("turret".into())
+        }));
+    }
+
+    #[test]
+    fn no_weapon_piece_at_all_records_a_shot_from_no_piece_and_says_so() {
+        let timeline = fired("function script.Create() end", &[fire(5, 1.0)], 8);
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: None
+        }));
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w == "The script named no weapon piece."));
+    }
+
+    #[test]
+    fn show_flare_is_on_the_unit_script_table_too() {
+        let timeline = fired(
+            r#"
+            local barrel = piece("barrel")
+            function script.FireWeapon1() UnitScript.ShowFlare(barrel) ShowFlare(barrel) end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline
+                .events
+                .iter()
+                .filter(|e| matches!(e, ScriptOutput::Flare { .. }))
+                .count(),
+            2
+        );
+    }
+
+    /// Most real units define the plain call-ins, not the numbered ones. The
+    /// engine calls `script.FireWeapon(n)`, `script.Shot(n)` and
+    /// `script.QueryWeapon(n)` with the weapon number as the first argument,
+    /// and only falls back to `FireWeapon1` and friends when the plain form
+    /// is missing (`LuaUnitScript.cpp:850-883,1018`).
+    #[test]
+    fn plain_call_ins_take_the_weapon_number_and_win_over_numbered_ones() {
+        let timeline = fired(
+            r#"
+            local turret, barrel = piece("turret", "barrel")
+            local flared = false
+            function script.FireWeapon(num)
+                if num == 1 then Spring.UnitScript.ShowFlare(turret) end
+            end
+            function script.Shot(num)
+                if num == 2 then Spring.UnitScript.ShowFlare(barrel) end
+            end
+            function script.QueryWeapon(num)
+                if num == 1 then return turret end
+                return barrel
+            end
+            "#,
+            &[fire(5, 1.0), fire(6, 2.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "turret".into()
+        }));
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 6,
+            piece: "barrel".into()
+        }));
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("turret".into())
+        }));
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 6,
+            weapon: 2,
+            piece: Some("barrel".into())
+        }));
     }
 }

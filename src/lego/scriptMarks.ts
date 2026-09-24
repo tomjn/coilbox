@@ -91,6 +91,10 @@ export function describeOutput(event: ScriptOutput): string {
         : `Nano spray from ${event.piece}`;
     case "build-start":
       return "Factory starts building";
+    case "flare":
+      return `Flare from ${event.piece}`;
+    case "shot":
+      return `Shot, weapon ${event.weapon} from ${event.piece ?? "no piece"}`;
   }
 }
 

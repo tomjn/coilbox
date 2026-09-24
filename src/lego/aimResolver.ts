@@ -157,10 +157,11 @@ export function resolveScenario(
       return { ...rest, args: [heading, pitch] };
     }
 
-    // `AimFromWeapon1` rather than `AimFromWeapon`: the marker names the
-    // engine's concept, the probe asks for the weapon the scenario drives, and
-    // every scenario here drives weapon 1.
-    const callin = "AimFromWeapon1";
+    // `AimFromWeapon<n>` rather than `AimFromWeapon`: the marker names the
+    // engine's concept, and the probe was asked for the weapon this event's
+    // own `AimWeapon<n>` drives, `expandForWeapons` having already given each
+    // weapon its own copy of the event.
+    const callin = `AimFromWeapon${weaponNumberOf(event.callin)}`;
     const piece = ctx.probed(callin);
     const from = piece ? ctx.pieceRest.get(piece) : undefined;
     if (!from) {
@@ -172,7 +173,11 @@ export function resolveScenario(
     return { ...rest, args: [heading, pitch] };
   });
 
-  return { events, notes };
+  // A re-aim can fire many times in one scenario, and each miss produces the
+  // same wording. Dedupe so the panel shows each distinct note once rather
+  // than one row per event, which also keeps AnimationPanel's `key={note}`
+  // list free of duplicate keys.
+  return { events, notes: [...new Set(notes)] };
 }
 
 /** `TransportDrop`'s Lua arguments for a `dropAtStandIn` marker. */
@@ -271,6 +276,181 @@ export function withWorld(
     ...event,
     world: worldAt(track, event.frame, ctx, buildStart),
   }));
+}
+
+/**
+ * The unit direction `AimWeapon`'s heading and pitch point along, which is
+ * the inverse of `aimWeaponAngles` and the engine's `wantedDir`.
+ */
+export function aimDirection(heading: number, pitch: number): Vec3 {
+  return [
+    Math.cos(pitch) * Math.sin(heading),
+    Math.sin(pitch),
+    Math.cos(pitch) * Math.cos(heading),
+  ];
+}
+
+/** Where a resolved `AimWeapon` aimed, and when. */
+export interface Aim {
+  frame: number;
+  dir: Vec3;
+}
+
+/** Every resolved `AimWeapon<n>` in a run's events, in order. A muzzle flame
+ *  faces the latest one (`Weapon.cpp:509-510`). */
+export function aimsOf(events: ScriptEvent[]): Aim[] {
+  const aims: Aim[] = [];
+  for (const event of events) {
+    const [heading, pitch] = event.args ?? [];
+    if (!/^AimWeapon\d+$/.test(event.callin ?? "")) continue;
+    if (typeof heading !== "number" || typeof pitch !== "number") continue;
+    aims.push({ frame: event.frame, dir: aimDirection(heading, pitch) });
+  }
+  return aims;
+}
+
+/** The weapon number an `AimWeapon<n>` call-in names, or 1 for anything else,
+ *  which is every scenario's own convention before it drives more than one
+ *  weapon. */
+function weaponNumberOf(callin: string | undefined): number {
+  const match = /^AimWeapon(\d+)$/.exec(callin ?? "");
+  return match ? Number(match[1]) : 1;
+}
+
+/** The Recoil ordinal names a unit script may still define instead of a
+ *  numbered call-in, one per call-in stem: `QueryPrimary`, `AimPrimary`,
+ *  `AimFromPrimary`, `FirePrimary`, and the `Secondary` and `Tertiary` forms
+ *  of each (`CobScriptNames.cpp:79-90`, aliased back the same way by
+ *  `alias()` in `crates/tauri-plugin-coilbox-anim/src/cobrun.rs`). Only the
+ *  first three weapons ever had these names. */
+const ORDINAL_WEAPON_CALLIN =
+  /^(?:Query|Aim|AimFrom|Fire)(Primary|Secondary|Tertiary)$/;
+
+/** The weapon slot each ordinal above means. */
+const ORDINAL_WEAPON_NUMBERS: Record<string, number> = {
+  Primary: 1,
+  Secondary: 2,
+  Tertiary: 3,
+};
+
+/**
+ * How many weapons the firing scenario should drive.
+ *
+ * A unit definition's own `weapons` table is definitive when there is one:
+ * the highest numbered slot it fills, `weapons` being keyed `"1"`, `"2"` and
+ * so on. Without a definition, the script's own numbered weapon functions are
+ * the next best answer, since a script defining `AimWeapon3` has a third
+ * weapon whether or not its definition is known here. A script with only
+ * plain call-ins and no definition to count from gets one weapon, which is
+ * what every scenario drove before this.
+ */
+export function weaponCount(
+  unitDef: Record<string, unknown> | null | undefined,
+  functions: string[],
+): number {
+  if (unitDef) return weaponCountFromDef(unitDef) ?? 1;
+  return weaponCountFromFunctions(functions);
+}
+
+/** `MAX_WEAPONS_PER_UNIT`, `rts/Sim/Misc/GlobalConstants.h:126`: the engine
+ *  never reads a unit def's `weapons` table past this many slots. */
+const MAX_WEAPONS_PER_UNIT = 32;
+
+/** The name a `weapons` table slot gives its weapon, empty when the slot
+ *  names none: the entry is either the weapon's own name as a string, or a
+ *  table naming it in `name` (`UnitDef.cpp:749-758`). */
+function weaponEntryName(entry: unknown): string {
+  if (typeof entry === "string") return entry;
+  if (entry && typeof entry === "object") {
+    const name = (entry as Record<string, unknown>).name;
+    if (typeof name === "string") return name;
+  }
+  return "";
+}
+
+/**
+ * `UnitDef::ParseWeaponsTable` (`UnitDef.cpp:749-771`): the table is read
+ * slot by slot from 1. An empty slot is tolerated, and skipped over, only
+ * among the first four (`w <= 3`). An empty slot after that stops the table
+ * being read at all, so a weapon named past that point is never seen. This
+ * assumes any named slot resolves to a real `WeaponDef`, which is the best a
+ * preview with no weapon-def table to check against can do.
+ */
+function weaponCountFromDef(unitDef: Record<string, unknown>): number | null {
+  const weapons = unitDef.weapons;
+  if (!weapons || typeof weapons !== "object") return null;
+  const table = weapons as Record<string, unknown>;
+  let highest = 0;
+  for (let slot = 0; slot < MAX_WEAPONS_PER_UNIT; slot++) {
+    if (weaponEntryName(table[String(slot + 1)])) {
+      highest = slot + 1;
+      continue;
+    }
+    if (slot > 3) break;
+  }
+  return highest > 0 ? highest : null;
+}
+
+function weaponCountFromFunctions(functions: string[]): number {
+  let highest = 0;
+  for (const name of functions) {
+    const numbered = /^(?:AimWeapon|FireWeapon|QueryWeapon)(\d+)$/.exec(name);
+    if (numbered) highest = Math.max(highest, Number(numbered[1]));
+    const ordinal = ORDINAL_WEAPON_CALLIN.exec(name);
+    if (ordinal)
+      highest = Math.max(highest, ORDINAL_WEAPON_NUMBERS[ordinal[1]]);
+  }
+  return highest || 1;
+}
+
+/**
+ * A scenario's events with every weapon 1 aim and shot matched by one for
+ * every other weapon the unit has.
+ *
+ * An `AimWeapon1` event gets a same-frame `AimWeapon<n>` for each other
+ * weapon, which `resolveScenario` then measures from that weapon's own
+ * `AimFromWeapon<n>` piece. A weapon 1 `fire` engine event gets one for each
+ * other weapon too, spread evenly across the gap to weapon 1's next shot
+ * rather than trailing past it: weapon `n` fires
+ * `floor((n - 1) * intervalFrames / weapons)` frames later in the same
+ * volley, so the shots read apart without the last weapon overlapping the
+ * next round.
+ *
+ * A no-op below two weapons: nothing here duplicates when there is only the
+ * one to drive.
+ */
+export function expandForWeapons(
+  events: ScriptEvent[],
+  weapons: number,
+  intervalFrames: number,
+): ScriptEvent[] {
+  if (weapons <= 1) return events;
+  const expanded: ScriptEvent[] = [];
+  for (const event of events) {
+    expanded.push(event);
+    if (event.callin === "AimWeapon1") {
+      for (let weapon = 2; weapon <= weapons; weapon++) {
+        expanded.push({ ...event, callin: `AimWeapon${weapon}` });
+      }
+      continue;
+    }
+    if (event.engine === "fire" && (event.args?.[0] ?? 1) === 1) {
+      for (let weapon = 2; weapon <= weapons; weapon++) {
+        expanded.push({
+          ...event,
+          frame:
+            event.frame + Math.floor(((weapon - 1) * intervalFrames) / weapons),
+          args: [weapon],
+        });
+      }
+    }
+  }
+  // Frame order, with an aim landing before a fire on the same frame, the
+  // same tie-break `aimedFire` uses when it first builds the firing
+  // scenario's events.
+  return expanded.sort(
+    (a, b) => a.frame - b.frame || Number(!a.callin) - Number(!b.callin),
+  );
 }
 
 /**

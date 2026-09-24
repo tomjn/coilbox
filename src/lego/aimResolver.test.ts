@@ -2,15 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   type AimContext,
+  aimDirection,
+  aimsOf,
   aimWeaponAngles,
+  expandForWeapons,
   resolveScenario,
   startBuildingAngles,
   type WorldContext,
+  weaponCount,
   withWorld,
   worldAt,
 } from "./aimResolver";
 import {
   type Scenario,
+  type ScriptEvent,
   STAND_IN_UNIT_ID,
   type StandInTrack,
 } from "./scriptPlayback";
@@ -183,6 +188,30 @@ describe("resolveScenario", () => {
     expect(events[0].args?.[1]).toBeLessThan(-0.5);
   });
 
+  /** A re-aim can fire many times with the same cause, and the panel keys its
+   *  note list on the note text, so a repeated cause must not repeat the
+   *  note. */
+  it("pushes a repeated note once, even when several events hit the same cause", () => {
+    const blind = context({ probed: () => null });
+    const repeated: Scenario = {
+      ...firing,
+      events: [
+        {
+          frame: 10,
+          callin: "AimWeapon1",
+          aimAtStandIn: { from: "AimFromWeapon" },
+        },
+        {
+          frame: 20,
+          callin: "AimWeapon1",
+          aimAtStandIn: { from: "AimFromWeapon" },
+        },
+      ],
+    };
+    const { notes } = resolveScenario(repeated, blind);
+    expect(notes).toHaveLength(1);
+  });
+
   it("has nothing to aim at in a scenario with no track", () => {
     const { events, notes } = resolveScenario(
       { ...firing, standIn: undefined },
@@ -221,6 +250,147 @@ describe("resolveScenario", () => {
     const { events, notes } = resolveScenario(putting, context());
     expect(events[0].args).toEqual([STAND_IN_UNIT_ID, 0, 0, 0]);
     expect(notes.join(" ")).toContain("TransportDrop");
+  });
+
+  /** A weapon's own aim, measured from that weapon's own `AimFromWeapon<n>`
+   *  piece rather than always weapon 1's. */
+  it("measures an AimWeapon2 marker from AimFromWeapon2's own piece", () => {
+    const secondWeapon: Scenario = {
+      ...firing,
+      events: [
+        {
+          frame: 10,
+          callin: "AimWeapon2",
+          aimAtStandIn: { from: "AimFromWeapon" },
+        },
+      ],
+    };
+    const ctx = context({
+      pieceRest: new Map([["cannon", [0, 30, 0]]]),
+      probed: (callin) => (callin === "AimFromWeapon2" ? "cannon" : null),
+    });
+    const { events } = resolveScenario(secondWeapon, ctx);
+    const aim = events.find((e) => e.callin === "AimWeapon2");
+    // Weapon 1's probe names nothing here, so a pitch measured from the
+    // origin instead would come out level rather than steeply down.
+    expect(aim?.args?.[1]).toBeLessThan(-0.5);
+  });
+});
+
+describe("weaponCount", () => {
+  it("counts the highest numbered slot a unit definition fills", () => {
+    expect(
+      weaponCount(
+        { weapons: { "1": { name: "gatling" }, "2": { name: "cannon" } } },
+        [],
+      ),
+    ).toBe(2);
+  });
+
+  it("tolerates an empty slot among the first four", () => {
+    expect(
+      weaponCount(
+        { weapons: { "1": { name: "gatling" }, "2": {}, "3": { name: "c" } } },
+        [],
+      ),
+    ).toBe(3);
+  });
+
+  it("stops at a gap past the first four slots, missing a weapon named beyond it", () => {
+    expect(
+      weaponCount({ weapons: { "1": { name: "gatling" }, "5": {} } }, []),
+    ).toBe(1);
+  });
+
+  it("counts a plain string entry as a weapon", () => {
+    expect(weaponCount({ weapons: { "1": "very-heavy-gatling" } }, [])).toBe(1);
+  });
+
+  it("caps the scan at MAX_WEAPONS_PER_UNIT, ignoring a key past it", () => {
+    const weapons: Record<string, { name: string }> = {};
+    for (let slot = 1; slot <= 40; slot++) {
+      weapons[String(slot)] = { name: `weapon${slot}` };
+    }
+    expect(weaponCount({ weapons }, [])).toBe(32);
+  });
+
+  it("is 1 for a definition with no weapons table", () => {
+    expect(weaponCount({}, ["AimWeapon3"])).toBe(1);
+  });
+
+  it("without a definition, counts the script's own numbered functions", () => {
+    expect(
+      weaponCount(null, ["AimWeapon1", "FireWeapon2", "QueryWeapon3"]),
+    ).toBe(3);
+  });
+
+  it("without a definition, counts a Recoil ordinal call-in as its own slot", () => {
+    expect(weaponCount(null, ["AimPrimary", "FireSecondary"])).toBe(2);
+  });
+
+  it("does not count a bare ordinal name no script defines", () => {
+    expect(weaponCount(null, ["Primary", "Secondary"])).toBe(1);
+  });
+
+  it("is 1 for a plain script with no definition and no numbered names", () => {
+    expect(weaponCount(null, ["AimWeapon", "FireWeapon"])).toBe(1);
+  });
+});
+
+describe("expandForWeapons", () => {
+  const events: ScriptEvent[] = [
+    { frame: 0, callin: "Create" },
+    {
+      frame: 15,
+      callin: "AimWeapon1",
+      aimAtStandIn: { from: "AimFromWeapon" },
+    },
+    { frame: 30, engine: "fire", args: [1] },
+  ];
+
+  /** A fire interval chosen so `(n - 1) * interval / weapons` lands on a
+   *  whole frame for both the 3- and 4-weapon cases below. */
+  const INTERVAL_FRAMES = 12;
+
+  it("leaves events alone for one weapon", () => {
+    expect(expandForWeapons(events, 1, INTERVAL_FRAMES)).toEqual(events);
+  });
+
+  it("gives every other weapon its own aim on the same frame", () => {
+    const expanded = expandForWeapons(events, 3, INTERVAL_FRAMES);
+    const aims = expanded.filter((e) => e.frame === 15);
+    expect(aims.map((e) => e.callin)).toEqual([
+      "AimWeapon1",
+      "AimWeapon2",
+      "AimWeapon3",
+    ]);
+    expect(aims[1].aimAtStandIn).toEqual({ from: "AimFromWeapon" });
+  });
+
+  it("spreads each other weapon's shot evenly across the fire interval", () => {
+    const expanded = expandForWeapons(events, 3, INTERVAL_FRAMES);
+    const fires = expanded.filter((e) => e.engine === "fire");
+    expect(fires.map((e) => [e.frame, e.args])).toEqual([
+      [30, [1]],
+      [34, [2]],
+      [38, [3]],
+    ]);
+  });
+
+  it("keeps the last weapon's shot inside the interval rather than growing past it", () => {
+    const expanded = expandForWeapons(events, 4, INTERVAL_FRAMES);
+    const fires = expanded.filter((e) => e.engine === "fire");
+    const frames = fires.map((e) => e.frame);
+    expect(frames).toEqual([30, 33, 36, 39]);
+    // The next volley's own weapon 1 shot would land at 30 + interval: every
+    // weapon here fires before it.
+    expect(Math.max(...frames)).toBeLessThan(30 + INTERVAL_FRAMES);
+  });
+
+  it("keeps events in frame order with an aim before a fire on the same frame", () => {
+    const expanded = expandForWeapons(events, 2, INTERVAL_FRAMES);
+    const frames = expanded.map((e) => e.frame);
+    expect(frames).toEqual([...frames].sort((a, b) => a - b));
   });
 });
 
@@ -352,5 +522,32 @@ describe("withWorld", () => {
     );
     expect(events[0].world?.standIn).toBeNull();
     expect(events[3].world?.standIn?.pos).toEqual([0, 20, -5]);
+  });
+});
+
+describe("aimDirection", () => {
+  it("undoes aimWeaponAngles", () => {
+    const from: [number, number, number] = [1, 2, 3];
+    const to: [number, number, number] = [-7, 5, 11];
+    const { heading, pitch } = aimWeaponAngles(from, to);
+    const dir = aimDirection(heading, pitch);
+    const length = Math.hypot(-8, 3, 8);
+    expect(dir[0]).toBeCloseTo(-8 / length);
+    expect(dir[1]).toBeCloseTo(3 / length);
+    expect(dir[2]).toBeCloseTo(8 / length);
+  });
+});
+
+describe("aimsOf", () => {
+  it("reads each resolved AimWeapon's direction, and nothing else", () => {
+    const aims = aimsOf([
+      { frame: 0, callin: "Create" },
+      { frame: 15, callin: "AimWeapon1", args: [0, 0] },
+      { frame: 20, callin: "StartBuilding", args: [1, 0] },
+      { frame: 30, callin: "AimWeapon2", args: [Math.PI / 2, 0] },
+    ]);
+    expect(aims.map((aim) => aim.frame)).toEqual([15, 30]);
+    expect(aims[0].dir[2]).toBeCloseTo(1);
+    expect(aims[1].dir[0]).toBeCloseTo(1);
   });
 });

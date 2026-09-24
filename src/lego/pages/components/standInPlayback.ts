@@ -13,6 +13,7 @@
 
 import * as THREE from "three";
 
+import type { Aim } from "../../aimResolver";
 import type { LegoProject } from "../../model";
 import type {
   NanoStyle,
@@ -41,6 +42,9 @@ export interface StandInPlacement {
   /** How the running scenario's unit sprays nano at the stand-in, or null
    *  when it does not. */
   nano?: NanoStyle | null;
+  /** The direction each resolved `AimWeapon` aimed, which is the engine's
+   *  `wantedDir` a muzzle flame faces (`Weapon.cpp:509-510`). */
+  aims?: Aim[];
 }
 
 const AT = new THREE.Vector3();

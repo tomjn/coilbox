@@ -10,7 +10,7 @@ import {
   restoreFromPlayback,
 } from "./animationPlayback";
 import { disposeBaked, showBaked } from "./bakedPlayback";
-import { placeEffects } from "./effectsPlayback";
+import { bakedVertices, placeEffects } from "./effectsPlayback";
 import { attachGizmo } from "./gizmoCommit";
 import { type SceneState, syncScene } from "./sceneState";
 import { placeStandIn, type StandInPlacement } from "./standInPlayback";
@@ -121,6 +121,7 @@ export function useScriptFrameStepping(
             showEffectsRef.current,
             timeline,
             frameAt(timeline, elapsed),
+            bakedVertices(projectRef.current, packRef.current, rawRef.current),
           );
           onScriptFrameRef.current?.(frameAt(timeline, elapsed));
         } else {
@@ -187,6 +188,7 @@ export function useScriptFrameStepping(
       showEffects,
       scriptTimeline,
       frame,
+      bakedVertices(projectRef.current, packRef.current, rawRef.current),
     );
     state.render();
   }, [
@@ -198,5 +200,7 @@ export function useScriptFrameStepping(
     standIn,
     showEffects,
     projectRef,
+    packRef,
+    rawRef,
   ]);
 }

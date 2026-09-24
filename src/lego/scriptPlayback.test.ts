@@ -9,6 +9,7 @@ import {
   playable,
   poseAt,
   SCENARIOS,
+  type ScriptEvent,
   type ScriptTimeline,
   scenarioById,
 } from "./scriptPlayback";
@@ -145,6 +146,62 @@ describe("scenarios", () => {
 
     expect(aim?.aimAtStandIn).toEqual({ from: "AimFromWeapon" });
     expect(aim?.args).toBeUndefined();
+  });
+
+  it("fires weapon 1 through the engine in the firing scenario", () => {
+    const firing = SCENARIOS.find((scenario) => scenario.id === "firing");
+    const fires = firing?.events.filter((event) => event.engine === "fire");
+    const firstVolley = [1, 1.5, 2, 2.5, 3, 3.5, 4].map(
+      (seconds) => [at(seconds), [1]] as const,
+    );
+    const secondVolley = [7, 7.5, 8, 8.5, 9, 9.5, 10].map(
+      (seconds) => [at(seconds), [1]] as const,
+    );
+    expect(fires?.map((event) => [event.frame, event.args])).toEqual([
+      ...firstVolley,
+      ...secondVolley,
+    ]);
+    expect(firing?.events.some((event) => event.callin === "Shot1")).toBe(
+      false,
+    );
+  });
+
+  /** The engine calls a weapon's `AimWeapon` again every `reaimTime` frames,
+   *  15 by default, while it still has a target (`Weapon.cpp:137,352-357,380`),
+   *  whether or not the target is moving, so the arm keeps following the
+   *  stand-in for the whole preview rather than only during a volley. */
+  it("re-aims the weapon every 15 frames for the whole preview", () => {
+    const firing = scenarioById("firing");
+    const aims = firing?.events.filter(
+      (event) => event.callin === "AimWeapon1",
+    );
+
+    const expected: number[] = [];
+    for (let frame = at(0.5); frame <= PREVIEW_FRAMES - 1; frame += 15) {
+      expected.push(frame);
+    }
+
+    expect(aims?.map((event) => event.frame)).toEqual(expected);
+    for (const aim of aims ?? []) {
+      expect(aim.aimAtStandIn).toEqual({ from: "AimFromWeapon" });
+    }
+  });
+
+  it("aims before firing when an aim and a fire land on the same frame", () => {
+    const firing = scenarioById("firing");
+    const byFrame = new Map<number, ScriptEvent[]>();
+    for (const event of firing?.events ?? []) {
+      byFrame.set(event.frame, [...(byFrame.get(event.frame) ?? []), event]);
+    }
+
+    for (const group of byFrame.values()) {
+      const aimIndex = group.findIndex(
+        (event) => event.callin === "AimWeapon1",
+      );
+      const fireIndex = group.findIndex((event) => event.engine === "fire");
+      if (aimIndex === -1 || fireIndex === -1) continue;
+      expect(aimIndex).toBeLessThan(fireIndex);
+    }
   });
 
   /** Every event that aims at a stand-in is in a scenario that has one, and

@@ -34,6 +34,7 @@ use std::collections::{BTreeSet, HashMap};
 use coilbox_unitpose::{
     unitvalue, EngineAction, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS,
 };
+use serde::Serialize;
 
 use crate::cob;
 use crate::opcodes::opcode;
@@ -107,6 +108,80 @@ pub fn run(
     match Run::start(bytes, pieces, rest, values) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(pieces, error),
+    }
+}
+
+/// What one call-in that returns a piece named, for a `.cob`.
+///
+/// The same shape `coilbox_springlua::unitscript::Probe` reports for a Lua
+/// script, mirrored here rather than shared because that crate is only a dev
+/// dependency of this one. The frontend's `ScriptProbe` fits either.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Probe {
+    /// Key asked for, such as `AimFromWeapon1`.
+    pub callin: String,
+    /// The pieces it named, in call order and with repeats kept.
+    pub pieces: Vec<String>,
+    /// Why it named nothing.
+    pub note: Option<String>,
+}
+
+/// Every probe of one `.cob`, plus whatever went wrong before any ran.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Probes {
+    /// The unit's piece names, so a caller can check they are what it expected.
+    pub pieces: Vec<String>,
+    pub probes: Vec<Probe>,
+    /// The script's own names, empty when it could not be decoded at all. A
+    /// caller working out how many weapons a unit has, with no unit
+    /// definition to read it from, counts the numbered weapon names here.
+    pub functions: Vec<String>,
+    /// Set when the script could not be loaded at all, in which case `probes`
+    /// is empty.
+    pub error: Option<String>,
+}
+
+/// How many times each probe calls its call-in.
+///
+/// The same limit the Lua probe uses, so a cycling answer, several nozzles on
+/// a builder, is reported the same way whichever runtime answered it.
+const PROBE_CALLS: usize = 16;
+
+/// Ask a compiled script which pieces it names, by calling the call-ins that
+/// return one.
+///
+/// Not a run. Nothing is animated and no frames pass. Each call-in is called
+/// directly, seeded and stepped once, the way `Run::ask_piece` asks for one on
+/// the engine's behalf, except a probe reports what stopped it rather than
+/// falling back to script piece 1. A caller here wants to know whether the
+/// script named a piece, not what the engine would have shown regardless.
+///
+/// Never returns an error. A file that will not decode comes back with
+/// `error` set and no probes. One that loads but answers badly says so on the
+/// probe itself.
+pub fn probe(bytes: &[u8], pieces: &[String], callins: &[String]) -> Probes {
+    let mut run = match Run::start(bytes, pieces, &[], &HashMap::new()) {
+        Ok(run) => run,
+        Err(error) => {
+            return Probes {
+                pieces: pieces.to_vec(),
+                probes: Vec::new(),
+                functions: Vec::new(),
+                error: Some(error),
+            }
+        }
+    };
+    let functions = run.program.names.clone();
+    Probes {
+        pieces: pieces.to_vec(),
+        probes: callins
+            .iter()
+            .map(|callin| run.probe_callin(callin))
+            .collect(),
+        functions,
+        error: None,
     }
 }
 
@@ -256,6 +331,9 @@ struct Call {
     /// How much of the data stack belongs to callers, so a return can drop
     /// everything this frame put on it.
     stack_top: usize,
+    /// The function this frame is running, which is what `SHOW` checks
+    /// (`CobThread.cpp:715-718`).
+    function: usize,
 }
 
 enum State {
@@ -291,13 +369,13 @@ struct Thread {
 
 impl Thread {
     fn new(function: usize, pc: usize, mask: u32, origin: String) -> Self {
-        let _ = function;
         Self {
             pc,
             data: Vec::new(),
             calls: vec![Call {
                 ret: None,
                 stack_top: 0,
+                function,
             }],
             params: 0,
             mask,
@@ -345,6 +423,10 @@ struct Run {
     /// Offsets, into the whole code stream, of every opcode word actually
     /// executed. Sorted by construction, since it fills from a `BTreeSet`.
     offsets_run: BTreeSet<u32>,
+    /// The functions the engine calls as `FireWeapon1` to `FireWeapon32`, in
+    /// which `SHOW` draws a flare instead of unhiding
+    /// (`CobThread.cpp:715-728`, `MAX_WEAPONS_PER_UNIT` being 32).
+    fire_functions: Vec<usize>,
 }
 
 impl Run {
@@ -364,6 +446,9 @@ impl Run {
                 ));
             }
         }
+        let fire_functions = (1..=32)
+            .filter_map(|weapon| program.script(&format!("FireWeapon{weapon}")))
+            .collect();
         Ok(Self {
             program,
             model,
@@ -379,6 +464,7 @@ impl Run {
             world: None,
             asked: Vec::new(),
             offsets_run: BTreeSet::new(),
+            fire_functions,
         })
     }
 
@@ -457,7 +543,12 @@ impl Run {
             }
             if let Some(action) = event.engine {
                 self.tick_queued_call_ins(start)?;
-                self.engine(action)?;
+                if action == EngineAction::Fire {
+                    let weapon = event.args.first().copied().unwrap_or(1.0) as u32;
+                    self.fire(weapon)?;
+                } else {
+                    self.engine(action)?;
+                }
                 continue;
             }
             if !self.start_callin(&event.callin, &event.args)? {
@@ -675,6 +766,146 @@ impl Run {
                 .to_string(),
         );
         Ok(UNANSWERED)
+    }
+
+    /// A weapon fires: `FireWeapon`, then `Shot` with its one argument of 0,
+    /// then `QueryWeapon` for the muzzle, each call-in's first tick run inline
+    /// as the engine's `Call` runs it (`Weapon.cpp:509-511,590-595`,
+    /// `CobInstance.cpp:489-493,593`).
+    fn fire(&mut self, weapon: u32) -> Result<(), String> {
+        let queued_at = self.threads.len();
+        self.start_callin(&format!("FireWeapon{weapon}"), &[])?;
+        self.tick_queued_call_ins(queued_at)?;
+        let queued_at = self.threads.len();
+        self.start_callin(&format!("Shot{weapon}"), &[0.0])?;
+        self.tick_queued_call_ins(queued_at)?;
+        let piece = self.weapon_piece(weapon)?;
+        self.model.shot(self.frame, weapon, piece);
+        Ok(())
+    }
+
+    /// The muzzle piece, as `CWeapon::UpdateWeaponPieces` settles it: what
+    /// `QueryWeapon` answers, or the `AimFromWeapon` piece when that is not a
+    /// piece (`Weapon.cpp:235-260`).
+    ///
+    /// The engine only calls this once, at weapon init, and caches the
+    /// answer for every later shot (`UpdateWeaponPieces(false)` at
+    /// `Weapon.cpp:591`). Asking the script again here at shot time gives the
+    /// same piece unless the script's answer changes between init and firing.
+    fn weapon_piece(&mut self, weapon: u32) -> Result<Option<usize>, String> {
+        let muzzle = self.ask_piece(&format!("QueryWeapon{weapon}"), "the shot")?;
+        if let Some(piece) = model_piece(&self.program, muzzle) {
+            return Ok(Some(piece));
+        }
+        let aim_from = self.ask_piece(&format!("AimFromWeapon{weapon}"), "the shot")?;
+        Ok(model_piece(&self.program, aim_from))
+    }
+
+    /// Ask a call-in for a piece, straight away, as the engine's `Call` does.
+    ///
+    /// Seeded `[-1]`, one parameter, and the first slot is the answer, the
+    /// same shape `QueryNanoPiece` and `QueryTransport` are asked in
+    /// (`CobInstance.cpp:437-446`). A script with no call-in of that name, or
+    /// one that waits, leaves the seed there, so it answers script piece 1.
+    fn ask_piece(&mut self, callin: &str, what: &str) -> Result<i32, String> {
+        const UNANSWERED: i32 = 1;
+        let Some(function) = self.program.script(callin) else {
+            self.model.note(format!(
+                "This script has no {callin} call-in, so {what} comes from script piece 1, which is what the engine answers for it."
+            ));
+            return Ok(UNANSWERED);
+        };
+        let mut thread = Thread::new(function, self.program.offsets[function], 0, callin.into());
+        thread.data = vec![-1];
+        thread.params = 1;
+        self.add(thread)?;
+        let index = self.threads.len() - 1;
+        self.step_thread(index)?;
+        for thread in std::mem::take(&mut self.queued) {
+            self.add(thread)?;
+        }
+        if matches!(self.threads[index].state, State::Dead) {
+            return Ok(self.threads[index].data.first().copied().unwrap_or(0));
+        }
+        self.model.note(format!(
+            "{callin} waited rather than answering, so {what} comes from script piece 1, which is what the engine answers for it."
+        ));
+        Ok(UNANSWERED)
+    }
+
+    /// Ask one call-in for the pieces it names, `PROBE_CALLS` times so a
+    /// cycling answer is reported in order, the same shape the Lua probe
+    /// reports.
+    ///
+    /// Each call is asked the way `ask_piece` asks one, seeded `[-1]` and
+    /// stepped once, but a probe does not fall back to script piece 1: a
+    /// call-in the script lacks, one that waits rather than answering, or one
+    /// that names a piece this model does not have all stop the probe with a
+    /// note instead.
+    ///
+    /// The budget and the fatal flag are refilled before each call, the way
+    /// `step` refills them once a frame and the Lua probe refills them once a
+    /// call, so a call that spends its own budget does not leave the next one
+    /// short.
+    fn probe_callin(&mut self, callin: &str) -> Probe {
+        let Some(function) = self.program.script(callin) else {
+            return Probe {
+                callin: callin.to_string(),
+                pieces: Vec::new(),
+                note: Some(format!("This script has no {callin} call-in.")),
+            };
+        };
+
+        let mut pieces = Vec::new();
+        let mut note = None;
+        for _ in 0..PROBE_CALLS {
+            self.budget = FRAME_INSTRUCTIONS;
+            self.fatal = false;
+            let mut thread =
+                Thread::new(function, self.program.offsets[function], 0, callin.into());
+            thread.data = vec![-1];
+            thread.params = 1;
+            if let Err(error) = self.add(thread) {
+                note = Some(error);
+                break;
+            }
+            let index = self.threads.len() - 1;
+            let stepped = self.tick_thread(index);
+            for queued in std::mem::take(&mut self.queued) {
+                let _ = self.add(queued);
+            }
+            if let Err(error) = stepped {
+                // A thread that dies mid-instruction leaves no answer behind,
+                // so the error it died on is the useful note, not a claim
+                // that whatever is left in its data slot is a bad piece.
+                if !self.fatal {
+                    self.threads[index].state = State::Dead;
+                }
+                note = Some(error);
+                break;
+            }
+            if !matches!(self.threads[index].state, State::Dead) {
+                note = Some(format!("{callin} waited rather than answering."));
+                break;
+            }
+            let answer = self.threads[index].data.first().copied().unwrap_or(0);
+            match model_piece(&self.program, answer) {
+                Some(at) => pieces.push(self.model.pieces[at].name.clone()),
+                None => {
+                    note = Some(format!(
+                        "{callin} answered with something that is not a piece of this unit."
+                    ));
+                    break;
+                }
+            }
+            self.threads.retain(|t| !matches!(t.state, State::Dead));
+        }
+
+        Probe {
+            callin: callin.to_string(),
+            pieces,
+            note,
+        }
     }
 
     /// Give a first tick to every call-in thread this frame's `fire_due` has
@@ -1010,7 +1241,13 @@ impl Run {
                 let hide = word == op("HIDE");
                 let piece = self.word(i)?;
                 if let Some(piece) = model_piece(&self.program, piece) {
-                    self.model.set_hidden(piece, hide);
+                    let function = self.threads[i].calls.last().map(|call| call.function);
+                    let in_fire = function.is_some_and(|f| self.fire_functions.contains(&f));
+                    if !hide && in_fire {
+                        self.model.show_flare(self.frame, piece);
+                    } else {
+                        self.model.set_hidden(piece, hide);
+                    }
                 }
             }
             // Scaling arrived in Recoil and no `.cob` in the wild uses it, but
@@ -1077,6 +1314,7 @@ impl Run {
                     Some(Call {
                         ret: Some(ret),
                         stack_top,
+                        ..
                     }) => {
                         self.threads[i].pc = ret;
                         self.threads[i].data.truncate(stack_top);
@@ -1302,6 +1540,7 @@ impl Run {
         self.threads[i].calls.push(Call {
             ret: Some(ret),
             stack_top,
+            function,
         });
         self.threads[i].params = args as i32;
         self.threads[i].pc = self.program.offsets[function];

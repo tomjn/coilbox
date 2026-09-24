@@ -1841,3 +1841,312 @@ mod engine_factory {
         assert!(close(pose(&timeline, 4, "turret")[2], 3.0));
     }
 }
+
+mod engine_fire {
+    use super::*;
+    use coilbox_unitpose::{EngineAction, ScriptOutput};
+    use std::path::Path;
+
+    fn compile(source: &str) -> Vec<u8> {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+        crate::compile_bos(source, &dir).unwrap()
+    }
+
+    fn fire(frame: u32, weapon: f64) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: vec![weapon],
+            ambient: false,
+            world: None,
+            engine: Some(EngineAction::Fire),
+        }
+    }
+
+    fn fired(bytes: &[u8], events: &[ScriptEvent], frames: u32) -> Timeline {
+        let mut all = created();
+        all.extend_from_slice(events);
+        run(bytes, &model_pieces(), &all, frames, &[], &HashMap::new())
+    }
+
+    fn hidden(timeline: &Timeline, frame: usize, piece: &str) -> bool {
+        let index = timeline.pieces.iter().position(|p| p == piece).unwrap();
+        timeline.hidden[frame][index]
+    }
+
+    const GUN: &str = r#"
+        piece base, turret, barrel;
+        Create() { hide barrel; }
+        QueryWeapon1(piecenum) { piecenum = barrel; }
+        AimFromWeapon1(piecenum) { piecenum = turret; }
+        FirePrimary() { show barrel; }
+        Shot1(zero) { show turret; }
+    "#;
+
+    /// `show` inside a fire function draws a flare and leaves the piece
+    /// hidden (`CobThread.cpp:715-728`). Anywhere else it unhides.
+    #[test]
+    fn show_in_a_fire_function_records_a_flare_and_leaves_the_piece_hidden() {
+        let timeline = fired(&compile(GUN), &[fire(5, 1.0)], 8);
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "barrel".into()
+        }));
+        assert!(hidden(&timeline, 7, "barrel"));
+    }
+
+    /// `Shot1` is not a fire function, so its `show` unhides.
+    #[test]
+    fn show_outside_a_fire_function_still_unhides() {
+        let source = GUN.replace("show turret", "hide turret; show turret");
+        let timeline = fired(&compile(&source), &[fire(5, 1.0)], 8);
+
+        assert!(!hidden(&timeline, 7, "turret"));
+        assert!(!timeline
+            .events
+            .iter()
+            .any(|e| matches!(e, ScriptOutput::Flare { piece, .. } if piece == "turret")));
+    }
+
+    /// A function a fire function calls is not itself a fire function: the
+    /// engine checks the innermost call frame.
+    #[test]
+    fn show_in_a_function_called_from_a_fire_function_unhides() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { hide barrel; }
+            Flash() { show barrel; }
+            FireWeapon1() { call-script Flash(); }
+        "#;
+        let timeline = fired(&compile(source), &[fire(5, 1.0)], 8);
+
+        assert!(!hidden(&timeline, 7, "barrel"));
+        assert!(!timeline
+            .events
+            .iter()
+            .any(|e| matches!(e, ScriptOutput::Flare { .. })));
+    }
+
+    /// `FireWeapon`, then `Shot`, then `QueryWeapon`, on the one frame
+    /// (`Weapon.cpp:509-511,590-595`). The shot names what `QueryWeapon1`
+    /// answered after `Shot1` ran.
+    #[test]
+    fn fire_calls_fire_then_shot_then_query_weapon_on_its_frame() {
+        let source = r#"
+            piece base, turret, barrel;
+            static-var muzzle;
+            Create() { muzzle = turret; }
+            FireWeapon1() { muzzle = base; }
+            Shot1(zero) { muzzle = barrel; }
+            QueryWeapon1(piecenum) { piecenum = muzzle; }
+        "#;
+        let timeline = fired(&compile(source), &[fire(5, 1.0)], 8);
+
+        assert_eq!(
+            timeline
+                .events
+                .iter()
+                .filter(|e| matches!(e, ScriptOutput::Shot { .. }))
+                .cloned()
+                .collect::<Vec<_>>(),
+            [ScriptOutput::Shot {
+                frame: 5,
+                weapon: 1,
+                piece: Some("barrel".into())
+            }]
+        );
+    }
+
+    /// A missing `QueryWeapon` answers script piece 1, as the engine's seed
+    /// leaves it (`CobInstance.cpp:437-446`).
+    #[test]
+    fn a_missing_query_weapon_answers_script_piece_one() {
+        let source = "piece base, turret, barrel;\nCreate() { }\n";
+        let timeline = fired(&compile(source), &[fire(5, 1.0)], 8);
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("turret".into())
+        }));
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryWeapon1")));
+    }
+
+    /// The weapon number picks the call-ins: weapon 2 runs `FireWeapon2`.
+    #[test]
+    fn the_weapon_number_picks_the_call_ins() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { hide barrel; hide turret; }
+            FireWeapon1() { show turret; }
+            FireWeapon2() { show barrel; }
+            QueryWeapon2(piecenum) { piecenum = barrel; }
+        "#;
+        let timeline = fired(&compile(source), &[fire(5, 2.0)], 8);
+
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "barrel".into()
+        }));
+        assert!(!timeline
+            .events
+            .iter()
+            .any(|e| matches!(e, ScriptOutput::Flare { piece, .. } if piece == "turret")));
+    }
+}
+
+mod probe {
+    use super::*;
+    use std::path::Path;
+
+    fn compile(source: &str) -> Vec<u8> {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+        crate::compile_bos(source, &dir).unwrap()
+    }
+
+    /// A script written before Recoil numbered its first weapon still answers
+    /// `AimFromWeapon1`, because `Program::script` maps it to the older
+    /// `AimFromPrimary` the same way the run itself does.
+    #[test]
+    fn aim_from_primary_answers_under_aim_from_weapon_one() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { }
+            AimFromPrimary(piecenum) { piecenum = turret; }
+        "#;
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["AimFromWeapon1".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "AimFromWeapon1");
+        // Called PROBE_CALLS times, same as the Lua probe, so a script that
+        // always names the same piece reports it that many times over.
+        assert_eq!(probe.pieces, vec!["turret".to_string(); PROBE_CALLS]);
+        assert_eq!(probe.note, None);
+    }
+
+    /// A call-in that answers a different piece on every call, the way a
+    /// builder's `QueryNanoPiece` alternates its nozzles, is reported in the
+    /// order the calls were made, over a static variable the run keeps
+    /// between the sixteen fresh threads the probe hands it.
+    #[test]
+    fn a_cycling_answer_is_reported_in_call_order() {
+        let source = r#"
+            piece base, turret, barrel;
+            static-var spray;
+            Create() { }
+            QueryNanoPiece(piecenum)
+            {
+                if( spray == 0 )
+                {
+                    piecenum = turret;
+                }
+                else
+                {
+                    piecenum = barrel;
+                }
+                spray = !spray;
+            }
+        "#;
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["QueryNanoPiece".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "QueryNanoPiece");
+        let expected: Vec<String> = (0..PROBE_CALLS)
+            .map(|i| if i % 2 == 0 { "turret" } else { "barrel" }.to_string())
+            .collect();
+        assert_eq!(probe.pieces, expected);
+        assert_eq!(probe.note, None);
+    }
+
+    /// A call-in that sleeps rather than answering leaves the probe's seed,
+    /// `-1`, sitting unread in the thread's data slot. The probe has to tell
+    /// that apart from a real answer rather than reporting `-1` as a piece.
+    #[test]
+    fn a_sleeping_callin_stops_the_probe_rather_than_reporting_its_seed() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { }
+            AimFromWeapon1(piecenum)
+            {
+                sleep 100;
+                piecenum = turret;
+            }
+        "#;
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["AimFromWeapon1".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "AimFromWeapon1");
+        assert!(probe.pieces.is_empty());
+        assert!(probe
+            .note
+            .as_deref()
+            .is_some_and(|note| note.contains("waited rather than answering")));
+    }
+
+    /// A call-in the script has no function for gets a note and names no
+    /// piece, the same answer the Lua probe gives.
+    #[test]
+    fn a_missing_callin_gives_a_note_and_no_piece() {
+        let source = "piece base, turret, barrel;\nCreate() { }\n";
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["QueryBuildInfo".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "QueryBuildInfo");
+        assert!(probe.pieces.is_empty());
+        assert!(probe
+            .note
+            .as_deref()
+            .is_some_and(|note| note.contains("no QueryBuildInfo call-in")));
+    }
+
+    /// A caller working out how many weapons a unit has, with no unit
+    /// definition to read the count from, counts the script's own numbered
+    /// weapon scripts. Those come from the same place `Timeline::functions`
+    /// does: the `.cob`'s own name table.
+    #[test]
+    fn reports_the_scripts_own_names() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { }
+            AimWeapon1(heading, pitch) { }
+            AimWeapon2(heading, pitch) { }
+        "#;
+        let probes = probe(&compile(source), &model_pieces(), &["Create".to_string()]);
+
+        assert_eq!(probes.error, None);
+        assert!(
+            probes.functions.contains(&"AimWeapon2".to_string()),
+            "{:?}",
+            probes.functions
+        );
+    }
+}

@@ -65,6 +65,10 @@ export interface ScriptEvent {
    *
    * `factory-finish` stops the spray and fires `StopBuilding`, or notes that
    * the script never set stance.
+   *
+   * `fire` fires a weapon, whose number, counted from one, is `args[0]`. The
+   * runtime calls `FireWeapon`, then `Shot`, then asks `QueryWeapon` for the
+   * muzzle, on the one frame (`rts/Sim/Weapons/Weapon.cpp:509-511,590-595`).
    */
   engine?:
     | "attach"
@@ -72,7 +76,8 @@ export interface ScriptEvent {
     | "nano-start"
     | "nano-stop"
     | "factory-build"
-    | "factory-finish";
+    | "factory-finish"
+    | "fire";
 }
 
 /** The scene one frame of a script run is told about. */
@@ -98,7 +103,14 @@ export type ScriptOutput =
   | { frame: number; kind: "explode"; piece: string; flags: number }
   | { frame: number; kind: "sound"; name: string | null }
   | { frame: number; kind: "nano"; piece: string | null } // null when no piece is named yet
-  | { frame: number; kind: "build-start" }; // the frame a factory started building
+  | { frame: number; kind: "build-start" } // the frame a factory started building
+  | { frame: number; kind: "flare"; piece: string } // show inside a fire function, or ShowFlare
+  | {
+      frame: number;
+      kind: "shot";
+      weapon: number;
+      piece: string | null;
+    }; // null when neither QueryWeapon nor AimFromWeapon named a piece
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
 export interface ScriptTimeline {
@@ -148,6 +160,10 @@ export interface ScriptProbe {
 export interface ScriptProbes {
   pieces: string[];
   probes: ScriptProbe[];
+  /** The script's own function names, empty when it could not be loaded at
+   *  all. Used to count a unit's weapons when there is no unit definition to
+   *  read the count from. */
+  functions: string[];
   /** Set when nothing could be asked, in which case `probes` is empty. */
   error: string | null;
 }
@@ -320,6 +336,64 @@ export const STAND_IN_UNIT_ID = 2;
  *  unit. */
 const STAND_OFF = 5;
 
+/** Seconds between shots in the firing scenario's volleys, set by eye rather
+ *  than read from a unit def. The weapon's real reload time lives in
+ *  `reloadtime` in its unit def, which the preview does not read yet. */
+const FIRE_INTERVAL_S = 0.5;
+
+/** Frames between shots in the firing scenario's volleys, for
+ *  `expandForWeapons` to spread a unit's other weapons across without
+ *  reaching the next shot. */
+export const FIRE_INTERVAL_FRAMES = at(FIRE_INTERVAL_S);
+
+/** A `fire` call-in every `FIRE_INTERVAL_S` from `startS` to `endS`
+ *  inclusive, for a scenario that holds the stand-in still while it fires. */
+function fireVolley(startS: number, endS: number): ScriptEvent[] {
+  const shots = Math.round((endS - startS) / FIRE_INTERVAL_S) + 1;
+  return Array.from({ length: shots }, (_, index) => ({
+    frame: at(startS + index * FIRE_INTERVAL_S),
+    engine: "fire" as const,
+    args: [1],
+  }));
+}
+
+/** How often the engine calls a weapon's aiming script again while it still
+ *  has a target: `CWeapon::UpdateAim` calls `CallAimingScript` whenever
+ *  `HaveTarget()` (`Weapon.cpp:352-357`), which fires only once
+ *  `gs->frameNum >= lastAimedFrame + reaimTime` (`Weapon.cpp:380`), and
+ *  `reaimTime` defaults to `GAME_SPEED >> 1`, 15 frames at the engine's 30 fps
+ *  (`Weapon.cpp:137`). A script that only turns the arm from `AimWeapon`
+ *  stands it down again after a fixed delay, so without this the arm goes
+ *  back to its rest pose well before a volley ends. */
+const REAIM_INTERVAL_FRAMES = 15;
+
+/** `AimWeapon1` re-aimed at the stand-in every `REAIM_INTERVAL_FRAMES`, from
+ *  `startS` up to and including `endFrame`. */
+function reaimVolley(startS: number, endFrame: number): ScriptEvent[] {
+  const events: ScriptEvent[] = [];
+  for (
+    let frame = at(startS);
+    frame <= endFrame;
+    frame += REAIM_INTERVAL_FRAMES
+  ) {
+    events.push({
+      frame,
+      callin: "AimWeapon1",
+      aimAtStandIn: { from: "AimFromWeapon" },
+    });
+  }
+  return events;
+}
+
+/** Aim and fire events merged into one series, sorted by frame, with an aim
+ *  landing before a fire on the same frame, since a script fires after it has
+ *  turned to face the target rather than before. */
+function aimedFire(aims: ScriptEvent[], fires: ScriptEvent[]): ScriptEvent[] {
+  return [...aims, ...fires].sort(
+    (a, b) => a.frame - b.frame || Number(!a.callin) - Number(!b.callin),
+  );
+}
+
 /**
  * What a preview can put a unit through.
  *
@@ -477,37 +551,42 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "firing",
     label: "Aiming and firing",
-    description: "Aims one way, fires, aims the other, fires again.",
+    description:
+      "Aims one way and fires a volley, then aims the other way and fires again.",
     events: [
       ...CREATED,
       // Aimed at the stand-in rather than at two numbers, and measured from
       // the piece `AimFromWeapon1` names, as the engine measures it
-      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`).
-      {
-        frame: at(0.5),
-        callin: "AimWeapon1",
-        aimAtStandIn: { from: "AimFromWeapon" },
-      },
-      { frame: at(4), callin: "Shot1" },
-      {
-        frame: at(6),
-        callin: "AimWeapon1",
-        aimAtStandIn: { from: "AimFromWeapon" },
-      },
-      { frame: at(9.5), callin: "Shot1" },
+      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`). Re-aimed every
+      // `REAIM_INTERVAL_FRAMES` for as long as the preview runs, one
+      // continuous series rather than one per volley, since the engine keeps
+      // calling a weapon's aiming script every `reaimTime` frames for as long
+      // as it has a target, whether or not the target is moving
+      // (`Weapon.cpp:352-357,380`). Without this the arm follows the stand-in
+      // between volleys too, not only while it fires.
+      //
+      // The stand-in holds its first spot until at(4), so the first volley
+      // fires while aim is settled rather than mid-turn. It holds its second
+      // spot from at(6) to at(10) the same way, and the continuous re-aim is
+      // what turns the arm to follow it there.
+      ...aimedFire(reaimVolley(0.5, PREVIEW_FRAMES - 1), [
+        ...fireVolley(1, 4),
+        ...fireVolley(7, 10),
+      ]),
     ],
-    // Off the ground and well out, so the second aim differs from the first in
-    // pitch as well as heading and a barrel that only turns is obvious.
+    // Both spots are on the ground and well out in front, set by eye with the
+    // user. The pitch still differs a little between the two because each is
+    // measured from the weapon's own piece.
     //
     // Back where it started by the end, so the turret tracks it round rather
     // than the stand-in jumping across the scene when the preview loops.
     standIn: {
       keys: [
-        { frame: 0, pos: [2.6, 2.2, 4] },
-        { frame: at(4), pos: [2.6, 2.2, 4] },
-        { frame: at(6), pos: [-2.6, 0.6, 4] },
-        { frame: at(10), pos: [-2.6, 0.6, 4] },
-        { frame: at(PREVIEW_SECONDS), pos: [2.6, 2.2, 4] },
+        { frame: 0, pos: [4, 0, 10] },
+        { frame: at(4), pos: [4, 0, 10] },
+        { frame: at(6), pos: [-4, 0, 10] },
+        { frame: at(10), pos: [-4, 0, 10] },
+        { frame: at(PREVIEW_SECONDS), pos: [4, 0, 10] },
       ],
     },
   },
