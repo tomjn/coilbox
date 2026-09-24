@@ -191,6 +191,30 @@ fn piece(source: &coilbox_3do::Piece, state: &mut Walk) -> coilbox_s3o::Piece {
             .collect();
     }
 
+    // A piece with faces emits from the file's vertex 0 towards its vertex 1
+    // too, and its corners above only start there when its first face does
+    // (issue #3016). Otherwise those two go in front, used by no face.
+    let emit = source.vertices.get(..2).unwrap_or(&[]);
+    if !indices.is_empty()
+        && !vertices
+            .iter()
+            .map(|v| v.pos)
+            .take(2)
+            .eq(emit.iter().copied())
+    {
+        vertices.splice(
+            0..0,
+            emit.iter().map(|pos| coilbox_s3o::Vertex {
+                pos: *pos,
+                normal: [0.0; 3],
+                uv: [0.0; 2],
+            }),
+        );
+        for index in &mut indices {
+            *index += emit.len() as u32;
+        }
+    }
+
     state.vertices += vertices.len();
     state.triangles += indices.len() / 3;
 
@@ -613,6 +637,86 @@ mod tests {
         assert_eq!(positions, vec![[0.0, 1.0, 2.0], [0.0, 1.0, -3.0]]);
         assert!(out.model.root.indices.is_empty());
         assert_eq!(out.model.root.children[0].vertices.len(), 3);
+    }
+
+    /// Issue #3016: a piece with faces emits from the file's vertex 0 towards
+    /// its vertex 1, and its corners start somewhere else. Those two go in
+    /// front, used by no face, so the piece emits where the engine would and
+    /// still draws the same triangles.
+    #[test]
+    fn puts_the_files_first_two_vertices_in_front_of_a_faced_piece() {
+        let out = convert(piece3("flare", vec![textured(vec![2, 3, 0])]));
+        let root = &out.model.root;
+
+        let positions: Vec<[f32; 3]> = root.vertices.iter().map(|v| v.pos).collect();
+        assert_eq!(
+            positions,
+            vec![
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 1.0],
+                [0.0, 0.0, 1.0],
+                [0.0, 0.0, 0.0],
+            ]
+        );
+        assert_eq!(root.indices, vec![2, 4, 3]);
+        assert_eq!(out.vertices, 5);
+        assert_eq!(out.triangles, 1);
+    }
+
+    /// The Bantha's `rgunflare` (Balanced Annihilation's `armbanth.3do`), the
+    /// specimen #3016 was filed for. Its only face starts at the file's vertex
+    /// 1, so its corners would emit from vertex 1 back towards vertex 0: the
+    /// muzzle flash 21.9 elmos away and facing the wrong way.
+    #[test]
+    fn keeps_the_bantha_flares_emit_point() {
+        let mut flare = piece3("rgunflare", vec![textured(vec![1, 0, 2])]);
+        flare.vertices = vec![
+            [0.0, -25.185196, -0.03152466],
+            [0.0, -3.6661682, -4.0437164],
+            [0.0, -0.19654846, -0.011108398],
+        ];
+        let out = convert(flare);
+        let root = &out.model.root;
+
+        assert_eq!(root.vertices[0].pos, [0.0, -25.185196, -0.03152466]);
+        assert_eq!(root.vertices[1].pos, [0.0, -3.6661682, -4.0437164]);
+        let drawn: Vec<[f32; 3]> = root
+            .indices
+            .iter()
+            .map(|&i| root.vertices[i as usize].pos)
+            .collect();
+        assert_eq!(
+            drawn,
+            vec![
+                [0.0, -3.6661682, -4.0437164],
+                [0.0, -0.19654846, -0.011108398],
+                [0.0, -25.185196, -0.03152466],
+            ]
+        );
+    }
+
+    /// A first face that already starts at vertex 0 then vertex 1 emits from
+    /// the right place, so nothing is added and the output is as it was.
+    #[test]
+    fn adds_nothing_when_the_first_corners_are_already_the_files_first_vertices() {
+        let out = convert(piece3("body", vec![textured(vec![0, 1, 2])]));
+
+        assert_eq!(out.model.root.vertices.len(), 3);
+        assert_eq!(out.model.root.indices, vec![0, 2, 1]);
+    }
+
+    /// The extra vertices change neither the header, which the engine reads
+    /// for the collision sphere, nor whether the result writes and reads back.
+    #[test]
+    fn a_faced_piece_with_its_emit_point_in_front_writes_and_reads_back() {
+        let out = convert(piece3("flare", vec![textured(vec![2, 3, 0])]));
+
+        assert_eq!(out.model.radius, 1.5);
+        assert_eq!(out.model.height, 2.0);
+        assert_eq!(out.model.mid, [0.0, 1.0, 0.0]);
+        let bytes = coilbox_s3o::write(&out.model).expect("write");
+        assert_eq!(coilbox_s3o::read(&bytes).expect("read"), out.model);
     }
 
     /// A piece with no vertices at all, a hierarchy node, stays empty.

@@ -1011,6 +1011,36 @@ mod tests {
             assert_eq!(out.triangles, 1);
         }
 
+        /// Issue #3016: a piece with faces emits from the file's vertex 0
+        /// towards its vertex 1, so those are the first two vertices of its
+        /// mesh, where the preview reads its emit point from. They sit in
+        /// front of the corners and no triangle uses them.
+        #[test]
+        fn a_faced_piece_keeps_the_files_emit_point_in_its_first_two_vertices() {
+            let out = import_3do(
+                &model3(piece3("flare", vec![textured(vec![2, 3, 0])])),
+                &rects(),
+            )
+            .expect("import");
+            let blob = inflate(&out.blob);
+            let position = |i: usize| {
+                let at = BLOB_HEADER_SIZE + i * FLOATS_PER_VERTEX * 4;
+                [
+                    f32_at(&blob, at),
+                    f32_at(&blob, at + 4),
+                    f32_at(&blob, at + 8),
+                ]
+            };
+
+            assert_eq!(out.vertices, 5);
+            assert_eq!(out.triangles, 1);
+            assert_eq!(position(0), [0.0, 0.0, 0.0]);
+            assert_eq!(position(1), [1.0, 0.0, 0.0]);
+            let indices_at = u32_at(&blob, 24) as usize;
+            let drawn: Vec<u32> = (0..3).map(|i| u32_at(&blob, indices_at + i * 4)).collect();
+            assert_eq!(drawn, vec![2, 4, 3]);
+        }
+
         /// The real specimen this rule was written for: `ARM_T1_HOV_Constructor`
         /// (Basically OTA) and its XTA equivalent both carry a `nanogun` piece
         /// with two empty children both called `beam`. The engine can only ever
