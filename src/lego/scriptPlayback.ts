@@ -348,6 +348,50 @@ function fireVolley(startS: number, endS: number): ScriptEvent[] {
   }));
 }
 
+/** How often the engine calls a weapon's aiming script again while it still
+ *  has a target: `CWeapon::UpdateAim` calls `CallAimingScript` whenever
+ *  `HaveTarget()` (`Weapon.cpp:352-357`), which fires only once
+ *  `gs->frameNum >= lastAimedFrame + reaimTime` (`Weapon.cpp:380`), and
+ *  `reaimTime` defaults to `GAME_SPEED >> 1`, 15 frames at the engine's 30 fps
+ *  (`Weapon.cpp:137`). A script that only turns the arm from `AimWeapon`
+ *  stands it down again after a fixed delay, so without this the arm goes
+ *  back to its rest pose well before a volley ends. */
+const REAIM_INTERVAL_FRAMES = 15;
+
+/** `AimWeapon1` re-aimed at the stand-in every `REAIM_INTERVAL_FRAMES`, from
+ *  `startS` up to and including `endFrame`. */
+function reaimVolley(startS: number, endFrame: number): ScriptEvent[] {
+  const events: ScriptEvent[] = [];
+  for (
+    let frame = at(startS);
+    frame <= endFrame;
+    frame += REAIM_INTERVAL_FRAMES
+  ) {
+    events.push({
+      frame,
+      callin: "AimWeapon1",
+      aimAtStandIn: { from: "AimFromWeapon" },
+    });
+  }
+  return events;
+}
+
+/** Aim and fire events for one volley, aim events re-aiming the arm every
+ *  `REAIM_INTERVAL_FRAMES` across it. Sorted by frame, and where an aim and a
+ *  fire land on the same frame the aim comes first, since a script fires
+ *  after it has turned to face the target rather than before. */
+function volley(
+  aimStartS: number,
+  fireStartS: number,
+  endS: number,
+): ScriptEvent[] {
+  const fires = fireVolley(fireStartS, endS);
+  const aims = reaimVolley(aimStartS, at(endS));
+  return [...aims, ...fires].sort(
+    (a, b) => a.frame - b.frame || Number(!a.callin) - Number(!b.callin),
+  );
+}
+
 /**
  * What a preview can put a unit through.
  *
@@ -511,22 +555,17 @@ export const SCENARIOS: Scenario[] = [
       ...CREATED,
       // Aimed at the stand-in rather than at two numbers, and measured from
       // the piece `AimFromWeapon1` names, as the engine measures it
-      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`).
-      {
-        frame: at(0.5),
-        callin: "AimWeapon1",
-        aimAtStandIn: { from: "AimFromWeapon" },
-      },
+      // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`). Re-aimed every
+      // `REAIM_INTERVAL_FRAMES` across the volley, as the engine keeps doing
+      // while the weapon has a target, so the arm holds its pose for the
+      // whole volley instead of standing down after the script's own
+      // `AimPrimary` delay.
+      //
       // The stand-in holds its first spot until at(4), so the volley fires
       // while aim is settled rather than mid-turn.
-      ...fireVolley(1, 4),
-      {
-        frame: at(6),
-        callin: "AimWeapon1",
-        aimAtStandIn: { from: "AimFromWeapon" },
-      },
+      ...volley(0.5, 1, 4),
       // The stand-in holds its second spot from at(6) to at(10).
-      ...fireVolley(7, 10),
+      ...volley(6, 7, 10),
     ],
     // Both spots are on the ground and well out in front, set by eye with the
     // user. The pitch still differs a little between the two because each is

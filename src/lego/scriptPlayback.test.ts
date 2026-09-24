@@ -9,6 +9,7 @@ import {
   playable,
   poseAt,
   SCENARIOS,
+  type ScriptEvent,
   type ScriptTimeline,
   scenarioById,
 } from "./scriptPlayback";
@@ -163,6 +164,51 @@ describe("scenarios", () => {
     expect(firing?.events.some((event) => event.callin === "Shot1")).toBe(
       false,
     );
+  });
+
+  /** The engine calls a weapon's `AimWeapon` again every `reaimTime` frames,
+   *  15 by default, while it still has a target (`Weapon.cpp:137,352-357,380`),
+   *  so a script whose own `AimPrimary` stands the arm down after a fixed
+   *  delay is kept aiming for as long as the volley runs. */
+  it("re-aims the weapon every 15 frames across each volley", () => {
+    const firing = scenarioById("firing");
+    const aims = firing?.events.filter(
+      (event) => event.callin === "AimWeapon1",
+    );
+
+    const firstVolley: number[] = [];
+    for (let frame = at(0.5); frame <= at(4); frame += 15) {
+      firstVolley.push(frame);
+    }
+    const secondVolley: number[] = [];
+    for (let frame = at(6); frame <= at(10); frame += 15) {
+      secondVolley.push(frame);
+    }
+
+    expect(aims?.map((event) => event.frame)).toEqual([
+      ...firstVolley,
+      ...secondVolley,
+    ]);
+    for (const aim of aims ?? []) {
+      expect(aim.aimAtStandIn).toEqual({ from: "AimFromWeapon" });
+    }
+  });
+
+  it("aims before firing when an aim and a fire land on the same frame", () => {
+    const firing = scenarioById("firing");
+    const byFrame = new Map<number, ScriptEvent[]>();
+    for (const event of firing?.events ?? []) {
+      byFrame.set(event.frame, [...(byFrame.get(event.frame) ?? []), event]);
+    }
+
+    for (const group of byFrame.values()) {
+      const aimIndex = group.findIndex(
+        (event) => event.callin === "AimWeapon1",
+      );
+      const fireIndex = group.findIndex((event) => event.engine === "fire");
+      if (aimIndex === -1 || fireIndex === -1) continue;
+      expect(aimIndex).toBeLessThan(fireIndex);
+    }
   });
 
   /** Every event that aims at a stand-in is in a scenario that has one, and
