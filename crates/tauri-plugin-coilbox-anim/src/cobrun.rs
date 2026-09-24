@@ -712,6 +712,11 @@ impl Run {
     /// The muzzle piece, as `CWeapon::UpdateWeaponPieces` settles it: what
     /// `QueryWeapon` answers, or the `AimFromWeapon` piece when that is not a
     /// piece (`Weapon.cpp:235-260`).
+    ///
+    /// The engine only calls this once, at weapon init, and caches the
+    /// answer for every later shot (`UpdateWeaponPieces(false)` at
+    /// `Weapon.cpp:591`). Asking the script again here at shot time gives the
+    /// same piece unless the script's answer changes between init and firing.
     fn weapon_piece(&mut self, weapon: u32) -> Result<Option<usize>, String> {
         let muzzle = self.ask_piece(&format!("QueryWeapon{weapon}"), "the shot")?;
         if let Some(piece) = model_piece(&self.program, muzzle) {
