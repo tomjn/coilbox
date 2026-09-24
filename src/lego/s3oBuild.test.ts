@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { emitPoint } from "./effects";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
@@ -555,6 +556,50 @@ describe("baking an imported unit", () => {
     expect(child(build?.root as S3oPiece, "hull").vertices[1].pos).toEqual([
       0, 6, 0,
     ]);
+  });
+
+  it("keeps an emit point's vertices, so a wake points back along them", () => {
+    // Issue #3013: a wake with two vertices and no faces, the second behind
+    // the first. Dropped, the engine would emit it forward along +Z.
+    const wake: RawGeometry = {
+      byId: new Map([
+        [
+          "m1",
+          {
+            id: "m1",
+            vFirst: 0,
+            vCount: 2,
+            iFirst: 0,
+            iCount: 0,
+            bbox: { min: [0, 1, -3], max: [0, 1, 2] },
+          },
+        ],
+      ]),
+      vertices: new Float32Array([
+        0, 1, 2, 0, 0, 0, 0, 0, 0, 1, -3, 0, 0, 0, 0, 0,
+      ]),
+      indices: new Uint32Array(),
+    };
+    const doc = project([
+      {
+        id: "wake1",
+        name: "wake1",
+        parentId: "root",
+        partId: null,
+        meshId: "m1",
+      },
+    ]);
+
+    const built = child(
+      buildS3o(doc, pack(), wake, TEXTURES)?.root as S3oPiece,
+      "wake1",
+    );
+
+    expect(built.indices).toEqual([]);
+    expect(emitPoint(built.vertices.map((vertex) => vertex.pos))).toEqual({
+      pos: [0, 1, 2],
+      dir: [0, 0, -5],
+    });
   });
 
   it("shows nothing for a mesh the sidecar does not hold", () => {

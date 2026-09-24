@@ -190,6 +190,30 @@ describe("pieceKind", () => {
   it("is empty for a hierarchy node, flare, aim point or emitter", () => {
     expect(pieceKind(piece("a", null))).toBe("empty");
   });
+
+  it("is empty for an imported emit point, a mesh with no triangles", () => {
+    const mesh = {
+      vFirst: 0,
+      vCount: 2,
+      iFirst: 0,
+      bbox: {
+        min: [0, 0, 0] as [number, number, number],
+        max: [0, 0, 1] as [number, number, number],
+      },
+    };
+    const raw = {
+      byId: new Map([
+        ["m1", { ...mesh, id: "m1", iCount: 0 }],
+        ["m2", { ...mesh, id: "m2", iCount: 3 }],
+      ]),
+      vertices: new Float32Array(),
+      indices: new Uint32Array(),
+    };
+    expect(pieceKind({ ...piece("a", null), meshId: "m1" }, raw)).toBe("empty");
+    expect(pieceKind({ ...piece("a", null), meshId: "m2" }, raw)).toBe(
+      "geometry",
+    );
+  });
 });
 
 describe("projectProblems", () => {

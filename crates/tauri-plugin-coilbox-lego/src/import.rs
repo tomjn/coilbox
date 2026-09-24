@@ -75,8 +75,9 @@ struct Bbox {
 pub struct ImportPiece {
     pub name: String,
     pub offset: [f32; 3],
-    /// `None` for a piece with no geometry: a hierarchy node, a flare or an aim
-    /// point, which is how the format carries all three.
+    /// `None` for a piece with no vertices: a hierarchy node or an aim point.
+    /// A flare or a wake with one or two vertices and no faces has a mesh
+    /// that draws nothing, because those vertices are its emit point.
     pub mesh_id: Option<String>,
     pub children: Vec<ImportPiece>,
 }
@@ -115,7 +116,7 @@ pub struct Imported {
 
 /// Flatten a model into a geometry blob and the tree that indexes it.
 ///
-/// Every piece with triangles gets a mesh, keyed by its position in the
+/// Every piece with vertices gets a mesh, keyed by its position in the
 /// depth-first walk. The key is not the piece name: names in a shipped model
 /// repeat, and the document's own names are normalised and made unique after
 /// this, so a key derived from either would move under the geometry.
@@ -384,10 +385,14 @@ fn walk(piece: &coilbox_s3o::Piece, state: &mut Walk) -> ImportPiece {
     state.next += 1;
 
     let indices = piece.triangles();
-    let mesh_id = if indices.is_empty() || piece.vertices.is_empty() {
+    // A piece with vertices and no triangles still gets a mesh. The engine
+    // reads a piece's emit point and direction off its first two vertices
+    // (`3DModelPiece.cpp:60-78`), so a wake or a flare without them points
+    // along +Z from its origin.
+    let mesh_id = if piece.vertices.is_empty() {
         None
     } else {
-        if piece.primitive_type != coilbox_s3o::PrimitiveType::Triangles {
+        if !indices.is_empty() && piece.primitive_type != coilbox_s3o::PrimitiveType::Triangles {
             state.converted += 1;
         }
         let v_first = state.vertices.len() / FLOATS_PER_VERTEX;
@@ -519,6 +524,32 @@ mod tests {
         assert_eq!(out.meshes, 1);
         assert_eq!(out.vertices, 3);
         assert_eq!(out.triangles, 1);
+    }
+
+    /// Issue #3013: a wake's two vertices are its emit point and direction,
+    /// so they survive as a mesh with no triangles rather than being dropped.
+    #[test]
+    fn an_emit_point_piece_keeps_its_vertices() {
+        let mut root = piece("base", Vec::new(), Vec::new());
+        root.children
+            .push(piece("wake1", vec![vertex(0.0), vertex(1.0)], Vec::new()));
+        root.primitive_type = coilbox_s3o::PrimitiveType::Quads;
+        let out = import(&model(root)).expect("import");
+
+        assert_eq!(out.root.children[0].mesh_id.as_deref(), Some("m1"));
+        assert_eq!(out.meshes, 1);
+        assert_eq!(out.vertices, 2);
+        assert_eq!(out.triangles, 0);
+        assert_eq!(out.converted, 0);
+        let blob = inflate(&out.blob);
+        let second = BLOB_HEADER_SIZE + FLOATS_PER_VERTEX * 4;
+        assert_eq!(
+            blob[second..second + 12],
+            [1.0f32, 2.0, 3.0]
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect::<Vec<u8>>()[..]
+        );
     }
 
     #[test]
@@ -958,18 +989,26 @@ mod tests {
             assert_eq!(out.triangles, 1);
         }
 
-        /// A piece with one or two vertices and no faces is a flare or an aim
-        /// point, and the format carries all of them this way.
+        /// A piece with no vertices is a hierarchy node and gets no mesh. One
+        /// with vertices and no faces is a flare or a wake, and gets a mesh
+        /// with no triangles so its emit point survives (issue #3013).
         #[test]
-        fn leaves_a_piece_with_no_faces_without_a_mesh() {
+        fn gives_a_piece_with_no_faces_a_mesh_only_if_it_has_vertices() {
             let mut root = piece3("base", Vec::new());
+            root.vertices.clear();
+            let mut wake = piece3("wake1", Vec::new());
+            wake.vertices.truncate(2);
+            root.children.push(wake);
             root.children
                 .push(piece3("body", vec![textured(vec![0, 1, 2])]));
             let out = import_3do(&model3(root), &rects()).expect("import");
 
             assert_eq!(out.root.mesh_id, None);
             assert_eq!(out.root.children[0].mesh_id.as_deref(), Some("m1"));
-            assert_eq!(out.meshes, 1);
+            assert_eq!(out.root.children[1].mesh_id.as_deref(), Some("m2"));
+            assert_eq!(out.meshes, 2);
+            assert_eq!(out.vertices, 5);
+            assert_eq!(out.triangles, 1);
         }
 
         /// The real specimen this rule was written for: `ARM_T1_HOV_Constructor`
