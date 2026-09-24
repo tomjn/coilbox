@@ -589,7 +589,12 @@ impl Run {
             }
             if let Some(action) = event.engine {
                 self.tick_queued_call_ins(start)?;
-                self.engine(action)?;
+                if action == EngineAction::Fire {
+                    let weapon = event.args.first().copied().unwrap_or(1.0) as u32;
+                    self.fire(weapon)?;
+                } else {
+                    self.engine(action)?;
+                }
                 continue;
             }
             let args = event.args.iter().map(|arg| Value::Number(*arg)).collect();
@@ -767,6 +772,51 @@ impl Run {
                     "QueryTransport failed, so the stand-in goes in the void, which is what the engine answers for it: {}",
                     describe(&error)
                 ));
+                -1
+            }
+        }
+    }
+
+    /// A weapon fires: `FireWeapon`, then `Shot`, then `QueryWeapon` for the
+    /// muzzle, each call-in's first tick run inline
+    /// (`Weapon.cpp:509-511,590-595`, `LuaUnitScript.cpp:878-883,1018`).
+    fn fire(&mut self, weapon: u32) -> Result<(), String> {
+        let queued_at = self.runners.len();
+        self.start_callin(&format!("FireWeapon{weapon}"), Vec::new())?;
+        self.tick_queued_call_ins(queued_at)?;
+        let queued_at = self.runners.len();
+        self.start_callin(&format!("Shot{weapon}"), Vec::new())?;
+        self.tick_queued_call_ins(queued_at)?;
+        let piece = self.weapon_piece(weapon);
+        let mut sim = self.sim.borrow_mut();
+        let frame = sim.frame;
+        sim.model.shot(frame, weapon, piece);
+        Ok(())
+    }
+
+    /// What `QueryWeapon` names, or the `AimFromWeapon` piece when that names
+    /// none of this unit's pieces (`Weapon.cpp:235-260`).
+    fn weapon_piece(&mut self, weapon: u32) -> Option<usize> {
+        let count = self.sim.borrow().model.pieces.len();
+        let valid = |piece: i64| usize::try_from(piece).ok().filter(|index| *index < count);
+        valid(self.ask_piece(&format!("QueryWeapon{weapon}")))
+            .or_else(|| valid(self.ask_piece(&format!("AimFromWeapon{weapon}"))))
+    }
+
+    /// Ask a call-in that answers with a piece, as `RunQueryCallIn` does: a
+    /// piece counted from one out, less one, or -1 when it is missing, fails
+    /// or answers nothing (`LuaUnitScript.cpp:505-519`).
+    fn ask_piece(&mut self, callin: &str) -> i64 {
+        let function: Option<Function> = self.script.get(callin).ok().flatten();
+        let Some(function) = function else { return -1 };
+        match function.call::<Option<f64>>(()) {
+            Ok(Some(piece)) => piece as i64 - 1,
+            Ok(None) => -1,
+            Err(error) => {
+                self.sim
+                    .borrow_mut()
+                    .model
+                    .note(format!("{callin} failed: {}", describe(&error)));
                 -1
             }
         }
@@ -1159,6 +1209,7 @@ fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
         "PlaySoundFile",
         "AttachUnit",
         "DropUnit",
+        "ShowFlare",
     ] {
         let held: Value = globals.get(name)?;
         table.set(name, held)?;
@@ -2189,6 +2240,20 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             })?,
         )?;
     }
+
+    // `Spring.UnitScript.ShowFlare(piece)`, which draws a muzzle flame at the
+    // piece rather than showing it (`LuaUnitScript.cpp:185-186,1512-1520`).
+    let state = Rc::clone(sim);
+    globals.set(
+        "ShowFlare",
+        lua.create_function(move |_, piece: i64| {
+            let mut sim = state.borrow_mut();
+            let index = piece_index(&sim, piece)?;
+            let frame = sim.frame;
+            sim.model.show_flare(frame, index);
+            Ok(())
+        })?,
+    )?;
 
     Ok(())
 }

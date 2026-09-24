@@ -3424,3 +3424,139 @@ mod engine_factory {
         assert_close(pose(&timeline, 4, "base")[2], 84.0);
     }
 }
+
+mod engine_fire {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn fire(frame: u32, weapon: f64) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: vec![weapon],
+            ambient: false,
+            world: None,
+            engine: Some(EngineAction::Fire),
+        }
+    }
+
+    fn fired(script: &str, events: &[ScriptEvent], frames: u32) -> Timeline {
+        let mut all = vec![ScriptEvent {
+            frame: 0,
+            callin: "Create".into(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: None,
+        }];
+        all.extend_from_slice(events);
+        run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &all,
+            frames,
+            &HashMap::new(),
+        )
+    }
+
+    #[test]
+    fn show_flare_records_a_flare_and_leaves_the_piece_hidden() {
+        let timeline = fired(
+            r#"
+            local turret, barrel = piece("turret", "barrel")
+            function script.Create() Hide(barrel) end
+            function script.QueryWeapon1() return barrel end
+            function script.FireWeapon1() Spring.UnitScript.ShowFlare(barrel) end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "barrel".into()
+        }));
+        let index = timeline.pieces.iter().position(|p| p == "barrel").unwrap();
+        assert!(timeline.hidden[7][index]);
+    }
+
+    #[test]
+    fn fire_calls_fire_then_shot_then_query_weapon_on_its_frame() {
+        let timeline = fired(
+            r#"
+            local base, turret, barrel = piece("base", "turret", "barrel")
+            local muzzle = turret
+            function script.FireWeapon1() muzzle = base end
+            function script.Shot1() muzzle = barrel end
+            function script.QueryWeapon1() return muzzle end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("barrel".into())
+        }));
+    }
+
+    /// `RunQueryCallIn` answers -1 for a missing `QueryWeapon`, so the engine
+    /// falls back to the `AimFromWeapon` piece (`Weapon.cpp:235-260`).
+    #[test]
+    fn a_missing_query_weapon_falls_back_to_aim_from_weapon() {
+        let timeline = fired(
+            r#"
+            local turret = piece("turret")
+            function script.AimFromWeapon1() return turret end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("turret".into())
+        }));
+    }
+
+    #[test]
+    fn no_weapon_piece_at_all_records_a_shot_from_no_piece_and_says_so() {
+        let timeline = fired("function script.Create() end", &[fire(5, 1.0)], 8);
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: None
+        }));
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w == "The script named no weapon piece."));
+    }
+
+    #[test]
+    fn show_flare_is_on_the_unit_script_table_too() {
+        let timeline = fired(
+            r#"
+            local barrel = piece("barrel")
+            function script.FireWeapon1() UnitScript.ShowFlare(barrel) ShowFlare(barrel) end
+            "#,
+            &[fire(5, 1.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            timeline
+                .events
+                .iter()
+                .filter(|e| matches!(e, ScriptOutput::Flare { .. }))
+                .count(),
+            2
+        );
+    }
+}
