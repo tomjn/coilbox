@@ -22,7 +22,7 @@ Both `apt-get install` steps in CI fail from time to time on the runner rather t
 
 ## Driving the app
 
-Verifying a change on screen is expected for anything visual, and every step below has cost somebody real time. Read this before starting an instance.
+Verifying a change on screen is expected for anything visual. Read this before starting an instance.
 
 **A portable instance has no games until you seed it.** Running your own coilbox is the safe way to avoid disturbing one already open, and portable mode keeps it out of the user's app data: a `.coilbox/profile.json` beside the binary redirects `data_dir` to `.coilbox/data` and `cache_dir` to `.coilbox/cache`. But a fresh portable profile has **no content roots**, because the auto-detection that finds the Spring data directory does not apply there. The game picker comes up empty and every screenshot is of an app with nothing in it. Seed it first:
 
