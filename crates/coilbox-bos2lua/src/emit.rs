@@ -1198,6 +1198,10 @@ struct Writer<'p, 'a> {
     /// The loops the statement being written is inside, innermost last, each
     /// with the flag its `break` sets when the body is wrapped for `continue`.
     loops: Vec<Option<String>>,
+    /// Whether the function being written is one the engine calls as a fire
+    /// call-in, where `show` draws a muzzle flame instead of unhiding
+    /// (`CobThread.cpp:715-728`).
+    fire: bool,
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
@@ -1238,6 +1242,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             last_header: None,
             adapters: Vec::new(),
             loops: Vec::new(),
+            fire: false,
         }
     }
 
@@ -2198,6 +2203,8 @@ impl<'p, 'a> Writer<'p, 'a> {
         );
         self.refs.clear();
         self.locals.clear();
+        self.fire =
+            matches!(&role, Some(Role::Callin(spec)) if spec.lua.starts_with("script.FireWeapon"));
 
         // Locals may not take a name the function also needs for something else.
         let mut taken: HashSet<String> = self.p.taken.clone();
@@ -2406,6 +2413,7 @@ impl<'p, 'a> Writer<'p, 'a> {
         self.code("end", trailing);
         self.worst_refs = self.worst_refs.max(self.refs.len());
         self.ret = None;
+        self.fire = false;
 
         if !direct {
             if let Some(Role::Callin(spec)) = &role {
@@ -2859,6 +2867,10 @@ impl<'p, 'a> Writer<'p, 'a> {
                 let f = self.header("Sleep");
                 let v = self.num(e).wrap(P_ADD);
                 self.code(&format!("{f}({v} + {SLEEP_FRAME})"), t);
+            }
+            StmtKind::Show(piece) if self.fire => {
+                let p = self.piece(piece);
+                self.code(&format!("Spring.UnitScript.ShowFlare({p})"), t);
             }
             StmtKind::Hide(piece) | StmtKind::Show(piece) => {
                 let f = self.header(if matches!(s.kind, StmtKind::Hide(_)) {

@@ -562,3 +562,32 @@ fn a_piece_given_as_a_number_is_the_one_the_script_declares_there() {
         }
     }
 }
+
+/// The engine draws a muzzle flame for `show` inside a fire function and
+/// leaves the piece hidden (`CobThread.cpp:715-728`). Anywhere else, `show`
+/// unhides.
+#[test]
+fn show_in_a_fire_function_becomes_show_flare() {
+    let source = r#"
+        piece base, flare;
+        Create() { hide flare; show base; }
+        FirePrimary() { show flare; }
+    "#;
+    let lua = convert(
+        source,
+        &Options {
+            name: "scripts/gun.bos",
+            includes: &HashMap::new(),
+            pieces: None,
+            linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
+            prune: false,
+        },
+    )
+    .unwrap()
+    .lua;
+
+    assert!(lua.contains("Spring.UnitScript.ShowFlare(flare)"), "{lua}");
+    assert!(lua.contains("Show(base)"), "{lua}");
+    assert!(!lua.contains("Show(flare)"), "{lua}");
+}
