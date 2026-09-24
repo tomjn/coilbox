@@ -969,7 +969,8 @@ describe("placeStandIn", () => {
         { frame: 5, kind: "shot", weapon: 1, piece: "arm" },
       ]);
       // Two vertices, so the emit point is the first one, ten elmos up the
-      // arm from its origin.
+      // arm from its origin. The arm's own rest position, set in
+      // `standInScene`, is y = 4, so the emit vertex's world y is 14.
       const vertices: PieceVertices = (piece) =>
         piece === "arm"
           ? [
@@ -978,11 +979,13 @@ describe("placeStandIn", () => {
             ]
           : [];
       placeEffects(state, doc, aiming, true, timeline, 5, vertices);
-      expect(sprites(state).instanceCount).toBeGreaterThan(0);
+      // On the shot's own frame the tracer has not travelled yet, so its
+      // only sprite sits at the emit point itself: proof the tracer starts
+      // from the vertex, ten elmos above the arm's origin, rather than from
+      // the origin on its own.
+      expect(sprites(state).instanceCount).toBe(1);
       const center = sprites(state).getAttribute("center").array;
-      for (let i = 0; i < sprites(state).instanceCount; i++) {
-        expect(center[i * 3 + 1]).toBeGreaterThanOrEqual(0);
-      }
+      expectNear(center[1], 14, 0.01);
     });
 
     it("draws no tracer for a shot from no piece", () => {

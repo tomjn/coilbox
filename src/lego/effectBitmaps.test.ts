@@ -111,8 +111,14 @@ describe("loadEffectBitmaps", () => {
       height: 16,
     }));
     vi.spyOn(atlasBuilder, "build").mockResolvedValue({
-      texture: {} as never,
-      packed: { width: 64, height: 64, rects: [] },
+      texture: { dispose: vi.fn() } as never,
+      packed: {
+        width: 64,
+        height: 64,
+        rects: [
+          { slot: BITMAP_MUZZLE_FLAME, x: 0, y: 0, width: 16, height: 16 },
+        ],
+      },
       failed: [],
     });
 
@@ -122,6 +128,32 @@ describe("loadEffectBitmaps", () => {
     );
 
     expect(result.note).toContain("bitmaps/laserfalloff.tga");
+  });
+
+  it("has no atlas, rather than a 0x0 texture, when every bitmap fails to decode", async () => {
+    vi.mocked(unitsyncLuaExec).mockResolvedValue({
+      result: quotedResult(),
+      errors: [],
+    });
+    vi.mocked(legoBitmapPng).mockImplementation(async ({ file }) => ({
+      dataUrl: `data:image/png;base64,${file}`,
+      width: 16,
+      height: 16,
+    }));
+    const dispose = vi.fn();
+    vi.spyOn(atlasBuilder, "build").mockResolvedValue({
+      texture: { dispose } as never,
+      packed: { width: 0, height: 0, rects: [] },
+      failed: [BITMAP_MUZZLE_FLAME],
+    });
+
+    const result = await loadEffectBitmaps(
+      { enginePath: "/engine", dataDir: "/data" },
+      "Game.sdd",
+    );
+
+    expect(result.atlas).toBeNull();
+    expect(dispose).toHaveBeenCalled();
   });
 
   it("reports the read error when unitsync fails", async () => {

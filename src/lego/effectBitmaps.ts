@@ -1,6 +1,6 @@
 /**
  * Reading a game's own particle bitmaps and packing them into one atlas for
- * the preview's effects layer (issue #1526's sibling in PR B).
+ * the preview's effects layer.
  *
  * `ProjectileDrawer` reads `gamedata/resources.lua`, prefixes `bitmaps/`, and
  * falls back to the base content's defaults when a game ships neither the file
@@ -328,18 +328,23 @@ export async function loadEffectBitmaps(
   }
 
   const { texture, packed, failed } = await atlasBuilder.build(entries);
+  for (const slot of failed) {
+    const bitmap = bitmaps.find((entry) => slotOf(entry.key) === slot);
+    if (bitmap) missing.push(missingName(bitmap));
+  }
+
+  if (packed.rects.length === 0) {
+    texture.dispose();
+    return { atlas: null, note: missingNote(missing) };
+  }
+
   for (const rect of packed.rects) {
-    if (failed.includes(rect.slot)) continue;
     rects[rect.slot] = [
       rect.x / packed.width,
       rect.y / packed.height,
       (rect.x + rect.width) / packed.width,
       (rect.y + rect.height) / packed.height,
     ];
-  }
-  for (const slot of failed) {
-    const bitmap = bitmaps.find((entry) => slotOf(entry.key) === slot);
-    if (bitmap) missing.push(missingName(bitmap));
   }
 
   return {

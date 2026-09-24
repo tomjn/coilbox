@@ -37,6 +37,7 @@ export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
       setLoaded(null);
       return;
     }
+    setLoaded(null);
     let live = true;
     loadEffectBitmaps({ enginePath, dataDir }, archive)
       .then((next) => {
