@@ -16,7 +16,7 @@ The two easiest to miss are `scripts/mission-tests.sh` and `cargo test --workspa
 
 Both Lua suites need `luajit` on PATH (`brew install luajit`), as do two vitest files that shell out to it to check the Lua they generate compiles. Without the binary they fail on the missing dependency rather than on a real error.
 
-Let rustfmt own formatting — run `cargo fmt --all` rather than hand-formatting. CI's clippy compiles the Tauri app crate, so externalBin sidecars must exist; the unitsync worker is built in CI and locally via `bun run sidecar:unitsync`.
+Let rustfmt own formatting. Run `cargo fmt --all` rather than hand-formatting. CI's clippy compiles the Tauri app crate, so the externalBin sidecars must exist. CI builds the unitsync worker and the relay agent before clippy, and `bun run sidecar:all` does the same locally.
 
 Both `apt-get install` steps in CI fail from time to time on the runner rather than on your diff. A red job whose failing step is `Install LuaJIT` or `Linux build dependencies` is an infrastructure flake, so re-run the job rather than changing code.
 
