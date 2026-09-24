@@ -769,6 +769,39 @@ fn a_call_in_with_arguments_gets_them() {
     assert_close(rot_y(&timeline, 0, "turret"), 0.75);
 }
 
+/// SplinterFaction's Bear and Cobra define a plain `AimWeapon(weaponID,
+/// heading, pitch)` rather than a numbered `AimWeapon1`, which the engine
+/// calls with the weapon number prepended (`LuaUnitScript.cpp:850-883,1018`).
+/// The event still carries the numbered name, since that is what an
+/// `AimWeapon1` engine call-in is, so the runtime has to know the plain form
+/// answers it.
+#[test]
+fn an_aim_weapon_event_turns_the_plain_call_ins_piece() {
+    let timeline = run(
+        r#"
+        local turret = piece("turret")
+        function script.AimWeapon(weaponID, heading, pitch)
+            Turn(turret, y_axis, heading)
+            return true
+        end
+        "#,
+        "test.lua",
+        &Unit::new(&pieces()),
+        &[ScriptEvent {
+            frame: 0,
+            callin: "AimWeapon1".to_string(),
+            args: vec![0.75, 0.1],
+            ambient: false,
+            world: None,
+            engine: None,
+        }],
+        3,
+        &HashMap::new(),
+    );
+    assert_eq!(timeline.error, None);
+    assert_close(rot_y(&timeline, 0, "turret"), 0.75);
+}
+
 /// The shape coilbox's own generator writes: locals, a signal, a looping cycle
 /// thread started from a call-in and stopped by a signal from another. If this
 /// does not run, nothing a user takes ownership of will either.
@@ -1176,6 +1209,35 @@ mod probing {
         let probe = answers(&probes, "QueryNanoPiece");
         assert!(probe.pieces.is_empty());
         assert!(probe.note.is_some(), "{probe:?}");
+    }
+
+    /// A script with a plain `AimFromWeapon(weaponID)` rather than a numbered
+    /// `AimFromWeapon1` still answers a probe asking for `AimFromWeapon1`,
+    /// with the weapon number as its argument, the same rule a run applies
+    /// when it fires the call-in for real.
+    #[test]
+    fn probes_the_plain_call_in_for_a_numbered_weapon_request() {
+        let probes = ask(
+            "local flare = piece('flare')\n\
+             function script.AimFromWeapon(weaponID) return flare end",
+            &["AimFromWeapon1"],
+        );
+
+        let probe = answers(&probes, "AimFromWeapon1");
+        assert_eq!(probe.pieces.first().map(String::as_str), Some("flare"));
+        assert_eq!(probe.note, None);
+    }
+
+    #[test]
+    fn reports_the_scripts_own_function_names() {
+        let probes = ask(
+            "function script.Create() end\nfunction script.AimWeapon(w, h, p) end",
+            &["QueryNanoPiece"],
+        );
+        assert_eq!(
+            probes.functions,
+            vec!["AimWeapon".to_string(), "Create".to_string()]
+        );
     }
 
     #[test]

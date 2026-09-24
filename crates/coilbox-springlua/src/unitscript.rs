@@ -97,6 +97,10 @@ pub struct Probes {
     /// The unit's piece names, so a caller can check they are what it expected.
     pub pieces: Vec<String>,
     pub probes: Vec<Probe>,
+    /// The script's own function names, empty when it could not be loaded at
+    /// all. A caller working out how many weapons a unit has, with no unit
+    /// definition to read it from, counts the numbered weapon functions here.
+    pub functions: Vec<String>,
     /// Set when the script could not be loaded at all, in which case `probes`
     /// is empty. A script that loaded and then answered badly reports that on
     /// the probe itself instead.
@@ -355,13 +359,16 @@ pub fn probe(script: &str, name: &str, unit: &Unit, callins: &[String]) -> Probe
             return Probes {
                 pieces: unit.pieces.to_vec(),
                 probes: Vec::new(),
+                functions: Vec::new(),
                 error: Some(error),
             }
         }
     };
+    let functions = run.functions.clone();
     Probes {
         pieces: unit.pieces.to_vec(),
         probes: callins.iter().map(|callin| run.probe(callin)).collect(),
+        functions,
         error: None,
     }
 }
@@ -462,8 +469,19 @@ impl Run {
     ///
     /// A call that throws stops the probe rather than being retried: the first
     /// failure says why, and fifteen more copies of it say nothing.
+    ///
+    /// `callin` may name a numbered weapon call-in such as `AimFromWeapon1`,
+    /// in which case a script that defines the plain `AimFromWeapon` is asked
+    /// that instead, with the weapon number as its argument, the same rule
+    /// `start_callin` applies when a run fires the call-in for real.
     fn probe(&mut self, callin: &str) -> Probe {
-        let Ok(Some(function)) = self.script.get::<Option<Function>>(callin) else {
+        let (target, args) = match numbered_weapon_callin(callin) {
+            Some((stem, weapon)) if self.has_plain(stem) => {
+                (stem.to_string(), vec![Value::Number(f64::from(weapon))])
+            }
+            _ => (callin.to_string(), Vec::new()),
+        };
+        let Ok(Some(function)) = self.script.get::<Option<Function>>(target) else {
             return Probe {
                 callin: callin.to_string(),
                 pieces: Vec::new(),
@@ -475,7 +493,7 @@ impl Run {
         let mut note = None;
         for _ in 0..PROBE_CALLS {
             self.budget.set(FRAME_INSTRUCTIONS);
-            match function.call::<Option<i64>>(()) {
+            match function.call::<Option<i64>>(MultiValue::from_iter(args.clone())) {
                 Ok(Some(index)) => {
                     match piece_index(&self.sim.borrow(), index) {
                         Ok(at) => pieces.push(self.sim.borrow().model.pieces[at].name.clone()),
@@ -656,8 +674,19 @@ impl Run {
     /// Start a runner for a call-in by name, with these arguments, exactly as
     /// an event naming it would. `false` when the script defines no such
     /// call-in, so a caller can decide what that means to it.
+    ///
+    /// `callin` may be a numbered weapon call-in such as `AimWeapon1`, the
+    /// name every event carries. The engine calls a weapon's plain call-in
+    /// first, with the weapon number prepended to its own arguments, and only
+    /// dispatches to the numbered name when the plain one is missing
+    /// (`LuaUnitScript.cpp:850-883,1018`), the same rule `numbered_callin`
+    /// applies for `FireWeapon` and `Shot`.
     fn start_callin(&mut self, callin: &str, args: Vec<Value>) -> Result<bool, String> {
-        let function: Option<Function> = self.script.get(callin).ok().flatten();
+        let (callin, args) = match numbered_weapon_callin(callin) {
+            Some((stem, weapon)) => self.weapon_callin(stem, weapon, args),
+            None => (callin.to_string(), args),
+        };
+        let function: Option<Function> = self.script.get(callin.as_str()).ok().flatten();
         let Some(function) = function else {
             return Ok(false);
         };
@@ -665,7 +694,7 @@ impl Run {
             .lua
             .create_thread(function)
             .map_err(|e| format!("could not start {callin}: {e}"))?;
-        self.add_runner(thread, args, callin.to_string(), Mask::default())?;
+        self.add_runner(thread, args, callin.clone(), Mask::default())?;
         Ok(true)
     }
 
@@ -808,24 +837,39 @@ impl Run {
         })
     }
 
-    /// The call-in a weapon's stem fires: the plain name with the weapon
-    /// number as its one argument when the script defines it, else the older
-    /// `<Stem><n>` name with none. The engine calls the plain name first,
-    /// counting the weapon from one, and only builds a dispatcher over the
-    /// numbered names when the plain one is missing and `AimWeapon1` exists
-    /// (`LuaUnitScript.cpp:850-883,1018`).
+    /// The call-in a weapon's stem fires, with no arguments of its own beyond
+    /// the weapon number: the plain name with the weapon number as its one
+    /// argument when the script defines it, else the older `<Stem><n>` name
+    /// with none.
     fn numbered_callin(&self, stem: &str, weapon: u32) -> (String, Vec<Value>) {
-        let has_plain = self
-            .script
+        self.weapon_callin(stem, weapon, Vec::new())
+    }
+
+    /// The call-in a weapon's stem fires, with `args` besides the weapon
+    /// number: the plain name with the weapon number prepended to `args` when
+    /// the script defines it, else the older `<Stem><n>` name with `args`
+    /// unchanged. The engine calls the plain name first, counting the weapon
+    /// from one, and only builds a dispatcher over the numbered names when the
+    /// plain one is missing and `AimWeapon1` exists
+    /// (`LuaUnitScript.cpp:850-883,1018`).
+    fn weapon_callin(&self, stem: &str, weapon: u32, args: Vec<Value>) -> (String, Vec<Value>) {
+        if self.has_plain(stem) {
+            let mut full = vec![Value::Number(f64::from(weapon))];
+            full.extend(args);
+            (stem.to_string(), full)
+        } else {
+            (format!("{stem}{weapon}"), args)
+        }
+    }
+
+    /// Whether the script defines a call-in under this exact name, with no
+    /// weapon number attached.
+    fn has_plain(&self, stem: &str) -> bool {
+        self.script
             .get::<Option<Function>>(stem)
             .ok()
             .flatten()
-            .is_some();
-        if has_plain {
-            (stem.to_string(), vec![Value::Number(f64::from(weapon))])
-        } else {
-            (format!("{stem}{weapon}"), Vec::new())
-        }
+            .is_some()
     }
 
     /// Ask a call-in that answers with a piece, as `RunQueryCallIn` does: a
@@ -1076,6 +1120,37 @@ impl Run {
             _ => Ok(State::Sleeping(self.frame + 1)),
         }
     }
+}
+
+/// The stems the engine dispatches by weapon number, counted from one
+/// (`LuaUnitScript.cpp:850-883,1018`). An event or probe request naming one of
+/// these with a number on the end means the numbered call-in a script written
+/// the old way would define, and the plain call-in the engine actually calls
+/// when the script defines it.
+const NUMBERED_WEAPON_STEMS: &[&str] = &[
+    "AimWeapon",
+    "AimFromWeapon",
+    "QueryWeapon",
+    "FireWeapon",
+    "Shot",
+    "EndBurst",
+    "BlockShot",
+    "TargetWeight",
+];
+
+/// Split a numbered weapon call-in into its stem and weapon number, such as
+/// `AimWeapon1` into `("AimWeapon", 1)`. `None` for anything else, including a
+/// stem with no number stuck on it.
+fn numbered_weapon_callin(callin: &str) -> Option<(&'static str, u32)> {
+    for stem in NUMBERED_WEAPON_STEMS {
+        let Some(rest) = callin.strip_prefix(stem) else {
+            continue;
+        };
+        if let Ok(weapon) = rest.parse::<u32>() {
+            return Some((stem, weapon));
+        }
+    }
+    None
 }
 
 impl Runner {
