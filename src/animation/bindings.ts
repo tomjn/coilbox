@@ -95,6 +95,28 @@ export const animCobRun = defineCommand<
 >("coilbox-anim", "anim_cob_run");
 
 /**
+ * Ask a compiled script which pieces it names, by calling the call-ins that
+ * return one, without playing it.
+ *
+ * `lego_probe_script` asks the same question of a Lua unit script, which is
+ * how the model editor's "Aiming and firing" scenario works out where a
+ * compiled unit's `AimFromWeapon1` piece is, rather than assuming the
+ * unit's origin.
+ *
+ * Not a run: nothing is animated and no frames pass. Read only, like
+ * `animCobRun`.
+ */
+export const animCobProbe = defineCommand<
+  {
+    bytes: number[];
+    pieces: string[];
+    /** Call-in names, such as `AimFromWeapon1`. */
+    callins: string[];
+  },
+  import("../lego/scriptPlayback").ScriptProbes
+>("coilbox-anim", "anim_cob_probe");
+
+/**
  * Compile a `.bos` to `.cob`. Writes `<basename>.cob` next to the source unless
  * `output` is given. If the output exists and `overwrite` isn't set, it returns
  * `needsOverwrite: true` without writing, so the UI can confirm first.

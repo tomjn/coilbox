@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { animCobRun } from "../../../animation/bindings";
+import { animCobProbe, animCobRun } from "../../../animation/bindings";
 import { useReduceMotion } from "../../../general/display";
 import { aimPoint } from "../../aimPoint";
 import {
@@ -90,8 +90,8 @@ const CALL_FUNCTION = "call";
  *
  * Both answer with a piece rather than doing anything, which is what makes
  * them safe to call directly rather than drive over frames: see
- * `legoProbeScript`. `QueryTransport` is not here: the runtime asks it
- * itself, at the moment the engine attaches a passenger.
+ * `legoProbeScript` and `animCobProbe`. `QueryTransport` is not here: the
+ * runtime asks it itself, at the moment the engine attaches a passenger.
  */
 const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo"];
 
@@ -103,18 +103,9 @@ const NO_STAND_IN: {
 } = { track: null, attachPieces: new Map() };
 
 /** What a scenario's attachment could not be resolved to, in words. */
-function attachNotes(
-  scenario: Scenario,
-  named: Map<string, string>,
-  isCompiled: boolean,
-): string[] {
+function attachNotes(scenario: Scenario, named: Map<string, string>): string[] {
   const attach = scenario.standIn?.attach;
   if (!attach || named.has(attach.from)) return [];
-  if (isCompiled) {
-    return [
-      `This unit's script is compiled, and a compiled script cannot be asked which piece its ${attach.from} names. The stand-in stays where the scenario puts it.`,
-    ];
-  }
   return [
     `This script names no ${attach.from} piece, so the stand-in stays where the scenario puts it rather than sitting on the unit.`,
   ];
@@ -428,12 +419,16 @@ export function AnimationPanel({
         return runEvents(scenario.events, withValues);
       }
 
-      // A compiled script has no probe: `anim_cob_run` plays bytecode and
-      // there is no `anim_cob_probe` beside it. Such a unit gets its stand-in
-      // where the keys put it and is told the piece is unknown, which is the
-      // same answer a Lua script that names none gets.
+      // Both runtimes answer the same question: which piece a call-in like
+      // `AimFromWeapon1` names. `anim_cob_probe` asks the bytecode the same
+      // way `legoProbeScript` asks the Lua, so a compiled unit's stand-in
+      // sits on its aim-from piece rather than the unit's origin.
       const probes = compiled
-        ? null
+        ? await animCobProbe({
+            bytes: compiled.bytes,
+            pieces: project.pieces.map((piece) => piece.name),
+            callins: STAND_IN_PROBES,
+          })
         : await legoProbeScript({
             script: project.script ?? "",
             unitName: project.unitName,
@@ -465,10 +460,7 @@ export function AnimationPanel({
         },
       );
 
-      setStandInNotes([
-        ...notes,
-        ...attachNotes(scenario, named, compiled !== undefined),
-      ]);
+      setStandInNotes([...notes, ...attachNotes(scenario, named)]);
       onStandIn({
         track,
         attachPieces: named,

@@ -30,6 +30,11 @@ const probe = vi.fn(async (_args: unknown) => ({
   probes: [],
   error: null,
 }));
+const probeCob = vi.fn(async (_args: unknown) => ({
+  pieces: [],
+  probes: [],
+  error: null,
+}));
 
 vi.mock("../../bindings", () => ({
   legoRunScript: (args: unknown) => runLua(args),
@@ -38,6 +43,7 @@ vi.mock("../../bindings", () => ({
 
 vi.mock("../../../animation/bindings", () => ({
   animCobRun: (args: unknown) => runCob(args),
+  animCobProbe: (args: unknown) => probeCob(args),
 }));
 
 // Reads a stored setting through the app frame, which a panel rendered on its
@@ -133,8 +139,10 @@ const COMPILED = { member: "scripts/armcom.cob", bytes: [4, 0, 0, 0] };
 beforeEach(() => {
   runLua.mockReset();
   runCob.mockReset();
+  probeCob.mockReset();
   runLua.mockResolvedValue(timeline());
   runCob.mockResolvedValue(timeline());
+  probeCob.mockResolvedValue({ pieces: [], probes: [], error: null });
 });
 
 afterEach(cleanup);
@@ -337,6 +345,30 @@ describe("the scene a script is told about", () => {
     );
     expect(begin.world.standIn).toMatchObject({ id: 2 });
     expect(begin.world.standIn.pos).toHaveLength(3);
+  });
+
+  /**
+   * A compiled unit's "Aiming and firing" scenario has to know which piece
+   * `AimFromWeapon1` names to measure the stand-in from, the same thing the
+   * Lua runtime is asked with `legoProbeScript`. Before `animCobProbe`
+   * existed there was no way to ask a compiled script this, so the aim was
+   * always measured from the unit's origin.
+   */
+  it("asks the compiled script the same probe a Lua one gets", async () => {
+    show(project({ compiledScript: COMPILED }));
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "What happens to the unit" }),
+    );
+    fireEvent.click(await screen.findByText("Aiming and firing"));
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(probeCob).toHaveBeenCalled());
+    expect(probeCob.mock.calls[0][0]).toMatchObject({
+      bytes: [4, 0, 0, 0],
+      pieces: ["base"],
+      callins: ["AimFromWeapon1", "QueryBuildInfo"],
+    });
+    expect(probe).not.toHaveBeenCalled();
   });
 });
 
