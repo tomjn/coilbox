@@ -15,6 +15,14 @@
  */
 
 import { Button } from "@picoframe/frame";
+import { ChevronRight, Loader2 } from "lucide-react";
+import type { ReactNode } from "react";
+
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 import {
   Select,
@@ -476,40 +484,67 @@ export function ImportResult({
   stage,
   onAtlasChange,
   onAccept,
+  children,
+  pending,
 }: {
   stage: ImportStage;
   onAtlasChange: (atlas: string | null) => void;
   onAccept: () => void;
+  /** More about the unit, drawn above the button that opens it. */
+  children?: ReactNode;
+  /** Why the unit cannot be opened yet, shown on the button while it waits.
+   *  Something still being read would be left off it otherwise. */
+  pending?: string | null;
 }) {
   if (stage.state === "reading") {
-    return <p className="text-xs text-muted-foreground">Reading the model.</p>;
+    return (
+      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        Reading the model.
+      </p>
+    );
   }
   if (stage.state === "failed") {
     return <p className="text-xs text-destructive">{stage.message}</p>;
   }
-  if (stage.state === "recovered") {
-    return (
-      <Recovered
-        stage={stage}
-        onAtlasChange={onAtlasChange}
-        onAccept={onAccept}
-      />
-    );
-  }
-  if (stage.state === "imported") {
-    return <Imported stage={stage} onAccept={onAccept} />;
-  }
-  return null;
+  if (stage.state !== "recovered" && stage.state !== "imported") return null;
+
+  const name =
+    stage.state === "recovered"
+      ? stage.recovery.project.name
+      : stage.imported.project.name;
+  return (
+    <>
+      {stage.state === "recovered" ? (
+        <Recovered stage={stage} onAtlasChange={onAtlasChange} />
+      ) : (
+        <Imported stage={stage} />
+      )}
+      {children}
+      <div className="border-t border-border/60 pt-4">
+        <Button onClick={onAccept} disabled={Boolean(pending)}>
+          {pending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              {pending}
+            </>
+          ) : stage.state === "recovered" ? (
+            `Recover ${name}`
+          ) : (
+            `Open ${name}`
+          )}
+        </Button>
+      </div>
+    </>
+  );
 }
 
 function Recovered({
   stage,
   onAtlasChange,
-  onAccept,
 }: {
   stage: Extract<ImportStage, { state: "recovered" }>;
   onAtlasChange: (atlas: string | null) => void;
-  onAccept: () => void;
 }) {
   return (
     <>
@@ -568,108 +603,96 @@ function Recovered({
           ))}
         </ul>
       </div>
-
-      <div className="border-t border-border/60 pt-4">
-        <Button onClick={onAccept}>
-          Recover {stage.recovery.project.name}
-        </Button>
-      </div>
     </>
   );
 }
 
+/**
+ * A model opened as its own geometry: the few facts somebody opening it needs
+ * up front, and everything else folded away under the details.
+ *
+ * A missing texture stays up front. It changes what the unit looks like the
+ * moment it opens, which is not a detail.
+ */
 function Imported({
   stage,
-  onAccept,
 }: {
   stage: Extract<ImportStage, { state: "imported" }>;
-  onAccept: () => void;
 }) {
   const { project, meshes, vertices, triangles, converted, bytes } =
     stage.imported;
   const imported = project.imported;
 
+  const details: string[] = [...(stage.notes ?? [])];
+  if (converted > 0) {
+    details.push(
+      `${converted} ${converted === 1 ? "piece was" : "pieces were"} drawn as quads or a triangle strip and ${converted === 1 ? "has" : "have"} been converted to triangles, which is what the engine does on load anyway.`,
+    );
+  }
+  if (imported?.texture) {
+    details.push(
+      imported.texture.source
+        ? `${imported.texture.name} was copied into coilbox's own store, so the unit keeps working if the game folder goes away. It can be refreshed after editing it elsewhere.`
+        : `${imported.texture.name} was copied into coilbox's own store, so the unit keeps working if the game folder goes away. ${stage.textureFrom ?? "There is no file behind it to refresh from, because a packed archive holds no path to hand back."}`,
+    );
+  }
+  if (imported?.texture2) {
+    details.push(
+      `${imported.texture2.name} is the shading map, which the engine reads as glow in red and shine in green. It is kept with the unit and written back out by the export, though nothing here draws it.`,
+    );
+  } else if (imported?.missingTexture2) {
+    details.push(
+      `The shading map, ${imported.missingTexture2}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out.`,
+    );
+  }
+  details.push(...(stage.textureNotes ?? []));
+  details.push(stage.refused);
+
   return (
-    <>
-      <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
-        <span className="text-sm font-medium">What came in</span>
-        <p className="text-xs text-muted-foreground">
-          {project.pieces.length} pieces, {meshes} of them with geometry.{" "}
-          {vertices.toLocaleString()} vertices and {triangles.toLocaleString()}{" "}
-          triangles, stored beside the model as{" "}
-          {Math.max(1, Math.round(bytes / 1024)).toLocaleString()} KiB.
-        </p>
-        {(stage.notes ?? []).map((note) => (
-          <p key={note} className="text-xs text-muted-foreground">
-            {note}
-          </p>
-        ))}
-        {converted > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {converted} {converted === 1 ? "piece was" : "pieces were"} drawn as
-            quads or a triangle strip and {converted === 1 ? "has" : "have"}{" "}
-            been converted to triangles, which is what the engine does on load
-            anyway.
-          </p>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Texture</span>
-        {imported?.texture ? (
-          <p className="text-xs text-muted-foreground">
-            Drawn with <code>{imported.texture.name}</code>, copied into
-            coilbox's own store so the unit keeps working if the game folder
-            goes away. You can point it at a different file later
-            {imported.texture.source
-              ? ", or refresh it after editing it elsewhere."
-              : `. ${stage.textureFrom ?? "There is no file behind this one to refresh from, because a packed archive holds no path to hand back."}`}
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            {imported?.missingTexture
-              ? `The model names ${imported.missingTexture}, and no such file was found beside it. The unit opens untextured, and you can point it at the file yourself.`
-              : "The model names no texture, so the unit opens untextured."}
-          </p>
-        )}
-        {imported?.texture2 ? (
-          <p className="text-xs text-muted-foreground">
-            <code>{imported.texture2.name}</code> is the shading map, which the
-            engine reads as glow in red and shine in green. Kept with the unit
-            and written back out by the export, though nothing here draws it.
-          </p>
-        ) : imported?.missingTexture2 ? (
-          <p className="text-xs text-muted-foreground">
-            The shading map, <code>{imported.missingTexture2}</code>, was not
-            found. Nothing here draws it, so the unit looks the same either way,
-            but the export will have no glow or shine to write out.
-          </p>
-        ) : null}
-        {(stage.textureNotes ?? []).map((note) => (
-          <p key={note} className="text-xs text-muted-foreground">
-            {note}
-          </p>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">What you can do with it</span>
-        <p className="text-xs text-muted-foreground">
-          Move, turn, rename and reparent its pieces, animate it, give it a unit
-          definition and a collision volume, and export it again.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Not add lego parts to it. Its UV map points onto its own texture
-          rather than onto the parts pack's sheet, so a part dropped in would
-          sample the wrong image. The parts library and the atlas picker are
-          hidden for this unit for that reason.
-        </p>
-        <p className="text-xs text-muted-foreground">{stage.refused}</p>
-      </div>
-
-      <div className="border-t border-border/60 pt-4">
-        <Button onClick={onAccept}>Open {project.name}</Button>
-      </div>
-    </>
+    <section className="flex flex-col gap-2 border-t border-border/60 pt-4">
+      <h3 className="text-sm font-medium">Model</h3>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+        <dt className="text-muted-foreground">Pieces</dt>
+        <dd>
+          {project.pieces.length}, {meshes} with geometry
+        </dd>
+        <dt className="text-muted-foreground">Size</dt>
+        <dd>
+          {triangles.toLocaleString()} triangles, {vertices.toLocaleString()}{" "}
+          vertices, {Math.max(1, Math.round(bytes / 1024)).toLocaleString()} KiB
+        </dd>
+        <dt className="text-muted-foreground">Texture</dt>
+        <dd className="min-w-0">
+          {imported?.texture ? (
+            <code className="break-all">{imported.texture.name}</code>
+          ) : imported?.missingTexture ? (
+            <span className="text-amber-500">
+              <code className="break-all">{imported.missingTexture}</code> was
+              not found, so it opens untextured
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              None named, so it opens untextured
+            </span>
+          )}
+        </dd>
+      </dl>
+      <Collapsible>
+        <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <ChevronRight
+            className="size-3.5 transition-transform group-data-[state=open]:rotate-90"
+            aria-hidden
+          />
+          Import details
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-xs text-muted-foreground">
+            {details.map((detail) => (
+              <li key={detail}>{detail}</li>
+            ))}
+          </ul>
+        </CollapsibleContent>
+      </Collapsible>
+    </section>
   );
 }

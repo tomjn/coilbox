@@ -7,6 +7,7 @@ import {
   type BackdropId,
   backdropById,
   buildTerrain,
+  buildWater,
   type GroundId,
   skyTexture,
 } from "../../environment";
@@ -41,6 +42,9 @@ export interface SceneState {
    *  selected piece's but in a different colour and never both on one piece. */
   hoverOutline: THREE.BoxHelper;
   hoverOverlay: THREE.Mesh;
+  /** A dot at the hovered piece's origin, for a piece with no faces to wash.
+   *  Drawn through the model, since a flare or emitter usually sits inside it. */
+  hoverMark: THREE.Points;
   /** A violet box and face wash per selected piece. Pooled rather than made
    *  per selection: a set is selected and cleared constantly, and a fresh
    *  BoxHelper each time would leak its geometry. */
@@ -136,6 +140,8 @@ export interface SceneState {
   /** The solid ground, built the first time it is asked for and kept after
    *  that. A view aid like the grid. */
   terrain: THREE.Mesh | null;
+  /** The sea, kept the same way. */
+  water: THREE.Mesh | null;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
   /** Geometry built for playback, which this owns and must free. The shared
@@ -230,14 +236,18 @@ export function applyBackdrop(state: SceneState, id: BackdropId) {
   if (texture) state.sky = { id, texture };
 }
 
-/** Put the solid ground under the markings, or take it away again. */
+/** Put the solid ground or the sea under the markings, or take both away
+ *  again. */
 export function applyGround(state: SceneState, id: GroundId) {
-  if (id !== "terrain") {
-    state.terrain?.removeFromParent();
-    return;
+  state.terrain?.removeFromParent();
+  state.water?.removeFromParent();
+  if (id === "terrain") {
+    state.terrain ??= buildTerrain();
+    state.scene.add(state.terrain);
+  } else if (id === "water") {
+    state.water ??= buildWater();
+    state.scene.add(state.water);
   }
-  if (!state.terrain) state.terrain = buildTerrain();
-  state.scene.add(state.terrain);
 }
 
 /**

@@ -29,7 +29,7 @@ import * as THREE from "three";
 import { GROUND_ELMOS } from "./buildPlate";
 
 export type BackdropId = "studio" | "sky";
-export type GroundId = "grid" | "terrain";
+export type GroundId = "grid" | "terrain" | "water";
 
 /** A gradient stop, measured from the top of the sky down. 0.5 is the horizon. */
 interface SkyStop {
@@ -89,9 +89,11 @@ export interface GroundSurface {
 }
 
 /**
- * Two grounds. The grid alone is see-through, which is what makes a piece
+ * Three grounds. The grid alone is see-through, which is what makes a piece
  * hanging under the ground plane obvious. Terrain is opaque, which is what the
- * engine will actually put under the unit.
+ * engine will actually put under the unit. Water is for a ship or a hovercraft:
+ * the engine's sea level is also y = 0, and a translucent surface shows how
+ * much of a hull sits under it.
  */
 export const GROUND_SURFACES: GroundSurface[] = [
   {
@@ -103,6 +105,11 @@ export const GROUND_SURFACES: GroundSurface[] = [
     id: "terrain",
     label: "Terrain",
     hint: "A flat, muted surface under the markings.",
+  },
+  {
+    id: "water",
+    label: "Water",
+    hint: "A see-through sea at y = 0, for how a hull sits in it.",
   },
 ];
 
@@ -272,10 +279,73 @@ function terrainTexture(): THREE.CanvasTexture | null {
   return texture;
 }
 
-/** Frees what `buildTerrain` allocated. */
+/** Frees what `buildTerrain` or `buildWater` allocated. They are built from
+ *  the same parts. */
 export function disposeTerrain(mesh: THREE.Mesh): void {
   mesh.geometry.dispose();
   const material = mesh.material as THREE.MeshBasicMaterial;
   material.map?.dispose();
   material.dispose();
+}
+
+/** The sea's colour, and how opaque it is where it is solid. See-through
+ *  enough that a hull under the surface still reads as the same part. */
+const WATER_COLOUR = "#1f5670";
+const WATER_OPACITY = 0.6;
+/** The sea's texture, in pixels. It is one flat colour with a fade, so it
+ *  needs far fewer than the terrain's mottle. */
+const WATER_PIXELS = 256;
+
+/**
+ * The sea, in its own mesh: the same plane as the terrain, fading out the same
+ * way, but a flat translucent blue.
+ *
+ * Transparent, so three draws it after every solid piece. That is what lets
+ * the part of a hull below the surface show through tinted, while the part
+ * above it hides the water behind it.
+ */
+export function buildWater(): THREE.Mesh {
+  const geometry = new THREE.PlaneGeometry(TERRAIN_ELMOS, TERRAIN_ELMOS);
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, TERRAIN_Y, 0);
+
+  const material = new THREE.MeshBasicMaterial({
+    map: waterTexture(),
+    transparent: true,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = -1;
+  mesh.raycast = () => {};
+  return mesh;
+}
+
+function waterTexture(): THREE.CanvasTexture | null {
+  const canvas =
+    typeof document === "undefined" ? null : document.createElement("canvas");
+  const context = canvas?.getContext("2d");
+  if (!canvas || !context) return null;
+
+  const size = WATER_PIXELS;
+  canvas.width = size;
+  canvas.height = size;
+  context.fillStyle = WATER_COLOUR;
+  context.fillRect(0, 0, size, size);
+
+  const image = context.getImageData(0, 0, size, size);
+  const half = size / 2;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const elmos =
+        (Math.hypot(x - half, y - half) / half) * (TERRAIN_ELMOS / 2);
+      image.data[(y * size + x) * 4 + 3] = Math.round(
+        terrainAlpha(elmos) * WATER_OPACITY * 255,
+      );
+    }
+  }
+  context.putImageData(image, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }

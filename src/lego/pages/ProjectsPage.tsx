@@ -3,11 +3,14 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import {
   Blocks,
   Boxes,
+  ChevronDown,
+  ChevronRight,
   FileUp,
   ImageOff,
   Package,
   Pencil,
   Plus,
+  Search,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -24,7 +27,7 @@ import { legoThumbUrl } from "../../lib/assetUrl";
 import type { LegoAtlas } from "../atlas";
 import { type LegoProject, newProject } from "../model";
 import { loadPack } from "../pack";
-import { groupProjects } from "../projectGroups";
+import { filterGrouped, groupProjects } from "../projectGroups";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
 import { GameModelDrawer } from "./components/GameModelDrawer";
@@ -34,6 +37,44 @@ import { ImportDrawer } from "./components/ImportDrawer";
  *  under it stay the thing you read. */
 const SECTION =
   "text-xs font-medium uppercase tracking-wide text-muted-foreground";
+
+/** Where the folded game sections are remembered between visits. Opening a
+ *  model leaves this page, so a fold that lasted only as long as the page
+ *  would be gone every time you came back. */
+const COLLAPSED_GAMES_KEY = "coilbox.lego.collapsedGames";
+
+/** The game sections folded away, by group key, and a toggle that remembers
+ *  the answer. Storage that cannot be read or written leaves every section
+ *  open, and folding then lasts for the visit. */
+function useCollapsedGames(): [ReadonlySet<string>, (key: string) => void] {
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => {
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem(COLLAPSED_GAMES_KEY) ?? "[]",
+      );
+      return new Set(
+        Array.isArray(stored)
+          ? stored.filter((key) => typeof key === "string")
+          : [],
+      );
+    } catch {
+      return new Set();
+    }
+  });
+
+  function toggle(key: string) {
+    setCollapsed((was) => {
+      const next = new Set(was);
+      if (!next.delete(key)) next.add(key);
+      try {
+        localStorage.setItem(COLLAPSED_GAMES_KEY, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  }
+
+  return [collapsed, toggle];
+}
 
 /** The name field being edited, and why it cannot be saved yet, if at all. */
 interface Renaming {
@@ -77,6 +118,10 @@ export default function ProjectsPage() {
   const [noPicture, setNoPicture] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const grouped = useMemo(() => groupProjects(projects), [projects]);
+  const [query, setQuery] = useState("");
+  const shown = useMemo(() => filterGrouped(grouped, query), [grouped, query]);
+  const searching = query.trim() !== "";
+  const [collapsedGames, toggleGame] = useCollapsedGames();
   /** Whether anything here came from somebody else's model, which is the only
    *  reason to split the page up at all. */
   const sectioned = grouped.games.length > 0 || grouped.files.length > 0;
@@ -286,7 +331,7 @@ export default function ProjectsPage() {
 
   function grid(items: LegoProject[]) {
     return (
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start gap-4">
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(147px,1fr))] content-start gap-4">
         {items.map((project) => card(project))}
       </ul>
     );
@@ -382,31 +427,76 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <div className="flex-1 space-y-6 overflow-y-auto p-6">
+          <div className="relative max-w-sm">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search models and games"
+              aria-label="Search models and games"
+              className="pl-8"
+            />
+          </div>
+
+          {searching &&
+          shown.own.length + shown.games.length + shown.files.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No models match "{query.trim()}".
+            </p>
+          ) : null}
+
           {/* A heading over your own units only earns its space once there is
               something else below it to tell it apart from. */}
-          {grouped.own.length > 0 ? (
+          {shown.own.length > 0 ? (
             <section className="space-y-3">
               {sectioned ? <h2 className={SECTION}>Built from parts</h2> : null}
-              {grid(grouped.own)}
+              {grid(shown.own)}
             </section>
           ) : null}
 
-          {grouped.games.length > 0 ? (
+          {shown.games.length > 0 ? (
             <section className="space-y-4">
               <h2 className={SECTION}>Opened from a game</h2>
-              {grouped.games.map((game) => (
-                <div key={game.key} className="space-y-3">
-                  <h3 className="text-sm font-medium">{game.label}</h3>
-                  {grid(game.projects)}
-                </div>
-              ))}
+              {shown.games.map((game) => {
+                // A search opens every game it found something in, since a
+                // match hidden in a folded section reads as no match at all.
+                const open = searching || !collapsedGames.has(game.key);
+                return (
+                  <div key={game.key} className="space-y-3">
+                    <h3>
+                      <button
+                        type="button"
+                        onClick={() => toggleGame(game.key)}
+                        aria-expanded={open}
+                        disabled={searching}
+                        className="flex items-center gap-1.5 rounded text-sm font-medium hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {open ? (
+                          <ChevronDown size={14} />
+                        ) : (
+                          <ChevronRight size={14} />
+                        )}
+                        {game.label}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {game.projects.length}
+                        </span>
+                      </button>
+                    </h3>
+                    {open ? grid(game.projects) : null}
+                  </div>
+                );
+              })}
             </section>
           ) : null}
 
-          {grouped.files.length > 0 ? (
+          {shown.files.length > 0 ? (
             <section className="space-y-3">
               <h2 className={SECTION}>Opened from a file</h2>
-              {grid(grouped.files)}
+              {grid(shown.files)}
             </section>
           ) : null}
         </div>

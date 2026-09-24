@@ -32,6 +32,7 @@ describe("the options", () => {
     expect(backdropById("sky").id).toBe("sky");
     expect(backdropById("nonsense")).toBe(BACKDROPS[0]);
     expect(groundById("terrain").id).toBe("terrain");
+    expect(groundById("water").id).toBe("water");
     expect(groundById("nonsense")).toBe(GROUND_SURFACES[0]);
   });
 });

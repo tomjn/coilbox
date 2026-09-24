@@ -73,11 +73,20 @@ const handlers = {
   onReparent: vi.fn(),
   onToggleHidden: vi.fn(),
   onHoverChange: vi.fn(),
+  onToggleCollapsed: vi.fn(),
 };
+
+/** Nothing folded, which is how the tree opens. */
+const NONE = new Set<string>();
 
 function show(project: LegoProject, selectedIds: string[] = []) {
   return render(
-    <PieceTree project={project} selectedIds={selectedIds} {...handlers} />,
+    <PieceTree
+      project={project}
+      selectedIds={selectedIds}
+      {...handlers}
+      collapsedIds={NONE}
+    />,
   );
 }
 
@@ -95,8 +104,9 @@ function ghost(): HTMLElement | null {
 
 /** The row's own button: the one that selects the piece, not the eye beside it. */
 function rowButton(pieceId: string): HTMLButtonElement {
-  const found = row(pieceId).querySelector("button");
-  if (!found) throw new Error(`no select button for ${pieceId}`);
+  const found = row(pieceId).querySelector("button[aria-pressed]");
+  if (!(found instanceof HTMLButtonElement))
+    throw new Error(`no select button for ${pieceId}`);
   return found;
 }
 
@@ -156,7 +166,12 @@ describe("the shape of the list", () => {
     const { rerender } = show(walker());
     const before = document.querySelectorAll("[data-piece-id]").length;
     rerender(
-      <PieceTree project={walker()} selectedIds={["turret"]} {...handlers} />,
+      <PieceTree
+        project={walker()}
+        selectedIds={["turret"]}
+        {...handlers}
+        collapsedIds={NONE}
+      />,
     );
     expect(document.querySelectorAll("[data-piece-id]")).toHaveLength(before);
   });
@@ -192,7 +207,13 @@ describe("the shape of the list", () => {
       indices: new Uint32Array(),
     };
     render(
-      <PieceTree project={project} raw={raw} selectedIds={[]} {...handlers} />,
+      <PieceTree
+        project={project}
+        raw={raw}
+        selectedIds={[]}
+        {...handlers}
+        collapsedIds={NONE}
+      />,
     );
     expect(screen.getAllByLabelText("Geometry piece")).toHaveLength(2);
     expect(screen.getAllByLabelText("Empty piece")).toHaveLength(4);
@@ -335,5 +356,40 @@ describe("hovering a row", () => {
     handlers.onHoverChange.mockClear();
     fireEvent.mouseEnter(row("skirt"));
     expect(handlers.onHoverChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("folding a branch", () => {
+  it("offers a toggle only on a piece with children", () => {
+    show(walker());
+    expect(screen.getByLabelText("Collapse hull")).toBeTruthy();
+    expect(screen.getByLabelText("Collapse turret")).toBeTruthy();
+    expect(screen.queryByLabelText("Collapse skirt")).toBeNull();
+    expect(screen.queryByLabelText("Collapse flare")).toBeNull();
+  });
+
+  it("asks for the piece whose toggle was pressed", () => {
+    show(walker());
+    fireEvent.click(screen.getByLabelText("Collapse hull"));
+    expect(handlers.onToggleCollapsed).toHaveBeenCalledWith("hull");
+    expect(handlers.onSelect).not.toHaveBeenCalled();
+  });
+
+  it("leaves out everything under a folded piece, and the piece itself stays", () => {
+    render(
+      <PieceTree
+        project={walker()}
+        selectedIds={[]}
+        {...handlers}
+        collapsedIds={new Set(["hull"])}
+      />,
+    );
+    expect(row("hull")).toBeTruthy();
+    expect(row("flare")).toBeTruthy();
+    for (const id of ["turret", "barrel", "skirt"]) {
+      expect(document.querySelector(`[data-piece-id="${id}"]`)).toBeNull();
+    }
+    const toggle = screen.getByLabelText("Expand hull");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
   });
 });

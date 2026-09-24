@@ -40,6 +40,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
+import { TipButton } from "@/components/TipButton";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Tooltip,
@@ -242,6 +243,9 @@ const PIECE_EDIT_LINE_WIDTH = 3;
 const AIM_COLOUR = 0xef4444;
 const AIM_DOT = 13;
 
+/** The script events the effects layer draws. See `effectsPlayback.ts`. */
+const EFFECT_KINDS = new Set(["nano", "flare", "shot", "sfx"]);
+
 /** Where the camera starts, and where Reset view puts it back. */
 export const HOME_CAMERA: [number, number, number] = [9, 7, 11];
 
@@ -251,12 +255,15 @@ export const HOME_CAMERA: [number, number, number] = [9, 7, 11];
  * `applySceneScale`. Neither ever shrinks below these, so a unit on its own
  * behaves exactly as it always has.
  */
-export const MIN_MAX_DISTANCE = 120;
+export const MIN_MAX_DISTANCE = 240;
 export const MIN_FAR = 500;
 /** Slack past a tight fit, so the whole scene is comfortably inside the view at
  *  the furthest the camera can go rather than flush with its edges. The same
  *  figure `framing.ts` pads a framed box by. */
 export const ZOOM_OUT_PADDING = 1.3;
+/** How many times that fit the camera may pull back, so there is room to see
+ *  the unit small against its surroundings. */
+export const ZOOM_OUT_REACH = 2;
 
 /** Rotation lands on 15 degree steps unless snapping is held off. */
 export const ROTATION_STEP = Math.PI / 12;
@@ -366,6 +373,9 @@ interface Props {
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
   onGround?: () => void;
+  /** False when the unit already rests on y = 0, so the button has nothing
+   *  to do. */
+  canGround?: boolean;
   /** The toolbar's actions on the current selection: duplicate, paste,
    *  save as a compound and delete, and whether each is available. */
   pieceActions: {
@@ -380,8 +390,8 @@ interface Props {
      */
     onPaste: () => void;
     /** Save the selected piece and everything under it, to reuse in another
-     *  unit. */
-    onSaveAsCompound: () => void;
+     *  unit. Absent hides the button, for a unit whose pieces are not parts. */
+    onSaveAsCompound?: () => void;
     canSaveAsCompound: boolean;
     /** Delete every selected piece (Backspace). */
     onDelete: () => void;
@@ -462,6 +472,7 @@ export function ModelViewport({
   effectsAtlas,
   uniformScale = false,
   onGround,
+  canGround = true,
   pieceActions,
   symmetry,
   anchorPlacement,
@@ -535,6 +546,13 @@ export function ModelViewport({
   // toggle exists for getting it out of the way rather than for opting in.
   const [showStandIn, setShowStandIn] = useState(true);
   const [showEffects, setShowEffects] = useState(true);
+  // Each toggle only shows while the run has something for it to hide: a
+  // scenario that places a stand-in or carries one, and a script that drew
+  // an effect the effects layer draws.
+  const events = scriptTimeline?.events ?? [];
+  const hasStandIn =
+    standIn.track !== null || events.some((event) => event.kind === "attach");
+  const hasEffects = events.some((event) => EFFECT_KINDS.has(event.kind));
   // View settings, held for as long as the viewport is open and no longer,
   // exactly as the two above are. Both open on what the builder has always
   // shown, so nothing about opening a project changes.
@@ -778,6 +796,14 @@ export function ModelViewport({
       hoverOverlay.visible = false;
       hoverOverlay.raycast = () => {};
 
+      // The origin dot's size in the hover colour, for a piece with no faces.
+      const hoverMark = points(
+        [0, 0, 0],
+        null,
+        dotMaterial(ORIGIN_DOT, renderer.getPixelRatio(), false, HOVER_COLOUR),
+      );
+      hoverMark.visible = false;
+
       const selectOverlayMaterial = overlayMaterial(
         ORIGIN_COLOUR,
         SELECT_OVERLAY_OPACITY,
@@ -840,6 +866,7 @@ export function ModelViewport({
         groupChanges: new Map(),
         hoverOutline,
         hoverOverlay,
+        hoverMark,
         selectOverlayMaterial,
         selectOutlines: [],
         selectOverlays: [],
@@ -875,6 +902,7 @@ export function ModelViewport({
         aimMark,
         sky: null,
         terrain: null,
+        water: null,
         groups: new Map(),
         baked: [],
         imported: null,
@@ -1009,6 +1037,8 @@ export function ModelViewport({
           (state.seatMark.material as THREE.PointsMaterial).dispose();
           state.seatOutline.dispose();
           state.hoverOutline.dispose();
+          state.hoverMark.geometry.dispose();
+          (state.hoverMark.material as THREE.PointsMaterial).dispose();
           // Not the overlays' geometry: it is always a borrowed reference to a
           // piece's own mesh geometry (or the pack's cache, or the bake), never
           // something these meshes own.
@@ -1024,6 +1054,7 @@ export function ModelViewport({
           disposeFrontMarker(frontMarker);
           state.sky?.texture.dispose();
           if (state.terrain) disposeTerrain(state.terrain);
+          if (state.water) disposeTerrain(state.water);
           // Not `reference`: the figure may have been swapped for a unit read
           // out of an installed game since the scene was built.
           state.disposeReference();
@@ -1172,7 +1203,7 @@ export function ModelViewport({
                   return (
                     <Tooltip key={id}>
                       <TooltipTrigger asChild>
-                        <Button
+                        <TipButton
                           size="icon"
                           variant={mode === id && !off ? "default" : "outline"}
                           onClick={() => setMode(id)}
@@ -1181,7 +1212,7 @@ export function ModelViewport({
                           aria-pressed={mode === id && !off}
                         >
                           <Icon className="size-4" />
-                        </Button>
+                        </TipButton>
                       </TooltipTrigger>
                       <TooltipContent side="right">
                         {!off
@@ -1201,17 +1232,20 @@ export function ModelViewport({
                 <ButtonGroup orientation="vertical">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
+                      <TipButton
                         size="icon"
                         variant="outline"
                         onClick={onGround}
+                        disabled={!canGround}
                         aria-label="Sit the unit on the ground"
                       >
                         <ArrowDownToLine className="size-4" />
-                      </Button>
+                      </TipButton>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      Sit on the ground
+                      {canGround
+                        ? "Sit on the ground"
+                        : "Sit on the ground: the unit is already on it"}
                     </TooltipContent>
                   </Tooltip>
                 </ButtonGroup>
@@ -1242,7 +1276,7 @@ export function ModelViewport({
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
+                    <TipButton
                       size="icon"
                       variant="outline"
                       onClick={onDuplicate}
@@ -1250,7 +1284,7 @@ export function ModelViewport({
                       aria-label="Duplicate the selection"
                     >
                       <Copy className="size-4" />
-                    </Button>
+                    </TipButton>
                   </TooltipTrigger>
                   <TooltipContent side="right">
                     Duplicate (Cmd D)
@@ -1269,25 +1303,27 @@ export function ModelViewport({
                   </TooltipTrigger>
                   <TooltipContent side="right">Paste (Cmd V)</TooltipContent>
                 </Tooltip>
+                {onSaveAsCompound ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TipButton
+                        size="icon"
+                        variant="outline"
+                        onClick={onSaveAsCompound}
+                        disabled={!canSaveAsCompound}
+                        aria-label="Save the selection as a compound"
+                      >
+                        <PackagePlus className="size-4" />
+                      </TipButton>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      Save as a compound
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={onSaveAsCompound}
-                      disabled={!canSaveAsCompound}
-                      aria-label="Save the selection as a compound"
-                    >
-                      <PackagePlus className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    Save as a compound
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
+                    <TipButton
                       size="icon"
                       variant="outline"
                       onClick={onDelete}
@@ -1295,7 +1331,7 @@ export function ModelViewport({
                       aria-label="Delete the selection"
                     >
                       <Trash2 className="size-4" />
-                    </Button>
+                    </TipButton>
                   </TooltipTrigger>
                   <TooltipContent side="right">
                     Delete (Backspace)
@@ -1396,20 +1432,24 @@ export function ModelViewport({
                 if (choice) setShowReference(true);
               }}
             />
-            <ViewToggle
-              icon={Target}
-              on={showStandIn}
-              onChange={setShowStandIn}
-              hideTitle="Hide the stand-in unit"
-              showTitle="Show the stand-in unit, the thing a scenario aims at, builds or carries"
-            />
-            <ViewToggle
-              icon={Sparkles}
-              on={showEffects}
-              onChange={setShowEffects}
-              hideTitle="Hide script effects"
-              showTitle="Show script effects, such as nano spray, from the unit's own script"
-            />
+            {hasStandIn ? (
+              <ViewToggle
+                icon={Target}
+                on={showStandIn}
+                onChange={setShowStandIn}
+                hideTitle="Hide the stand-in unit"
+                showTitle="Show the stand-in unit, the thing a scenario aims at, builds or carries"
+              />
+            ) : null}
+            {hasEffects ? (
+              <ViewToggle
+                icon={Sparkles}
+                on={showEffects}
+                onChange={setShowEffects}
+                hideTitle="Hide script effects"
+                showTitle="Show script effects, such as nano spray, from the unit's own script"
+              />
+            ) : null}
             <ViewButton
               title="Keyboard shortcuts (?)"
               onClick={() => setShortcutsOpen(true)}

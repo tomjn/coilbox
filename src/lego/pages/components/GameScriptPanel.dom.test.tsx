@@ -31,7 +31,6 @@ function adopted(over: Partial<AdoptedScript> = {}): AdoptedScript {
     kind: "lua",
     declared: "armcom.cob",
     findings: { proposals: [], notes: [], error: null },
-    listing: null,
     converted: null,
     compiled: null,
     unitDef: null,
@@ -74,111 +73,113 @@ afterEach(() => {
 });
 
 describe("a unit whose game ships Lua for it", () => {
-  it("names the file and offers to keep it", () => {
+  it("names the file it imports, with no choice to make", () => {
     show(adopted());
 
     expect(screen.getByText("scripts/armcom.lua")).toBeTruthy();
-    expect(screen.getByLabelText("Keep the game's script")).toBeTruthy();
-  });
-
-  /** Taking a script over means the presets stop applying, which is a thing
-   *  somebody should be told before they land on a panel that looks empty. */
-  it("says the presets stop applying, and that it can be handed back", () => {
-    show(adopted());
-
-    expect(screen.getByText(/presets do not apply/)).toBeTruthy();
-    expect(screen.getByText(/hand it back later/)).toBeTruthy();
-  });
-
-  it("asks before changing whether the script is kept", () => {
-    show(adopted());
-    fireEvent.click(screen.getByLabelText("Keep the game's script"));
-
-    expect(onTakeScript).toHaveBeenCalledWith(false);
+    expect(screen.getByText("Lua")).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
   });
 });
 
-describe("a unit whose game ships compiled bytecode", () => {
+describe("while the script is still being read", () => {
+  it("says so rather than leaving the section out", () => {
+    render(
+      <GameScriptPanel
+        adopted={null}
+        takeScript={false}
+        onTakeScript={onTakeScript}
+        taken={new Set()}
+        onToggleRole={onToggleRole}
+      />,
+    );
+
+    expect(screen.getByText("Animation")).toBeTruthy();
+    expect(screen.getByText(/Looking for this unit's animation/)).toBeTruthy();
+  });
+});
+
+describe("a unit whose game ships only compiled bytecode", () => {
   const compiled = adopted({
     script: null,
     kind: "cob",
     member: "scripts/armcom.cob",
-    listing: "; COB v4\n; 3 scripts\n",
+    compiled: { member: "scripts/armcom.cob", bytes: [1, 2, 3] },
     findings: null,
-    notes: ["That file is compiled bytecode rather than Lua."],
   });
 
-  it("offers no way to keep a script that cannot be written back", () => {
+  it("names the compiled file it runs, with no choice to make", () => {
     show(compiled);
 
-    expect(screen.queryByLabelText("Keep the game's script")).toBeNull();
-    expect(screen.getByText(/compiled rather than Lua/)).toBeTruthy();
+    expect(screen.getByText("scripts/armcom.cob")).toBeTruthy();
+    expect(screen.getByText("Compiled")).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
   });
 
-  /** Coilbox cannot write a `.cob` and can run one, and those are different
-   *  things. The panel used to say only the first. */
-  it("says the unit still animates, because the file is run", () => {
+  /** Coilbox can run a `.cob` and cannot write or convert one, and both of
+   *  those decide what somebody can do with the unit afterwards. */
+  it("says it plays as in the game and cannot be converted", () => {
     show(compiled);
 
-    expect(screen.getByText(/Coilbox runs it/)).toBeTruthy();
+    expect(screen.getByText(/Plays exactly as in the game/)).toBeTruthy();
+    expect(screen.getByText(/cannot be converted to Lua/)).toBeTruthy();
   });
 
-  it("still lets it be read, and says the file is untouched", () => {
+  it("offers nothing to read the bytecode with", () => {
     show(compiled);
-    fireEvent.click(screen.getByRole("button", { name: "Read it anyway" }));
 
-    expect(screen.getByText(/; COB v4/)).toBeTruthy();
-    expect(screen.getByText(/the file itself is untouched/)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });
 
 /**
- * The case the compiled-script note used to end at. What matters is that the
- * offer never reads as the game's own file. The conversion runs as it is, but
- * it is still a reading of the game's script, and whatever it could not carry
- * over is listed rather than left for somebody to find.
+ * Two ways in, laid out as two named options. A switch read as "no animation"
+ * when off, and neither option is that.
  */
 describe("a unit whose game ships the source beside the bytecode", () => {
   const converted = adopted({
     script: "local base = piece 'base' \n",
     kind: "cob",
     member: "scripts/armcom.cob",
-    listing: "; COB v4\n",
+    compiled: { member: "scripts/armcom.cob", bytes: [1, 2, 3] },
     findings: null,
     converted: { member: "scripts/armcom.bos" },
-    notes: [],
+    notes: ["could not find sfxtype.h"],
   });
 
-  it("names the source it converted, not only the compiled file", () => {
-    show(converted);
+  it("offers the compiled file and the conversion, each naming its file", () => {
+    show(converted, undefined, false);
 
-    expect(screen.getByText("scripts/armcom.bos")).toBeTruthy();
-    expect(screen.getByText("scripts/armcom.cob")).toBeTruthy();
+    const compiledOption = screen.getByRole("radio", {
+      name: /Run the compiled script/,
+    });
+    const luaOption = screen.getByRole("radio", { name: /Convert to Lua/ });
+    expect(compiledOption.textContent).toContain("scripts/armcom.cob");
+    expect(luaOption.textContent).toContain("scripts/armcom.bos");
   });
 
-  it("says outright that this is a conversion rather than the game's file", () => {
-    show(converted);
+  it("starts on the option the switch value says", () => {
+    show(converted, undefined, false);
 
     expect(
-      screen.getByText(/a conversion rather than the game's own file/),
-    ).toBeTruthy();
-    expect(screen.getByText(/could not carry over/)).toBeTruthy();
+      screen
+        .getByRole("radio", { name: /Run the compiled script/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
-  it("offers it, and asks before taking it", () => {
+  it("asks for the conversion when it is picked", () => {
     show(converted, undefined, false);
-    fireEvent.click(screen.getByLabelText("Use the converted script"));
+    fireEvent.click(screen.getByRole("radio", { name: /Convert to Lua/ }));
 
     expect(onTakeScript).toHaveBeenCalledWith(true);
   });
 
-  /** The compiled file is still what the game runs, so the faithful reading of
-   *  it stays available beside the conversion. */
-  it("still lets the compiled file be read", () => {
+  it("lists what the conversion could not carry over", () => {
     show(converted);
-    fireEvent.click(screen.getByRole("button", { name: "Read it anyway" }));
 
-    expect(screen.getByText(/; COB v4/)).toBeTruthy();
+    expect(screen.getByText("could not find sfxtype.h")).toBeTruthy();
   });
 });
 
@@ -232,10 +233,8 @@ describe("the two kinds of proposal", () => {
   it("keeps them under separate headings", () => {
     show(both);
 
-    expect(screen.getByText("The script named these")).toBeTruthy();
-    expect(
-      screen.getByText("These moved when the unit was asked to work"),
-    ).toBeTruthy();
+    expect(screen.getByText("Named by the script")).toBeTruthy();
+    expect(screen.getByText("Worked out from what moved")).toBeTruthy();
   });
 
   it("names the call-in each one came from, as the reason", () => {
@@ -259,7 +258,7 @@ describe("the two kinds of proposal", () => {
       }),
     );
 
-    expect(screen.queryByText("The script named these")).toBeNull();
+    expect(screen.queryByText("Named by the script")).toBeNull();
   });
 
   it("hands back the piece whose box was clicked", () => {
@@ -316,6 +315,7 @@ describe("when there is little to say", () => {
     );
 
     expect(screen.getByText(/no animation script/)).toBeTruthy();
+    expect(screen.getByText(/opens with the animation presets/)).toBeTruthy();
   });
 
   /** A unit not out of a game at all has nothing to report and no panel. */
