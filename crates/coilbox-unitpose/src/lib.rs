@@ -22,9 +22,33 @@ pub mod unitvalue;
 pub use nanopiece::NanoPieces;
 pub use passenger::Passenger;
 
-/// Said once when a run recorded an effect, an explosion or a sound, none of
-/// which the preview draws or plays.
-pub const EFFECTS_NOTE: &str = "Effects are marked on the scrubber, not drawn.";
+/// Said once when a run recorded an explosion or a sound, which the preview
+/// marks on the scrubber but neither draws nor plays.
+pub const EFFECTS_NOTE: &str = "Explode debris and sounds are marked on the scrubber, not drawn.";
+
+/// Said once when a run emitted a unit or global CEG. The preview draws it as
+/// a plain puff, because the real effect is defined by the game.
+pub const CEG_NOTE: &str =
+    "CEGs are drawn as a plain puff. The game's own effect needs its definition.";
+
+/// Said once when a run emitted bubbles. The engine pins them just under sea
+/// level (`BubbleProjectile.cpp:68-71`), which is under the preview's ground.
+pub const BUBBLE_NOTE: &str = "Bubbles are not drawn, because they sit under the water line.";
+
+/// The sfx numbers the engine's switch matches exactly, before it tests any
+/// range bit (`rts/Sim/Units/Scripts/CobDefines.h:9-16`, `UnitScript.cpp:651-717`).
+const BUILT_IN_SFX: [i32; 8] = [0, 2, 3, 4, 5, 257, 258, 259];
+const SFX_BUBBLE: i32 = 259;
+/// The unit and global CEG range bits (`CobDefines.h:17,20`).
+const SFX_CEG: i32 = 1024;
+const SFX_GLOBAL: i32 = 16384;
+
+/// Whether an sfx number emits a CEG. The engine tests the global CEG bit and
+/// then the unit CEG bit before the weapon bits, and only for a number that is
+/// not one of the built-in ones (`UnitScript.cpp:719-750`).
+pub fn sfx_is_ceg(sfx: i32) -> bool {
+    !BUILT_IN_SFX.contains(&sfx) && (sfx & (SFX_GLOBAL | SFX_CEG)) != 0
+}
 
 /// Sim frames per second. The engine's `GAME_SPEED`, which every `Sleep` and
 /// every per-second speed is measured against.
@@ -217,13 +241,10 @@ pub enum ScriptOutput {
 }
 
 impl ScriptOutput {
-    /// Whether this is something the preview would draw or play, as opposed
-    /// to carrying the stand-in.
-    fn is_effect(&self) -> bool {
-        matches!(
-            self,
-            Self::Sfx { .. } | Self::Explode { .. } | Self::Sound { .. }
-        )
+    /// Whether this is something the preview marks but neither draws nor
+    /// plays.
+    fn is_undrawn(&self) -> bool {
+        matches!(self, Self::Explode { .. } | Self::Sound { .. })
     }
 }
 
@@ -685,14 +706,26 @@ impl Model {
         timeline.hidden.push(hidden);
     }
 
-    /// Close a timeline off: carry the warnings and events over, say once that
-    /// effects are marked rather than drawn, and drop the visibility track when
-    /// nothing ever used it.
+    /// Close a timeline off: carry the warnings and events over, say once for
+    /// each kind of output the preview cannot draw, and drop the visibility
+    /// track when nothing ever used it.
     pub fn finish(&self, timeline: &mut Timeline) {
         timeline.warnings.extend(self.warnings.iter().cloned());
         timeline.events = self.events.clone();
-        if self.events.iter().any(ScriptOutput::is_effect) {
+        if self.events.iter().any(ScriptOutput::is_undrawn) {
             timeline.warnings.push(EFFECTS_NOTE.to_string());
+        }
+        let sfx_numbers = || {
+            self.events.iter().filter_map(|event| match event {
+                ScriptOutput::Sfx { sfx, .. } => Some(*sfx),
+                _ => None,
+            })
+        };
+        if sfx_numbers().any(sfx_is_ceg) {
+            timeline.warnings.push(CEG_NOTE.to_string());
+        }
+        if sfx_numbers().any(|sfx| sfx == SFX_BUBBLE) {
+            timeline.warnings.push(BUBBLE_NOTE.to_string());
         }
         if !self.visibility_used {
             timeline.hidden.clear();
@@ -791,7 +824,7 @@ pub fn axis_index(axis: i64) -> Option<usize> {
 mod tests {
     use super::*;
 
-    fn names() -> Vec<String> {
+    pub(super) fn names() -> Vec<String> {
         ["base", "torso", "arm"]
             .iter()
             .map(|n| (*n).to_string())
@@ -799,7 +832,7 @@ mod tests {
     }
 
     /// A base on the ground, a torso above it, an arm out to one side of that.
-    fn placed() -> Model {
+    pub(super) fn placed() -> Model {
         let mut model = Model::new(&names());
         model.place(&[
             Rest {
@@ -1107,6 +1140,7 @@ mod tests {
 
 #[cfg(test)]
 mod world_tests {
+    use super::tests::{names, placed};
     use super::*;
 
     /// The shape the panel sends, field for field.
@@ -1219,5 +1253,65 @@ mod world_tests {
         let mut timeline = Timeline::new(vec!["base".to_string()], 1);
         model.finish(&mut timeline);
         assert!(!timeline.warnings.iter().any(|w| w == EFFECTS_NOTE));
+    }
+
+    /// Built-in sfx are drawn now, so an sfx on its own no longer brings the
+    /// note that effects are not.
+    #[test]
+    fn a_built_in_sfx_does_not_say_effects_are_not_drawn() {
+        let mut model = placed();
+        model.emit_sfx(0, 2, 257);
+        let mut timeline = Timeline::new(names(), 0);
+        model.finish(&mut timeline);
+        assert!(!timeline.warnings.iter().any(|w| w == EFFECTS_NOTE));
+        assert!(!timeline.warnings.iter().any(|w| w == CEG_NOTE));
+    }
+
+    #[test]
+    fn an_explosion_says_debris_is_not_drawn() {
+        let mut model = placed();
+        model.explode(0, 2, 1);
+        let mut timeline = Timeline::new(names(), 0);
+        model.finish(&mut timeline);
+        assert!(timeline.warnings.iter().any(|w| w == EFFECTS_NOTE));
+    }
+
+    #[test]
+    fn a_ceg_says_it_is_drawn_as_a_puff_once() {
+        let mut model = placed();
+        model.emit_sfx(0, 2, 1024 + 3);
+        model.emit_sfx(1, 2, 16384 + 1);
+        let mut timeline = Timeline::new(names(), 0);
+        model.finish(&mut timeline);
+        assert_eq!(
+            timeline.warnings.iter().filter(|w| *w == CEG_NOTE).count(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_bubble_says_it_is_not_drawn() {
+        let mut model = placed();
+        model.emit_sfx(0, 2, 259);
+        let mut timeline = Timeline::new(names(), 0);
+        model.finish(&mut timeline);
+        assert!(timeline.warnings.iter().any(|w| w == BUBBLE_NOTE));
+        assert!(!timeline.warnings.iter().any(|w| w == CEG_NOTE));
+    }
+
+    /// The engine's switch takes the exact built-in numbers before it tests
+    /// any range bit, and the global CEG bit before the unit CEG bit
+    /// (`UnitScript.cpp:651-750`).
+    #[test]
+    fn reads_a_ceg_in_the_engines_order() {
+        assert!(sfx_is_ceg(1024));
+        assert!(sfx_is_ceg(16384 + 5));
+        assert!(sfx_is_ceg(1024 + 257));
+        assert!(sfx_is_ceg(2048 + 1024));
+        assert!(sfx_is_ceg(16384 + 2048));
+        assert!(!sfx_is_ceg(257));
+        assert!(!sfx_is_ceg(0));
+        assert!(!sfx_is_ceg(2048));
+        assert!(!sfx_is_ceg(4096 + 2048));
     }
 }
