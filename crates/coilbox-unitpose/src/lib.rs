@@ -27,9 +27,9 @@ pub use passenger::Passenger;
 pub const EFFECTS_NOTE: &str = "Explode debris and sounds are marked on the scrubber, not drawn.";
 
 /// Said once when a run emitted a unit or global CEG. The preview draws it as
-/// a plain puff, because the real effect is defined by the game.
+/// a stand-in glow, because the real effect is defined by the game.
 pub const CEG_NOTE: &str =
-    "CEGs are drawn as a plain puff. The game's own effect needs its definition.";
+    "CEGs are drawn as a stand-in glow. The game's own effect needs its definition.";
 
 /// Said once when a run emitted bubbles. The engine pins them just under sea
 /// level (`BubbleProjectile.cpp:68-71`), which is under the preview's ground.
