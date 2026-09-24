@@ -14,6 +14,11 @@
  * A shot also draws the engine's muzzle flame the way `CMuzzleFlame` draws it,
  * and a tracer running from the muzzle to the target, a neutral look the
  * preview chose since the engine draws the projectile itself instead.
+ *
+ * The engine's built-in sfx are drawn as its own particle classes draw them:
+ * smoke as `CSmokeProjectile`, a VTOL jet as `CHeatCloudProjectile` and a wake
+ * as `CWakeProjectile`. A CEG, whose real look the game defines, is a neutral
+ * puff instead.
  */
 
 import type { NanoStyle } from "./scriptPlayback";
@@ -66,7 +71,39 @@ export interface TracerEmission {
   weapon: number;
 }
 
-export type Emission = NanoEmission | FlameEmission | TracerEmission;
+export interface SmokeEmission {
+  kind: "smoke";
+  birth: number;
+  at: Vec3;
+  /** 0.5 for white smoke (257), 0.6 for black (258). */
+  color: number;
+  seed: number;
+}
+export interface VtolEmission {
+  kind: "vtol";
+  birth: number;
+  at: Vec3;
+  /** The emit direction, world space, unit length or zero. */
+  dir: Vec3;
+  seed: number;
+}
+export interface WakeEmission {
+  kind: "wake";
+  birth: number;
+  at: Vec3;
+  dir: Vec3;
+  /** 4 and 5 run back along the emit direction. */
+  reverse: boolean;
+  seed: number;
+}
+
+export type Emission =
+  | NanoEmission
+  | FlameEmission
+  | TracerEmission
+  | SmokeEmission
+  | VtolEmission
+  | WakeEmission;
 
 export interface Sprites {
   count: number;
@@ -509,6 +546,177 @@ function tracerSprites(
   tracerEndCap(tailPos, behindHead, 1, colors, out);
 }
 
+/** A sprite that turns to face the camera. */
+function pushBillboard(
+  out: SpriteArrays,
+  center: Vec3,
+  halfSize: number,
+  color: [number, number, number, number],
+  bitmap: number,
+): void {
+  out.centers.push(...center);
+  out.halfSizes.push(halfSize);
+  out.colors.push(...color);
+  out.bitmaps.push(bitmap);
+  out.axes.push(0, 0, 0);
+  out.sides.push(0, 0, 0);
+  out.halfLengths.push(0);
+  out.uvRanges.push(0, 1);
+}
+
+/** `CSmokeProjectile`'s arguments for sfx 257 and 258: 60 frames, start size
+ *  4, growing 0.5 a frame (`UnitScript.cpp:693-698`). */
+const SMOKE_TTL = 60;
+const SMOKE_START_SIZE = 4;
+const SMOKE_SIZE_EXPANSION = 0.5;
+
+/** Smoke on one frame, following `CSmokeProjectile::Update` and `Draw`
+ *  (`SmokeProjectile.cpp:46-125`). Its size catches up towards its start size
+ *  in a way with no simple closed form, so it is replayed from birth in
+ *  32-bit floats, as the engine runs it. The replay stops when the particle
+ *  dies, so it never runs more than about 60 steps. There is no wind in the
+ *  preview, so the wind term is left out. */
+function smokeSprites(
+  emission: SmokeEmission,
+  frame: number,
+  smokeCount: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  const ageSpeed = Math.fround(1 / SMOKE_TTL);
+  let age = 0;
+  let size = 0;
+  for (let i = 0; i < updates; i++) {
+    age = Math.fround(age + ageSpeed);
+    size = Math.fround(size + SMOKE_SIZE_EXPANSION);
+    if (size < SMOKE_START_SIZE) {
+      size = Math.fround(size + (SMOKE_START_SIZE - size) * 0.2);
+    }
+    age = Math.min(age, 1);
+    if (age >= 1) return;
+  }
+
+  // speed = guRNG.NextVector() * 0.5 + UpVector * 1.1 (UnitScript.cpp:694).
+  const wobble = ballPoint(emission.seed, 0);
+  const center: Vec3 = [
+    emission.at[0] + wobble[0] * 0.5 * updates,
+    emission.at[1] + (wobble[1] * 0.5 + 1.1) * updates,
+    emission.at[2] + wobble[2] * 0.5 * updates,
+  ];
+  const alpha = Math.trunc((1 - age) * 255);
+  const shade = Math.trunc(emission.color * alpha) / 255;
+  const texture = Math.min(
+    smokeCount - 1,
+    Math.floor(unitFloat(emission.seed, 3) * smokeCount),
+  );
+  pushBillboard(
+    out,
+    center,
+    size,
+    [shade, shade, shade, alpha / 255],
+    BITMAP_SMOKE + texture,
+  );
+}
+
+/** A VTOL jet's heat cloud on one frame. The arguments come from
+ *  `UnitScript.cpp:700-717`: a temperature of 10 to 15, a size argument of 3
+ *  to 5, and `size` set to 3 after construction. It moves at
+ *  `GetObjectSpaceVec(0.5 * dir.x, -0.5 * |dir.y|, 0.5 * dir.z)`, the
+ *  engine's formula with the unit's own speed at 0, since the preview unit
+ *  does not move. `CHeatCloudProjectile` loses one heat a frame and dies at
+ *  none, grows by `size / temperature` a frame, and draws its heat as
+ *  brightness with an alpha of 1 (`HeatCloudProjectile.cpp:48-139`). */
+function vtolSprites(
+  emission: VtolEmission,
+  frame: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  const temperature = 10 + unitFloat(emission.seed, 0) * 5;
+  const heat = temperature - updates;
+  if (heat <= 0) return;
+  const growth = (3 + unitFloat(emission.seed, 1) * 2) / temperature;
+  const speed: Vec3 = [
+    0.5 * emission.dir[0],
+    -0.5 * Math.abs(emission.dir[1]),
+    0.5 * emission.dir[2],
+  ];
+  const glow = Math.trunc((heat / temperature) * 255) / 255;
+  pushBillboard(
+    out,
+    [
+      emission.at[0] + speed[0] * updates,
+      emission.at[1] + speed[1] * updates,
+      emission.at[2] + speed[2] * updates,
+    ],
+    3 + growth * updates,
+    [glow, glow, glow, 1 / 255],
+    BITMAP_HEATCLOUD,
+  );
+}
+
+/** How far above the preview's ground a wake is drawn. The engine puts a
+ *  wake at sea level (`WakeProjectile.cpp:48`), and the preview's ground
+ *  counts as sea level, so a wake drawn at exactly 0 would flicker against
+ *  the ground. Set by eye, to be tuned with the user on screen. */
+export const WAKE_LIFT = 0.5;
+
+/** `CWakeProjectile`'s ship values, from `UnitScript.cpp:638-640`. Hover
+ *  craft use other values (`:645-649`) that depend on a move def the editor
+ *  does not have. */
+const WAKE_ALPHA_DECAY = 0.004;
+const WAKE_FADEUP_TIME = 4;
+
+/** A wake on one frame, following `CWakeProjectile` (`WakeProjectile.cpp:30-109`)
+ *  with the arguments from `UnitScript.cpp:653-676`. It fades up over its
+ *  first four updates, then out at 0.004 a frame, and is deleted once its
+ *  alpha goes below 0. It lies flat and turns slowly. */
+function wakeSprites(
+  emission: WakeEmission,
+  frame: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  const alphaStart = 0.3 + unitFloat(emission.seed, 5) * 0.2;
+  const alphaAdd = alphaStart / WAKE_FADEUP_TIME;
+  const alpha =
+    Math.min(updates, WAKE_FADEUP_TIME) * alphaAdd - updates * WAKE_ALPHA_DECAY;
+  if (updates > WAKE_FADEUP_TIME && alpha < 0) return;
+
+  const wobble = ballPoint(emission.seed, 0);
+  const pace = emission.reverse ? -0.4 : 0.4;
+  const size =
+    6 +
+    unitFloat(emission.seed, 3) * 4 +
+    (0.15 + unitFloat(emission.seed, 4) * 0.3) * updates;
+  const rotation =
+    unitFloat(emission.seed, 6) * Math.PI * 2 +
+    (unitFloat(emission.seed, 7) - 0.5) * Math.PI * 2 * 0.01 * updates;
+  const axis: Vec3 = [Math.cos(rotation), 0, Math.sin(rotation)];
+  // dir1.cross(UpVector), WakeProjectile.cpp:99.
+  const side: Vec3 = [-axis[2], 0, axis[0]];
+  const shade = Math.trunc(255 * Math.max(alpha, 0)) / 255;
+
+  out.centers.push(
+    emission.at[0] + wobble[0] * 2 + emission.dir[0] * pace * updates,
+    WAKE_LIFT,
+    emission.at[2] + wobble[2] * 2 + emission.dir[2] * pace * updates,
+  );
+  out.halfSizes.push(size);
+  out.colors.push(shade, shade, shade, shade);
+  out.bitmaps.push(BITMAP_WAKE);
+  out.axes.push(...axis);
+  out.sides.push(...side);
+  out.halfLengths.push(size);
+  out.uvRanges.push(0, 1);
+}
+
 export function particlesAt(
   emissions: Emission[],
   frame: number,
@@ -534,6 +742,18 @@ export function particlesAt(
     }
     if (emission.kind === "tracer") {
       tracerSprites(emission, frame, sprites);
+      continue;
+    }
+    if (emission.kind === "smoke") {
+      smokeSprites(emission, frame, smokeCount, sprites);
+      continue;
+    }
+    if (emission.kind === "vtol") {
+      vtolSprites(emission, frame, sprites);
+      continue;
+    }
+    if (emission.kind === "wake") {
+      wakeSprites(emission, frame, sprites);
       continue;
     }
     const age = frame - emission.birth;

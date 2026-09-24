@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  BITMAP_HEATCLOUD,
   BITMAP_LASER,
   BITMAP_LASER_END,
   BITMAP_MUZZLE_FLAME,
   BITMAP_SMOKE,
+  BITMAP_WAKE,
   DEFAULT_FLAME_SIZE,
   emitPoint,
   type FlameEmission,
@@ -12,8 +14,13 @@ import {
   type NanoEmission,
   type Particles,
   particlesAt,
+  type SmokeEmission,
   type TracerEmission,
   unitFloat,
+  type Vec3,
+  type VtolEmission,
+  WAKE_LIFT,
+  type WakeEmission,
 } from "./effects";
 
 function nano(
@@ -455,5 +462,183 @@ describe("particlesAt with flames and tracers", () => {
     expect(sprites.count).toBeGreaterThan(0);
     expect(sprites.sides).toHaveLength(sprites.count * 3);
     expect(sprites.sides.every((value) => value === 0)).toBe(true);
+  });
+});
+
+/** `CSmokeProjectile::Update` replayed step by step in 32-bit floats, as the
+ *  engine runs it, with no wind (`SmokeProjectile.cpp:85-98`). Null once the
+ *  particle has been deleted. */
+function replaySmoke(updates: number): { size: number; age: number } | null {
+  const ageSpeed = Math.fround(1 / 60);
+  let age = 0;
+  let size = 0;
+  for (let i = 0; i < updates; i++) {
+    age = Math.fround(age + ageSpeed);
+    size = Math.fround(size + 0.5);
+    if (size < 4) size = Math.fround(size + (4 - size) * 0.2);
+    age = Math.min(age, 1);
+    if (age >= 1) return null;
+  }
+  return { size, age };
+}
+
+function smoke(overrides: Partial<SmokeEmission> = {}): SmokeEmission {
+  return {
+    kind: "smoke",
+    birth: 0,
+    at: [0, 0, 0],
+    color: 0.5,
+    seed: 7,
+    ...overrides,
+  };
+}
+
+describe("sfx smoke", () => {
+  it("grows and dies as a direct replay of CSmokeProjectile::Update does", () => {
+    for (let k = 0; k < 70; k++) {
+      const replay = replaySmoke(k + 1);
+      const { sprites } = particlesAt([smoke()], k);
+      if (replay === null) {
+        expect(sprites.count).toBe(0);
+        continue;
+      }
+      expect(sprites.count).toBe(1);
+      expect(sprites.halfSizes[0]).toBeCloseTo(replay.size, 4);
+    }
+  });
+
+  it("fades as CSmokeProjectile::Draw does, black smoke a little lighter than white", () => {
+    const replay = replaySmoke(1);
+    if (!replay) throw new Error("smoke died on its first update");
+    const alpha = Math.trunc((1 - replay.age) * 255);
+    const white = particlesAt([smoke()], 0).sprites.colors;
+    expect(white[0]).toBeCloseTo(Math.trunc(0.5 * alpha) / 255, 6);
+    expect(white[3]).toBeCloseTo(alpha / 255, 6);
+    const black = particlesAt([smoke({ color: 0.6 })], 0).sprites.colors;
+    expect(black[0]).toBeCloseTo(Math.trunc(0.6 * alpha) / 255, 6);
+  });
+
+  it("rises 1.1 elmos a frame, give or take half an elmo in each direction", () => {
+    const { sprites } = particlesAt([smoke()], 9);
+    expect(sprites.centers[1]).toBeGreaterThanOrEqual(10 * 0.6 - 1e-4);
+    expect(sprites.centers[1]).toBeLessThanOrEqual(10 * 1.6 + 1e-4);
+    expect(Math.abs(sprites.centers[0])).toBeLessThanOrEqual(5 + 1e-4);
+  });
+
+  it("draws nothing before its birth frame", () => {
+    expect(particlesAt([smoke({ birth: 5 })], 4).sprites.count).toBe(0);
+  });
+
+  it("picks one of the game's smoke bitmaps by its seed", () => {
+    const picked = new Set<number>();
+    for (let seed = 0; seed < 50; seed++) {
+      picked.add(particlesAt([smoke({ seed })], 0, 4).sprites.bitmaps[0]);
+    }
+    for (const bitmap of picked) {
+      expect(bitmap).toBeGreaterThanOrEqual(BITMAP_SMOKE);
+      expect(bitmap).toBeLessThan(BITMAP_SMOKE + 4);
+    }
+    expect(picked.size).toBeGreaterThan(1);
+  });
+});
+
+function vtol(dir: Vec3, overrides: Partial<VtolEmission> = {}): VtolEmission {
+  return { kind: "vtol", birth: 0, at: [0, 0, 0], dir, seed: 3, ...overrides };
+}
+
+describe("sfx VTOL", () => {
+  it("moves at half the emit direction a frame, always downward", () => {
+    const sideways = particlesAt([vtol([0.6, 0.8, 0])], 0).sprites.centers;
+    expect(sideways[0]).toBeCloseTo(0.3, 6);
+    expect(sideways[1]).toBeCloseTo(-0.4, 6);
+    expect(sideways[2]).toBeCloseTo(0, 6);
+    const down = particlesAt([vtol([0, -1, 0])], 0).sprites.centers;
+    expect(down[1]).toBeCloseTo(-0.5, 6);
+  });
+
+  it("starts at size 3 and lives as many frames as its temperature", () => {
+    for (let seed = 0; seed < 30; seed++) {
+      const first = particlesAt([vtol([0, 0, 1], { seed })], 0).sprites;
+      expect(first.halfSizes[0]).toBeGreaterThanOrEqual(3.2 - 1e-6);
+      expect(first.halfSizes[0]).toBeLessThanOrEqual(3.5 + 1e-6);
+      expect(particlesAt([vtol([0, 0, 1], { seed })], 8).sprites.count).toBe(1);
+      expect(particlesAt([vtol([0, 0, 1], { seed })], 14).sprites.count).toBe(
+        0,
+      );
+    }
+  });
+
+  it("glows by its heat with the heat cloud bitmap and almost no alpha", () => {
+    const { sprites } = particlesAt([vtol([0, 0, 1])], 0);
+    expect(sprites.bitmaps[0]).toBe(BITMAP_HEATCLOUD);
+    expect(sprites.colors[3]).toBeCloseTo(1 / 255, 6);
+    expect(sprites.colors[0]).toBeGreaterThanOrEqual(229 / 255 - 1e-6);
+    expect(sprites.colors[0]).toBeLessThanOrEqual(238 / 255 + 1e-6);
+  });
+});
+
+function wake(dir: Vec3, overrides: Partial<WakeEmission> = {}): WakeEmission {
+  return {
+    kind: "wake",
+    birth: 0,
+    at: [0, 20, 0],
+    dir,
+    reverse: false,
+    seed: 11,
+    ...overrides,
+  };
+}
+
+describe("sfx wake", () => {
+  it("lies flat on the ground, whatever height it was emitted at", () => {
+    const { sprites } = particlesAt([wake([1, 0, 0])], 0);
+    expect(sprites.count).toBe(1);
+    expect(sprites.centers[1]).toBe(WAKE_LIFT);
+    expect(sprites.bitmaps[0]).toBe(BITMAP_WAKE);
+    const axis = Array.from(sprites.axes.slice(0, 3));
+    const side = Array.from(sprites.sides.slice(0, 3));
+    expect(axis[1]).toBe(0);
+    expect(side[1]).toBe(0);
+    expect(Math.hypot(...axis)).toBeCloseTo(1, 6);
+    expect(Math.hypot(...side)).toBeCloseTo(1, 6);
+    expect(axis[0] * side[0] + axis[2] * side[2]).toBeCloseTo(0, 6);
+    expect(sprites.halfLengths[0]).toBe(sprites.halfSizes[0]);
+  });
+
+  it("starts 6 to 10 elmos across and grows 0.15 to 0.45 a frame", () => {
+    const { halfSizes } = particlesAt([wake([1, 0, 0])], 0).sprites;
+    expect(halfSizes[0]).toBeGreaterThanOrEqual(6.15 - 1e-6);
+    expect(halfSizes[0]).toBeLessThanOrEqual(10.45 + 1e-6);
+  });
+
+  it("fades up over four frames, then out, with the same value in every channel", () => {
+    const alphas = Array.from({ length: 8 }, (_, k) => {
+      const { colors } = particlesAt([wake([1, 0, 0])], k).sprites;
+      expect(colors[0]).toBe(colors[3]);
+      return colors[3];
+    });
+    for (let k = 1; k < 4; k++)
+      expect(alphas[k]).toBeGreaterThan(alphas[k - 1]);
+    for (let k = 4; k < 8; k++) expect(alphas[k]).toBeLessThan(alphas[k - 1]);
+  });
+
+  it("lasts until its alpha runs out at 0.004 a frame", () => {
+    for (let seed = 0; seed < 20; seed++) {
+      expect(particlesAt([wake([1, 0, 0], { seed })], 70).sprites.count).toBe(
+        1,
+      );
+      expect(particlesAt([wake([1, 0, 0], { seed })], 130).sprites.count).toBe(
+        0,
+      );
+    }
+  });
+
+  it("drifts 0.4 elmos a frame along the emit direction, or back along it in reverse", () => {
+    const dir: Vec3 = [0.6, 0.8, 0];
+    const ahead = particlesAt([wake(dir)], 49).sprites.centers[0];
+    const behind = particlesAt([wake(dir, { reverse: true })], 49).sprites
+      .centers[0];
+    expect(Math.abs(ahead - 50 * 0.4 * 0.6)).toBeLessThanOrEqual(2 + 1e-4);
+    expect(Math.abs(behind + 50 * 0.4 * 0.6)).toBeLessThanOrEqual(2 + 1e-4);
   });
 });
