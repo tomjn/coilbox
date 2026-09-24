@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BITMAP_LASER,
+  BITMAP_LASER_END,
   BITMAP_MUZZLE_FLAME,
   BITMAP_SMOKE,
   DEFAULT_FLAME_SIZE,
@@ -259,7 +260,7 @@ const tracer: TracerEmission = {
 describe("the tracer", () => {
   it("draws an outer bolt and a thinner core, both the laser bitmap, along the path", () => {
     const { sprites } = particlesAt([tracer], 22);
-    expect(sprites.count).toBe(2);
+    expect(sprites.count).toBe(6);
     for (let i = 0; i < 2; i++) {
       expect(sprites.bitmaps[i]).toBe(BITMAP_LASER);
       expect(sprites.axes[i * 3]).toBeCloseTo(0);
@@ -267,6 +268,27 @@ describe("the tracer", () => {
       expect(sprites.axes[i * 3 + 2]).toBeCloseTo(1);
     }
     expect(sprites.halfSizes[0]).toBeGreaterThan(sprites.halfSizes[1]);
+  });
+
+  it("draws a camera-facing end cap at the head and the tail, using the laser end bitmap", () => {
+    const { sprites } = particlesAt([tracer], 22);
+    const k = 2;
+    const head = Math.min(k * 10, 100);
+    const tail = Math.max(head - 40, 0);
+    // Caps are indices 2 to 5: an outer and a core quad at the head, then the
+    // same pair at the tail, matching `LaserProjectile.cpp`'s own order.
+    for (let i = 2; i < 6; i++) {
+      expect(sprites.bitmaps[i]).toBe(BITMAP_LASER_END);
+      // Billboarded, not stretched along the bolt's axis.
+      expect(Array.from(sprites.axes.slice(i * 3, i * 3 + 3))).toEqual([
+        0, 0, 0,
+      ]);
+      expect(sprites.halfLengths[i]).toBe(0);
+    }
+    expect(sprites.centers[2 * 3 + 2]).toBeCloseTo(head);
+    expect(sprites.centers[4 * 3 + 2]).toBeCloseTo(tail);
+    expect(sprites.halfSizes[2]).toBeGreaterThan(sprites.halfSizes[3]);
+    expect(sprites.halfSizes[4]).toBeGreaterThan(sprites.halfSizes[5]);
   });
 
   it("stretches from the clamped tail to the clamped head, centred between them", () => {
@@ -284,7 +306,7 @@ describe("the tracer", () => {
 
   it("starts at the muzzle on its birth frame, before it has travelled", () => {
     const { sprites } = particlesAt([tracer], 20);
-    expect(sprites.count).toBe(2);
+    expect(sprites.count).toBe(6);
     expect(sprites.centers[2]).toBeCloseTo(0);
     expect(sprites.halfLengths[0]).toBeCloseTo(0);
   });

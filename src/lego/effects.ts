@@ -73,7 +73,8 @@ export interface Sprites {
   halfSizes: Float32Array;
   /** Four per sprite, RGBA from 0 to 1, multiplied by the bitmap. */
   colors: Float32Array;
-  /** One per sprite: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`, or `BITMAP_SMOKE + n`. */
+  /** One per sprite: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`, `BITMAP_LASER_END`,
+   *  or `BITMAP_SMOKE + n`. */
   bitmaps: Float32Array;
   /** Three per sprite, a world-space unit direction, zero for an ordinary
    *  billboard. Only a stretched sprite such as the tracer's bolt sets it. */
@@ -94,10 +95,12 @@ export interface Particles {
   sprites: Sprites;
 }
 
-/** Which bitmap a sprite draws, `CMuzzleFlame::Draw`'s three textures. */
+/** Which bitmap a sprite draws, `CMuzzleFlame::Draw`'s three textures, plus
+ *  the laser's own end cap texture. */
 export const BITMAP_MUZZLE_FLAME = 0;
 export const BITMAP_LASER = 1;
-export const BITMAP_SMOKE = 2;
+export const BITMAP_LASER_END = 2;
+export const BITMAP_SMOKE = 3;
 
 /** `CMuzzleFlame`'s size with the weapon def's defaults: area of effect 8
  *  stored as 4 (`WeaponDef.cpp:71`) and damage 1 (`WeaponDef.cpp:417`), fed
@@ -342,12 +345,35 @@ function flameSprites(
   }
 }
 
+/** A camera-facing quad at one end of the bolt, drawn the way
+ *  `CLaserProjectile::Draw` draws its `texture2` end cap: at the outer `size`
+ *  and the core `coresize`, in the outer and core colours
+ *  (`LaserProjectile.cpp:243-260,279-295`). Billboarded rather than stretched,
+ *  so `axis` and `halfLength` are left at zero. */
+function tracerEndCap(center: Vec3, out: SpriteArrays): void {
+  out.centers.push(...center);
+  out.halfSizes.push(TRACER_THICKNESS);
+  out.colors.push(...TRACER_OUTER_COLOR);
+  out.bitmaps.push(BITMAP_LASER_END);
+  out.axes.push(0, 0, 0);
+  out.halfLengths.push(0);
+
+  out.centers.push(...center);
+  out.halfSizes.push(TRACER_CORE_THICKNESS);
+  out.colors.push(...TRACER_CORE_COLOR);
+  out.bitmaps.push(BITMAP_LASER_END);
+  out.axes.push(0, 0, 0);
+  out.halfLengths.push(0);
+}
+
 /** A preview tracer's bolt on one frame, drawn as `CLaserProjectile::Draw`
  *  draws a laser: one quad stretched from `tail` to `head` along the shot's
- *  path, plus a thinner core quad over it. `head` is how far the tracer has
- *  travelled and `tail` is `TRACER_LENGTH` behind it, both clamped to the run
- *  from the muzzle to the target. Nothing is drawn once the raw, unclamped
- *  tail has passed the target, or before the emission's birth frame. */
+ *  path, plus a thinner core quad over it, and a camera-facing end cap quad
+ *  at each end (`LaserProjectile.cpp:243-260,279-295`, the `texture2` branch).
+ *  `head` is how far the tracer has travelled and `tail` is `TRACER_LENGTH`
+ *  behind it, both clamped to the run from the muzzle to the target. Nothing
+ *  is drawn once the raw, unclamped tail has passed the target, or before the
+ *  emission's birth frame. */
 function tracerSprites(
   emission: TracerEmission,
   frame: number,
@@ -391,6 +417,19 @@ function tracerSprites(
   out.bitmaps.push(BITMAP_LASER);
   out.axes.push(...dir);
   out.halfLengths.push(halfLength);
+
+  const headPos: Vec3 = [
+    emission.at[0] + dir[0] * head,
+    emission.at[1] + dir[1] * head,
+    emission.at[2] + dir[2] * head,
+  ];
+  const tailPos: Vec3 = [
+    emission.at[0] + dir[0] * tail,
+    emission.at[1] + dir[1] * tail,
+    emission.at[2] + dir[2] * tail,
+  ];
+  tracerEndCap(headPos, out);
+  tracerEndCap(tailPos, out);
 }
 
 export function particlesAt(

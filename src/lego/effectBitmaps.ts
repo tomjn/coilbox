@@ -22,7 +22,12 @@ import * as THREE from "three";
 import { unitsyncArchiveExtract, unitsyncLuaExec } from "@/content/bindings";
 import { primeScan } from "@/content/config";
 import { legoBitmapPng } from "./bindings";
-import { BITMAP_LASER, BITMAP_MUZZLE_FLAME, BITMAP_SMOKE } from "./effects";
+import {
+  BITMAP_LASER,
+  BITMAP_LASER_END,
+  BITMAP_MUZZLE_FLAME,
+  BITMAP_SMOKE,
+} from "./effects";
 import type { EffectsAtlas } from "./pages/components/effectsLayer";
 
 /** The Lua that finds and reads the bitmaps, run with the game mounted. */
@@ -38,7 +43,7 @@ end
 -- The engine reads gamedata/resources.lua through the game and the base
 -- content under it (ProjectileDrawer.cpp:98). With neither, these are the
 -- base content's defaults (springcontent/gamedata/resources.lua:97-112).
-local textures = { explo = 'explo.tga', laserfalloff = 'laserfalloff.tga' }
+local textures = { explo = 'explo.tga', laserfalloff = 'laserfalloff.tga', laserend = 'laserend.tga' }
 local smoke = nil
 if VFS.FileExists('gamedata/resources.lua') then
   local ok, res = pcall(VFS.Include, 'gamedata/resources.lua')
@@ -66,6 +71,7 @@ end
 
 add('muzzleflame', field(textures, 'muzzleflametexture') or field(textures, 'explo'))
 add('laserfalloff', field(textures, 'laserfalloff'))
+add('laserend', field(textures, 'laserend'))
 if type(smoke) == 'table' and #smoke > 0 then
   for i = 1, #smoke do add('smoke' .. i, smoke[i]) end
 else
@@ -120,11 +126,12 @@ export function parseBitmaps(result: string | undefined): BitmapFile[] {
   return out;
 }
 
-/** The atlas slot a key goes in: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`, or
- *  `BITMAP_SMOKE + n - 1` for smoke n. */
+/** The atlas slot a key goes in: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`,
+ *  `BITMAP_LASER_END`, or `BITMAP_SMOKE + n - 1` for smoke n. */
 export function slotOf(key: string): number {
   if (key === "muzzleflame") return BITMAP_MUZZLE_FLAME;
   if (key === "laserfalloff") return BITMAP_LASER;
+  if (key === "laserend") return BITMAP_LASER_END;
   const smoke = /^smoke(\d+)$/.exec(key);
   if (smoke) return BITMAP_SMOKE + Number(smoke[1]) - 1;
   return -1;

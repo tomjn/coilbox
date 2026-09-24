@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { BITMAP_LASER, BITMAP_MUZZLE_FLAME, BITMAP_SMOKE } from "./effects";
+import {
+  BITMAP_LASER,
+  BITMAP_LASER_END,
+  BITMAP_MUZZLE_FLAME,
+  BITMAP_SMOKE,
+} from "./effects";
 
 vi.mock("@tauri-apps/api/path", () => ({
   tempDir: vi.fn().mockResolvedValue("/tmp"),
@@ -48,6 +53,7 @@ describe("slotOf", () => {
   it("puts each bitmap in its atlas slot", () => {
     expect(slotOf("muzzleflame")).toBe(BITMAP_MUZZLE_FLAME);
     expect(slotOf("laserfalloff")).toBe(BITMAP_LASER);
+    expect(slotOf("laserend")).toBe(BITMAP_LASER_END);
     expect(slotOf("smoke1")).toBe(BITMAP_SMOKE);
     expect(slotOf("smoke3")).toBe(BITMAP_SMOKE + 2);
   });
@@ -99,7 +105,11 @@ describe("packShelves", () => {
 /** One resources.lua result with every key present but the laser bitmap
  *  named nothing, the shape a game with no `laserfalloff.tga` sends back. */
 function quotedResult(): string {
-  const entries = ["muzzleflame|explo.tga|1", "laserfalloff|laserfalloff.tga|"];
+  const entries = [
+    "muzzleflame|explo.tga|1",
+    "laserfalloff|laserfalloff.tga|",
+    "laserend|laserend.tga|1",
+  ];
   for (let i = 1; i <= 12; i++) entries.push(`smoke${i}|smoke${i}.tga|1`);
   const escaped = entries.join(";").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;
