@@ -1645,8 +1645,13 @@ fn install_spring(
                 );
                 return Ok((Some(0.0), Some(0.0), Some(0.0)));
             };
+            let awaiting_build = sim.model.awaiting_build;
             Ok(match unitvalue::who(asked, &world) {
                 unitvalue::Who::Own(_) => (Some(0.0), Some(0.0), Some(0.0)),
+                // The buildee does not exist until the script reaches build
+                // stance, so it answers as for a unit that is not there, the
+                // way `unitvalue::world` already does.
+                unitvalue::Who::StandIn(_) if awaiting_build => (None, None, None),
                 unitvalue::Who::StandIn(stand_in) => {
                     match sim.model.passenger.at().or(stand_in.pos) {
                         Some([x, y, z]) => (Some(x), Some(y), Some(z)),
@@ -2005,8 +2010,13 @@ fn unit_size(sim: &Rc<RefCell<Sim>>, asked_by: &str, id: Option<i64>) -> Option<
         ));
         return None;
     };
+    let awaiting_build = sim.model.awaiting_build;
     match unitvalue::who(id.unwrap_or(i64::from(unitvalue::UNIT_ID)), &world) {
         unitvalue::Who::Own(own) => Some((own.radius, own.height)),
+        // The buildee does not exist until the script reaches build stance,
+        // so it answers as for a unit that is not there, the way
+        // `unitvalue::world` already does.
+        unitvalue::Who::StandIn(_) if awaiting_build => None,
         unitvalue::Who::StandIn(stand_in) => Some((stand_in.radius, stand_in.height)),
         unitvalue::Who::Nobody => None,
     }

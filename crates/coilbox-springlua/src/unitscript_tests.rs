@@ -3359,4 +3359,68 @@ mod engine_factory {
         assert_close(pose(&timeline, 1, "base")[2], 0.0);
         assert_close(pose(&timeline, 4, "turret")[2], 3.0);
     }
+
+    /// The same hiding as above, through the `Spring.*` calls a Lua transport
+    /// uses instead of `GetUnitValue`: `GetUnitPosition`, `GetUnitHeight` and
+    /// `GetUnitRadius` answer as for a unit that is not there while a factory
+    /// awaits build stance, and for real once building has started.
+    #[test]
+    fn hides_the_stand_in_from_spring_calls_while_awaiting_build_stance() {
+        let script = r#"
+            local base = piece("base")
+            function script.Activate()
+                Sleep(33)
+                SetUnitValue(COB.INBUILDSTANCE, true)
+            end
+            function script.ProbeBefore()
+                if Spring.GetUnitPosition(2) ~= nil then error("found a position") end
+                if Spring.GetUnitHeight(2) ~= nil then error("found a height") end
+                if Spring.GetUnitRadius(2) ~= nil then error("found a radius") end
+            end
+            function script.ProbeAfter()
+                local _, _, z = Spring.GetUnitPosition(2)
+                Move(base, z_axis, z)
+            end
+        "#;
+        let world = Some(scene(Some([0.0, 3.0, 84.0])));
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            ScriptEvent {
+                frame: 1,
+                callin: "ProbeBefore".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: world.clone(),
+                engine: None,
+            },
+            ScriptEvent {
+                frame: 4,
+                callin: "ProbeAfter".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world,
+                engine: None,
+            },
+        ];
+        let timeline = run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            6,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [2]);
+        // A thread that errors takes only itself down, so a wrongly answered
+        // position shows up as a note rather than `timeline.error`.
+        assert!(
+            !timeline.warnings.iter().any(|w| w.contains("found a")),
+            "{:?}",
+            timeline.warnings
+        );
+        assert_close(pose(&timeline, 4, "base")[2], 84.0);
+    }
 }
