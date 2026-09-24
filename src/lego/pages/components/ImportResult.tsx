@@ -649,53 +649,50 @@ function Imported({
   details.push(stage.refused);
 
   return (
-    <>
-      <section className="flex flex-col gap-2 border-t border-border/60 pt-4">
-        <h3 className="text-sm font-medium">Model</h3>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-          <dt className="text-muted-foreground">Pieces</dt>
-          <dd>
-            {project.pieces.length}, {meshes} with geometry
-          </dd>
-          <dt className="text-muted-foreground">Size</dt>
-          <dd>
-            {triangles.toLocaleString()} triangles, {vertices.toLocaleString()}{" "}
-            vertices, {Math.max(1, Math.round(bytes / 1024)).toLocaleString()}{" "}
-            KiB
-          </dd>
-          <dt className="text-muted-foreground">Texture</dt>
-          <dd className="min-w-0">
-            {imported?.texture ? (
-              <code className="break-all">{imported.texture.name}</code>
-            ) : imported?.missingTexture ? (
-              <span className="text-amber-500">
-                <code className="break-all">{imported.missingTexture}</code> was
-                not found, so it opens untextured
-              </span>
-            ) : (
-              <span className="text-muted-foreground">
-                None named, so it opens untextured
-              </span>
-            )}
-          </dd>
-        </dl>
-        <Collapsible>
-          <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <ChevronRight
-              className="size-3.5 transition-transform group-data-[state=open]:rotate-90"
-              aria-hidden
-            />
-            Import details
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-xs text-muted-foreground">
-              {details.map((detail) => (
-                <li key={detail}>{detail}</li>
-              ))}
-            </ul>
-          </CollapsibleContent>
-        </Collapsible>
-      </section>
-    </>
+    <section className="flex flex-col gap-2 border-t border-border/60 pt-4">
+      <h3 className="text-sm font-medium">Model</h3>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+        <dt className="text-muted-foreground">Pieces</dt>
+        <dd>
+          {project.pieces.length}, {meshes} with geometry
+        </dd>
+        <dt className="text-muted-foreground">Size</dt>
+        <dd>
+          {triangles.toLocaleString()} triangles, {vertices.toLocaleString()}{" "}
+          vertices, {Math.max(1, Math.round(bytes / 1024)).toLocaleString()} KiB
+        </dd>
+        <dt className="text-muted-foreground">Texture</dt>
+        <dd className="min-w-0">
+          {imported?.texture ? (
+            <code className="break-all">{imported.texture.name}</code>
+          ) : imported?.missingTexture ? (
+            <span className="text-amber-500">
+              <code className="break-all">{imported.missingTexture}</code> was
+              not found, so it opens untextured
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              None named, so it opens untextured
+            </span>
+          )}
+        </dd>
+      </dl>
+      <Collapsible>
+        <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <ChevronRight
+            className="size-3.5 transition-transform group-data-[state=open]:rotate-90"
+            aria-hidden
+          />
+          Import details
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-xs text-muted-foreground">
+            {details.map((detail) => (
+              <li key={detail}>{detail}</li>
+            ))}
+          </ul>
+        </CollapsibleContent>
+      </Collapsible>
+    </section>
   );
 }
