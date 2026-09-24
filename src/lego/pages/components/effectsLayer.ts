@@ -276,6 +276,9 @@ export function buildEffectsLayer(): EffectsLayer {
     blendDst: THREE.OneMinusSrcAlphaFactor,
     depthTest: true,
     depthWrite: false,
+    // A wake lies flat with its front face pointing down, so a camera above
+    // the ground sees its back. Sprites that turn to the camera are unaffected.
+    side: THREE.DoubleSide,
     uniforms: {
       atlas: { value: atlasTexture },
     },

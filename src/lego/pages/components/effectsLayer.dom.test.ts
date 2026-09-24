@@ -153,6 +153,14 @@ describe("the sprite mesh", () => {
     expect(material.depthWrite).toBe(false);
   });
 
+  /** A wake lies flat with its front face down, so a camera above the
+   *  ground sees its back. */
+  it("draws both faces, so a sprite lying flat shows from above", () => {
+    const material = buildEffectsLayer().sprites
+      .material as THREE.ShaderMaterial;
+    expect(material.side).toBe(THREE.DoubleSide);
+  });
+
   it("draws as many sprites as it is given, growing past its first size", () => {
     const layer = buildEffectsLayer();
     layer.update(withSprites(3, 0));
