@@ -3559,4 +3559,51 @@ mod engine_fire {
             2
         );
     }
+
+    /// Most real units define the plain call-ins, not the numbered ones. The
+    /// engine calls `script.FireWeapon(n)`, `script.Shot(n)` and
+    /// `script.QueryWeapon(n)` with the weapon number as the first argument,
+    /// and only falls back to `FireWeapon1` and friends when the plain form
+    /// is missing (`LuaUnitScript.cpp:850-883,1018`).
+    #[test]
+    fn plain_call_ins_take_the_weapon_number_and_win_over_numbered_ones() {
+        let timeline = fired(
+            r#"
+            local turret, barrel = piece("turret", "barrel")
+            local flared = false
+            function script.FireWeapon(num)
+                if num == 1 then Spring.UnitScript.ShowFlare(turret) end
+            end
+            function script.Shot(num)
+                if num == 2 then Spring.UnitScript.ShowFlare(barrel) end
+            end
+            function script.QueryWeapon(num)
+                if num == 1 then return turret end
+                return barrel
+            end
+            "#,
+            &[fire(5, 1.0), fire(6, 2.0)],
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "turret".into()
+        }));
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 6,
+            piece: "barrel".into()
+        }));
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("turret".into())
+        }));
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 6,
+            weapon: 2,
+            piece: Some("barrel".into())
+        }));
+    }
 }

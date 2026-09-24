@@ -782,10 +782,12 @@ impl Run {
     /// (`Weapon.cpp:509-511,590-595`, `LuaUnitScript.cpp:878-883,1018`).
     fn fire(&mut self, weapon: u32) -> Result<(), String> {
         let queued_at = self.runners.len();
-        self.start_callin(&format!("FireWeapon{weapon}"), Vec::new())?;
+        let (callin, args) = self.numbered_callin("FireWeapon", weapon);
+        self.start_callin(&callin, args)?;
         self.tick_queued_call_ins(queued_at)?;
         let queued_at = self.runners.len();
-        self.start_callin(&format!("Shot{weapon}"), Vec::new())?;
+        let (callin, args) = self.numbered_callin("Shot", weapon);
+        self.start_callin(&callin, args)?;
         self.tick_queued_call_ins(queued_at)?;
         let piece = self.weapon_piece(weapon);
         let mut sim = self.sim.borrow_mut();
@@ -799,17 +801,40 @@ impl Run {
     fn weapon_piece(&mut self, weapon: u32) -> Option<usize> {
         let count = self.sim.borrow().model.pieces.len();
         let valid = |piece: i64| usize::try_from(piece).ok().filter(|index| *index < count);
-        valid(self.ask_piece(&format!("QueryWeapon{weapon}")))
-            .or_else(|| valid(self.ask_piece(&format!("AimFromWeapon{weapon}"))))
+        let (callin, args) = self.numbered_callin("QueryWeapon", weapon);
+        valid(self.ask_piece(&callin, args)).or_else(|| {
+            let (callin, args) = self.numbered_callin("AimFromWeapon", weapon);
+            valid(self.ask_piece(&callin, args))
+        })
+    }
+
+    /// The call-in a weapon's stem fires: the plain name with the weapon
+    /// number as its one argument when the script defines it, else the older
+    /// `<Stem><n>` name with none. The engine calls the plain name first,
+    /// counting the weapon from one, and only builds a dispatcher over the
+    /// numbered names when the plain one is missing and `AimWeapon1` exists
+    /// (`LuaUnitScript.cpp:850-883,1018`).
+    fn numbered_callin(&self, stem: &str, weapon: u32) -> (String, Vec<Value>) {
+        let has_plain = self
+            .script
+            .get::<Option<Function>>(stem)
+            .ok()
+            .flatten()
+            .is_some();
+        if has_plain {
+            (stem.to_string(), vec![Value::Number(f64::from(weapon))])
+        } else {
+            (format!("{stem}{weapon}"), Vec::new())
+        }
     }
 
     /// Ask a call-in that answers with a piece, as `RunQueryCallIn` does: a
     /// piece counted from one out, less one, or -1 when it is missing, fails
     /// or answers nothing (`LuaUnitScript.cpp:505-519`).
-    fn ask_piece(&mut self, callin: &str) -> i64 {
+    fn ask_piece(&mut self, callin: &str, args: Vec<Value>) -> i64 {
         let function: Option<Function> = self.script.get(callin).ok().flatten();
         let Some(function) = function else { return -1 };
-        match function.call::<Option<f64>>(()) {
+        match function.call::<Option<f64>>(MultiValue::from_iter(args)) {
             Ok(Some(piece)) => piece as i64 - 1,
             Ok(None) => -1,
             Err(error) => {
