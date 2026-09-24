@@ -332,6 +332,22 @@ export const STAND_IN_UNIT_ID = 2;
  *  unit. */
 const STAND_OFF = 5;
 
+/** Seconds between shots in the firing scenario's volleys, set by eye rather
+ *  than read from a unit def. The weapon's real reload time lives in
+ *  `reloadtime` in its unit def, which the preview does not read yet. */
+const FIRE_INTERVAL_S = 0.5;
+
+/** A `fire` call-in every `FIRE_INTERVAL_S` from `startS` to `endS`
+ *  inclusive, for a scenario that holds the stand-in still while it fires. */
+function fireVolley(startS: number, endS: number): ScriptEvent[] {
+  const shots = Math.round((endS - startS) / FIRE_INTERVAL_S) + 1;
+  return Array.from({ length: shots }, (_, index) => ({
+    frame: at(startS + index * FIRE_INTERVAL_S),
+    engine: "fire" as const,
+    args: [1],
+  }));
+}
+
 /**
  * What a preview can put a unit through.
  *
@@ -489,7 +505,8 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "firing",
     label: "Aiming and firing",
-    description: "Aims one way, fires, aims the other, fires again.",
+    description:
+      "Aims one way and fires a volley, then aims the other way and fires again.",
     events: [
       ...CREATED,
       // Aimed at the stand-in rather than at two numbers, and measured from
@@ -500,13 +517,16 @@ export const SCENARIOS: Scenario[] = [
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(4), engine: "fire", args: [1] },
+      // The stand-in holds its first spot until at(4), so the volley fires
+      // while aim is settled rather than mid-turn.
+      ...fireVolley(1, 4),
       {
         frame: at(6),
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(9.5), engine: "fire", args: [1] },
+      // The stand-in holds its second spot from at(6) to at(10).
+      ...fireVolley(7, 10),
     ],
     // Off the ground and well out, so the second aim differs from the first in
     // pitch as well as heading and a barrel that only turns is obvious.

@@ -150,9 +150,15 @@ describe("scenarios", () => {
   it("fires weapon 1 through the engine in the firing scenario", () => {
     const firing = SCENARIOS.find((scenario) => scenario.id === "firing");
     const fires = firing?.events.filter((event) => event.engine === "fire");
+    const firstVolley = [1, 1.5, 2, 2.5, 3, 3.5, 4].map(
+      (seconds) => [at(seconds), [1]] as const,
+    );
+    const secondVolley = [7, 7.5, 8, 8.5, 9, 9.5, 10].map(
+      (seconds) => [at(seconds), [1]] as const,
+    );
     expect(fires?.map((event) => [event.frame, event.args])).toEqual([
-      [at(4), [1]],
-      [at(9.5), [1]],
+      ...firstVolley,
+      ...secondVolley,
     ]);
     expect(firing?.events.some((event) => event.callin === "Shot1")).toBe(
       false,
