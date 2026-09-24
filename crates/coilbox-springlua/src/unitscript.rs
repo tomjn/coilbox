@@ -676,11 +676,14 @@ impl Run {
     /// call-in, so a caller can decide what that means to it.
     ///
     /// `callin` may be a numbered weapon call-in such as `AimWeapon1`, the
-    /// name every event carries. The engine calls a weapon's plain call-in
+    /// name every event carries. The gadget calls a weapon's plain call-in
     /// first, with the weapon number prepended to its own arguments, and only
     /// dispatches to the numbered name when the plain one is missing
-    /// (`LuaUnitScript.cpp:850-883,1018`), the same rule `numbered_callin`
-    /// applies for `FireWeapon` and `Shot`.
+    /// (`LuaGadgets/Gadgets/unit_script.lua:739-765`), the same rule
+    /// `numbered_callin` applies for `FireWeapon` and `Shot`. The gadget
+    /// decides this once for every stem, keyed on whether the script defines
+    /// a plain `AimWeapon` or `AimShield`. Here it is decided per call-in
+    /// instead.
     fn start_callin(&mut self, callin: &str, args: Vec<Value>) -> Result<bool, String> {
         let (callin, args) = match numbered_weapon_callin(callin) {
             Some((stem, weapon)) => self.weapon_callin(stem, weapon, args),
@@ -848,10 +851,12 @@ impl Run {
     /// The call-in a weapon's stem fires, with `args` besides the weapon
     /// number: the plain name with the weapon number prepended to `args` when
     /// the script defines it, else the older `<Stem><n>` name with `args`
-    /// unchanged. The engine calls the plain name first, counting the weapon
+    /// unchanged. The gadget calls the plain name first, counting the weapon
     /// from one, and only builds a dispatcher over the numbered names when the
     /// plain one is missing and `AimWeapon1` exists
-    /// (`LuaUnitScript.cpp:850-883,1018`).
+    /// (`LuaGadgets/Gadgets/unit_script.lua:739-765`). The gadget decides this
+    /// once for every stem, keyed on `AimWeapon` or `AimShield`, where this
+    /// function decides it per call-in.
     fn weapon_callin(&self, stem: &str, weapon: u32, args: Vec<Value>) -> (String, Vec<Value>) {
         if self.has_plain(stem) {
             let mut full = vec![Value::Number(f64::from(weapon))];
@@ -1122,11 +1127,13 @@ impl Run {
     }
 }
 
-/// The stems the engine dispatches by weapon number, counted from one
-/// (`LuaUnitScript.cpp:850-883,1018`). An event or probe request naming one of
-/// these with a number on the end means the numbered call-in a script written
-/// the old way would define, and the plain call-in the engine actually calls
-/// when the script defines it.
+/// The stems the gadget dispatches by weapon number, counted from one
+/// (`LuaGadgets/Gadgets/unit_script.lua:739-765`). An event or probe request
+/// naming one of these with a number on the end means the numbered call-in a
+/// script written the old way would define, and the plain call-in the gadget
+/// actually calls when the script defines it. The gadget decides this once
+/// for every stem, keyed on `AimWeapon` or `AimShield`, where the functions
+/// above decide it per call-in.
 const NUMBERED_WEAPON_STEMS: &[&str] = &[
     "AimWeapon",
     "AimFromWeapon",
