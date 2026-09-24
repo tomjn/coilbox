@@ -274,6 +274,37 @@ export function withWorld(
 }
 
 /**
+ * The unit direction `AimWeapon`'s heading and pitch point along, which is
+ * the inverse of `aimWeaponAngles` and the engine's `wantedDir`.
+ */
+export function aimDirection(heading: number, pitch: number): Vec3 {
+  return [
+    Math.cos(pitch) * Math.sin(heading),
+    Math.sin(pitch),
+    Math.cos(pitch) * Math.cos(heading),
+  ];
+}
+
+/** Where a resolved `AimWeapon` aimed, and when. */
+export interface Aim {
+  frame: number;
+  dir: Vec3;
+}
+
+/** Every resolved `AimWeapon<n>` in a run's events, in order. A muzzle flame
+ *  faces the latest one (`Weapon.cpp:509-510`). */
+export function aimsOf(events: ScriptEvent[]): Aim[] {
+  const aims: Aim[] = [];
+  for (const event of events) {
+    const [heading, pitch] = event.args ?? [];
+    if (!/^AimWeapon\d+$/.test(event.callin ?? "")) continue;
+    if (typeof heading !== "number" || typeof pitch !== "number") continue;
+    aims.push({ frame: event.frame, dir: aimDirection(heading, pitch) });
+  }
+  return aims;
+}
+
+/**
  * `GetHeadingFromVectorF` in `rts/System/SpringMath.inl:38-62`.
  *
  * That function is a polynomial approximation of `atan2(dx, dz)`, written for

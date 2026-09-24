@@ -147,6 +147,18 @@ describe("scenarios", () => {
     expect(aim?.args).toBeUndefined();
   });
 
+  it("fires weapon 1 through the engine in the firing scenario", () => {
+    const firing = SCENARIOS.find((scenario) => scenario.id === "firing");
+    const fires = firing?.events.filter((event) => event.engine === "fire");
+    expect(fires?.map((event) => [event.frame, event.args])).toEqual([
+      [at(4), [1]],
+      [at(9.5), [1]],
+    ]);
+    expect(firing?.events.some((event) => event.callin === "Shot1")).toBe(
+      false,
+    );
+  });
+
   /** Every event that aims at a stand-in is in a scenario that has one, and
    *  every track's keys are inside the preview. */
   it("never aims at a stand-in a scenario does not place", () => {

@@ -65,6 +65,10 @@ export interface ScriptEvent {
    *
    * `factory-finish` stops the spray and fires `StopBuilding`, or notes that
    * the script never set stance.
+   *
+   * `fire` fires a weapon, whose number, counted from one, is `args[0]`. The
+   * runtime calls `FireWeapon`, then `Shot`, then asks `QueryWeapon` for the
+   * muzzle, on the one frame (`rts/Sim/Weapons/Weapon.cpp:509-511,590-595`).
    */
   engine?:
     | "attach"
@@ -72,7 +76,8 @@ export interface ScriptEvent {
     | "nano-start"
     | "nano-stop"
     | "factory-build"
-    | "factory-finish";
+    | "factory-finish"
+    | "fire";
 }
 
 /** The scene one frame of a script run is told about. */
@@ -98,7 +103,14 @@ export type ScriptOutput =
   | { frame: number; kind: "explode"; piece: string; flags: number }
   | { frame: number; kind: "sound"; name: string | null }
   | { frame: number; kind: "nano"; piece: string | null } // null when no piece is named yet
-  | { frame: number; kind: "build-start" }; // the frame a factory started building
+  | { frame: number; kind: "build-start" } // the frame a factory started building
+  | { frame: number; kind: "flare"; piece: string } // show inside a fire function, or ShowFlare
+  | {
+      frame: number;
+      kind: "shot";
+      weapon: number;
+      piece: string | null;
+    }; // null when neither QueryWeapon nor AimFromWeapon named a piece
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
 export interface ScriptTimeline {
@@ -488,13 +500,13 @@ export const SCENARIOS: Scenario[] = [
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(4), callin: "Shot1" },
+      { frame: at(4), engine: "fire", args: [1] },
       {
         frame: at(6),
         callin: "AimWeapon1",
         aimAtStandIn: { from: "AimFromWeapon" },
       },
-      { frame: at(9.5), callin: "Shot1" },
+      { frame: at(9.5), engine: "fire", args: [1] },
     ],
     // Off the ground and well out, so the second aim differs from the first in
     // pitch as well as heading and a barrel that only turns is obvious.

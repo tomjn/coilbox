@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   type AimContext,
+  aimDirection,
+  aimsOf,
   aimWeaponAngles,
   resolveScenario,
   startBuildingAngles,
@@ -352,5 +354,32 @@ describe("withWorld", () => {
     );
     expect(events[0].world?.standIn).toBeNull();
     expect(events[3].world?.standIn?.pos).toEqual([0, 20, -5]);
+  });
+});
+
+describe("aimDirection", () => {
+  it("undoes aimWeaponAngles", () => {
+    const from: [number, number, number] = [1, 2, 3];
+    const to: [number, number, number] = [-7, 5, 11];
+    const { heading, pitch } = aimWeaponAngles(from, to);
+    const dir = aimDirection(heading, pitch);
+    const length = Math.hypot(-8, 3, 8);
+    expect(dir[0]).toBeCloseTo(-8 / length);
+    expect(dir[1]).toBeCloseTo(3 / length);
+    expect(dir[2]).toBeCloseTo(8 / length);
+  });
+});
+
+describe("aimsOf", () => {
+  it("reads each resolved AimWeapon's direction, and nothing else", () => {
+    const aims = aimsOf([
+      { frame: 0, callin: "Create" },
+      { frame: 15, callin: "AimWeapon1", args: [0, 0] },
+      { frame: 20, callin: "StartBuilding", args: [1, 0] },
+      { frame: 30, callin: "AimWeapon2", args: [Math.PI / 2, 0] },
+    ]);
+    expect(aims.map((aim) => aim.frame)).toEqual([15, 30]);
+    expect(aims[0].dir[2]).toBeCloseTo(1);
+    expect(aims[1].dir[0]).toBeCloseTo(1);
   });
 });

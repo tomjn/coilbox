@@ -33,7 +33,12 @@ import { Switch } from "@/components/ui/switch";
 import { animCobRun } from "../../../animation/bindings";
 import { useReduceMotion } from "../../../general/display";
 import { aimPoint } from "../../aimPoint";
-import { resolveScenario, withWorld } from "../../aimResolver";
+import {
+  type Aim,
+  aimsOf,
+  resolveScenario,
+  withWorld,
+} from "../../aimResolver";
 import {
   type AppliedPreset,
   countRoles,
@@ -228,6 +233,7 @@ interface Props {
     track: StandInTrack | null;
     attachPieces: Map<string, string>;
     nano?: NanoStyle | null;
+    aims?: Aim[];
   }) => void;
 }
 
@@ -458,7 +464,12 @@ export function AnimationPanel({
         ...notes,
         ...attachNotes(scenario, named, compiled !== undefined),
       ]);
-      onStandIn({ track, attachPieces: named, nano: scenario.nano ?? null });
+      onStandIn({
+        track,
+        attachPieces: named,
+        nano: scenario.nano ?? null,
+        aims: aimsOf(events),
+      });
       const scene = withWorld(events, track, {
         radius,
         self: size,
