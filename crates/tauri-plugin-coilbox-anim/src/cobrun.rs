@@ -490,21 +490,26 @@ impl Run {
         // starts a build (`Factory.cpp:138-151`). Checked before the spraying
         // block below, so the frame the stance is seen is also the first frame
         // that sprays.
-        if self.model.awaiting_build
-            && self
+        if self.model.awaiting_build {
+            // A call-in queued later in this same frame, such as `Activate`
+            // listed after `factory-build`, needs its first tick before the
+            // stance check below, the way the engine-action path above does.
+            self.tick_queued_call_ins(start)?;
+            if self
                 .set_values
                 .get(&unitvalue::INBUILDSTANCE)
                 .copied()
                 .unwrap_or(0)
                 != 0
-        {
-            self.model.awaiting_build = false;
-            self.model.building = true;
-            self.model.spraying = true;
-            self.model.build_start(frame);
-            let queued_at = self.threads.len();
-            self.start_callin("StartBuilding", &[])?;
-            self.tick_queued_call_ins(queued_at)?;
+            {
+                self.model.awaiting_build = false;
+                self.model.building = true;
+                self.model.spraying = true;
+                self.model.build_start(frame);
+                let queued_at = self.threads.len();
+                self.start_callin("StartBuilding", &[])?;
+                self.tick_queued_call_ins(queued_at)?;
+            }
         }
         // After the frame's call-ins and before its threads, because the engine
         // updates builders before scripts tick (`rts/Game/Game.cpp:1782-1798`).

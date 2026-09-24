@@ -1665,6 +1665,25 @@ mod engine_factory {
         assert!(nano_frames(&timeline).contains(&0));
     }
 
+    /// `Factory.cpp:138-151`: `Activate` and the stance check run in the same
+    /// `Update`, whatever order the frame lists them in. A `factory-build`
+    /// event queued before `Activate` must not push the build a frame late.
+    #[test]
+    fn building_starts_the_same_frame_even_when_factory_build_is_listed_first() {
+        let bytes = build(
+            &[("Activate", activate_now()), ("StartBuilding", emits(42))],
+            PIECES,
+            0,
+        );
+        let events = vec![action(0, EngineAction::FactoryBuild), callin(0, "Activate")];
+        let timeline = run(&bytes, &model_pieces(), &events, 4, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 42), [0]);
+        assert!(nano_frames(&timeline).contains(&0));
+    }
+
     /// A script that sleeps first, standing in for an opening animation, only
     /// starts building once it actually sets the stance.
     #[test]
