@@ -137,4 +137,15 @@ describe("particlesAt", () => {
   it("draws nothing for an emission with nowhere to go", () => {
     expect(particlesAt([nano(0, { to: [0, 0, 0] })], 0).count).toBe(0);
   });
+
+  /** A long-dead emission is skipped whole, before its dots are even looped,
+   *  so it neither draws nor changes what a still-alive emission draws. */
+  it("a long-dead emission contributes nothing, however far past its death frame", () => {
+    const longDead = nano(0); // life 10, well dead by frame 903
+    const stillAlive = nano(900, { to: [9, 0, 0] }); // life 3
+    const combined = particlesAt([longDead, stillAlive], 903);
+    const aloneAlive = particlesAt([stillAlive], 903);
+    expect(combined.count).toBeGreaterThan(0);
+    expect(combined).toEqual(aloneAlive);
+  });
 });

@@ -120,13 +120,14 @@ interface NanoMotion {
 /** Where a nano particle goes and for how long, from
  *  `CProjectileHandler::AddNanoParticle` (`ProjectileHandler.cpp:686-703,724-745`). */
 function nanoMotion(emission: NanoEmission, dot: number): NanoMotion | null {
+  const life = nanoLife(emission);
+  if (life === null) return null;
   const d: Vec3 = [
     emission.to[0] - emission.at[0],
     emission.to[1] - emission.at[1],
     emission.to[2] - emission.at[2],
   ];
   const len = Math.hypot(...d);
-  if (len === 0) return null;
   const builder = emission.style === "builder";
   const jitter = (builder ? emission.radius / len : 0.15) * NANO_SPREAD;
   const pace = builder ? 3 : 1;
@@ -136,7 +137,22 @@ function nanoMotion(emission: NanoEmission, dot: number): NanoMotion | null {
     (d[1] / len + wobble[1] * jitter) * pace,
     (d[2] / len + wobble[2] * jitter) * pace,
   ];
-  return { speed, life: Math.trunc(builder ? len / 3 : len) };
+  return { speed, life };
+}
+
+/** How long a nano particle lives, in frames, from the same formula as
+ *  `nanoMotion`. Depends only on the emission, not the dot, so `particlesAt`
+ *  computes it once and skips a whole dead emission before looping its dots. */
+function nanoLife(emission: NanoEmission): number | null {
+  const d: Vec3 = [
+    emission.to[0] - emission.at[0],
+    emission.to[1] - emission.at[1],
+    emission.to[2] - emission.at[2],
+  ];
+  const len = Math.hypot(...d);
+  if (len === 0) return null;
+  const builder = emission.style === "builder";
+  return Math.trunc(builder ? len / 3 : len);
 }
 
 /** A TA nano dot's colour: the nano colour, a little brighter or darker, and
@@ -157,6 +173,8 @@ export function particlesAt(emissions: Emission[], frame: number): Particles {
   for (const emission of emissions) {
     const age = frame - emission.birth;
     if (age < 0) continue;
+    const life = nanoLife(emission);
+    if (life === null || age >= life + (emission.span ?? 1)) continue;
     for (let dot = 0; dot < NANO_DOTS_PER_FRAME; dot++) {
       const motion = nanoMotion(emission, dot);
       if (!motion) continue;
