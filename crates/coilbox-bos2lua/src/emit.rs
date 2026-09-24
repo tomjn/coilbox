@@ -7,10 +7,14 @@
 //! BOS's units, and a condition tests `~= 0` rather than trusting Lua, where 0
 //! is true.
 //!
-//! Pieces are the one exception. A piece in Lua is the number `piece()` hands
-//! out, counted from one, and the Lua holds that number everywhere a BOS script
-//! held the piece, so a query call-in returns it as it is. The few unit values
-//! that take a piece get it counted from zero, as the engine wants.
+//! Pieces are converted where they meet the engine too. A piece used as a value
+//! is COB's number for it, where the script declares it counted from zero. A
+//! number used as a piece looks it up in `PIECES`, the declared pieces in that
+//! order, because `piece()` numbers them in the model's order, from one. A
+//! piece named outright stays the `piece()` number, so a query call-in whose
+//! every answer is a name returns it as it is. The few unit values and gadget
+//! calls that take a piece get the model's number, counted from zero, as the
+//! engine numbers a Lua script's pieces.
 
 use crate::parse::{self, Axis, Comment, Expr, Func, Item, ItemKind, Stmt, StmtKind};
 use crate::pp::{self, Output as Pre};
@@ -118,6 +122,11 @@ const RESERVED: &[&str] = &[
 
 /// Lua 5.1's limits, as the engine builds it (`luaconf.h`).
 const MAX_UPVALUES: usize = 60;
+
+/// The table of the script's pieces in the order it declares them, which a
+/// piece given as a number indexes.
+const PIECES: &str = "PIECES";
+
 /// One frame at the engine's 30 a second, in milliseconds, which is how much
 /// sooner Lua's `Sleep` wakes than COB's.
 const SLEEP_FRAME: u32 = 33;
@@ -528,6 +537,10 @@ struct Program<'a> {
     options: &'a Options<'a>,
     /// Lower-cased BOS name to (Lua name, the name `piece()` is asked for).
     pieces: Vec<(String, String, String)>,
+    /// Every piece the script declares, in its order, which is how COB numbers
+    /// them: lower-cased BOS name and the model's name, or none for a piece the
+    /// model does not have. Kept whole when unused pieces are left out.
+    declared: Vec<(String, Option<String>)>,
     statics: Vec<(String, String)>,
     funcs: HashMap<String, FuncInfo>,
     /// BOS function names in the order they are defined.
@@ -818,6 +831,7 @@ impl<'a> Program<'a> {
             pre,
             options,
             pieces: Vec::new(),
+            declared: Vec::new(),
             statics: Vec::new(),
             funcs: HashMap::new(),
             func_order: Vec::new(),
@@ -862,6 +876,9 @@ impl<'a> Program<'a> {
                             }
                             None => name.clone(),
                         };
+                        let known = !piece_warnings.contains_key(&name.to_lowercase());
+                        p.declared
+                            .push((name.to_lowercase(), known.then(|| model.clone())));
                         p.pieces.push((name.to_lowercase(), lua, model));
                     }
                 }
@@ -1167,6 +1184,10 @@ struct Writer<'p, 'a> {
     /// lower-cased. Those hold Lua's number for the piece, so the answer reads
     /// `return flare` rather than a sum.
     piece_out: HashSet<String>,
+    /// Whether anything reads `PIECES`.
+    pieces_table: bool,
+    /// Where in `out` the last `piece` line ends, which is where `PIECES` goes.
+    pieces_at: Option<usize>,
     /// Something to say at the end of the line being written.
     note: Option<String>,
     warnings: Vec<Warning>,
@@ -1180,7 +1201,8 @@ struct Writer<'p, 'a> {
 }
 
 impl<'p, 'a> Writer<'p, 'a> {
-    const HELPER_NAMES: [&'static str; 8] = [
+    const HELPER_NAMES: [&'static str; 9] = [
+        PIECES,
         "COB_ANGLE",
         "COB_LINEAR",
         "trunc",
@@ -1207,6 +1229,8 @@ impl<'p, 'a> Writer<'p, 'a> {
             worst_refs: 0,
             ret: None,
             piece_out: HashSet::new(),
+            pieces_table: false,
+            pieces_at: None,
             note: None,
             warnings: p.warnings.clone(),
             warned: HashSet::new(),
@@ -1229,7 +1253,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             + if self.mode.pieces_global {
                 0
             } else {
-                self.p.pieces.len()
+                self.p.pieces.len() + usize::from(self.pieces_table)
             }
             + if self.mode.statics_global {
                 0
@@ -1247,6 +1271,15 @@ impl<'p, 'a> Writer<'p, 'a> {
         );
         if self.sleeps {
             lua.push_str(&format!("\n-- A COB thread wakes once its sleep has passed, a frame later than Lua's\n-- Sleep wakes, so every Sleep here is {SLEEP_FRAME} milliseconds longer than the BOS's.\n"));
+        }
+        let mut out = self.out.clone();
+        if self.pieces_table {
+            let at = self.pieces_at.unwrap_or(0);
+            let mut table = self.pieces_table_text();
+            if !out[at..].starts_with('\n') {
+                table.push('\n');
+            }
+            out.insert_str(at, &table);
         }
         let helpers = &self.helpers;
         if helpers.contains("COB_ANGLE") || helpers.contains("COB_LINEAR") {
@@ -1270,10 +1303,10 @@ impl<'p, 'a> Writer<'p, 'a> {
         if helpers.contains("cobAllied") {
             lua.push_str(SHARED_VALUES);
         }
-        if (!helpers.is_empty() || self.sleeps) && !self.out.starts_with('\n') {
+        if (!helpers.is_empty() || self.sleeps) && !out.starts_with('\n') {
             lua.push('\n');
         }
-        lua.push_str(&self.out);
+        lua.push_str(&out);
         if !self.adapters.is_empty() {
             lua.push_str("\n-- The engine's call-ins, handed on to the functions above.\n");
             for a in &self.adapters {
@@ -1290,6 +1323,30 @@ impl<'p, 'a> Writer<'p, 'a> {
             shared_values: self.helpers.contains("cobAllied"),
             missing_includes: self.p.pre.missing.clone(),
         }
+    }
+
+    /// `PIECES`, naming each piece the file already holds and asking for the
+    /// rest. One the model does not have is nil, as asking would stop the
+    /// script loading.
+    fn pieces_table_text(&self) -> String {
+        let decl = if self.mode.pieces_global {
+            ""
+        } else {
+            "local "
+        };
+        let mut text = format!(
+            "\n-- The pieces in the order the BOS declares them. COB numbers a piece by\n-- where it is here, counted from 0.\n{decl}{PIECES} = {{\n"
+        );
+        for (bos, model) in &self.p.declared {
+            let entry = match (self.p.pieces.iter().find(|(b, _, _)| b == bos), model) {
+                (Some((_, lua, _)), _) => lua.clone(),
+                (None, Some(model)) => format!("piece(\"{model}\")"),
+                (None, None) => "nil".into(),
+            };
+            text.push_str(&format!("\t{entry},\n"));
+        }
+        text.push_str("}\n");
+        text
     }
 
     // Output.
@@ -1490,16 +1547,13 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
             return L::atom(lua);
         }
-        if self.p.pieces.iter().any(|(bos, _, _)| *bos == lower) {
-            // A piece as a value is COB's number for it, counted from zero, so
-            // a script using `base` as nought still means nought.
-            let p = self.piece(name);
+        if let Some(i) = self.p.declared.iter().position(|(bos, _)| *bos == lower) {
+            // A piece as a value is COB's number for it: where the script
+            // declares it, counted from zero.
+            let i = i as i64;
             return L {
-                text: format!("{p} - 1"),
-                prec: P_ADD,
-                boolean: false,
-                value: None,
-                literal: false,
+                text: format!("{i} --[[{name}]]"),
+                ..L::number(i)
             };
         }
         if let Some(id) = self.p.cob_names.get(name) {
@@ -1564,9 +1618,19 @@ impl<'p, 'a> Writer<'p, 'a> {
                 let id = self.num(id);
                 self.removed_value(id.value);
                 let f = self.unit_value_call(id.value, "GetUnitValue", "cobGet");
+                let takes_piece = id.value.is_some_and(|v| {
+                    ["PIECE_XZ", "PIECE_Y", "PIECE_HEADING", "PIECE_PITCH"]
+                        .iter()
+                        .any(|n| self.p.cob_names.get(*n) == Some(&v))
+                });
                 let mut parts = vec![id.text.clone()];
-                for a in args {
-                    parts.push(self.num(a).text);
+                for (i, a) in args.iter().enumerate() {
+                    let v = if (takes_piece && i == 0) || self.piece_name(a).is_some() {
+                        self.engine_piece(a)
+                    } else {
+                        self.num(a).text
+                    };
+                    parts.push(v);
                 }
                 L::atom(format!("{f}({})", parts.join(", ")))
             }
@@ -1823,22 +1887,65 @@ impl<'p, 'a> Writer<'p, 'a> {
         format!("math.rad({})", decimal(sign * v as f64 * 360.0 / 65536.0))
     }
 
-    /// A piece for the engine, counted from one, from a value counted from
-    /// zero.
+    /// The piece a name means, if it is one rather than a variable.
+    fn piece_name(&self, e: &Expr) -> Option<String> {
+        let Expr::Name(n) = e else {
+            return None;
+        };
+        let lower = n.to_lowercase();
+        let shadowed =
+            self.locals.contains_key(&lower) || self.p.statics.iter().any(|(bos, _)| *bos == lower);
+        (!shadowed && self.p.pieces.iter().any(|(bos, _, _)| *bos == lower)).then(|| n.clone())
+    }
+
+    /// A piece for the engine, as `piece()` numbers it, from COB's number for
+    /// it. A number outside the script's pieces is 0, which the engine reads
+    /// as no piece.
     fn lua_piece(&mut self, e: &Expr) -> String {
-        if let Expr::Name(n) = e {
-            let lower = n.to_lowercase();
-            let shadowed = self.locals.contains_key(&lower)
-                || self.p.statics.iter().any(|(bos, _)| *bos == lower);
-            if !shadowed && self.p.pieces.iter().any(|(bos, _, _)| *bos == lower) {
-                return self.piece(n);
-            }
+        if let Some(n) = self.piece_name(e) {
+            return self.piece(&n);
         }
         let l = self.num(e);
         match l.value {
-            Some(v) if l.literal => (v + 1).to_string(),
-            _ => format!("{} + 1", l.wrap(P_ADD)),
+            Some(v) if l.literal => {
+                let named = usize::try_from(v)
+                    .ok()
+                    .and_then(|i| self.p.declared.get(i))
+                    .map(|(bos, _)| bos.clone());
+                match named {
+                    Some(bos) if self.p.pieces.iter().any(|(b, _, _)| *b == bos) => {
+                        self.piece(&bos)
+                    }
+                    Some(_) => format!("({} or 0)", self.numbered_piece(&(v + 1).to_string())),
+                    None => "0".into(),
+                }
+            }
+            _ => format!(
+                "({} or 0)",
+                self.numbered_piece(&format!("{} + 1", l.wrap(P_ADD)))
+            ),
         }
+    }
+
+    /// The piece at `index` in the script's own order, counted from one.
+    fn numbered_piece(&mut self, index: &str) -> String {
+        self.pieces_table = true;
+        if !self.mode.pieces_global {
+            self.refs.insert(PIECES.into());
+        }
+        format!("{PIECES}[{index}]")
+    }
+
+    /// A value the engine or a gadget reads as a piece, counted from zero in
+    /// the model's order, which is how the engine numbers a Lua script's
+    /// pieces.
+    fn engine_piece(&mut self, e: &Expr) -> String {
+        if let Some(n) = self.piece_name(e) {
+            return format!("{} - 1", self.piece(&n));
+        }
+        let l = self.num(e);
+        let p = self.numbered_piece(&format!("{} + 1", l.wrap(P_ADD)));
+        format!("({p} or 0) - 1")
     }
 
     /// A distance for `Move`, in elmos.
@@ -1946,6 +2053,7 @@ impl<'p, 'a> Writer<'p, 'a> {
                         first = false;
                         self.code(&format!("{decl}{lua} = piece(\"{model}\")"), trailing);
                     }
+                    self.pieces_at = Some(self.out.len());
                 }
                 ItemKind::Statics(names) => {
                     self.gap();
@@ -2460,7 +2568,7 @@ impl<'p, 'a> Writer<'p, 'a> {
     fn fallthrough(&mut self) -> Option<String> {
         let (ret, params, _) = self.ret.clone()?;
         let param = |i: usize| params.get(i).cloned().unwrap_or_else(|| "0".into());
-        let piece = |i: usize, this: &Self| {
+        let piece = |i: usize, this: &mut Self| {
             let p = param(i);
             let typed = this
                 .locals
@@ -2469,7 +2577,7 @@ impl<'p, 'a> Writer<'p, 'a> {
             if typed || p == "0" {
                 p
             } else {
-                format!("{p} + 1")
+                this.numbered_piece(&format!("{p} + 1"))
             }
         };
         Some(match ret {
@@ -2599,7 +2707,14 @@ impl<'p, 'a> Writer<'p, 'a> {
             // whatever the script defines under that name. A unit script cannot
             // reach LuaRules' globals, only `GG`.
             StmtKind::Call(name, args) if name.starts_with("lua_") => {
-                let values: Vec<String> = args.iter().map(|a| self.num(a).text).collect();
+                // A gadget reads a piece as the engine numbers it.
+                let values: Vec<String> = args
+                    .iter()
+                    .map(|a| match self.piece_name(a) {
+                        Some(_) => self.engine_piece(a),
+                        None => self.num(a).text,
+                    })
+                    .collect();
                 let lua = &name["lua_".len()..];
                 self.warn(
                     &format!("luacall:{name}"),
