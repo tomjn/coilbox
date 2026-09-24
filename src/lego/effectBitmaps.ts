@@ -6,16 +6,21 @@
  * falls back to the base content's defaults when a game ships neither the file
  * nor a smoke table (`ProjectileDrawer.cpp:98-150,231,137-145`). `RESOURCES_LUA`
  * plays that same lookup back through unitsync, with the game and its
- * dependencies mounted, and answers the bytes as hex because that is all the
- * unitsync Lua parser can hand back.
+ * dependencies mounted, and answers only the name and whether it exists.
+ * unitsync's `LuaParser::LoadFile` hands data back with `lua_pushstring`,
+ * which stops at the first zero byte (LuaParser.cpp:715), and a TGA's first
+ * byte is zero, so Lua cannot return the bytes here. `loadEffectBitmaps` reads
+ * them separately, through `unitsyncArchiveExtract`.
  *
  * The image decode and canvas draw are pulled out into `buildAtlas` so a test
  * can replace them: a real decode never resolves in an environment with no
  * image pipeline.
  */
 
+import { join, tempDir } from "@tauri-apps/api/path";
 import * as THREE from "three";
-import { unitsyncLuaExec } from "@/content/bindings";
+import { unitsyncArchiveExtract, unitsyncLuaExec } from "@/content/bindings";
+import { primeScan } from "@/content/config";
 import { legoBitmapPng } from "./bindings";
 import { BITMAP_LASER, BITMAP_MUZZLE_FLAME, BITMAP_SMOKE } from "./effects";
 import type { EffectsAtlas } from "./pages/components/effectsLayer";
@@ -44,20 +49,19 @@ if VFS.FileExists('gamedata/resources.lua') then
   end
 end
 
-local function hex(file)
-  local path = 'bitmaps/' .. file
-  if not VFS.FileExists(path) then return '' end
-  local data = VFS.LoadFile(path)
-  if not data then return '' end
-  return (string.gsub(data, '.', function(c)
-    return string.format('%02x', string.byte(c))
-  end))
+-- VFS.LoadFile cannot return these bytes: unitsync's LuaParser::LoadFile
+-- hands the data back with lua_pushstring, which stops at the first zero
+-- byte (LuaParser.cpp:715), and a TGA's first byte is zero. So this only
+-- says whether the file is there, and the caller fetches the bytes another
+-- way, through unitsync_archive_extract.
+local function present(file)
+  return VFS.FileExists('bitmaps/' .. file) and '1' or ''
 end
 
 local out = {}
 local function add(key, file)
   if type(file) ~= 'string' then file = nil end
-  out[#out + 1] = key .. '|' .. (file or '') .. '|' .. (file and hex(file) or '')
+  out[#out + 1] = key .. '|' .. (file or '') .. '|' .. (file and present(file) or '')
 end
 
 add('muzzleflame', field(textures, 'muzzleflametexture') or field(textures, 'explo'))
@@ -75,8 +79,8 @@ export interface BitmapFile {
   key: string;
   /** The name under `bitmaps/`, or null when the game names none. */
   file: string | null;
-  /** The file's bytes as hex, or null when it is not in the game. */
-  hex: string | null;
+  /** Whether the file exists under `bitmaps/` in the game or its dependencies. */
+  present: boolean;
 }
 
 /** Turns one `\X` escape back into the literal character it stands for,
@@ -104,13 +108,13 @@ export function parseBitmaps(result: string | undefined): BitmapFile[] {
 
   const out: BitmapFile[] = [];
   for (const entry of line.split(";")) {
-    const [rawKey, rawFile, rawHex] = entry.split("|");
+    const [rawKey, rawFile, rawPresent] = entry.split("|");
     const key = rawKey ?? "";
     if (key === "") continue;
     out.push({
       key,
       file: rawFile ? rawFile : null,
-      hex: rawHex ? rawHex : null,
+      present: rawPresent === "1",
     });
   }
   return out;
@@ -298,15 +302,61 @@ export async function loadEffectBitmaps(
     bitmaps.filter((bitmap) => bitmap.key.startsWith("smoke")).length,
   );
 
+  // One folder for every bitmap this load extracts, staged the way
+  // `gameImport.ts`'s `stageModel` stages a model. Left for the OS to
+  // reclaim: there is no delete-file command exposed to the frontend, and
+  // adding one for this alone would be more to go wrong than a few
+  // megabytes in the temp folder.
+  const folder = await join(
+    await tempDir(),
+    `coilbox-effect-bitmaps-${crypto.randomUUID()}`,
+  );
+
+  // A bitmap missing from the game's own archive is usually shipped by one
+  // of its dependencies instead, so the dependency list is fetched only
+  // once, and only if a bitmap actually needs it.
+  let dependencyArchives: string[] | null = null;
+  async function dependencyArchiveNames(): Promise<string[]> {
+    if (dependencyArchives) return dependencyArchives;
+    const scan = await primeScan(target.enginePath, target.dataDir);
+    const game = scan.games.find((g) => g.primaryArchive.name === archive);
+    dependencyArchives = game ? game.dependencyArchives.map((a) => a.name) : [];
+    return dependencyArchives;
+  }
+
   const missing: string[] = [];
   const entries: AtlasEntry[] = [];
   for (const bitmap of bitmaps) {
-    if (!bitmap.file || !bitmap.hex) {
+    if (!bitmap.file || !bitmap.present) {
       missing.push(missingName(bitmap));
       continue;
     }
+    const member = `bitmaps/${bitmap.file}`;
+    const dest = await join(folder, bitmap.file);
     try {
-      const png = await legoBitmapPng({ hex: bitmap.hex, file: bitmap.file });
+      let extracted = await unitsyncArchiveExtract({
+        ...target,
+        archive,
+        file: member,
+        dest,
+      });
+      if (extracted.errors.length > 0) {
+        let found = false;
+        for (const dep of await dependencyArchiveNames()) {
+          extracted = await unitsyncArchiveExtract({
+            ...target,
+            archive: dep,
+            file: member,
+            dest,
+          });
+          if (extracted.errors.length === 0) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) throw new Error(extracted.errors.join(". "));
+      }
+      const png = await legoBitmapPng({ path: dest });
       entries.push({
         slot: slotOf(bitmap.key),
         dataUrl: png.dataUrl,

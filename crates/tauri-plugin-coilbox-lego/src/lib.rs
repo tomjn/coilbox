@@ -1716,28 +1716,19 @@ async fn lego_texture_import<R: Runtime>(app: AppHandle<R>, path: String) -> Cli
     }
 }
 
-/// A particle bitmap from a game archive, hex encoded, as a PNG with its alpha
+/// A particle bitmap already extracted to `path`, as a PNG with its alpha
 /// kept, because the engine's particle blend reads it.
-fn bitmap_png(hex: &str, file: &str) -> Result<(Vec<u8>, u32, u32), String> {
-    if !hex.is_ascii() || !hex.len().is_multiple_of(2) {
-        return Err(format!("{file} did not arrive as hex"));
-    }
-    let bytes = (0..hex.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16))
-        .collect::<Result<Vec<u8>, _>>()
-        .map_err(|_| format!("{file} did not arrive as hex"))?;
-    let img = coilbox_texture::decode(&extension_of(Path::new(file)), &bytes)
-        .ok_or_else(|| format!("coilbox cannot decode {file}"))?;
+fn bitmap_png(path: &str) -> Result<(Vec<u8>, u32, u32), String> {
+    let img = read_texture(path)?;
     let png = coilbox_texture::encode_png(&img)
-        .ok_or_else(|| format!("could not encode {file} as a PNG"))?;
+        .ok_or_else(|| format!("could not encode {path} as a PNG"))?;
     Ok((png, img.width(), img.height()))
 }
 
 /// `lego_bitmap_png` decodes one particle bitmap for the preview's effects.
 #[tauri::command]
-async fn lego_bitmap_png(hex: String, file: String) -> CliResult {
-    match bitmap_png(&hex, &file) {
+async fn lego_bitmap_png(path: String) -> CliResult {
+    match bitmap_png(&path) {
         Ok((png, width, height)) => CliResult::ok(json!({
             "dataUrl": coilbox_texture::png_data_url(&png),
             "width": width,
@@ -3563,17 +3554,24 @@ mod tests {
         image::DynamicImage::ImageRgba8(img)
             .write_to(&mut std::io::Cursor::new(&mut tga), image::ImageFormat::Tga)
             .unwrap();
-        let hex: String = tga.iter().map(|b| format!("{b:02x}")).collect();
+        let path = std::env::temp_dir().join(format!(
+            "coilbox-bitmap-png-test-{}.tga",
+            std::process::id()
+        ));
+        std::fs::write(&path, &tga).unwrap();
 
-        let (png, width, height) = bitmap_png(&hex, "flame.tga").unwrap();
+        let (png, width, height) = bitmap_png(path.to_str().unwrap()).unwrap();
 
         assert_eq!((width, height), (2, 1));
         let back = image::load_from_memory(&png).unwrap().to_rgba8();
         assert_eq!(back.get_pixel(0, 0).0, [255, 128, 0, 64]);
+
+        std::fs::remove_file(&path).unwrap();
     }
 
     #[test]
-    fn bitmap_png_refuses_what_is_not_hex() {
-        assert!(bitmap_png("zz", "flame.tga").is_err());
+    fn bitmap_png_names_the_file_when_it_is_missing() {
+        let err = bitmap_png("/no/such/flame.tga").unwrap_err();
+        assert!(err.contains("flame.tga"), "got: {err}");
     }
 }

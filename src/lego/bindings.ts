@@ -582,11 +582,11 @@ export const legoTexturePng = defineCommand<
 >("coilbox-lego", "lego_texture_png");
 
 /**
- * One particle bitmap from a game archive, hex encoded, decoded with its
+ * One particle bitmap already extracted to a path on disk, decoded with its
  * alpha kept as a PNG `data:` URL.
  */
 export const legoBitmapPng = defineCommand<
-  { hex: string; file: string },
+  { path: string },
   { dataUrl: string; width: number; height: number }
 >("coilbox-lego", "lego_bitmap_png");
 

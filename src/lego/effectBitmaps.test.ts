@@ -1,14 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import { BITMAP_LASER, BITMAP_MUZZLE_FLAME, BITMAP_SMOKE } from "./effects";
 
+vi.mock("@tauri-apps/api/path", () => ({
+  tempDir: vi.fn().mockResolvedValue("/tmp"),
+  join: vi.fn((...parts: string[]) => Promise.resolve(parts.join("/"))),
+}));
 vi.mock("@/content/bindings", () => ({
   unitsyncLuaExec: vi.fn(),
+  unitsyncArchiveExtract: vi.fn(),
+}));
+vi.mock("@/content/config", () => ({
+  primeScan: vi.fn(),
 }));
 vi.mock("./bindings", () => ({
   legoBitmapPng: vi.fn(),
 }));
 
-import { unitsyncLuaExec } from "@/content/bindings";
+import { unitsyncArchiveExtract, unitsyncLuaExec } from "@/content/bindings";
+import { primeScan } from "@/content/config";
 import { legoBitmapPng } from "./bindings";
 import {
   atlasBuilder,
@@ -20,13 +29,13 @@ import {
 } from "./effectBitmaps";
 
 describe("parseBitmaps", () => {
-  it("reads each bitmap's key, file and bytes from the quoted result", () => {
+  it("reads each bitmap's key, file and presence from the quoted result", () => {
     const result =
-      '"muzzleflame|explo.tga|00ff;laserfalloff||;smoke1|smoke\\\\smoke00.tga|"';
+      '"muzzleflame|explo.tga|1;laserfalloff||;smoke1|smoke\\\\smoke00.tga|"';
     expect(parseBitmaps(result)).toEqual([
-      { key: "muzzleflame", file: "explo.tga", hex: "00ff" },
-      { key: "laserfalloff", file: null, hex: null },
-      { key: "smoke1", file: "smoke\\smoke00.tga", hex: null },
+      { key: "muzzleflame", file: "explo.tga", present: true },
+      { key: "laserfalloff", file: null, present: false },
+      { key: "smoke1", file: "smoke\\smoke00.tga", present: false },
     ]);
   });
 
@@ -90,13 +99,16 @@ describe("packShelves", () => {
 /** One resources.lua result with every key present but the laser bitmap
  *  named nothing, the shape a game with no `laserfalloff.tga` sends back. */
 function quotedResult(): string {
-  const entries = [
-    "muzzleflame|explo.tga|00ff",
-    "laserfalloff|laserfalloff.tga|",
-  ];
-  for (let i = 1; i <= 12; i++) entries.push(`smoke${i}|smoke${i}.tga|00ff`);
+  const entries = ["muzzleflame|explo.tga|1", "laserfalloff|laserfalloff.tga|"];
+  for (let i = 1; i <= 12; i++) entries.push(`smoke${i}|smoke${i}.tga|1`);
   const escaped = entries.join(";").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;
+}
+
+/** One resources.lua result naming only the muzzle flame bitmap, present or
+ *  not, for the tests that only care about how that one file is fetched. */
+function muzzleFlameResult(present: boolean): string {
+  return `"muzzleflame|explo.tga|${present ? "1" : ""}"`;
 }
 
 describe("loadEffectBitmaps", () => {
@@ -105,8 +117,12 @@ describe("loadEffectBitmaps", () => {
       result: quotedResult(),
       errors: [],
     });
-    vi.mocked(legoBitmapPng).mockImplementation(async ({ file }) => ({
-      dataUrl: `data:image/png;base64,${file}`,
+    vi.mocked(unitsyncArchiveExtract).mockResolvedValue({
+      size: 100,
+      errors: [],
+    });
+    vi.mocked(legoBitmapPng).mockImplementation(async ({ path }) => ({
+      dataUrl: `data:image/png;base64,${path}`,
       width: 16,
       height: 16,
     }));
@@ -135,8 +151,12 @@ describe("loadEffectBitmaps", () => {
       result: quotedResult(),
       errors: [],
     });
-    vi.mocked(legoBitmapPng).mockImplementation(async ({ file }) => ({
-      dataUrl: `data:image/png;base64,${file}`,
+    vi.mocked(unitsyncArchiveExtract).mockResolvedValue({
+      size: 100,
+      errors: [],
+    });
+    vi.mocked(legoBitmapPng).mockImplementation(async ({ path }) => ({
+      dataUrl: `data:image/png;base64,${path}`,
       width: 16,
       height: 16,
     }));
@@ -154,6 +174,138 @@ describe("loadEffectBitmaps", () => {
 
     expect(result.atlas).toBeNull();
     expect(dispose).toHaveBeenCalled();
+  });
+
+  it("reads a present bitmap's bytes out of the project's own archive", async () => {
+    vi.mocked(unitsyncLuaExec).mockResolvedValue({
+      result: muzzleFlameResult(true),
+      errors: [],
+    });
+    vi.mocked(unitsyncArchiveExtract).mockResolvedValue({
+      size: 100,
+      errors: [],
+    });
+    vi.mocked(legoBitmapPng).mockResolvedValue({
+      dataUrl: "data:image/png;base64,x",
+      width: 16,
+      height: 16,
+    });
+    vi.spyOn(atlasBuilder, "build").mockResolvedValue({
+      texture: { dispose: vi.fn() } as never,
+      packed: {
+        width: 16,
+        height: 16,
+        rects: [
+          { slot: BITMAP_MUZZLE_FLAME, x: 0, y: 0, width: 16, height: 16 },
+        ],
+      },
+      failed: [],
+    });
+
+    const result = await loadEffectBitmaps(
+      { enginePath: "/engine", dataDir: "/data" },
+      "Game.sdd",
+    );
+
+    expect(unitsyncArchiveExtract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archive: "Game.sdd",
+        file: "bitmaps/explo.tga",
+      }),
+    );
+    expect(primeScan).not.toHaveBeenCalled();
+    expect(result.atlas).not.toBeNull();
+  });
+
+  it("falls back to a dependency archive when the primary lacks the bitmap", async () => {
+    vi.mocked(unitsyncLuaExec).mockResolvedValue({
+      result: muzzleFlameResult(true),
+      errors: [],
+    });
+    vi.mocked(unitsyncArchiveExtract).mockImplementation(
+      async ({ archive }) => ({
+        size: archive === "Base.sdz" ? 100 : 0,
+        errors: archive === "Base.sdz" ? [] : ["not found"],
+      }),
+    );
+    vi.mocked(primeScan).mockResolvedValue({
+      maps: [],
+      games: [
+        {
+          name: "Game",
+          primaryArchive: { name: "Game.sdd" } as never,
+          dependencyArchives: [{ name: "Base.sdz" } as never],
+          info: {},
+        },
+      ],
+      errors: [],
+    });
+    vi.mocked(legoBitmapPng).mockResolvedValue({
+      dataUrl: "data:image/png;base64,x",
+      width: 16,
+      height: 16,
+    });
+    vi.spyOn(atlasBuilder, "build").mockResolvedValue({
+      texture: { dispose: vi.fn() } as never,
+      packed: {
+        width: 16,
+        height: 16,
+        rects: [
+          { slot: BITMAP_MUZZLE_FLAME, x: 0, y: 0, width: 16, height: 16 },
+        ],
+      },
+      failed: [],
+    });
+
+    const result = await loadEffectBitmaps(
+      { enginePath: "/engine", dataDir: "/data" },
+      "Game.sdd",
+    );
+
+    expect(unitsyncArchiveExtract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archive: "Game.sdd",
+        file: "bitmaps/explo.tga",
+      }),
+    );
+    expect(unitsyncArchiveExtract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archive: "Base.sdz",
+        file: "bitmaps/explo.tga",
+      }),
+    );
+    expect(result.atlas).not.toBeNull();
+  });
+
+  it("reports a bitmap missing by its bitmaps/<file> name when it is in neither archive", async () => {
+    vi.mocked(unitsyncLuaExec).mockResolvedValue({
+      result: muzzleFlameResult(true),
+      errors: [],
+    });
+    vi.mocked(unitsyncArchiveExtract).mockResolvedValue({
+      size: 0,
+      errors: ["not found"],
+    });
+    vi.mocked(primeScan).mockResolvedValue({
+      maps: [],
+      games: [
+        {
+          name: "Game",
+          primaryArchive: { name: "Game.sdd" } as never,
+          dependencyArchives: [{ name: "Base.sdz" } as never],
+          info: {},
+        },
+      ],
+      errors: [],
+    });
+
+    const result = await loadEffectBitmaps(
+      { enginePath: "/engine", dataDir: "/data" },
+      "Game.sdd",
+    );
+
+    expect(result.atlas).toBeNull();
+    expect(result.note).toContain("bitmaps/explo.tga");
   });
 
   it("reports the read error when unitsync fails", async () => {
