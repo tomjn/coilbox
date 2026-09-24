@@ -376,17 +376,10 @@ function reaimVolley(startS: number, endFrame: number): ScriptEvent[] {
   return events;
 }
 
-/** Aim and fire events for one volley, aim events re-aiming the arm every
- *  `REAIM_INTERVAL_FRAMES` across it. Sorted by frame, and where an aim and a
- *  fire land on the same frame the aim comes first, since a script fires
- *  after it has turned to face the target rather than before. */
-function volley(
-  aimStartS: number,
-  fireStartS: number,
-  endS: number,
-): ScriptEvent[] {
-  const fires = fireVolley(fireStartS, endS);
-  const aims = reaimVolley(aimStartS, at(endS));
+/** Aim and fire events merged into one series, sorted by frame, with an aim
+ *  landing before a fire on the same frame, since a script fires after it has
+ *  turned to face the target rather than before. */
+function aimedFire(aims: ScriptEvent[], fires: ScriptEvent[]): ScriptEvent[] {
   return [...aims, ...fires].sort(
     (a, b) => a.frame - b.frame || Number(!a.callin) - Number(!b.callin),
   );
@@ -556,16 +549,21 @@ export const SCENARIOS: Scenario[] = [
       // Aimed at the stand-in rather than at two numbers, and measured from
       // the piece `AimFromWeapon1` names, as the engine measures it
       // (`rts/Sim/Weapons/Weapon.cpp:241-244,286-304,410-424`). Re-aimed every
-      // `REAIM_INTERVAL_FRAMES` across the volley, as the engine keeps doing
-      // while the weapon has a target, so the arm holds its pose for the
-      // whole volley instead of standing down after the script's own
-      // `AimPrimary` delay.
+      // `REAIM_INTERVAL_FRAMES` for as long as the preview runs, one
+      // continuous series rather than one per volley, since the engine keeps
+      // calling a weapon's aiming script every `reaimTime` frames for as long
+      // as it has a target, whether or not the target is moving
+      // (`Weapon.cpp:352-357,380`). Without this the arm follows the stand-in
+      // between volleys too, not only while it fires.
       //
-      // The stand-in holds its first spot until at(4), so the volley fires
-      // while aim is settled rather than mid-turn.
-      ...volley(0.5, 1, 4),
-      // The stand-in holds its second spot from at(6) to at(10).
-      ...volley(6, 7, 10),
+      // The stand-in holds its first spot until at(4), so the first volley
+      // fires while aim is settled rather than mid-turn. It holds its second
+      // spot from at(6) to at(10) the same way, and the continuous re-aim is
+      // what turns the arm to follow it there.
+      ...aimedFire(reaimVolley(0.5, PREVIEW_FRAMES - 1), [
+        ...fireVolley(1, 4),
+        ...fireVolley(7, 10),
+      ]),
     ],
     // Both spots are on the ground and well out in front, set by eye with the
     // user. The pitch still differs a little between the two because each is

@@ -168,27 +168,20 @@ describe("scenarios", () => {
 
   /** The engine calls a weapon's `AimWeapon` again every `reaimTime` frames,
    *  15 by default, while it still has a target (`Weapon.cpp:137,352-357,380`),
-   *  so a script whose own `AimPrimary` stands the arm down after a fixed
-   *  delay is kept aiming for as long as the volley runs. */
-  it("re-aims the weapon every 15 frames across each volley", () => {
+   *  whether or not the target is moving, so the arm keeps following the
+   *  stand-in for the whole preview rather than only during a volley. */
+  it("re-aims the weapon every 15 frames for the whole preview", () => {
     const firing = scenarioById("firing");
     const aims = firing?.events.filter(
       (event) => event.callin === "AimWeapon1",
     );
 
-    const firstVolley: number[] = [];
-    for (let frame = at(0.5); frame <= at(4); frame += 15) {
-      firstVolley.push(frame);
-    }
-    const secondVolley: number[] = [];
-    for (let frame = at(6); frame <= at(10); frame += 15) {
-      secondVolley.push(frame);
+    const expected: number[] = [];
+    for (let frame = at(0.5); frame <= PREVIEW_FRAMES - 1; frame += 15) {
+      expected.push(frame);
     }
 
-    expect(aims?.map((event) => event.frame)).toEqual([
-      ...firstVolley,
-      ...secondVolley,
-    ]);
+    expect(aims?.map((event) => event.frame)).toEqual(expected);
     for (const aim of aims ?? []) {
       expect(aim.aimAtStandIn).toEqual({ from: "AimFromWeapon" });
     }
