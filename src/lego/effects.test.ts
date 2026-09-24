@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  BITMAP_EXPLO,
   BITMAP_HEATCLOUD,
   BITMAP_LASER,
   BITMAP_LASER_END,
   BITMAP_MUZZLE_FLAME,
   BITMAP_SMOKE,
   BITMAP_WAKE,
+  BURST_SCALE,
   DEFAULT_FLAME_SIZE,
   emitPoint,
   type FlameEmission,
@@ -13,8 +15,12 @@ import {
   NANO_SPREAD,
   type NanoEmission,
   type Particles,
+  PUFF_LIFE,
+  type PuffEmission,
   particlesAt,
+  SFX_TRACER_RANGE,
   type SmokeEmission,
+  sfxEmission,
   type TracerEmission,
   unitFloat,
   type Vec3,
@@ -640,5 +646,99 @@ describe("sfx wake", () => {
       .centers[0];
     expect(Math.abs(ahead - 50 * 0.4 * 0.6)).toBeLessThanOrEqual(2 + 1e-4);
     expect(Math.abs(behind + 50 * 0.4 * 0.6)).toBeLessThanOrEqual(2 + 1e-4);
+  });
+});
+
+function puff(overrides: Partial<PuffEmission> = {}): PuffEmission {
+  return {
+    kind: "puff",
+    birth: 0,
+    at: [0, 0, 0],
+    dir: [0, 1, 0],
+    seed: 5,
+    ...overrides,
+  };
+}
+
+describe("the CEG puff and the detonation burst", () => {
+  it("drifts along the emit direction, grows, and fades, with the explo bitmap", () => {
+    const early = particlesAt([puff()], 0).sprites;
+    const later = particlesAt([puff()], 5).sprites;
+    expect(early.bitmaps[0]).toBe(BITMAP_EXPLO);
+    expect(later.centers[1]).toBeGreaterThan(early.centers[1]);
+    expect(later.centers[0]).toBe(0);
+    expect(later.halfSizes[0]).toBeGreaterThan(early.halfSizes[0]);
+    expect(later.colors[0]).toBeLessThan(early.colors[0]);
+  });
+
+  it("is gone once it has lived PUFF_LIFE updates", () => {
+    expect(particlesAt([puff()], PUFF_LIFE - 2).sprites.count).toBe(1);
+    expect(particlesAt([puff()], PUFF_LIFE - 1).sprites.count).toBe(0);
+  });
+
+  it("draws a burst as the same puff, BURST_SCALE times the size", () => {
+    const small = particlesAt([puff()], 3).sprites.halfSizes[0];
+    const big = particlesAt([puff({ kind: "burst" })], 3).sprites.halfSizes[0];
+    expect(big).toBeCloseTo(small * BURST_SCALE, 6);
+  });
+});
+
+describe("sfxEmission", () => {
+  const at: Vec3 = [1, 2, 3];
+  const dir: Vec3 = [0, 0, 1];
+  const kindOf = (sfx: number) => sfxEmission(sfx, 4, at, dir, 9)?.kind ?? null;
+
+  it("reads the built-in numbers", () => {
+    expect(kindOf(0)).toBe("vtol");
+    for (const sfx of [2, 3, 4, 5]) expect(kindOf(sfx)).toBe("wake");
+    expect(sfxEmission(2, 4, at, dir, 9)).toMatchObject({ reverse: false });
+    expect(sfxEmission(3, 4, at, dir, 9)).toMatchObject({ reverse: false });
+    expect(sfxEmission(4, 4, at, dir, 9)).toMatchObject({ reverse: true });
+    expect(sfxEmission(5, 4, at, dir, 9)).toMatchObject({ reverse: true });
+    expect(sfxEmission(257, 4, at, dir, 9)).toMatchObject({
+      kind: "smoke",
+      color: 0.5,
+    });
+    expect(sfxEmission(258, 4, at, dir, 9)).toMatchObject({
+      kind: "smoke",
+      color: 0.6,
+    });
+  });
+
+  it("draws nothing for a bubble or a number the engine does not know", () => {
+    for (const sfx of [259, 1, 6, 256, 260, 1023]) {
+      expect(kindOf(sfx)).toBeNull();
+    }
+  });
+
+  it("reads the range bits", () => {
+    expect(kindOf(1024 + 3)).toBe("puff");
+    expect(kindOf(16384 + 2)).toBe("puff");
+    expect(kindOf(4096 + 1)).toBe("burst");
+    expect(sfxEmission(2048 + 1, 4, at, dir, 9)).toEqual({
+      kind: "tracer",
+      birth: 4,
+      at,
+      to: [1, 2, 3 + SFX_TRACER_RANGE],
+      seed: 9,
+      weapon: 2,
+    });
+  });
+
+  it("tests the range bits in the engine's order, after the exact numbers", () => {
+    expect(kindOf(1024 + 257)).toBe("puff");
+    expect(kindOf(16384 + 2048)).toBe("puff");
+    expect(kindOf(1024 + 2048)).toBe("puff");
+    expect(kindOf(2048 + 4096)).toBe("tracer");
+  });
+
+  it("keeps the emission's birth, place and direction", () => {
+    expect(sfxEmission(1024, 4, at, dir, 9)).toEqual({
+      kind: "puff",
+      birth: 4,
+      at,
+      dir,
+      seed: 9,
+    });
   });
 });

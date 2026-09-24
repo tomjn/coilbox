@@ -97,13 +97,24 @@ export interface WakeEmission {
   seed: number;
 }
 
+export interface PuffEmission {
+  /** A CEG's stand-in puff, or a weapon detonation's larger burst. */
+  kind: "puff" | "burst";
+  birth: number;
+  at: Vec3;
+  /** The emit direction, world space, unit length or zero. */
+  dir: Vec3;
+  seed: number;
+}
+
 export type Emission =
   | NanoEmission
   | FlameEmission
   | TracerEmission
   | SmokeEmission
   | VtolEmission
-  | WakeEmission;
+  | WakeEmission
+  | PuffEmission;
 
 export interface Sprites {
   count: number;
@@ -717,6 +728,124 @@ function wakeSprites(
   out.uvRanges.push(0, 1);
 }
 
+/**
+ * A CEG's stand-in puff. The game defines the real effect, and the preview
+ * cannot read it without the unit def, so every number here is set by eye,
+ * to be tuned with the user on screen: how many updates it lives, its half
+ * size at birth, how much it grows an update and how far it drifts along the
+ * emit direction an update. A detonation's burst is the same puff,
+ * `BURST_SCALE` times the size.
+ */
+export const PUFF_LIFE = 20;
+const PUFF_START_SIZE = 4;
+const PUFF_GROWTH = 0.5;
+const PUFF_DRIFT = 0.5;
+export const BURST_SCALE = 3;
+
+/** `PuffEmission.kind` is itself a union of two literals, so a plain
+ *  equality check against each does not narrow it out of `Emission`. */
+function isPuff(emission: Emission): emission is PuffEmission {
+  return emission.kind === "puff" || emission.kind === "burst";
+}
+
+/** A puff or burst on one frame: brightness fading with age and an alpha of
+ *  1, as the engine's heat cloud draws, with the `explo` bitmap. */
+function puffSprites(
+  emission: PuffEmission,
+  frame: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  if (updates >= PUFF_LIFE) return;
+  const scale = emission.kind === "burst" ? BURST_SCALE : 1;
+  const glow = 1 - updates / PUFF_LIFE;
+  pushBillboard(
+    out,
+    [
+      emission.at[0] + emission.dir[0] * PUFF_DRIFT * updates,
+      emission.at[1] + emission.dir[1] * PUFF_DRIFT * updates,
+      emission.at[2] + emission.dir[2] * PUFF_DRIFT * updates,
+    ],
+    (PUFF_START_SIZE + PUFF_GROWTH * updates) * scale,
+    [glow, glow, glow, 1 / 255],
+    BITMAP_EXPLO,
+  );
+}
+
+/** How far an `sfx 2048 + n` tracer runs along the emit direction. The
+ *  engine aims the weapon one elmo ahead of the emit point
+ *  (`UnitScript.cpp:768`), which would draw nothing to see, and the weapon's
+ *  real range needs its unit def. Set by eye, to be tuned with the user on
+ *  screen. */
+export const SFX_TRACER_RANGE = 200;
+
+/** `EmitSfx`'s numbers (`rts/Sim/Units/Scripts/CobDefines.h:9-20`). */
+const SFX_VTOL = 0;
+const SFX_WAKE = 2;
+const SFX_WAKE_2 = 3;
+const SFX_REVERSE_WAKE = 4;
+const SFX_REVERSE_WAKE_2 = 5;
+const SFX_WHITE_SMOKE = 257;
+const SFX_BLACK_SMOKE = 258;
+const SFX_CEG = 1024;
+const SFX_FIRE_WEAPON = 2048;
+const SFX_DETONATE_WEAPON = 4096;
+const SFX_GLOBAL = 16384;
+
+/**
+ * What an `emit-sfx` number draws, read in the engine's order: the exact
+ * built-in numbers first, then the range bits, global CEG, unit CEG, fire
+ * weapon, then detonate weapon (`UnitScript.cpp:651-790`). A bubble (259)
+ * sits under the water line and so under the preview's ground, and draws
+ * nothing, as does a number the engine does not know.
+ */
+export function sfxEmission(
+  sfx: number,
+  birth: number,
+  at: Vec3,
+  dir: Vec3,
+  seed: number,
+): Emission | null {
+  switch (sfx) {
+    case SFX_REVERSE_WAKE:
+    case SFX_REVERSE_WAKE_2:
+      return { kind: "wake", birth, at, dir, reverse: true, seed };
+    case SFX_WAKE:
+    case SFX_WAKE_2:
+      return { kind: "wake", birth, at, dir, reverse: false, seed };
+    case SFX_WHITE_SMOKE:
+      return { kind: "smoke", birth, at, color: 0.5, seed };
+    case SFX_BLACK_SMOKE:
+      return { kind: "smoke", birth, at, color: 0.6, seed };
+    case SFX_VTOL:
+      return { kind: "vtol", birth, at, dir, seed };
+  }
+  if ((sfx & (SFX_GLOBAL | SFX_CEG)) !== 0) {
+    return { kind: "puff", birth, at, dir, seed };
+  }
+  if ((sfx & SFX_FIRE_WEAPON) !== 0) {
+    return {
+      kind: "tracer",
+      birth,
+      at,
+      to: [
+        at[0] + dir[0] * SFX_TRACER_RANGE,
+        at[1] + dir[1] * SFX_TRACER_RANGE,
+        at[2] + dir[2] * SFX_TRACER_RANGE,
+      ],
+      seed,
+      // A unit definition counts its weapons from one.
+      weapon: sfx - SFX_FIRE_WEAPON + 1,
+    };
+  }
+  if ((sfx & SFX_DETONATE_WEAPON) !== 0) {
+    return { kind: "burst", birth, at, dir, seed };
+  }
+  return null;
+}
+
 export function particlesAt(
   emissions: Emission[],
   frame: number,
@@ -754,6 +883,10 @@ export function particlesAt(
     }
     if (emission.kind === "wake") {
       wakeSprites(emission, frame, sprites);
+      continue;
+    }
+    if (isPuff(emission)) {
+      puffSprites(emission, frame, sprites);
       continue;
     }
     const age = frame - emission.birth;
