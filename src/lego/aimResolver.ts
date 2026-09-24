@@ -157,10 +157,11 @@ export function resolveScenario(
       return { ...rest, args: [heading, pitch] };
     }
 
-    // `AimFromWeapon1` rather than `AimFromWeapon`: the marker names the
-    // engine's concept, the probe asks for the weapon the scenario drives, and
-    // every scenario here drives weapon 1.
-    const callin = "AimFromWeapon1";
+    // `AimFromWeapon<n>` rather than `AimFromWeapon`: the marker names the
+    // engine's concept, and the probe was asked for the weapon this event's
+    // own `AimWeapon<n>` drives, `expandForWeapons` having already given each
+    // weapon its own copy of the event.
+    const callin = `AimFromWeapon${weaponNumberOf(event.callin)}`;
     const piece = ctx.probed(callin);
     const from = piece ? ctx.pieceRest.get(piece) : undefined;
     if (!from) {
@@ -306,6 +307,115 @@ export function aimsOf(events: ScriptEvent[]): Aim[] {
     aims.push({ frame: event.frame, dir: aimDirection(heading, pitch) });
   }
   return aims;
+}
+
+/** The weapon number an `AimWeapon<n>` call-in names, or 1 for anything else,
+ *  which is every scenario's own convention before it drives more than one
+ *  weapon. */
+function weaponNumberOf(callin: string | undefined): number {
+  const match = /^AimWeapon(\d+)$/.exec(callin ?? "");
+  return match ? Number(match[1]) : 1;
+}
+
+/** The Recoil ordinal a unit script may still define instead of a numbered
+ *  call-in, and the weapon slot each one means (`CobScriptNames.cpp`). */
+const ORDINAL_WEAPON_NUMBERS: Record<string, number> = {
+  Primary: 1,
+  Secondary: 2,
+  Tertiary: 3,
+};
+
+/**
+ * How many weapons the firing scenario should drive.
+ *
+ * A unit definition's own `weapons` table is definitive when there is one:
+ * the highest numbered slot it fills, `weapons` being keyed `"1"`, `"2"` and
+ * so on. Without a definition, the script's own numbered weapon functions are
+ * the next best answer, since a script defining `AimWeapon3` has a third
+ * weapon whether or not its definition is known here. A script with only
+ * plain call-ins and no definition to count from gets one weapon, which is
+ * what every scenario drove before this.
+ */
+export function weaponCount(
+  unitDef: Record<string, unknown> | null | undefined,
+  functions: string[],
+): number {
+  if (unitDef) return weaponCountFromDef(unitDef) ?? 1;
+  return weaponCountFromFunctions(functions);
+}
+
+function weaponCountFromDef(unitDef: Record<string, unknown>): number | null {
+  const weapons = unitDef.weapons;
+  if (!weapons || typeof weapons !== "object") return null;
+  let highest = 0;
+  for (const [key, entry] of Object.entries(
+    weapons as Record<string, unknown>,
+  )) {
+    const slot = Number(key);
+    if (!Number.isInteger(slot) || slot < 1) continue;
+    if (entry && typeof entry === "object") highest = Math.max(highest, slot);
+  }
+  return highest > 0 ? highest : null;
+}
+
+function weaponCountFromFunctions(functions: string[]): number {
+  let highest = 0;
+  for (const name of functions) {
+    const numbered = /^(?:AimWeapon|FireWeapon|QueryWeapon)(\d+)$/.exec(name);
+    if (numbered) highest = Math.max(highest, Number(numbered[1]));
+    const ordinal = ORDINAL_WEAPON_NUMBERS[name];
+    if (ordinal) highest = Math.max(highest, ordinal);
+  }
+  return highest || 1;
+}
+
+/** How many frames after weapon 1 fires that weapon `n` fires in the same
+ *  volley, set by eye so the shots read apart rather than landing together. */
+export const WEAPON_FIRE_STAGGER_FRAMES = 5;
+
+/**
+ * A scenario's events with every weapon 1 aim and shot matched by one for
+ * every other weapon the unit has.
+ *
+ * An `AimWeapon1` event gets a same-frame `AimWeapon<n>` for each other
+ * weapon, which `resolveScenario` then measures from that weapon's own
+ * `AimFromWeapon<n>` piece. A weapon 1 `fire` engine event gets one for each
+ * other weapon too, `(n - 1) * WEAPON_FIRE_STAGGER_FRAMES` frames later in the
+ * same volley.
+ *
+ * A no-op below two weapons: nothing here duplicates when there is only the
+ * one to drive.
+ */
+export function expandForWeapons(
+  events: ScriptEvent[],
+  weapons: number,
+): ScriptEvent[] {
+  if (weapons <= 1) return events;
+  const expanded: ScriptEvent[] = [];
+  for (const event of events) {
+    expanded.push(event);
+    if (event.callin === "AimWeapon1") {
+      for (let weapon = 2; weapon <= weapons; weapon++) {
+        expanded.push({ ...event, callin: `AimWeapon${weapon}` });
+      }
+      continue;
+    }
+    if (event.engine === "fire" && (event.args?.[0] ?? 1) === 1) {
+      for (let weapon = 2; weapon <= weapons; weapon++) {
+        expanded.push({
+          ...event,
+          frame: event.frame + (weapon - 1) * WEAPON_FIRE_STAGGER_FRAMES,
+          args: [weapon],
+        });
+      }
+    }
+  }
+  // Frame order, with an aim landing before a fire on the same frame, the
+  // same tie-break `aimedFire` uses when it first builds the firing
+  // scenario's events.
+  return expanded.sort(
+    (a, b) => a.frame - b.frame || Number(!a.callin) - Number(!b.callin),
+  );
 }
 
 /**

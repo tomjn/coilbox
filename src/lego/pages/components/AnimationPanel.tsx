@@ -36,7 +36,9 @@ import { aimPoint } from "../../aimPoint";
 import {
   type Aim,
   aimsOf,
+  expandForWeapons,
   resolveScenario,
+  weaponCount,
   withWorld,
 } from "../../aimResolver";
 import {
@@ -419,30 +421,51 @@ export function AnimationPanel({
         return runEvents(scenario.events, withValues);
       }
 
+      const pieces = project.pieces.map((piece) => piece.name);
+      const probeOnce = (callins: string[]) =>
+        compiled
+          ? animCobProbe({ bytes: compiled.bytes, pieces, callins })
+          : legoProbeScript({
+              script: project.script ?? "",
+              unitName: project.unitName,
+              pieces,
+              callins,
+              unitDef: project.gameUnitDef ?? null,
+              includes: project.gameScriptIncludes ?? null,
+              rest: pieceRest(project),
+            });
+
       // Both runtimes answer the same question: which piece a call-in like
       // `AimFromWeapon1` names. `anim_cob_probe` asks the bytecode the same
       // way `legoProbeScript` asks the Lua, so a compiled unit's stand-in
       // sits on its aim-from piece rather than the unit's origin.
-      const probes = compiled
-        ? await animCobProbe({
-            bytes: compiled.bytes,
-            pieces: project.pieces.map((piece) => piece.name),
-            callins: STAND_IN_PROBES,
-          })
-        : await legoProbeScript({
-            script: project.script ?? "",
-            unitName: project.unitName,
-            pieces: project.pieces.map((piece) => piece.name),
-            callins: STAND_IN_PROBES,
-            unitDef: project.gameUnitDef ?? null,
-            includes: project.gameScriptIncludes ?? null,
-            rest: pieceRest(project),
-          });
+      const probes = await probeOnce(STAND_IN_PROBES);
 
       const named = new Map<string, string>();
       for (const probe of probes?.probes ?? []) {
         const first = probe.pieces[0];
         if (first) named.set(probe.callin, first);
+      }
+
+      // How many weapons this scenario should drive, from the unit's own
+      // definition when there is one, else the script's own numbered weapon
+      // functions, which the probe above already asked for regardless of
+      // what it was told to name a piece for.
+      const weapons = weaponCount(
+        project.gameUnitDef ?? null,
+        probes?.functions ?? [],
+      );
+      if (weapons > 1) {
+        const more = await probeOnce(
+          Array.from(
+            { length: weapons - 1 },
+            (_, index) => `AimFromWeapon${index + 2}`,
+          ),
+        );
+        for (const probe of more?.probes ?? []) {
+          const first = probe.pieces[0];
+          if (first) named.set(probe.callin, first);
+        }
       }
 
       const rest = pieceWorldRest(project, pack, raw);
@@ -451,7 +474,11 @@ export function AnimationPanel({
         ? trackBesideUnit(scenario.standIn, bounds, radius)
         : null;
       const { events, notes } = resolveScenario(
-        { ...scenario, standIn: track ?? undefined },
+        {
+          ...scenario,
+          events: expandForWeapons(scenario.events, weapons),
+          standIn: track ?? undefined,
+        },
         {
           radius,
           mid: aimPoint(project, bounds),

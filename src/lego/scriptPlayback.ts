@@ -160,6 +160,10 @@ export interface ScriptProbe {
 export interface ScriptProbes {
   pieces: string[];
   probes: ScriptProbe[];
+  /** The script's own function names, empty when it could not be loaded at
+   *  all. Used to count a unit's weapons when there is no unit definition to
+   *  read the count from. */
+  functions: string[];
   /** Set when nothing could be asked, in which case `probes` is empty. */
   error: string | null;
 }

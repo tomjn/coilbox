@@ -134,6 +134,10 @@ pub struct Probes {
     /// The unit's piece names, so a caller can check they are what it expected.
     pub pieces: Vec<String>,
     pub probes: Vec<Probe>,
+    /// The script's own names, empty when it could not be decoded at all. A
+    /// caller working out how many weapons a unit has, with no unit
+    /// definition to read it from, counts the numbered weapon names here.
+    pub functions: Vec<String>,
     /// Set when the script could not be loaded at all, in which case `probes`
     /// is empty.
     pub error: Option<String>,
@@ -164,16 +168,19 @@ pub fn probe(bytes: &[u8], pieces: &[String], callins: &[String]) -> Probes {
             return Probes {
                 pieces: pieces.to_vec(),
                 probes: Vec::new(),
+                functions: Vec::new(),
                 error: Some(error),
             }
         }
     };
+    let functions = run.program.names.clone();
     Probes {
         pieces: pieces.to_vec(),
         probes: callins
             .iter()
             .map(|callin| run.probe_callin(callin))
             .collect(),
+        functions,
         error: None,
     }
 }

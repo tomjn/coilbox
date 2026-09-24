@@ -2127,4 +2127,26 @@ mod probe {
             .as_deref()
             .is_some_and(|note| note.contains("no QueryBuildInfo call-in")));
     }
+
+    /// A caller working out how many weapons a unit has, with no unit
+    /// definition to read the count from, counts the script's own numbered
+    /// weapon scripts. Those come from the same place `Timeline::functions`
+    /// does: the `.cob`'s own name table.
+    #[test]
+    fn reports_the_scripts_own_names() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { }
+            AimWeapon1(heading, pitch) { }
+            AimWeapon2(heading, pitch) { }
+        "#;
+        let probes = probe(&compile(source), &model_pieces(), &["Create".to_string()]);
+
+        assert_eq!(probes.error, None);
+        assert!(
+            probes.functions.contains(&"AimWeapon2".to_string()),
+            "{:?}",
+            probes.functions
+        );
+    }
 }

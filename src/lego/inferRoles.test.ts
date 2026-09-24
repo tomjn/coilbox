@@ -51,6 +51,7 @@ function probes(named: Record<string, string[]>): ScriptProbes {
   return {
     pieces: NAMES,
     error: null,
+    functions: [],
     probes: Object.entries(named).map(([callin, pieces]) => ({
       callin,
       pieces,

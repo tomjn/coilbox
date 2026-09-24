@@ -28,11 +28,13 @@ const runCob = vi.fn();
 const probe = vi.fn(async (_args: unknown) => ({
   pieces: [],
   probes: [],
+  functions: [],
   error: null,
 }));
 const probeCob = vi.fn(async (_args: unknown) => ({
   pieces: [],
   probes: [],
+  functions: [],
   error: null,
 }));
 
@@ -142,7 +144,12 @@ beforeEach(() => {
   probeCob.mockReset();
   runLua.mockResolvedValue(timeline());
   runCob.mockResolvedValue(timeline());
-  probeCob.mockResolvedValue({ pieces: [], probes: [], error: null });
+  probeCob.mockResolvedValue({
+    pieces: [],
+    probes: [],
+    functions: [],
+    error: null,
+  });
 });
 
 afterEach(cleanup);
