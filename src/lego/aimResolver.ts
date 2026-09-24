@@ -237,7 +237,9 @@ export function worldAt(
   // for where the run will carry it from that frame on.
   if (attach && attach.frame === undefined) {
     if (buildStart === undefined || frame < buildStart) {
-      return { standIn: { ...base, pos: null }, self: ctx.self };
+      // The buildee does not exist before `factory-build`, so there is no
+      // stand-in to report at all, not one with nowhere to stand.
+      return { standIn: null, self: ctx.self };
     }
     const resting = ctx.attachPiece(attach.from);
     if (resting) return { standIn: { ...base, pos: resting }, self: ctx.self };

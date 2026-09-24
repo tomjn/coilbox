@@ -303,7 +303,7 @@ describe("worldAt", () => {
       ...PARKED,
       attach: { from: "QueryBuildInfo", until: 150 },
     };
-    expect(worldAt(noStart, 30, CTX, 60).standIn?.pos).toBeNull();
+    expect(worldAt(noStart, 30, CTX, 60).standIn).toBeNull();
     expect(worldAt(noStart, 60, CTX, 60).standIn?.pos).toEqual([0, 20, -5]);
     expect(worldAt(noStart, 90, CTX, 60).standIn?.pos).toEqual([0, 20, -5]);
   });
@@ -315,7 +315,7 @@ describe("worldAt", () => {
       ...PARKED,
       attach: { from: "QueryBuildInfo", until: 150 },
     };
-    expect(worldAt(noStart, 120, CTX).standIn?.pos).toBeNull();
+    expect(worldAt(noStart, 120, CTX).standIn).toBeNull();
   });
 });
 
@@ -350,7 +350,7 @@ describe("withWorld", () => {
       noStart,
       CTX,
     );
-    expect(events[0].world?.standIn?.pos).toBeNull();
+    expect(events[0].world?.standIn).toBeNull();
     expect(events[3].world?.standIn?.pos).toEqual([0, 20, -5]);
   });
 });
