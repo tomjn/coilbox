@@ -528,18 +528,19 @@ export const SCENARIOS: Scenario[] = [
       // The stand-in holds its second spot from at(6) to at(10).
       ...fireVolley(7, 10),
     ],
-    // Off the ground and well out, so the second aim differs from the first in
-    // pitch as well as heading and a barrel that only turns is obvious.
+    // Both spots are on the ground and well out in front, set by eye with the
+    // user. The pitch still differs a little between the two because each is
+    // measured from the weapon's own piece.
     //
     // Back where it started by the end, so the turret tracks it round rather
     // than the stand-in jumping across the scene when the preview loops.
     standIn: {
       keys: [
-        { frame: 0, pos: [2.6, 2.2, 4] },
-        { frame: at(4), pos: [2.6, 2.2, 4] },
-        { frame: at(6), pos: [-2.6, 0.6, 4] },
-        { frame: at(10), pos: [-2.6, 0.6, 4] },
-        { frame: at(PREVIEW_SECONDS), pos: [2.6, 2.2, 4] },
+        { frame: 0, pos: [4, 0, 10] },
+        { frame: at(4), pos: [4, 0, 10] },
+        { frame: at(6), pos: [-4, 0, 10] },
+        { frame: at(10), pos: [-4, 0, 10] },
+        { frame: at(PREVIEW_SECONDS), pos: [4, 0, 10] },
       ],
     },
   },
