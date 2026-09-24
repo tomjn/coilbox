@@ -201,6 +201,13 @@ function missingName(entry: { key: string; file: string | null }): string {
   return entry.file ? `bitmaps/${entry.file}` : entry.key;
 }
 
+// The engine builds four base archives (`cont/base/CMakeLists.txt:2-5`), and
+// a game's own gamedata/resources.lua often names a bitmap that lives only
+// in one of them, such as Balanced Annihilation's laserfalloff.tga and smoke
+// set, which live in bitmaps.sdz. Tried after the game and its dependencies,
+// since a mod archive outranks base content in the engine's own VFS order.
+const BASE_ARCHIVES = ["bitmaps.sdz", "springcontent.sdz"];
+
 interface AtlasEntry {
   slot: number;
   dataUrl: string;
@@ -342,7 +349,11 @@ export async function loadEffectBitmaps(
       });
       if (extracted.errors.length > 0) {
         let found = false;
-        for (const dep of await dependencyArchiveNames()) {
+        const fallbacks = [
+          ...(await dependencyArchiveNames()),
+          ...BASE_ARCHIVES,
+        ];
+        for (const dep of fallbacks) {
           extracted = await unitsyncArchiveExtract({
             ...target,
             archive: dep,

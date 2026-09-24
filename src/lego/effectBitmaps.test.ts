@@ -277,6 +277,60 @@ describe("loadEffectBitmaps", () => {
     expect(result.atlas).not.toBeNull();
   });
 
+  it("falls back to the engine's bitmaps.sdz when neither the game nor its dependencies have the bitmap", async () => {
+    vi.mocked(unitsyncLuaExec).mockResolvedValue({
+      result: muzzleFlameResult(true),
+      errors: [],
+    });
+    vi.mocked(unitsyncArchiveExtract).mockImplementation(
+      async ({ archive }) => ({
+        size: archive === "bitmaps.sdz" ? 100 : 0,
+        errors: archive === "bitmaps.sdz" ? [] : ["not found"],
+      }),
+    );
+    vi.mocked(primeScan).mockResolvedValue({
+      maps: [],
+      games: [
+        {
+          name: "Game",
+          primaryArchive: { name: "Game.sdd" } as never,
+          dependencyArchives: [{ name: "Base.sdz" } as never],
+          info: {},
+        },
+      ],
+      errors: [],
+    });
+    vi.mocked(legoBitmapPng).mockResolvedValue({
+      dataUrl: "data:image/png;base64,x",
+      width: 16,
+      height: 16,
+    });
+    vi.spyOn(atlasBuilder, "build").mockResolvedValue({
+      texture: { dispose: vi.fn() } as never,
+      packed: {
+        width: 16,
+        height: 16,
+        rects: [
+          { slot: BITMAP_MUZZLE_FLAME, x: 0, y: 0, width: 16, height: 16 },
+        ],
+      },
+      failed: [],
+    });
+
+    const result = await loadEffectBitmaps(
+      { enginePath: "/engine", dataDir: "/data" },
+      "Game.sdd",
+    );
+
+    expect(unitsyncArchiveExtract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archive: "bitmaps.sdz",
+        file: "bitmaps/explo.tga",
+      }),
+    );
+    expect(result.atlas).not.toBeNull();
+  });
+
   it("reports a bitmap missing by its bitmaps/<file> name when it is in neither archive", async () => {
     vi.mocked(unitsyncLuaExec).mockResolvedValue({
       result: muzzleFlameResult(true),
