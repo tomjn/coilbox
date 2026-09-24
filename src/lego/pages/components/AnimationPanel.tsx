@@ -235,6 +235,10 @@ interface Props {
     nano?: NanoStyle | null;
     aims?: Aim[];
   }) => void;
+  /** What the unit's game lacks for effects to draw its own bitmaps, or null
+   *  when it has everything they need. Shown only for a scenario that fires
+   *  something drawn with a bitmap. */
+  effectsNote?: string | null;
 }
 
 export function AnimationPanel({
@@ -253,6 +257,7 @@ export function AnimationPanel({
   pack,
   raw,
   onStandIn,
+  effectsNote,
 }: Props) {
   const reduceMotion = useReduceMotion();
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
@@ -905,6 +910,13 @@ export function AnimationPanel({
               {note}
             </p>
           ))}
+
+          {effectsNote &&
+          timeline?.events.some(
+            (event) => event.kind === "flare" || event.kind === "shot",
+          ) ? (
+            <p className="text-xs text-muted-foreground">{effectsNote}</p>
+          ) : null}
 
           {compiled ? (
             <p className="text-xs text-muted-foreground">

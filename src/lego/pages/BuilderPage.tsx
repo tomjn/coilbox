@@ -118,6 +118,7 @@ import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
 import { TransformFields } from "./components/TransformFields";
+import { useEffectBitmaps } from "./components/useEffectBitmaps";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
 const NO_ROLE = "none";
@@ -166,6 +167,7 @@ function Builder({ id }: { id: string | undefined }) {
   // alongside the document, and null for a unit built out of parts.
   const geometry = useRawGeometry(draft);
   const raw = geometry.raw;
+  const effectBitmaps = useEffectBitmaps(draft);
   // A unit imported whole has no parts and no atlas, so the parts library, the
   // compound library and the atlas picker are all hidden for it. Its UVs point
   // onto its own texture rather than onto the pack's sheet, so a part dropped
@@ -1072,6 +1074,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onScriptFrame: setScriptFrame,
                   standIn: { ...standIn, show: true },
                 }}
+                effectsAtlas={effectBitmaps.atlas}
                 uniformScale={uniformScale}
                 onGround={() =>
                   edit((project) => sitOnGround(project, pack, raw))
@@ -1450,6 +1453,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onBuilderChange={(builder) =>
                     edit((project) => ({ ...project, builder }))
                   }
+                  effectsNote={effectBitmaps.note}
                 />
               ) : (
                 <>
