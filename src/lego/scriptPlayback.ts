@@ -341,6 +341,11 @@ const STAND_OFF = 5;
  *  `reloadtime` in its unit def, which the preview does not read yet. */
 const FIRE_INTERVAL_S = 0.5;
 
+/** Frames between shots in the firing scenario's volleys, for
+ *  `expandForWeapons` to spread a unit's other weapons across without
+ *  reaching the next shot. */
+export const FIRE_INTERVAL_FRAMES = at(FIRE_INTERVAL_S);
+
 /** A `fire` call-in every `FIRE_INTERVAL_S` from `startS` to `endS`
  *  inclusive, for a scenario that holds the stand-in still while it fires. */
 function fireVolley(startS: number, endS: number): ScriptEvent[] {

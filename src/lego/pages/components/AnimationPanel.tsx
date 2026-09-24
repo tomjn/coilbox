@@ -65,6 +65,7 @@ import {
   at,
   CREATED,
   clampFrame,
+  FIRE_INTERVAL_FRAMES,
   type NanoStyle,
   PREVIEW_FRAMES,
   PREVIEW_SECONDS,
@@ -476,7 +477,11 @@ export function AnimationPanel({
       const { events, notes } = resolveScenario(
         {
           ...scenario,
-          events: expandForWeapons(scenario.events, weapons),
+          events: expandForWeapons(
+            scenario.events,
+            weapons,
+            FIRE_INTERVAL_FRAMES,
+          ),
           standIn: track ?? undefined,
         },
         {
