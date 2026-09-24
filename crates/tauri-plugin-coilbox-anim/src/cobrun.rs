@@ -256,6 +256,9 @@ struct Call {
     /// How much of the data stack belongs to callers, so a return can drop
     /// everything this frame put on it.
     stack_top: usize,
+    /// The function this frame is running, which is what `SHOW` checks
+    /// (`CobThread.cpp:715-718`).
+    function: usize,
 }
 
 enum State {
@@ -291,13 +294,13 @@ struct Thread {
 
 impl Thread {
     fn new(function: usize, pc: usize, mask: u32, origin: String) -> Self {
-        let _ = function;
         Self {
             pc,
             data: Vec::new(),
             calls: vec![Call {
                 ret: None,
                 stack_top: 0,
+                function,
             }],
             params: 0,
             mask,
@@ -345,6 +348,10 @@ struct Run {
     /// Offsets, into the whole code stream, of every opcode word actually
     /// executed. Sorted by construction, since it fills from a `BTreeSet`.
     offsets_run: BTreeSet<u32>,
+    /// The functions the engine calls as `FireWeapon1` to `FireWeapon32`, in
+    /// which `SHOW` draws a flare instead of unhiding
+    /// (`CobThread.cpp:715-728`, `MAX_WEAPONS_PER_UNIT` being 32).
+    fire_functions: Vec<usize>,
 }
 
 impl Run {
@@ -364,6 +371,9 @@ impl Run {
                 ));
             }
         }
+        let fire_functions = (1..=32)
+            .filter_map(|weapon| program.script(&format!("FireWeapon{weapon}")))
+            .collect();
         Ok(Self {
             program,
             model,
@@ -379,6 +389,7 @@ impl Run {
             world: None,
             asked: Vec::new(),
             offsets_run: BTreeSet::new(),
+            fire_functions,
         })
     }
 
@@ -457,7 +468,12 @@ impl Run {
             }
             if let Some(action) = event.engine {
                 self.tick_queued_call_ins(start)?;
-                self.engine(action)?;
+                if action == EngineAction::Fire {
+                    let weapon = event.args.first().copied().unwrap_or(1.0) as u32;
+                    self.fire(weapon)?;
+                } else {
+                    self.engine(action)?;
+                }
                 continue;
             }
             if !self.start_callin(&event.callin, &event.args)? {
@@ -674,6 +690,66 @@ impl Run {
             "QueryNanoPiece waited rather than answering, so nano sprays from script piece 1, which is what the engine answers for it."
                 .to_string(),
         );
+        Ok(UNANSWERED)
+    }
+
+    /// A weapon fires: `FireWeapon`, then `Shot` with its one argument of 0,
+    /// then `QueryWeapon` for the muzzle, each call-in's first tick run inline
+    /// as the engine's `Call` runs it (`Weapon.cpp:509-511,590-595`,
+    /// `CobInstance.cpp:489-493,593`).
+    fn fire(&mut self, weapon: u32) -> Result<(), String> {
+        let queued_at = self.threads.len();
+        self.start_callin(&format!("FireWeapon{weapon}"), &[])?;
+        self.tick_queued_call_ins(queued_at)?;
+        let queued_at = self.threads.len();
+        self.start_callin(&format!("Shot{weapon}"), &[0.0])?;
+        self.tick_queued_call_ins(queued_at)?;
+        let piece = self.weapon_piece(weapon)?;
+        self.model.shot(self.frame, weapon, piece);
+        Ok(())
+    }
+
+    /// The muzzle piece, as `CWeapon::UpdateWeaponPieces` settles it: what
+    /// `QueryWeapon` answers, or the `AimFromWeapon` piece when that is not a
+    /// piece (`Weapon.cpp:235-260`).
+    fn weapon_piece(&mut self, weapon: u32) -> Result<Option<usize>, String> {
+        let muzzle = self.ask_piece(&format!("QueryWeapon{weapon}"), "the shot")?;
+        if let Some(piece) = model_piece(&self.program, muzzle) {
+            return Ok(Some(piece));
+        }
+        let aim_from = self.ask_piece(&format!("AimFromWeapon{weapon}"), "the shot")?;
+        Ok(model_piece(&self.program, aim_from))
+    }
+
+    /// Ask a call-in for a piece, straight away, as the engine's `Call` does.
+    ///
+    /// Seeded `[-1]`, one parameter, and the first slot is the answer, the
+    /// same shape `QueryNanoPiece` and `QueryTransport` are asked in
+    /// (`CobInstance.cpp:437-446`). A script with no call-in of that name, or
+    /// one that waits, leaves the seed there, so it answers script piece 1.
+    fn ask_piece(&mut self, callin: &str, what: &str) -> Result<i32, String> {
+        const UNANSWERED: i32 = 1;
+        let Some(function) = self.program.script(callin) else {
+            self.model.note(format!(
+                "This script has no {callin} call-in, so {what} comes from script piece 1, which is what the engine answers for it."
+            ));
+            return Ok(UNANSWERED);
+        };
+        let mut thread = Thread::new(function, self.program.offsets[function], 0, callin.into());
+        thread.data = vec![-1];
+        thread.params = 1;
+        self.add(thread)?;
+        let index = self.threads.len() - 1;
+        self.step_thread(index)?;
+        for thread in std::mem::take(&mut self.queued) {
+            self.add(thread)?;
+        }
+        if matches!(self.threads[index].state, State::Dead) {
+            return Ok(self.threads[index].data.first().copied().unwrap_or(0));
+        }
+        self.model.note(format!(
+            "{callin} waited rather than answering, so {what} comes from script piece 1, which is what the engine answers for it."
+        ));
         Ok(UNANSWERED)
     }
 
@@ -1010,7 +1086,13 @@ impl Run {
                 let hide = word == op("HIDE");
                 let piece = self.word(i)?;
                 if let Some(piece) = model_piece(&self.program, piece) {
-                    self.model.set_hidden(piece, hide);
+                    let function = self.threads[i].calls.last().map(|call| call.function);
+                    let in_fire = function.is_some_and(|f| self.fire_functions.contains(&f));
+                    if !hide && in_fire {
+                        self.model.show_flare(self.frame, piece);
+                    } else {
+                        self.model.set_hidden(piece, hide);
+                    }
                 }
             }
             // Scaling arrived in Recoil and no `.cob` in the wild uses it, but
@@ -1077,6 +1159,7 @@ impl Run {
                     Some(Call {
                         ret: Some(ret),
                         stack_top,
+                        ..
                     }) => {
                         self.threads[i].pc = ret;
                         self.threads[i].data.truncate(stack_top);
@@ -1302,6 +1385,7 @@ impl Run {
         self.threads[i].calls.push(Call {
             ret: Some(ret),
             stack_top,
+            function,
         });
         self.threads[i].params = args as i32;
         self.threads[i].pc = self.program.offsets[function];

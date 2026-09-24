@@ -1841,3 +1841,161 @@ mod engine_factory {
         assert!(close(pose(&timeline, 4, "turret")[2], 3.0));
     }
 }
+
+mod engine_fire {
+    use super::*;
+    use coilbox_unitpose::{EngineAction, ScriptOutput};
+    use std::path::Path;
+
+    fn compile(source: &str) -> Vec<u8> {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+        crate::compile_bos(source, &dir).unwrap()
+    }
+
+    fn fire(frame: u32, weapon: f64) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: vec![weapon],
+            ambient: false,
+            world: None,
+            engine: Some(EngineAction::Fire),
+        }
+    }
+
+    fn fired(bytes: &[u8], events: &[ScriptEvent], frames: u32) -> Timeline {
+        let mut all = created();
+        all.extend_from_slice(events);
+        run(bytes, &model_pieces(), &all, frames, &[], &HashMap::new())
+    }
+
+    fn hidden(timeline: &Timeline, frame: usize, piece: &str) -> bool {
+        let index = timeline.pieces.iter().position(|p| p == piece).unwrap();
+        timeline.hidden[frame][index]
+    }
+
+    const GUN: &str = r#"
+        piece base, turret, barrel;
+        Create() { hide barrel; }
+        QueryWeapon1(piecenum) { piecenum = barrel; }
+        AimFromWeapon1(piecenum) { piecenum = turret; }
+        FirePrimary() { show barrel; }
+        Shot1(zero) { show turret; }
+    "#;
+
+    /// `show` inside a fire function draws a flare and leaves the piece
+    /// hidden (`CobThread.cpp:715-728`). Anywhere else it unhides.
+    #[test]
+    fn show_in_a_fire_function_records_a_flare_and_leaves_the_piece_hidden() {
+        let timeline = fired(&compile(GUN), &[fire(5, 1.0)], 8);
+
+        assert_eq!(timeline.error, None);
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "barrel".into()
+        }));
+        assert!(hidden(&timeline, 7, "barrel"));
+    }
+
+    /// `Shot1` is not a fire function, so its `show` unhides.
+    #[test]
+    fn show_outside_a_fire_function_still_unhides() {
+        let source = GUN.replace("show turret", "hide turret; show turret");
+        let timeline = fired(&compile(&source), &[fire(5, 1.0)], 8);
+
+        assert!(!hidden(&timeline, 7, "turret"));
+        assert!(!timeline
+            .events
+            .iter()
+            .any(|e| matches!(e, ScriptOutput::Flare { piece, .. } if piece == "turret")));
+    }
+
+    /// A function a fire function calls is not itself a fire function: the
+    /// engine checks the innermost call frame.
+    #[test]
+    fn show_in_a_function_called_from_a_fire_function_unhides() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { hide barrel; }
+            Flash() { show barrel; }
+            FireWeapon1() { call-script Flash(); }
+        "#;
+        let timeline = fired(&compile(source), &[fire(5, 1.0)], 8);
+
+        assert!(!hidden(&timeline, 7, "barrel"));
+        assert!(!timeline
+            .events
+            .iter()
+            .any(|e| matches!(e, ScriptOutput::Flare { .. })));
+    }
+
+    /// `FireWeapon`, then `Shot`, then `QueryWeapon`, on the one frame
+    /// (`Weapon.cpp:509-511,590-595`). The shot names what `QueryWeapon1`
+    /// answered after `Shot1` ran.
+    #[test]
+    fn fire_calls_fire_then_shot_then_query_weapon_on_its_frame() {
+        let source = r#"
+            piece base, turret, barrel;
+            static-var muzzle;
+            Create() { muzzle = turret; }
+            FireWeapon1() { muzzle = base; }
+            Shot1(zero) { muzzle = barrel; }
+            QueryWeapon1(piecenum) { piecenum = muzzle; }
+        "#;
+        let timeline = fired(&compile(source), &[fire(5, 1.0)], 8);
+
+        assert_eq!(
+            timeline
+                .events
+                .iter()
+                .filter(|e| matches!(e, ScriptOutput::Shot { .. }))
+                .cloned()
+                .collect::<Vec<_>>(),
+            [ScriptOutput::Shot {
+                frame: 5,
+                weapon: 1,
+                piece: Some("barrel".into())
+            }]
+        );
+    }
+
+    /// A missing `QueryWeapon` answers script piece 1, as the engine's seed
+    /// leaves it (`CobInstance.cpp:437-446`).
+    #[test]
+    fn a_missing_query_weapon_answers_script_piece_one() {
+        let source = "piece base, turret, barrel;\nCreate() { }\n";
+        let timeline = fired(&compile(source), &[fire(5, 1.0)], 8);
+
+        assert!(timeline.events.contains(&ScriptOutput::Shot {
+            frame: 5,
+            weapon: 1,
+            piece: Some("turret".into())
+        }));
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryWeapon1")));
+    }
+
+    /// The weapon number picks the call-ins: weapon 2 runs `FireWeapon2`.
+    #[test]
+    fn the_weapon_number_picks_the_call_ins() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { hide barrel; hide turret; }
+            FireWeapon1() { show turret; }
+            FireWeapon2() { show barrel; }
+            QueryWeapon2(piecenum) { piecenum = barrel; }
+        "#;
+        let timeline = fired(&compile(source), &[fire(5, 2.0)], 8);
+
+        assert!(timeline.events.contains(&ScriptOutput::Flare {
+            frame: 5,
+            piece: "barrel".into()
+        }));
+        assert!(!timeline
+            .events
+            .iter()
+            .any(|e| matches!(e, ScriptOutput::Flare { piece, .. } if piece == "turret")));
+    }
+}

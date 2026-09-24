@@ -105,6 +105,11 @@ pub enum EngineAction {
     /// `StopBuilding`.
     #[serde(rename = "factory-finish")]
     FactoryFinish,
+    /// A weapon fires. The engine calls `FireWeapon`, then `Shot`, then asks
+    /// `QueryWeapon` for the muzzle, all on one frame
+    /// (`rts/Sim/Weapons/Weapon.cpp:509-511,590-595`). The weapon number,
+    /// counted from one, is the event's first argument.
+    Fire,
 }
 
 /// What the preview's scene holds on one event's frame, for a script that asks.
@@ -193,6 +198,17 @@ pub enum ScriptOutput {
     /// The piece one frame's nano particle comes from, as `NanoPieceCache`
     /// chose it. None when the script has named no piece of this unit yet.
     Nano { frame: u32, piece: Option<String> },
+    /// `show` inside a fire function, or `ShowFlare`. The engine draws a
+    /// muzzle flame at the piece rather than unhiding it
+    /// (`rts/Sim/Units/Scripts/CobThread.cpp:715-728`).
+    Flare { frame: u32, piece: String },
+    /// A shot, and the piece `QueryWeapon` named for its muzzle, or none when
+    /// neither it nor `AimFromWeapon` named a piece of this unit.
+    Shot {
+        frame: u32,
+        weapon: u32,
+        piece: Option<String>,
+    },
     /// `build-start`. The frame the factory started building, once its
     /// script set `INBUILDSTANCE`. Not an effect: the preview draws the
     /// spraying it starts rather than marking it on the scrubber.
@@ -557,6 +573,23 @@ impl Model {
     pub fn emit_sfx(&mut self, frame: u32, piece: usize, sfx: i32) {
         let piece = self.pieces[piece].name.clone();
         self.events.push(ScriptOutput::Sfx { frame, piece, sfx });
+    }
+
+    pub fn show_flare(&mut self, frame: u32, piece: usize) {
+        let piece = self.pieces[piece].name.clone();
+        self.events.push(ScriptOutput::Flare { frame, piece });
+    }
+
+    pub fn shot(&mut self, frame: u32, weapon: u32, piece: Option<usize>) {
+        if piece.is_none() {
+            self.note("The script named no weapon piece.".to_string());
+        }
+        let piece = piece.map(|index| self.pieces[index].name.clone());
+        self.events.push(ScriptOutput::Shot {
+            frame,
+            weapon,
+            piece,
+        });
     }
 
     pub fn explode(&mut self, frame: u32, piece: usize, flags: i32) {
@@ -1051,6 +1084,24 @@ mod tests {
             serde_json::to_value(&sfx).unwrap(),
             serde_json::json!({ "kind": "sfx", "frame": 1, "piece": "flare", "sfx": 1025 })
         );
+    }
+
+    #[test]
+    fn serialises_a_flare_and_a_shot_with_their_kinds() {
+        let flare = serde_json::to_value(ScriptOutput::Flare {
+            frame: 3,
+            piece: "flare1".into(),
+        })
+        .unwrap();
+        assert_eq!(flare["kind"], "flare");
+        let shot = serde_json::to_value(ScriptOutput::Shot {
+            frame: 3,
+            weapon: 1,
+            piece: None,
+        })
+        .unwrap();
+        assert_eq!(shot["kind"], "shot");
+        assert_eq!(shot["piece"], serde_json::Value::Null);
     }
 }
 
